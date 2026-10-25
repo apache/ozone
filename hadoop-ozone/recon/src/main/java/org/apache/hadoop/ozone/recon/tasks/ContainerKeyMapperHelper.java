@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -239,8 +239,8 @@ public abstract class ContainerKeyMapperHelper {
     Map<ContainerKeyPrefix, Integer> localContainerKeyMap = new HashMap<>();
     // Local map: containerId -> key count (per event batch)
     Map<Long, Long> localContainerKeyCountMap = new HashMap<>();
-    // List of the deleted (container, key) pair's
-    List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
+    // Set of the deleted (container, key) pairs
+    Set<ContainerKeyPrefix> deletedKeyCountList = new HashSet<>();
     long startTime = Time.monotonicNow();
 
     while (eventIterator.hasNext()) {
@@ -265,8 +265,7 @@ public abstract class ContainerKeyMapperHelper {
 
         case UPDATE:
           if (omdbUpdateEvent.getOldValue() != null) {
-            handleDeleteOMKeyEvent(
-                omdbUpdateEvent.getOldValue().getKeyName(), localContainerKeyMap,
+            handleDeleteOMKeyEvent(updatedKey, localContainerKeyMap,
                 localContainerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
           } else {
             LOG.warn("Update event does not have the old Key Info for {}.", updatedKey);
@@ -313,7 +312,7 @@ public abstract class ContainerKeyMapperHelper {
   private static void handlePutOMKeyEvent(String key, OmKeyInfo omKeyInfo,
                                           Map<ContainerKeyPrefix, Integer> containerKeyMap,
                                           Map<Long, Long> containerKeyCountMap,
-                                          List<ContainerKeyPrefix> deletedContainerKeyList,
+                                          Set<ContainerKeyPrefix> deletedContainerKeyList,
                                           ReconContainerMetadataManager reconContainerMetadataManager)
       throws IOException {
     long containerCountToIncrement = 0;
@@ -323,7 +322,9 @@ public abstract class ContainerKeyMapperHelper {
         for (OmKeyLocationInfo omKeyLocationInfo : locationList) {
           long containerId = omKeyLocationInfo.getContainerID();
           ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
-          if (reconContainerMetadataManager.getCountForContainerKeyPrefix(containerKeyPrefix) == 0 &&
+          // A mapping deleted earlier in this batch stays in the DB until the batch is written, so add it again.
+          if ((reconContainerMetadataManager.getCountForContainerKeyPrefix(containerKeyPrefix) == 0 ||
+              deletedContainerKeyList.contains(containerKeyPrefix)) &&
               !containerKeyMap.containsKey(containerKeyPrefix)) {
             // Save on writes. No need to save same container-key prefix
             // mapping again.
@@ -375,7 +376,7 @@ public abstract class ContainerKeyMapperHelper {
   private static void handleDeleteOMKeyEvent(String key,
                                              Map<ContainerKeyPrefix, Integer> containerKeyMap,
                                              Map<Long, Long> containerKeyCountMap,
-                                             List<ContainerKeyPrefix> deletedContainerKeyList,
+                                             Set<ContainerKeyPrefix> deletedContainerKeyList,
                                              ReconContainerMetadataManager reconContainerMetadataManager)
       throws IOException {
 
@@ -389,8 +390,10 @@ public abstract class ContainerKeyMapperHelper {
         Table.KeyValue<KeyPrefixContainer, Integer> keyValue = keyContainerIterator.next();
         String keyPrefix = keyValue.getKey().getKeyPrefix();
         if (keyPrefix.equals(key)) {
-          if (keyValue.getKey().getContainerId() != -1) {
-            keysToBeDeleted.add(keyValue.getKey().toContainerKeyPrefix());
+          // Skip a mapping that an earlier event in this batch already deleted, so its count drops only once.
+          ContainerKeyPrefix containerKeyPrefix = keyValue.getKey().toContainerKeyPrefix();
+          if (keyValue.getKey().getContainerId() != -1 && !deletedContainerKeyList.contains(containerKeyPrefix)) {
+            keysToBeDeleted.add(containerKeyPrefix);
           }
         } else {
           break;
@@ -428,7 +431,7 @@ public abstract class ContainerKeyMapperHelper {
 
   private static void writeToTheDB(Map<ContainerKeyPrefix, Integer> localContainerKeyMap,
                                    Map<Long, AtomicLong> containerKeyCountMap,
-                                   List<ContainerKeyPrefix> deletedContainerKeyList,
+                                   Collection<ContainerKeyPrefix> deletedContainerKeyList,
                                    ReconContainerMetadataManager reconContainerMetadataManager)
       throws IOException {
 
