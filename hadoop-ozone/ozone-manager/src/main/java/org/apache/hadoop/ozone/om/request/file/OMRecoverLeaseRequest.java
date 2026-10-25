@@ -106,11 +106,23 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
             keyPath, getBucketLayout());
 
     // check ACL
-    checkKeyAcls(ozoneManager,
-        recoverLeaseRequest.getVolumeName(),
-        recoverLeaseRequest.getBucketName(),
-        recoverLeaseRequest.getKeyName(),
-        IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
+    try {
+      checkKeyAcls(ozoneManager,
+          recoverLeaseRequest.getVolumeName(),
+          recoverLeaseRequest.getBucketName(),
+          recoverLeaseRequest.getKeyName(),
+          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
+    } catch (IOException ex) {
+      // Ensure audit log captures preExecute failures
+      Map<String, String> auditMap = new LinkedHashMap<>();
+      auditMap.put(OzoneConsts.VOLUME, recoverLeaseRequest.getVolumeName());
+      auditMap.put(OzoneConsts.BUCKET, recoverLeaseRequest.getBucketName());
+      auditMap.put(OzoneConsts.KEY, recoverLeaseRequest.getKeyName());
+      markForAudit(ozoneManager.getAuditLogger(),
+          buildAuditMessage(OMAction.RECOVER_LEASE, auditMap, ex,
+              getOmRequest().getUserInfo()));
+      throw ex;
+    }
 
     return request.toBuilder()
         .setRecoverLeaseRequest(

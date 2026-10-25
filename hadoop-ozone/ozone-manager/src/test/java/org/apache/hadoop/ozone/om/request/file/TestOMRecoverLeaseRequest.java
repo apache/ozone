@@ -21,6 +21,9 @@ import static org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSi
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.verify;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -34,6 +37,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -56,6 +63,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseResponse;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -71,6 +80,25 @@ public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() {
+    OMRecoverLeaseRequest req = new OMRecoverLeaseRequest(
+        createRecoverLeaseRequest(volumeName, bucketName, keyName, false)) {
+      @Override
+      protected void checkKeyAcls(OzoneManager ozoneManager, String volume,
+          String bucket, String key, IAccessAuthorizer.ACLType aclType,
+          OzoneObj.ResourceType type) throws IOException {
+        throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
+
+    OMException e = assertThrows(OMException.class, () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
+    // Simulate what OMExecutionFlow does in its catch block: flush the audit builder
+    OMAuditLogger.log(req.getAuditBuilder());
+    verify(auditLogger).logWrite(any(AuditMessage.class));
   }
 
   /**
