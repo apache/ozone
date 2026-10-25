@@ -35,8 +35,9 @@ if [[ "$@" =~ -Ptest-([a-z]+) ]]; then
     # but skip shaded ones
     args="$args -DskipShade"
   else
-    # apply profile only to the "main" integration test module
-    args="$args -pl :ozone-integration-test"
+    # apply profile only to the integration test module
+    # ozone-main is needed for fetching libhadoop
+    args="$args -pl :ozone-main,:ozone-integration-test"
 
     if [[ "${CI:-}" != "true" ]]; then
       # build requirements, too
