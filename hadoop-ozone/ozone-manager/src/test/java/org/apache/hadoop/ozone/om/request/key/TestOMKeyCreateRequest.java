@@ -72,16 +72,19 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -118,6 +121,30 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     ReplicationConfig ratis3Config =
         ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
     preExecuteTest(false, 0, ratis3Config);
+  }
+
+  @Test
+  public void testMissingPipelineDuringCreateKeyReturnsRetryableErrorBeforeRatisSubmission() throws Exception {
+    OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
+        anyString(), any(ExcludeList.class), anyString()))
+        .thenThrow(new SCMException("waited pipeline disappeared", SCMException.ResultCodes.PIPELINE_NOT_FOUND));
+    OMRequest request = createKeyRequest(false, 0, 100, replicationConfig, null).toBuilder()
+        .setVersion(ClientVersion.CURRENT.serialize()).build();
+
+    OzoneManagerProtocolProtos.OMResponse response = new OMExecutionFlow(ozoneManager).submit(request, true);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALLOCATION_PIPELINE_NOT_FOUND, response.getStatus());
+    assertFalse(response.getSuccess());
+    verify(ozoneManager, never()).getOmRatisServer();
+
+    OMRequest oldClientRequest = request.toBuilder()
+        .setVersion(ClientVersion.BUCKET_LAYOUT_SUPPORT.serialize()).build();
+    OzoneManagerProtocolProtos.OMResponse oldClientResponse =
+        new OMExecutionFlow(ozoneManager).submit(oldClientRequest, true);
+    assertEquals(OzoneManagerProtocolProtos.Status.INTERNAL_ERROR, oldClientResponse.getStatus());
+    verify(ozoneManager, never()).getOmRatisServer();
   }
 
   @Test

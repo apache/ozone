@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALLOCATION_PIPELINE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_IN_SAFE_MODE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
@@ -277,6 +278,8 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The client side implementation of OzoneManagerProtocol.
@@ -285,6 +288,8 @@ import org.apache.hadoop.util.Time;
 @InterfaceAudience.Private
 public final class OzoneManagerProtocolClientSideTranslatorPB
     implements OzoneManagerClientProtocol {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneManagerProtocolClientSideTranslatorPB.class);
 
   private final String clientID;
   private OmTransport transport;
@@ -296,12 +301,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   public static final int BLOCK_ALLOCATION_RETRY_COUNT = 90;
   public static final int BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS = 1000;
+  private final int blockAllocationRetryCount;
+  private final int blockAllocationRetryWaitTimeMs;
 
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
       String clientId) {
+    this(omTransport, clientId, BLOCK_ALLOCATION_RETRY_COUNT, BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS);
+  }
+
+  @VisibleForTesting
+  OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport, String clientId,
+      int retryCount, int retryWaitTimeMs) {
     this.clientID = clientId;
     this.transport = omTransport;
     this.s3AuthCheck = false;
+    this.blockAllocationRetryCount = retryCount;
+    this.blockAllocationRetryWaitTimeMs = retryWaitTimeMs;
   }
 
   /**
@@ -802,7 +817,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCreateKeyRequest(req)
         .build();
 
-    CreateKeyResponse keyResponse = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getCreateKeyResponse();
+    CreateKeyResponse keyResponse = handleSubmitRequestWithBlockAllocationRetry(omRequest).getCreateKeyResponse();
     OpenKeySession openKeySession = new OpenKeySession(keyResponse.getID(),
         OmKeyInfo.getFromProtobuf(keyResponse.getKeyInfo()),
         keyResponse.getOpenVersion());
@@ -851,7 +866,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setAllocateBlockRequest(req)
         .build();
 
-    AllocateBlockResponse resp = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getAllocateBlockResponse();
+    AllocateBlockResponse resp = handleSubmitRequestWithBlockAllocationRetry(omRequest).getAllocateBlockResponse();
     return OmKeyLocationInfo.getFromProtobuf(resp.getKeyLocation());
   }
 
@@ -2627,33 +2642,36 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(Type.CreateFile)
         .setCreateFileRequest(createFileRequest)
         .build();
-    CreateFileResponse resp = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getCreateFileResponse();
+    CreateFileResponse resp = handleSubmitRequestWithBlockAllocationRetry(omRequest).getCreateFileResponse();
 
     return new OpenKeySession(resp.getID(),
         OmKeyInfo.getFromProtobuf(resp.getKeyInfo()), resp.getOpenVersion());
   }
 
   @Nonnull
-  private OMResponse handleSubmitRequestAndSCMSafeModeRetry(OMRequest omRequest) throws IOException {
-    int retryCount = BLOCK_ALLOCATION_RETRY_COUNT;
+  private OMResponse handleSubmitRequestWithBlockAllocationRetry(OMRequest omRequest) throws IOException {
+    int retryCount = blockAllocationRetryCount;
     while (true) {
       try {
         return handleError(submitRequest(omRequest));
       } catch (OMException e) {
-        if (e.getResult().equals(SCM_IN_SAFE_MODE) && retryCount > 0) {
-          System.err.println("SCM is in safe mode. Will retry in " +
-              BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS + "ms");
-          retryCount--;
-          try {
-            Thread.sleep(BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS);
-            continue;
-          } catch (InterruptedException ex) {
-            throw new OMException(ex.getMessage(), ResultCodes.SCM_IN_SAFE_MODE);
-          }
-        } else if (e.getResult().equals(SCM_IN_SAFE_MODE) && retryCount == 0) {
-          throw new OMException(e.getMessage(), ResultCodes.SCM_IN_SAFE_MODE);
+        if ((e.getResult() != SCM_IN_SAFE_MODE && e.getResult() != KEY_ALLOCATION_PIPELINE_NOT_FOUND)
+            || retryCount == 0) {
+          throw e;
         }
-        throw e;
+        if (retryCount == blockAllocationRetryCount) {
+          LOG.warn("Block allocation failed with {}. Retrying up to {} times at {}ms intervals",
+              e.getResult(), retryCount, blockAllocationRetryWaitTimeMs);
+        } else {
+          LOG.debug("Block allocation failed with {}. Retries remaining: {}", e.getResult(), retryCount);
+        }
+        retryCount--;
+        try {
+          Thread.sleep(blockAllocationRetryWaitTimeMs);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+          throw e;
+        }
       }
     }
   }
