@@ -161,27 +161,22 @@ public class TestGrpcOMFollowerReadFailoverProxyProvider {
     assertEquals(2, leaderRequests.size());
   }
 
-  @Test
-  void testLeaderNotReadyExceptionFallsBackToLeader() throws Exception {
-    failures.put(nodeIds.get(0), toServerError(new OMLeaderNotReadyException("leader is not ready")));
-
-    submit(newRequest(Type.ListVolume));
-
-    assertEquals(1, countNodeRequests());
-    assertEquals(1, leaderRequests.size());
-    assertEquals(nodeIds.get(0), provider.getCurrentFollowerReadNodeId());
-    assertTrue(provider.isOmServiceSupportsFollowerRead());
-  }
-
-  @Test
-  void testFailureWithoutFailoverIsThrown() {
-    final StatusRuntimeException failure = Status.RESOURCE_EXHAUSTED.asRuntimeException();
+  @ParameterizedTest
+  @MethodSource("failuresToThrow")
+  void testFailureIsThrown(StatusRuntimeException failure) {
     failures.put(nodeIds.get(0), failure);
 
     assertSame(failure, assertThrows(StatusRuntimeException.class, () -> submit(newRequest(Type.ListVolume))));
     assertEquals(1, countNodeRequests());
     assertEquals(0, leaderRequests.size());
     assertEquals(nodeIds.get(0), provider.getCurrentFollowerReadNodeId());
+    assertTrue(provider.isOmServiceSupportsFollowerRead());
+  }
+
+  static Stream<StatusRuntimeException> failuresToThrow() {
+    return Stream.of(
+        Status.RESOURCE_EXHAUSTED.asRuntimeException(),
+        toServerError(new OMLeaderNotReadyException("leader is not ready")));
   }
 
   private void submit(OMRequest request) throws IOException {
