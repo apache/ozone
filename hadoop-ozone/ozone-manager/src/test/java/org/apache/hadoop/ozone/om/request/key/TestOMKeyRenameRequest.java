@@ -22,10 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -33,6 +37,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +60,25 @@ public class TestOMKeyRenameRequest extends OMKeyRequestTests {
     toKeyName = new Path("toKey").toString();
     fromKeyInfo = getOmKeyInfo(fromKeyName).build();
     dbToKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
+  }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() {
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    OMKeyRenameRequest req = new OMKeyRenameRequest(
+        createRenameKeyRequest(volumeName, bucketName, fromKeyName, toKeyName),
+        getBucketLayout()) {
+      @Override
+      protected void checkKeyAcls(OzoneManager ozoneManager, String volume,
+          String bucket, String key, IAccessAuthorizer.ACLType aclType,
+          OzoneObj.ResourceType type) throws IOException {
+        throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
+
+    OMException e = assertThrows(OMException.class, () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test
