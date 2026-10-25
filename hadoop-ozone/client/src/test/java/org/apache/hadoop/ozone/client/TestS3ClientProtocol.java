@@ -61,7 +61,6 @@ class TestS3ClientProtocol {
   @ParameterizedTest(name = "{0} [reverseBooleans={1}]")
   @MethodSource("methods")
   void forwardsEveryMethod(Method method, boolean reverseBooleans) throws Exception {
-    S3ClientProtocol.class.getDeclaredMethod(method.getName(), method.getParameterTypes());
     Class<?>[] types = method.getParameterTypes();
     Object[] args = new Object[types.length];
     for (int i = 0; i < types.length; i++) {
