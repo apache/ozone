@@ -132,7 +132,10 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     String bucketName = UUID.randomUUID().toString();
 
     OMBucketCreateRequest omBucketCreateRequest = doPreExecute(newBucketInfoBuilder(bucketName, volumeName)
-        .setUsedBytes(1000L).setUsedNamespace(10L).setSnapshotUsedBytes(100L).setSnapshotUsedNamespace(1L));
+        .setUsedBytes(1000L)
+        .setUsedNamespace(10L)
+        .setSnapshotUsedBytes(100L)
+        .setSnapshotUsedNamespace(1L));
     doValidateAndUpdateCache(volumeName, bucketName, omBucketCreateRequest.getOmRequest());
 
     OmBucketInfo bucketInfo =
