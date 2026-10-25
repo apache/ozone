@@ -83,7 +83,6 @@ CI-aligned local checks live under
 [`hadoop-ozone/dev-support/checks/`](./hadoop-ozone/dev-support/checks/).
 Prefer these when validating a change because they match CI layout and reporting:
 
-- `./hadoop-ozone/dev-support/checks/unit.sh`
 - `./hadoop-ozone/dev-support/checks/integration.sh`
 - `./hadoop-ozone/dev-support/checks/checkstyle.sh`
 - `./hadoop-ozone/dev-support/checks/rat.sh`
