@@ -284,14 +284,10 @@ public class XceiverClientManager extends XceiverClientCreator {
     }
     localDNCache.clear();
     cacheMetrics.unregister();
-
-    if (metrics != null) {
-      metrics.unRegister();
-    }
   }
 
   /**
-   * Get xceiver client metric.
+   * Get xceiver client metrics shared by all managers for the lifetime of the JVM.
    */
   public static synchronized XceiverClientMetrics getXceiverClientMetrics() {
     if (metrics == null) {
