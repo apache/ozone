@@ -314,6 +314,13 @@ public final class OzoneManagerRatisUtils {
       OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
           omRequest.getDeleteKeysRequest()
               .getDeleteKeys();
+      if (omRequest.getAssumeS3Context()) {
+        // Resolve before choosing the bucket layout and write the resolved volume to Ratis.
+        deleteKeyArgs = deleteKeyArgs.toBuilder().setVolumeName(
+            ozoneManager.getS3VolumeContext().getOmVolumeArgs().getVolume()).build();
+        omRequest = omRequest.toBuilder().setDeleteKeysRequest(
+            omRequest.getDeleteKeysRequest().toBuilder().setDeleteKeys(deleteKeyArgs)).build();
+      }
       volumeName = deleteKeyArgs.getVolumeName();
       bucketName = deleteKeyArgs.getBucketName();
       break;

@@ -28,11 +28,17 @@ public class OmDeleteKeys {
   private String bucket;
 
   private List<String> keyNames;
+  private final boolean assumeS3Context;
 
   public OmDeleteKeys(String volume, String bucket, List<String> keyNames) {
+    this(volume, bucket, keyNames, false);
+  }
+
+  public OmDeleteKeys(String volume, String bucket, List<String> keyNames, boolean assumeS3Context) {
     this.volume = volume;
     this.bucket = bucket;
     this.keyNames = keyNames;
+    this.assumeS3Context = assumeS3Context;
   }
 
   public String getVolume() {
@@ -45,5 +51,9 @@ public class OmDeleteKeys {
 
   public List< String > getKeyNames() {
     return keyNames;
+  }
+
+  public boolean isAssumeS3Context() {
+    return assumeS3Context;
   }
 }

@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -909,6 +911,53 @@ public class TestRpcClient {
       ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
       verify(om).deleteObjectTagging(args.capture());
       assertThat(args.getValue().getVolumeName()).isEqualTo("s3v");
+      assertThat(args.getValue().isAssumeS3Context()).isFalse();
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"LIST_STATUS_REJECTS_OBS", "S3_VOLUME_CONTEXT_RESOLUTION", "S3_IF_NONE_MATCH_ETAG"})
+  void testDeleteKeysWithNullVolume(OzoneManagerVersion version) throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+      List<String> keys = Arrays.asList("key", "missing");
+
+      if (OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version)) {
+        client.deleteKeys(null, "bucket", keys, true);
+
+        ArgumentCaptor<OmDeleteKeys> args = ArgumentCaptor.forClass(OmDeleteKeys.class);
+        verify(om).deleteKeys(args.capture(), eq(true));
+        assertThat(args.getValue().getVolume()).isEqualTo("s3v");
+        assertThat(args.getValue().getBucket()).isEqualTo("bucket");
+        assertThat(args.getValue().getKeyNames()).containsExactlyElementsOf(keys);
+        assertThat(args.getValue().isAssumeS3Context()).isTrue();
+      } else {
+        assertThrows(NullPointerException.class, () -> client.deleteKeys(null, "bucket", keys, true));
+        verifyNoInteractions(om);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  void testDeleteKeysPreservesExplicitVolume() throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      client.deleteKeys("s3v", "bucket", Collections.singletonList("key"), true);
+
+      ArgumentCaptor<OmDeleteKeys> args = ArgumentCaptor.forClass(OmDeleteKeys.class);
+      verify(om).deleteKeys(args.capture(), eq(true));
+      assertThat(args.getValue().getVolume()).isEqualTo("s3v");
       assertThat(args.getValue().isAssumeS3Context()).isFalse();
     } finally {
       client.close();

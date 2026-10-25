@@ -39,6 +39,8 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -134,6 +136,26 @@ class TestS3ClientProtocol {
     assertThat(assertThrows(IOException.class, () -> versionedClient.deleteKey(null, "bucket", "key", false)))
         .isSameAs(failure);
     verify(delegate, never()).deleteKey(any(), anyString(), anyString(), anyBoolean());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {"ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
+  void resolvesBatchVolumeForOlderOm(OzoneManagerVersion version) throws Exception {
+    List<String> keys = Collections.singletonList("key");
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(delegate.getS3VolumeContext()).thenReturn(volumeContext("tenant-volume"));
+    when(delegate.getBucketDetails("tenant-volume", "bucket")).thenReturn(bucket);
+    ClientProtocol versionedClient = createClient(version);
+
+    versionedClient.deleteKeys(null, "bucket", keys, true);
+
+    if (OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version)) {
+      verify(delegate).deleteKeys(null, "bucket", keys, true);
+      verify(delegate, never()).getS3VolumeContext();
+    } else {
+      verify(bucket).deleteKeys(keys, true);
+      verify(delegate, never()).deleteKeys(any(), anyString(), any(), anyBoolean());
+    }
   }
 
   @ParameterizedTest(name = "{0} [reverseBooleans={1}]")

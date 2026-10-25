@@ -397,6 +397,22 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
+  void deleteKeysSetsS3Context(boolean assumeS3Context) throws IOException {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    List<String> keys = Arrays.asList("key", "missing");
+    client.deleteKeys(new OmDeleteKeys("s3v", "bucket", keys, assumeS3Context), true);
+
+    OMRequest request = transport.getLastRequest();
+    assertThat(request.getCmdType()).isEqualTo(Type.DeleteKeys);
+    assertThat(request.getAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.hasAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.getDeleteKeysRequest().getDeleteKeys().getKeysList()).containsExactlyElementsOf(keys);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
   void deleteKeySetsS3Context(boolean assumeS3Context) throws IOException {
     CapturingTransport transport = new CapturingTransport();
     OzoneManagerProtocolClientSideTranslatorPB client =

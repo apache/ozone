@@ -188,7 +188,7 @@ public class TestPermissionCheck {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     final Map<String, ErrorInfo> deleteErrors = Collections.singletonMap(
         "deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
-    when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
+    when(clientProtocol.deleteKeys(isNull(), anyString(), any(), eq(true))).thenReturn(deleteErrors);
 
     final BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
@@ -206,7 +206,7 @@ public class TestPermissionCheck {
       throws IOException {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     doThrow(new IOException("DeleteObjects failed", new OMException("OM failure", resultCode)))
-        .when(bucket).deleteKeys(any(), anyBoolean());
+        .when(clientProtocol).deleteKeys(isNull(), anyString(), any(), eq(true));
 
     final BucketEndpoint bucketEndpoint = spy(new BucketEndpoint());
     EndpointBuilder.newBucketEndpointBuilder()
