@@ -157,7 +157,7 @@ public class TestFollowerReadFailoverProxyProviderBase {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID), String.join(",", omNodeIds));
     for (String nodeId : omNodeIds) {
-      conf.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID, nodeId), "0.0.0.0:8080");
+      conf.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID, nodeId), "localhost:8080");
     }
     return new HadoopRpcOMFailoverProxyProvider<>(conf, UserGroupInformation.getCurrentUser(),
         OM_SERVICE_ID, OzoneManagerProtocolPB.class);
