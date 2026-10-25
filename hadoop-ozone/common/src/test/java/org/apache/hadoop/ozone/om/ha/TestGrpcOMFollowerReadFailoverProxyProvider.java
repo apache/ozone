@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcOmExceptionUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -210,7 +209,7 @@ public class TestGrpcOMFollowerReadFailoverProxyProvider {
 
   /** The error that the OM gRPC server returns for an exception, see OzoneManagerServiceGrpc. */
   private static StatusRuntimeException toServerError(IOException e) {
-    return GrpcOmExceptionUtils.toStatusRuntimeException(e);
+    return Status.INTERNAL.withDescription(e.toString()).asRuntimeException();
   }
 
   private static OMRequest newRequest(Type cmdType) {

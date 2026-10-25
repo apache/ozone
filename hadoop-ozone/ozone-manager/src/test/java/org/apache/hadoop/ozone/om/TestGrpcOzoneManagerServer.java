@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createRequestWithS3Credentials;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,23 +32,18 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
-import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
-import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcOmExceptionUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for GrpcOzoneManagerServer.
@@ -134,28 +128,6 @@ public class TestGrpcOzoneManagerServer {
         .build();
 
     assertRequestPassedThrough(request, false);
-  }
-
-  @Test
-  public void testOmExceptionIsSentInTrailers() throws ServiceException {
-    OzoneManagerProtocolServerSideTranslatorPB omTranslator = mock(OzoneManagerProtocolServerSideTranslatorPB.class);
-    when(omTranslator.submitRequest(any(), any()))
-        .thenThrow(new ServiceException(new OMLeaderNotReadyException("om1 is not ready")));
-    OzoneManagerServiceGrpc service = new OzoneManagerServiceGrpc(omTranslator, false);
-    @SuppressWarnings("unchecked")
-    StreamObserver<OMResponse> observer = mock(StreamObserver.class);
-
-    service.submitRequest(OMRequest.newBuilder()
-        .setCmdType(Type.ServiceList)
-        .setClientId("test-client")
-        .build(), observer);
-
-    ArgumentCaptor<Throwable> error = ArgumentCaptor.forClass(Throwable.class);
-    verify(observer).onError(error.capture());
-    verify(observer, never()).onCompleted();
-    RemoteException omException = GrpcOmExceptionUtils.toRemoteException((StatusRuntimeException) error.getValue());
-    assertEquals(OMLeaderNotReadyException.class.getName(), omException.getClassName());
-    assertEquals("om1 is not ready", omException.getMessage());
   }
 
   /**

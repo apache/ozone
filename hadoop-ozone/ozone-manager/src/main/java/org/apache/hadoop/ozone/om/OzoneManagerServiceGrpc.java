@@ -18,14 +18,13 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
 import io.grpc.Status;
+import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcOmExceptionUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -109,8 +108,10 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
       responseObserver.onNext(omResponse);
     } catch (Throwable e) {
       LOG.error("Failed to submit request", e);
-      Throwable omException = e instanceof ServiceException ? e.getCause() : e;
-      responseObserver.onError(GrpcOmExceptionUtils.toStatusRuntimeException(omException));
+      IOException ex = new IOException(e.getCause());
+      responseObserver.onError(
+          Status.INTERNAL.withDescription(ex.getMessage())
+              .asRuntimeException());
       return;
     }
     responseObserver.onCompleted();

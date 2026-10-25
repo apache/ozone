@@ -28,6 +28,8 @@ import static org.mockito.Mockito.mock;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.HashMap;
@@ -43,8 +45,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcOmExceptionUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -246,8 +246,11 @@ public class TestGrpcOmTransportConcurrentFailover {
 
                 if (!isLeader.get()) {
                   failureCount.incrementAndGet();
-                  responseObserver.onError(GrpcOmExceptionUtils.toStatusRuntimeException(
-                      new OMNotLeaderException("OM:" + nodeId + " is not the leader. Suggested leader: om2")));
+                  String errorMsg = "org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException: " +
+                      "OM:" + nodeId + " is not the leader. Suggested leader: om2";
+
+                  responseObserver.onError(new StatusRuntimeException(
+                      Status.INTERNAL.withDescription(errorMsg)));
                 } else {
                   successCount.incrementAndGet();
                   OMResponse response = OMResponse.newBuilder()
