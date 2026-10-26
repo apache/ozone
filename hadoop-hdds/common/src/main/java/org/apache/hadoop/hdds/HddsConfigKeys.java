@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds;
 
+import org.apache.hadoop.fs.StorageType;
+
 /**
  * This class contains constants for configuration keys and default values
  * used in hdds.
@@ -70,6 +72,11 @@ public final class HddsConfigKeys {
   // Configuration to allow volume choosing policy.
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
+  // StorageType used to choose a volume when a request carries no StorageType.
+  public static final String HDDS_DATANODE_DEFAULT_STORAGE_TYPE =
+      "hdds.datanode.default.storagetype";
+  public static final String HDDS_DATANODE_DEFAULT_STORAGE_TYPE_DEFAULT =
+      StorageType.DISK.toString();
 
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 

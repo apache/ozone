@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DEFAULT_STORAGE_TYPE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -77,6 +80,69 @@ public class TestStorageTypeVolumeChoosingPolicy {
     assertThrows(DiskOutOfSpaceException.class,
         () -> policy.chooseVolume(
             Collections.singletonList(diskVolume), 1L, StorageType.SSD));
+  }
+
+  @Test
+  public void testNullStorageTypeUsesDefaultStorageType() throws Exception {
+    HddsVolume diskVolume = createVolume("disk", StorageType.DISK);
+    HddsVolume ssdVolume = createVolume("ssd", StorageType.SSD);
+
+    RoundRobinVolumeChoosingPolicy policy = new RoundRobinVolumeChoosingPolicy();
+    policy.init(StorageType.SSD);
+    HddsVolume chosen = policy.chooseVolume(
+        Arrays.asList(diskVolume, ssdVolume), 1L, null);
+
+    assertThat(chosen).isSameAs(ssdVolume);
+    assertThat(ssdVolume.getCommittedBytes()).isEqualTo(1L);
+    assertThat(diskVolume.getCommittedBytes()).isZero();
+  }
+
+  @Test
+  public void testRequestedStorageTypeOverridesDefaultStorageType() throws Exception {
+    HddsVolume diskVolume = createVolume("disk", StorageType.DISK);
+    HddsVolume ssdVolume = createVolume("ssd", StorageType.SSD);
+
+    CapacityVolumeChoosingPolicy policy = new CapacityVolumeChoosingPolicy();
+    policy.init(StorageType.SSD);
+    HddsVolume chosen = policy.chooseVolume(
+        Arrays.asList(diskVolume, ssdVolume), 1L, StorageType.DISK);
+
+    assertThat(chosen).isSameAs(diskVolume);
+  }
+
+  @Test
+  public void testNullStorageTypeRejectsMissingDefaultStorageType() throws Exception {
+    HddsVolume ssdVolume = createVolume("ssd", StorageType.SSD);
+
+    CapacityVolumeChoosingPolicy policy = new CapacityVolumeChoosingPolicy();
+    policy.init(StorageType.DISK);
+
+    assertThatThrownBy(() -> policy.chooseVolume(
+        Collections.singletonList(ssdVolume), 1L, null))
+        .isInstanceOf(DiskOutOfSpaceException.class);
+    assertThat(ssdVolume.getCommittedBytes()).isZero();
+  }
+
+  @Test
+  public void testFactoryUsesConfiguredDefaultStorageType() throws Exception {
+    HddsVolume diskVolume = createVolume("disk", StorageType.DISK);
+    HddsVolume ssdVolume = createVolume("ssd", StorageType.SSD);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DEFAULT_STORAGE_TYPE, "ssd");
+
+    HddsVolume chosen = VolumeChoosingPolicyFactory.getPolicy(conf)
+        .chooseVolume(Arrays.asList(diskVolume, ssdVolume), 1L, null);
+
+    assertThat(chosen).isSameAs(ssdVolume);
+  }
+
+  @Test
+  public void testFactoryRejectsInvalidDefaultStorageType() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DEFAULT_STORAGE_TYPE, "TAPE");
+
+    assertThatThrownBy(() -> VolumeChoosingPolicyFactory.getPolicy(conf))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   private HddsVolume createVolume(String name, StorageType storageType)

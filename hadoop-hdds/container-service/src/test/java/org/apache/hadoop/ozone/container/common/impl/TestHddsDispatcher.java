@@ -480,24 +480,24 @@ public class TestHddsDispatcher {
     ContainerCommandResponseProto response = dispatcher.dispatch(writeToRAMDISKChunkRequest, null);
     assertEquals(DISK_OUT_OF_SPACE, response.getResult());
 
-    // If set the StorageType to null, then the Container can be created on any StorageType Volume
-    ContainerCommandRequestProto writeAnyStorageTypeChunkRequest1 =
+    // If set the StorageType to null, then the Container is created on a Volume of the default StorageType (DISK)
+    ContainerCommandRequestProto writeDefaultStorageTypeChunkRequest1 =
         getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, null);
-    ContainerCommandRequestProto writeAnyStorageTypeChunkRequest2 =
+    ContainerCommandRequestProto writeDefaultStorageTypeChunkRequest2 =
         getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, null);
-    ContainerCommandRequestProto writeAnyStorageTypeChunkRequest3 =
+    ContainerCommandRequestProto writeDefaultStorageTypeChunkRequest3 =
         getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, null);
-    ContainerCommandRequestProto writeAnyStorageTypeChunkRequest4 =
+    ContainerCommandRequestProto writeDefaultStorageTypeChunkRequest4 =
         getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, null);
 
-    assertContainerCreateAtSpecificVolume(dispatcher, writeAnyStorageTypeChunkRequest1,
-        Arrays.asList(ssdVolume, diskVolume));
-    assertContainerCreateAtSpecificVolume(dispatcher, writeAnyStorageTypeChunkRequest2,
-        Arrays.asList(ssdVolume, diskVolume));
-    assertContainerCreateAtSpecificVolume(dispatcher, writeAnyStorageTypeChunkRequest3,
-        Arrays.asList(ssdVolume, diskVolume));
-    assertContainerCreateAtSpecificVolume(dispatcher, writeAnyStorageTypeChunkRequest4,
-        Arrays.asList(ssdVolume, diskVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeDefaultStorageTypeChunkRequest1,
+        Collections.singletonList(diskVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeDefaultStorageTypeChunkRequest2,
+        Collections.singletonList(diskVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeDefaultStorageTypeChunkRequest3,
+        Collections.singletonList(diskVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeDefaultStorageTypeChunkRequest4,
+        Collections.singletonList(diskVolume));
   }
 
   @Test
