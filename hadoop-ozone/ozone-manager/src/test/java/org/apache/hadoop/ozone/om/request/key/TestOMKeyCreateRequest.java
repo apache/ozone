@@ -27,6 +27,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
@@ -129,6 +131,19 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     ReplicationConfig ratis3Config =
         ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
     preExecuteTest(true, 1, ratis3Config);
+  }
+
+  @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = createKeyRequest(true, 1);
+    KeyArgs keyArgs = omRequest.getCreateKeyRequest().getKeyArgs().toBuilder()
+        .setMultipartUploadID("invalid/" + UUID.randomUUID()).build();
+    OMRequest invalidRequest = omRequest.toBuilder()
+        .setCreateKeyRequest(omRequest.getCreateKeyRequest().toBuilder().setKeyArgs(keyArgs)).build();
+
+    OMException e = assertThrows(OMException.class,
+        () -> getOMKeyCreateRequest(invalidRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
   }
 
   private void preExecuteTest(boolean isMultipartKey, int partNumber,
@@ -623,6 +638,33 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     assertNull(omKeyInfo);
+  }
+
+  @Test
+  public void testRejectInvalidReplicationConfig() throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(false, false));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMRequest.Builder request = createKeyRequest(true, 1).toBuilder();
+    request.getCreateKeyRequestBuilder().getKeyArgsBuilder().setType(EC)
+        .setEcReplicationConfig(OMRequestTestUtils.invalidEcReplicationConfig());
+    OMRequest modifiedRequest = doPreExecute(request.build());
+    OMClientResponse response = getOMKeyCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(INVALID_REQUEST, response.getOMResponse().getStatus());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithInvalidPartNumber(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    for (int partNumber : new int[] {0, -1}) {
+      OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(true, partNumber));
+      OMClientResponse response = getOMKeyCreateRequest(modifiedOmRequest).validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
   }
 
   @ParameterizedTest

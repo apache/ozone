@@ -207,3 +207,6 @@ OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 # OZONE-SITE.XML_ozone.recon.chatbot.gateway.api.key=YOUR_GATEWAY_KEY_HERE
 # OZONE-SITE.XML_ozone.recon.chatbot.gateway.models=gpt-4.1,claude-sonnet,gemini-2.5-flash
 # OZONE-SITE.XML_ozone.recon.chatbot.default.model=claude-sonnet
+
+# Revert when HDDS-17350 is merged. (lazy client tracing init)
+OZONE-SITE.XML_ozone.tracing.client.application-aware=false

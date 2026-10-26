@@ -96,6 +96,10 @@ jobs:
         if: always()
         run: find ~/.m2/repository -type f | sort | xargs ls -lh
 
+      - name: Clean workspace
+        if: always()
+        run: mvn $BUILD_ARGS $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline -Dscan=false clean
+
       - name: Save cache for Maven dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
