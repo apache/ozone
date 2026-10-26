@@ -56,7 +56,7 @@ create_aws_dir
 
 mkdir -p "$REPORT_DIR"
 
-if [[ "${OZONE_TEST_SELECTOR}" =~ "test-s3a.sh" ]]; then
+if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]] || [[ "${OZONE_TEST_SELECTOR}" =~ "test-s3a.sh" ]]; then
   OZONE_ACCEPTANCE_TEST_TYPE="maven"
 
   if [[ -z "${HADOOP_AWS_DIR}" ]]; then
