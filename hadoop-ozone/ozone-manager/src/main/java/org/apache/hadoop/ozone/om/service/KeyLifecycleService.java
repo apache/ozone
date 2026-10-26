@@ -266,71 +266,45 @@ public class KeyLifecycleService extends BackgroundService {
   }
 
   /**
-   * Apply the new value of a property in {@link #OZONE_KEY_LIFECYCLE_PROPERTIES
-   * } without restarting OM.
-   * Changes to batch sizes and limits take effect on the next scheduled task. A new interval restarts the service,
-   * running tasks stop at their next checkpoint and resume from the saved scan state in the next run.
-   * @param property the property being reconfigured
-   * @param conf configuration holding the new value, or not holding the property to fall back to the default
+   * Validate the values of {@link #OZONE_KEY_LIFECYCLE_PROPERTIES} in the given configuration.
+   * @throws IllegalArgumentException if any value is invalid
    */
-  public void reconfigure(String property, ConfigurationSource conf) {
-    switch (property) {
-    case OZONE_KEY_LIFECYCLE_SERVICE_ENABLED:
-      isServiceEnabled.set(conf.getBoolean(property, OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT));
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL:
-      long newInterval = conf.getTimeDuration(property, OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      Preconditions.checkArgument(newInterval > 0, property + " should be a positive value.");
-      updateIntervalAndRestart(newInterval);
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT:
-      long newTimeout = conf.getTimeDuration(property, OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT_DEFAULT,
-          TimeUnit.NANOSECONDS);
-      Preconditions.checkArgument(newTimeout > 0, property + " should be a positive value.");
-      setServiceTimeoutInNanos(newTimeout);
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_WORKERS:
-      int newWorkers = conf.getInt(property, OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT);
-      Preconditions.checkArgument(newWorkers > 0, property + " should be a positive value.");
-      setPoolSize(newWorkers);
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE:
-      int newBatchSize = conf.getInt(property, OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT);
-      Preconditions.checkArgument(newBatchSize > 0, property + " should be a positive value.");
-      keyDeleteBatchSize = newBatchSize;
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK:
-      int newMpuAbortLimit = conf.getInt(property, OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT);
-      Preconditions.checkArgument(newMpuAbortLimit > 0, property + " should be a positive value.");
-      mpuAbortLimitPerTask = newMpuAbortLimit;
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT:
-      long newCachedDirMaxCount =
-          conf.getLong(property, OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT);
-      Preconditions.checkArgument(newCachedDirMaxCount > 0, property + " should be a positive value.");
-      cachedDirMaxCount = newCachedDirMaxCount;
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS:
-      long newStateSaveInterval = conf.getLong(property, OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT);
-      Preconditions.checkArgument(newStateSaveInterval > 0, property + " should be a positive value.");
-      stateSaveIntervalMs = newStateSaveInterval;
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED:
-      long newMaxKeysProcessed = conf.getLong(property, OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT);
-      Preconditions.checkArgument(newMaxKeysProcessed > 0, property + " should be a positive value.");
-      maxKeysProcessedPerState = newMaxKeysProcessed;
-      break;
-    case OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED:
-      moveToTrashEnabled.set(conf.getBoolean(property, OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT));
-      break;
-    default:
-      throw new IllegalArgumentException(property + " is not a reconfigurable property of KeyLifecycleService.");
-    }
-    LOG.info("Reconfigured {} to {}", property, conf.get(property));
+  public static void validate(ConfigurationSource conf) {
+    new ReconfigurableSettings(conf);
   }
 
-  private void updateIntervalAndRestart(long newIntervalMs) {
+  /**
+   * Apply the values of all {@link #OZONE_KEY_LIFECYCLE_PROPERTIES} at once without restarting OM.
+   * Properties not set in the configuration fall back to their defaults. All changes except the interval take
+   * effect immediately, running tasks pick them up on their next batch scan. A new interval, or enabling a
+   * disabled service, restarts the service, running tasks stop at their next checkpoint and resume from the
+   * saved scan state in the next run.
+   * @param conf configuration holding the new values
+   * @throws IllegalArgumentException if any value is invalid, in which case nothing is changed
+   */
+  public void reconfigure(ConfigurationSource conf) {
+    ReconfigurableSettings settings = new ReconfigurableSettings(conf);
+    keyDeleteBatchSize = settings.keyDeleteBatchSize;
+    mpuAbortLimitPerTask = settings.mpuAbortLimitPerTask;
+    cachedDirMaxCount = settings.cachedDirMaxCount;
+    stateSaveIntervalMs = settings.stateSaveIntervalMs;
+    maxKeysProcessedPerState = settings.maxKeysProcessedPerState;
+    moveToTrashEnabled.set(settings.moveToTrashEnabled);
+    setServiceTimeoutInNanos(settings.timeoutNanos);
+    setPoolSize(settings.workers);
+    boolean wasEnabled = isServiceEnabled.getAndSet(settings.enabled);
+    LOG.info("Reconfigured KeyLifecycleService: enabled = {}, interval = {} ms, timeout = {} ns, workers = {}, " +
+            "deleteBatchSize = {}, mpuAbortLimitPerTask = {}, cachedDirMaxCount = {}, stateSaveIntervalMs = {}, " +
+            "maxKeysProcessedPerState = {}, moveToTrashEnabled = {}", settings.enabled, settings.intervalMs,
+        settings.timeoutNanos, settings.workers, settings.keyDeleteBatchSize, settings.mpuAbortLimitPerTask,
+        settings.cachedDirMaxCount, settings.stateSaveIntervalMs, settings.maxKeysProcessedPerState,
+        settings.moveToTrashEnabled);
+    if (settings.intervalMs != getIntervalMillis() || (settings.enabled && !wasEnabled)) {
+      restart(settings.intervalMs);
+    }
+  }
+
+  private void restart(long newIntervalMs) {
     LOG.info("Restarting KeyLifecycleService with interval {} ms", newIntervalMs);
     // Running and queued tasks check shouldRun() and stop early, which lets the executor drain
     // instead of being force-terminated with tasks left in inFlight.
@@ -345,6 +319,53 @@ public class KeyLifecycleService extends BackgroundService {
     synchronized (this) {
       setInterval(newIntervalMs, TimeUnit.MILLISECONDS);
       start();
+    }
+  }
+
+  /**
+   * Validated values of {@link #OZONE_KEY_LIFECYCLE_PROPERTIES}.
+   */
+  private static final class ReconfigurableSettings {
+    private final boolean enabled;
+    private final long intervalMs;
+    private final long timeoutNanos;
+    private final int workers;
+    private final int keyDeleteBatchSize;
+    private final int mpuAbortLimitPerTask;
+    private final long cachedDirMaxCount;
+    private final long stateSaveIntervalMs;
+    private final long maxKeysProcessedPerState;
+    private final boolean moveToTrashEnabled;
+
+    private ReconfigurableSettings(ConfigurationSource conf) {
+      enabled = conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT);
+      intervalMs = checkPositive(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, conf.getTimeDuration(
+          OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS));
+      timeoutNanos = checkPositive(OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT, conf.getTimeDuration(
+          OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT, OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT_DEFAULT, TimeUnit.NANOSECONDS));
+      workers = (int) checkPositive(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS,
+          conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS, OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT));
+      keyDeleteBatchSize = (int) checkPositive(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE, conf.getInt(
+          OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE, OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
+      mpuAbortLimitPerTask = (int) checkPositive(OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK,
+          conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK,
+              OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT));
+      cachedDirMaxCount = checkPositive(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT,
+          conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT,
+              OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT));
+      stateSaveIntervalMs = checkPositive(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS,
+          conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS,
+              OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT));
+      maxKeysProcessedPerState = checkPositive(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED,
+          conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED,
+              OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT));
+      moveToTrashEnabled = conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED,
+          OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT);
+    }
+
+    private static long checkPositive(String property, long value) {
+      Preconditions.checkArgument(value > 0, property + " should be a positive value.");
+      return value;
     }
   }
 

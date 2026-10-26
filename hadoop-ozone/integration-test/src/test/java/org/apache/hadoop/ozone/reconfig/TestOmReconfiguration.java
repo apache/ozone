@@ -28,8 +28,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
@@ -272,18 +275,19 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     final OzoneManager om = cluster().getOzoneManager();
     final KeyLifecycleService service = om.getKeyManager().getKeyLifecycleService();
     final boolean originalEnabled = service.status().getIsEnabled();
+    final String originalEnabledValue = om.getConfiguration().get(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED);
     final String originalInterval = om.getConfiguration().get(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL);
     final String originalWorkers = om.getConfiguration().get(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS);
 
+    // All changed properties are applied together once reconfiguration completes
     getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, String.valueOf(!originalEnabled));
+    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, "30s");
+    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS, "3");
+    assertEquals("30s", om.getConfiguration().get(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL));
+    service.reconfigure(om.getConfiguration());
     assertEquals(!originalEnabled, service.status().getIsEnabled());
     assertEquals(!originalEnabled, om.getLifecycleServiceStatus().getIsEnabled());
-
-    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, "30s");
     assertEquals(30000, service.getIntervalMillis());
-    assertEquals("30s", om.getConfiguration().get(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL));
-
-    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS, "3");
     assertEquals(3, service.getExecutorService().getCorePoolSize());
 
     // Invalid values are rejected and the configuration is left unchanged
@@ -291,11 +295,25 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         () -> getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE, "0"));
     assertThrows(ReconfigurationException.class,
         () -> getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, "-1"));
+    assertEquals("30s", om.getConfiguration().get(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL));
+    service.reconfigure(om.getConfiguration());
     assertEquals(30000, service.getIntervalMillis());
 
-    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, String.valueOf(originalEnabled));
+    // Unset properties fall back to their defaults
+    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, null);
+    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, null);
+    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS, null);
+    assertNull(om.getConfiguration().get(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL));
+    service.reconfigure(om.getConfiguration());
+    assertEquals(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT, service.status().getIsEnabled());
+    assertEquals(om.getConfiguration().getTimeDuration(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL,
+        OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT, MILLISECONDS), service.getIntervalMillis());
+    assertEquals(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT, service.getExecutorService().getCorePoolSize());
+
+    getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, originalEnabledValue);
     getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, originalInterval);
     getSubject().reconfigureProperty(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS, originalWorkers);
+    service.reconfigure(om.getConfiguration());
     assertEquals(originalEnabled, service.status().getIsEnabled());
   }
 
