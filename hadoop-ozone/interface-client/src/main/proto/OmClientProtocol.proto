@@ -2866,17 +2866,22 @@ service OzoneManagerService {
  The error that OzoneManagerService sends in the gRPC trailers when submitRequest fails.
 */
 message OMGrpcErrorProto {
-  enum Code {
-    INTERNAL = 1;
-    NOT_LEADER = 2;
-    LEADER_NOT_READY = 3;
-    READ_INDEX_FAILED = 4;
-    READ_FAILED = 5;
+  message NotLeader {
+    // The OM node ID of the suggested leader, if known.
+    optional string suggestedLeaderNodeId = 1;
   }
-  optional Code code = 1;
-  optional string message = 2;
-  // The OM node ID of the suggested leader, for NOT_LEADER.
-  optional string suggestedLeaderNodeId = 3;
+  message LeaderNotReady {}
+  message ReadIndexFailed {}
+  message ReadFailed {}
+
+  optional string message = 1;
+  // Not set for any other error.
+  oneof error {
+    NotLeader notLeader = 2;
+    LeaderNotReady leaderNotReady = 3;
+    ReadIndexFailed readIndexFailed = 4;
+    ReadFailed readFailed = 5;
+  }
 }
 
 message GetLifecycleServiceStatusRequest {

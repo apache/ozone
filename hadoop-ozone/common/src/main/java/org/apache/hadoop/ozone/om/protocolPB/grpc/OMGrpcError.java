@@ -73,15 +73,15 @@ public final class OMGrpcError {
       return null;
     }
     final String message = error.hasMessage() ? error.getMessage() : null;
-    switch (error.getCode()) {
-    case NOT_LEADER:
-      return new OMNotLeaderException(message,
-          error.hasSuggestedLeaderNodeId() ? error.getSuggestedLeaderNodeId() : null);
-    case LEADER_NOT_READY:
+    switch (error.getErrorCase()) {
+    case NOTLEADER:
+      return new OMNotLeaderException(message, error.getNotLeader().hasSuggestedLeaderNodeId()
+          ? error.getNotLeader().getSuggestedLeaderNodeId() : null);
+    case LEADERNOTREADY:
       return new OMLeaderNotReadyException(message);
-    case READ_INDEX_FAILED:
+    case READINDEXFAILED:
       return new ReadIndexException(message);
-    case READ_FAILED:
+    case READFAILED:
       return new ReadException(message);
     default:
       return new OMException(message, OMException.ResultCodes.INTERNAL_ERROR);
@@ -89,29 +89,24 @@ public final class OMGrpcError {
   }
 
   private static OMGrpcErrorProto toProto(Throwable omException) {
-    final OMGrpcErrorProto.Builder error = OMGrpcErrorProto.newBuilder().setCode(toCode(omException));
+    final OMGrpcErrorProto.Builder error = OMGrpcErrorProto.newBuilder();
     if (omException.getMessage() != null) {
       error.setMessage(omException.getMessage());
     }
     if (omException instanceof OMNotLeaderException) {
+      final OMGrpcErrorProto.NotLeader.Builder notLeader = OMGrpcErrorProto.NotLeader.newBuilder();
       final String suggestedLeader = ((OMNotLeaderException) omException).getSuggestedLeaderNodeId();
       if (suggestedLeader != null) {
-        error.setSuggestedLeaderNodeId(suggestedLeader);
+        notLeader.setSuggestedLeaderNodeId(suggestedLeader);
       }
+      error.setNotLeader(notLeader);
+    } else if (omException instanceof OMLeaderNotReadyException) {
+      error.setLeaderNotReady(OMGrpcErrorProto.LeaderNotReady.getDefaultInstance());
+    } else if (omException instanceof ReadIndexException) {
+      error.setReadIndexFailed(OMGrpcErrorProto.ReadIndexFailed.getDefaultInstance());
+    } else if (omException instanceof ReadException) {
+      error.setReadFailed(OMGrpcErrorProto.ReadFailed.getDefaultInstance());
     }
     return error.build();
-  }
-
-  private static OMGrpcErrorProto.Code toCode(Throwable omException) {
-    if (omException instanceof OMNotLeaderException) {
-      return OMGrpcErrorProto.Code.NOT_LEADER;
-    } else if (omException instanceof OMLeaderNotReadyException) {
-      return OMGrpcErrorProto.Code.LEADER_NOT_READY;
-    } else if (omException instanceof ReadIndexException) {
-      return OMGrpcErrorProto.Code.READ_INDEX_FAILED;
-    } else if (omException instanceof ReadException) {
-      return OMGrpcErrorProto.Code.READ_FAILED;
-    }
-    return OMGrpcErrorProto.Code.INTERNAL;
   }
 }
