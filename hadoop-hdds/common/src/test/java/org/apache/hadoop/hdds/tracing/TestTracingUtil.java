@@ -53,9 +53,6 @@ import org.slf4j.MDC;
 
 /**
  * Test for {@link TracingUtil}.
- * OpenTelemetry fixes the context storage once per JVM and this class never installs
- * {@link TracingUtil.MdcContextStorage} before using {@link Context}, so the global storage here is
- * the "not installed" case (as in client applications). The MDC behaviour is tested on a local instance.
  */
 public class TestTracingUtil {
   private static final String TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
@@ -310,7 +307,6 @@ public class TestTracingUtil {
 
   @Test
   public void testMdcContextStorageClearsStaleMdc() {
-    // e.g. values inherited from the parent thread through log4j's InheritableThreadLocal MDC
     MDC.put(MDC_TRACE_ID, "stale-trace");
     MDC.put(MDC_SPAN_ID, "stale-span");
     try (Scope ignored = mdcContextStorage().attach(spanContext(PARENT_SPAN_ID))) {
@@ -332,7 +328,6 @@ public class TestTracingUtil {
       }).get();
       assertEquals(TRACE_ID, inSpan[0]);
       assertEquals(PARENT_SPAN_ID, inSpan[1]);
-      // after the task, the worker thread must not keep the span IDs
       assertNull(executor.submit(() -> MDC.get(MDC_TRACE_ID)).get());
       assertNull(executor.submit(() -> MDC.get(MDC_SPAN_ID)).get());
     } finally {
