@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.om.protocolPB.grpc;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.ProtoUtils;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -34,22 +34,8 @@ import org.apache.ratis.protocol.exceptions.ReadIndexException;
  * It converts between this error and the exception thrown by OM.
  */
 public final class OMGrpcError {
-  private static final Metadata.Key<OMGrpcErrorProto> ERROR_KEY = Metadata.Key.of(
-      "om-grpc-error" + Metadata.BINARY_HEADER_SUFFIX, new Metadata.BinaryMarshaller<OMGrpcErrorProto>() {
-        @Override
-        public byte[] toBytes(OMGrpcErrorProto error) {
-          return error.toByteArray();
-        }
-
-        @Override
-        public OMGrpcErrorProto parseBytes(byte[] serialized) {
-          try {
-            return OMGrpcErrorProto.parseFrom(serialized);
-          } catch (InvalidProtocolBufferException e) {
-            throw new IllegalArgumentException("Failed to parse OMGrpcErrorProto", e);
-          }
-        }
-      });
+  private static final Metadata.Key<OMGrpcErrorProto> ERROR_KEY = Metadata.Key.of("om-grpc-error-bin",
+      ProtoUtils.metadataMarshaller(OMGrpcErrorProto.getDefaultInstance()));
 
   private OMGrpcError() {
   }
