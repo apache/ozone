@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static java.util.Collections.emptyList;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_MAX_LIMIT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -405,7 +406,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testHeartbeatCapsReportsAndSchedulesFollowup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(HDDS_CONTAINER_REPORT_MAX_LIMIT, 2);
+    conf.setInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT, 2);
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
@@ -442,6 +443,13 @@ public class TestHeartbeatEndpointTask {
     // The remainder stays queued and a follow-up heartbeat is scheduled now.
     assertTrue(context.hasPendingReports(TEST_SCM_ENDPOINT));
     verify(datanodeStateMachine).setNextHB(anyLong());
+
+    // The follow-ups drain the rest; the last one sends 1 ICR and schedules nothing.
+    endpointTask.call();
+    endpointTask.call();
+    assertEquals(1, argument.getValue().getIncrementalContainerReportCount());
+    assertFalse(context.hasPendingReports(TEST_SCM_ENDPOINT));
+    verify(datanodeStateMachine, times(2)).setNextHB(anyLong());
   }
 
   @ParameterizedTest
@@ -449,7 +457,7 @@ public class TestHeartbeatEndpointTask {
   public void testHeartbeatClampsNonPositiveReportLimit(int configuredLimit)
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(HDDS_CONTAINER_REPORT_MAX_LIMIT, configuredLimit);
+    conf.setInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT, configuredLimit);
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
