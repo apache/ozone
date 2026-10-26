@@ -1106,6 +1106,21 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testListObjectVersionsFiltersCommonPrefixesByKeyMarker() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    Arrays.asList("dir/a", "dir/b", "dira/c", "file")
+        .forEach(key -> s3Client.putObject(b -> b.bucket(bucketName).key(key), RequestBody.fromString("bar")));
+
+    final ListObjectVersionsResponse result = s3Client.listObjectVersions(
+        b -> b.bucket(bucketName).delimiter("/").keyMarker("dir/a"));
+
+    assertThat(result.commonPrefixes()).extracting(CommonPrefix::prefix).containsExactly("dira/");
+    assertThat(result.versions()).extracting(ObjectVersion::key).containsExactly("file");
+    assertThat(result.isTruncated()).isFalse();
+  }
+
+  @Test
   public void testPutObjectLegalHoldNotImplemented() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();

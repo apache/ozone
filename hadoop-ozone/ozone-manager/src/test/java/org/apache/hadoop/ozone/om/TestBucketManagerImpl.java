@@ -407,7 +407,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
         .setIsVersionEnabled(true)
         .addAllMetadata(singletonMap("CustomKey", "CustomValue"))
         .build();
-    writeClient.createBucket(bucketInfo);
+    createBucket(omTestManagers.getMetadataManager(), bucketInfo);
 
     OmBucketInfo bucketLinkInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volume)

@@ -1051,7 +1051,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         kv = openKeyIter.next();
         if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
           String dbKey = kv.getKey();
-          long clientID = OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
+          // The open key of a multipart upload ends with the upload ID and has no client ID, so it is listed with
+          // client ID 0, which no real client has
+          final boolean isUpload = OMMultipartUploadUtils.getUploadIdFromDbKey(dbKey) != null;
+          long clientID = isUpload ? 0 : OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
           OmKeyInfo omKeyInfo = kv.getValue();
           // Note with HDDS-10077, there is no need to check KeyTable for hsync metadata
           openKeySessionList.add(
