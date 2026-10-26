@@ -90,6 +90,8 @@ public class TestReconUtils {
         new ReconControllerModule(null).getDataSourceConfiguration(configuration);
 
     assertEquals("jdbc:sqlite:" + temporaryFolder + "/ozone_recon_sqlite.db", dataSourceConfiguration.getJdbcUrl());
+    // The dialect follows the SQLite URL even though the configured default is still DERBY.
+    assertEquals("SQLITE", dataSourceConfiguration.getSqlDialect());
   }
 
   @Test

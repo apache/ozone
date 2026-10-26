@@ -86,6 +86,7 @@ import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDa
 import org.apache.ratis.protocol.ClientId;
 import org.jooq.Configuration;
 import org.jooq.DAO;
+import org.jooq.SQLDialect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -243,6 +244,10 @@ public class ReconControllerModule extends AbstractModule {
           reconUtils.getReconDbDir(ozoneConfiguration, OZONE_RECON_DB_DIR);
       sqlDbConfig.setJdbcUrl(StringUtils.replace(sqlDbConfig.getJdbcUrl(), reconDbDirPlaceholder,
           reconDbDir.getPath()));
+    }
+    // Only the SQLITE dialect works with SQLite, so setting the URL is enough to switch to SQLite.
+    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:sqlite:")) {
+      sqlDbConfig.setSqlDbDialect(SQLDialect.SQLITE.name());
     }
 
     return new DataSourceConfiguration() {
