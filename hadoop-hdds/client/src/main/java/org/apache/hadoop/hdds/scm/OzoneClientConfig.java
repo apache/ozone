@@ -348,6 +348,16 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean datastreamPutBlockWithoutRaftEnabled = false;
 
+  @Config(key = "ozone.client.datastream.hsync.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, hsync of a Ratis data stream makes the datanodes sync the block data and " +
+          "the PutBlock to disk before replying. Otherwise, hsync returns once the datanodes have written them " +
+          "without sync. It takes effect only when hsync is enabled (ozone.fs.hsync.enabled) and the PutBlock " +
+          "is committed through the data stream (ozone.client.datastream.putblock.without.raft.enabled).",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamHsyncEnabled = false;
+
   @Config(key = "ozone.client.key.write.concurrency",
       defaultValue = "1",
       description = "Maximum concurrent writes allowed on each key. " +
@@ -777,6 +787,14 @@ public class OzoneClientConfig {
 
   public void setDatastreamPutBlockWithoutRaftEnabled(boolean datastreamPutBlockWithoutRaftEnabled) {
     this.datastreamPutBlockWithoutRaftEnabled = datastreamPutBlockWithoutRaftEnabled;
+  }
+
+  public boolean isDatastreamHsyncEnabled() {
+    return datastreamHsyncEnabled;
+  }
+
+  public void setDatastreamHsyncEnabled(boolean datastreamHsyncEnabled) {
+    this.datastreamHsyncEnabled = datastreamHsyncEnabled;
   }
 
   /**

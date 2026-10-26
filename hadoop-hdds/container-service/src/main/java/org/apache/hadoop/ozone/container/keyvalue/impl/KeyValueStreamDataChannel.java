@@ -266,8 +266,6 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   private void closeWithStreamPutBlock() throws IOException {
     final ContainerCommandRequestProto proto =
         closeBuffers(buffers, super::writeFileChannel);
-    // Without a Raft log to replay, the data must be durable before the PutBlock is committed.
-    force(false);
     putBlockRequest.set(proto);
     Preconditions.checkState(putBlock != null);
     putBlock.accept(proto);

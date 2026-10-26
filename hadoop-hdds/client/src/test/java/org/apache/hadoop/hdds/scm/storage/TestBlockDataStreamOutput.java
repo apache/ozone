@@ -174,6 +174,42 @@ class TestBlockDataStreamOutput {
   }
 
   @Test
+  void hsyncPutBlockCommandIsNotSyncedWhenDisabled() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      stream.write(ByteBuffer.wrap(randomBytes(400)), 0, 400);
+      stream.hsync();
+      stream.write(ByteBuffer.wrap(randomBytes(50)), 0, 50);
+      stream.hsync();
+    }
+    assertThat(pipeline.getReceivedCommands()).extracting(c -> c.getPutBlock().getSync())
+        .containsExactly(false, false);
+  }
+
+  @Test
+  void onlyHsyncPutBlockCommandIsSynced() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    config.setDatastreamHsyncEnabled(true);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      // The flush boundary PutBlock is not synced.
+      stream.write(ByteBuffer.wrap(randomBytes(400)), 0, 400);
+      // hsync without new data sends a PutBlock only to sync the data committed by the boundary PutBlock.
+      stream.hsync();
+      // hsync with new data syncs its own PutBlock.
+      stream.write(ByteBuffer.wrap(randomBytes(50)), 0, 50);
+      stream.hsync();
+      // hsync after a synced PutBlock has nothing to sync.
+      stream.hsync();
+    }
+    assertThat(pipeline.getReceivedCommands()).extracting(c -> c.getPutBlock().getSync())
+        .containsExactly(false, true, true);
+  }
+
+  @Test
   void midStreamPutBlockCommandReleasesBuffers() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     OzoneClientConfig config = createConfig();

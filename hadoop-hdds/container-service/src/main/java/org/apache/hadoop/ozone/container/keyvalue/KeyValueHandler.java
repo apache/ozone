@@ -699,8 +699,7 @@ public class KeyValueHandler extends Handler {
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
-      if (DispatcherContext.op(dispatcherContext).isStreamCommit()) {
-        // Without a Raft log to replay, the PutBlock must be durable before it is acknowledged.
+      if (request.getPutBlock().getSync()) {
         try (DBHandle db = BlockUtils.getDB(kvContainer.getContainerData(), conf)) {
           db.getStore().flushLog(true);
         }

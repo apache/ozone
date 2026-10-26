@@ -158,6 +158,7 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
     OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setDatastreamPutBlockWithoutRaftEnabled(true);
+    clientConfig.setDatastreamHsyncEnabled(true);
     clientConfig.setDatastreamPipelineMode(pipelineMode);
     conf.setFromObject(clientConfig);
 
