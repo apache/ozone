@@ -31,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapred.LocalJobRunner;
+import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
@@ -129,8 +129,8 @@ class TestMetricsLeakAssertion {
       referenceCountField.setAccessible(true);
       int references = referenceCountField.getInt(metricsSystem);
       try (LocalJobRunnerMetricsCleanup cleanup = new LocalJobRunnerMetricsCleanup()) {
-        new LocalJobRunner(new Configuration());
-        new LocalJobRunner(new Configuration());
+        new Cluster(new Configuration()).close();
+        new Cluster(new Configuration()).close();
         assertThat(sources.keySet()).filteredOn(name -> name.startsWith("LocalJobRunnerMetrics-")).hasSize(3);
         cleanup.close();
         assertThat(sources.keySet()).filteredOn(name -> name.startsWith("LocalJobRunnerMetrics-"))

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -193,7 +193,7 @@ class TestDatanodeMetricsLifecycle {
       Method factory = XceiverServerRatis.class.getDeclaredMethod("getStateMachine", RaftGroupId.class);
       factory.setAccessible(true);
       stateMachine = (ContainerStateMachine) factory.invoke(server, RaftGroupId.randomId());
-      assertFalse(sources().equals(initial));
+      assertNotEquals(initial, sources());
       server.stop();
       assertEquals(initial, sources(), "The server must release state machines missing from the Ratis division map");
     } finally {
