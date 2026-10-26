@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -124,24 +125,44 @@ public class SignedChunksInputStream extends InputStream {
 
   /** Supported checksum trailers, or no trailer for a regular signed stream. */
   public enum TrailerHeader {
-    NONE(""),
-    CRC32("x-amz-checksum-crc32"),
-    CRC32C("x-amz-checksum-crc32c"),
-    CRC64NVME("x-amz-checksum-crc64nvme"),
-    SHA1("x-amz-checksum-sha1"),
-    SHA256("x-amz-checksum-sha256");
+    NONE("", 0),
+    CRC32("x-amz-checksum-crc32", 4),
+    CRC32C("x-amz-checksum-crc32c", 4),
+    CRC64NVME("x-amz-checksum-crc64nvme", 8),
+    SHA1("x-amz-checksum-sha1", 20),
+    SHA256("x-amz-checksum-sha256", 32);
 
     private final String headerName;
+    private final int checksumLength;
 
-    TrailerHeader(String headerName) {
+    TrailerHeader(String headerName, int checksumLength) {
       this.headerName = headerName;
+      this.checksumLength = checksumLength;
     }
 
-    /** Parse the required single-checksum declaration of a signed trailer upload. */
+    String getHeaderName() {
+      return headerName;
+    }
+
+    byte[] decodeValue(String value, String resource) {
+      try {
+        byte[] checksum = Base64.getDecoder().decode(value);
+        if (checksum.length == checksumLength) {
+          return checksum;
+        }
+      } catch (IllegalArgumentException ignored) {
+        // Invalid Base64 and incorrect decoded length are both malformed checksum values.
+      }
+      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, resource);
+      ex.setErrorMessage("Value for " + headerName + " header is invalid");
+      throw ex;
+    }
+
+    /** Parse the required single-checksum declaration of a trailer upload. */
     public static TrailerHeader fromHeader(String header, String keyPath) {
       if (StringUtils.isBlank(header)) {
         OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, keyPath);
-        ex.setErrorMessage("The " + X_AMZ_TRAILER + " header is required for signed trailing headers");
+        ex.setErrorMessage("The " + X_AMZ_TRAILER + " header is required for trailing headers");
         throw ex;
       }
       String name = header.trim().toLowerCase(Locale.ROOT);
