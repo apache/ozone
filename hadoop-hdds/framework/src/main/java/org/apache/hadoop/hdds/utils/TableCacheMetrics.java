@@ -25,6 +25,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class emits table level cache metrics.
@@ -35,22 +36,26 @@ public final class TableCacheMetrics implements MetricsSource {
 
   private final TableCache<?, ?> cache;
   private final String tableName;
+  private final String sourceName;
+  private boolean registered;
 
   private TableCacheMetrics(TableCache<?, ?> cache, String name) {
     this.cache = cache;
     this.tableName = name;
+    this.sourceName = MetricUtil.getMetricsSourceName(name + "Cache");
   }
 
   public static TableCacheMetrics create(TableCache<?, ?> cache,
                                          String tableName) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     TableCacheMetrics tableMetrics = new TableCacheMetrics(cache, tableName);
-    return ms.register(tableMetrics.getSourceName(), "Table cache metrics",
-        tableMetrics);
+    ms.register(tableMetrics.getSourceName(), "Table cache metrics", tableMetrics);
+    tableMetrics.registered = true;
+    return tableMetrics;
   }
 
   private String getSourceName() {
-    return tableName + "Cache";
+    return sourceName;
   }
 
   @Override
@@ -66,7 +71,11 @@ public final class TableCacheMetrics implements MetricsSource {
         .addGauge(MetricsInfos.IterationCount, stats.getIterationTimes());
   }
 
-  public void unregister() {
+  public synchronized void unregister() {
+    if (!registered) {
+      return;
+    }
+    registered = false;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(getSourceName());
   }

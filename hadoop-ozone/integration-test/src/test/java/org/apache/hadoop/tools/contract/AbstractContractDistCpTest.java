@@ -55,6 +55,7 @@ import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.util.functional.RemoteIterators;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LocalJobRunnerMetricsCleanup;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -648,16 +649,18 @@ public abstract class AbstractContractDistCpTest
    * @throws Exception failure
    */
   private Job runDistCp(final DistCpOptions options) throws Exception {
-    Job job = new DistCp(conf, options).execute();
-    assertThat(job).withFailMessage("Unexpected null job returned from DistCp execution.")
-        .isNotNull();
-    assertThat(job.isComplete())
-        .withFailMessage("DistCp job did not complete.")
-        .isTrue();
-    assertThat(job.isSuccessful())
-        .withFailMessage("DistCp job did not complete successfully.")
-        .isTrue();
-    return job;
+    try (LocalJobRunnerMetricsCleanup ignored = new LocalJobRunnerMetricsCleanup()) {
+      Job job = new DistCp(conf, options).execute();
+      assertThat(job).withFailMessage("Unexpected null job returned from DistCp execution.")
+          .isNotNull();
+      assertThat(job.isComplete())
+          .withFailMessage("DistCp job did not complete.")
+          .isTrue();
+      assertThat(job.isSuccessful())
+          .withFailMessage("DistCp job did not complete successfully.")
+          .isTrue();
+      return job;
+    }
   }
 
   /**
@@ -1033,15 +1036,17 @@ public abstract class AbstractContractDistCpTest
   private static void assertRunDistCp(int exitCode, String src, String dst,
                                       String[] options, Configuration conf)
       throws Exception {
-    DistCp distCp = new DistCp(conf, null);
-    String[] optsArr = new String[options.length + 2];
-    System.arraycopy(options, 0, optsArr, 0, options.length);
-    optsArr[optsArr.length - 2] = src;
-    optsArr[optsArr.length - 1] = dst;
+    try (LocalJobRunnerMetricsCleanup ignored = new LocalJobRunnerMetricsCleanup()) {
+      DistCp distCp = new DistCp(conf, null);
+      String[] optsArr = new String[options.length + 2];
+      System.arraycopy(options, 0, optsArr, 0, options.length);
+      optsArr[optsArr.length - 2] = src;
+      optsArr[optsArr.length - 1] = dst;
 
-    Assertions.assertThat(ToolRunner.run(conf, distCp, optsArr))
-        .describedAs("Exit code of distcp %s",
-            Arrays.stream(optsArr).collect(Collectors.joining(" ")))
-        .isEqualTo(exitCode);
+      Assertions.assertThat(ToolRunner.run(conf, distCp, optsArr))
+          .describedAs("Exit code of distcp %s",
+              Arrays.stream(optsArr).collect(Collectors.joining(" ")))
+          .isEqualTo(exitCode);
+    }
   }
 }

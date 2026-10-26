@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is used for maintaining SafeMode metric information, which can
@@ -36,6 +37,9 @@ public class SafeModeMetrics {
   private static final String SOURCE_NAME = SafeModeMetrics.class.getSimpleName();
 
   // These all values will be set to some values when safemode is enabled.
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private boolean registered = true;
+
   private @Metric MutableGaugeLong
       numContainerWithOneReplicaReportedThreshold;
   private @Metric MutableGaugeLong
@@ -70,7 +74,8 @@ public class SafeModeMetrics {
 
   public static SafeModeMetrics create() {
     final MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "SCM Safemode Metrics", new SafeModeMetrics());
+    SafeModeMetrics metrics = new SafeModeMetrics();
+    return ms.register(metrics.sourceName, "SCM Safemode Metrics", metrics);
   }
 
   public void setNumHealthyPipelinesThreshold(long val) {
@@ -189,8 +194,11 @@ public class SafeModeMetrics {
     return scmInSafeMode;
   }
 
-  public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+  public synchronized void unRegister() {
+    if (registered) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ms.unregisterSource(sourceName);
+      registered = false;
+    }
   }
 }

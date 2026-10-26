@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -90,6 +91,11 @@ public class TestBackgroundContainerDataScanner extends
   public void setup() {
     super.setup();
     scanner = new BackgroundContainerDataScanner(conf, controller, vol);
+  }
+
+  @AfterEach
+  public void tearDown() {
+    scanner.shutdown();
   }
 
   @Test

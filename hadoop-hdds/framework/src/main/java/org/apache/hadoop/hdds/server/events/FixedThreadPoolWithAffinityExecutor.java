@@ -30,7 +30,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -197,7 +196,6 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     }
     executorMap.clear();
     metrics.unregister();
-    DefaultMetricsSystem.instance().unregisterSource(EVENT_QUEUE + name);
   }
 
   @Override

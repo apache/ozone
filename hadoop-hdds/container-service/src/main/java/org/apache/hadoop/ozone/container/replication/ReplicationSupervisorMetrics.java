@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -27,6 +28,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics source to report number of replication tasks.
@@ -38,6 +40,8 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
 
   public static final String SOURCE =
       ReplicationSupervisorMetrics.class.getSimpleName();
+  private final AtomicBoolean registered = new AtomicBoolean(false);
+  private final String metricsSourceName = MetricUtil.getMetricsSourceName(SOURCE);
   private final ReplicationSupervisor supervisor;
 
   public ReplicationSupervisorMetrics(ReplicationSupervisor
@@ -48,13 +52,17 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
   public static ReplicationSupervisorMetrics create(ReplicationSupervisor
       supervisor) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE, "Container Replication Supervisor Metrics",
-        new ReplicationSupervisorMetrics(supervisor));
+    ReplicationSupervisorMetrics metrics = new ReplicationSupervisorMetrics(supervisor);
+    ms.register(metrics.metricsSourceName, "Container Replication Supervisor Metrics", metrics);
+    metrics.registered.set(true);
+    return metrics;
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE);
+    if (registered.compareAndSet(true, false)) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ms.unregisterSource(metricsSourceName);
+    }
   }
 
   @Override

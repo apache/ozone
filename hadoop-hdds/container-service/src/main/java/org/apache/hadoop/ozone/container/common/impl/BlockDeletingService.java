@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  * A per-datanode container block deleting service takes in charge
  * of deleting staled ozone blocks.
  */
-public class BlockDeletingService extends BackgroundService {
+public class BlockDeletingService extends BackgroundService implements AutoCloseable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockDeletingService.class);
@@ -66,6 +66,7 @@ public class BlockDeletingService extends BackgroundService {
   private final ConfigurationSource conf;
   private final DatanodeConfiguration dnConf;
   private final BlockDeletingServiceMetrics metrics;
+  private final BlockDeletingServiceMetrics.Handle metricsHandle;
 
   // Task priority is useful when a to-delete block has weight.
   private static final int TASK_PRIORITY_DEFAULT = 1;
@@ -109,7 +110,8 @@ public class BlockDeletingService extends BackgroundService {
     }
     this.blockDeletingMaxLockHoldingTime =
         dnConf.getBlockDeletingMaxLockHoldingTime();
-    metrics = BlockDeletingServiceMetrics.create();
+    metricsHandle = BlockDeletingServiceMetrics.acquireHandle();
+    metrics = metricsHandle.metrics();
   }
 
   public void registerReconfigCallbacks(ReconfigurationHandler handler) {
@@ -309,6 +311,15 @@ public class BlockDeletingService extends BackgroundService {
 
   public ConfigurationSource getConf() {
     return conf;
+  }
+
+  @Override
+  public void close() {
+    try {
+      shutdown();
+    } finally {
+      metricsHandle.close();
+    }
   }
 
   public BlockDeletingServiceMetrics getMetrics() {

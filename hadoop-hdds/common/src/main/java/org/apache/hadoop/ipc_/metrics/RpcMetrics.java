@@ -29,6 +29,7 @@ import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
@@ -53,13 +54,14 @@ public class RpcMetrics implements MetricsSource {
   final Server server;
   final MetricsRegistry registry;
   final String name;
+  private boolean registered;
   final boolean rpcQuantileEnable;
   /** The time unit used when storing/accessing time durations. */
   public final static TimeUnit TIMEUNIT = TimeUnit.MILLISECONDS;
   
   RpcMetrics(Server server, Configuration conf) {
     String port = String.valueOf(server.getListenerAddress().getPort());
-    name = "RpcActivityForPort" + port;
+    name = MetricUtil.getMetricsSourceName("RpcActivityForPort" + port);
     this.server = server;
     registry = new MetricsRegistry("rpc")
         .tag("port", "RPC port", port)
@@ -103,7 +105,9 @@ public class RpcMetrics implements MetricsSource {
 
   public static RpcMetrics create(Server server, Configuration conf) {
     RpcMetrics m = new RpcMetrics(server, conf);
-    return DefaultMetricsSystem.instance().register(m.name, null, m);
+    DefaultMetricsSystem.instance().register(m.name, null, m);
+    m.registered = true;
+    return m;
   }
 
   @Metric("Number of received bytes") MutableCounterLong receivedBytes;
@@ -185,8 +189,14 @@ public class RpcMetrics implements MetricsSource {
    * Shutdown the instrumentation for the process
    */
   //@Override
-  public void shutdown() {
-    DefaultMetricsSystem.instance().unregisterSource(name);
+  public synchronized void shutdown() {
+    if (registered) {
+      DefaultMetricsSystem.instance().unregisterSource(name);
+      registered = false;
+    }
+    MetricUtil.stop(rpcQueueTimeQuantiles);
+    MetricUtil.stop(rpcLockWaitTimeQuantiles);
+    MetricUtil.stop(rpcProcessingTimeQuantiles);
   }
 
   /**

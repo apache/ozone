@@ -39,17 +39,23 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskControllerMetrics;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskMetrics;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -111,6 +117,34 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     if (reconTaskController != null) {
       reconTaskController.stop();
     }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T getField(Object instance, String name) throws ReflectiveOperationException {
+    Field field = instance.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return (T) field.get(instance);
+  }
+
+  @Test
+  public void testMetricsAfterStopAndRestart() throws Exception {
+    ReconTaskControllerMetrics controllerMetrics = getField(reconTaskController, "controllerMetrics");
+    ReconTaskMetrics taskMetrics = getField(reconTaskController, "taskMetrics");
+    String controllerSource = getField(controllerMetrics, "sourceName");
+    String taskSource = getField(taskMetrics, "sourceName");
+    Map<String, MetricsSource> sources = getField(DefaultMetricsSystem.instance(), "allSources");
+    assertThat(sources).containsKeys(controllerSource, taskSource);
+    controllerMetrics.incrTotalEventCount(3);
+
+    reconTaskController.stop();
+    reconTaskController.stop();
+    assertThat(sources).doesNotContainKeys(controllerSource, taskSource);
+
+    reconTaskController.start();
+    assertThat(sources).containsKeys(controllerSource, taskSource);
+    assertEquals(3, controllerMetrics.getTotalEventCount());
+    reconTaskController.stop();
+    assertThat(sources).doesNotContainKeys(controllerSource, taskSource);
   }
 
   @Test

@@ -29,6 +29,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Including OM performance related metrics.
@@ -43,6 +44,8 @@ import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 public class OMPerformanceMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       OMPerformanceMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private boolean registered;
 
   // TODO: https://issues.apache.org/jira/browse/HDDS-13555
   @SuppressWarnings("PMD.SingularField")
@@ -209,14 +212,26 @@ public class OMPerformanceMetrics implements MetricsSource {
 
   public static OMPerformanceMetrics register() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        "OzoneManager Request Performance",
-        new OMPerformanceMetrics());
+    OMPerformanceMetrics metrics = new OMPerformanceMetrics();
+    ms.register(metrics.sourceName, "OzoneManager Request Performance", metrics);
+    metrics.registered = true;
+    return metrics;
   }
 
-  public static void unregister() {
+  public synchronized void registerMetrics() {
+    if (!registered) {
+      DefaultMetricsSystem.instance().register(sourceName, "OzoneManager Request Performance", this);
+      registered = true;
+    }
+  }
+
+  public synchronized void unregister() {
+    if (!registered) {
+      return;
+    }
+    registered = false;
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   @Override

@@ -2137,6 +2137,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
+    metrics.register();
+    perfMetrics.registerMetrics();
+    omDeletionMetrics.register();
+    volumeUtilizationMetrics.register();
+    bucketUtilizationMetrics.register();
     omSnapshotIntMetrics.register();
 
     instantiateServices(false);
@@ -2616,7 +2621,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // OzoneManageDoubleBuffer in OM server protocol.
       if (omRatisServer != null) {
         omRatisServer.stop();
-        OMHAMetrics.unRegister();
       }
       isOmRpcServerRunning = false;
       if (isOmGrpcServerEnabled) {
@@ -2645,8 +2649,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRatisSnapshotProvider.close();
       }
       serviceManager.stop();
-      DeletingServiceMetrics.unregister();
-      OMPerformanceMetrics.unregister();
+      omDeletionMetrics.unregister();
+      perfMetrics.unregister();
       omSnapshotIntMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
@@ -2655,7 +2659,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
 
       if (omhaMetrics != null) {
-        OMHAMetrics.unRegister();
+        omhaMetrics.unRegister();
       }
       omRatisServer = null;
 
@@ -3788,7 +3792,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void omHAMetricsInit(String leaderId) {
     // unregister, in case metrics already exist
     // so that the metrics will get updated.
-    OMHAMetrics.unRegister();
+    if (omhaMetrics != null) {
+      omhaMetrics.unRegister();
+    }
     omhaMetrics = OMHAMetrics
         .create(getOMNodeId(), leaderId);
   }

@@ -48,6 +48,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.ha.OMPeriodicMetrics;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +64,8 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
       LoggerFactory.getLogger(OMSnapshotDirectoryMetrics.class);
   private static final String SOURCE_NAME =
       OMSnapshotDirectoryMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private boolean registered;
 
   // Aggregate metrics
   private @Metric MutableGaugeLong dbSnapshotsDirSize;
@@ -101,8 +104,11 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
   public static OMSnapshotDirectoryMetrics create(ConfigurationSource conf,
       String parent, OMMetadataManager metadataManager) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, parent,
-        new OMSnapshotDirectoryMetrics(conf, metadataManager));
+    OMSnapshotDirectoryMetrics metrics = new OMSnapshotDirectoryMetrics(conf, metadataManager);
+    ms.register(metrics.sourceName, parent,
+        metrics);
+    metrics.registered = true;
+    return metrics;
   }
 
   /**
@@ -296,10 +302,14 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
     return sstBackupSstFilesCount.value();
   }
 
-  public void unRegister() {
+  public synchronized void unRegister() {
+    if (!registered) {
+      return;
+    }
+    registered = false;
     stop();
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   /**

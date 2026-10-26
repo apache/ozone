@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 abstract class AbstractOzoneContract extends AbstractFSContract {
 
   private final MiniOzoneCluster cluster;
+  private FileSystem fileSystem;
 
   /**
    * @return root URI for the FileSystem
@@ -50,6 +51,19 @@ abstract class AbstractOzoneContract extends AbstractFSContract {
   public FileSystem getTestFileSystem() throws IOException {
     assertNotNull(cluster, "cluster not created");
     getConf().set("fs.defaultFS", getRootURI());
-    return FileSystem.get(getConf());
+    fileSystem = FileSystem.get(getConf());
+    return fileSystem;
+  }
+
+  @Override
+  public void teardown() throws IOException {
+    try {
+      if (fileSystem != null) {
+        fileSystem.close();
+        fileSystem = null;
+      }
+    } finally {
+      super.teardown();
+    }
   }
 }

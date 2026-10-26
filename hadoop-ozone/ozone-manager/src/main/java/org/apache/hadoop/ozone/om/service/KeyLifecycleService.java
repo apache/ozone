@@ -398,7 +398,7 @@ public class KeyLifecycleService extends BackgroundService {
   @Override
   public void shutdown() {
     super.shutdown();
-    KeyLifecycleServiceMetrics.unregister();
+    metrics.unregister();
   }
 
   /**

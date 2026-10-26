@@ -110,7 +110,7 @@ public class ECReconstructionCoordinator implements Closeable {
   private final MemoizedSupplier<ExecutorService> ecReconstructWriteExecutor;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
-  private final ContainerClientMetrics clientMetrics;
+  private final ContainerClientMetrics.Handle clientMetrics;
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
@@ -137,7 +137,7 @@ public class ECReconstructionCoordinator implements Closeable {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructReadExecutor);
     tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
-    this.clientMetrics = ContainerClientMetrics.acquire();
+    this.clientMetrics = ContainerClientMetrics.acquireHandle();
     this.metrics = metrics;
   }
 
@@ -231,7 +231,7 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
         BufferPool.empty(), ozoneClientConfig,
-        blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor,
+        blockLocationInfo.getToken(), clientMetrics.metrics(), streamBufferArgs, ecReconstructWriteExecutor,
         false);
   }
 
@@ -450,13 +450,17 @@ public class ECReconstructionCoordinator implements Closeable {
 
   @Override
   public void close() throws IOException {
-    if (containerOperationClient != null) {
-      containerOperationClient.close();
+    try {
+      if (containerOperationClient != null) {
+        containerOperationClient.close();
+      }
+    } finally {
+      if (ecReconstructWriteExecutor.isInitialized()) {
+        ecReconstructWriteExecutor.get().shutdownNow();
+      }
+      ecReconstructReadExecutor.shutdownNow();
+      clientMetrics.close();
     }
-    if (ecReconstructWriteExecutor.isInitialized()) {
-      ecReconstructWriteExecutor.get().shutdownNow();
-    }
-    ecReconstructReadExecutor.shutdownNow();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,

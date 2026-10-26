@@ -23,6 +23,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Class contains metrics related to ContainerManager.
@@ -36,6 +37,9 @@ public final class SCMContainerManagerMetrics {
   // These are the metrics which will be reset to zero after restart.
   // These metrics capture count of number of successful/failure operations
   // of create/delete containers in SCM.
+
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private boolean registered = true;
 
   private @Metric MutableCounterLong numSuccessfulCreateContainers;
   private @Metric MutableCounterLong numFailureCreateContainers;
@@ -57,16 +61,19 @@ public final class SCMContainerManagerMetrics {
    */
   public static SCMContainerManagerMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "SCM ContainerManager Metrics",
-        new SCMContainerManagerMetrics());
+    SCMContainerManagerMetrics metrics = new SCMContainerManagerMetrics();
+    return ms.register(metrics.sourceName, "SCM ContainerManager Metrics", metrics);
   }
 
   /**
    * Unregister metrics.
    */
-  public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+  public synchronized void unRegister() {
+    if (registered) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ms.unregisterSource(sourceName);
+      registered = false;
+    }
   }
 
   public void incNumSuccessfulCreateContainers() {

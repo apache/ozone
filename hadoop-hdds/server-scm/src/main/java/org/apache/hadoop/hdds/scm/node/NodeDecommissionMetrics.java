@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -32,6 +33,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Class contains metrics related to the NodeDecommissionManager.
@@ -41,6 +43,9 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   public static final String METRICS_SOURCE_NAME =
       org.apache.hadoop.hdds.scm.node.NodeDecommissionMetrics
           .class.getSimpleName();
+
+  private final String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME);
+  private final AtomicBoolean registered = new AtomicBoolean(true);
 
   @Metric("Number of nodes tracked for decommissioning and maintenance.")
   private MutableGaugeLong decommissioningMaintenanceNodesTotal;
@@ -76,12 +81,17 @@ public final class NodeDecommissionMetrics implements MetricsSource {
    * @return NodeDecommissionMetrics
    */
   public static NodeDecommissionMetrics create() {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+    NodeDecommissionMetrics metrics = new NodeDecommissionMetrics();
+    return DefaultMetricsSystem.instance().register(metrics.sourceName,
         "Metrics tracking the progress of nodes in the "
             + "Decommissioning and Maintenance workflows.  "
             + "Tracks num nodes in mode and container "
             + "replications state and pipelines waiting to close",
-        new NodeDecommissionMetrics());
+        metrics);
+  }
+
+  String getSourceName() {
+    return sourceName;
   }
 
   /**
@@ -123,7 +133,9 @@ public final class NodeDecommissionMetrics implements MetricsSource {
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+    if (registered.compareAndSet(true, false)) {
+      DefaultMetricsSystem.instance().unregisterSource(sourceName);
+    }
   }
 
   public synchronized void setDecommissioningMaintenanceNodesTotal(

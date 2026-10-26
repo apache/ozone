@@ -20,6 +20,7 @@ package org.apache.hadoop.ipc_.metrics;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRatesWithAggregation;
 import org.slf4j.Logger;
@@ -37,9 +38,10 @@ public class RpcDetailedMetrics {
   static final Logger LOG = LoggerFactory.getLogger(RpcDetailedMetrics.class);
   final MetricsRegistry registry;
   final String name;
+  private boolean registered;
 
   RpcDetailedMetrics(int port) {
-    name = "RpcDetailedActivityForPort"+ port;
+    name = MetricUtil.getMetricsSourceName("RpcDetailedActivityForPort" + port);
     registry = new MetricsRegistry("rpcdetailed")
         .tag("port", "RPC port", String.valueOf(port));
     LOG.debug(registry.info().toString());
@@ -49,7 +51,9 @@ public class RpcDetailedMetrics {
 
   public static RpcDetailedMetrics create(int port) {
     RpcDetailedMetrics m = new RpcDetailedMetrics(port);
-    return DefaultMetricsSystem.instance().register(m.name, null, m);
+    DefaultMetricsSystem.instance().register(m.name, null, m);
+    m.registered = true;
+    return m;
   }
 
   /**
@@ -74,7 +78,10 @@ public class RpcDetailedMetrics {
    * Shutdown the instrumentation for the process
    */
   //@Override // some instrumentation interface
-  public void shutdown() {
-    DefaultMetricsSystem.instance().unregisterSource(name);
+  public synchronized void shutdown() {
+    if (registered) {
+      DefaultMetricsSystem.instance().unregisterSource(name);
+      registered = false;
+    }
   }
 }

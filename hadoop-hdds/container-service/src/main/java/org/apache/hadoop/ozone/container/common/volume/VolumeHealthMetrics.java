@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -28,6 +29,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is used to track Volume Health metrics for all volumes on a datanode.
@@ -47,6 +49,7 @@ public final class VolumeHealthMetrics implements MetricsSource {
       Interns.info("NumFailedVolumes", "Number of failed volumes");
 
   private final MetricsRegistry registry;
+  private final AtomicBoolean closed = new AtomicBoolean(false);
   private final String metricsSourceName;
   private final AtomicInteger healthyVolumes;
   private final AtomicInteger failedVolumes;
@@ -59,8 +62,9 @@ public final class VolumeHealthMetrics implements MetricsSource {
   private VolumeHealthMetrics(StorageVolume.VolumeType volumeType) {
     this.healthyVolumes = new AtomicInteger(0);
     this.failedVolumes = new AtomicInteger(0);
-    metricsSourceName = SOURCE_BASENAME + '-' + volumeType.name();
-    registry = new MetricsRegistry(metricsSourceName);
+    String name = SOURCE_BASENAME + '-' + volumeType.name();
+    metricsSourceName = MetricUtil.getMetricsSourceName(name);
+    registry = new MetricsRegistry(name);
   }
 
   /**
@@ -76,8 +80,10 @@ public final class VolumeHealthMetrics implements MetricsSource {
   }
 
   public void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(metricsSourceName);
+    if (closed.compareAndSet(false, true)) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ms.unregisterSource(metricsSourceName);
+    }
   }
 
   public void incrementHealthyVolumes() {

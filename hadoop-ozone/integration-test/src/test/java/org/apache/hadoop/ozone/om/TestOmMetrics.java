@@ -107,6 +107,7 @@ public class TestOmMetrics {
   private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
   private OzoneClient client;
+  private FileSystem fs;
 
   @BeforeAll
   public void setup() throws Exception {
@@ -133,7 +134,7 @@ public class TestOmMetrics {
 
   @AfterAll
   public void shutdown() {
-    IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(client, fs);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -147,7 +148,7 @@ public class TestOmMetrics {
     VolumeManager mockVm = spy(volumeManager);
 
     // get initial values for metrics
-    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    MetricsRecordBuilder omMetrics = getMetrics(ozoneManager.getMetrics());
     long initialNumVolumeOps = getLongCounter("NumVolumeOps", omMetrics);
     long initialNumVolumeCreates = getLongCounter("NumVolumeCreates", omMetrics);
     long initialNumVolumeUpdates = getLongCounter("NumVolumeUpdates", omMetrics);
@@ -165,7 +166,7 @@ public class TestOmMetrics {
     OmVolumeArgs volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumVolumeOps + 5, getLongCounter("NumVolumeOps", omMetrics));
     assertEquals(initialNumVolumeCreates + 1, getLongCounter("NumVolumeCreates", omMetrics));
     assertEquals(initialNumVolumeUpdates + 1, getLongCounter("NumVolumeUpdates", omMetrics));
@@ -182,7 +183,7 @@ public class TestOmMetrics {
     writeClient.createVolume(volumeArgs);
     writeClient.deleteVolume(volumeArgs.getVolume());
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     // Accounting 's3v' volume which is created by default.
     assertEquals(initialNumVolumes + 2, getLongGauge("NumVolumes", omMetrics));
 
@@ -199,7 +200,7 @@ public class TestOmMetrics {
     volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumVolumeOps + 14, getLongCounter("NumVolumeOps", omMetrics));
     assertEquals(initialNumVolumeCreates + 5, getLongCounter("NumVolumeCreates", omMetrics));
     assertEquals(initialNumVolumeUpdates + 2, getLongCounter("NumVolumeUpdates", omMetrics));
@@ -229,7 +230,7 @@ public class TestOmMetrics {
     BucketManager mockBm = spy(bucketManager);
 
     // get initial values for metrics
-    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    MetricsRecordBuilder omMetrics = getMetrics(ozoneManager.getMetrics());
     long initialNumBucketOps = getLongCounter("NumBucketOps", omMetrics);
     long initialNumBucketCreates = getLongCounter("NumBucketCreates", omMetrics);
     long initialNumBucketUpdates = getLongCounter("NumBucketUpdates", omMetrics);
@@ -249,7 +250,7 @@ public class TestOmMetrics {
     OmBucketInfo bucketInfo = createBucketInfo(false);
     doBucketOps(bucketInfo);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumBucketOps + 5, getLongCounter("NumBucketOps", omMetrics));
     assertEquals(initialNumBucketCreates + 1, getLongCounter("NumBucketCreates", omMetrics));
     assertEquals(initialNumBucketUpdates + 1, getLongCounter("NumBucketUpdates", omMetrics));
@@ -263,7 +264,7 @@ public class TestOmMetrics {
     writeClient.deleteBucket(ecBucketInfo.getVolumeName(),
         ecBucketInfo.getBucketName());
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialEcBucketCreateTotal + 1, getLongCounter("EcBucketCreateTotal", omMetrics));
 
     bucketInfo = createBucketInfo(false);
@@ -275,7 +276,7 @@ public class TestOmMetrics {
     writeClient.deleteBucket(bucketInfo.getVolumeName(),
         bucketInfo.getBucketName());
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumBuckets + 2, getLongGauge("NumBuckets", omMetrics));
 
     // inject exception to test for Failure Metrics on the read path
@@ -296,7 +297,7 @@ public class TestOmMetrics {
     } catch (Exception e) {
       //Expected failure
     }
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialEcBucketCreateFailsTotal + 1, getLongCounter("EcBucketCreateFailsTotal", omMetrics));
     assertEquals(initialNumBucketOps + 17, getLongCounter("NumBucketOps", omMetrics));
     assertEquals(initialNumBucketCreates + 7, getLongCounter("NumBucketCreates", omMetrics));
@@ -328,7 +329,7 @@ public class TestOmMetrics {
     KeyManager mockKm = spy(keyManager);
 
     // get initial values for metrics
-    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    MetricsRecordBuilder omMetrics = getMetrics(ozoneManager.getMetrics());
     long initialNumKeyOps = getLongCounter("NumKeyOps", omMetrics);
     long initialNumKeyAllocate = getLongCounter("NumKeyAllocate", omMetrics);
     long initialNumKeyLookup = getLongCounter("NumKeyLookup", omMetrics);
@@ -358,7 +359,7 @@ public class TestOmMetrics {
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs); // This will perform 7 different operations on the key
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
 
     assertEquals(initialNumKeyOps + 10, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 1, getLongCounter("NumKeyAllocate", omMetrics));
@@ -375,7 +376,7 @@ public class TestOmMetrics {
         new ECReplicationConfig("rs-3-2-1024K"));
     doKeyOps(keyArgs);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeys, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialEcKeyCreateTotal + 1, getLongCounter("EcKeyCreateTotal", omMetrics));
 
@@ -403,7 +404,7 @@ public class TestOmMetrics {
       assertThat(e.getMessage()).contains("No enough datanodes to choose");
     }
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeys + 2, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumBlockAllocationFails + 1, getLongCounter("NumBlockAllocationFails", omMetrics));
 
@@ -426,7 +427,7 @@ public class TestOmMetrics {
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeyOps + 37, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 6, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 3, getLongCounter("NumKeyLookup", omMetrics));
@@ -453,7 +454,7 @@ public class TestOmMetrics {
     } catch (Exception e) {
       //Expected Failure
     }
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialEcKeyCreateFailsTotal + 1, getLongCounter("EcKeyCreateFailsTotal", omMetrics));
 
     // restore state
@@ -467,7 +468,7 @@ public class TestOmMetrics {
   @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
   public void testDirectoryOps(BucketLayout bucketLayout) throws Exception {
     // get initial values for metrics
-    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    MetricsRecordBuilder omMetrics = getMetrics(ozoneManager.getMetrics());
     long initialNumKeys = getLongGauge("NumKeys", omMetrics);
     long initialNumCreateDirectory = getLongCounter("NumCreateDirectory", omMetrics);
     long initialNumKeyDeletes = getLongCounter("NumKeyDeletes", omMetrics);
@@ -490,13 +491,13 @@ public class TestOmMetrics {
     String rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    FileSystem fs = FileSystem.get(conf);
+    fs = FileSystem.get(conf);
     Path bucketPath = new Path(OZONE_ROOT, String.join(OZONE_URI_DELIMITER, volumeName, bucketName));
     Path dirPath = new Path(bucketPath, String.join(OZONE_URI_DELIMITER, "dir1", "dir2"));
     fs.mkdirs(dirPath);
     assertEquals(bucketLayout,
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName).getBucketLayout());
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeys + 2, getLongGauge("NumKeys", omMetrics));
     // Only one directory create command is given, even though it created two directories.
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
@@ -507,7 +508,7 @@ public class TestOmMetrics {
     // Add 2 files at different parts of the tree.
     ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
     ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeys + 4, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
     assertEquals(initialNumKeyDeletes, getLongCounter("NumKeyDeletes", omMetrics));
@@ -515,7 +516,7 @@ public class TestOmMetrics {
 
     // Rename the child directory.
     fs.rename(dirPath, new Path(dirPath.getParent(), "new-name"));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeys + 4, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
     assertEquals(initialNumKeyDeletes, getLongCounter("NumKeyDeletes", omMetrics));
@@ -530,10 +531,10 @@ public class TestOmMetrics {
     long numKeysBeforeDeletion = getLongGauge("NumKeys", omMetrics);
     fs.delete(dirPath.getParent(), true);
     GenericTestUtils.waitFor(() -> {
-      long keyCount = getLongGauge("NumKeys", getMetrics("OMMetrics"));
+      long keyCount = getLongGauge("NumKeys", getMetrics(ozoneManager.getMetrics()));
       return keyCount == 0;
     }, timeoutMillis / 5, timeoutMillis);
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeys, getLongGauge("NumKeys", omMetrics));
     // This is the number of times the create directory command was given, not the current number of directories.
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
@@ -546,15 +547,15 @@ public class TestOmMetrics {
     fs.mkdirs(dirPath);
     ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
     ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeys + 4, getLongGauge("NumKeys", omMetrics));
     numKeysBeforeDeletion = getLongGauge("NumKeys", omMetrics);
     fs.delete(bucketPath, true);
     GenericTestUtils.waitFor(() -> {
-      long keyCount = getLongGauge("NumKeys", getMetrics("OMMetrics"));
+      long keyCount = getLongGauge("NumKeys", getMetrics(ozoneManager.getMetrics()));
       return keyCount == 0;
     }, timeoutMillis / 5, timeoutMillis);
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumKeys, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumCreateDirectory + 2, getLongCounter("NumCreateDirectory", omMetrics));
     numKeysDeleted += numKeysBeforeDeletion - getLongGauge("NumKeys", omMetrics);
@@ -567,7 +568,7 @@ public class TestOmMetrics {
   public void testSnapshotOps() throws Exception {
     // This tests needs enough dataNodes to allocate the blocks for the keys.
     // get initial values for metrics
-    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    MetricsRecordBuilder omMetrics = getMetrics(ozoneManager.getMetrics());
     long initialNumSnapshotCreateFails = getLongCounter("NumSnapshotCreateFails", omMetrics);
     long initialNumSnapshotCreates = getLongCounter("NumSnapshotCreates", omMetrics);
     long initialNumSnapshotInfoFails = getLongCounter("NumSnapshotInfoFails", omMetrics);
@@ -606,7 +607,7 @@ public class TestOmMetrics {
     // Create first snapshot
     writeClient.createSnapshot(volumeName, bucketName, snapshot1);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotCreateFails, getLongCounter("NumSnapshotCreateFails", omMetrics));
     assertEquals(initialNumSnapshotCreates + 1, getLongCounter("NumSnapshotCreates", omMetrics));
     assertEquals(initialNumSnapshotListFails, getLongCounter("NumSnapshotListFails", omMetrics));
@@ -636,7 +637,7 @@ public class TestOmMetrics {
         Thread.sleep(response.getWaitTimeInMs());
       }
     }
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
 
     assertEquals(initialNumSnapshotDiffJobs + 1, getLongCounter("NumSnapshotDiffJobs", omMetrics));
     assertEquals(initialNumSnapshotDiffJobFails, getLongCounter("NumSnapshotDiffJobFails", omMetrics));
@@ -644,42 +645,42 @@ public class TestOmMetrics {
     // List snapshot diff jobs
     writeClient.listSnapshotDiffJobs(volumeName, bucketName, "", true, null, 1000);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumListSnapshotDiffJobs + 1, getLongCounter("NumListSnapshotDiffJobs", omMetrics));
     assertEquals(initialNumListSnapshotDiffJobFails, getLongCounter("NumListSnapshotDiffJobFails", omMetrics));
 
     // List snapshot diff jobs: invalid bucket case.
     assertThrows(OMException.class, () ->
         writeClient.listSnapshotDiffJobs(volumeName, "invalidBucket", "", true, null, 1000));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumListSnapshotDiffJobs + 2, getLongCounter("NumListSnapshotDiffJobs", omMetrics));
     assertEquals(initialNumListSnapshotDiffJobFails + 1, getLongCounter("NumListSnapshotDiffJobFails", omMetrics));
 
     // Cancel snapshot diff
     writeClient.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumCancelSnapshotDiffs + 1, getLongCounter("NumCancelSnapshotDiffs", omMetrics));
     assertEquals(initialNumCancelSnapshotDiffFails, getLongCounter("NumCancelSnapshotDiffFails", omMetrics));
 
     // Cancel snapshot diff job: invalid bucket case.
     assertThrows(OMException.class, () ->
         writeClient.cancelSnapshotDiff(volumeName, "invalidBucket", snapshot1, snapshot2));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumCancelSnapshotDiffs + 2, getLongCounter("NumCancelSnapshotDiffs", omMetrics));
     assertEquals(initialNumCancelSnapshotDiffFails + 1, getLongCounter("NumCancelSnapshotDiffFails", omMetrics));
 
     // Get snapshot info
     writeClient.getSnapshotInfo(volumeName, bucketName, snapshot1);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotInfos + 1, getLongCounter("NumSnapshotInfos", omMetrics));
     assertEquals(initialNumSnapshotInfoFails, getLongCounter("NumSnapshotInfoFails", omMetrics));
 
     // Get snapshot info: invalid snapshot case.
     assertThrows(OMException.class, () ->
         writeClient.getSnapshotInfo(volumeName, bucketName, "invalidSnapshot"));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotInfos + 2, getLongCounter("NumSnapshotInfos", omMetrics));
     assertEquals(initialNumSnapshotInfoFails + 1, getLongCounter("NumSnapshotInfoFails", omMetrics));
 
@@ -687,7 +688,7 @@ public class TestOmMetrics {
     writeClient.listSnapshot(
         volumeName, bucketName, null, null, Integer.MAX_VALUE);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotActive + 2, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotCreates + 2, getLongCounter("NumSnapshotCreates", omMetrics));
     assertEquals(initialNumSnapshotListFails, getLongCounter("NumSnapshotListFails", omMetrics));
@@ -696,14 +697,14 @@ public class TestOmMetrics {
     // List snapshot: invalid bucket case.
     assertThrows(OMException.class, () -> writeClient.listSnapshot(volumeName,
         "invalidBucket", null, null, Integer.MAX_VALUE));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotLists + 2, getLongCounter("NumSnapshotLists", omMetrics));
     assertEquals(initialNumSnapshotListFails + 1, getLongCounter("NumSnapshotListFails", omMetrics));
 
     // Rename snapshot
     writeClient.renameSnapshot(volumeName, bucketName, snapshot2, snapshot3);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotActive + 2, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotRenames + 1, getLongCounter("NumSnapshotRenames", omMetrics));
     assertEquals(initialNumSnapshotRenameFails, getLongCounter("NumSnapshotRenameFails", omMetrics));
@@ -711,7 +712,7 @@ public class TestOmMetrics {
     // Rename snapshot: invalid snapshot case.
     assertThrows(OMException.class, () -> writeClient.renameSnapshot(volumeName,
         bucketName, snapshot2, snapshot3));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotActive + 2, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotRenames + 2, getLongCounter("NumSnapshotRenames", omMetrics));
     assertEquals(initialNumSnapshotRenameFails + 1, getLongCounter("NumSnapshotRenameFails", omMetrics));
@@ -719,7 +720,7 @@ public class TestOmMetrics {
     // Delete snapshot
     writeClient.deleteSnapshot(volumeName, bucketName, snapshot3);
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotActive + 1, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotDeletes + 1, getLongCounter("NumSnapshotDeletes", omMetrics));
     assertEquals(initialNumSnapshotDeleted + 1, getLongGauge("NumSnapshotDeleted", omMetrics));
@@ -728,7 +729,7 @@ public class TestOmMetrics {
     // Delete snapshot: invalid snapshot case.
     assertThrows(OMException.class, () -> writeClient.deleteSnapshot(volumeName,
         bucketName, snapshot3));
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumSnapshotActive + 1, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotDeletes + 2, getLongCounter("NumSnapshotDeletes", omMetrics));
     assertEquals(initialNumSnapshotDeleted + 1, getLongGauge("NumSnapshotDeleted", omMetrics));
@@ -766,7 +767,7 @@ public class TestOmMetrics {
   @Test
   public void testAclOperations() throws Exception {
     // get initial values for metrics
-    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    MetricsRecordBuilder omMetrics = getMetrics(ozoneManager.getMetrics());
     long initialNumGetAcl = getLongCounter("NumGetAcl", omMetrics);
     long initialNumAddAcl = getLongCounter("NumAddAcl", omMetrics);
     long initialNumSetAcl = getLongCounter("NumSetAcl", omMetrics);
@@ -785,7 +786,7 @@ public class TestOmMetrics {
     writeClient.setAcl(volObj, acls);
     writeClient.removeAcl(volObj, acls.get(0));
 
-    omMetrics = getMetrics("OMMetrics");
+    omMetrics = getMetrics(ozoneManager.getMetrics());
     assertEquals(initialNumGetAcl + 1, getLongCounter("NumGetAcl", omMetrics));
     assertEquals(initialNumAddAcl + 1, getLongCounter("NumAddAcl", omMetrics));
     assertEquals(initialNumSetAcl + 1, getLongCounter("NumSetAcl", omMetrics));

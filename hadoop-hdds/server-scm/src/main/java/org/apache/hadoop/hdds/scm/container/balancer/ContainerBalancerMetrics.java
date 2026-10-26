@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics related to Container Balancer running in SCM.
@@ -33,6 +34,8 @@ public final class ContainerBalancerMetrics {
       ContainerBalancerMetrics.class.getSimpleName();
 
   private final MetricsSystem ms;
+  private final String sourceName = MetricUtil.getMetricsSourceName(NAME);
+  private boolean registered = true;
 
   @Metric(about = "Amount of Gigabytes that Container Balancer moved" +
       " in the latest iteration.")
@@ -98,12 +101,19 @@ public final class ContainerBalancerMetrics {
    */
   public static ContainerBalancerMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(NAME, "Container Balancer Metrics",
-        new ContainerBalancerMetrics(ms));
+    ContainerBalancerMetrics metrics = new ContainerBalancerMetrics(ms);
+    return ms.register(metrics.sourceName, "Container Balancer Metrics", metrics);
   }
 
   private ContainerBalancerMetrics(MetricsSystem ms) {
     this.ms = ms;
+  }
+
+  public synchronized void unregister() {
+    if (registered) {
+      ms.unregisterSource(sourceName);
+      registered = false;
+    }
   }
 
   /**

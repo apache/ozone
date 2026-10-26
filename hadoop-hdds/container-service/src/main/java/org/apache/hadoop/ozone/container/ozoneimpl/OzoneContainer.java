@@ -738,13 +738,13 @@ public class OzoneContainer {
     if (dbCompactionExecutorService != null) {
       dbCompactionExecutorService.shutdown();
     }
-    blockDeletingService.shutdown();
+    blockDeletingService.close();
     if (diskBalancerService != null) {
       diskBalancerService.shutdown();
     }
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
-    ContainerMetrics.remove();
+    metrics.close();
     checksumTreeManager.stop();
     if (this.witnessedContainerMetadataStore != null) {
       try {

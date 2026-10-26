@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -27,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Class to maintain metrics and info related to OM HA.
@@ -35,6 +37,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 public final class OMHAMetrics implements MetricsSource {
 
   public static final String SOURCE_NAME = OMHAMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private final AtomicBoolean registered = new AtomicBoolean();
   private final OMHAMetricsInfo omhaMetricsInfo = new OMHAMetricsInfo();
   private MetricsRegistry metricsRegistry;
 
@@ -92,15 +96,20 @@ public final class OMHAMetrics implements MetricsSource {
   public static OMHAMetrics create(
       String nodeId, String leaderId) {
     OMHAMetrics metrics = new OMHAMetrics(nodeId, leaderId);
-    return DefaultMetricsSystem.instance()
-        .register(SOURCE_NAME, "Metrics for OM HA", metrics);
+    DefaultMetricsSystem.instance()
+        .register(metrics.sourceName, "Metrics for OM HA", metrics);
+    metrics.registered.set(true);
+    return metrics;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+  public void unRegister() {
+    if (!registered.compareAndSet(true, false)) {
+      return;
+    }
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   @Override

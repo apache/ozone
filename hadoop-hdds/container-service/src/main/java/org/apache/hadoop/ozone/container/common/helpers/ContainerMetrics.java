@@ -21,6 +21,7 @@ import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -52,6 +53,8 @@ import org.apache.hadoop.ozone.util.MetricUtil;
 public class ContainerMetrics implements Closeable {
   public static final String STORAGE_CONTAINER_METRICS =
       "StorageContainerMetrics";
+  private final AtomicBoolean registered = new AtomicBoolean(false);
+  private final String metricsSourceName = MetricUtil.getMetricsSourceName(STORAGE_CONTAINER_METRICS);
   @Metric private MutableCounterLong numOps;
   @Metric private MutableCounterLong containerDeleteFailedNonEmpty;
   @Metric private MutableCounterLong containerDeleteFailedBlockCountNotZero;
@@ -129,9 +132,10 @@ public class ContainerMetrics implements Closeable {
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
         conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
-    return ms.register(STORAGE_CONTAINER_METRICS,
-                       "Storage Container Node Metrics",
-                       new ContainerMetrics(intervals));
+    ContainerMetrics metrics = new ContainerMetrics(intervals);
+    ms.register(metrics.metricsSourceName, "Storage Container Node Metrics", metrics);
+    metrics.registered.set(true);
+    return metrics;
   }
 
   public static void remove() {
@@ -141,6 +145,9 @@ public class ContainerMetrics implements Closeable {
 
   @Override
   public void close() {
+    if (registered.compareAndSet(true, false)) {
+      DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
+    }
     opsLatQuantiles.values().forEach(MetricUtil::stop);
   }
 

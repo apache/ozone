@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -59,10 +61,14 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   @Metric(about = "Bytes transferred for successful replication tasks")
   private MutableGaugeLong transferredBytes;
 
+  private final AtomicBoolean closed = new AtomicBoolean(false);
+  private final String metricsSourceName;
+
   public MeasuredReplicator(ContainerReplicator delegate, String name) {
     this.delegate = delegate;
     this.name = name;
-    DefaultMetricsSystem.instance().register(metricsName(),
+    this.metricsSourceName = MetricUtil.getMetricsSourceName(metricsName());
+    DefaultMetricsSystem.instance().register(metricsSourceName,
         "Closed container " + name + " replication metrics", this);
   }
 
@@ -92,7 +98,9 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    DefaultMetricsSystem.instance().unregisterSource(metricsName());
+    if (closed.compareAndSet(false, true)) {
+      DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
+    }
   }
 
   MutableCounterLong getSuccess() {

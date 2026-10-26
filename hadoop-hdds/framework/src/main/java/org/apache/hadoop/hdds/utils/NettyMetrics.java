@@ -25,6 +25,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocatorMetricProvider;
 
@@ -42,10 +43,15 @@ public final class NettyMetrics implements MetricsSource {
   // direct memory once instead of on every getMetrics() call.
   private static final long MAX_DIRECT_MEMORY = maxDirectMemory();
 
+  private boolean registered;
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+
   public static NettyMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     NettyMetrics metrics = new NettyMetrics();
-    return ms.register(SOURCE_NAME, "Netty metrics", metrics);
+    ms.register(metrics.sourceName, "Netty metrics", metrics);
+    metrics.registered = true;
+    return metrics;
   }
 
   @Override
@@ -57,9 +63,11 @@ public final class NettyMetrics implements MetricsSource {
         .addGauge(MetricsInfos.MAX_DIRECT_MEM, MAX_DIRECT_MEMORY);
   }
 
-  public void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+  public synchronized void unregister() {
+    if (registered) {
+      DefaultMetricsSystem.instance().unregisterSource(sourceName);
+      registered = false;
+    }
   }
 
   /**

@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Closeable;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -52,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * Container balancer is a service in SCM to move containers between over- and
  * under-utilized datanodes.
  */
-public class ContainerBalancer extends StatefulService<ContainerBalancerConfigurationProto> {
+public class ContainerBalancer extends StatefulService<ContainerBalancerConfigurationProto> implements Closeable {
 
   private static final AtomicInteger ID = new AtomicInteger();
 
@@ -404,6 +405,15 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
     }
 
     blockTillTaskStop(balancingThread);
+  }
+
+  @Override
+  public void close() {
+    try {
+      stop();
+    } finally {
+      metrics.unregister();
+    }
   }
 
   private static void blockTillTaskStop(Thread balancingThread) {

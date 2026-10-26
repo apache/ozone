@@ -159,7 +159,7 @@ public class TestBlockDeletingService {
   public void cleanup() throws IOException {
     if (blockDeletingService != null) {
       // Wait for deletion tasks to release container DB references before cleanup.
-      blockDeletingService.shutdown();
+      blockDeletingService.close();
     }
     BlockUtils.shutdownCache(conf);
     CodecBuffer.assertNoLeaks();
@@ -698,7 +698,7 @@ public class TestBlockDeletingService {
       assertEquals(BLOCK_CHUNK_SIZE,
           deletingServiceMetrics.getTotalPendingBlockBytes());
     }
-    blockDeletingService.shutdown();
+    blockDeletingService.close();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -901,7 +901,7 @@ public class TestBlockDeletingService {
       assertFalse(f.exists());
     }
 
-    blockDeletingService.shutdown();
+    blockDeletingService.close();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -926,7 +926,7 @@ public class TestBlockDeletingService {
     GenericTestUtils.waitFor(() -> blockDeletingService.getThreadCount() > 0, 100, 1000);
 
     // Shutdown service and verify all threads are stopped
-    blockDeletingService.shutdown();
+    blockDeletingService.close();
     GenericTestUtils.waitFor(() -> blockDeletingService.getThreadCount() == 0, 100, 1000);
   }
 
@@ -959,7 +959,7 @@ public class TestBlockDeletingService {
       svc.updateAndRestart(updatedConf);
       assertEquals(newInterval.toMillis(), svc.getIntervalMillis());
     } finally {
-      svc.shutdown();
+      svc.close();
     }
   }
 
@@ -997,7 +997,7 @@ public class TestBlockDeletingService {
     }, 100, 1000);
 
     log.stopCapturing();
-    svc.shutdown();
+    svc.close();
 
     // test for normal case that doesn't have timeout limitation
 
@@ -1028,7 +1028,7 @@ public class TestBlockDeletingService {
       assertThat(newLog.getOutput())
           .doesNotContain("Background task executes timed out, retrying in next interval");
     }
-    svc.shutdown();
+    svc.close();
   }
 
   private void createBlockDeletingService(
@@ -1112,7 +1112,7 @@ public class TestBlockDeletingService {
                   0 && containerData.get(1).getBytesUsed() == 0),
           100, 3000);
     } finally {
-      blockDeletingService.shutdown();
+      blockDeletingService.close();
     }
   }
 
@@ -1158,7 +1158,7 @@ public class TestBlockDeletingService {
             StringUtils.countMatches(log.getOutput(), "Max lock hold time"));
       }
     } finally {
-      blockDeletingService.shutdown();
+      blockDeletingService.close();
     }
   }
 
@@ -1240,7 +1240,7 @@ public class TestBlockDeletingService {
               100, 3000);
 
     } finally {
-      blockDeletingService.shutdown();
+      blockDeletingService.close();
     }
   }
 

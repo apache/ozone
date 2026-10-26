@@ -41,6 +41,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -73,6 +74,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -131,6 +133,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int clientPort;
 
   private final RaftServer server;
+  private final Set<ContainerStateMachine> stateMachines = ConcurrentHashMap.newKeySet();
   private final String name;
   private final List<ThreadPoolExecutor> chunkExecutors;
   private final ContainerDispatcher dispatcher;
@@ -238,8 +241,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
-    return new ContainerStateMachine(datanodeService, gid, dispatcher, containerController,
-        chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
+    ContainerStateMachine stateMachine = new ContainerStateMachine(datanodeService, gid, dispatcher,
+        containerController, chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
+    stateMachines.add(stateMachine);
+    return stateMachine;
+  }
+
+  void removeStateMachine(ContainerStateMachine stateMachine) {
+    stateMachines.remove(stateMachine);
   }
 
   private void setUpRatisStream(RaftProperties properties) {
@@ -587,19 +596,19 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   @Override
   public void stop() {
-    if (isStarted) {
-      try {
-        LOG.info("Closing {}", name);
-        // shutdown server before the executors as while shutting down,
-        // some of the tasks would be executed using the executors.
-        server.close();
-        for (ExecutorService executor : chunkExecutors) {
-          executor.shutdown();
-        }
-        isStarted = false;
-      } catch (IOException e) {
-        LOG.error("Failed to close {}.", name, e);
+    try {
+      LOG.info("Closing {}", name);
+      // Shutdown the server before the executors because closing divisions may still submit tasks.
+      server.close();
+    } catch (IOException e) {
+      LOG.error("Failed to close {}.", name, e);
+    } finally {
+      // Ratis can remove a division before initialization completes, without closing its state machine.
+      IOUtils.close(LOG, stateMachines);
+      for (ExecutorService executor : chunkExecutors) {
+        executor.shutdown();
       }
+      isStarted = false;
     }
   }
 

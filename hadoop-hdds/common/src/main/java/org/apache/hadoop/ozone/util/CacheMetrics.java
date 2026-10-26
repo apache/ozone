@@ -36,12 +36,13 @@ public final class CacheMetrics implements MetricsSource {
 
   private final Cache<?, ?> cache;
   private final String name;
+  private boolean registered;
   private final String sourceName;
 
   private CacheMetrics(Cache<?, ?> cache, String name) {
     this.cache = cache;
     this.name = name;
-    sourceName = SOURCE_NAME + "-" + name;
+    sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME + "-" + name);
   }
 
   public static CacheMetrics create(Cache<?, ?> cache, Object owner) {
@@ -53,7 +54,9 @@ public final class CacheMetrics implements MetricsSource {
   public static CacheMetrics create(Cache<?, ?> cache, String name) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     CacheMetrics source = new CacheMetrics(cache, name);
-    return ms.register(source.sourceName, "Cache Metrics", source);
+    ms.register(source.sourceName, "Cache Metrics", source);
+    source.registered = true;
+    return source;
   }
 
   @Override
@@ -78,9 +81,11 @@ public final class CacheMetrics implements MetricsSource {
 
   }
 
-  public void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(sourceName);
+  public synchronized void unregister() {
+    if (registered) {
+      DefaultMetricsSystem.instance().unregisterSource(sourceName);
+      registered = false;
+    }
   }
 
   enum CacheMetricsInfo implements MetricsInfo {

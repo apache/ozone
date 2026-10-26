@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -32,6 +33,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is used to track Volume Info stats for each HDDS Volume.
@@ -72,6 +74,7 @@ public class VolumeInfoMetrics implements MetricsSource {
           "(FilesystemUsed - OzoneUsed)");
 
   private final MetricsRegistry registry;
+  private final AtomicBoolean closed = new AtomicBoolean(false);
   private final String metricsSourceName;
   private final HddsVolume volume;
   @Metric("Returns the RocksDB compact times of the Volume")
@@ -105,20 +108,24 @@ public class VolumeInfoMetrics implements MetricsSource {
   public VolumeInfoMetrics(String identifier, HddsVolume volume) {
     this.volume = volume;
 
-    metricsSourceName = SOURCE_BASENAME + '-' + identifier;
-    registry = new MetricsRegistry(metricsSourceName);
+    String name = SOURCE_BASENAME + '-' + identifier;
+    metricsSourceName = MetricUtil.getMetricsSourceName(name);
+    registry = new MetricsRegistry(name);
 
     init();
   }
 
   public void init() {
+    closed.set(false);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.register(metricsSourceName, "Volume Info Statistics", this);
   }
 
   public void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(metricsSourceName);
+    if (closed.compareAndSet(false, true)) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ms.unregisterSource(metricsSourceName);
+    }
   }
 
   @Metric("Metric to return the Storage Type")

@@ -30,6 +30,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * A class for collecting and reporting bucket utilization metrics.
@@ -50,6 +51,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 public class BucketUtilizationMetrics implements MetricsSource {
 
   private static final String SOURCE = BucketUtilizationMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE);
+  private boolean registered;
 
   private final OMMetadataManager metadataManager;
 
@@ -59,7 +62,10 @@ public class BucketUtilizationMetrics implements MetricsSource {
 
   public static BucketUtilizationMetrics create(OMMetadataManager metadataManager) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE, "Bucket Utilization Metrics", new BucketUtilizationMetrics(metadataManager));
+    BucketUtilizationMetrics metrics = new BucketUtilizationMetrics(metadataManager);
+    ms.register(metrics.sourceName, "Bucket Utilization Metrics", metrics);
+    metrics.registered = true;
+    return metrics;
   }
 
   @Override
@@ -94,9 +100,20 @@ public class BucketUtilizationMetrics implements MetricsSource {
     }
   }
 
-  public void unRegister() {
+  public synchronized void register() {
+    if (!registered) {
+      DefaultMetricsSystem.instance().register(sourceName, "Bucket Utilization Metrics", this);
+      registered = true;
+    }
+  }
+
+  public synchronized void unRegister() {
+    if (!registered) {
+      return;
+    }
+    registered = false;
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE);
+    ms.unregisterSource(sourceName);
   }
 
   enum BucketMetricsInfo implements MetricsInfo {

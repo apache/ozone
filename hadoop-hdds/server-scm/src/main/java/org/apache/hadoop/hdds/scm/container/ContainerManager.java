@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import jakarta.annotation.Nullable;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
@@ -34,7 +35,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
  * ContainerManager is responsible for keeping track of all Containers and
  * managing all containers operations like creating, deleting etc.
  */
-public interface ContainerManager {
+public interface ContainerManager extends Closeable {
   /**
    * Reinitialize the containerManager with the updated container store.
    * @param containerStore Container Table

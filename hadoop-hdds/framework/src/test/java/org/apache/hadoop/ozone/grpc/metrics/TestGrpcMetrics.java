@@ -67,6 +67,22 @@ public class TestGrpcMetrics {
   }
 
   @Test
+  public void testUnregisterDoesNotRequireMetricsMonitor() throws Exception {
+    GrpcMetrics registeredMetrics = GrpcMetrics.create(new OzoneConfiguration());
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      // Sampling holds the metrics-system monitor before acquiring this monitor.
+      // Shutdown must not acquire the same monitors in the opposite order.
+      synchronized (registeredMetrics) {
+        executor.submit(registeredMetrics::unRegister).get(5, TimeUnit.SECONDS);
+      }
+    } finally {
+      executor.shutdownNow();
+      registeredMetrics.unRegister();
+    }
+  }
+
+  @Test
   public void testGrpcMetricsIsUsedAsItsOwnSource() {
     assertSame(metrics, source);
   }

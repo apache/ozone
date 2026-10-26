@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Class contains metrics for monitoring SST file pruning operations in RocksDBCheckpointDiffer.
@@ -37,6 +38,8 @@ public final class SSTFilePruningMetrics implements MetricsSource {
   private static final String METRICS_SOURCE_NAME_PREFIX = SSTFilePruningMetrics.class.getSimpleName();
   private final String metricSourceName;
   private final MetricsRegistry registry;
+  private final String sourceName;
+  private boolean registered;
 
   /*
    * Pruning Throughput Metrics.
@@ -60,6 +63,7 @@ public final class SSTFilePruningMetrics implements MetricsSource {
 
   private SSTFilePruningMetrics(String sourceName) {
     this.metricSourceName = sourceName;
+    this.sourceName = MetricUtil.getMetricsSourceName(sourceName);
     this.registry = new MetricsRegistry(metricSourceName);
   }
 
@@ -71,15 +75,21 @@ public final class SSTFilePruningMetrics implements MetricsSource {
   public static SSTFilePruningMetrics create(String dbLocation) {
     String sourceName = METRICS_SOURCE_NAME_PREFIX +
         (dbLocation == null || dbLocation.isEmpty() ? "" : "-" + dbLocation.replaceAll("[/\\:\\s]", "_"));
-    return DefaultMetricsSystem.instance().register(sourceName, "SST File Pruning Metrics",
-        new SSTFilePruningMetrics(sourceName));
+    SSTFilePruningMetrics metrics = new SSTFilePruningMetrics(sourceName);
+    DefaultMetricsSystem.instance().register(metrics.sourceName, "SST File Pruning Metrics", metrics);
+    metrics.registered = true;
+    return metrics;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(metricSourceName);
+  public synchronized void unRegister() {
+    if (!registered) {
+      return;
+    }
+    registered = false;
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void updateQueueSize(long queueSize) {

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 public final class BlockDeletingServiceMetrics {
 
   private static BlockDeletingServiceMetrics instance;
+  private static int referenceCount;
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
 
@@ -97,11 +99,44 @@ public final class BlockDeletingServiceMetrics {
     return instance;
   }
 
+  /** Acquires the shared metrics for one block deleting service. */
+  public static synchronized Handle acquireHandle() {
+    BlockDeletingServiceMetrics metrics = create();
+    referenceCount++;
+    return new Handle(metrics);
+  }
+
+  /** Keeps the shared source registered until the final service stops. */
+  public static final class Handle implements AutoCloseable {
+    private final BlockDeletingServiceMetrics metrics;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    private Handle(BlockDeletingServiceMetrics metrics) {
+      this.metrics = metrics;
+    }
+
+    public BlockDeletingServiceMetrics metrics() {
+      return metrics;
+    }
+
+    @Override
+    public void close() {
+      if (closed.compareAndSet(false, true)) {
+        synchronized (BlockDeletingServiceMetrics.class) {
+          if (instance == metrics && --referenceCount == 0) {
+            unRegister();
+          }
+        }
+      }
+    }
+  }
+
   /**
    * Unregister the metrics instance.
    */
   public static synchronized void unRegister() {
     instance = null;
+    referenceCount = 0;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }

@@ -1643,13 +1643,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       stateMachine.stopDNServerStartRetry();
     }
     try {
-      if (containerBalancer.isBalancerRunning()) {
-        LOG.info("Stopping Container Balancer service.");
-        // stop ContainerBalancer thread in this scm
-        containerBalancer.stop();
-      } else {
-        LOG.info("Container Balancer is not running.");
-      }
+      LOG.info("Stopping Container Balancer service.");
+      containerBalancer.close();
     } catch (Exception e) {
       LOG.error("Failed to stop Container Balancer service.", e);
     }
@@ -1749,7 +1744,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMHAMetrics.unRegister();
     }
 
-    IOUtils.cleanupWithLogger(LOG, pipelineManager);
+    IOUtils.cleanupWithLogger(LOG, pipelineManager, containerManager, scmNodeManager);
 
     if (ms != null) {
       ms.stop();

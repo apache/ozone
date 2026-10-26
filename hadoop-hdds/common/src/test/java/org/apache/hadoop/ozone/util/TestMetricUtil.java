@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.junit.jupiter.api.AfterEach;
@@ -28,6 +30,15 @@ class TestMetricUtil {
   @AfterEach
   void resetMiniClusterMode() {
     DefaultMetricsSystem.setMiniClusterMode(false);
+  }
+
+  @Test
+  void testUniqueMetricsSourceName() {
+    assertEquals("source", MetricUtil.getMetricsSourceName("source"));
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    String first = MetricUtil.getMetricsSourceName("source");
+    assertTrue(first.startsWith("source-"));
+    assertNotEquals(first, MetricUtil.getMetricsSourceName("source"));
   }
 
   @Test

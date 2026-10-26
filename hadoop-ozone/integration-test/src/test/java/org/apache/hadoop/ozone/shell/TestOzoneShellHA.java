@@ -699,6 +699,7 @@ public class TestOzoneShellHA {
     } finally {
       // Cleanup
       IOUtils.closeQuietly(streams);
+      IOUtils.closeQuietly(fs);
     }
 
   }
@@ -818,6 +819,7 @@ public class TestOzoneShellHA {
     }  finally {
       // Cleanup
       IOUtils.closeQuietly(streams);
+      IOUtils.closeQuietly(fs);
     }
   }
 
@@ -946,6 +948,7 @@ public class TestOzoneShellHA {
     }  finally {
       // Cleanup
       IOUtils.closeQuietly(streams);
+      IOUtils.closeQuietly(fs);
     }
   }
 

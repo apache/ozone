@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -24,6 +25,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics class for EC Reconstruction.
@@ -35,6 +37,8 @@ public final class ECReconstructionMetrics {
   private static final String SOURCE =
       ECReconstructionMetrics.class.getSimpleName();
 
+  private final AtomicBoolean registered = new AtomicBoolean(false);
+  private final String metricsSourceName = MetricUtil.getMetricsSourceName(SOURCE);
   private @Metric MutableCounterLong blockGroupReconstructionTotal;
   private @Metric MutableCounterLong blockGroupReconstructionFailsTotal;
   private @Metric MutableCounterLong reconstructionTotal;
@@ -45,13 +49,17 @@ public final class ECReconstructionMetrics {
 
   public static ECReconstructionMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE, "EC Reconstruction Coordinator Metrics",
-        new ECReconstructionMetrics());
+    ECReconstructionMetrics metrics = new ECReconstructionMetrics();
+    ms.register(metrics.metricsSourceName, "EC Reconstruction Coordinator Metrics", metrics);
+    metrics.registered.set(true);
+    return metrics;
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE);
+    if (registered.compareAndSet(true, false)) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ms.unregisterSource(metricsSourceName);
+    }
   }
 
   public void incBlockGroupReconstructionTotal(long count) {

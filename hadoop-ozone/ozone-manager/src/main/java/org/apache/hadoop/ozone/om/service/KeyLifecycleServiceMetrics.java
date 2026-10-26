@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Class contains metrics related to the OM KeyLifeCycle services.
@@ -36,6 +37,8 @@ public final class KeyLifecycleServiceMetrics implements MetricsSource {
 
   public static final String METRICS_SOURCE_NAME =
       KeyLifecycleServiceMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME);
+  private boolean registered;
   private MetricsRegistry registry;
 
   @Metric("Total no. of tasks skipped due to previous round task of this bucket has not finished")
@@ -105,16 +108,23 @@ public final class KeyLifecycleServiceMetrics implements MetricsSource {
    * @return KeyLifecycleServiceMetrics
    */
   public static KeyLifecycleServiceMetrics create() {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+    KeyLifecycleServiceMetrics metrics = new KeyLifecycleServiceMetrics();
+    DefaultMetricsSystem.instance().register(metrics.sourceName,
         "Metrics tracking the lifecycle service in the OM",
-        new KeyLifecycleServiceMetrics());
+        metrics);
+    metrics.registered = true;
+    return metrics;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+  public synchronized void unregister() {
+    if (!registered) {
+      return;
+    }
+    registered = false;
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void incrNumSkippedTask() {

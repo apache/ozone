@@ -116,6 +116,9 @@ public class TestContainerManagerImpl {
 
   @AfterEach
   public void cleanup() throws Exception {
+    if (containerManager != null) {
+      containerManager.close();
+    }
     if (dbStore != null) {
       dbStore.close();
     }

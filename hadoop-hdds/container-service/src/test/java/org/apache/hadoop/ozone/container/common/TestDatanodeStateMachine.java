@@ -37,8 +37,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -54,6 +56,9 @@ import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -148,6 +153,27 @@ public class TestDatanodeStateMachine {
     } catch (Exception e) {
       //ignore all exception from the shutdown
     }
+  }
+
+  @Test
+  void testCloseUnregistersClientCacheMetrics() throws Exception {
+    Set<String> before = clientCacheMetricsSources();
+    try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
+      assertThat(clientCacheMetricsSources().size()).isGreaterThan(before.size());
+      stateMachine.close();
+      stateMachine.close();
+      assertThat(clientCacheMetricsSources()).containsExactlyInAnyOrderElementsOf(before);
+    }
+  }
+
+  private Set<String> clientCacheMetricsSources() throws ReflectiveOperationException {
+    Field field = MetricsSystemImpl.class.getDeclaredField("allSources");
+    field.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<String, MetricsSource> sources = (Map<String, MetricsSource>) field.get(DefaultMetricsSystem.instance());
+    Set<String> names = new HashSet<>(sources.keySet());
+    names.removeIf(name -> !name.startsWith("CacheMetrics-XceiverClientManager@"));
+    return names;
   }
 
   /**
