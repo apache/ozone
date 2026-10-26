@@ -21,7 +21,8 @@
 #include "rocksdb/raw_iterator.h"
 #include <string>
 #include "cplusplus_to_java_convert.h"
-#include <iostream>
+#include <algorithm>
+#include <cstring>
 
 template <class T>
 static jint copyToDirect(JNIEnv* env, T& source, jobject jtarget, jint jtarget_off, jint jtarget_len);
