@@ -1159,13 +1159,63 @@ class TestObjectPut {
     assertThat(key.isFile()).as("directory").isFalse();
   }
 
-  @Test
-  void testDirectoryCreationWithUnsignedTrailer() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDirectoryCreationWithUnsignedTrailer(boolean hasContentLength) throws Exception {
     configureUnsignedTrailer(0, false);
+    String body = "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n";
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(hasContentLength ? String.valueOf(body.length()) : null);
 
-    assertSucceeds(() -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/",
-        "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n"));
+    try (InputStream input = new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))) {
+      assertSucceeds(() -> objectEndpoint.put(FSO_BUCKET_NAME, "dir/", input));
+    }
     assertThat(fsoBucket.getKey("dir/").isFile()).isFalse();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutNonEmptyObjectWithTrailingSlashWithoutContentLength(boolean signed) throws Exception {
+    String content = "hello";
+    String body;
+    if (signed) {
+      configureSignedChunksWithTrailer(content.length());
+      ((OzoneBucketStub) fsoBucket).setDerivedKey(signingKey());
+      when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+      body = signedChunkedBodyWithTrailer(content, "x-amz-checksum-crc32", "NhCmhg==");
+    } else {
+      configureUnsignedTrailer(content.length(), false);
+      body = "5\r\nhello\r\n0\r\nx-amz-checksum-crc32:NhCmhg==\r\n\r\n";
+    }
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn(null);
+
+    try (InputStream input = new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))) {
+      assertSucceeds(() -> objectEndpoint.put(FSO_BUCKET_NAME, "dir/", input));
+    }
+
+    OzoneKeyDetails key = fsoBucket.getKey("dir/");
+    assertThat(key.isFile()).isTrue();
+    assertThat(key.getDataSize()).isEqualTo(content.length());
+    assertKeyContent(fsoBucket, "dir/", content);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"'',5", "hello,0"})
+  void testPutWithTrailingSlashUsesContentLengthForNonStreamingPayload(String content, String decodedLength)
+      throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(decodedLength);
+
+    assertSucceeds(() -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", content));
+
+    OzoneKeyDetails key = fsoBucket.getKey("dir/");
+    assertThat(key.isFile()).isEqualTo(!content.isEmpty());
+    assertThat(key.getDataSize()).isEqualTo(content.length());
+    if (!content.isEmpty()) {
+      assertKeyContent(fsoBucket, "dir/", content);
+    }
   }
 
   @ParameterizedTest
