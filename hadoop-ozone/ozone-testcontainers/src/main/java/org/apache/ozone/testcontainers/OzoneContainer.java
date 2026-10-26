@@ -18,6 +18,7 @@
 package org.apache.ozone.testcontainers;
 
 import java.time.Duration;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
@@ -38,24 +39,15 @@ import org.testcontainers.utility.DockerImageName;
  * <p>Readiness: the container waits for the S3 Gateway port, then retries {@code ozone admin safemode wait}
  * until SCM leaves safe mode. The startup timeout defaults to four minutes and can be changed with
  * {@link #withStartupTimeout(Duration)}.
- *
- * <p><b>Incubating:</b> this module is new and its API may change in a future
- * release.
  */
+@InterfaceStability.Evolving
 public class OzoneContainer extends GenericContainer<OzoneContainer> {
 
   public static final int S3G_PORT = 9878;
 
-  static final DockerImageName DEFAULT_IMAGE =
-      DockerImageName.parse("apache/ozone:2.2.1-all-in-one");
-
   private static final String ACCESS_KEY = "testuser";
   private static final String SECRET_KEY = "testsecret";
   private static final String REGION = "us-east-1";
-
-  public OzoneContainer() {
-    this(DEFAULT_IMAGE);
-  }
 
   public OzoneContainer(DockerImageName image) {
     super(image);

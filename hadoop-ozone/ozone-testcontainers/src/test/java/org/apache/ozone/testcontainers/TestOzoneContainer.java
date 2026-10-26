@@ -117,13 +117,13 @@ class TestOzoneContainer {
               AwsBasicCredentials.create(ozone.getAccessKey(), ozone.getSecretKey())))
           .region(Region.of(ozone.getRegion()))
           .forcePathStyle(true)
+          .overrideConfiguration(c -> c.retryStrategy(b -> b.maxAttempts(1)))
           .build()) {
 
         String bucket = "test-bucket";
         String key = "hello.txt";
         String body = "hello ozone";
 
-        // The container is ready (out of safe mode) after start(), so no retry.
         s3.createBucket(b -> b.bucket(bucket));
         s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromString(body));
 
@@ -139,7 +139,7 @@ class TestOzoneContainer {
   /** CI sets {@code OZONE_IMAGE} to the ghcr.io mirror to avoid Docker Hub rate limits. */
   private static DockerImageName smokeTestImage() {
     String repository = System.getenv().getOrDefault("OZONE_IMAGE", "apache/ozone");
-    return DockerImageName.parse(repository + ":" + OzoneContainer.DEFAULT_IMAGE.getVersionPart());
+    return DockerImageName.parse(repository + ":2.2.1-all-in-one");
   }
 
   private static ExecResult execResult(int exitCode) {
@@ -156,6 +156,10 @@ class TestOzoneContainer {
   }
 
   private static final class TestableOzoneContainer extends OzoneContainer {
+    private TestableOzoneContainer() {
+      super(smokeTestImage());
+    }
+
     void awaitReady(WaitStrategyTarget target) {
       getWaitStrategy().waitUntilReady(target);
     }

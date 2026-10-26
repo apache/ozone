@@ -28,7 +28,7 @@ raised on [HDDS-14893](https://issues.apache.org/jira/browse/HDDS-14893).
 Add `org.apache.ozone:ozone-testcontainers` as a test dependency, then:
 
 ```java
-try (OzoneContainer ozone = new OzoneContainer()) {
+try (OzoneContainer ozone = new OzoneContainer(DockerImageName.parse("apache/ozone:2.2.1-all-in-one"))) {
   ozone.start();
   try (S3Client s3 = S3Client.builder()
       .endpointOverride(URI.create(ozone.getS3Endpoint()))
@@ -42,10 +42,11 @@ try (OzoneContainer ozone = new OzoneContainer()) {
 }
 ```
 
-The default image is the all-in-one quickstart image
-([HDDS-14452](https://issues.apache.org/jira/browse/HDDS-14452)); pass a different one with
-`new OzoneContainer(DockerImageName)`. See the `OzoneContainer` javadoc for credentials and
-readiness behavior.
+Choose an explicit version of the all-in-one quickstart image
+([HDDS-14452](https://issues.apache.org/jira/browse/HDDS-14452)). The image version is independent
+of the `ozone-testcontainers` dependency version. The image must run a non-secure Ozone cluster
+with S3 Gateway on port 9878 and provide the `ozone admin safemode wait` command.
+See the `OzoneContainer` javadoc for credentials and readiness behavior.
 
 ## Run
 
