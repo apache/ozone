@@ -25,6 +25,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.MAX_ECHO_PAYLOAD_SIZE;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.MAX_ECHO_SLEEP_MS;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
@@ -74,6 +76,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -353,6 +356,50 @@ public class TestKeyValueHandler {
   }
 
   @Test
+  public void testEchoSleepIsClamped() throws Exception {
+    KeyValueHandler kvHandler = createKeyValueHandler(tempDir).getHandler();
+
+    ContainerCommandResponseProto quick = KeyValueHandler.dispatchRequest(kvHandler, echoRequest(1, 1), null, null);
+    assertThat(quick.getResult()).isEqualTo(ContainerProtos.Result.SUCCESS);
+
+    final int wellAboveCap = MAX_ECHO_SLEEP_MS + 10_000;
+    long start = System.nanoTime();
+    ContainerCommandResponseProto clamped =
+        KeyValueHandler.dispatchRequest(kvHandler, echoRequest(wellAboveCap, 1), null, null);
+    long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+    assertThat(clamped.getResult()).isEqualTo(ContainerProtos.Result.SUCCESS);
+    assertThat(elapsedMs).isLessThan(wellAboveCap - MAX_ECHO_SLEEP_MS);
+  }
+
+  @Test
+  public void testEchoPayloadIsClamped() throws Exception {
+    KeyValueHandler kvHandler = createKeyValueHandler(tempDir).getHandler();
+
+    ContainerCommandResponseProto small = KeyValueHandler.dispatchRequest(kvHandler, echoRequest(0, 1), null, null);
+    assertThat(small.getResult()).isEqualTo(ContainerProtos.Result.SUCCESS);
+    assertThat(small.getEcho().getPayload().size()).isEqualTo(1);
+
+    ContainerCommandResponseProto clamped =
+        KeyValueHandler.dispatchRequest(kvHandler, echoRequest(0, MAX_ECHO_PAYLOAD_SIZE + 1), null, null);
+    assertThat(clamped.getResult()).isEqualTo(ContainerProtos.Result.SUCCESS);
+    assertThat(clamped.getEcho().getPayload().size()).isEqualTo(MAX_ECHO_PAYLOAD_SIZE);
+
+    ContainerCommandResponseProto negative = KeyValueHandler.dispatchRequest(kvHandler, echoRequest(0, -1), null, null);
+    assertThat(negative.getResult()).isEqualTo(ContainerProtos.Result.SUCCESS);
+    assertThat(negative.getEcho().getPayload().size()).isZero();
+  }
+
+  private static ContainerCommandRequestProto echoRequest(int sleepTimeMs, int payloadSizeResp) {
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.Echo)
+        .setContainerID(DUMMY_CONTAINER_ID)
+        .setDatanodeUuid(DATANODE_UUID)
+        .setEcho(ContainerProtos.EchoRequestProto.newBuilder().setSleepTimeMs(sleepTimeMs)
+            .setPayloadSizeResp(payloadSizeResp))
+        .build();
+  }
+
+  @Test
   public void testVolumeSetInKeyValueHandler() throws Exception {
     File datanodeDir =
         Files.createDirectory(tempDir.resolve("datanodeDir")).toFile();
@@ -625,6 +672,32 @@ public class TestKeyValueHandler {
       assertThat(kvHandlerLogs.getOutput()).contains(expectedLog);
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
+
+  @Test
+  public void testDeleteRecoveringContainer() throws IOException {
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir);
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+    try {
+      ContainerCommandRequestProto.Builder request = createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID)
+          .toBuilder();
+      request.getCreateContainerBuilder().setState(State.RECOVERING);
+      assertThat(keyValueHandler.handleCreateContainer(request.build(), null).getResult())
+          .isEqualTo(ContainerProtos.Result.SUCCESS);
+      Container<?> container = containerSet.getContainer(DUMMY_CONTAINER_ID);
+      assertThat(container).isNotNull();
+      assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
+      assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
+
+      keyValueHandler.deleteContainer(container, true);
+
+      assertThat(containerSet.getContainer(DUMMY_CONTAINER_ID)).isNull();
+      assertThat(containerSet.getRecoveringContainerMap()).doesNotContainKey(DUMMY_CONTAINER_ID);
+    } finally {
+      keyValueHandler.stop();
+      handlerCtx.getVolumeSet().getVolumesList().forEach(StorageVolume::shutdown);
     }
   }
 
