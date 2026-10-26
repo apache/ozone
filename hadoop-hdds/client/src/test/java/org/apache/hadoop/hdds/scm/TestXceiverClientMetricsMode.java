@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import static org.apache.hadoop.hdds.scm.XceiverClientMetrics.SOURCE_NAME;
 import static org.apache.hadoop.hdds.scm.XceiverClientMetrics.isSinkConfigured;
+import static org.apache.hadoop.hdds.scm.XceiverClientMetrics.metricsConfigLocator;
 import static org.apache.hadoop.hdds.scm.XceiverClientMetrics.startsMetricsSystem;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -32,6 +33,7 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Function;
 import javax.management.ObjectName;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig.MetricsMode;
@@ -92,14 +94,64 @@ class TestXceiverClientMetricsMode {
     assertTrue(sinkConfigured());
   }
 
+  @Test
+  void clientFileInWorkingDirectory() throws IOException {
+    write(workDir(), CLIENT_FILE, FILE_SINK_DEFAULTS + CLIENT_FILE_SINK);
+    assertTrue(sinkConfigured());
+  }
+
+  @Test
+  void clientFileInHomeDirectory() throws IOException {
+    write(homeDir(), CLIENT_FILE, FILE_SINK_DEFAULTS + CLIENT_FILE_SINK);
+    assertTrue(sinkConfigured());
+  }
+
+  @Test
+  void workingDirectoryWinsOverHomeDirectoryAndClasspath() throws IOException {
+    write(workDir(), CLIENT_FILE, "*.period=10\n");
+    write(homeDir(), CLIENT_FILE, FILE_SINK_DEFAULTS + CLIENT_FILE_SINK);
+    write(CLIENT_FILE, FILE_SINK_DEFAULTS + CLIENT_FILE_SINK);
+    assertFalse(sinkConfigured());
+  }
+
+  @Test
+  void homeDirectoryWinsOverClasspath() throws IOException {
+    write(homeDir(), CLIENT_FILE, "*.period=10\n");
+    write(CLIENT_FILE, FILE_SINK_DEFAULTS + CLIENT_FILE_SINK);
+    assertFalse(sinkConfigured());
+  }
+
+  /** As in Hadoop's MetricsConfig, the default file is only read if the client file is nowhere. */
+  @Test
+  void clientFileAnywhereWinsOverDefaultFileInWorkingDirectory() throws IOException {
+    write(workDir(), DEFAULT_FILE, FILE_SINK_DEFAULTS + CLIENT_FILE_SINK);
+    write(CLIENT_FILE, "*.period=10\n");
+    assertFalse(sinkConfigured());
+  }
+
+  /** Hadoop follows includes (case-insensitive) into other files, which may configure the sink. */
+  @ParameterizedTest
+  @ValueSource(strings = {"include", "includeoptional", "INCLUDE", "IncludeOptional"})
+  void includeDirectiveCountsAsSink(String directive) throws IOException {
+    write(DEFAULT_FILE, FILE_SINK_DEFAULTS + directive + "=sinks.properties\n");
+    assertTrue(sinkConfigured());
+  }
+
+  @Test
+  void includeInClientFileCountsAsSink() throws IOException {
+    write(CLIENT_FILE, "include=${user.home}/sinks.properties\n");
+    assertTrue(sinkConfigured());
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void startsMetricsSystemByMode(boolean withSink) throws IOException {
     write(DEFAULT_FILE, FILE_SINK_DEFAULTS + (withSink ? CLIENT_FILE_SINK : ""));
     try (URLClassLoader loader = loader()) {
-      assertTrue(startsMetricsSystem(MetricsMode.ALWAYS, loader));
-      assertFalse(startsMetricsSystem(MetricsMode.NEVER, loader));
-      assertEquals(withSink, startsMetricsSystem(MetricsMode.AUTO, loader));
+      Function<String, URL> locator = locator(loader);
+      assertTrue(startsMetricsSystem(MetricsMode.ALWAYS, locator));
+      assertFalse(startsMetricsSystem(MetricsMode.NEVER, locator));
+      assertEquals(withSink, startsMetricsSystem(MetricsMode.AUTO, locator));
     }
   }
 
@@ -122,18 +174,40 @@ class TestXceiverClientMetricsMode {
     }
   }
 
+  /** Writes a file onto the test classpath. */
   private void write(String name, String content) throws IOException {
-    Files.write(dir.resolve(name), content.getBytes(StandardCharsets.UTF_8));
+    write(classpathDir(), name, content);
+  }
+
+  private static void write(Path where, String name, String content) throws IOException {
+    Files.write(where.resolve(name), content.getBytes(StandardCharsets.UTF_8));
   }
 
   private boolean sinkConfigured() throws IOException {
     try (URLClassLoader loader = loader()) {
-      return isSinkConfigured(SOURCE_NAME, loader);
+      return isSinkConfigured(SOURCE_NAME, locator(loader));
     }
   }
 
-  /** Sees only the files in {@link #dir}, not the test classpath. */
+  /** Looks in {@link #workDir()}, then {@link #homeDir()}, then the loader. */
+  private Function<String, URL> locator(URLClassLoader loader) throws IOException {
+    return metricsConfigLocator(workDir().toFile(), homeDir().toFile(), loader::getResource);
+  }
+
+  /** Sees only the files in {@link #classpathDir()}, not the test classpath. */
   private URLClassLoader loader() throws IOException {
-    return new URLClassLoader(new URL[] {dir.toUri().toURL()}, null);
+    return new URLClassLoader(new URL[] {classpathDir().toUri().toURL()}, null);
+  }
+
+  private Path workDir() throws IOException {
+    return Files.createDirectories(dir.resolve("work"));
+  }
+
+  private Path homeDir() throws IOException {
+    return Files.createDirectories(dir.resolve("home"));
+  }
+
+  private Path classpathDir() throws IOException {
+    return Files.createDirectories(dir.resolve("classpath"));
   }
 }

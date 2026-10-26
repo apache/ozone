@@ -18,11 +18,14 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.EnumMap;
 import java.util.Properties;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -102,7 +105,8 @@ public class XceiverClientMetrics implements MetricsSource {
   }
 
   public static XceiverClientMetrics create() {
-    if (startsMetricsSystem(metricsMode, classLoader())) {
+    if (startsMetricsSystem(metricsMode, metricsConfigLocator(null, new File(System.getProperty("user.home")),
+        XceiverClientMetrics::classpathResource))) {
       DefaultMetricsSystem.initialize(SOURCE_NAME);
     }
     // Registering is cheap without a started metrics system: the source goes live if the system starts later.
@@ -111,27 +115,27 @@ public class XceiverClientMetrics implements MetricsSource {
         new XceiverClientMetrics());
   }
 
-  static boolean startsMetricsSystem(MetricsMode mode, ClassLoader loader) {
+  static boolean startsMetricsSystem(MetricsMode mode, Function<String, URL> locator) {
     switch (mode) {
     case ALWAYS:
       return true;
     case NEVER:
       return false;
     default:
-      return isSinkConfigured(SOURCE_NAME, loader);
+      return isSinkConfigured(SOURCE_NAME, locator);
     }
   }
 
   /**
    * Whether the metrics system would configure a sink for the prefix. Same lookup as Hadoop's MetricsConfig:
-   * the first of hadoop-metrics2-[prefix].properties and hadoop-metrics2.properties found on the classpath, with
+   * the first of hadoop-metrics2-[prefix].properties and hadoop-metrics2.properties that the locator finds, with
    * [prefix].sink.[instance].[option] keys; "*.sink" keys only supply defaults. Uses java.util.Properties to avoid
    * loading Commons Configuration.
    */
-  static boolean isSinkConfigured(String prefix, ClassLoader loader) {
+  static boolean isSinkConfigured(String prefix, Function<String, URL> locator) {
     final String lowerPrefix = StringUtils.toLowerCase(prefix);
     for (String name : new String[] {"hadoop-metrics2-" + lowerPrefix + ".properties", "hadoop-metrics2.properties"}) {
-      final URL url = loader.getResource(name);
+      final URL url = locator.apply(name);
       if (url == null) {
         continue;
       }
@@ -142,6 +146,12 @@ public class XceiverClientMetrics implements MetricsSource {
         LOG.warn("Failed to read {}, starting the metrics system", url, e);
         return true;
       }
+      // Hadoop's parser follows include and includeoptional into other files, which may configure the sink
+      if (properties.stringPropertyNames().stream()
+          .anyMatch(key -> key.equalsIgnoreCase("include") || key.equalsIgnoreCase("includeoptional"))) {
+        LOG.debug("{} includes other files, starting the metrics system", url);
+        return true;
+      }
       final String sinkPrefix = lowerPrefix + ".sink.";
       return properties.stringPropertyNames().stream()
           .anyMatch(key -> key.startsWith(sinkPrefix)
@@ -150,9 +160,36 @@ public class XceiverClientMetrics implements MetricsSource {
     return false;
   }
 
-  private static ClassLoader classLoader() {
+  /**
+   * Finds a metrics configuration file by name where Hadoop's MetricsConfig would, through Commons Configuration's
+   * default location strategy for a relative file name: in the working directory, in the user's home directory, then
+   * on the classpath.
+   *
+   * @param workingDir where to look first, or null for the working directory itself
+   * @param homeDir where to look next
+   * @param classpath where to look last
+   */
+  static Function<String, URL> metricsConfigLocator(File workingDir, File homeDir, Function<String, URL> classpath) {
+    return name -> {
+      for (File file : new File[] {workingDir == null ? new File(name) : new File(workingDir, name),
+          new File(homeDir, name)}) {
+        if (file.isFile()) {
+          try {
+            return file.toURI().toURL();
+          } catch (MalformedURLException e) {
+            LOG.debug("Skipping {}", file, e);
+          }
+        }
+      }
+      return classpath.apply(name);
+    };
+  }
+
+  /** The classpath resource, from the thread's context class loader, then the system class loader. */
+  private static URL classpathResource(String name) {
     final ClassLoader loader = Thread.currentThread().getContextClassLoader();
-    return loader != null ? loader : XceiverClientMetrics.class.getClassLoader();
+    final URL url = loader == null ? null : loader.getResource(name);
+    return url != null ? url : ClassLoader.getSystemResource(name);
   }
 
   public void incrPendingContainerOpsMetrics(ContainerProtos.Type type) {
