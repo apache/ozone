@@ -29,10 +29,13 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
@@ -68,6 +71,8 @@ public class XceiverClientManager extends XceiverClientCreator {
       LoggerFactory.getLogger(XceiverClientManager.class);
 
   private final Cache<String, XceiverClientSpi> clientCache;
+  // The cache expires idle clients only while it is used, so this cleans it up periodically to close them anyway.
+  private final ScheduledExecutorService cleanupExecutor;
   private final CacheMetrics cacheMetrics;
   private static XceiverClientMetrics metrics;
   private final ConcurrentHashMap<String, DatanodeDetails> localDNCache;
@@ -108,9 +113,23 @@ public class XceiverClientManager extends XceiverClientCreator {
               }
             }
           }).build();
+    cleanupExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder()
+        .setNameFormat("XceiverClientManager-cleanup-%d").setDaemon(true).build());
+    if (staleThresholdMs > 0) {
+      cleanupExecutor.scheduleWithFixedDelay(this::cleanUpCache, staleThresholdMs, staleThresholdMs, MILLISECONDS);
+    }
 
     cacheMetrics = CacheMetrics.create(clientCache, this);
     this.localDNCache = new ConcurrentHashMap<>();
+  }
+
+  private void cleanUpCache() {
+    try {
+      clientCache.cleanUp();
+    } catch (RuntimeException e) {
+      // keep the task scheduled
+      LOG.warn("Failed to close idle clients", e);
+    }
   }
 
   @VisibleForTesting
@@ -276,6 +295,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public void close() {
     super.close();
+    cleanupExecutor.shutdown();
     //closing is done through RemovalListener
     clientCache.invalidateAll();
     clientCache.cleanUp();
