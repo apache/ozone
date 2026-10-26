@@ -25,6 +25,7 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.api.trace.TracerProvider;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
@@ -249,10 +250,16 @@ public final class TracingUtil {
             .setTracerProvider(tracerProvider)
             .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
             .build();
-        if (!GlobalOpenTelemetry.isSet() || !isRealGlobal(GlobalOpenTelemetry.get())) {
-          GlobalOpenTelemetry.set(sdk);
+        if (!GlobalOpenTelemetry.isSet() && trySetGlobal(sdk)) {
+          tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
+        } else if (isRealGlobal(GlobalOpenTelemetry.get())) {
+          tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
+        } else {
+          // A global was set already, e.g. OpenTelemetry's default after an early GlobalOpenTelemetry.get(); it can't
+          // be replaced, so Ozone uses its SDK without registering it.
+          LOG.info("Tracing: GlobalOpenTelemetry is already set to a no-op, using Ozone's SDK without registering it");
+          tracer = sdk.getTracer(GLOBAL_TRACER_NAME);
         }
-        tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
       } else {
         sdk = OpenTelemetrySdk.builder()
             .setTracerProvider(tracerProvider)
@@ -267,12 +274,25 @@ public final class TracingUtil {
     }
   }
 
+  /** Sets the global, unless another thread has set one first. */
+  private static boolean trySetGlobal(OpenTelemetrySdk sdk) {
+    try {
+      GlobalOpenTelemetry.set(sdk);
+      return true;
+    } catch (IllegalStateException e) {
+      return false;
+    }
+  }
+
   /**
    * Distinguish an application-registered GlobalOpenTelemetry from the OTel built-in noop.
-   * OpenTelemetry.noop() returns a singleton, so identity comparison is sufficient.
+   * OpenTelemetry.noop() returns a singleton. GlobalOpenTelemetry.get() without a registered global installs it wrapped
+   * in another object, which delegates to the same no-op tracer provider, so that is compared too.
    */
   private static boolean isRealGlobal(OpenTelemetry global) {
-    return global != null && global != OpenTelemetry.noop();
+    return global != null && global != OpenTelemetry.noop()
+        && global.getTracerProvider() != OpenTelemetry.noop().getTracerProvider()
+        && global.getTracerProvider() != TracerProvider.noop();
   }
 
   /**

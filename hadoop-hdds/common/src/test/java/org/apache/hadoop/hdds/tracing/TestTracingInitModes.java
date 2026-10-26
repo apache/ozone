@@ -271,6 +271,46 @@ public class TestTracingInitModes {
     appProvider.shutdown();
   }
 
+  /**
+   * app-aware: a library that reads GlobalOpenTelemetry after Ozone's init, before Ozone's first traced call, makes
+   * OpenTelemetry install its default, a wrapped no-op. That must not be adopted: Ozone's child spans still need an
+   * SDK.
+   */
+  @Test
+  public void testApplicationAwareAfterDefaultGlobalRead() {
+    MutableConfigurationSource conf = configDroppingSpans(false, true);
+    TracingUtil.initTracing("app-aware-lazy", conf);
+    GlobalOpenTelemetry.get();
+    assertTrue(GlobalOpenTelemetry.isSet());
+
+    SdkTracerProvider appProvider = noExportTracerProvider();
+    Span appSpan = appProvider.get("app").spanBuilder("app-root").startSpan();
+    try (Scope ignored = appSpan.makeCurrent();
+         TracingUtil.TraceCloseable ignoredChild = TracingUtil.createActivatedSpan("child")) {
+      Span child = Span.current();
+      assertTrue(child.getSpanContext().isValid());
+      assertEquals(appSpan.getSpanContext().getTraceId(), child.getSpanContext().getTraceId());
+      // a no-op tracer would hand back the parent itself
+      assertNotEquals(appSpan.getSpanContext().getSpanId(), child.getSpanContext().getSpanId(),
+          "Ozone should create its own child span");
+    } finally {
+      appSpan.end();
+      appProvider.shutdown();
+    }
+  }
+
+  /** Enabled: OpenTelemetry's default global, installed by an earlier read, must not replace Ozone's SDK. */
+  @Test
+  public void testEnabledModeAfterDefaultGlobalRead() {
+    GlobalOpenTelemetry.get();
+    MutableConfigurationSource conf = configDroppingSpans(true, true);
+    TracingUtil.initTracing("enabled-after-default", conf);
+
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("root")) {
+      assertTrue(Span.current().getSpanContext().isValid(), "Enabled tracing should produce a valid root span");
+    }
+  }
+
   /** Enabled: Ozone's SDK is built at init, as before, so root spans can start at once. */
   @Test
   public void testEnabledModeBuildsSdkEagerly() {
