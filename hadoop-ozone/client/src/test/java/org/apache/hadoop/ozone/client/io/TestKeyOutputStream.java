@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -36,20 +39,32 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.util.Collections;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.MockRatisPipeline;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
@@ -63,9 +78,236 @@ import org.slf4j.event.Level;
  */
 public class TestKeyOutputStream {
 
+  private static final int CHUNK_SIZE = 100;
+  private static final long FLUSH_SIZE = 400;
+  private static final long BLOCK_SIZE = 800;
+
   @BeforeAll
   static void init() {
     GenericTestUtils.setLogLevel(KeyOutputStreamSemaphore.class, Level.DEBUG);
+  }
+
+  private static OzoneClientConfig createConfig() {
+    OzoneClientConfig config = new OzoneClientConfig();
+    config.setStreamBufferSize(CHUNK_SIZE);
+    config.setStreamBufferFlushSize(FLUSH_SIZE);
+    config.setStreamBufferMaxSize(2 * FLUSH_SIZE);
+    config.setStreamBufferFlushDelay(false);
+    config.setChecksumType(ContainerProtos.ChecksumType.NONE);
+    config.setBytesPerChecksum(CHUNK_SIZE);
+    config.setEnablePutblockPiggybacking(false);
+    return config;
+  }
+
+  /**
+   * Creates a shared XceiverClientFactory that routes acquireClient calls to the correct MockRatisPipeline.
+   */
+  private XceiverClientFactory createSharedClientFactory(MockRatisPipeline... pipelines) throws IOException {
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    doAnswer(invocation -> {
+      Pipeline p = invocation.getArgument(0);
+      for (MockRatisPipeline pipeline : pipelines) {
+        if (pipeline.getPipeline().getId().equals(p.getId())) {
+          return pipeline.getXceiverClient();
+        }
+      }
+      throw new IOException("Unknown pipeline: " + p.getId());
+    }).when(factory).acquireClient(any(Pipeline.class), anyBoolean());
+
+    doAnswer(invocation -> {
+      Pipeline p = invocation.getArgument(0);
+      for (MockRatisPipeline pipeline : pipelines) {
+        if (pipeline.getPipeline().getId().equals(p.getId())) {
+          return pipeline.getXceiverClient();
+        }
+      }
+      throw new IOException("Unknown pipeline: " + p.getId());
+    }).when(factory).acquireClient(any(Pipeline.class));
+
+    return factory;
+  }
+
+  /**
+   * Creates a KeyOutputStream with a mocked OM client and an initial preallocated block.
+   */
+  private KeyOutputStream createKeyStream(OzoneManagerProtocol omClient, MockRatisPipeline... pipelines)
+      throws IOException {
+    OzoneClientConfig config = createConfig();
+    ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setVolumeName("vol")
+        .setBucketName("bucket")
+        .setKeyName("testkey")
+        .setDataSize(BLOCK_SIZE)
+        .setReplicationConfig(replicationConfig)
+        .build();
+
+    OpenKeySession session = new OpenKeySession(1L, keyInfo, 0L);
+    StreamBufferArgs streamBufferArgs = StreamBufferArgs.getDefaultStreamBufferArgs(replicationConfig, config);
+
+    KeyOutputStream keyStream = new KeyOutputStream.Builder()
+        .setHandler(session)
+        .setXceiverClientManager(createSharedClientFactory(pipelines))
+        .setOmClient(omClient)
+        .setConfig(config)
+        .setStreamBufferArgs(streamBufferArgs)
+        .setReplicationConfig(replicationConfig)
+        .setClientMetrics(ContainerClientMetrics.acquire())
+        .setExecutorServiceSupplier(() -> newFixedThreadPool(4))
+        .setOmVersion(OzoneManagerVersion.SOFTWARE_VERSION)
+        .build();
+
+    OmKeyLocationInfo firstBlock = new OmKeyLocationInfo.Builder()
+        .setBlockID(pipelines[0].getBlockID())
+        .setPipeline(pipelines[0].getPipeline())
+        .setLength(BLOCK_SIZE)
+        .build();
+    OmKeyLocationInfoGroup version = new OmKeyLocationInfoGroup(0, Collections.singletonList(firstBlock));
+    keyStream.addPreallocateBlocks(version, 0);
+
+    return keyStream;
+  }
+
+  /**
+   * Creates a mock OM client that allocates blocks from mocked pipelines in order.
+   */
+  private OzoneManagerProtocol createOmClient(MockRatisPipeline... pipelines) throws IOException {
+    OzoneManagerProtocol omClient = mock(OzoneManagerProtocol.class);
+    AtomicInteger allocIndex = new AtomicInteger(0);
+    doAnswer(invocation -> {
+      int idx = allocIndex.getAndIncrement();
+      if (idx >= pipelines.length) {
+        throw new IOException("No more blocks to allocate");
+      }
+      MockRatisPipeline pipeline = pipelines[idx];
+      return new OmKeyLocationInfo.Builder()
+          .setBlockID(pipeline.getBlockID())
+          .setPipeline(pipeline.getPipeline())
+          .setLength(BLOCK_SIZE)
+          .build();
+    }).when(omClient).allocateBlock(any(OmKeyArgs.class), anyLong(), any(ExcludeList.class));
+    return omClient;
+  }
+
+  @Test
+  void writeAndCloseCommitsKey() throws Exception {
+    MockRatisPipeline pipeline = new MockRatisPipeline();
+    OzoneManagerProtocol omClient = createOmClient(pipeline);
+
+    try (KeyOutputStream stream = createKeyStream(omClient, pipeline)) {
+      writeRandom(stream, 300);
+    }
+
+    verify(omClient, times(1)).commitKey(any(OmKeyArgs.class), anyLong());
+  }
+
+  @Test
+  void writeCrossBlockBoundary() throws Exception {
+    MockRatisPipeline pipeline1 = new MockRatisPipeline(new BlockID(1, 1));
+    MockRatisPipeline pipeline2 = new MockRatisPipeline(new BlockID(2, 2));
+
+    // OM returns pipeline2 when allocateBlock is called
+    OzoneManagerProtocol omClient = createOmClient(pipeline2);
+
+    // The first block (pipeline1) has BLOCK_SIZE=800 capacity. Both mocks must be known to the shared client factory.
+    try (KeyOutputStream stream = createKeyStream(omClient, pipeline1, pipeline2)) {
+      writeRandom(stream, 850);
+    }
+
+    // allocateBlock should have been called for the second block
+    verify(omClient, times(1)).allocateBlock(any(OmKeyArgs.class), anyLong(), any(ExcludeList.class));
+    verify(omClient, times(1)).commitKey(any(OmKeyArgs.class), anyLong());
+
+    // pipeline1 should have received 800 bytes, pipeline2 should have received 50
+    assertEquals(800, totalReceived(pipeline1));
+    assertEquals(50, totalReceived(pipeline2));
+  }
+
+  @Test
+  void hsyncCallsOmHsyncKey() throws Exception {
+    MockRatisPipeline pipeline = new MockRatisPipeline();
+    OzoneManagerProtocol omClient = createOmClient(pipeline);
+
+    try (KeyOutputStream stream = createKeyStream(omClient, pipeline)) {
+      writeRandom(stream, 200);
+      stream.hsync();
+
+      verify(omClient, times(1)).hsyncKey(any(OmKeyArgs.class), anyLong());
+    }
+  }
+
+  @Test
+  void hsyncWithBlockErrorDoesNotCallOmHsync() throws Exception {
+    MockRatisPipeline pipeline = new MockRatisPipeline();
+    // First putBlock will fail
+    pipeline.failPutBlockAfter(0, () -> new IOException("putBlock failed"));
+    OzoneManagerProtocol omClient = createOmClient(pipeline);
+
+    KeyOutputStream stream = createKeyStream(omClient, pipeline);
+    writeRandom(stream, 200);
+
+    // hsync should throw because the block-level flush failed
+    assertThrows(IOException.class, stream::hsync, "hsync() must throw when block-level flush fails");
+
+    // OM hsyncKey must NOT have been called — data was not committed
+    verify(omClient, never()).hsyncKey(any(OmKeyArgs.class), anyLong());
+
+    stream.close();
+  }
+
+  @Test
+  void containerCloseTriggersRetryOnNewBlock() throws Exception {
+    MockRatisPipeline pipeline1 = new MockRatisPipeline(new BlockID(1, 1));
+    MockRatisPipeline pipeline2 = new MockRatisPipeline(new BlockID(2, 2));
+
+    // First pipeline: putBlock fails with ContainerNotOpen
+    pipeline1.failPutBlockAfter(0,
+        () -> new StorageContainerException("Container closed", ContainerProtos.Result.CLOSED_CONTAINER_IO));
+
+    OzoneManagerProtocol omClient = createOmClient(pipeline2);
+
+    try (KeyOutputStream stream = createKeyStream(omClient, pipeline1, pipeline2)) {
+      writeRandom(stream, 200);
+      // The flush on close will hit the container closed error, trigger exception handling, allocate a new block on
+      // pipeline2, and retry to write there.
+    }
+
+    // allocateBlock should have been called (for the retry block)
+    verify(omClient, times(1)).allocateBlock(any(OmKeyArgs.class), anyLong(), any(ExcludeList.class));
+    verify(omClient, times(1)).commitKey(any(OmKeyArgs.class), anyLong());
+  }
+
+  @Test
+  void multipleHsyncsCallOmAtLeastOnce() throws Exception {
+    MockRatisPipeline pipeline = new MockRatisPipeline();
+    OzoneManagerProtocol omClient = createOmClient(pipeline);
+
+    try (KeyOutputStream stream = createKeyStream(omClient, pipeline)) {
+      writeRandom(stream, 200);
+      stream.hsync();
+
+      writeRandom(stream, 200);
+      stream.hsync();
+
+      // hsyncKey is called at least once; the second call is skipped because the block ID hasn't changed
+      // (OM optimization at BlockOutputStreamEntryPool.hsyncKey).
+      verify(omClient, times(1)).hsyncKey(any(OmKeyArgs.class), anyLong());
+
+      // But both hsyncs should have flushed data to the datanode
+      assertEquals(400, totalReceived(pipeline));
+    }
+  }
+
+  @Test
+  void writeAfterCloseThrows() throws Exception {
+    MockRatisPipeline pipeline = new MockRatisPipeline();
+    KeyOutputStream stream = createKeyStream(createOmClient(pipeline), pipeline);
+
+    writeRandom(stream, 100);
+    stream.close();
+
+    assertThrows(IOException.class, () -> writeRandom(stream, 100), "write() after close() should throw");
   }
 
   @Test
@@ -197,5 +439,14 @@ public class TestKeyOutputStream {
     // Reader must see the allocated entry, not the intermediate null (fails without the fix).
     assertSame(allocation.get(5, TimeUnit.SECONDS), read.get(5, TimeUnit.SECONDS),
         "Reader must not observe the intermediate index before the new entry is added");
+  }
+
+  private static int totalReceived(MockRatisPipeline pipeline) {
+    return pipeline.getReceivedChunks().stream().mapToInt(c -> c.length).sum();
+  }
+
+  private static void writeRandom(KeyOutputStream stream, int length) throws IOException {
+    byte[] data = RandomUtils.secure().randomBytes(length);
+    stream.write(data, 0, data.length);
   }
 }
