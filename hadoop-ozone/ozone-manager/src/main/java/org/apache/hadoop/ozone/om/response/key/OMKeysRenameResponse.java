@@ -92,7 +92,8 @@ public class OMKeysRenameResponse extends OMClientResponse {
 
       String renamedKey = omMetadataManager.getSnapshotRenamedTable()
           .get(renameDbKey);
-      if (isSnapshotBucket && renamedKey == null) {
+      if (isSnapshotBucket && renamedKey == null && OMKeyRenameResponse.isCommittedAt(
+          omMetadataManager.getKeyTable(getBucketLayout()), fromDbKey, newKeyInfo.getObjectID())) {
         omMetadataManager.getSnapshotRenamedTable().putWithBatch(
             batchOperation, renameDbKey, fromDbKey);
       }

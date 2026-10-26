@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.response.key;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -85,10 +87,22 @@ public class OMKeyRenameResponse extends OmKeyResponse {
         renameKeyInfo.getObjectID());
     String renamedKey = omMetadataManager.getSnapshotRenamedTable()
         .get(renameDbKey);
-    if (isSnapshotBucket && renamedKey == null) {
+    if (isSnapshotBucket && renamedKey == null
+        && isCommittedAt(omMetadataManager.getKeyTable(getBucketLayout()), fromDbKey, renameKeyInfo.getObjectID())) {
       omMetadataManager.getSnapshotRenamedTable().putWithBatch(
           batchOperation, renameDbKey, fromDbKey);
     }
+  }
+
+  /**
+   * Returns whether the committed DB still has the object at {@code fromDbKey}. The snapshotRenamedTable read
+   * does not see a put made earlier in the same batch. If an earlier rename of this object is in the batch, the
+   * object got its current name in this batch, so this rename must not replace the name that rename recorded.
+   */
+  static boolean isCommittedAt(Table<String, ? extends WithObjectID> table, String fromDbKey, long objectID)
+      throws IOException {
+    WithObjectID committed = table.getSkipCache(fromDbKey);
+    return committed != null && committed.getObjectID() == objectID;
   }
 
   public OmKeyInfo getRenameKeyInfo() {

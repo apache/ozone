@@ -20,11 +20,13 @@ package org.apache.hadoop.ozone.om.response.key;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -92,7 +94,10 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
         getRenameKeyInfo().getObjectID());
     String renamedKey = omMetadataManager.getSnapshotRenamedTable()
         .get(renameDbKey);
-    if (isSnapshotBucket && renamedKey == null) {
+    Table<String, ? extends WithObjectID> fromTable = isRenameDirectory
+        ? omMetadataManager.getDirectoryTable() : omMetadataManager.getKeyTable(getBucketLayout());
+    if (isSnapshotBucket && renamedKey == null
+        && isCommittedAt(fromTable, getFromKeyName(), getRenameKeyInfo().getObjectID())) {
       omMetadataManager.getSnapshotRenamedTable().putWithBatch(
           batchOperation, renameDbKey, getFromKeyName());
     }
