@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests payload checksums with independent AWS CRT and hashlib reference values. */
 class TestTrailerChecksum {
@@ -70,5 +71,26 @@ class TestTrailerChecksum {
     }
     checksum.update(payload, 0, payload.length);
     assertThat(checksum.getValue()).isEqualTo(0xb9d9d4a8492cbd7fL);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 255, 256, 257, 8192, 8199})
+  void crc64BulkUpdatesMatchSingleBytes(int length) {
+    byte[] payload = new byte[length + 8];
+    for (int i = 0; i < payload.length; i++) {
+      payload[i] = (byte) (i * 131 + 17);
+    }
+    for (int offset = 0; offset < 8; offset++) {
+      TrailerChecksum.Crc64Nvme expected = new TrailerChecksum.Crc64Nvme();
+      for (int i = offset; i < offset + length; i++) {
+        expected.update(payload[i]);
+      }
+      for (int split = 0; split <= Math.min(length, 16); split++) {
+        TrailerChecksum.Crc64Nvme actual = new TrailerChecksum.Crc64Nvme();
+        actual.update(payload, offset, split);
+        actual.update(payload, offset + split, length - split);
+        assertThat(actual.getValue()).isEqualTo(expected.getValue());
+      }
+    }
   }
 }

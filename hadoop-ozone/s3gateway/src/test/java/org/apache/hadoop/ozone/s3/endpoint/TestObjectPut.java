@@ -1181,7 +1181,7 @@ class TestObjectPut {
     OzoneClient client = spy(objectEndpoint.getClient());
     ClientProtocol protocol = spy(client.getProxy());
     when(protocol.getOmVersion()).thenReturn(OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS);
-    doReturn(protocol).when(client).getProxy();
+    when(client.getProxy()).thenReturn(protocol);
     objectEndpoint.setClient(client);
     // Rebuild the handler chain to use the spied endpoint and client.
     objectEndpoint.init();

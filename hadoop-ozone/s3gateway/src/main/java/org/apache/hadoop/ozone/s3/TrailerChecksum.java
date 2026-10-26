@@ -74,29 +74,47 @@ final class TrailerChecksum {
 
   /** CRC-64/NVME: reflected polynomial 0x9a6c9329ac4bc9b5, initial value and final XOR all ones. */
   static final class Crc64Nvme implements Checksum {
-    private static final long[] TABLE = createTable();
+    private static final long[][] TABLE = createTable();
     private long crc = -1L;
 
-    private static long[] createTable() {
-      long[] table = new long[256];
-      for (int i = 0; i < table.length; i++) {
+    private static long[][] createTable() {
+      long[][] table = new long[8][256];
+      for (int i = 0; i < table[0].length; i++) {
         long value = i;
         for (int bit = 0; bit < Byte.SIZE; bit++) {
           value = (value >>> 1) ^ ((value & 1) == 0 ? 0 : 0x9a6c9329ac4bc9b5L);
         }
-        table[i] = value;
+        table[0][i] = value;
+      }
+      for (int slice = 1; slice < table.length; slice++) {
+        for (int i = 0; i < table[slice].length; i++) {
+          long value = table[slice - 1][i];
+          table[slice][i] = table[0][(int) value & 0xff] ^ (value >>> Byte.SIZE);
+        }
       }
       return table;
     }
 
     @Override
     public void update(int value) {
-      crc = TABLE[((int) crc ^ value) & 0xff] ^ (crc >>> Byte.SIZE);
+      crc = TABLE[0][((int) crc ^ value) & 0xff] ^ (crc >>> Byte.SIZE);
     }
 
     @Override
     public void update(byte[] bytes, int offset, int length) {
-      for (int i = offset; i < offset + length; i++) {
+      int end = offset + length;
+      int i = offset;
+      for (; i <= end - Long.BYTES; i += Long.BYTES) {
+        crc = TABLE[7][((int) crc ^ bytes[i]) & 0xff]
+            ^ TABLE[6][((int) (crc >>> 8) ^ bytes[i + 1]) & 0xff]
+            ^ TABLE[5][((int) (crc >>> 16) ^ bytes[i + 2]) & 0xff]
+            ^ TABLE[4][((int) (crc >>> 24) ^ bytes[i + 3]) & 0xff]
+            ^ TABLE[3][((int) (crc >>> 32) ^ bytes[i + 4]) & 0xff]
+            ^ TABLE[2][((int) (crc >>> 40) ^ bytes[i + 5]) & 0xff]
+            ^ TABLE[1][((int) (crc >>> 48) ^ bytes[i + 6]) & 0xff]
+            ^ TABLE[0][((int) (crc >>> 56) ^ bytes[i + 7]) & 0xff];
+      }
+      for (; i < end; i++) {
         update(bytes[i]);
       }
     }
