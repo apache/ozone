@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmPartModifica
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.http.HttpStatus.SC_OK;
+import static org.apache.http.HttpStatus.SC_PARTIAL_CONTENT;
 import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -133,6 +134,7 @@ import software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.Bucket;
 import software.amazon.awssdk.services.s3.model.BucketLifecycleConfiguration;
+import software.amazon.awssdk.services.s3.model.CommonPrefix;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -600,6 +602,25 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testPutObjectIfNoneMatchETag() {
+    String bucketName = getBucketName();
+    String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    PutObjectResponse initial = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName).ifNoneMatch("\"different-etag\""), RequestBody.fromString("original"));
+
+    S3Exception error = assertThrows(S3Exception.class, () -> s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName).ifNoneMatch(initial.eTag()), RequestBody.fromString("replacement")));
+    assertEquals(412, error.statusCode());
+    assertEquals("PreconditionFailed", error.awsErrorDetails().errorCode());
+    assertEquals("original", s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName).ifNoneMatch("\"different-etag\""),
+        RequestBody.fromString("replacement"));
+    assertEquals("replacement", s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+  }
+
+  @Test
   public void testPutObjectIfMatch() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -647,8 +668,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(initialResponse.eTag(), headObjectResponse.eTag());
   }
 
-  @Test
-  public void testPutObjectIfMatchMissingKeyFail() {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testPutObjectIfMatchMissingKeyFail(String ifMatch) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -656,11 +678,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
             .bucket(bucketName)
             .key(keyName)
-            .ifMatch("some-etag"),
+            .ifMatch(ifMatch),
         RequestBody.fromString("bar2")));
 
-    assertEquals(412, exception.statusCode());
-    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchKey", exception.awsErrorDetails().errorCode());
     assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
         b -> b.bucket(bucketName).key(keyName)));
   }
@@ -1083,6 +1105,21 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testListObjectVersionsFiltersCommonPrefixesByKeyMarker() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    Arrays.asList("dir/a", "dir/b", "dira/c", "file")
+        .forEach(key -> s3Client.putObject(b -> b.bucket(bucketName).key(key), RequestBody.fromString("bar")));
+
+    final ListObjectVersionsResponse result = s3Client.listObjectVersions(
+        b -> b.bucket(bucketName).delimiter("/").keyMarker("dir/a"));
+
+    assertThat(result.commonPrefixes()).extracting(CommonPrefix::prefix).containsExactly("dira/");
+    assertThat(result.versions()).extracting(ObjectVersion::key).containsExactly("file");
+    assertThat(result.isTruncated()).isFalse();
+  }
+
+  @Test
   public void testPutObjectLegalHoldNotImplemented() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -1113,6 +1150,27 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()));
 
     assertEquals(Long.valueOf(content.length()), response.contentLength());
+  }
+
+  @Test
+  public void testHeadObjectRange() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    HeadObjectResponse response = s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=0-4"));
+
+    assertEquals(SC_PARTIAL_CONTENT, response.sdkHttpResponse().statusCode());
+    assertEquals(Long.valueOf(5), response.contentLength());
+    assertEquals("bytes 0-4/10", response.contentRange());
+    assertEquals("bytes", response.acceptRanges());
+
+    // A HEAD error has no body, so only the status code identifies InvalidRange.
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=10-20")));
+    assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode());
   }
 
   /**
@@ -1472,6 +1530,36 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testCompleteMultipartUploadIfNoneMatchETag() {
+    String bucketName = getBucketName();
+    String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    String currentETag = null;
+    String currentContent = null;
+    for (int attempt = 0; attempt < 3; attempt++) {
+      String content = "content-" + attempt;
+      String condition = attempt == 1 ? currentETag : "\"different-etag\"";
+      String uploadId = s3Client.createMultipartUpload(b -> b.bucket(bucketName).key(keyName)).uploadId();
+      String partETag = s3Client.uploadPart(b -> b.bucket(bucketName).key(keyName).uploadId(uploadId).partNumber(1),
+          RequestBody.fromString(content)).eTag();
+      CompleteMultipartUploadRequest request = CompleteMultipartUploadRequest.builder()
+          .bucket(bucketName).key(keyName).uploadId(uploadId).ifNoneMatch(condition)
+          .multipartUpload(CompletedMultipartUpload.builder()
+              .parts(CompletedPart.builder().partNumber(1).eTag(partETag).build()).build()).build();
+      if (attempt == 1) {
+        S3Exception error = assertThrows(S3Exception.class, () -> s3Client.completeMultipartUpload(request));
+        assertEquals(412, error.statusCode());
+        assertEquals("PreconditionFailed", error.awsErrorDetails().errorCode());
+        s3Client.abortMultipartUpload(b -> b.bucket(bucketName).key(keyName).uploadId(uploadId));
+      } else {
+        currentETag = s3Client.completeMultipartUpload(request).eTag();
+        currentContent = content;
+      }
+      assertEquals(currentContent, s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+    }
+  }
+
+  @Test
   public void testCompleteMultipartUploadIfMatch() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -1559,8 +1647,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
   }
 
-  @Test
-  public void testCompleteMultipartUploadIfMatchMissingKeyFail() {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testCompleteMultipartUploadIfMatchMissingKeyFail(String ifMatch) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -1591,11 +1680,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         .bucket(bucketName)
         .key(keyName)
         .uploadId(uploadId)
-        .ifMatch("\"some-etag\"")
+        .ifMatch(ifMatch)
         .multipartUpload(CompletedMultipartUpload.builder().parts(completedPart).build())));
 
-    assertEquals(412, exception.statusCode());
-    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchKey", exception.awsErrorDetails().errorCode());
   }
 
   @Test
@@ -2167,6 +2256,60 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(content, response.asUtf8String());
     assertEquals(Long.valueOf(content.length()), response.response().contentLength());
     assertNull(response.response().contentRange());
+  }
+
+  @Test
+  public void testGetAndHeadObjectUnsatisfiableRange() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String emptyKeyName = getKeyName("empty");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("0123456789"));
+    s3Client.putObject(b -> b.bucket(bucketName).key(emptyKeyName), RequestBody.empty());
+
+    for (String range : Arrays.asList("bytes=10-", "bytes=-0", "bytes=10-20")) {
+      S3Exception exception = assertThrows(S3Exception.class,
+          () -> s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName).range(range)));
+      assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode(), range);
+      assertEquals("InvalidRange", exception.awsErrorDetails().errorCode(), range);
+
+      // HEAD responses have no body, so only the status code is checked.
+      S3Exception headException = assertThrows(S3Exception.class,
+          () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range(range)));
+      assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, headException.statusCode(), range);
+    }
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(emptyKeyName).range("bytes=-5")));
+    assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode());
+    assertEquals("InvalidRange", exception.awsErrorDetails().errorCode());
+
+    S3Exception headException = assertThrows(S3Exception.class,
+        () -> s3Client.headObject(b -> b.bucket(bucketName).key(emptyKeyName).range("bytes=-5")));
+    assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, headException.statusCode());
+  }
+
+  @Test
+  public void testGetAndHeadObjectRangeWithoutNumbers() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    // "bytes=-" has neither a first byte nor a suffix length, so it is ignored like AWS GetObject.
+    ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName).range("bytes=-"));
+
+    assertEquals(SC_OK, response.response().sdkHttpResponse().statusCode());
+    assertEquals(content, response.asUtf8String());
+    assertEquals(Long.valueOf(content.length()), response.response().contentLength());
+    assertNull(response.response().contentRange());
+
+    HeadObjectResponse headResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=-"));
+    assertEquals(SC_OK, headResponse.sdkHttpResponse().statusCode());
+    assertEquals(Long.valueOf(content.length()), headResponse.contentLength());
+    assertNull(headResponse.contentRange());
   }
 
   @Test

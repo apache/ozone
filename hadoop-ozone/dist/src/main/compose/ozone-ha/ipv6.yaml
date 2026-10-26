@@ -1,0 +1,67 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Override for running the cluster on an IPv6-only network.
+# Other environments keep the default bind host (0.0.0.0); here the bind host
+# properties are set to the IPv6 wildcard address explicitly.
+# SCM HA reads the RPC bind hosts only from the keys with service ID and node ID.
+x-ipv6-config:
+  &ipv6-config
+  environment:
+    HTTPFS-SITE.XML_httpfs.http.hostname: "::"
+    OZONE-SITE.XML_hdds.datanode.client.bind.host: "::"
+    OZONE-SITE.XML_hdds.datanode.http-bind-host: "::"
+    OZONE-SITE.XML_ozone.om.http-bind-host: "::"
+    OZONE-SITE.XML_ozone.recon.http-bind-host: "::"
+    OZONE-SITE.XML_ozone.s3g.http-bind-host: "::"
+    OZONE-SITE.XML_ozone.s3g.webadmin.http-bind-host: "::"
+    OZONE-SITE.XML_ozone.scm.block.client.bind.host.scmservice.scm1: "::"
+    OZONE-SITE.XML_ozone.scm.block.client.bind.host.scmservice.scm2: "::"
+    OZONE-SITE.XML_ozone.scm.block.client.bind.host.scmservice.scm3: "::"
+    OZONE-SITE.XML_ozone.scm.client.bind.host.scmservice.scm1: "::"
+    OZONE-SITE.XML_ozone.scm.client.bind.host.scmservice.scm2: "::"
+    OZONE-SITE.XML_ozone.scm.client.bind.host.scmservice.scm3: "::"
+    OZONE-SITE.XML_ozone.scm.datanode.bind.host.scmservice.scm1: "::"
+    OZONE-SITE.XML_ozone.scm.datanode.bind.host.scmservice.scm2: "::"
+    OZONE-SITE.XML_ozone.scm.datanode.bind.host.scmservice.scm3: "::"
+    OZONE-SITE.XML_ozone.scm.http-bind-host: "::"
+
+services:
+  datanode:
+    <<: *ipv6-config
+  om1:
+    <<: *ipv6-config
+  om2:
+    <<: *ipv6-config
+  om3:
+    <<: *ipv6-config
+  scm1:
+    <<: *ipv6-config
+  scm2:
+    <<: *ipv6-config
+  scm3:
+    <<: *ipv6-config
+  httpfs:
+    <<: *ipv6-config
+  s3g:
+    <<: *ipv6-config
+  recon:
+    <<: *ipv6-config
+
+networks:
+  default:
+    enable_ipv4: false
+    enable_ipv6: true

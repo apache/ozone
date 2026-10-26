@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.common.BekInfoUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -161,7 +162,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
 
     if (bucketInfo.hasDefaultReplicationConfig()) {
-      DefaultReplicationConfig drc = DefaultReplicationConfig.fromProto(
+      DefaultReplicationConfig drc = OzoneConfigUtil.toDefaultReplicationConfig(
           bucketInfo.getDefaultReplicationConfig());
       ozoneManager.validateReplicationConfig(drc.getReplicationConfig());
     }
