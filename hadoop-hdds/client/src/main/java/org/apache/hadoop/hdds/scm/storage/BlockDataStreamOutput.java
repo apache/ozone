@@ -440,6 +440,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   /**
+   * @param close whether putBlock is happening as part of closing the stream
+   * @param force true if no data was written since most recent putBlock and
+   *            either the stream is being closed or the previous putBlock is to be synced
    * @param sync whether the datanodes sync the data and the PutBlock to disk before replying;
    *             it applies only to a PutBlock committed in the middle of the stream without Raft
    */
