@@ -369,13 +369,20 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive) throws IOException {
-    delegate.deleteKey(volumeName, bucketName, keyName, recursive);
+    delegate.deleteKey(resolveVolumeName(volumeName), bucketName, keyName, recursive);
   }
 
   @Override
   public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive, String expectedETag)
       throws IOException {
-    delegate.deleteKey(volumeName, bucketName, keyName, recursive, expectedETag);
+    delegate.deleteKey(resolveVolumeName(volumeName), bucketName, keyName, recursive, expectedETag);
+  }
+
+  private String resolveVolumeName(String volumeName) throws IOException {
+    if (volumeName != null || OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(delegate.getOmVersion())) {
+      return volumeName;
+    }
+    return delegate.getS3VolumeContext().getOmVolumeArgs().getVolume();
   }
 
   @Override

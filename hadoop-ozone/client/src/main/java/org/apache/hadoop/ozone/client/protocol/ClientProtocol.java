@@ -653,7 +653,7 @@ public interface ClientProtocol {
 
   /**
    * Deletes an existing key.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume; S3 clients may pass null to resolve it from their S3 context.
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param recursive recursive deletion of all sub path keys if true,
@@ -666,7 +666,7 @@ public interface ClientProtocol {
 
   /**
    * Deletes an existing key if the key's current ETag matches expectedETag.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume; S3 clients may pass null to resolve it from their S3 context.
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param recursive recursive deletion of all sub path keys if true,

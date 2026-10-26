@@ -234,6 +234,7 @@ public class RpcClient implements ClientProtocol {
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
+  private final boolean resolveS3VolumeOnOm;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -282,6 +283,8 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
+    resolveS3VolumeOnOm = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false)
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion);
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -1827,6 +1830,10 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive,
       String expectedETag) throws IOException {
+    boolean assumeS3Context = volumeName == null && resolveS3VolumeOnOm;
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
@@ -1834,7 +1841,8 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRecursive(recursive);
+        .setRecursive(recursive)
+        .setAssumeS3Context(assumeS3Context);
     if (expectedETag != null) {
       keyArgs.setExpectedETag(expectedETag);
     }

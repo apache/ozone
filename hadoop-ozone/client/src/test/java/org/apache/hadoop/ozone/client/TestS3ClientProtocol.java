@@ -21,11 +21,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,12 +41,17 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedConstruction;
@@ -56,6 +66,73 @@ class TestS3ClientProtocol {
     return Arrays.stream(ClientProtocol.class.getMethods())
         .filter(method -> !Modifier.isStatic(method.getModifiers()))
         .flatMap(method -> Stream.of(false, true).map(reverseBooleans -> Arguments.of(method, reverseBooleans)));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"ZDU, false", "ZDU, true", "S3_VOLUME_CONTEXT_RESOLUTION, false",
+      "S3_VOLUME_CONTEXT_RESOLUTION, true", "S3_IF_NONE_MATCH_ETAG, false", "S3_IF_NONE_MATCH_ETAG, true"})
+  void resolvesVolumeForOlderOm(OzoneManagerVersion version, boolean conditional) throws Exception {
+    when(delegate.getS3VolumeContext()).thenReturn(volumeContext("tenant-volume"));
+    ClientProtocol versionedClient = createClient(version);
+
+    if (conditional) {
+      versionedClient.deleteKey(null, "bucket", "key", false, "etag");
+    } else {
+      versionedClient.deleteKey(null, "bucket", "key", false);
+    }
+
+    boolean resolveOnOm = OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version);
+    String volume = resolveOnOm ? null : "tenant-volume";
+    if (conditional) {
+      verify(delegate).deleteKey(volume, "bucket", "key", false, "etag");
+    } else {
+      verify(delegate).deleteKey(volume, "bucket", "key", false);
+    }
+    verify(delegate, times(resolveOnOm ? 0 : 1)).getS3VolumeContext();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"s3v", "tenant-volume"})
+  void preservesExplicitVolume(String volume) throws Exception {
+    ClientProtocol versionedClient = createClient(OzoneManagerVersion.ZDU);
+
+    versionedClient.deleteKey(volume, "bucket", "key", true, "etag");
+
+    verify(delegate).deleteKey(volume, "bucket", "key", true, "etag");
+    verify(delegate, never()).getS3VolumeContext();
+  }
+
+  @Test
+  void resolvesTenantVolumeForEachRequest() throws Exception {
+    when(delegate.getS3VolumeContext()).thenReturn(volumeContext("tenant-one"), volumeContext("tenant-two"));
+    ClientProtocol versionedClient = createClient(OzoneManagerVersion.ZDU);
+
+    versionedClient.deleteKey(null, "bucket", "key", false);
+    versionedClient.deleteKey(null, "bucket", "key", false);
+
+    verify(delegate).deleteKey("tenant-one", "bucket", "key", false);
+    verify(delegate).deleteKey("tenant-two", "bucket", "key", false);
+  }
+
+  @Test
+  void propagatesDeleteFailure() throws Exception {
+    ClientProtocol versionedClient = createClient(OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION);
+    OMException failure = new OMException("Denied", OMException.ResultCodes.PERMISSION_DENIED);
+    doThrow(failure).when(delegate).deleteKey(null, "bucket", "key", false, "etag");
+
+    assertThat(assertThrows(OMException.class, () -> versionedClient.deleteKey(null, "bucket", "key", false, "etag")))
+        .isSameAs(failure);
+  }
+
+  @Test
+  void doesNotDeleteWhenVolumeResolutionFails() throws Exception {
+    ClientProtocol versionedClient = createClient(OzoneManagerVersion.ZDU);
+    IOException failure = new IOException("Volume lookup failed");
+    when(delegate.getS3VolumeContext()).thenThrow(failure);
+
+    assertThat(assertThrows(IOException.class, () -> versionedClient.deleteKey(null, "bucket", "key", false)))
+        .isSameAs(failure);
+    verify(delegate, never()).deleteKey(any(), anyString(), anyString(), anyBoolean());
   }
 
   @ParameterizedTest(name = "{0} [reverseBooleans={1}]")
@@ -117,18 +194,21 @@ class TestS3ClientProtocol {
   }
 
   @Test
-  void forwardsNullArgumentUnchanged() throws Exception {
-    client.deleteKey(null, "bucket", "key", false);
-
-    verify(delegate).deleteKey(null, "bucket", "key", false);
-  }
-
-  @Test
   void propagatesExceptionUnchanged() throws Exception {
     IOException failure = new IOException("Lookup failed");
     doThrow(failure).when(delegate).getVolumeDetails("volume");
 
     assertSame(failure, assertThrows(IOException.class, () -> client.getVolumeDetails("volume")));
+  }
+
+  private ClientProtocol createClient(OzoneManagerVersion version) {
+    when(delegate.getOmVersion()).thenReturn(version);
+    return new S3ClientProtocol(delegate);
+  }
+
+  private static S3VolumeContext volumeContext(String volume) {
+    return new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume(volume).setOwnerName("owner")
+        .setAdminName("admin").build(), "owner");
   }
 
   private static Object value(Class<?> type, int index, boolean reverseBooleans) {

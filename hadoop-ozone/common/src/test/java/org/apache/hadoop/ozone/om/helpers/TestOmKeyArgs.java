@@ -38,4 +38,13 @@ class TestOmKeyArgs {
     assertEquals(headOp, subject.toBuilder().build().isHeadOp());
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void toBuilderPreservesAssumeS3Context(boolean assumeS3Context) {
+    OmKeyArgs subject = new OmKeyArgs.Builder().setAssumeS3Context(assumeS3Context).build();
+
+    assertEquals(assumeS3Context, subject.isAssumeS3Context());
+    assertEquals(assumeS3Context, subject.toBuilder().build().isAssumeS3Context());
+  }
+
 }

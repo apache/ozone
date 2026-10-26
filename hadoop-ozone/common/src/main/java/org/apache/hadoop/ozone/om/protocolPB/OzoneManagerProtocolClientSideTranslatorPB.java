@@ -1025,11 +1025,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     req.setKeyArgs(keyArgs);
 
-    OMRequest omRequest = createOMRequest(Type.DeleteKey)
-        .setDeleteKeyRequest(req)
-        .build();
+    OMRequest.Builder omRequest = createOMRequest(Type.DeleteKey)
+        .setDeleteKeyRequest(req);
+    if (args.isAssumeS3Context()) {
+      omRequest.setAssumeS3Context(true);
+    }
 
-    handleError(submitRequest(omRequest));
+    handleError(submitRequest(omRequest.build()));
 
   }
 
