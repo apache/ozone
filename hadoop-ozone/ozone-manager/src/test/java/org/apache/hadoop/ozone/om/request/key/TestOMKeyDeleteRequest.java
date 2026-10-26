@@ -21,16 +21,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -44,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests OmKeyDelete request.
@@ -76,10 +82,27 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
   }
 
   @Test
-  public void preExecutePermissionDeniedWhenAclEnabled() {
+  public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    OMKeyDeleteRequest req = createDeniedDeleteRequest();
 
-    OMKeyDeleteRequest req = new OMKeyDeleteRequest(createDeleteKeyRequest(), getBucketLayout()) {
+    OMException e = assertThrows(OMException.class, () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
+
+    OMAuditLogger.log(req.getAuditBuilder());
+    ArgumentCaptor<AuditMessage> captor = ArgumentCaptor.forClass(AuditMessage.class);
+    verify(auditLogger).logWrite(captor.capture());
+    AuditMessage message = captor.getValue();
+    assertEquals(OMAction.DELETE_KEY.getAction(), message.getOp());
+    assertSame(e, message.getThrowable());
+  }
+
+  /**
+   * Creates a delete request whose ACL check always throws PERMISSION_DENIED.
+   * Subclasses should override to use the layout-appropriate request class.
+   */
+  protected OMKeyDeleteRequest createDeniedDeleteRequest() {
+    return new OMKeyDeleteRequest(createDeleteKeyRequest(), getBucketLayout()) {
       @Override
       protected void checkKeyAcls(OzoneManager ozoneManager, String volume,
           String bucket, String key, IAccessAuthorizer.ACLType aclType,
@@ -87,9 +110,6 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
         throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
       }
     };
-
-    OMException e = assertThrows(OMException.class, () -> req.preExecute(ozoneManager));
-    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test
