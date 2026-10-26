@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.freon;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.hadoop.ozone.DataTestUtil;
@@ -64,5 +65,6 @@ public abstract class TestOzoneClientPositionedReader implements NonHATests.Test
     BaseFreonGenerator subject = (BaseFreonGenerator) cmd.getParseResult().subcommand().commandSpec().userObject();
     assertEquals(reads, subject.getSuccessCount());
     assertEquals(0, subject.getFailureCount());
+    assertThat(subject.getMetrics().counter("sequential-read-bytes").getCount()).isPositive();
   }
 }

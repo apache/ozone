@@ -105,6 +105,7 @@ public class OzoneClientPositionedReader extends BaseFreonGenerator implements C
   private ExecutorService sequentialReaders;
   private final List<Future<Void>> sequentialReaderResults = new ArrayList<>();
   private volatile boolean sequentialReadersStopped;
+  private volatile Exception sequentialReaderFailure;
   private Timer sequentialTimer;
   private Counter sequentialBytes;
   private long sequentialStartNanos;
@@ -154,6 +155,9 @@ public class OzoneClientPositionedReader extends BaseFreonGenerator implements C
   }
 
   private void readPositioned(long counter) throws Exception {
+    if (sequentialReaderFailure != null) {
+      throw new IOException("A sequential reader failed", sequentialReaderFailure);
+    }
     OzoneInputStream stream = streams.get((int) (getThreadSequenceId() % streamCount));
     ByteBuffer buffer = buffers.get();
     buffer.clear();
@@ -181,13 +185,18 @@ public class OzoneClientPositionedReader extends BaseFreonGenerator implements C
 
   private Void readSequentially(OzoneInputStream stream) throws Exception {
     byte[] buffer = new byte[sequentialReadSize];
-    while (!sequentialReadersStopped) {
-      int n = sequentialTimer.time(() -> stream.read(buffer, 0, buffer.length));
-      if (n < 0) {
-        stream.seek(0);
-      } else {
-        sequentialBytes.inc(n);
+    try {
+      while (!sequentialReadersStopped) {
+        int n = sequentialTimer.time(() -> stream.read(buffer, 0, buffer.length));
+        if (n < 0) {
+          stream.seek(0);
+        } else {
+          sequentialBytes.inc(n);
+        }
       }
+    } catch (Exception e) {
+      sequentialReaderFailure = e;
+      throw e;
     }
     return null;
   }
