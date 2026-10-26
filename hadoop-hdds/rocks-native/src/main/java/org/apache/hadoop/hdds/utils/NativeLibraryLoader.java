@@ -29,7 +29,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.FileUtils;
@@ -165,13 +164,23 @@ public class NativeLibraryLoader {
         return Pair.of(Optional.empty(), null);
       }
 
-      final String nativeLibDir =
-          Objects.nonNull(getSystemProperty(NATIVE_LIB_TMP_DIR)) ?
-              getSystemProperty(NATIVE_LIB_TMP_DIR) : "";
-      final File dir = new File(nativeLibDir).getAbsoluteFile();
+      final String nativeLibDir = getSystemProperty(NATIVE_LIB_TMP_DIR);
+      final boolean useWorkingDir = nativeLibDir == null || nativeLibDir.isEmpty();
+      final File dir = new File(useWorkingDir ? getSystemProperty("user.dir") : nativeLibDir).getAbsoluteFile();
 
       // create a temporary dir to copy the library to
-      final Path tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
+      Path tempPath;
+      try {
+        tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
+      } catch (IOException e) {
+        if (!useWorkingDir) {
+          throw e;
+        }
+        // The working directory may not be writable, fall back to java.io.tmpdir.
+        LOG.info("Unable to extract {} under working directory {}, using java.io.tmpdir instead: {}",
+            libraryName, dir, e.toString());
+        tempPath = Files.createTempDirectory(libraryName);
+      }
       final File tempDir = tempPath.toFile();
       if (!tempDir.exists()) {
         return Pair.of(Optional.empty(), null);

@@ -511,10 +511,13 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
-      newContainerData.releaseCommitSpace();
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
       containerIdLock.unlock();
+      if (!created) {
+        // Release the space reserved when the volume was chosen, also on unchecked exceptions.
+        newContainerData.releaseCommitSpace();
+      }
     }
 
     if (created) {
@@ -1441,6 +1444,10 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer container = createNewContainer(targetTempContainerData);
     HddsVolume targetVolume = targetTempContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
+    // createNewContainer() builds the new data as OPEN state. Set it as RECOVERING, as a
+    // replication import does, so the data checksum and empty flag are checked and loaded.
+    // In the meanwhile, the container file on disk is of RECOVERING state too at this point.
+    container.getContainerData().setState(RECOVERING);
     container.importContainerData((KeyValueContainerData) targetTempContainerData);
     return container;
   }
