@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
@@ -153,6 +154,19 @@ public final class OMRequestTestUtils {
     }
 
     addBucketToDB(omMetadataManager, builder);
+  }
+
+  /** Adds the volume (if missing) and a bucket with the given storage policy and fallback flag to the OM DB. */
+  public static OmBucketInfo addVolumeAndBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, BucketLayout bucketLayout, StoragePolicy storagePolicy,
+      boolean allowFallbackStoragePolicy) throws Exception {
+    if (!omMetadataManager.getVolumeTable().isExist(omMetadataManager.getVolumeKey(volumeName))) {
+      addVolumeToDB(volumeName, omMetadataManager);
+    }
+    return addBucketToDB(omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+            .setBucketLayout(bucketLayout)
+            .setStoragePolicy(storagePolicy).setAllowFallbackStoragePolicy(allowFallbackStoragePolicy));
   }
 
   @SuppressWarnings("parameterNumber")

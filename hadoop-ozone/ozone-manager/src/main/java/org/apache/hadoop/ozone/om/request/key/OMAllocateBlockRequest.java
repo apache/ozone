@@ -97,7 +97,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         : ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList());
 
     // TODO: Here we are allocating block with out any check for key exist in
-    //  open table or not when the request carries a storage policy.
+    //  open table or not and also with out any authorization checks.
+    //  When the request doesn't carry a storage policy, key existence in the
+    //  open table is verified.
     //  Assumption here is that allocateBlocks with out openKey will be less.
     //  There is a chance some one can misuse this api to flood allocateBlock
     //  calls. But currently allocateBlock is internally called from

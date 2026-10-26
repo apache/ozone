@@ -275,24 +275,6 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     verifyPolicySentToScm(OzoneStoragePolicy.COLD, false);
   }
 
-  private void addVolumeAndBucketWithPolicy(StoragePolicy storagePolicy, boolean allowFallback) throws Exception {
-    OmBucketInfo.Builder bucket = OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
-        .setBucketLayout(getBucketLayout())
-        .setStoragePolicy(storagePolicy).setAllowFallbackStoragePolicy(allowFallback);
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager, bucket);
-    // OMKeyRequestTests stubs OzoneManager#getBucketInfo with an empty bucket, which preExecute reads.
-    when(ozoneManager.getBucketInfo(volumeName, bucketName)).thenReturn(bucket.build());
-  }
-
-  private void verifyPolicySentToScm(StoragePolicy expectedPolicy, boolean expectedAllowFallback) throws Exception {
-    ArgumentCaptor<StoragePolicy> policy = ArgumentCaptor.forClass(StoragePolicy.class);
-    ArgumentCaptor<Boolean> allowFallback = ArgumentCaptor.forClass(Boolean.class);
-    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(), any(), any(), any(),
-        policy.capture(), allowFallback.capture());
-    assertThat(policy.getValue()).isEqualTo(expectedPolicy);
-    assertThat(allowFallback.getValue()).isEqualTo(expectedAllowFallback);
-  }
-
   /**
    * This method calls preExecute and verify the modified request.
    * @param originalOMRequest
@@ -586,6 +568,22 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
       mockedRpcServer.when(Server::getRemoteIp).thenReturn(clientIp);
       request.preExecute(ozoneManager);
     }
+  }
+
+  private void addVolumeAndBucketWithPolicy(StoragePolicy storagePolicy, boolean allowFallback) throws Exception {
+    final OmBucketInfo bucket = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        getBucketLayout(), storagePolicy, allowFallback);
+    // OMKeyRequestTests stubs OzoneManager#getBucketInfo with an empty bucket, which preExecute reads.
+    when(ozoneManager.getBucketInfo(volumeName, bucketName)).thenReturn(bucket);
+  }
+
+  private void verifyPolicySentToScm(StoragePolicy expectedPolicy, boolean expectedAllowFallback) throws Exception {
+    ArgumentCaptor<StoragePolicy> policy = ArgumentCaptor.forClass(StoragePolicy.class);
+    ArgumentCaptor<Boolean> allowFallback = ArgumentCaptor.forClass(Boolean.class);
+    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(), any(), any(), any(),
+        policy.capture(), allowFallback.capture());
+    assertThat(policy.getValue()).isEqualTo(expectedPolicy);
+    assertThat(allowFallback.getValue()).isEqualTo(expectedAllowFallback);
   }
 
   protected OMRequest createAllocateBlockRequest() {
