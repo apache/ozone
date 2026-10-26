@@ -136,7 +136,7 @@ on:
 
 env:
   HADOOP_IMAGE: ghcr.io/apache/hadoop
-  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
@@ -158,6 +158,11 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.sha }}
           fetch-depth: ${{ inputs.checkout-fetch-depth }}
+
+      - name: Delete .git to omit commit SHA in build artifacts
+        if: ${{ !inputs.needs-ozone-source-tarball && inputs.checkout-fetch-depth == '1' }}
+        run: |
+          rm -fr .git
 
       - name: Download Ozone source tarball
         if: ${{ inputs.needs-ozone-source-tarball }}

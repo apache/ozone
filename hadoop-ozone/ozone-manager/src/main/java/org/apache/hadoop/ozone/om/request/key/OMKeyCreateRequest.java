@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -93,6 +94,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     Objects.requireNonNull(createKeyRequest, "createKeyRequest == null");
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
+
+    if (keyArgs.hasExcludedETag()) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
+    }
 
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
@@ -173,6 +178,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     newKeyArgs.setKeyName(keyPath);
 
     if (keyArgs.getIsMultipartKey()) {
+      OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
       getFileEncryptionInfoForMpuKey(keyArgs, newKeyArgs, ozoneManager);
     } else {
       generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
@@ -241,7 +247,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
       validateAtomicRewrite(dbKeyInfo, keyArgs);
-      keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(keyArgs, dbKeyInfo);
+      keyArgs = validateAndRewriteETagConditionsAsExpectedGeneration(keyArgs, dbKeyInfo);
 
       OmBucketInfo bucketInfo =
           getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
