@@ -104,7 +104,8 @@ Snapshot Diff RPC Is Compatible
 Snapshot Diff Ordered Submit Is Compatible
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_ORDERED_VERSION}'    Client does not support --ordered
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Snapshot CLI not supported by this client
-    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Snapshot CLI not supported by this client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Snapshot CLI not supported by this cluster
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Cluster does not support snapshot diff submit
 
     ${bucket} =      Set Variable    snapdiff-ordered-${CLIENT_VERSION}
     ${fromSnap} =    Set Variable    snapdiff-ordered-from-${CLIENT_VERSION}
@@ -125,7 +126,7 @@ Snapshot Diff Ordered Submit Is Compatible
     ...    ${fromSnap}    ${toSnap}    ${key1}    ${key1}
 
 Snapshot Diff Legacy Client Ignores Ordered Report Metadata
-    Pass Execution If    '${CLIENT_VERSION}' >= '${SNAPSHOT_DIFF_ORDERED_VERSION}'    New client uses submit path
+    Pass Execution If    '${CLIENT_VERSION}' >= '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client uses submit path
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Snapshot CLI not supported by this client
     Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Snapshot CLI not supported by this client
 
@@ -142,7 +143,8 @@ Snapshot Diff Legacy Client Ignores Ordered Report Metadata
 
     Wait Until Keyword Succeeds    2min    5sec
     ...    Legacy Snapshot Diff Report Omits Dependency Metadata
-    ...    /vol1/${bucket}    ${fromSnap}    ${toSnap}    ${key1}
+    ...    ozone sh snapshot diff /vol1/${bucket} ${fromSnap} ${toSnap}
+    ...    ${fromSnap}    ${toSnap}    ${key1}
 
 *** Keywords ***
 Snapshot Diff Report Should Contain Created Keys
@@ -189,8 +191,8 @@ Snapshot Diff Command Should Contain Created Keys
     Should Contain    ${output}    ${key2}
 
 Legacy Snapshot Diff Report Omits Dependency Metadata
-    [Arguments]    ${bucketPath}    ${fromSnap}    ${toSnap}    ${key1}
-    ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+    [Arguments]    ${command}    ${fromSnap}    ${toSnap}    ${key1}
+    ${output} =    Execute    ${command}
     Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
     Should Contain    ${output}    ${key1}
     Should Not Contain    ${output}    Report is dependency

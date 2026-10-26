@@ -119,6 +119,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -175,6 +176,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMXBean {
+  private static final String DEPENDENCY_REPORT_REASON_PREFIX = "Report is dependency ";
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final Map<DiffType, String> DIFF_TYPE_STRING_MAP =
@@ -689,7 +691,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
     JobStatus prevStatus = snapDiffJob.getStatus();
     String prevReason = snapDiffJob.getReason();
-    if (isEmpty(prevReason) || prevReason.startsWith("Report is dependency ")) {
+    if (isEmpty(prevReason) || prevReason.startsWith(DEPENDENCY_REPORT_REASON_PREFIX)) {
       prevReason = null;
     }
     String jobId = snapDiffJob.getJobId();
@@ -1393,12 +1395,15 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
     boolean fullDiff = useFullDiff || deltaDiffComputer.isFullDiff();
     deltaDiffComputer.resetFullDiffFallback();
-    @SuppressWarnings("unchecked")
-    Table<byte[], byte[]> fromTable =
-        (Table<byte[], byte[]>) fromMeta.getTable(tableName);
-    @SuppressWarnings("unchecked")
-    Table<byte[], byte[]> toTable =
-        (Table<byte[], byte[]>) toMeta.getTable(tableName);
+    // Raw RDBTable (DBStore#getTable): delta keys and values are byte[]; TypedTable would decode keys/values.
+    Table<byte[], byte[]> fromTable;
+    Table<byte[], byte[]> toTable;
+    try {
+      fromTable = fromMeta.getStore().getTable(tableName);
+      toTable = toMeta.getStore().getTable(tableName);
+    } catch (RocksDatabaseException e) {
+      throw new IOException(e);
+    }
     byte[] tablePrefix = isEmpty(tablePrefixes.getTablePrefix(tableName)) ? null
         : StringUtils.string2Bytes(tablePrefixes.getTablePrefix(tableName));
     long estimatedToTableKeys = Math.max(1L, toTable.getEstimatedKeyCount());
@@ -2017,8 +2022,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     snapshotDiffJob.setTotalDiffEntries(totalDiffEntries);
     snapshotDiffJob.setLargestEntryKey(largestJobKey);
     if (orderedReportOutcome != null) {
-      snapshotDiffJob.setOrderedReport(orderedReportOutcome);
-      snapshotDiffJob.setReason("Report is dependency " + (orderedReportOutcome ? "ordered" : "unordered") + ".");
+      snapshotDiffJob.setReason(DEPENDENCY_REPORT_REASON_PREFIX
+          + (orderedReportOutcome ? "ordered" : "unordered") + ".");
     }
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }

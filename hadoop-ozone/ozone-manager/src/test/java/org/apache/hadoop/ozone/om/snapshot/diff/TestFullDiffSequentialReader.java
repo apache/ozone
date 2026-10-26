@@ -312,7 +312,6 @@ class TestFullDiffSequentialReader {
       EntryValue oldModify = EntryValue.fromBytes(store.getOldList(2L));
       assertFalse(Arrays.equals(newModify.getSignature(), oldModify.getSignature()));
 
-
       assertFromEdge(store, 1L, null, null);
       assertFromEdge(store, 2L, BUCKET_OBJECT_ID, "modify");
       assertFromEdge(store, 3L, BUCKET_OBJECT_ID, "oldname");
