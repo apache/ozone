@@ -24,19 +24,27 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -57,6 +65,8 @@ import org.junit.jupiter.api.Test;
 public class TestECContainerCloseOnVolumeFailure {
 
   private static final ECReplicationConfig EC = new ECReplicationConfig(3, 2);
+  private static final Set<Integer> ALL_INDEXES = IntStream.rangeClosed(1, EC.getRequiredNodes())
+      .boxed().collect(Collectors.toSet());
 
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
@@ -66,8 +76,17 @@ public class TestECContainerCloseOnVolumeFailure {
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 500, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
+    // close commands go out right after the container is moved to CLOSING
+    conf.setTimeDuration(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, 1, TimeUnit.SECONDS);
+    ReplicationManager.ReplicationManagerConfiguration rmConfig =
+        conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    rmConfig.setInterval(Duration.ofSeconds(1));
+    rmConfig.setUnderReplicatedInterval(Duration.ofSeconds(1));
+    conf.setFromObject(rmConfig);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
+        // RS(3,2) needs 5; a spare datanode keeps the reconstruction target from depending on the failed one
+        .setNumDatanodes(6)
         // a datanode keeps a working volume after one fails
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder().setNumDataVolumes(2).build())
         .build();
@@ -102,9 +121,32 @@ public class TestECContainerCloseOnVolumeFailure {
     // new writes get another container, and succeed
     writeKey("after", data);
     assertNotEquals(containerID, bucket.getKey("after").getOzoneKeyLocations().get(0).getContainerID());
-    // the data written before is still readable
-    try (OzoneInputStream in = bucket.readKey("before")) {
+    // the data written before is still readable, from the surviving replicas
+    assertKeyData("before", data);
+
+    // the close completes
+    GenericTestUtils.waitFor(() -> state(containerManager, containerID) == HddsProtos.LifeCycleState.CLOSED,
+        200, 60_000);
+    // and the lost replica is reconstructed: every index has a CLOSED replica again
+    GenericTestUtils.waitFor(() -> closedReplicaIndexes(containerManager, containerID).equals(ALL_INDEXES),
+        500, 120_000);
+    assertKeyData("before", data);
+  }
+
+  private static void assertKeyData(String name, byte[] data) throws IOException {
+    try (OzoneInputStream in = bucket.readKey(name)) {
       assertArrayEquals(data, IOUtils.toByteArray(in));
+    }
+  }
+
+  private static Set<Integer> closedReplicaIndexes(ContainerManager containerManager, long containerID) {
+    try {
+      return containerManager.getContainerReplicas(ContainerID.valueOf(containerID)).stream()
+          .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
+          .map(ContainerReplica::getReplicaIndex)
+          .collect(Collectors.toSet());
+    } catch (IOException e) {
+      throw new IllegalStateException(e);
     }
   }
 
