@@ -1067,6 +1067,12 @@
                 "name": "eof",
                 "type": "bool",
                 "optional": true
+              },
+              {
+                "id": 3,
+                "name": "containerAutoCreate",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -1415,6 +1421,12 @@
                 "id": 4,
                 "name": "block",
                 "type": "PutBlockRequestProto",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "containerAutoCreate",
+                "type": "bool",
                 "optional": true
               }
             ]
@@ -3571,7 +3583,13 @@
                 "id": 8,
                 "name": "deleteTransactionId",
                 "type": "int64",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 9,
