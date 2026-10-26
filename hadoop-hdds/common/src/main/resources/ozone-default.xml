@@ -4378,7 +4378,8 @@
     <value>5s</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The minimum timeout duration for SCM ratis leader
-      election. Default is 1s.</description>
+      election. Default is 5s. It is used as raft.server.rpc.timeout.min of SCM's Ratis server,
+      and raft.server.rpc.timeout.max is set to this value plus 200ms.</description>
   </property>
   <property>
     <name>ozone.scm.ha.raft.server.rpc.first-election.timeout</name>

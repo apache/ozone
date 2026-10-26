@@ -42,3 +42,6 @@ HDDS_DN_OPTS="-Dhdds.dn.opts=test"
 OZONE_SERVER_OPTS="-Dserver.opt=test"
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
+
+# Revert when HDDS-17350 is merged. (lazy client tracing init)
+OZONE-SITE.XML_ozone.tracing.client.application-aware=false

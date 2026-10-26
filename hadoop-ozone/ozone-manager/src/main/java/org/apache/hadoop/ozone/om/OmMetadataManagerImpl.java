@@ -1051,7 +1051,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         kv = openKeyIter.next();
         if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
           String dbKey = kv.getKey();
-          long clientID = OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
+          // The open key of a multipart upload ends with the upload ID and has no client ID, so it is listed with
+          // client ID 0, which no real client has
+          final boolean isUpload = OMMultipartUploadUtils.getUploadIdFromDbKey(dbKey) != null;
+          long clientID = isUpload ? 0 : OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
           OmKeyInfo omKeyInfo = kv.getValue();
           // Note with HDDS-10077, there is no need to check KeyTable for hsync metadata
           openKeySessionList.add(
@@ -1108,7 +1111,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     String seekKey;
     boolean skipStartKey = false;
-    if (StringUtils.isNotBlank(startKey)) {
+    // Every key matching keyPrefix sorts after a startKey that sorts before keyPrefix,
+    // so seek to keyPrefix; seeking to startKey would stop at the first non-matching key.
+    if (StringUtils.isNotBlank(startKey)
+        && (StringUtils.isEmpty(keyPrefix) || startKey.compareTo(keyPrefix) >= 0)) {
       // Seek to the specified key.
       seekKey = getOzoneKey(volumeName, bucketName, startKey);
       skipStartKey = true;
