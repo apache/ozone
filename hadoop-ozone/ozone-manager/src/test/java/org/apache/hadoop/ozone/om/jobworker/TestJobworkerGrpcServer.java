@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.jobworker;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,6 +39,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.GetOMVersionResponse;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.conf.OMJobworkerConfiguration;
 import org.apache.hadoop.ozone.jobworker.client.JobworkerClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.jobworker.command.OMJobworkerCommandManager;
@@ -55,6 +58,47 @@ public class TestJobworkerGrpcServer {
   private JobworkerClient client;
   private JobworkerProtocolServerImpl jobworkerProtocolServer;
   private OMJobworkerCommandManager commandManager;
+
+  @Test
+  public void testConfigurationDefaults() {
+    OMJobworkerConfiguration config = new OzoneConfiguration().getObject(OMJobworkerConfiguration.class);
+    assertFalse(config.isEnabled());
+    assertEquals(32, config.getGrpcExecutorThreadNum());
+    assertEquals(8982, config.getGrpcPort());
+    assertEquals(1, config.getGrpcBossGroupSize());
+    assertEquals(8, config.getGrpcWorkerGroupSize());
+    assertEquals(32 * 1024 * 1024, config.getGrpcMaximumInboundLength());
+    assertEquals(300_000, config.getStaleNodeIntervalMs());
+    assertEquals(30_000, config.getHeartbeatProcessIntervalMs());
+    assertEquals(3_600_000, config.getRemovalTimeoutMs());
+  }
+
+  @Test
+  public void testConfigurationRoundTrip() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OMJobworkerConfiguration config = conf.getObject(OMJobworkerConfiguration.class);
+    config.setEnabled(true);
+    config.setGrpcExecutorThreadNum(2);
+    config.setGrpcPort(12345);
+    config.setGrpcBossGroupSize(3);
+    config.setGrpcWorkerGroupSize(4);
+    config.setGrpcMaximumInboundLength(2 * 1024 * 1024);
+    config.setStaleNodeIntervalMs(120_000);
+    config.setHeartbeatProcessIntervalMs(10_000);
+    config.setRemovalTimeoutMs(600_000);
+    conf.setFromObject(config);
+
+    OMJobworkerConfiguration restored = conf.getObject(OMJobworkerConfiguration.class);
+    assertEquals(config.isEnabled(), restored.isEnabled());
+    assertEquals(config.getGrpcExecutorThreadNum(), restored.getGrpcExecutorThreadNum());
+    assertEquals(config.getGrpcPort(), restored.getGrpcPort());
+    assertEquals(config.getGrpcBossGroupSize(), restored.getGrpcBossGroupSize());
+    assertEquals(config.getGrpcWorkerGroupSize(), restored.getGrpcWorkerGroupSize());
+    assertEquals(config.getGrpcMaximumInboundLength(), restored.getGrpcMaximumInboundLength());
+    assertEquals(config.getStaleNodeIntervalMs(), restored.getStaleNodeIntervalMs());
+    assertEquals(config.getHeartbeatProcessIntervalMs(), restored.getHeartbeatProcessIntervalMs());
+    assertEquals(config.getRemovalTimeoutMs(), restored.getRemovalTimeoutMs());
+  }
 
   @BeforeEach
   public void setUp() throws IOException {

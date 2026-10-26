@@ -22,16 +22,12 @@ import org.apache.hadoop.hdds.protocol.JobworkerDetails;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.om.jobworker.JobworkerHeartbeatDispatcher.NodeReportFromJobworker;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handles Node Reports from Jobworker.
  */
 public class JobworkerNodeReportHandler implements EventHandler<NodeReportFromJobworker> {
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(JobworkerNodeReportHandler.class);
   private final JobworkerNodeManager nodeManager;
 
   public JobworkerNodeReportHandler(JobworkerNodeManager nodeManager) {

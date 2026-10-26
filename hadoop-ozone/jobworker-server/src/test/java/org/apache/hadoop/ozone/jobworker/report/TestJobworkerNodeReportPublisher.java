@@ -45,23 +45,19 @@ import org.mockito.ArgumentCaptor;
 public class TestJobworkerNodeReportPublisher {
 
   private JobworkerNodeReportPublisher publisher;
-  private JobworkerStateContext mockContext;
-  private JobworkerStateMachine mockStateMachine;
   private JobworkerVolumeSet mockVolumeSet;
-  private OzoneConfiguration conf;
-  private ScheduledExecutorService mockExecutor;
   private JobworkerReportManager mockReportManager;
 
   @BeforeEach
   public void setup() {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     publisher = new JobworkerNodeReportPublisher();
     publisher.setConf(conf);
 
-    mockContext = mock(JobworkerStateContext.class);
-    mockStateMachine = mock(JobworkerStateMachine.class);
+    JobworkerStateContext mockContext = mock(JobworkerStateContext.class);
+    JobworkerStateMachine mockStateMachine = mock(JobworkerStateMachine.class);
     mockVolumeSet = mock(JobworkerVolumeSet.class);
-    mockExecutor = mock(ScheduledExecutorService.class);
+    ScheduledExecutorService mockExecutor = mock(ScheduledExecutorService.class);
     mockReportManager = mock(JobworkerReportManager.class);
 
     when(mockContext.getParent()).thenReturn(mockStateMachine);

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -67,6 +68,52 @@ public class TestJobworkerService {
    */
   private void configureSingleOM() {
     conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "127.0.0.1:9862");
+  }
+
+  @Test
+  public void testConfigurationDefaults() {
+    JobworkerConfiguration config = conf.getObject(JobworkerConfiguration.class);
+    assertEquals(Duration.ofSeconds(10), config.getRpcTimeout());
+    assertEquals(32 * 1024 * 1024, config.getGrpcMaximumInboundLength());
+    assertEquals(Duration.ofSeconds(30), config.getHeartbeatInterval());
+    assertEquals(10, config.getHeartbeatLogWarnInterval());
+    assertEquals("", config.getStorageDirs());
+    assertEquals(Duration.ofSeconds(60), config.getNodeReportInterval());
+    assertEquals(4096, config.getMaxReportCount());
+    assertEquals(8 * 1024 * 1024, config.getMaxReportSizeInBytes());
+    assertEquals(100, config.getCommandQueueLimit());
+    assertEquals(Duration.ofSeconds(30), config.getCommandStatusReportInterval());
+    assertEquals("", config.getOmServiceIds());
+  }
+
+  @Test
+  public void testConfigurationRoundTrip() {
+    JobworkerConfiguration config = conf.getObject(JobworkerConfiguration.class);
+    config.setRpcTimeout(Duration.ofSeconds(2));
+    config.setGrpcMaximumInboundLength(2 * 1024 * 1024);
+    config.setHeartbeatInterval(Duration.ofSeconds(5));
+    config.setHeartbeatLogWarnInterval(7);
+    config.setStorageVolumeDirs("/worker/data");
+    config.setNodeReportInterval(Duration.ofSeconds(11));
+    config.setMaxReportCount(13);
+    config.setMaxReportSizeInBytes(4 * 1024 * 1024);
+    config.setCommandQueueLimit(12);
+    config.setCommandStatusReportInterval(Duration.ofSeconds(10));
+    config.setOmServiceIds("service1,service2");
+    conf.setFromObject(config);
+
+    JobworkerConfiguration restored = conf.getObject(JobworkerConfiguration.class);
+    assertEquals(config.getRpcTimeout(), restored.getRpcTimeout());
+    assertEquals(config.getGrpcMaximumInboundLength(), restored.getGrpcMaximumInboundLength());
+    assertEquals(config.getHeartbeatInterval(), restored.getHeartbeatInterval());
+    assertEquals(config.getHeartbeatLogWarnInterval(), restored.getHeartbeatLogWarnInterval());
+    assertEquals(config.getStorageDirs(), restored.getStorageDirs());
+    assertEquals(config.getNodeReportInterval(), restored.getNodeReportInterval());
+    assertEquals(config.getMaxReportCount(), restored.getMaxReportCount());
+    assertEquals(config.getMaxReportSizeInBytes(), restored.getMaxReportSizeInBytes());
+    assertEquals(config.getCommandQueueLimit(), restored.getCommandQueueLimit());
+    assertEquals(config.getCommandStatusReportInterval(), restored.getCommandStatusReportInterval());
+    assertEquals(config.getOmServiceIds(), restored.getOmServiceIds());
   }
 
   @Test

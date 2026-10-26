@@ -36,13 +36,13 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.jobworker.JobworkerConfiguration;
-import org.apache.hadoop.ozone.jobworker.JobworkerStateContext;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -60,13 +60,9 @@ public class TestJobworkerVolumeSet {
   private String volume1;
   private String volume2;
   private List<String> volumes;
-  private JobworkerStateContext mockContext;
 
   @BeforeEach
   public void setup() throws Exception {
-    // Create mock JobworkerStateContext
-    mockContext = Mockito.mock(JobworkerStateContext.class);
-
     // Setup configuration with volume paths
     conf = new OzoneConfiguration();
     JobworkerConfiguration jwConf = conf.getObject(JobworkerConfiguration.class);
@@ -77,7 +73,7 @@ public class TestJobworkerVolumeSet {
     String dataDirKey = String.join(",", volumes);
     jwConf.setStorageVolumeDirs(dataDirKey);
     conf.setFromObject(jwConf);
-    volumeSet = new VolatileJobworkerVolumeSet(jobworkerUuid, conf, mockContext);
+    volumeSet = new VolatileJobworkerVolumeSet(jobworkerUuid, conf);
   }
 
   @AfterEach
@@ -274,7 +270,7 @@ public class TestJobworkerVolumeSet {
     jwConf.setStorageVolumeDirs("");
     conf.setFromObject(jwConf);
 
-    VolatileJobworkerVolumeSet emptySet = new VolatileJobworkerVolumeSet(jobworkerUuid, badConf, mockContext);
+    VolatileJobworkerVolumeSet emptySet = new VolatileJobworkerVolumeSet(jobworkerUuid, badConf);
 
     emptySet.initializeVolumeSet(clusterId);
     assertEquals(0, emptySet.getVolumesList().size());
@@ -290,7 +286,7 @@ public class TestJobworkerVolumeSet {
     emptyVolumeConf.setFromObject(jwConf);
 
     VolatileJobworkerVolumeSet
-        emptyVolumeSet = new VolatileJobworkerVolumeSet(jobworkerUuid, emptyVolumeConf, mockContext);
+        emptyVolumeSet = new VolatileJobworkerVolumeSet(jobworkerUuid, emptyVolumeConf);
     emptyVolumeSet.initializeVolumeSet(clusterId);
 
     // Trying to create a task directory should throw exception
@@ -301,5 +297,32 @@ public class TestJobworkerVolumeSet {
 
     assertTrue(exception.getMessage().contains("No viable volumes available"));
     emptyVolumeSet.close();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", " ", "\t\r\n "})
+  public void testBlankVolumePaths(String paths) throws Exception {
+    OzoneConfiguration blankConf = new OzoneConfiguration();
+    JobworkerConfiguration config = blankConf.getObject(JobworkerConfiguration.class);
+    config.setStorageVolumeDirs(paths);
+    blankConf.setFromObject(config);
+    try (VolatileJobworkerVolumeSet emptySet = new VolatileJobworkerVolumeSet(jobworkerUuid, blankConf)) {
+      emptySet.initializeVolumeSet(clusterId);
+      assertTrue(emptySet.getVolumesList().isEmpty());
+    }
+  }
+
+  @Test
+  public void testPaddedVolumePathPreservesUnicodeWhitespaceInDirectoryName() throws Exception {
+    Path volumePath = tempDir.resolve("\u2003");
+    OzoneConfiguration paddedConf = new OzoneConfiguration();
+    JobworkerConfiguration config = paddedConf.getObject(JobworkerConfiguration.class);
+    config.setStorageVolumeDirs(" \t" + volumePath + "\r\n ");
+    paddedConf.setFromObject(config);
+    try (VolatileJobworkerVolumeSet paddedSet = new VolatileJobworkerVolumeSet(jobworkerUuid, paddedConf)) {
+      paddedSet.initializeVolumeSet(clusterId);
+      assertEquals(1, paddedSet.getVolumesList().size());
+      assertEquals(volumePath.toFile(), paddedSet.getVolumesList().get(0).getVolumeRootDir());
+    }
   }
 }

@@ -181,7 +181,7 @@ public class TestJobworkerReportCommandStatus {
   public static String generateStringOfBytes(int byteLength) {
     StringBuilder sb = new StringBuilder();
     while (sb.toString().getBytes(StandardCharsets.UTF_8).length < byteLength) {
-      sb.append("a");
+      sb.append('a');
     }
     // Cut off the excess
     byte[] bytes = sb.toString().getBytes(StandardCharsets.UTF_8);

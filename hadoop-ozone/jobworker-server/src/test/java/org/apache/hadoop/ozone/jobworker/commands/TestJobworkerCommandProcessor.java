@@ -55,7 +55,6 @@ public class TestJobworkerCommandProcessor {
   private JobworkerStateContext context;
   private JobworkerCommandManager commandManager;
   private JobworkerCommandDispatcher commandDispatcher;
-  private OzoneConfiguration conf;
   private AtomicLong nextHB;
   private JobworkerCommandProcessor processor;
 
@@ -70,10 +69,9 @@ public class TestJobworkerCommandProcessor {
             .setContext(context)
             .setConnectionManager(mock(JobworkerConnectionManager.class))
             .build());
-    conf = new OzoneConfiguration();
     nextHB = new AtomicLong(0);
     processor = new JobworkerCommandProcessor(
-        context, commandManager, commandDispatcher, conf, "test-", nextHB);
+        context, commandManager, commandDispatcher, "test-", nextHB);
   }
 
   @AfterEach
@@ -151,7 +149,7 @@ public class TestJobworkerCommandProcessor {
 
   @Test
   public void testUnhandledCommandStatusUpdate() throws InterruptedException {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     commandManager = new JobworkerCommandManager(conf);
     JobworkerDetails jobworkerDetails = MockJobworkerDetails.randomJobworkerDetails();
     context = new JobworkerStateContext(conf, JobworkerStates.RUNNING,
@@ -163,7 +161,7 @@ public class TestJobworkerCommandProcessor {
     commandManager.addCommand(command);
     JobworkerCommandStatus cmdStatus = commandManager.getCmdStatus(command.getOmServiceId(), command.getId());
     processor = new JobworkerCommandProcessor(
-        context, commandManager, commandDispatcher, conf, "test-", nextHB);
+        context, commandManager, commandDispatcher, "test-", nextHB);
 
     processor.start();
 

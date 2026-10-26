@@ -52,7 +52,6 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestJobworkerRPCProtocol {
 
-  private static JobworkerGrpcServer server;
   private static JobworkerClient client;
 
   @TempDir

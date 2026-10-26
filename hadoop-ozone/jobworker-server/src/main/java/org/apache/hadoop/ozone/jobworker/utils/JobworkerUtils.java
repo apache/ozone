@@ -36,8 +36,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMJobworkerConfiguration;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.jobworker.JobworkerConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for JobWorker.
@@ -45,7 +43,6 @@ import org.slf4j.LoggerFactory;
 public final class JobworkerUtils {
 
   public static final String DEFAULT_OM_SERVICE_ID = "DEFAULT";
-  private static final Logger LOG = LoggerFactory.getLogger(JobworkerUtils.class);
 
   private JobworkerUtils() {
     // Do not instantiate

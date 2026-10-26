@@ -236,9 +236,9 @@ public class JobworkerNodeStateManager implements Closeable {
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
-    builder.append("Total number of JobWorker nodes: ").append(getTotalNodeCount());
-    builder.append(", Healthy nodes: ").append(getNodeCount(HEALTHY));
-    builder.append(", Stale nodes: ").append(getNodeCount(NodeState.STALE));
+    builder.append("Total number of JobWorker nodes: ").append(getTotalNodeCount())
+        .append(", Healthy nodes: ").append(getNodeCount(HEALTHY))
+        .append(", Stale nodes: ").append(getNodeCount(NodeState.STALE));
     return builder.toString();
   }
 

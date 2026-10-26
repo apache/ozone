@@ -36,14 +36,13 @@ import org.junit.jupiter.api.Test;
  */
 public class TestJobworkerConnectionManager {
 
-  private OzoneConfiguration conf;
   private JobworkerConnectionManager connectionManager;
   private static final String THREAD_NAME_PREFIX = "test-";
   private static final String OM_SERVICE_ID = "omServiceId1";
 
   @BeforeEach
   public void setUp() {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     connectionManager = new JobworkerConnectionManager(conf);
   }
 

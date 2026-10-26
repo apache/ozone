@@ -48,7 +48,6 @@ public class TestJobworkerVolume {
   private Path folder;
 
   private VolatileJobworkerVolume.Builder volumeBuilder;
-  private File versionFile;
   private File rootDir;
 
   @BeforeEach
@@ -65,7 +64,7 @@ public class TestJobworkerVolume {
     VolatileJobworkerVolume volume = volumeBuilder.build();
 
     // Version file should be created automatically during initialization
-    versionFile = volume.getVersionFile();
+    File versionFile = volume.getVersionFile();
     assertTrue(versionFile.exists(), "Version file should be created during initialization");
 
     Properties properties = JobworkerVersionFile.readFrom(versionFile);

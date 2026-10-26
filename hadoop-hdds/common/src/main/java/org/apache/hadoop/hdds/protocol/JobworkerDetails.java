@@ -36,8 +36,6 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * JobworkerDetails class contains details about Jobworker like:
@@ -51,23 +49,11 @@ import org.slf4j.LoggerFactory;
 public class JobworkerDetails extends NodeImpl implements
     Comparable<JobworkerDetails> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(JobworkerDetails.class);
-
   private static final Codec<JobworkerDetails> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(ExtendedJobWorkDetailsProto.getDefaultInstance()),
       JobworkerDetails::getFromProtoBuf,
       JobworkerDetails::getExtendedProtoBufMessage,
       JobworkerDetails.class);
-
-  /**
-   * Get the codec for JobworkerDetails.
-   *
-   * @return The Codec instance
-   */
-  public static Codec<JobworkerDetails> getCodec() {
-    return CODEC;
-  }
 
   /**
    * Jobworker's unique identifier in the cluster.
@@ -82,6 +68,15 @@ public class JobworkerDetails extends NodeImpl implements
   private volatile HddsProtos.NodeOperationalState operationalState;
   private String revision;
   private JobworkerVersion jobworkerVersion;
+
+  /**
+   * Get the codec for JobworkerDetails.
+   *
+   * @return The Codec instance
+   */
+  public static Codec<JobworkerDetails> getCodec() {
+    return CODEC;
+  }
 
   /**
    * Constructs JobworkerDetails instance. JobworkerDetails.Builder is used

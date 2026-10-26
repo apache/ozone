@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.JobworkerStorageReportProto;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.jobworker.JobworkerConfiguration;
-import org.apache.hadoop.ozone.jobworker.JobworkerStateContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,37 +63,24 @@ public class VolatileJobworkerVolumeSet implements JobworkerVolumeSet {
    */
   private Map<String, VolatileJobworkerVolume> failedVolumeMap;
   private String clusterID;
-  private JobworkerStateContext context;
 
   /**
    * Constructor for JobWorkerVolumeSet.
    *
    * @param jobWorkerUuid UUID of the job worker
    * @param conf          Configuration
-   * @param context       State context
    */
   public VolatileJobworkerVolumeSet(
       String jobWorkerUuid,
-      ConfigurationSource conf,
-      JobworkerStateContext context) {
+      ConfigurationSource conf) {
     this.jobWorkerUuid = jobWorkerUuid;
     this.conf = conf;
-    this.context = context;
     this.volumeSetRWLock = new ReentrantReadWriteLock();
     jwConf = conf.getObject(JobworkerConfiguration.class);
     initializingStatus =
         new AtomicReference<>(InitializingStatus.UNINITIALIZED);
     volumeMap = new ConcurrentHashMap<>();
     failedVolumeMap = new ConcurrentHashMap<>();
-  }
-
-  /**
-   * Set the state context for this volume set.
-   *
-   * @param context The state context
-   */
-  public void setContext(JobworkerStateContext context) {
-    this.context = context;
   }
 
   /**
@@ -159,10 +145,14 @@ public class VolatileJobworkerVolumeSet implements JobworkerVolumeSet {
    */
   private Collection<String> getConfiguredVolumePaths() {
     String rawLocationStr = jwConf.getStorageDirs();
-    if (rawLocationStr == null || rawLocationStr.trim().isEmpty()) {
+    if (rawLocationStr == null) {
       return Collections.emptyList();
     }
-    Collection<String> rawLocations = Arrays.asList(rawLocationStr.trim().split("\\s*[,\n]\\s*"));
+    String trimmedLocationStr = rawLocationStr.trim();
+    if (trimmedLocationStr.isEmpty()) {
+      return Collections.emptyList();
+    }
+    Collection<String> rawLocations = Arrays.asList(trimmedLocationStr.split("\\s*[,\n]\\s*"));
     LOG.info("Configured Volume path {}", String.join(", ", rawLocations));
     return rawLocations;
   }

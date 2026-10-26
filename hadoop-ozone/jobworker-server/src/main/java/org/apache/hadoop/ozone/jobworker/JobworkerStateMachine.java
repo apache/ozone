@@ -96,7 +96,7 @@ public class JobworkerStateMachine implements Closeable {
         new ThreadFactoryBuilder()
             .setNameFormat(threadNamePrefix + "TaskThread-%d")
             .build());
-    this.volumeSet = new VolatileJobworkerVolumeSet(jobworkerDetails.getUuidString(), conf, context);
+    this.volumeSet = new VolatileJobworkerVolumeSet(jobworkerDetails.getUuidString(), conf);
     this.connectionManager = new JobworkerConnectionManager(conf);
     this.commandManager = new JobworkerCommandManager(conf);
     this.context = new JobworkerStateContext(
@@ -119,7 +119,7 @@ public class JobworkerStateMachine implements Closeable {
     }
     this.commandDispatcher = dispatcherBuilder.build();
     this.commandProcessor = new JobworkerCommandProcessor(
-        context, commandManager, commandDispatcher, conf, threadNamePrefix, nextHB);
+        context, commandManager, commandDispatcher, threadNamePrefix, nextHB);
   }
 
   /**

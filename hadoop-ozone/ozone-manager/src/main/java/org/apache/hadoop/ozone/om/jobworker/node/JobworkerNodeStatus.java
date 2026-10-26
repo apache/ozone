@@ -44,6 +44,9 @@ public final class JobworkerNodeStatus {
       HddsProtos.NodeOperationalState.DECOMMISSIONED
   ));
 
+  private final HddsProtos.NodeOperationalState operationalState;
+  private final HddsProtos.NodeState healthState;
+
   public static Set<HddsProtos.NodeOperationalState> decommissionStates() {
     return DECOMMISSION_STATES;
   }
@@ -51,9 +54,6 @@ public final class JobworkerNodeStatus {
   public static Set<HddsProtos.NodeOperationalState> outOfServiceStates() {
     return OUT_OF_SERVICE_STATES;
   }
-
-  private final HddsProtos.NodeOperationalState operationalState;
-  private final HddsProtos.NodeState healthState;
 
   public JobworkerNodeStatus(HddsProtos.NodeOperationalState operationalState,
       HddsProtos.NodeState healthState) {

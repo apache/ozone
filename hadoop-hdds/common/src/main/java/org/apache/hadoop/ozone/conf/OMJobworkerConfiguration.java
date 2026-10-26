@@ -38,6 +38,66 @@ public class OMJobworkerConfiguration {
       description = "Enable the OM Jobworker framework. The reference gRPC transport is plaintext.")
   private boolean enabled;
 
+  @Config(key = "ozone.om.jobworker.grpc.executor.thread.num",
+      defaultValue = "32",
+      type = ConfigType.INT,
+      tags = {ConfigTag.JOBWORKER},
+      description = "Number of threads in the gRPC executor.")
+  private int grpcExecutorThreadNum;
+
+  @Config(key = "ozone.om.jobworker.grpc.port",
+      type = ConfigType.INT,
+      defaultValue = "8982",
+      tags = {ConfigTag.JOBWORKER},
+      description = "Port used for the Job Worker gRPC service.")
+  private int grpcPort;
+  static final String GRPC_PORT_KEY = "grpc.port";
+
+  @Config(key = "ozone.om.jobworker.grpc.bossgroup.size",
+      defaultValue = "1",
+      type = ConfigType.INT,
+      tags = {ConfigTag.JOBWORKER},
+      description = "Number of threads in the gRPC boss group.")
+  private int grpcBossGroupSize;
+
+  @Config(key = "ozone.om.jobworker.grpc.workergroup.size",
+      defaultValue = "8",
+      type = ConfigType.INT,
+      tags = {ConfigTag.JOBWORKER},
+      description = "Number of threads in the gRPC worker group.")
+  private int grpcWorkerGroupSize;
+
+  @Config(key = "ozone.om.jobworker.grpc.maximum.inbound.length",
+      defaultValue = "32M",
+      type = ConfigType.SIZE,
+      tags = {ConfigTag.JOBWORKER},
+      description = "Maximum inbound message size for gRPC.")
+  private int grpcMaximumInboundLength;
+
+  @Config(key = "ozone.om.jobworker.stalenode.interval",
+      defaultValue = "300s",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.JOBWORKER},
+      description = "Time interval after which a jobworker is marked as stale " +
+          "if it does not send heartbeats.")
+  private long staleNodeIntervalMs;
+
+  @Config(key = "ozone.om.jobworker.heartbeat.process.interval",
+      defaultValue = "30s",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.JOBWORKER},
+      description = "Time interval at which the OM processes jobworker heartbeats " +
+          "to check for stale nodes.")
+  private long heartbeatProcessIntervalMs;
+  private static final String HEARTBEAT_PROCESS_INTERVAL_KEY = "heartbeat.process.interval";
+
+  @Config(key = "ozone.om.jobworker.removal.timeout.ms",
+      defaultValue = "1h",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.JOBWORKER},
+      description = "Time after which a stale jobworker is removed from OM's memory.")
+  private long removalTimeoutMs;
+
   public boolean isEnabled() {
     return enabled;
   }
@@ -45,13 +105,6 @@ public class OMJobworkerConfiguration {
   public void setEnabled(boolean enabled) {
     this.enabled = enabled;
   }
-
-  @Config(key = "ozone.om.jobworker.grpc.executor.thread.num",
-      defaultValue = "32",
-      type = ConfigType.INT,
-      tags = {ConfigTag.JOBWORKER},
-      description = "Number of threads in the gRPC executor.")
-  private int grpcExecutorThreadNum;
 
   public int getGrpcExecutorThreadNum() {
     return grpcExecutorThreadNum;
@@ -61,14 +114,6 @@ public class OMJobworkerConfiguration {
     this.grpcExecutorThreadNum = grpcExecutorThreadNum;
     return this;
   }
-
-  @Config(key = "ozone.om.jobworker.grpc.port",
-      type = ConfigType.INT,
-      defaultValue = "8982",
-      tags = {ConfigTag.JOBWORKER},
-      description = "Port used for the Job Worker gRPC service.")
-  private int grpcPort;
-  static final String GRPC_PORT_KEY = "grpc.port";
 
   public int getGrpcPort() {
     return grpcPort;
@@ -83,13 +128,6 @@ public class OMJobworkerConfiguration {
     return this;
   }
 
-  @Config(key = "ozone.om.jobworker.grpc.bossgroup.size",
-      defaultValue = "1",
-      type = ConfigType.INT,
-      tags = {ConfigTag.JOBWORKER},
-      description = "Number of threads in the gRPC boss group.")
-  private int grpcBossGroupSize;
-
   public int getGrpcBossGroupSize() {
     return grpcBossGroupSize;
   }
@@ -98,13 +136,6 @@ public class OMJobworkerConfiguration {
     this.grpcBossGroupSize = grpcBossGroupSize;
     return this;
   }
-
-  @Config(key = "ozone.om.jobworker.grpc.workergroup.size",
-      defaultValue = "8",
-      type = ConfigType.INT,
-      tags = {ConfigTag.JOBWORKER},
-      description = "Number of threads in the gRPC worker group.")
-  private int grpcWorkerGroupSize;
 
   public int getGrpcWorkerGroupSize() {
     return grpcWorkerGroupSize;
@@ -115,13 +146,6 @@ public class OMJobworkerConfiguration {
     return this;
   }
 
-  @Config(key = "ozone.om.jobworker.grpc.maximum.inbound.length",
-      defaultValue = "32M",
-      type = ConfigType.SIZE,
-      tags = {ConfigTag.JOBWORKER},
-      description = "Maximum inbound message size for gRPC.")
-  private int grpcMaximumInboundLength;
-
   public int getGrpcMaximumInboundLength() {
     return grpcMaximumInboundLength;
   }
@@ -131,14 +155,6 @@ public class OMJobworkerConfiguration {
     return this;
   }
 
-  @Config(key = "ozone.om.jobworker.stalenode.interval",
-      defaultValue = "300s",
-      type = ConfigType.TIME,
-      tags = {ConfigTag.JOBWORKER},
-      description = "Time interval after which a jobworker is marked as stale " +
-          "if it does not send heartbeats.")
-  private long staleNodeIntervalMs;
-
   public long getStaleNodeIntervalMs() {
     return staleNodeIntervalMs;
   }
@@ -147,15 +163,6 @@ public class OMJobworkerConfiguration {
     this.staleNodeIntervalMs = staleNodeIntervalMs;
     return this;
   }
-
-  @Config(key = "ozone.om.jobworker.heartbeat.process.interval",
-      defaultValue = "30s",
-      type = ConfigType.TIME,
-      tags = {ConfigTag.JOBWORKER},
-      description = "Time interval at which the OM processes jobworker heartbeats " +
-          "to check for stale nodes.")
-  private long heartbeatProcessIntervalMs;
-  private static final String HEARTBEAT_PROCESS_INTERVAL_KEY = "heartbeat.process.interval";
 
   public static String getJobworkerServiceConfigKey() {
     return CONFIG_PREFIX + "." + HEARTBEAT_PROCESS_INTERVAL_KEY;
@@ -169,13 +176,6 @@ public class OMJobworkerConfiguration {
     this.heartbeatProcessIntervalMs = heartbeatProcessIntervalMs;
     return this;
   }
-
-  @Config(key = "ozone.om.jobworker.removal.timeout.ms",
-      defaultValue = "1h",
-      type = ConfigType.TIME,
-      tags = {ConfigTag.JOBWORKER},
-      description = "Time after which a stale jobworker is removed from OM's memory.")
-  private long removalTimeoutMs;
 
   public long getRemovalTimeoutMs() {
     return removalTimeoutMs;

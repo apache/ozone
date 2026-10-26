@@ -36,6 +36,24 @@ public class TestJobworkerDetails {
   private static final String TEST_IP_ADDRESS = "127.0.0.1";
   private static final int TEST_PORT_VALUE = 9876;
 
+  @Test
+  public void testCodecRoundTrip() throws Exception {
+    JobworkerDetails original = JobworkerDetails.newBuilder()
+        .setUuid(UUID.randomUUID())
+        .setHostName(TEST_HOST_NAME)
+        .setIpAddress(TEST_IP_ADDRESS)
+        .addPort(JobworkerPortType.HTTP, TEST_PORT_VALUE)
+        .setNetworkName("test-network")
+        .setNetworkLocation("/rack1")
+        .setVersion("1.0.0")
+        .setJobworkerVersion(JobworkerVersion.CURRENT)
+        .build();
+
+    byte[] serialized = JobworkerDetails.getCodec().toPersistedFormat(original);
+    JobworkerDetails restored = JobworkerDetails.getCodec().fromPersistedFormat(serialized);
+    assertEquals(original.getExtendedProtoBufMessage(), restored.getExtendedProtoBufMessage());
+  }
+
   /**
    * Test copy constructor functionality.
    */

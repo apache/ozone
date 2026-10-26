@@ -66,7 +66,6 @@ public class TestJobworkerCommandStatusReportPublisher {
   private JobworkerStateContext context;
   private JobworkerCommandManager commandManager;
   private OzoneConfiguration conf;
-  private JobworkerReportManager reportManager;
   private ScheduledExecutorService executorService;
 
   @BeforeEach
@@ -83,7 +82,7 @@ public class TestJobworkerCommandStatusReportPublisher {
         mock(JobworkerStateMachine.class), commandManager);
     publisher = new JobworkerCommandStatusReportPublisher();
     publisher.setConf(conf);
-    this.reportManager = JobworkerReportManager.newBuilder(conf)
+    JobworkerReportManager reportManager = JobworkerReportManager.newBuilder(conf)
         .setStateContext(context)
         .addThreadNamePrefix(context.getThreadNamePrefix())
         .addPublisherFor(JobworkerServiceProtocolProtos.CommandStatusReportsProto.class)

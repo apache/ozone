@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.jobworker.JobworkerHeartbeatDispatcher.CommandStatusReportFromJobworker;
 import org.apache.hadoop.ozone.om.jobworker.OMJobworkerEvents;
-import org.apache.hadoop.ozone.om.jobworker.node.JobworkerNodeManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -65,7 +64,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 public class TestOMJobworkerCommandManager {
 
-  private JobworkerNodeManager nodeManager;
   private OMJobworkerCommandManager commandManager;
   private TestCommandListener testReregisterCommandListener;
   private TestCommandListener testMockCommandListener;
@@ -93,7 +91,6 @@ public class TestOMJobworkerCommandManager {
     conf.setInt("ozone.om.jobworker.grpc.port", ozoneManager.getJobworkerGrpcPort());
     client = new JobworkerClient("localhost", conf);
 
-    nodeManager = ozoneManager.getJobworkerNodemanager();
     commandManager = ozoneManager.getOMJobworkerCommandManager();
 
     jobworkerUuid = UUID.randomUUID();

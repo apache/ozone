@@ -417,7 +417,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
    * This design encapsulates all timeout checking logic and thread management.
    */
   static final class CommandTimeoutChecker {
-    private static CommandTimeoutChecker instance;
     private final ScheduledExecutorService executor;
     private final Map<OMJobworkerCommandProto.Type, JobworkerCommandListener> listeners;
     private final Map<OMJobworkerCommandProto.Type, Map<Long, JobworkerCommandInfo>> commandInfoMaps;
@@ -535,6 +534,7 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
     }
   }
 
+  @Override
   public void close() {
     timeoutChecker.close();
   }

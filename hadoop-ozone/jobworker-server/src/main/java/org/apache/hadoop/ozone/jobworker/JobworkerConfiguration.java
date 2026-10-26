@@ -37,28 +37,12 @@ public class JobworkerConfiguration {
   )
   private Duration rpcTimeout;
 
-  public Duration getRpcTimeout() {
-    return rpcTimeout;
-  }
-
-  public void setRpcTimeout(Duration rpcTimeout) {
-    this.rpcTimeout = rpcTimeout;
-  }
-
   @Config(key = "ozone.jobworker.grpc.maximum.inbound.length",
       defaultValue = "32M",
       type = ConfigType.SIZE,
       tags = {ConfigTag.JOBWORKER},
       description = "Maximum inbound message size for gRPC.")
   private int grpcMaximumInboundLength;
-
-  public int getGrpcMaximumInboundLength() {
-    return grpcMaximumInboundLength;
-  }
-
-  public void setGrpcMaximumInboundLength(int grpcMaximumInboundLength) {
-    this.grpcMaximumInboundLength = grpcMaximumInboundLength;
-  }
 
   @Config(key = "ozone.jobworker.heartbeat.interval",
       type = ConfigType.TIME,
@@ -68,14 +52,6 @@ public class JobworkerConfiguration {
   )
   private Duration heartbeatInterval = Duration.ofSeconds(30);
 
-  public Duration getHeartbeatInterval() {
-    return heartbeatInterval;
-  }
-
-  public void setHeartbeatInterval(Duration heartbeatInterval) {
-    this.heartbeatInterval = heartbeatInterval;
-  }
-
   @Config(key = "ozone.jobworker.heartbeat.log.warn.interval",
       type = ConfigType.INT,
       tags = {ConfigTag.JOBWORKER},
@@ -83,14 +59,6 @@ public class JobworkerConfiguration {
       description = "Number of heartbeat failures before logging a warning."
   )
   private int heartbeatLogWarnInterval = 10;
-
-  public int getHeartbeatLogWarnInterval() {
-    return heartbeatLogWarnInterval;
-  }
-
-  public void setHeartbeatLogWarnInterval(int heartbeatLogWarnInterval) {
-    this.heartbeatLogWarnInterval = heartbeatLogWarnInterval;
-  }
 
   @Config(key = "ozone.jobworker.storage.volume.dirs",
       type = ConfigType.STRING,
@@ -100,28 +68,12 @@ public class JobworkerConfiguration {
   )
   private String storageDirs = "";
 
-  public String getStorageDirs() {
-    return storageDirs;
-  }
-
-  public void setStorageVolumeDirs(String dirs) {
-    this.storageDirs = dirs;
-  }
-
   @Config(key = "ozone.jobworker.node.report.interval",
       type = ConfigType.TIME,
       tags = {ConfigTag.JOBWORKER},
       defaultValue = "60s",
       description = "Interval for sending node reports from JobWorker to OM.")
   private Duration nodeReportInterval = Duration.ofSeconds(60);
-
-  public Duration getNodeReportInterval() {
-    return nodeReportInterval;
-  }
-
-  public void setNodeReportInterval(Duration nodeReportInterval) {
-    this.nodeReportInterval = nodeReportInterval;
-  }
 
   @Config(key = "ozone.jobworker.max.report.count",
       type = ConfigType.INT,
@@ -130,28 +82,12 @@ public class JobworkerConfiguration {
       description = "The maximum number of reports that a Jobworker can send to OM at one time.")
   private int maxReportCount = 4096;
 
-  public int getMaxReportCount() {
-    return maxReportCount;
-  }
-
-  public void setMaxReportCount(int maxReportCount) {
-    this.maxReportCount = maxReportCount;
-  }
-
   @Config(key = "ozone.jobworker.max.report.size",
       type = ConfigType.SIZE,
       tags = {ConfigTag.JOBWORKER},
       defaultValue = "8M",
       description = "The maximum size of reports that a Jobworker can send to OM at one time.")
   private int maxReportSizeInBytes = 8 * 1024 * 1024;
-
-  public int getMaxReportSizeInBytes() {
-    return maxReportSizeInBytes;
-  }
-
-  public void setMaxReportSizeInBytes(int maxReportSizeInBytes) {
-    this.maxReportSizeInBytes = maxReportSizeInBytes;
-  }
 
   @Config(key = "ozone.jobworker.command.queue.limit",
       type = ConfigType.INT,
@@ -161,14 +97,6 @@ public class JobworkerConfiguration {
   )
   private int commandQueueLimit = 100;
 
-  public int getCommandQueueLimit() {
-    return commandQueueLimit;
-  }
-
-  public void setCommandQueueLimit(int commandQueueLimit) {
-    this.commandQueueLimit = commandQueueLimit;
-  }
-
   @Config(key = "ozone.jobworker.command.status.report.interval",
       type = ConfigType.TIME,
       tags = {ConfigTag.JOBWORKER},
@@ -176,14 +104,6 @@ public class JobworkerConfiguration {
       description = "Interval for sending command status reports from JobWorker to OM."
   )
   private Duration commandStatusReportInterval = Duration.ofSeconds(30);
-
-  public Duration getCommandStatusReportInterval() {
-    return commandStatusReportInterval;
-  }
-
-  public void setCommandStatusReportInterval(Duration commandStatusReportInterval) {
-    this.commandStatusReportInterval = commandStatusReportInterval;
-  }
 
   @Config(key = "ozone.jobworker.om.service.ids",
       type = ConfigType.STRING,
@@ -198,6 +118,86 @@ public class JobworkerConfiguration {
 
   public static final String OZONE_JOBWORKER_OM_SERVICE_IDS_KEY = "ozone.jobworker.om.service.ids";
 
+  public Duration getRpcTimeout() {
+    return rpcTimeout;
+  }
+
+  public void setRpcTimeout(Duration rpcTimeout) {
+    this.rpcTimeout = rpcTimeout;
+  }
+
+  public int getGrpcMaximumInboundLength() {
+    return grpcMaximumInboundLength;
+  }
+
+  public void setGrpcMaximumInboundLength(int grpcMaximumInboundLength) {
+    this.grpcMaximumInboundLength = grpcMaximumInboundLength;
+  }
+
+  public Duration getHeartbeatInterval() {
+    return heartbeatInterval;
+  }
+
+  public void setHeartbeatInterval(Duration heartbeatInterval) {
+    this.heartbeatInterval = heartbeatInterval;
+  }
+
+  public int getHeartbeatLogWarnInterval() {
+    return heartbeatLogWarnInterval;
+  }
+
+  public void setHeartbeatLogWarnInterval(int heartbeatLogWarnInterval) {
+    this.heartbeatLogWarnInterval = heartbeatLogWarnInterval;
+  }
+
+  public String getStorageDirs() {
+    return storageDirs;
+  }
+
+  public void setStorageVolumeDirs(String dirs) {
+    this.storageDirs = dirs;
+  }
+
+  public Duration getNodeReportInterval() {
+    return nodeReportInterval;
+  }
+
+  public void setNodeReportInterval(Duration nodeReportInterval) {
+    this.nodeReportInterval = nodeReportInterval;
+  }
+
+  public int getMaxReportCount() {
+    return maxReportCount;
+  }
+
+  public void setMaxReportCount(int maxReportCount) {
+    this.maxReportCount = maxReportCount;
+  }
+
+  public int getMaxReportSizeInBytes() {
+    return maxReportSizeInBytes;
+  }
+
+  public void setMaxReportSizeInBytes(int maxReportSizeInBytes) {
+    this.maxReportSizeInBytes = maxReportSizeInBytes;
+  }
+
+  public int getCommandQueueLimit() {
+    return commandQueueLimit;
+  }
+
+  public void setCommandQueueLimit(int commandQueueLimit) {
+    this.commandQueueLimit = commandQueueLimit;
+  }
+
+  public Duration getCommandStatusReportInterval() {
+    return commandStatusReportInterval;
+  }
+
+  public void setCommandStatusReportInterval(Duration commandStatusReportInterval) {
+    this.commandStatusReportInterval = commandStatusReportInterval;
+  }
+
   public String getOmServiceIds() {
     return omServiceIds;
   }
@@ -205,5 +205,4 @@ public class JobworkerConfiguration {
   public void setOmServiceIds(String omServiceIds) {
     this.omServiceIds = omServiceIds;
   }
-
 }

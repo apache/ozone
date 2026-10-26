@@ -65,7 +65,6 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
   private OzoneConfiguration conf;
   private JobworkerDetails jobworkerDetails;
   private JobworkerStateMachine jobworkerStateMachine;
-  private OzoneAdmins admins;
   private boolean printBanner;
   private String[] args;
 
@@ -167,7 +166,7 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
 
       String starterUser =
           UserGroupInformation.getCurrentUser().getShortUserName();
-      admins = OzoneAdmins.getOzoneAdmins(starterUser, conf);
+      OzoneAdmins admins = OzoneAdmins.getOzoneAdmins(starterUser, conf);
       LOG.info("JobWorker started with admins: {}", admins.getAdminUsernames());
 
       jobworkerStateMachine.startDaemon();

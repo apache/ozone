@@ -40,7 +40,6 @@ public final class RegisterEndpointTask implements Callable<EndpointStates> {
   // Used to verify the correctness of the OM Service ID configuration.
   // Multiple OM nodes of one OM Service in the configuration should have the same OM Service ID on the OM side.
   private final JobworkerEndpointStateMachine rpcEndPoint;
-  private final ConfigurationSource conf;
   private final JobworkerStateContext stateContext;
   private JobworkerDetails jobworkerDetails;
 
@@ -48,15 +47,12 @@ public final class RegisterEndpointTask implements Callable<EndpointStates> {
    * Creates a register endpoint task.
    *
    * @param rpcEndPoint - endpoint
-   * @param conf        - conf
    * @param context     - State context
    */
   @VisibleForTesting
   public RegisterEndpointTask(JobworkerEndpointStateMachine rpcEndPoint,
-                              ConfigurationSource conf,
                               JobworkerStateContext context) {
     this.rpcEndPoint = rpcEndPoint;
-    this.conf = conf;
     this.stateContext = context;
   }
 
@@ -235,7 +231,7 @@ public final class RegisterEndpointTask implements Callable<EndpointStates> {
       }
 
       RegisterEndpointTask task = new RegisterEndpointTask(
-          this.endPointStateMachine, this.conf, this.context);
+          this.endPointStateMachine, this.context);
       task.setJobworkerDetails(jobworkerDetails);
       return task;
     }

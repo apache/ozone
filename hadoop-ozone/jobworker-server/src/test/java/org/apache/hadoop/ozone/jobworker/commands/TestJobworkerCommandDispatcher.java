@@ -49,7 +49,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestJobworkerCommandDispatcher {
 
-  private JobworkerStateContext context;
   private JobworkerConnectionManager connectionManager;
   private JobworkerCommandDispatcher dispatcher;
   private MockCommandHandler reRegisterHandler;
@@ -60,14 +59,13 @@ public class TestJobworkerCommandDispatcher {
   public void setUp() {
     OzoneConfiguration conf = new OzoneConfiguration();
     JobworkerDetails jobworkerDetails = MockJobworkerDetails.randomJobworkerDetails();
-    context = mock(JobworkerStateContext.class);
     connectionManager = mock(JobworkerConnectionManager.class);
 
     // Create handlers for different command types
     executorService = Executors.newSingleThreadScheduledExecutor();
     reRegisterHandler = new MockCommandHandler(OMJobworkerCommandProto.Type.reregisterCommand, executorService);
     mockCommandHandler = new MockCommandHandler(OMJobworkerCommandProto.Type.mockCommand, executorService);
-    context = new JobworkerStateContext(conf, JobworkerStates.RUNNING,
+    JobworkerStateContext context = new JobworkerStateContext(conf, JobworkerStates.RUNNING,
         jobworkerDetails, "jobworker-test-", mock(JobworkerStateMachine.class), new JobworkerCommandManager(conf)
     );
 
@@ -175,7 +173,7 @@ public class TestJobworkerCommandDispatcher {
     OzoneConfiguration conf = new OzoneConfiguration();
     JobworkerCommandManager commandManager = new JobworkerCommandManager(conf);
     JobworkerDetails jobworkerDetails = MockJobworkerDetails.randomJobworkerDetails();
-    context = new JobworkerStateContext(conf, JobworkerStates.RUNNING,
+    JobworkerStateContext context = new JobworkerStateContext(conf, JobworkerStates.RUNNING,
         jobworkerDetails, "jobworker-test-", mock(JobworkerStateMachine.class), commandManager);
 
     dispatcher = JobworkerCommandDispatcher.newBuilder()

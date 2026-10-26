@@ -2757,7 +2757,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           jobworkerLeaderTracker::getTermIfReady);
       jobworkerEventQueue.addHandler(OMJobworkerEvents.JW_NODE_REPORT,
           new JobworkerNodeReportHandler(jobworkerNodemanager));
-      jobworkerEventQueue.addHandler(OMJobworkerEvents.NEW_JOBWORKER, new NewJobworkerHandler(jobworkerNodemanager));
+      jobworkerEventQueue.addHandler(OMJobworkerEvents.NEW_JOBWORKER, new NewJobworkerHandler());
       jobworkerEventQueue.addHandler(OMJobworkerEvents.STALE_JOBWORKER,
           new StaleJobworkerHandler(jobworkerNodemanager, omJobworkerCommandManager));
       jobworkerEventQueue.addHandler(OMJobworkerEvents.JW_COMMAND_STATUS_REPORT,

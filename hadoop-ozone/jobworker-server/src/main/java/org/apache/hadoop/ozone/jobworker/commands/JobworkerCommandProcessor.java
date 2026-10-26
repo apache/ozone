@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.jobworker.commands;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandResultCode;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatus;
 import org.apache.hadoop.ozone.jobworker.JobworkerStateContext;
@@ -40,7 +39,6 @@ public class JobworkerCommandProcessor implements Closeable {
   private final JobworkerStateContext context;
   private final JobworkerCommandManager commandManager;
   private final JobworkerCommandDispatcher commandDispatcher;
-  private final ConfigurationSource conf;
   private final String threadNamePrefix;
   private final AtomicLong nextHB;
   private final AtomicLong commandsHandled = new AtomicLong(0);
@@ -54,7 +52,6 @@ public class JobworkerCommandProcessor implements Closeable {
    * @param context           context to use
    * @param commandManager    command manager to use
    * @param commandDispatcher command dispatcher to use
-   * @param conf              configuration
    * @param threadNamePrefix  prefix for thread names
    * @param nextHB            reference to next heartbeat time
    */
@@ -62,13 +59,11 @@ public class JobworkerCommandProcessor implements Closeable {
       JobworkerStateContext context,
       JobworkerCommandManager commandManager,
       JobworkerCommandDispatcher commandDispatcher,
-      ConfigurationSource conf,
       String threadNamePrefix,
       AtomicLong nextHB) {
     this.context = context;
     this.commandManager = commandManager;
     this.commandDispatcher = commandDispatcher;
-    this.conf = conf;
     this.threadNamePrefix = threadNamePrefix;
     this.nextHB = nextHB;
   }

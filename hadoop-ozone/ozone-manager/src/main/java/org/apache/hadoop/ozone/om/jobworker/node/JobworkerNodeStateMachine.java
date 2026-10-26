@@ -37,6 +37,8 @@ import org.apache.hadoop.ozone.common.statemachine.StateMachine;
  */
 public class JobworkerNodeStateMachine {
 
+  private final StateMachine<NodeState, NodeLifeCycleEvent> nodeHealthSM;
+
   /**
    * Node's state transition events.
    */
@@ -44,8 +46,6 @@ public class JobworkerNodeStateMachine {
     TIMEOUT, // Node has not sent heartbeats for a while
     RESTORE  // Node has resumed sending heartbeats
   }
-
-  private final StateMachine<NodeState, NodeLifeCycleEvent> nodeHealthSM;
 
   /**
    * Initialize the Jobworker node state machine.

@@ -32,12 +32,6 @@ public class NewJobworkerHandler implements EventHandler<JobworkerDetails> {
   private static final Logger LOG =
       LoggerFactory.getLogger(NewJobworkerHandler.class);
 
-  private final JobworkerNodeManager nodeManager;
-
-  public NewJobworkerHandler(JobworkerNodeManager nodeManager) {
-    this.nodeManager = nodeManager;
-  }
-
   @Override
   public void onMessage(JobworkerDetails jobworkerDetails,
                         EventPublisher publisher) {
