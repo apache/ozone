@@ -188,3 +188,5 @@ OZONE-SITE.XML_ozone.lifecycle.service.enabled=true
 OZONE-SITE.XML_ozone.lifecycle.service.interval=30s
 OZONE-SITE.XML_ozone.lifecycle.service.timeout=10s
 
+# Revert when HDDS-17350 is merged. (lazy client tracing init)
+OZONE-SITE.XML_ozone.tracing.client.application-aware=false

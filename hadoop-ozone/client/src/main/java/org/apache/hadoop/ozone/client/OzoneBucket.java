@@ -2068,16 +2068,15 @@ public class OzoneBucket extends WithMetadata {
             stack.push(seekDirPath);
           }
         } else if (StringUtils.isNotBlank(getKeyPrefix())) {
-          if (!OzoneFSUtils.isAncestorPath(getKeyPrefix(), prevKey)) {
-            // Case-1 - sibling: keyPrefix="a1/b2", startKey="a0/b123Invalid"
-            // Skip traversing, if the startKey is not a sibling.
-            // "a1/b", "a1/b1/e/"
-            return false;
-          } else if (StringUtils.compare(prevKey, getKeyPrefix()) < 0) {
-            // Case-2 - compare: keyPrefix="a1/b2", startKey="a1/b123Invalid"
+          if (StringUtils.compare(prevKey, getKeyPrefix()) < 0) {
+            // Case-1 - compare: keyPrefix="a1/b2", startKey="a1/b123Invalid" or "a0/b123Invalid"
             // Since startKey is lexographically behind keyPrefix,
             // the seek precedence goes to keyPrefix.
             stack.push(new ImmutablePair<>(getKeyPrefix(), ""));
+          } else if (!OzoneFSUtils.isAncestorPath(getKeyPrefix(), prevKey)) {
+            // Case-2 - sibling: keyPrefix="a1/b2", startKey="a2/b1"
+            // Skip traversing, if the startKey is not a sibling.
+            return false;
           }
         }
       }
