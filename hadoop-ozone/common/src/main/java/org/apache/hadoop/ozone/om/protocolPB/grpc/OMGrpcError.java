@@ -25,39 +25,39 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMGrpcError;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMGrpcErrorProto;
 import org.apache.ratis.protocol.exceptions.ReadException;
 import org.apache.ratis.protocol.exceptions.ReadIndexException;
 
 /**
- * Converts between an exception thrown by OM and the {@link OMGrpcError}
- * that the OM gRPC server sends in the gRPC trailers.
+ * The Java form of {@link OMGrpcErrorProto}, the error that the OM gRPC server sends in the gRPC trailers.
+ * It converts between this error and the exception thrown by OM.
  */
-public final class OMGrpcErrorUtils {
-  private static final Metadata.Key<OMGrpcError> ERROR_KEY = Metadata.Key.of(
-      "om-grpc-error" + Metadata.BINARY_HEADER_SUFFIX, new Metadata.BinaryMarshaller<OMGrpcError>() {
+public final class OMGrpcError {
+  private static final Metadata.Key<OMGrpcErrorProto> ERROR_KEY = Metadata.Key.of(
+      "om-grpc-error" + Metadata.BINARY_HEADER_SUFFIX, new Metadata.BinaryMarshaller<OMGrpcErrorProto>() {
         @Override
-        public byte[] toBytes(OMGrpcError error) {
+        public byte[] toBytes(OMGrpcErrorProto error) {
           return error.toByteArray();
         }
 
         @Override
-        public OMGrpcError parseBytes(byte[] serialized) {
+        public OMGrpcErrorProto parseBytes(byte[] serialized) {
           try {
-            return OMGrpcError.parseFrom(serialized);
+            return OMGrpcErrorProto.parseFrom(serialized);
           } catch (InvalidProtocolBufferException e) {
-            throw new IllegalArgumentException("Failed to parse OMGrpcError", e);
+            throw new IllegalArgumentException("Failed to parse OMGrpcErrorProto", e);
           }
         }
       });
 
-  private OMGrpcErrorUtils() {
+  private OMGrpcError() {
   }
 
   /** @return the gRPC error for the given exception thrown by OM. */
   public static StatusRuntimeException toStatusRuntimeException(Throwable omException) {
     final Metadata trailers = new Metadata();
-    trailers.put(ERROR_KEY, toError(omException));
+    trailers.put(ERROR_KEY, toProto(omException));
     // NOTE: gRPC clients of old versions read the exception class and message from the description.
     return Status.INTERNAL.withDescription(omException.toString()).asRuntimeException(trailers);
   }
@@ -68,7 +68,7 @@ public final class OMGrpcErrorUtils {
    */
   public static IOException toOMException(StatusRuntimeException e) {
     final Metadata trailers = e.getTrailers();
-    final OMGrpcError error = trailers == null ? null : trailers.get(ERROR_KEY);
+    final OMGrpcErrorProto error = trailers == null ? null : trailers.get(ERROR_KEY);
     if (error == null) {
       return null;
     }
@@ -88,8 +88,8 @@ public final class OMGrpcErrorUtils {
     }
   }
 
-  private static OMGrpcError toError(Throwable omException) {
-    final OMGrpcError.Builder error = OMGrpcError.newBuilder().setCode(toCode(omException));
+  private static OMGrpcErrorProto toProto(Throwable omException) {
+    final OMGrpcErrorProto.Builder error = OMGrpcErrorProto.newBuilder().setCode(toCode(omException));
     if (omException.getMessage() != null) {
       error.setMessage(omException.getMessage());
     }
@@ -102,16 +102,16 @@ public final class OMGrpcErrorUtils {
     return error.build();
   }
 
-  private static OMGrpcError.Code toCode(Throwable omException) {
+  private static OMGrpcErrorProto.Code toCode(Throwable omException) {
     if (omException instanceof OMNotLeaderException) {
-      return OMGrpcError.Code.NOT_LEADER;
+      return OMGrpcErrorProto.Code.NOT_LEADER;
     } else if (omException instanceof OMLeaderNotReadyException) {
-      return OMGrpcError.Code.LEADER_NOT_READY;
+      return OMGrpcErrorProto.Code.LEADER_NOT_READY;
     } else if (omException instanceof ReadIndexException) {
-      return OMGrpcError.Code.READ_INDEX_FAILED;
+      return OMGrpcErrorProto.Code.READ_INDEX_FAILED;
     } else if (omException instanceof ReadException) {
-      return OMGrpcError.Code.READ_FAILED;
+      return OMGrpcErrorProto.Code.READ_FAILED;
     }
-    return OMGrpcError.Code.INTERNAL;
+    return OMGrpcErrorProto.Code.INTERNAL;
   }
 }

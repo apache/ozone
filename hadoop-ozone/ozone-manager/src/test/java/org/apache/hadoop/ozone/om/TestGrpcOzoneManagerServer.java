@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcErrorUtils;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -154,7 +154,7 @@ public class TestGrpcOzoneManagerServer {
     verify(observer).onError(error.capture());
     verify(observer, never()).onCompleted();
     OMNotLeaderException omException =
-        (OMNotLeaderException) OMGrpcErrorUtils.toOMException((StatusRuntimeException) error.getValue());
+        (OMNotLeaderException) OMGrpcError.toOMException((StatusRuntimeException) error.getValue());
     assertEquals("om2", omException.getSuggestedLeaderNodeId());
   }
 

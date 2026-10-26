@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcErrorUtils;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
@@ -115,7 +115,7 @@ public class TestS3GrpcOmTransport {
                       responseObserver.onCompleted();
                     }
                   } catch (Throwable e) {
-                    responseObserver.onError(OMGrpcErrorUtils.toStatusRuntimeException(e.getCause()));
+                    responseObserver.onError(OMGrpcError.toStatusRuntimeException(e.getCause()));
                   }
                 }
               }));
@@ -610,7 +610,7 @@ public class TestS3GrpcOmTransport {
           public void submitRequest(OMRequest request,
               StreamObserver<OMResponse> responseObserver) {
             requestCount.incrementAndGet();
-            responseObserver.onError(OMGrpcErrorUtils.toStatusRuntimeException(notLeaderException));
+            responseObserver.onError(OMGrpcError.toStatusRuntimeException(notLeaderException));
           }
         })
         .build()

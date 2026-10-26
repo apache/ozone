@@ -25,7 +25,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcErrorUtils;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -110,7 +110,7 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
     } catch (Throwable e) {
       LOG.error("Failed to submit request", e);
       Throwable omException = e instanceof ServiceException ? e.getCause() : e;
-      responseObserver.onError(OMGrpcErrorUtils.toStatusRuntimeException(omException));
+      responseObserver.onError(OMGrpcError.toStatusRuntimeException(omException));
       return;
     }
     responseObserver.onCompleted();

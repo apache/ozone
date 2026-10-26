@@ -33,9 +33,9 @@ import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for {@link OMGrpcErrorUtils}.
+ * Tests for {@link OMGrpcError}.
  */
-public class TestOMGrpcErrorUtils {
+public class TestOMGrpcError {
 
   @Test
   void testNotLeaderExceptionKeepsSuggestedLeader() {
@@ -68,7 +68,7 @@ public class TestOMGrpcErrorUtils {
   void testDescriptionKeepsExceptionClassAndMessage() {
     final OMLeaderNotReadyException omException = new OMLeaderNotReadyException("om1 is not ready");
 
-    final StatusRuntimeException e = OMGrpcErrorUtils.toStatusRuntimeException(omException);
+    final StatusRuntimeException e = OMGrpcError.toStatusRuntimeException(omException);
 
     assertEquals(Status.Code.INTERNAL, e.getStatus().getCode());
     assertEquals(omException.toString(), e.getStatus().getDescription());
@@ -76,8 +76,8 @@ public class TestOMGrpcErrorUtils {
 
   @Test
   void testErrorWithoutOmError() {
-    assertNull(OMGrpcErrorUtils.toOMException(Status.INTERNAL.withDescription("a: b").asRuntimeException()));
-    assertNull(OMGrpcErrorUtils.toOMException(Status.UNAVAILABLE.asRuntimeException()));
+    assertNull(OMGrpcError.toOMException(Status.INTERNAL.withDescription("a: b").asRuntimeException()));
+    assertNull(OMGrpcError.toOMException(Status.UNAVAILABLE.asRuntimeException()));
   }
 
   private static void assertRoundTrip(IOException omException) {
@@ -87,6 +87,6 @@ public class TestOMGrpcErrorUtils {
   }
 
   private static IOException roundTrip(Throwable omException) {
-    return OMGrpcErrorUtils.toOMException(OMGrpcErrorUtils.toStatusRuntimeException(omException));
+    return OMGrpcError.toOMException(OMGrpcError.toStatusRuntimeException(omException));
   }
 }

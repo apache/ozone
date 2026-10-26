@@ -2865,7 +2865,7 @@ service OzoneManagerService {
 /**
  The error that OzoneManagerService sends in the gRPC trailers when submitRequest fails.
 */
-message OMGrpcError {
+message OMGrpcErrorProto {
   enum Code {
     INTERNAL = 1;
     NOT_LEADER = 2;

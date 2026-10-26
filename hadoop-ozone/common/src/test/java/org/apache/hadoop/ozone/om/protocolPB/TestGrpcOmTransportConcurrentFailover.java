@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcErrorUtils;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -246,7 +246,7 @@ public class TestGrpcOmTransportConcurrentFailover {
 
                 if (!isLeader.get()) {
                   failureCount.incrementAndGet();
-                  responseObserver.onError(OMGrpcErrorUtils.toStatusRuntimeException(
+                  responseObserver.onError(OMGrpcError.toStatusRuntimeException(
                       new OMNotLeaderException("OM:" + nodeId + " is not the leader. Suggested leader: om2")));
                 } else {
                   successCount.incrementAndGet();
