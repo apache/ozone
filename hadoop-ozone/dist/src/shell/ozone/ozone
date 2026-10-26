@@ -211,7 +211,7 @@ function ozonecmd_case
     ;;
     local)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.local.OzoneLocal
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-local"
     ;;
     version)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.util.OzoneVersionInfo

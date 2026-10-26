@@ -354,7 +354,7 @@ public final class HddsUtils {
    * @param value host or host:port
    * @throws ConfigurationException if the host is an unbracketed IPv6 literal
    */
-  private static void validateHostPortAuthority(String key, String value) {
+  public static void validateHostPortAuthority(String key, String value) {
     if (value == null || value.isEmpty() || value.startsWith("[")) {
       return;
     }
@@ -648,6 +648,7 @@ public final class HddsUtils {
     case UpdateContainer:
     case GetContainerChecksumInfo:
     case ListBlock:
+    case Echo:
       return true;
     default:
       return false;
