@@ -238,7 +238,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OmVolumeArgs omVolumeArgs;
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
-    final String owner = getOmRequest().getUserInfo().getUserName();
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -252,6 +251,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
+    // UserInfo holds the full Kerberos principal, but the user table is keyed by the volume owner's short name.
+    final String owner = volumeInfo.getOwnerName();
     Objects.requireNonNull(volumeName, "volumeName == null");
     Preconditions.checkState(request.getVolumeName().equals(volumeName),
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
