@@ -34,7 +34,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeStorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListStorageTypeUsageInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
@@ -563,4 +565,16 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException;
+
+  /**
+   * List disk usage information grouped by {@link org.apache.hadoop.fs.StorageType}
+   * for each datanode matching the given filter.
+   *
+   * @param requestProto optional node-state / operational-state filter.
+   * @param clientVersion Client's version number
+   * @return per-datanode, per-StorageType usage info.
+   * @throws IOException on error.
+   */
+  List<DatanodeStorageTypeUsageInfoProto> listStorageTypeUsageInfo(
+      ListStorageTypeUsageInfoRequestProto requestProto, int clientVersion) throws IOException;
 }
