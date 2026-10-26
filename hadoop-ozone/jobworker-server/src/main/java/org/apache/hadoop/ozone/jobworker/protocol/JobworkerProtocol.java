@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolP
 
 /**
  * The protocol spoken between Jobworker and OM.
- * For specifics, please the Protoc file {@link JobworkerServiceProtocol.proto} that defines this protocol.
+ * For details, see {@code JobworkerServiceProtocol.proto}, which defines this protocol.
  */
 public interface JobworkerProtocol extends Closeable {
 

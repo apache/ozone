@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USE_JOBWORKER_HOS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USE_JOBWORKER_HOSTNAME_KEY;
 import static org.apache.hadoop.ozone.om.jobworker.OMJobworkerEvents.STALE_JOBWORKER;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -303,7 +302,6 @@ public class JobworkerNodeManager implements JobworkerNodeProtocol, Closeable {
     this.commandQueue.clear();
   }
 
-  @VisibleForTesting
   public JobworkerNodeStateManager getNodeStateManager() {
     return nodeStateManager;
   }
@@ -474,12 +472,10 @@ public class JobworkerNodeManager implements JobworkerNodeProtocol, Closeable {
     return ((currentTime - lastHealthCheck) >= staleNodeIntervalMs);
   }
 
-  @VisibleForTesting
   public void setLastHealthCheck(long lastHealthCheck) {
     this.lastHealthCheck = lastHealthCheck;
   }
 
-  @VisibleForTesting
   public int getCommandCount(UUID jobworkerUuid, OMJobworkerCommandProto.Type commandType) {
     return commandQueue.getJobworkerCommandCount(jobworkerUuid, commandType);
   }

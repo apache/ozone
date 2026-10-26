@@ -2795,17 +2795,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return jobworkerNodemanager;
   }
 
-  @VisibleForTesting
   public JobworkerProtocolServerImpl getJobworkerServerProtocol() {
     return jobworkerServerProtocol;
   }
 
-  @VisibleForTesting
   public OMJobworkerCommandManager getOMJobworkerCommandManager() {
     return omJobworkerCommandManager;
   }
 
-  @VisibleForTesting
   public EventQueue getJobworkerEventQueue() {
     return jobworkerEventQueue;
   }

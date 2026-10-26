@@ -586,6 +586,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.use.jobworker.hostname</name>
+    <value>false</value>
+    <tag>OZONE, OM, JOBWORKER</tag>
+    <description>
+      Whether OM uses a Jobworker's hostname instead of its IP address
+      when resolving the Jobworker's network location for rack topology.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.handler.count.key</name>
     <value>100</value>
     <tag>OM, PERFORMANCE</tag>

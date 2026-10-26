@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.jobworker.commands;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -261,12 +260,10 @@ public abstract class AbstractJobworkerCommandHandler implements JobworkerComman
     return queuedCount.get();
   }
 
-  @VisibleForTesting
   public void setQueuedCount(int queuedCount) {
     this.queuedCount.set(queuedCount);
   }
 
-  @VisibleForTesting
   public void setInjector(FaultInjector injector) {
     this.injector = injector;
   }

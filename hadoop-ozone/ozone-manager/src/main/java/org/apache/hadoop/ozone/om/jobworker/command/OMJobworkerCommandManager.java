@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.jobworker.command;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -111,7 +110,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
    * @param commandType the command type
    * @return the listener for the command type, or null if not found
    */
-  @VisibleForTesting
   public JobworkerCommandListener getListener(OMJobworkerCommandProto.Type commandType) {
     return listeners.get(commandType);
   }
@@ -122,7 +120,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
    * @param commandType the command type
    * @param listener the listener to set
    */
-  @VisibleForTesting
   public void setListener(OMJobworkerCommandProto.Type commandType, JobworkerCommandListener listener) {
     listeners.put(commandType, listener);
   }
@@ -259,7 +256,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
    *
    * @param commands List of commands to mark as failed
    * @param jobworkerDetails Details of the stale JobWorker
-   * @return The number of commands that were marked as failed
    */
   public void markCommandsFailedForJobworker(List<OMJobworkerCommand> commands,
                                             JobworkerDetails jobworkerDetails) {
@@ -368,7 +364,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
   /**
    * For testing only - get access to the command info maps.
    */
-  @VisibleForTesting
   Map<OMJobworkerCommandProto.Type, Map<Long, JobworkerCommandInfo>> getCommandInfoMaps() {
     return commandInfoMaps;
   }
@@ -376,7 +371,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
   /**
    * For testing only - reset the command info maps.
    */
-  @VisibleForTesting
   public void resetCommandInfoMaps() {
     commandInfoMaps.forEach((type, commandInfoMap) -> {
       commandInfoMap.clear();
@@ -407,7 +401,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
   /**
    * For testing only - get the command timeout checker instance.
    */
-  @VisibleForTesting
   CommandTimeoutChecker getCommandTimeoutChecker() {
     return timeoutChecker;
   }
@@ -454,7 +447,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
      * Check for timed-out commands in a specific processor.
      * Leverages the monotonically increasing command IDs to optimize the check.
      */
-    @VisibleForTesting
     void checkTimeoutsForProcessor(OMJobworkerCommandProto.Type type) {
       Map<Long, JobworkerCommandInfo> commandStatusMap = commandInfoMaps.get(type);
       JobworkerCommandListener commandListener = listeners.get(type);
@@ -486,7 +478,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
      *
      * @param intervalSeconds interval in seconds
      */
-    @VisibleForTesting
     static void setCheckIntervalForTesting(long intervalSeconds) {
       checkIntervalSeconds = intervalSeconds;
     }
@@ -505,7 +496,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
      *
      * @param clock Supplier that provides the current time
      */
-    @VisibleForTesting
     void setClock(Supplier<Long> clock) {
       this.clock = clock;
     }
@@ -515,7 +505,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
      *
      * @return Timeout in milliseconds
      */
-    @VisibleForTesting
     long getTimeoutMs() {
       return DEFAULT_TIMEOUT_MS;
     }
@@ -524,7 +513,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
       return executor;
     }
 
-    @VisibleForTesting
     public static int getCheckTimes() {
       return checkTimes;
     }

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.jobworker.commands;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -91,7 +90,6 @@ public final class JobworkerCommandDispatcher {
    * @param type command type
    * @return the handler for that command type
    */
-  @VisibleForTesting
   public JobworkerCommandHandler getHandler(OMJobworkerCommandProto.Type type) {
     return handlerMap.get(type);
   }

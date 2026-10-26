@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.jobworker;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.executorServiceShutdownGraceful;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.IOException;
@@ -158,7 +157,6 @@ public class JobworkerStateMachine implements Closeable {
     this.context = context;
   }
 
-  @VisibleForTesting
   public void setHandlerInjector(OMJobworkerCommandProto.Type commandType,
       FaultInjector injector) {
     if (commandDispatcher.getHandler(commandType) instanceof AbstractJobworkerCommandHandler) {
@@ -338,13 +336,11 @@ public class JobworkerStateMachine implements Closeable {
    *
    * @return true if daemon has been stopped
    */
-  @VisibleForTesting
   public boolean isDaemonStopped() {
     return this.executorService.isShutdown()
         && this.getContext().getState() == JobworkerStates.SHUTDOWN;
   }
 
-  @VisibleForTesting
   public boolean isJobworkerReady() {
     if (context.getState() != JobworkerStates.RUNNING) {
       return false;

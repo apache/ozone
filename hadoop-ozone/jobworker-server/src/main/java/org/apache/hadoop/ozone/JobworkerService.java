@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
@@ -74,7 +73,6 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
    *
    * @param args command line arguments.
    */
-  @VisibleForTesting
   public JobworkerService(String[] args) {
     this(false, args);
   }
@@ -254,12 +252,10 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
     LOG.error("Exception in JobworkerService.", error);
   }
 
-  @VisibleForTesting
   public JobworkerStateMachine getJobworkerStateMachine() {
     return jobworkerStateMachine;
   }
 
-  @VisibleForTesting
   public JobworkerDetails getJobworkerDetails() {
     return jobworkerDetails;
   }

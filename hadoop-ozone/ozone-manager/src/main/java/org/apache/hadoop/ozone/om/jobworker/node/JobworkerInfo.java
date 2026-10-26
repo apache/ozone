@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.jobworker.node;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -91,7 +90,6 @@ public class JobworkerInfo extends JobworkerDetails {
    *
    * @param milliSecondsSinceEpoch - ms since Epoch to set as the heartbeat time
    */
-  @VisibleForTesting
   public void updateLastHeartbeatTime(long milliSecondsSinceEpoch) {
     try {
       lock.writeLock().lock();
@@ -101,7 +99,6 @@ public class JobworkerInfo extends JobworkerDetails {
     }
   }
 
-  @VisibleForTesting
   public long getLastHeartbeatTime() {
     return lastHeartbeatTime;
   }

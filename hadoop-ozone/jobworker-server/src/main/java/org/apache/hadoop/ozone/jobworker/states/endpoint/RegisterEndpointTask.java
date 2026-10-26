@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.jobworker.states.endpoint;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.Callable;
 import org.apache.commons.lang3.StringUtils;
@@ -49,7 +48,6 @@ public final class RegisterEndpointTask implements Callable<EndpointStates> {
    * @param rpcEndPoint - endpoint
    * @param context     - State context
    */
-  @VisibleForTesting
   public RegisterEndpointTask(JobworkerEndpointStateMachine rpcEndPoint,
                               JobworkerStateContext context) {
     this.rpcEndPoint = rpcEndPoint;

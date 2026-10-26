@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.jobworker.states.endpoint;
 
 import static org.apache.hadoop.ozone.jobworker.JobworkerEndpointStateMachine.EndpointStates.SHUTDOWN;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Callable;
@@ -151,7 +150,6 @@ public class VersionEndpointTask implements Callable<EndpointStates> {
     rpcEndPoint.setOmServiceId(reportedOMServiceId);
   }
 
-  @VisibleForTesting
   public static void resetClusterId() {
     verifiedClusterId = null;
   }

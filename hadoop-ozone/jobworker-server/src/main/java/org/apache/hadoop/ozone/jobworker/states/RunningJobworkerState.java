@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.jobworker.states;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -157,7 +156,6 @@ public class RunningJobworkerState implements JobworkerStateHandler<JobworkerSta
     }
   }
 
-  @VisibleForTesting
   public void setExecutorCompletionService(ExecutorCompletionService<EndpointStates> ecs) {
     this.completionService = ecs;
   }
