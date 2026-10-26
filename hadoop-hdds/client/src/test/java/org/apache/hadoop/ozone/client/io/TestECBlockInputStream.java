@@ -33,8 +33,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SplittableRandom;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -763,6 +767,127 @@ public class TestECBlockInputStream {
       assertEquals(600, ecb.read(buf));
       assertDataMatches(buf, 50, 600);
       assertEquals(650, ecb.getPos());
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("parallelReadConfigs")
+  public void testPositionedReadReturnsDataWithoutMovingPosition(ECReplicationConfig ecConfig) throws IOException {
+    repConfig = ecConfig;
+    int chunk = ecConfig.getEcChunkSize();
+    int stripe = chunk * ecConfig.getData();
+    int blockLength = 2 * stripe + chunk + chunk / 2;
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(ecConfig, ecConfig.getRequiredNodes(), blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+    int[][] ranges = {
+        {10, 50},                          // within one cell
+        {50, 100},                         // across two cells
+        {stripe - 30, 60},                 // across a stripe boundary
+        {0, blockLength},                  // the whole block
+        {2 * stripe + 10, chunk + 40},     // into the partial last stripe
+        {blockLength - 130, 500},          // past the end of the block
+    };
+    try (ECBlockInputStream ecb = createStream(keyInfo, dataStreamFactory, conf.getObject(OzoneClientConfig.class))) {
+      ecb.seek(37);
+      for (int[] range : ranges) {
+        ByteBuffer buf = ByteBuffer.allocate(range[1]);
+        int expected = Math.min(range[1], blockLength - range[0]);
+        assertEquals(expected, ecb.read(range[0], buf), "range " + Arrays.toString(range));
+        assertEquals(expected, buf.position());
+        assertDataMatches(buf, range[0], expected);
+        assertEquals(37, ecb.getPos());
+      }
+      assertEquals(-1, ecb.read(blockLength, ByteBuffer.allocate(10)));
+      assertEquals(ecConfig.getData(), dataStreamFactory.getBlockStreams().size());
+      for (ECStreamTestUtil.TestBlockInputStream indexStream : dataStreamFactory.getBlockStreams()) {
+        assertEquals(0, indexStream.getPos());
+      }
+
+      // the sequential read continues where it was
+      ByteBuffer buf = ByteBuffer.allocate(stripe);
+      assertEquals(stripe, ecb.read(buf));
+      assertDataMatches(buf, 37, stripe);
+      assertEquals(37 + stripe, ecb.getPos());
+    }
+    assertEquals(parallelRead, parallelReadTasks.get() > 0);
+  }
+
+  @Test
+  public void testConcurrentPositionedAndSequentialReads() throws Exception {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300 + 150;
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+    ExecutorService readers = Executors.newFixedThreadPool(8);
+    try (ECBlockInputStream ecb = createStream(keyInfo, dataStreamFactory, conf.getObject(OzoneClientConfig.class))) {
+      List<Future<?>> futures = new ArrayList<>();
+      for (int t = 0; t < 8; t++) {
+        long seed = t;
+        futures.add(readers.submit((Callable<Void>) () -> {
+          SplittableRandom random = new SplittableRandom(seed);
+          for (int i = 0; i < 200; i++) {
+            int offset = random.nextInt(blockLength);
+            int length = Math.min(1 + random.nextInt(350), blockLength - offset);
+            ByteBuffer buf = ByteBuffer.allocate(length);
+            ecb.readFully(offset, buf);
+            assertDataMatches(buf, offset, length);
+          }
+          return null;
+        }));
+      }
+      ByteBuffer buf = ByteBuffer.allocate(70);
+      for (long expectedPosition = 0; expectedPosition < blockLength;) {
+        buf.clear();
+        int read = ecb.read(buf);
+        assertDataMatches(buf, expectedPosition, read);
+        expectedPosition += read;
+        assertEquals(expectedPosition, ecb.getPos());
+      }
+      for (Future<?> future : futures) {
+        future.get(30, TimeUnit.SECONDS);
+      }
+      assertEquals(blockLength, ecb.getPos());
+    } finally {
+      readers.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testFailedPositionedReadReportsIndexesWithoutChangingState() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300;
+    Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
+      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+    }
+    // a spare location for index 2, which a positioned read must not switch to
+    DatanodeDetails spare = MockDatanodeDetails.randomDatanodeDetails();
+    datanodes.put(spare, 2);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, datanodes);
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    dataStreamFactory.setFailIndexes(2, 3);
+
+    try (ECBlockInputStream ecb = createStream(keyInfo, dataStreamFactory, conf.getObject(OzoneClientConfig.class))) {
+      ecb.seek(50);
+      ByteBuffer buf = ByteBuffer.allocate(300);
+      BadDataLocationException e = assertThrows(BadDataLocationException.class, () -> ecb.read(0, buf));
+      assertEquals(Arrays.asList(1, 2), e.getFailedLocationIndexes());
+      assertThat(e.getFailedLocations()).doesNotContain(spare).hasSize(2);
+      assertEquals(0, buf.position());
+      assertEquals(50, ecb.getPos());
+
+      // the failed streams were neither closed nor switched to the spare
+      dataStreamFactory.getBlockStream(2).setShouldError(false);
+      dataStreamFactory.getBlockStream(3).setShouldError(false);
+      assertEquals(300, ecb.read(0, buf));
+      assertDataMatches(buf, 0, 300);
+      assertEquals(3, dataStreamFactory.getBlockStreams().size());
+      assertEquals(50, ecb.getPos());
     }
   }
 

@@ -43,6 +43,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -732,6 +733,17 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   protected int readWithStrategy(ByteReaderStrategy strategy) {
     throw new NotImplementedException("readWithStrategy is not implemented. " +
         "Use readStripe() instead");
+  }
+
+  @Override
+  protected int readPositioned(long offset, ByteBuffer buffer) {
+    throw new UnsupportedOperationException("Use ECBlockInputStreamProxy for positioned reads");
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    return !StreamCapabilities.PREADBYTEBUFFER.equalsIgnoreCase(capability)
+        && super.hasCapability(capability);
   }
 
   @Override
