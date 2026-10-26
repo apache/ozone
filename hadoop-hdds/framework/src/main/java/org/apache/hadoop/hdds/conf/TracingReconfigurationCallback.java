@@ -45,7 +45,6 @@ public final class TracingReconfigurationCallback implements ReconfigurationChan
    */
   public static TracingReconfigurationCallback init(
       String serviceName, TracingConfig tracingConfig) {
-    TracingUtil.installMdcContextStorage();
     TracingUtil.initTracing(serviceName, tracingConfig);
     return new TracingReconfigurationCallback(serviceName, tracingConfig);
   }
