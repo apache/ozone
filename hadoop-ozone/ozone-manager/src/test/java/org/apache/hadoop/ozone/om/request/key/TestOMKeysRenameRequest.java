@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,6 +31,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -39,6 +43,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysMap;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests RenameKey request.
@@ -142,6 +148,50 @@ public class TestOMKeysRenameRequest extends OMKeyRequestTests {
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName))).isEqualTo(fromKeyInfo);
     assertThat(omMetadataManager.getKeyTable(getBucketLayout())
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName))).isEqualTo(toKeyInfo);
+  }
+
+  /**
+   * Whatever preExecute and validateAndUpdateCache make of a transaction, the key table committed by its response
+   * matches the cache. A transaction with a pair that shares a key with an earlier pair is rejected by preExecute.
+   */
+  @ParameterizedTest
+  // The key names of the first two cases are chosen so that the code without the check shows the defect.
+  @CsvSource({"key, key_b, key_b, key_c, true", "key, key_b, other, key, true", "key, key_b, other, other_b, false"})
+  public void testCommittedKeyTableMatchesCache(String from1, String to1, String from2, String to2,
+      boolean expectRejected) throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+    for (String name : new String[] {from1, from2}) {
+      if (!name.equals(to1)) {
+        OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, name, 0L,
+            RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+      }
+    }
+    OMRequest omRequest = createRenameKeyRequest(Arrays.asList(
+        RenameKeysMap.newBuilder().setFromKeyName(from1).setToKeyName(to1).build(),
+        RenameKeysMap.newBuilder().setFromKeyName(from2).setToKeyName(to2).build()));
+
+    OMException rejected = null;
+    try {
+      OMRequest checked = new OMKeysRenameRequest(omRequest, getBucketLayout()).preExecute(ozoneManager);
+      try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+        new OMKeysRenameRequest(checked, getBucketLayout()).validateAndUpdateCache(ozoneManager, 100L)
+            .checkAndUpdateDB(omMetadataManager, batchOperation);
+        omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      }
+    } catch (OMException e) {
+      rejected = e;
+    }
+
+    Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(getBucketLayout());
+    for (String name : new String[] {from1, to1, from2, to2}) {
+      String dbKey = omMetadataManager.getOzoneKey(volumeName, bucketName, name);
+      assertThat(objectId(keyTable.getSkipCache(dbKey))).as(name).isEqualTo(objectId(keyTable.get(dbKey)));
+    }
+    assertThat(rejected == null ? null : rejected.getResult()).isEqualTo(expectRejected ? INVALID_REQUEST : null);
+  }
+
+  private static Long objectId(OmKeyInfo keyInfo) {
+    return keyInfo == null ? null : keyInfo.getObjectID();
   }
 
   /**
