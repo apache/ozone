@@ -42,9 +42,9 @@ public class ContainerScannerConfiguration {
   public static final String HDDS_CONTAINER_SCRUB_ENABLED =
       "hdds.container.scrub.enabled";
   public static final String HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED =
-      "hdds.container.scrub.dev.data.enabled";
+      "hdds.container.scrub.dev.data.scan.enabled";
   public static final String HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED =
-      "hdds.container.scrub.dev.metadata.enabled";
+      "hdds.container.scrub.dev.metadata.scan.enabled";
   public static final String METADATA_SCAN_INTERVAL_KEY =
       "hdds.container.scrub.metadata.scan.interval";
   public static final String DATA_SCAN_INTERVAL_KEY =
@@ -75,7 +75,7 @@ public class ContainerScannerConfiguration {
       description = "Config parameter to enable all container scanners.")
   private boolean enabled = true;
 
-  @Config(key = "hdds.container.scrub.dev.data.scan.enabled",
+  @Config(key = HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED,
       type = ConfigType.BOOLEAN,
       defaultValue = "true",
       tags = {ConfigTag.STORAGE},
@@ -83,7 +83,7 @@ public class ContainerScannerConfiguration {
           "scanner for developer testing purposes.")
   private boolean dataScanEnabled = true;
 
-  @Config(key = "hdds.container.scrub.dev.metadata.scan.enabled",
+  @Config(key = HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED,
       type = ConfigType.BOOLEAN,
       defaultValue = "true",
       tags = {ConfigTag.STORAGE},

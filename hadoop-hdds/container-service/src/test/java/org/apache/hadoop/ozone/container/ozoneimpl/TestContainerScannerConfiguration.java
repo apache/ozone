@@ -22,12 +22,15 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfig
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.DATA_SCAN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.DATA_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.METADATA_SCAN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.METADATA_SCAN_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
@@ -46,6 +49,26 @@ public class TestContainerScannerConfiguration {
   @BeforeEach
   public void setup() {
     this.conf = new OzoneConfiguration();
+  }
+
+  @Test
+  public void disablesDataScanner() {
+    conf.setBoolean(HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED, false);
+
+    ContainerScannerConfiguration csConf = conf.getObject(ContainerScannerConfiguration.class);
+
+    assertFalse(csConf.isDataScanEnabled());
+    assertTrue(csConf.isMetadataScanEnabled());
+  }
+
+  @Test
+  public void disablesMetadataScanner() {
+    conf.setBoolean(HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED, false);
+
+    ContainerScannerConfiguration csConf = conf.getObject(ContainerScannerConfiguration.class);
+
+    assertFalse(csConf.isMetadataScanEnabled());
+    assertTrue(csConf.isDataScanEnabled());
   }
 
   @Test
