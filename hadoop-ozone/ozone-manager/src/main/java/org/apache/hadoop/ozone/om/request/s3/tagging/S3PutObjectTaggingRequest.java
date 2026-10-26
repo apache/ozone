@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PutObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PutObjectTaggingResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,8 +77,19 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
         keyArgs.toBuilder()
             .setKeyName(keyPath);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
-        ozoneManager, ACLType.WRITE);
+    KeyArgs requestedArgs = newKeyArgs.build();
+    KeyArgs resolvedArgs = null;
+    try {
+      resolvedArgs = resolveBucketLink(ozoneManager, requestedArgs);
+      checkKeyAcls(ozoneManager, resolvedArgs.getVolumeName(), resolvedArgs.getBucketName(),
+          requestedArgs.getKeyName(), ACLType.WRITE, OzoneObj.ResourceType.KEY);
+    } catch (IOException ex) {
+      // Like the success entry, audit the resolved bucket unless the bucket could not be resolved.
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.PUT_OBJECT_TAGGING,
+          buildKeyArgsAuditMap(resolvedArgs != null ? resolvedArgs : requestedArgs), ex,
+          getOmRequest().getUserInfo()));
+      throw ex;
+    }
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
         .setPutObjectTaggingRequest(
