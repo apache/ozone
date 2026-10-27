@@ -21,7 +21,6 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAIL;
 import static org.apache.hadoop.io_.retry.RetryPolicies.exponentialBackoffRetry;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -101,7 +100,6 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
     }
   }
 
-  @VisibleForTesting
   static RetryPolicy initialSecretKeyRetryPolicy() {
     // Exponential backoff policy, 100 max attempts. The base wait time doubles up to 16s
     // and each wait is randomized by +/-50%. The base wait times are (retries start from 1):
