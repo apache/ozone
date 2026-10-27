@@ -89,8 +89,22 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
             UserInfo.newBuilder().build(), ozoneManager));
 
-    assertEquals(OMException.ResultCodes.KEY_ALLOCATION_PIPELINE_NOT_FOUND, error.getResult());
+    assertEquals(OMException.ResultCodes.KEY_ALLOCATION_ERROR, error.getResult());
     assertEquals(message, error.getMessage());
+  }
+
+  @Test
+  public void testScmSafeModeMappingIsPreserved() throws Exception {
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), anyString()))
+        .thenThrow(new SCMException("SCM is in safe mode", SCMException.ResultCodes.SAFE_MODE_EXCEPTION));
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    OMException error = assertThrows(OMException.class,
+        () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
+            UserInfo.newBuilder().build(), ozoneManager));
+
+    assertEquals(OMException.ResultCodes.SCM_IN_SAFE_MODE, error.getResult());
   }
 
   @Test
