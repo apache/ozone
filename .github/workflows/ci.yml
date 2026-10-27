@@ -480,6 +480,7 @@ jobs:
       - acceptance
       - compat-old
       - integration
+      - junit
     steps:
       - name: Checkout project
         uses: actions/checkout@v7
