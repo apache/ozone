@@ -816,6 +816,37 @@ STS session policy ListBucketMultipartUploads must require bucket READ and LIST
     ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-multipart-uploads --bucket ${ICEBERG_BUCKET_OBS} --profile sts
     Should Contain                ${output}                     AccessDenied
 
+STS session policy ListBucketVersions must require bucket READ and LIST
+    # Positive control
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListBucketVersions","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    # A ListBucket grant must not authorize ListObjectVersions
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # A ListBucketVersions grant must not authorize ListObjects nor ListObjectsV2
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListBucketVersions","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-objects --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-objects-v2 --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative A: missing LIST (prefix upload so key READ is satisfied and only bucket LIST is denied)
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --prefix upload --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_LIST_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
 STS session policy GetBucketAcl must require bucket READ and READ_ACL
     # Positive control
     ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetBucketAcl","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
@@ -1604,6 +1635,7 @@ Expired STS temporary credentials must return ExpiredToken on S3 APIs
     Execute S3api Expect Expired Token Head Operation           head-bucket --bucket ${ICEBERG_BUCKET_OBS}    HeadBucket
     Execute S3api Expect Expired Token                          list-objects-v2 --bucket ${ICEBERG_BUCKET_OBS} --output json
     Execute S3api Expect Expired Token                          list-objects --bucket ${ICEBERG_BUCKET_OBS} --output json
+    Execute S3api Expect Expired Token                          list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --output json
     Execute S3api Expect Expired Token                          get-object --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/expired-sts-token-get-object.out
 
     Create File                   ${TEMP_DIR}/expired-sts-token-put-object-body.txt    expired sts token put body

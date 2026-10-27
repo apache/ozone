@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
@@ -84,6 +86,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
   private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconStorageContainerManagerFacade reconStorageContainerManager;
   private OzoneConfiguration configuration;
@@ -114,6 +117,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
     HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
+    HddsUtils.validateAdvertisedAddressConfig(configuration, ReconConfigKeys.OZONE_RECON_ADDRESS_KEY);
 
     try {
       reconAdmins = createReconAdmins(configuration);
@@ -151,6 +155,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       }
       jvmPauseMonitor = newJvmPauseMonitor("Recon");
       this.reconDBProvider = injector.getInstance(ReconDBProvider.class);
+      this.replicaHistoryDBProvider = injector.getInstance(ReconReplicaHistoryDBProvider.class);
       this.reconContainerMetadataManager =
           injector.getInstance(ReconContainerMetadataManager.class);
       this.reconNamespaceSummaryManager =
@@ -181,6 +186,9 @@ public class ReconServer extends GenericCli implements Callable<Void> {
 
       finalizeUpgrade();
 
+      // Fresh SQL installations are initialized at the software version and do not run upgrade actions.
+      replicaHistoryDBProvider.migrateReplicaHistory(reconDBProvider.getDbStore());
+
       LOG.debug("Now starting all services of Recon...");
       // Start all services
       start();
@@ -201,6 +209,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
       updateAndLogReconHealthStatus();
+      throw e;
     }
 
     ShutdownHookManager.get().addShutdownHook(() -> {
@@ -368,6 +377,13 @@ public class ReconServer extends GenericCli implements Callable<Void> {
         } catch (Exception ex) {
           LOG.error("Recon Container Key DB close failed", ex);
         }
+      }
+    }
+    if (replicaHistoryDBProvider != null) {
+      try {
+        replicaHistoryDBProvider.close();
+      } catch (IOException ex) {
+        LOG.error("Recon replica history DB close failed", ex);
       }
     }
     if (certClient != null) {

@@ -28,6 +28,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Clock;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -222,7 +223,14 @@ public final class ContainerTestUtils {
   public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
       String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
       ContainerChecksumTreeManager checksumTreeManager) {
-    return new KeyValueHandler(config, datanodeId, contSet, volSet, metrics, c -> { }, checksumTreeManager);
+    return getKeyValueHandler(config, datanodeId, contSet, volSet, metrics, checksumTreeManager, null);
+  }
+
+  public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
+      String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
+      ContainerChecksumTreeManager checksumTreeManager, OzoneContainer ozoneContainer) {
+    return new KeyValueHandler(config, datanodeId, contSet, volSet, null, metrics,
+        c -> { }, Clock.systemUTC(), checksumTreeManager, ozoneContainer);
   }
 
   /**

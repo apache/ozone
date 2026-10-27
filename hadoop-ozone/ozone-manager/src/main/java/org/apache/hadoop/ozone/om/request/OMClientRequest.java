@@ -264,7 +264,8 @@ public abstract class OMClientRequest implements RequestAuditor {
   /**
    * For non-rpc internal calls Server.getRemoteUser()
    * and Server.getRemoteIp() will be null.
-   * Passing getCurrentUser() and Ip of the Om node that started it.
+   * Passing getCurrentUser() and Ip of the Om node that started it,
+   * unless getUserInfo() already resolved a user name.
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
@@ -283,7 +284,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         LOG.debug("Couldn't get om Rpc server address", e);
         return getUserInfo();
       }
-      newuserInfo.setUserName(user.getUserName());
+      newuserInfo.setUserName(userInfo.hasUserName() ? userInfo.getUserName() : user.getUserName());
       newuserInfo.setHostName(remoteAddress.getHostName());
       newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
       return newuserInfo.build();

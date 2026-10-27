@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -196,6 +197,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         normalizeKeyArgs(bucket.update(resolvedVolumeArgs), bucket);
 
     try {
+      if (resolvedArgs.isRequireFileSystemLayout()) {
+        validateFileSystemLayout(bucket);
+      }
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
             checkAcls(ResourceType.KEY,
@@ -232,17 +236,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     }
   }
 
+  /**
+   * The number of entries listStatus and listStatusLight return at most for a request of {@code numEntries}:
+   * capped by {@code ozone.fs.listing.page.size.max} and at least 2.
+   */
+  public static long listStatusPageSize(ConfigurationSource conf, long numEntries) {
+    long maxListingPageSize = conf.getInt(OZONE_FS_LISTING_PAGE_SIZE_MAX, OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    return OzoneConfigUtil.limitValue(numEntries, OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        maxListingPageSize);
+  }
+
   @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
 
-    long maxListingPageSize = ozoneManager.getConfiguration().getInt(
-        OZONE_FS_LISTING_PAGE_SIZE_MAX,
-        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
-    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
-        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
-        maxListingPageSize);
+    long maxListingPageSize = listStatusPageSize(ozoneManager.getConfiguration(), numEntries);
 
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
 
@@ -252,6 +261,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (args.isRequireFileSystemLayout()) {
+        validateFileSystemLayout(bucket);
+      }
       if (isAclEnabled) {
         checkListStatusAcls(args, bucket);
       }
@@ -276,18 +288,16 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
-    long maxListingPageSize = ozoneManager.getConfiguration().getInt(
-        OZONE_FS_LISTING_PAGE_SIZE_MAX,
-        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
-    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
-        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
-        maxListingPageSize);
+    long maxListingPageSize = listStatusPageSize(ozoneManager.getConfiguration(), numEntries);
 
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
     OmKeyArgs resolvedArgs = bucket.update(args);
 
     try {
+      if (resolvedArgs.isRequireFileSystemLayout()) {
+        validateFileSystemLayout(bucket);
+      }
       if (isAclEnabled) {
         checkListStatusAcls(resolvedArgs, bucket);
       }
@@ -310,6 +320,26 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     }
   }
   
+  /**
+   * Rejects file system reads on a bucket whose link-resolved layout is
+   * OBJECT_STORE, so file system clients need no InfoBucket to check it.
+   * listStatus, listStatusLight and getKeyInfo call it only when the client
+   * asked for it, because they also serve object store callers (S3 shallow key
+   * listing, S3 GetObject and HeadObject, readKey).
+   */
+  private static void validateFileSystemLayout(ResolvedBucket bucket) throws OMException {
+    if (bucket.bucketLayout() != null) {
+      try {
+        OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(), bucket.bucketLayout());
+      } catch (IllegalArgumentException e) {
+        // Convert to an OMException so it is returned to the client as a
+        // normal (non-retryable) RPC response instead of escaping the read
+        // handler's IOException catch and triggering a client retry storm.
+        throw new OMException(e.getMessage(), ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
+    }
+  }
+
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
@@ -320,18 +350,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
-      if (bucket.bucketLayout() != null) {
-        try {
-          OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(),
-              bucket.bucketLayout());
-        } catch (IllegalArgumentException e) {
-          // Convert to an OMException so it is returned to the client as a
-          // normal (non-retryable) RPC response instead of escaping the read
-          // handler's IOException catch and triggering a client retry storm.
-          throw new OMException(e.getMessage(),
-              ResultCodes.NOT_SUPPORTED_OPERATION);
-        }
-      }
+      validateFileSystemLayout(bucket);
       if (isAclEnabled) {
         checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
       }
@@ -361,18 +380,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
-      if (bucket.bucketLayout() != null) {
-        try {
-          OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(),
-              bucket.bucketLayout());
-        } catch (IllegalArgumentException e) {
-          // Convert to an OMException so it is returned to the client as a
-          // normal (non-retryable) RPC response instead of escaping the read
-          // handler's IOException catch and triggering a client retry storm.
-          throw new OMException(e.getMessage(),
-              ResultCodes.NOT_SUPPORTED_OPERATION);
-        }
-      }
+      validateFileSystemLayout(bucket);
       if (isAclEnabled) {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
             bucket, args.getKeyName());

@@ -265,7 +265,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path path) throws IOException {
-    ozoneManager.getMetrics().incNumGetFileStatus();
+    ozoneManager.getMetrics().incNumTrashGetFileStatus();
     OmKeyArgs keyArgs = constructOmKeyArgs(path);
     OzoneFileStatus ofs = ozoneManager.getKeyManager().getFileStatus(keyArgs);
     FileStatus fileStatus = convertToFileStatus(ofs);

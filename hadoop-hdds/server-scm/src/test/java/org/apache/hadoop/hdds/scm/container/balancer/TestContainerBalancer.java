@@ -461,6 +461,33 @@ public class TestContainerBalancer {
   }
 
   /**
+   * Container Balancer runs iterations continuously with only a short wait in
+   * between, so the default balancing interval is 3 minutes.
+   */
+  @Test
+  public void testDefaultBalancingIntervalIsThreeMinutes() {
+    ContainerBalancerConfiguration defaultConfig =
+        new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+    assertEquals(3, defaultConfig.getBalancingInterval().toMinutes());
+  }
+
+  /**
+   * The freshness bound for the balancing interval is the node report interval
+   * and not the hourly du refresh period. The
+   * default 3m interval is above a typical 1m node report interval.
+   */
+  @Test
+  public void testBalancingIntervalNodeReportFreshnessBoundary() {
+    long nodeReportIntervalMs = TimeUnit.MINUTES.toMillis(1);
+    // Below the node report interval -> too short.
+    assertTrue(ContainerBalancer.isBalancingIntervalBelowNodeReportInterval(
+        TimeUnit.SECONDS.toMillis(30), nodeReportIntervalMs));
+    // The default 3m interval is above the node report interval -> acceptable.
+    assertFalse(ContainerBalancer.isBalancingIntervalBelowNodeReportInterval(
+        TimeUnit.MINUTES.toMillis(3), nodeReportIntervalMs));
+  }
+
+  /**
    * Verifies that a start request rejected during validation does not update startedAt of last run.
    * Prevents startedAt from advancing past stoppedAt, which previously caused a negative duration and CLI status crash.
    */

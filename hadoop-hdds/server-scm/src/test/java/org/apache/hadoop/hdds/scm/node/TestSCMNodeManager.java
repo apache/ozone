@@ -88,6 +88,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -420,6 +421,37 @@ public class TestSCMNodeManager {
       assertTrue(stored.hasPort(DatanodeDetails.Port.Name.STANDALONE));
       assertTrue(stored.hasPort(DatanodeDetails.Port.Name.RATIS));
       assertFalse(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+    }
+  }
+
+  /**
+   * A datanode that registers again with a new version, new ports or a new IP address must keep its containers.
+   * The full container report it sends after registering is compared with them, which is how SCM finds the
+   * replicas the datanode lost while it was away.
+   */
+  @Test
+  public void testRegisterKeepsContainersOnNodeUpdate()
+      throws IOException, AuthenticationException, NodeNotFoundException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      final UUID uuid = UUID.randomUUID();
+      final DatanodeDetails dn = datanodeWithoutDatastream(uuid).setVersion("1.0.0").build();
+      final ContainerID container1 = ContainerID.valueOf(1);
+      final ContainerID container2 = ContainerID.valueOf(2);
+      registerNode(nodeManager, dn);
+      nodeManager.addContainer(dn, container1);
+      nodeManager.addContainer(dn, container2);
+
+      // Each registration changes one more thing: the version, then the ports, then the IP address.
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).setVersion("2.0.0").build());
+      assertThat(nodeManager.getContainers(dn)).containsExactlyInAnyOrder(container1, container2);
+
+      final DatanodeDetails.Port datastream = DatanodeDetails.newPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM, 9855);
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).setVersion("2.0.0").addPort(datastream).build());
+      assertThat(nodeManager.getContainers(dn)).containsExactlyInAnyOrder(container1, container2);
+
+      registerNode(nodeManager,
+          datanodeWithoutDatastream(uuid).setVersion("2.0.0").addPort(datastream).setIpAddress("127.0.0.2").build());
+      assertThat(nodeManager.getContainers(dn)).containsExactlyInAnyOrder(container1, container2);
     }
   }
 
@@ -1000,7 +1032,7 @@ public class TestSCMNodeManager {
   @ParameterizedTest
   @MethodSource("ineligibleHealthStates")
   public void testDatanodeFinalizedCounterExcludesNonHealthyNodes(NodeStatus expectedStatus)
-      throws IOException, AuthenticationException, NodeNotFoundException, InterruptedException {
+      throws IOException, AuthenticationException, NodeNotFoundException, InterruptedException, TimeoutException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
@@ -1022,15 +1054,10 @@ public class TestSCMNodeManager {
           "Both nodes should start as healthy");
 
       // Only heartbeat the baseline node until transitionNode reaches the expected state.
-      // STALE requires > 3s (wait 4s), DEAD requires > 6s (wait 7s total).
-      boolean waitForDead = expectedStatus.equals(NodeStatus.inServiceDead());
-      Thread.sleep(2000);
-      nodeManager.processHeartbeat(heartbeatingNode);
-      Thread.sleep(2000);
-      if (waitForDead) {
+      GenericTestUtils.waitFor(() -> {
         nodeManager.processHeartbeat(heartbeatingNode);
-        Thread.sleep(3000);
-      }
+        return nodeManager.getNodeCount(expectedStatus) == 1;
+      }, 100, WAIT_FOR_TIMEOUT_MS);
 
       assertEquals(expectedStatus, nodeManager.getNodeStatus(transitionNode),
           "Node should have transitioned to " + expectedStatus);

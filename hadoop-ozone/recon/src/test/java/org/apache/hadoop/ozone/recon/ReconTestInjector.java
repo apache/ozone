@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconFileMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconGlobalStatsManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.ratis.util.Preconditions;
 
 /**
@@ -187,6 +188,7 @@ public class ReconTestInjector {
                   .to(ReconNamespaceSummaryManagerImpl.class)
                   .in(Singleton.class);
           bind(ReconDBProvider.class).in(Singleton.class);
+          bind(ReconReplicaHistoryDBProvider.class).in(Singleton.class);
         }
 
         for (Map.Entry<Class, Object> entry :

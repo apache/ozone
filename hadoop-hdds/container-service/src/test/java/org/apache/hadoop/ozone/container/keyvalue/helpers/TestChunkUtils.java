@@ -219,19 +219,7 @@ class TestChunkUtils {
   }
 
   @Test
-  void validateChunkForOverwrite() throws IOException {
-
-    Path tempFile = tempDir.toPath().resolve("overwrite");
-    FileUtils.write(tempFile.toFile(), "test", UTF_8);
-
-    assertTrue(
-        ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
-            new ChunkInfo("chunk", 3, 5)));
-
-    assertFalse(
-        ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
-            new ChunkInfo("chunk", 5, 5)));
-
+  void validateChunkForOverwrite() {
     assertTrue(ChunkUtils.validateChunkForOverwrite(4L, new ChunkInfo("chunk", 3, 5)));
 
     assertFalse(ChunkUtils.validateChunkForOverwrite(4L, new ChunkInfo("chunk", 5, 5)));

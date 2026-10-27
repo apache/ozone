@@ -43,19 +43,16 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_REGEX_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.hasMultiChunksPayload;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
@@ -96,6 +93,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -127,6 +125,7 @@ import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.ReadConsistencyContext;
+import org.apache.hadoop.ozone.s3.util.S3ContentSha256Type;
 import org.apache.hadoop.ozone.s3.util.S3GActionIamMapper;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -793,6 +792,21 @@ public abstract class EndpointBase {
   }
 
   /**
+   * Versioning is not implemented, so each object only has the null version, i.e. the current object.
+   *
+   * @return true if {@code versionId} refers to any other version
+   * @throws OS3Exception InvalidArgument if {@code versionId} is empty, same as AWS S3
+   */
+  static boolean isUnsupportedVersionId(@Nullable String versionId) {
+    if (versionId != null && versionId.isEmpty()) {
+      OS3Exception ex = newError(INVALID_ARGUMENT, versionId);
+      ex.setErrorMessage("Version id cannot be the empty string");
+      throw ex;
+    }
+    return versionId != null && !NULL_VERSION_ID.equals(versionId);
+  }
+
+  /**
    * Rejects the request with {@code NotImplemented} if it has any of the {@code subresources}.
    *
    * @return null if the request has none of the {@code subresources}
@@ -873,14 +887,16 @@ public abstract class EndpointBase {
   protected S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
       InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
     final String amzContentSha256Header = validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
+    final S3ContentSha256Type payloadType = S3ContentSha256Type.fromHeaderValue(amzContentSha256Header);
     final InputStream chunkInputStream;
     final long effectiveLength;
-    if (hasMultiChunksPayload(amzContentSha256Header)) {
+    if (payloadType.isStreaming()) {
       validateMultiChunksUpload(getHeaders(), amzDecodedLength, keyPath);
-      if (hasUnsignedPayload(amzContentSha256Header)) {
-        chunkInputStream = new UnsignedChunksInputStream(body);
+      if (payloadType.isUnsigned()) {
+        chunkInputStream = new UnsignedChunksInputStream(body, keyPath,
+            TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath));
       } else {
-        TrailerHeader trailerHeader = STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header)
+        TrailerHeader trailerHeader = payloadType == S3ContentSha256Type.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER
             ? TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath) : TrailerHeader.NONE;
         chunkInputStream = new SignedChunksInputStream(body, keyPath, trailerHeader);
       }
@@ -898,16 +914,20 @@ public abstract class EndpointBase {
     // and Sha256Digest is used for "x-amz-content-sha256" header verification
     List<MessageDigest> digests = new ArrayList<>();
     digests.add(getMD5DigestInstance());
-    if (!hasUnsignedPayload(amzContentSha256Header) && !hasMultiChunksPayload(amzContentSha256Header)) {
+    if (!payloadType.isUnsigned() && !payloadType.isStreaming()) {
       digests.add(getSha256DigestInstance());
     }
     MultiDigestInputStream multiDigestInputStream =
         new MultiDigestInputStream(chunkInputStream, digests);
     // Header auth only: for a presigned (query) request the payload hash is not part of the signed
     // canonical request, so its seed signature cannot start the chunk signature chain.
-    boolean verifyChunkSignature = signatureInfo.isSignPayload()
-        && (STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header)
-        || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header));
+    boolean verifyChunkSignature = signatureInfo.isSignPayload() && payloadType.isHmacSignedStreaming();
+    if (verifyChunkSignature && OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())
+        && !OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(getClientProtocol().getOmVersion())) {
+      OS3Exception ex = newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
+      ex.setErrorMessage("The connected Ozone Manager does not support signed chunk verification.");
+      throw ex;
+    }
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
   }
 
@@ -916,7 +936,7 @@ public abstract class EndpointBase {
    * the signing key OM derived (HDDS-15140). Called after the key is opened
    * (when the derived key is available) and before the payload is read.
    *
-   * <p>In secure mode OM always returns the derived key for a signed upload, so
+   * <p>In secure mode a supporting OM returns the derived key for a signed upload, so
    * a missing key is treated as a server-side anomaly and the request is
    * rejected rather than stored unverified. In non-secure mode there is no
    * secret to verify against, so verification is skipped.
