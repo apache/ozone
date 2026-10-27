@@ -78,7 +78,10 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
     }
 
     //split the value parts of the authorization header
-    String[] split = authHeader.substring(firstSep + 1).trim().split(", *");
+    String[] split = authHeader.substring(firstSep + 1).trim().split(",");
+    for (int i = 0; i < split.length; i++) {
+      split[i] = split[i].trim();
+    }
 
     if (split.length != 3) {
       throw new MalformedResourceException(authHeader);

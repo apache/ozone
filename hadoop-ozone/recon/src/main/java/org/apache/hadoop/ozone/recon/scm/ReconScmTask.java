@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 public abstract class ReconScmTask {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconScmTask.class);
-  private Thread taskThread;
+  private volatile Thread taskThread;
   private volatile boolean running;
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
@@ -46,7 +46,13 @@ public abstract class ReconScmTask {
     if (!isRunning()) {
       LOG.info("Starting {} Thread.", getTaskName());
       running = true;
-      taskThread = new Thread(this::run, "Recon-" + getTaskName());
+      taskThread = new Thread(() -> {
+        try {
+          run();
+        } finally {
+          running = false;
+        }
+      }, "Recon-" + getTaskName());
       taskThread.setName(getTaskName());
       taskThread.setDaemon(true);
       taskThread.start();
@@ -69,13 +75,8 @@ public abstract class ReconScmTask {
   }
 
   public boolean isRunning() {
-    if (!running) {
-      synchronized (this) {
-        return taskThread != null
-            && taskThread.isAlive();
-      }
-    }
-    return true;
+    Thread thread = taskThread;
+    return thread != null && thread.isAlive();
   }
 
   protected boolean canRun() {
@@ -92,10 +93,30 @@ public abstract class ReconScmTask {
 
   protected abstract void run();
 
-  protected void initializeAndRunTask() throws Exception {
+  /**
+   * Runs one iteration and records it in the task status table. Exceptions from {@link #runTask()}
+   * are logged and recorded as a failed run instead of being thrown; {@link InterruptedException}
+   * and {@link Error} are recorded as failed and rethrown. The run starts as successful, so
+   * {@link #runTask()} may set -1 to report a partial failure.
+   */
+  protected void initializeAndRunTask() throws InterruptedException {
     taskStatusUpdater.recordRunStart();
-    runTask();
-    taskStatusUpdater.recordRunCompletion();
+    try {
+      taskStatusUpdater.setLastTaskRunStatus(0);
+      runTask();
+    } catch (InterruptedException e) {
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+      throw e;
+    } catch (Exception e) {
+      LOG.error("Failed to run task {}.", getTaskName(), e);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+    } catch (Error e) {
+      LOG.error("Task {} failed with an unrecoverable error.", getTaskName(), e);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+      throw e;
+    } finally {
+      taskStatusUpdater.recordRunCompletion();
+    }
   }
 
   /**

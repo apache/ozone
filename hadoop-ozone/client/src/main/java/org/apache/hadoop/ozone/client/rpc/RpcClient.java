@@ -58,7 +58,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -194,6 +193,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.MemoizedSupplier;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -222,7 +222,6 @@ public class RpcClient implements ClientProtocol {
   private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
   private final UserGroupInformation ugi;
-  private UserGroupInformation s3gUgi;
   private final ClientId clientId = ClientId.randomId();
   private final boolean unsafeByteBufferConversion;
   private Text dtService;
@@ -280,9 +279,6 @@ public class RpcClient implements ClientProtocol {
     this.ozoneManagerClient = TracingUtil.createProxy(
         ozoneManagerProtocolClientSideTranslatorPB,
         OzoneManagerClientProtocol.class, conf);
-    if (getThreadLocalS3Auth() != null) {
-      this.s3gUgi = UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
-    }
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
@@ -754,8 +750,9 @@ public class RpcClient implements ClientProtocol {
     // After HDDS-5881 the user will not be different,
     // as S3G uses single RpcClient. So we should be checking thread-local
     // S3Auth and use it during proxy.
-    if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
-      return s3gUgi;
+    S3Auth s3Auth = ozoneManagerClient.getThreadLocalS3Auth();
+    if (s3Auth != null) {
+      return UserGroupInformation.createRemoteUser(s3Auth.getUserPrincipal());
     }
     return ugi;
   }
@@ -1810,7 +1807,7 @@ public class RpcClient implements ClientProtocol {
             .build();
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
 
-        blocks.put(dn, createInputStream(dnKeyInfo, Function.identity()));
+        blocks.put(dn, createInputStream(dnKeyInfo, k -> k));
       }
 
       result.put(locationInfo, blocks);
@@ -2582,15 +2579,9 @@ public class RpcClient implements ClientProtocol {
    */
   private OzoneInputStream getInputStreamWithRetryFunction(
       OmKeyInfo keyInfo, boolean requireFileSystemLayout) throws IOException {
-    return createInputStream(keyInfo, omKeyInfo -> {
-      try {
-        return getKeyInfo(omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-            omKeyInfo.getKeyName(), true, requireFileSystemLayout);
-      } catch (IOException e) {
-        LOG.error("Unable to lookup key {} on retry.", keyInfo.getKeyName(), e);
-        return null;
-      }
-    });
+    return createInputStream(keyInfo, omKeyInfo -> getKeyInfo(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), true,
+        requireFileSystemLayout));
   }
 
   @Override
@@ -2792,7 +2783,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private OzoneInputStream createInputStream(
-      OmKeyInfo keyInfo, Function<OmKeyInfo, OmKeyInfo> retryFunction)
+      OmKeyInfo keyInfo, CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction)
       throws IOException {
     // When Key is not MPU or when Key is MPU and encryption is not enabled
     // Need to revisit for GDP.
@@ -3060,7 +3051,6 @@ public class RpcClient implements ClientProtocol {
   public void setThreadLocalS3Auth(
       S3Auth ozoneSharedSecretAuth) {
     ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
-    this.s3gUgi = UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
   }
 
   @Override

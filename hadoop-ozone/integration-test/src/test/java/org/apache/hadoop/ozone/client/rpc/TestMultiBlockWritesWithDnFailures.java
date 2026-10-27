@@ -97,7 +97,6 @@ public class TestMultiBlockWritesWithDnFailures {
         1, TimeUnit.SECONDS);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
-    conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(datanodes)
         .build();
