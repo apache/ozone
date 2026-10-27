@@ -694,7 +694,7 @@ download_if_not_exists() {
     echo "${f} already downloaded"
   else
     echo "Downloading ${f} from ${url}"
-    curl --fail --location --output "${f}" --show-error --silent "${url}" || rm -fv "${f}"
+    curl --fail --location --output "${f}" --retry 3 --show-error --silent "${url}" || rm -fv "${f}"
   fi
 }
 
