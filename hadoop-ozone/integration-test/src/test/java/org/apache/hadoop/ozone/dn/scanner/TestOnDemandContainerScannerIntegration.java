@@ -94,13 +94,11 @@ class TestOnDemandContainerScannerIntegration
   @BeforeAll
   static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED,
-        true);
+    ContainerScannerConfiguration scannerConfig = ozoneConfig.getObject(ContainerScannerConfiguration.class);
+    scannerConfig.setEnabled(true);
     // Disable the background metadata scanner.
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED,
-        false);
+    scannerConfig.setMetadataScanEnabled(false);
+    ozoneConfig.setFromObject(scannerConfig);
     buildCluster(ozoneConfig);
   }
 
