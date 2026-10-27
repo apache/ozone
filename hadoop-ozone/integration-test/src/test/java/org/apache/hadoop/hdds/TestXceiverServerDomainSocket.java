@@ -600,7 +600,7 @@ public class TestXceiverServerDomainSocket {
       assertTrue(lastSock.isOpen());
 
       // write to first 10 sockets should be OK
-      for (int i = 0; i < count - 2; i++) {
+      for (int i = 0; i <= count - 2; i++) {
         DomainSocket sock = list.get(i);
         assertTrue(sock.isOpen());
         sock.getOutputStream().write(1);
@@ -626,7 +626,6 @@ public class TestXceiverServerDomainSocket {
       assertFalse(lastSock.isOpen());
 
       // the rejected connection must not hold a slot once every accepted connection is closed
-      list.get(count - 2).close();
       GenericTestUtils.waitFor(() -> Thread.getAllStackTraces().keySet().stream()
           .noneMatch(t -> t.getName().contains(XceiverServerDomainSocket.class.getSimpleName() + "@")), 100, 10000);
       assertThat(server.getXceiverCount()).isZero();
