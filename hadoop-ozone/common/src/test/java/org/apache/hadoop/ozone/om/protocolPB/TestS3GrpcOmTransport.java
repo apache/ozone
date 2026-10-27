@@ -36,11 +36,14 @@ import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -537,6 +540,55 @@ public class TestS3GrpcOmTransport {
   }
 
   @Test
+  public void testNotReadyLeaderIsRetriedOnSameOm() throws Exception {
+    configureHaOmService("om0", "om1");
+    conf.setLong(OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY, 10);
+
+    List<OMRequest> leaderRequests = new CopyOnWriteArrayList<>();
+    AtomicInteger otherRequestCount = new AtomicInteger();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNotReadyLeaderNodeChannel("om0", 2, leaderRequests));
+    client.startClient("om1", createNodeChannel("om1", otherRequestCount, new AtomicReference<>()));
+    client.changeLeaderProxyForTest("om0");
+
+    OMResponse response = client.submitRequest(arbitraryOmRequest());
+
+    assertEquals("om0", response.getLeaderOMNodeId());
+    assertEquals(3, leaderRequests.size());
+    assertEquals(0, otherRequestCount.get());
+  }
+
+  @Test
+  public void testFollowerReadOnNotReadyLeaderIsRetried() throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    configureHaOmService("om0", "om1");
+    conf.setLong(OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY, 10);
+
+    List<OMRequest> leaderRequests = new CopyOnWriteArrayList<>();
+    AtomicInteger otherRequestCount = new AtomicInteger();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNotReadyLeaderNodeChannel("om0", 2, leaderRequests));
+    client.startClient("om1", createNodeChannel("om1", otherRequestCount, new AtomicReference<>()));
+    client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om0");
+
+    client.submitRequest(OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT.serialize())
+        .setClientId("test")
+        .build());
+
+    assertEquals(3, leaderRequests.size());
+    assertEquals(0, otherRequestCount.get());
+    for (OMRequest request : leaderRequests) {
+      assertEquals(ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER,
+          request.getReadConsistencyHint().getReadConsistency());
+    }
+  }
+
+  @Test
   public void testFollowerReadRejectsInvalidFollowerReadConsistency() {
     conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
     conf.set(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY, "DEFAULT");
@@ -583,13 +635,7 @@ public class TestS3GrpcOmTransport {
               StreamObserver<OMResponse> responseObserver) {
             requestCount.incrementAndGet();
             lastRequest.set(request);
-            responseObserver.onNext(OMResponse.newBuilder()
-                .setSuccess(true)
-                .setStatus(org.apache.hadoop.ozone.protocol
-                    .proto.OzoneManagerProtocolProtos.Status.OK)
-                .setLeaderOMNodeId(nodeId)
-                .setCmdType(request.getCmdType())
-                .build());
+            responseObserver.onNext(newSuccessResponse(nodeId, request));
             responseObserver.onCompleted();
           }
         })
@@ -597,6 +643,41 @@ public class TestS3GrpcOmTransport {
         .start());
     return grpcCleanup.register(
         InProcessChannelBuilder.forName(nodeServerName).directExecutor().build());
+  }
+
+  /** An OM leader that is not ready for its first {@code notReadyCount} requests. */
+  private ManagedChannel createNotReadyLeaderNodeChannel(String nodeId, int notReadyCount,
+      List<OMRequest> requests) throws IOException {
+    String nodeServerName = InProcessServerBuilder.generateName();
+    grpcCleanup.register(InProcessServerBuilder
+        .forName(nodeServerName)
+        .directExecutor()
+        .addService(new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
+          @Override
+          public void submitRequest(OMRequest request, StreamObserver<OMResponse> responseObserver) {
+            requests.add(request);
+            if (requests.size() <= notReadyCount) {
+              responseObserver.onError(OMGrpcError.toStatusRuntimeException(
+                  new OMLeaderNotReadyException(nodeId + " is not ready")));
+              return;
+            }
+            responseObserver.onNext(newSuccessResponse(nodeId, request));
+            responseObserver.onCompleted();
+          }
+        })
+        .build()
+        .start());
+    return grpcCleanup.register(
+        InProcessChannelBuilder.forName(nodeServerName).directExecutor().build());
+  }
+
+  private static OMResponse newSuccessResponse(String nodeId, OMRequest request) {
+    return OMResponse.newBuilder()
+        .setSuccess(true)
+        .setStatus(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK)
+        .setLeaderOMNodeId(nodeId)
+        .setCmdType(request.getCmdType())
+        .build();
   }
 
   private ManagedChannel createNotLeaderNodeChannel(AtomicInteger requestCount,

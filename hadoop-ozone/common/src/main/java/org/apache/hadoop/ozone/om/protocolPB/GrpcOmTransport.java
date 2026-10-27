@@ -194,12 +194,6 @@ public class GrpcOmTransport implements OmTransport {
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
-    return followerReadFailoverProxyProvider.submitRequest(payload, this::submitRequestToHost,
-        this::submitRequestToLeader);
-  }
-
-  private OMResponse submitRequestToLeader(OMRequest payload)
-      throws IOException {
     int requestFailoverCount = 0;
     boolean tryOtherHost = true;
     int expectedFailoverCount = 0;
@@ -208,7 +202,8 @@ public class GrpcOmTransport implements OmTransport {
       tryOtherHost = false;
       expectedFailoverCount = globalFailoverCount.get();
       try {
-        return submitRequestToHost(payload, host.get());
+        return followerReadFailoverProxyProvider.submitRequest(payload, this::submitRequestToHost,
+            this::submitRequestToLeader);
       } catch (StatusRuntimeException e) {
         LOG.error("Failed to submit request", e);
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
@@ -227,6 +222,10 @@ public class GrpcOmTransport implements OmTransport {
       }
     }
     throw new OMException(resultCode);
+  }
+
+  private OMResponse submitRequestToLeader(OMRequest payload) throws IOException {
+    return submitRequestToHost(payload, host.get());
   }
 
   private OMResponse submitRequestToHost(OMRequest payload, String targetHost)
