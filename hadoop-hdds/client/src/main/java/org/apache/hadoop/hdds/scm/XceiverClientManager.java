@@ -99,8 +99,7 @@ public class XceiverClientManager extends XceiverClientCreator {
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
 
     // at most one thread, which exits when idle
-    this.closeExecutor = new ThreadPoolExecutor(0, 1, 60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(Math.max(1, clientConf.getMaxSize())),
+    this.closeExecutor = new ThreadPoolExecutor(0, 1, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat("XceiverClientManager-close-%d").build());
     this.clientCache = CacheBuilder.newBuilder()
         .recordStats()
@@ -206,7 +205,7 @@ public class XceiverClientManager extends XceiverClientCreator {
     try {
       closeExecutor.execute(() -> closeAndLog(client));
     } catch (RejectedExecutionException e) {
-      // too many clients are waiting to be closed, or this manager is already closed
+      // this manager is already closed
       closeAndLog(client);
     }
   }
