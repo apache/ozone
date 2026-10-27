@@ -89,21 +89,14 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
         .setModificationTime(Time.now()).setKeyName(srcKey);
 
-    KeyArgs auditArgs = newKeyArgs.build();
-    try {
-      auditArgs = resolveBucketLink(ozoneManager, auditArgs);
-    } catch (IOException ignored) {
-    }
-
     KeyArgs resolvedArgs;
     try {
       resolvedArgs = resolveBucketAndCheckAcls(newKeyArgs.build(),
           ozoneManager, srcKey, dstKey);
     } catch (IOException ex) {
-      // Ensure audit log captures preExecute failures
       markForAudit(ozoneManager.getAuditLogger(),
           buildAuditMessage(OMAction.RENAME_KEY,
-              buildAuditMap(auditArgs,
+              buildAuditMap(resolveBucketLinkForAudit(ozoneManager, newKeyArgs.build()),
                   renameKeyRequest.toBuilder().setToKeyName(dstKey).build()),
               ex, getOmRequest().getUserInfo()));
       throw ex;

@@ -88,20 +88,13 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
-    KeyArgs auditArgs = newKeyArgs.build();
-    try {
-      auditArgs = resolveBucketLink(ozoneManager, auditArgs);
-    } catch (IOException ignored) {
-    }
-
     KeyArgs resolvedArgs;
     try {
       resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
     } catch (IOException ex) {
-      // Ensure audit log captures preExecute failures
       markForAudit(ozoneManager.getAuditLogger(),
           buildAuditMessage(OMAction.DELETE_KEY,
-              buildLightKeyArgsAuditMap(auditArgs), ex,
+              buildLightKeyArgsAuditMap(resolveBucketLinkForAudit(ozoneManager, newKeyArgs.build())), ex,
               getOmRequest().getUserInfo()));
       throw ex;
     }
