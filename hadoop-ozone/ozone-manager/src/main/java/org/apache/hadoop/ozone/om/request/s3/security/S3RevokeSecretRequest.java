@@ -18,8 +18,13 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -31,6 +36,7 @@ import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS3SecretRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeSTSTokenRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -38,11 +44,14 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles RevokeS3Secret request.
+ *
+ * <p>The leader attaches an STS revocation cutoff so tokens stay revoked after the secret is recreated.</p>
  */
 public class S3RevokeSecretRequest extends OMClientRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3RevokeSecretRequest.class);
+  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
 
   public S3RevokeSecretRequest(OMRequest omRequest) {
     super(omRequest);
@@ -64,8 +73,14 @@ public class S3RevokeSecretRequest extends OMClientRequest {
             RevokeS3SecretRequest.newBuilder()
                     .setKerberosID(accessId).build();
 
+    final RevokeSTSTokenRequest stsRevocationCutoff = RevokeSTSTokenRequest.newBuilder()
+        .setOriginalAccessKeyId(accessId)
+        .setRevocationTimeMillis(CLOCK.millis())
+        .build();
+
     return omRequest.toBuilder()
         .setRevokeS3SecretRequest(revokeS3SecretRequest)
+        .setRevokeSTSTokenRequest(stsRevocationCutoff)
         .build();
   }
 
@@ -87,23 +102,23 @@ public class S3RevokeSecretRequest extends OMClientRequest {
             if (s3SecretManager.hasS3Secret(kerberosID)) {
               LOG.info("Secret for {} exists in table, removing it.",
                   kerberosID);
+              final Long stsRevocationCutoff = updateStsRevocationCutoff(ozoneManager, kerberosID, context.getIndex());
               // Invalid entry in table cache immediately
               s3SecretManager.invalidateCacheEntry(kerberosID);
-              return new S3RevokeSecretResponse(kerberosID,
-                  s3SecretManager,
+              return new S3RevokeSecretResponse(kerberosID, stsRevocationCutoff, s3SecretManager,
                   omResponse.setStatus(Status.OK).build());
             } else {
               LOG.info(
                   "Secret for {} doesn't exist in table hence cannot" +
                       " invalidate it", kerberosID);
-              return new S3RevokeSecretResponse(null,
+              return new S3RevokeSecretResponse(null, null,
                   s3SecretManager,
                   omResponse.setStatus(Status.S3_SECRET_NOT_FOUND).build());
             }
           });
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new S3RevokeSecretResponse(null,
+      omClientResponse = new S3RevokeSecretResponse(null, null,
           ozoneManager.getS3SecretManager(),
           createErrorOMResponse(omResponse, ex));
     }
@@ -124,5 +139,19 @@ public class S3RevokeSecretRequest extends OMClientRequest {
       LOG.error("Error when revoking secret for {}.", kerberosID, exception);
     }
     return omClientResponse;
+  }
+
+  /** Records the attached cutoff, never lowering an existing one; null if the entry has none (logged without it). */
+  private Long updateStsRevocationCutoff(OzoneManager ozoneManager, String accessId, long transactionIndex)
+      throws IOException {
+    if (!getOmRequest().hasRevokeSTSTokenRequest()) {
+      return null;
+    }
+    final Table<String, Long> table = ozoneManager.getMetadataManager().getS3RevokedStsTokenTable();
+    final Long existing = table.getIfExist(accessId);
+    final long requested = getOmRequest().getRevokeSTSTokenRequest().getRevocationTimeMillis();
+    final long cutoff = existing == null ? requested : Math.max(existing, requested);
+    table.addCacheEntry(new CacheKey<>(accessId), CacheValue.get(transactionIndex, cutoff));
+    return cutoff;
   }
 }
