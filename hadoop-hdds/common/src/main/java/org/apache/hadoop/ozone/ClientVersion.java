@@ -42,9 +42,6 @@ public enum ClientVersion implements ComponentVersion {
       "This client version has support for Object Store and File " +
           "System Optimized Bucket Layouts."),
 
-  KEY_ALLOCATION_PIPELINE_NOT_FOUND(4,
-      "Client supports retrying key allocation after an allocated pipeline disappears."),
-
   FUTURE_VERSION(-1, "Used internally by the server when the server side is older and an"
       + " unknown client version has arrived from the client.");
 

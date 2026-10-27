@@ -135,15 +135,15 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
 
     OzoneManagerProtocolProtos.OMResponse response = new OMExecutionFlow(ozoneManager).submit(request, true);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALLOCATION_PIPELINE_NOT_FOUND, response.getStatus());
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALLOCATION_ERROR, response.getStatus());
     assertFalse(response.getSuccess());
     verify(ozoneManager, never()).getOmRatisServer();
 
     OMRequest oldClientRequest = request.toBuilder()
-        .setVersion(ClientVersion.BUCKET_LAYOUT_SUPPORT.serialize()).build();
+        .setVersion(ClientVersion.ERASURE_CODING_SUPPORT.serialize()).build();
     OzoneManagerProtocolProtos.OMResponse oldClientResponse =
         new OMExecutionFlow(ozoneManager).submit(oldClientRequest, true);
-    assertEquals(OzoneManagerProtocolProtos.Status.INTERNAL_ERROR, oldClientResponse.getStatus());
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALLOCATION_ERROR, oldClientResponse.getStatus());
     verify(ozoneManager, never()).getOmRatisServer();
   }
 

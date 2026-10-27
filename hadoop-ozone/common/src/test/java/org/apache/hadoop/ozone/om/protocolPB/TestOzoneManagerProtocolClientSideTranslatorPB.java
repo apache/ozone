@@ -27,7 +27,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -73,7 +76,7 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   void retriesMissingPipelineAllocationForEachClientOperation(Type operation) throws Exception {
     OzoneManagerProtocolClientSideTranslatorPB client = retryingClient();
     when(omTransport.submitRequest(any(OMRequest.class)))
-        .thenReturn(errorResponse(operation, Status.KEY_ALLOCATION_PIPELINE_NOT_FOUND), successResponse(operation));
+        .thenReturn(errorResponse(operation, Status.KEY_ALLOCATION_ERROR), successResponse(operation));
 
     invokeBlockAllocation(client, operation);
 
@@ -87,19 +90,29 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   void stopsRetryingMissingPipelineAndPreservesLastError() throws Exception {
     Type operation = Type.CreateKey;
     when(omTransport.submitRequest(any(OMRequest.class)))
-        .thenReturn(errorResponse(operation, Status.KEY_ALLOCATION_PIPELINE_NOT_FOUND));
+        .thenReturn(errorResponse(operation, Status.KEY_ALLOCATION_ERROR));
 
-    OMException error = assertThrows(OMException.class,
-        () -> retryingClient().openKey(keyArgs()));
+    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+    PrintStream originalErr = System.err;
+    OMException error;
+    try {
+      System.setErr(new PrintStream(stderr, false, StandardCharsets.UTF_8.name()));
+      error = assertThrows(OMException.class, () -> retryingClient().openKey(keyArgs()));
+    } finally {
+      System.setErr(originalErr);
+    }
 
-    assertThat(error.getResult()).isEqualTo(ResultCodes.KEY_ALLOCATION_PIPELINE_NOT_FOUND);
+    assertThat(error.getResult()).isEqualTo(ResultCodes.KEY_ALLOCATION_ERROR);
     assertThat(error).hasMessage("allocation failed");
+    assertThat(stderr.toString(StandardCharsets.UTF_8.name()))
+        .contains("KEY_ALLOCATION_ERROR", "2 retries left", "1 retries left")
+        .doesNotContain("0 retries left");
     verify(omTransport, times(3)).submitRequest(any(OMRequest.class));
   }
 
   @ParameterizedTest
-  @EnumSource(value = Status.class, names = {"INTERNAL_ERROR", "KEY_ALLOCATION_ERROR"})
-  void doesNotRetryAmbiguousAllocationErrors(Status status) throws Exception {
+  @EnumSource(value = Status.class, names = {"INTERNAL_ERROR", "INVALID_REQUEST"})
+  void doesNotRetryUnrelatedErrors(Status status) throws Exception {
     when(omTransport.submitRequest(any(OMRequest.class)))
         .thenReturn(errorResponse(Type.CreateKey, status));
 
@@ -115,21 +128,29 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
     when(omTransport.submitRequest(any(OMRequest.class)))
         .thenReturn(errorResponse(Type.CreateKey, Status.SCM_IN_SAFE_MODE), successResponse(Type.CreateKey));
 
-    retryingClient().openKey(keyArgs());
+    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+    PrintStream originalErr = System.err;
+    try {
+      System.setErr(new PrintStream(stderr, false, StandardCharsets.UTF_8.name()));
+      retryingClient().openKey(keyArgs());
+    } finally {
+      System.setErr(originalErr);
+    }
 
+    assertThat(stderr.toString(StandardCharsets.UTF_8.name())).contains("SCM_IN_SAFE_MODE", "retrying");
     verify(omTransport, times(2)).submitRequest(any(OMRequest.class));
   }
 
   @Test
   void interruptedRetryRestoresInterruptFlagAndPreservesError() throws Exception {
     when(omTransport.submitRequest(any(OMRequest.class)))
-        .thenReturn(errorResponse(Type.CreateKey, Status.KEY_ALLOCATION_PIPELINE_NOT_FOUND));
+        .thenReturn(errorResponse(Type.CreateKey, Status.KEY_ALLOCATION_ERROR));
 
     Thread.currentThread().interrupt();
     try {
       OMException error = assertThrows(OMException.class,
           () -> retryingClient().openKey(keyArgs()));
-      assertThat(error.getResult()).isEqualTo(ResultCodes.KEY_ALLOCATION_PIPELINE_NOT_FOUND);
+      assertThat(error.getResult()).isEqualTo(ResultCodes.KEY_ALLOCATION_ERROR);
       assertThat(Thread.currentThread().isInterrupted()).isTrue();
       verify(omTransport).submitRequest(any(OMRequest.class));
     } finally {

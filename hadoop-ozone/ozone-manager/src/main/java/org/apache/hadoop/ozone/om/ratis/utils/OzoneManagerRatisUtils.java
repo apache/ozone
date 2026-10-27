@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -556,13 +555,8 @@ public final class OzoneManagerRatisUtils {
     // Added all write command types here, because in future if any of the
     // preExecute is changed to return IOException, we can return the error
     // OMResponse to the client.
-    Status status = OzoneManagerRatisUtils.exceptionToResponseStatus(exception);
-    if (status == Status.KEY_ALLOCATION_PIPELINE_NOT_FOUND
-        && !ClientVersion.KEY_ALLOCATION_PIPELINE_NOT_FOUND.isSupportedBy(omRequest.getVersion())) {
-      status = Status.INTERNAL_ERROR;
-    }
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OzoneManagerProtocolProtos.OMResponse.newBuilder()
-        .setStatus(status)
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(omRequest.getCmdType())
         .setTraceID(omRequest.getTraceID())
         .setSuccess(false);

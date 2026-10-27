@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALLOCATION_PIPELINE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALLOCATION_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_IN_SAFE_MODE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
@@ -278,8 +278,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The client side implementation of OzoneManagerProtocol.
@@ -288,8 +286,6 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 public final class OzoneManagerProtocolClientSideTranslatorPB
     implements OzoneManagerClientProtocol {
-
-  private static final Logger LOG = LoggerFactory.getLogger(OzoneManagerProtocolClientSideTranslatorPB.class);
 
   private final String clientID;
   private OmTransport transport;
@@ -2655,16 +2651,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       try {
         return handleError(submitRequest(omRequest));
       } catch (OMException e) {
-        if ((e.getResult() != SCM_IN_SAFE_MODE && e.getResult() != KEY_ALLOCATION_PIPELINE_NOT_FOUND)
+        if ((e.getResult() != SCM_IN_SAFE_MODE && e.getResult() != KEY_ALLOCATION_ERROR)
             || retryCount == 0) {
           throw e;
         }
-        if (retryCount == blockAllocationRetryCount) {
-          LOG.warn("Block allocation failed with {}. Retrying up to {} times at {}ms intervals",
-              e.getResult(), retryCount, blockAllocationRetryWaitTimeMs);
-        } else {
-          LOG.debug("Block allocation failed with {}. Retries remaining: {}", e.getResult(), retryCount);
-        }
+        System.err.println("Key block allocation failed with " + e.getResult() + "; retrying in "
+            + blockAllocationRetryWaitTimeMs + "ms (" + retryCount + " retries left)");
         retryCount--;
         try {
           Thread.sleep(blockAllocationRetryWaitTimeMs);
