@@ -659,7 +659,7 @@ public class TestSnapshotDiffManager {
           JobStatus.DONE, "vol", "buck", "fs", "ts", false,
           true, diffMap.size(), null, 0.0, totalDiffEntries.getRight());
       SnapshotDiffReportOzone snapshotDiffReportOzone =
-          snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
+          snapshotDiffManager.createPageResponse(snapshotDiffJob, "jobId", "vol",
               "buck", "fs", "ts",
               "", Integer.MAX_VALUE);
       Set<SnapshotDiffReport.DiffType> expectedOrder = new LinkedHashSet<>();
@@ -751,12 +751,12 @@ public class TestSnapshotDiffManager {
       if (pageSize <= 0) {
         int finalPageSize = pageSize;
         assertThrows(IOException.class,
-            () -> snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
+            () -> snapshotDiffManager.createPageResponse(snapshotDiffJob, testJobId, "vol",
                 "buck", "fs", "ts", pageMap.get(startIdx), finalPageSize));
         continue;
       }
       SnapshotDiffReportOzone snapshotDiffReportOzone =
-          snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
+          snapshotDiffManager.createPageResponse(snapshotDiffJob, testJobId, "vol",
               "buck", "fs", "ts",
               pageMap.get(startIdx), pageSize);
       int expectedTotalNumberOfRecords =
@@ -772,6 +772,87 @@ public class TestSnapshotDiffManager {
               Integer.parseInt(snapshotDiffReportOzone.getToken().substring(1)),
           idx == indexList.size() ? null : indexList.get(idx));
     }
+  }
+
+  /**
+   * A DONE job persisted before the largestEntryKey field existed deserializes
+   * with a null largestEntryKey after an upgrade. Reading its (fully intact)
+   * report must not trip the integrity check: the job stays readable instead of
+   * hitting an NPE in the recovery path.
+   */
+  @Test
+  public void testCreatePageResponseLegacyNullLargestEntryKeyStaysReadable()
+      throws IOException, RocksDBException {
+    UUID fromSnapshotId = UUID.randomUUID();
+    UUID toSnapshotId = UUID.randomUUID();
+    String jobKey = fromSnapshotId + DELIMITER + toSnapshotId;
+    String jobId = UUID.randomUUID().toString();
+    assertThat(jobId).isNotEqualTo(jobKey);
+
+    DiffReportEntry reportEntry = new DiffReportEntry(
+        SnapshotDiffReport.DiffType.MODIFY, codecRegistry.asRawData("key0"));
+    String reportKey = SnapshotDiffManager.getReportKeyForIndex(
+        jobId, SnapshotDiffReport.DiffType.MODIFY, 0);
+    db.get().put(snapDiffReportTable, codecRegistry.asRawData(reportKey),
+        codecRegistry.asRawData(reportEntry));
+
+    // Round-trip through the production codec to confirm a legacy job deserializes
+    // with a null largestEntryKey (this is byte-for-byte what an upgraded OM loads).
+    SnapshotDiffJob legacyJob = new SnapshotDiffJob(0, jobId, DONE, VOLUME_NAME,
+        BUCKET_NAME, "fs", "ts", false, true, 1, null, 0.0, null);
+    SnapshotDiffJob loaded = SnapshotDiffJob.codec().fromPersistedFormat(
+        SnapshotDiffJob.codec().toPersistedFormat(legacyJob));
+    assertNull(loaded.getLargestEntryKey());
+    db.get().put(snapDiffJobTable, codecRegistry.asRawData(jobKey),
+        codecRegistry.asRawData(loaded));
+
+    SnapshotDiffReportOzone report = snapshotDiffManager.createPageResponse(loaded,
+        jobKey, VOLUME_NAME, BUCKET_NAME, "fs", "ts", "", Integer.MAX_VALUE);
+    assertThat(report.getDiffList()).hasSize(1);
+    SnapshotDiffJob afterJob = codecRegistry.asObject(
+        db.get().get(snapDiffJobTable, codecRegistry.asRawData(jobKey)),
+        SnapshotDiffJob.class);
+    assertEquals(DONE, afterJob.getStatus());
+  }
+
+  /**
+   * When a DONE job's stored largestEntryKey genuinely disagrees with the report
+   * tail, the integrity check must flip the job (looked up by its dedup jobKey,
+   * not by the per-generation jobId) to FAILED and throw the designed retriable
+   * IOException rather than NPE on a wrong-key lookup.
+   */
+  @Test
+  public void testCreatePageResponseIntegrityFailureUsesJobKey()
+      throws IOException, RocksDBException {
+    UUID fromSnapshotId = UUID.randomUUID();
+    UUID toSnapshotId = UUID.randomUUID();
+    String jobKey = fromSnapshotId + DELIMITER + toSnapshotId;
+    String jobId = UUID.randomUUID().toString();
+    assertThat(jobId).isNotEqualTo(jobKey);
+
+    DiffReportEntry reportEntry = new DiffReportEntry(
+        SnapshotDiffReport.DiffType.MODIFY, codecRegistry.asRawData("key0"));
+    String reportKey = SnapshotDiffManager.getReportKeyForIndex(
+        jobId, SnapshotDiffReport.DiffType.MODIFY, 0);
+    db.get().put(snapDiffReportTable, codecRegistry.asRawData(reportKey),
+        codecRegistry.asRawData(reportEntry));
+
+    // Non-null largestEntryKey that does not match the actual report tail.
+    SnapshotDiffJob doneJob = new SnapshotDiffJob(0, jobId, DONE, VOLUME_NAME,
+        BUCKET_NAME, "fs", "ts", false, true, 1, null, 0.0,
+        jobId + DELIMITER + "mismatched-tail");
+    db.get().put(snapDiffJobTable, codecRegistry.asRawData(jobKey),
+        codecRegistry.asRawData(doneJob));
+
+    IOException ex = assertThrows(IOException.class, () ->
+        snapshotDiffManager.createPageResponse(doneJob, jobKey, VOLUME_NAME,
+            BUCKET_NAME, "fs", "ts", "", Integer.MAX_VALUE));
+    assertThat(ex).hasMessageContaining("Report integrity check failed");
+
+    SnapshotDiffJob afterJob = codecRegistry.asObject(
+        db.get().get(snapDiffJobTable, codecRegistry.asRawData(jobKey)),
+        SnapshotDiffJob.class);
+    assertEquals(FAILED, afterJob.getStatus());
   }
 
   @Test
@@ -794,14 +875,14 @@ public class TestSnapshotDiffManager {
         testJobId + DELIMITER + largestIndexToken);
 
     SnapshotDiffReportOzone firstPage = snapshotDiffManager.createPageResponse(snapshotDiffJob,
-        "vol", "buck", "fs", "ts", "", 2);
+        testJobId, "vol", "buck", "fs", "ts", "", 2);
     assertEquals(2, firstPage.getDiffList().size());
     assertEquals(getTestDiffEntry(testJobId, 0), firstPage.getDiffList().get(0));
     assertEquals(getTestDiffEntry(testJobId, 1), firstPage.getDiffList().get(1));
     assertEquals(orderedIndexTokens.get(2), firstPage.getToken());
 
     SnapshotDiffReportOzone secondPage = snapshotDiffManager.createPageResponse(snapshotDiffJob,
-        "vol", "buck", "fs", "ts", firstPage.getToken(), 2);
+        testJobId, "vol", "buck", "fs", "ts", firstPage.getToken(), 2);
     assertEquals(1, secondPage.getDiffList().size());
     assertEquals(getTestDiffEntry(testJobId, 2), secondPage.getDiffList().get(0));
     assertNull(secondPage.getToken());
@@ -1761,7 +1842,7 @@ public class TestSnapshotDiffManager {
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
         expectedEntries, null);
     doReturn(dummyReport).when(spy).createPageResponse(any(SnapshotDiffJob.class),
-        eq(ctx.volumeName), eq(ctx.bucketName), eq(ctx.fromSnapshotName),
+        eq(ctx.diffJobKey), eq(ctx.volumeName), eq(ctx.bucketName), eq(ctx.fromSnapshotName),
         eq(ctx.toSnapshotName), eq(""), eq(1000));
 
     SnapshotDiffJob doneJob = new SnapshotDiffJob(0L, jobId, DONE, ctx.volumeName,
