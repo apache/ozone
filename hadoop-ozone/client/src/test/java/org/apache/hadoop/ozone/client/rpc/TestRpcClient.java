@@ -702,6 +702,41 @@ public class TestRpcClient {
     }
   }
 
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testSetBucketVersioningRejectsOldVersion(OzoneManagerVersion version) throws IOException {
+    List<OMRequest> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList)
+              .setStatus(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK)
+              .setSuccess(true).setServiceListResponse(ServiceListResponse.newBuilder()
+                  .addServiceInfo(om(version).getProtobuf())).build();
+        }
+        if (request.getCmdType() == Type.SetBucketProperty) {
+          requests.add(request);
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      IOException error = assertThrows(IOException.class, () -> client.setBucketVersioning("vol", "bucket", true));
+      if (OzoneManagerVersion.S3_OBJECT_VERSIONING.isSupportedBy(version)) {
+        assertEquals("captured", error.getMessage());
+        assertThat(requests).hasSize(1);
+      } else {
+        assertThat(requests).isEmpty();
+        assertThat(error.getMessage()).contains("does not support S3 object versioning");
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   private static ServiceInfo om(OzoneManagerVersion version) {
     return new ServiceInfo.Builder()
         .setNodeType(HddsProtos.NodeType.OM)

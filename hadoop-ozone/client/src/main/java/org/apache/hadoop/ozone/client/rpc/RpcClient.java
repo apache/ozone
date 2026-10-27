@@ -1235,6 +1235,9 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(versioning, "versioning == null");
+    if (!OzoneManagerVersion.S3_OBJECT_VERSIONING.isSupportedBy(omVersion)) {
+      throw new IOException("Can not set bucket versioning, as OzoneManager does not support S3 object versioning.");
+    }
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
