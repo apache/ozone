@@ -26,9 +26,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 /**
  * What an S3 storage class means in Ozone.
  *
- * <p>Every field is optional. An unset field means the storage class takes no position on it, so
- * the value is resolved elsewhere, for example from the bucket. A new property is added as one more
- * optional field here, without changing {@link S3StorageClass} or its callers.
+ * <p>Fields may be unset in this value object. Each consumer defines how unset fields are handled. In particular,
+ * {@link S3StorageClassResolver} requires an explicit replication type when converting a spec to a replication config.
+ * An unset storage policy leaves policy resolution to the write path, for example from the bucket.
  *
  * <p>The spec holds a replication type rather than a full replication config. For EC, the layout is
  * resolved at write time by {@link S3StorageClassResolver}, so it is not fixed by the class.

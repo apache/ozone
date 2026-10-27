@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_REDUCED_
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD_IA;
 
-import java.util.Locale;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
@@ -82,7 +81,7 @@ public enum S3StorageClass {
   /**
    * Look up the S3StorageClass matching an S3 storage-class header value.
    *
-   * @param s3StorageClass the S3 storage class name (case-insensitive).
+   * @param s3StorageClass the S3 storage class name (case-sensitive, with surrounding whitespace ignored).
    * @return the matching S3StorageClass.
    * @throws IllegalArgumentException if the value is null or does not map to
    *         a supported storage class.
@@ -92,7 +91,7 @@ public enum S3StorageClass {
       throw new IllegalArgumentException("Not supported s3StorageClass: null");
     }
     try {
-      return S3StorageClass.valueOf(s3StorageClass.toUpperCase(Locale.ROOT));
+      return S3StorageClass.valueOf(s3StorageClass.trim());
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           "Not supported s3StorageClass: " + s3StorageClass);

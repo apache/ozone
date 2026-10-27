@@ -26,7 +26,9 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.List;
@@ -76,11 +78,29 @@ class TestS3StorageClass {
         S3StorageClass.fromS3StorageClass(S3_STORAGE_CLASS_STANDARD_IA));
     assertEquals(S3StorageClass.GLACIER,
         S3StorageClass.fromS3StorageClass(S3_STORAGE_CLASS_GLACIER));
-    assertEquals(S3StorageClass.STANDARD, S3StorageClass.fromS3StorageClass("standard"));
+    assertThrows(IllegalArgumentException.class,
+        () -> S3StorageClass.fromS3StorageClass("standard"));
     assertThrows(IllegalArgumentException.class,
         () -> S3StorageClass.fromS3StorageClass("INVALID"));
     assertThrows(IllegalArgumentException.class,
         () -> S3StorageClass.fromS3StorageClass(null));
+  }
+
+  @Test
+  void testFromS3StorageClassTrimsWhitespace() {
+    for (S3StorageClass storageClass : S3StorageClass.values()) {
+      String value = storageClass.getS3StorageClass();
+      for (String input : Arrays.asList(" " + value, value + " ", "\t " + value + " \t")) {
+        assertEquals(storageClass, S3StorageClass.fromS3StorageClass(input));
+      }
+    }
+  }
+
+  @Test
+  void testFromS3StorageClassRejectsCaseMismatchAndBlankValues() {
+    for (String input : Arrays.asList("Standard", "standard_ia", "glacier", " standard ", "", " \t ", "STANDARD IA")) {
+      assertThrows(IllegalArgumentException.class, () -> S3StorageClass.fromS3StorageClass(input));
+    }
   }
 
   /**
@@ -149,25 +169,25 @@ class TestS3StorageClass {
 
   @Test
   void testForwardDefaultSpecs() {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    S3StorageClassResolver resolver = new S3StorageClassResolver(new OzoneConfiguration());
 
-    S3StorageClassSpec standard = S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_STANDARD, conf);
+    S3StorageClassSpec standard = resolver.toSpec(S3_STORAGE_CLASS_STANDARD);
     assertEquals(ReplicationType.RATIS, standard.getReplicationType());
     assertEquals(ReplicationFactor.THREE, standard.getReplicationFactor());
     assertNull(standard.getStoragePolicy(), "unset by default, so the bucket's policy applies");
 
-    S3StorageClassSpec reduced =
-        S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY, conf);
+    S3StorageClassSpec reduced = resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY);
     assertEquals(ReplicationFactor.ONE, reduced.getReplicationFactor());
     assertNull(reduced.getStoragePolicy());
 
     assertEquals(OzoneStoragePolicy.WARM,
-        S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA, conf).getStoragePolicy());
+        resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.COLD,
-        S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_GLACIER, conf).getStoragePolicy());
+        resolver.toSpec(S3_STORAGE_CLASS_GLACIER).getStoragePolicy());
 
-    assertThrows(IllegalArgumentException.class,
-        () -> S3StorageClassResolver.toSpec("INVALID", conf));
+    for (String input : Arrays.asList(null, "", " \t ", "INVALID", "standard")) {
+      assertThrows(IllegalArgumentException.class, () -> resolver.toSpec(input));
+    }
   }
 
   @Test
@@ -175,28 +195,47 @@ class TestS3StorageClass {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "hot");
     conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, " WARM ");
+    S3StorageClassResolver resolver = new S3StorageClassResolver(conf);
 
     assertEquals(OzoneStoragePolicy.HOT,
-        S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_STANDARD, conf).getStoragePolicy());
-    assertEquals(OzoneStoragePolicy.WARM, S3StorageClassResolver.toSpec(
-        S3_STORAGE_CLASS_REDUCED_REDUNDANCY, conf).getStoragePolicy());
+        resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
+    assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
     // The setting applies only to its own class.
     assertEquals(OzoneStoragePolicy.COLD,
-        S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_GLACIER, conf).getStoragePolicy());
+        resolver.toSpec(S3_STORAGE_CLASS_GLACIER).getStoragePolicy());
   }
 
   /** COLD would make STANDARD writes report GLACIER, so it is rejected. */
   @Test
-  void testForwardRejectsColdAndUnknownPolicy() {
-    OzoneConfiguration cold = new OzoneConfiguration();
-    cold.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "COLD");
-    assertThrows(IllegalArgumentException.class,
-        () -> S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_STANDARD, cold));
+  void testConstructionRejectsColdAndUnknownPolicy() {
+    for (String key : Arrays.asList(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY,
+        OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY)) {
+      for (String value : Arrays.asList("COLD", " cold ", "LUKEWARM")) {
+        OzoneConfiguration conf = new OzoneConfiguration();
+        conf.set(key, value);
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> new S3StorageClassResolver(conf));
+        assertTrue(exception.getMessage().contains(key));
+        assertTrue(exception.getMessage().contains("Expected HOT, WARM or empty."));
+      }
+    }
+  }
 
-    OzoneConfiguration unknown = new OzoneConfiguration();
-    unknown.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "LUKEWARM");
-    assertThrows(IllegalArgumentException.class,
-        () -> S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY, unknown));
+  @Test
+  void testForwardReusesPoliciesResolvedAtConstruction() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "HOT");
+    conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "WARM");
+    S3StorageClassResolver resolver = new S3StorageClassResolver(conf);
+    S3StorageClassSpec standard = resolver.toSpec(S3_STORAGE_CLASS_STANDARD);
+    S3StorageClassSpec reduced = resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY);
+
+    conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "COLD");
+    conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "INVALID");
+    assertSame(standard, resolver.toSpec(S3_STORAGE_CLASS_STANDARD));
+    assertSame(reduced, resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY));
+    assertEquals(OzoneStoragePolicy.HOT, standard.getStoragePolicy());
+    assertEquals(OzoneStoragePolicy.WARM, reduced.getStoragePolicy());
   }
 
   /**
@@ -205,13 +244,17 @@ class TestS3StorageClass {
    */
   @Test
   void testConfiguredPolicyRoundTripsToSameClass() {
-    for (String policy : Arrays.asList("", "HOT", "WARM")) {
+    for (String policy : Arrays.asList("", " \t ", "HOT", "WARM")) {
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, policy);
       conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, policy);
+      S3StorageClassResolver resolver = new S3StorageClassResolver(conf);
+      if (policy.trim().isEmpty()) {
+        assertNull(resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
+        assertNull(resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
+      }
       for (S3StorageClass storageClass : S3StorageClass.values()) {
-        S3StorageClassSpec spec =
-            S3StorageClassResolver.toSpec(storageClass.getS3StorageClass(), conf);
+        S3StorageClassSpec spec = resolver.toSpec(storageClass.getS3StorageClass());
         ReplicationConfig replication =
             S3StorageClassResolver.toReplicationConfig(spec, null, null);
         assertEquals(storageClass,
@@ -224,8 +267,8 @@ class TestS3StorageClass {
   /** EC layout comes from the request header, then the bucket, then defaults to 3-2. */
   @Test
   void testForwardEcLayoutOrder() {
-    S3StorageClassSpec ec =
-        S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA, new OzoneConfiguration());
+    S3StorageClassResolver resolver = new S3StorageClassResolver(new OzoneConfiguration());
+    S3StorageClassSpec ec = resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA);
 
     assertEquals(new ECReplicationConfig("rs-6-3-1024k"),
         S3StorageClassResolver.toReplicationConfig(ec, "rs-6-3-1024k", EC_3_2));
@@ -234,16 +277,41 @@ class TestS3StorageClass {
     // A non-EC bucket replication is not used for an EC class.
     assertEquals(EC_3_2, S3StorageClassResolver.toReplicationConfig(ec, null, RATIS_THREE));
     assertEquals(EC_3_2, S3StorageClassResolver.toReplicationConfig(ec, null, null));
+
+    assertThrows(IllegalArgumentException.class,
+        () -> S3StorageClassResolver.toReplicationConfig(ec, "INVALID", EC_6_3));
+    assertThrows(IllegalArgumentException.class,
+        () -> S3StorageClassResolver.toReplicationConfig(ec, "INVALID", null));
   }
 
   @Test
   void testForwardRatisReplication() {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    S3StorageClassResolver resolver = new S3StorageClassResolver(new OzoneConfiguration());
     // RATIS classes use their own factor and ignore the bucket's replication.
     assertEquals(RATIS_THREE, S3StorageClassResolver.toReplicationConfig(
-        S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_STANDARD, conf), null, EC_6_3));
+        resolver.toSpec(S3_STORAGE_CLASS_STANDARD), null, EC_6_3));
     assertEquals(RATIS_ONE, S3StorageClassResolver.toReplicationConfig(
-        S3StorageClassResolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY, conf), null, null));
+        resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY), null, null));
+  }
+
+  @Test
+  void testForwardRejectsMissingReplicationTypeWithBucketDefault() {
+    S3StorageClassSpec spec = S3StorageClassSpec.newBuilder()
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
+        .build();
+
+    for (ReplicationConfig bucketConfig : Arrays.asList(RATIS_THREE, EC_6_3)) {
+      assertThrows(IllegalArgumentException.class,
+          () -> S3StorageClassResolver.toReplicationConfig(spec, null, bucketConfig));
+    }
+  }
+
+  @Test
+  void testForwardRejectsMissingReplicationTypeWithoutBucketDefault() {
+    S3StorageClassSpec spec = S3StorageClassSpec.newBuilder().build();
+
+    assertThrows(IllegalArgumentException.class,
+        () -> S3StorageClassResolver.toReplicationConfig(spec, null, null));
   }
 
   @Test

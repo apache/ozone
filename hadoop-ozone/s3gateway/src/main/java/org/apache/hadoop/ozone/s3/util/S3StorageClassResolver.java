@@ -50,47 +50,58 @@ public final class S3StorageClassResolver {
   private static final ECReplicationConfig DEFAULT_EC_REPLICATION_CONFIG =
       new ECReplicationConfig(3, 2);
 
-  private S3StorageClassResolver() {
+  private final S3StorageClassSpec standardSpec;
+  private final S3StorageClassSpec reducedRedundancySpec;
+
+  /**
+   * Resolves both gateway storage policy settings once, before the gateway accepts requests.
+   *
+   * @param conf gateway configuration
+   * @throws IllegalArgumentException if either configured storage policy is not valid
+   */
+  public S3StorageClassResolver(ConfigurationSource conf) {
+    standardSpec = S3StorageClass.STANDARD.getSpec().withStoragePolicy(
+        getConfiguredStoragePolicy(conf, OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY));
+    reducedRedundancySpec = S3StorageClass.REDUCED_REDUNDANCY.getSpec().withStoragePolicy(
+        getConfiguredStoragePolicy(conf, OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY));
   }
 
   /**
    * Forward mapping: the spec for a write that requests the given storage class.
    *
    * <p>For {@code STANDARD} and {@code REDUCED_REDUNDANCY}, the storage policy comes from the
-   * class's gateway setting. When the setting is empty, the spec has no storage policy and the
-   * write inherits the bucket's.
+   * class's gateway setting resolved at startup. When the setting is empty, the spec has no storage
+   * policy and the write inherits the bucket's. Configuration is not read during request lookup.
    *
    * @param s3StorageClass the {@code x-amz-storage-class} header value
-   * @param conf gateway configuration
-   * @throws IllegalArgumentException if the storage class is unknown, or its configured storage
-   *         policy is not valid
+   * @throws IllegalArgumentException if the storage class is null or unknown
    */
   @Nonnull
-  public static S3StorageClassSpec toSpec(String s3StorageClass, ConfigurationSource conf) {
+  public S3StorageClassSpec toSpec(String s3StorageClass) {
     S3StorageClass storageClass = S3StorageClass.fromS3StorageClass(s3StorageClass);
-    S3StorageClassSpec spec = storageClass.getSpec();
     switch (storageClass) {
     case STANDARD:
-      return spec.withStoragePolicy(
-          getConfiguredStoragePolicy(conf, OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY));
+      return standardSpec;
     case REDUCED_REDUNDANCY:
-      return spec.withStoragePolicy(getConfiguredStoragePolicy(conf,
-          OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY));
+      return reducedRedundancySpec;
     default:
-      return spec;
+      return storageClass.getSpec();
     }
   }
 
   /**
    * The replication config for a write with the given spec.
    *
+   * <p>The spec must supply a supported replication type (RATIS or EC). A missing type is rejected even when a bucket
+   * replication config is supplied.
+   *
    * <p>For EC, the layout comes from the {@code storage-config} request header, then from the
    * bucket's replication if it is EC, and otherwise defaults to EC 3-2.
    *
    * @param spec the spec from {@link #toSpec}
    * @param storageConfigHeader the {@code storage-config} header value, or null
-   * @param bucketReplicationConfig the bucket's default replication, or null
-   * @throws IllegalArgumentException if the spec has no replication type, or
+   * @param bucketReplicationConfig the bucket's default replication, used only for an EC spec, or null
+   * @throws IllegalArgumentException if the spec has no supported replication type, or
    *         {@code storageConfigHeader} is not a valid EC layout
    */
   @Nonnull

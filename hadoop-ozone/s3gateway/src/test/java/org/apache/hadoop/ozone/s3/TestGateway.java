@@ -17,12 +17,29 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static org.apache.hadoop.hdds.cli.GenericCli.EXECUTION_ERROR_EXIT_CODE;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_REDUCED_REDUNDANCY;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.Arrays;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.s3.util.S3StorageClassResolver;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,12 +56,14 @@ public class TestGateway {
 
   @BeforeEach
   void saveRootLoggerHandlers() {
+    OzoneConfigurationHolder.resetConfiguration();
     originalHandlers = rootLogger.getHandlers();
     removeRootLoggerHandlers();
   }
 
   @AfterEach
   void restoreRootLoggerHandlers() {
+    OzoneConfigurationHolder.resetConfiguration();
     removeRootLoggerHandlers();
     for (Handler handler : originalHandlers) {
       rootLogger.addHandler(handler);
@@ -71,6 +90,84 @@ public class TestGateway {
     } finally {
       logCapturer.stopCapturing();
     }
+  }
+
+  @Test
+  void rejectsInvalidStoragePoliciesBeforeStartingServers() {
+    for (String key : Arrays.asList(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY,
+        OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY)) {
+      for (String value : Arrays.asList("COLD", "LUKEWARM")) {
+        Gateway gateway = new Gateway() {
+          @Override
+          public void start() {
+            fail("Invalid storage policy must prevent server startup");
+          }
+        };
+        gateway.getOzoneConf().set(key, value);
+        StringWriter errors = new StringWriter();
+        gateway.getCmd().setErr(new PrintWriter(errors));
+
+        assertEquals(EXECUTION_ERROR_EXIT_CODE, gateway.execute(new String[0]));
+        assertThat(errors.toString()).contains(key, value, "Expected HOT, WARM or empty.");
+        assertNull(OzoneConfigurationHolder.configuration());
+        assertNull(OzoneConfigurationHolder.storageClassResolver());
+      }
+    }
+  }
+
+  @Test
+  void keepsResolverForTheInitialConfiguration() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "HOT");
+    conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "WARM");
+    OzoneConfigurationHolder.setConfiguration(conf);
+    S3StorageClassResolver resolver = OzoneConfigurationHolder.storageClassResolver();
+
+    OzoneConfiguration ignored = new OzoneConfiguration();
+    ignored.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "COLD");
+    OzoneConfigurationHolder.setConfiguration(ignored);
+
+    assertSame(conf, OzoneConfigurationHolder.configuration());
+    assertSame(resolver, OzoneConfigurationHolder.storageClassResolver());
+    assertEquals(OzoneStoragePolicy.HOT, resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
+    assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
+  }
+
+  @Test
+  void resetsResolverWithConfiguration() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "HOT");
+    OzoneConfigurationHolder.setConfiguration(conf);
+    S3StorageClassResolver previous = OzoneConfigurationHolder.storageClassResolver();
+
+    OzoneConfigurationHolder.resetConfiguration();
+    assertNull(OzoneConfigurationHolder.configuration());
+    assertNull(OzoneConfigurationHolder.storageClassResolver());
+
+    OzoneConfiguration next = new OzoneConfiguration();
+    next.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "WARM");
+    OzoneConfigurationHolder.setConfiguration(next);
+    S3StorageClassResolver resolver = OzoneConfigurationHolder.storageClassResolver();
+    assertSame(next, OzoneConfigurationHolder.configuration());
+    assertNotSame(previous, resolver);
+    assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
+  }
+
+  @Test
+  void canInitializeAfterCorrectingInvalidConfiguration() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "HOT");
+    conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "COLD");
+    assertThrows(IllegalArgumentException.class, () -> OzoneConfigurationHolder.setConfiguration(conf));
+    assertNull(OzoneConfigurationHolder.configuration());
+    assertNull(OzoneConfigurationHolder.storageClassResolver());
+
+    conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "WARM");
+    OzoneConfigurationHolder.setConfiguration(conf);
+    S3StorageClassResolver resolver = OzoneConfigurationHolder.storageClassResolver();
+    assertSame(conf, OzoneConfigurationHolder.configuration());
+    assertEquals(OzoneStoragePolicy.HOT, resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
+    assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
   }
 
   private void removeRootLoggerHandlers() {
