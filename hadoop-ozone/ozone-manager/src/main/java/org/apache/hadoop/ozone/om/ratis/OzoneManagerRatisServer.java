@@ -703,6 +703,9 @@ public final class OzoneManagerRatisServer {
       server.close();
     } catch (IOException e) {
       throw new RuntimeException(e);
+    } finally {
+      // Ratis skips its state machine close callback when the server has not started.
+      omStateMachine.stop();
     }
   }
 

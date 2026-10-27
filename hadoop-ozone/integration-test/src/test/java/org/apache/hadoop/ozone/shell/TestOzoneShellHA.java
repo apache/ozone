@@ -1100,7 +1100,7 @@ public class TestOzoneShellHA {
         getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
-    try {
+    try (FileSystem fs = FileSystem.get(clientConf)) {
       int res;
       // Test orphan link bucket when source volume removed
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
@@ -1185,7 +1185,7 @@ public class TestOzoneShellHA {
     String volName = "testlistbucket";
     int numBuckets = pageSize;
 
-    try {
+    try (FileSystem fs = FileSystem.get(clientConf)) {
       generateBuckets("/" + volName, numBuckets);
       out.reset();
       int res = ToolRunner.run(shell, new String[]{"-ls", "/" + volName});
@@ -2136,7 +2136,11 @@ public class TestOzoneShellHA {
     // Delete bucket1 recursively
     args = new String[]{"bucket", "delete", volume1 + OZONE_URI_DELIMITER +
           bucket1, "-r", "--yes"};
-    execute(ozoneShell, args);
+    OzoneConfiguration clientConf = getClientConfForOFS(OZONE_OFS_URI_SCHEME + "://" + omServiceId, cluster.getConf());
+    try (FileSystem fs = FileSystem.get(clientConf)) {
+      execute(ozoneShell, args);
+      assertTrue(fs.exists(new Path("/" + volume1 + "/" + bucket3)));
+    }
     out.reset();
 
     // Bucket1 should not exist

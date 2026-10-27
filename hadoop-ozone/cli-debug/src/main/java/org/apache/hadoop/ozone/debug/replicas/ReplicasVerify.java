@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -159,39 +160,40 @@ public class ReplicasVerify extends Handler {
 
     replicaVerifiers = new ArrayList<>();
 
-    addVerifier(verification.doExecuteChecksums, () -> {
-      try {
-        return new ChecksumVerifier(getConf());
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
-
-    addVerifier(verification.doExecuteBlockExistence, () -> {
-      try {
-        return new BlockExistenceVerifier(getConf());
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
-
-    addVerifier(verification.doExecuteReplicaState, () -> {
-      try {
-        return new ContainerStateVerifier(getConf(), containerCacheSize);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
-
-    // Add shutdown hook to ensure summary is printed even if interrupted
-    addShutdownHook();
-
     try {
+      addVerifier(verification.doExecuteChecksums, () -> {
+        try {
+          return new ChecksumVerifier(getConf());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
+
+      addVerifier(verification.doExecuteBlockExistence, () -> {
+        try {
+          return new BlockExistenceVerifier(getConf());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
+
+      addVerifier(verification.doExecuteReplicaState, () -> {
+        try {
+          return new ContainerStateVerifier(getConf(), containerCacheSize);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
+
+      // Add shutdown hook to ensure summary is printed even if interrupted
+      addShutdownHook();
+
       findCandidateKeys(client, address);
     } catch (Exception e) {
       exception = e;
       throw e;
     } finally {
+      IOUtils.closeQuietly(replicaVerifiers);
       endTime = System.nanoTime();
     }
   }

@@ -87,6 +87,11 @@ public class ContainerStateVerifier implements ReplicaVerifier {
   }
 
   @Override
+  public void close() {
+    containerOperationClient.close();
+  }
+
+  @Override
   public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation) {
     try {
       StringBuilder replicaCheckMsg = new StringBuilder().append("Replica state is ");

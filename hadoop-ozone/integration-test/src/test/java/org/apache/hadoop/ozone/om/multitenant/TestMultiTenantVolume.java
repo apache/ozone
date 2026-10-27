@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.OzoneQuota;
@@ -67,6 +69,7 @@ public class TestMultiTenantVolume {
   private static final String BUCKET_NAME = "bucket";
   private static final String ACCESS_ID = "tenant$username";
   private static OzoneClient client;
+  private static final List<OzoneClient> TENANT_CLIENTS = new ArrayList<>();
 
   @BeforeAll
   public static void initClusterProvider() throws Exception {
@@ -88,6 +91,7 @@ public class TestMultiTenantVolume {
 
   @AfterAll
   public static void shutdownClusterProvider() {
+    IOUtils.closeQuietly(TENANT_CLIENTS);
     IOUtils.closeQuietly(client);
     cluster.shutdown();
   }
@@ -260,7 +264,9 @@ public class TestMultiTenantVolume {
     // userPrincipal is set to be the same as accessId for the test
     rpcClient.setThreadLocalS3Auth(
         new S3Auth("unused1", "unused2", accessID, accessID));
-    return new ObjectStore(conf, rpcClient);
+    OzoneClient tenantClient = new OzoneClient(conf, rpcClient);
+    TENANT_CLIENTS.add(tenantClient);
+    return tenantClient.getObjectStore();
   }
 
   @Test

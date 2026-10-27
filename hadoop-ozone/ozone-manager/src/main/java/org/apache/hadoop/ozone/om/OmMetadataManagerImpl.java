@@ -229,7 +229,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.lock = new OzoneManagerLock(conf);
     this.hierarchicalLockManager = new PoolBasedHierarchicalResourceLockManager(conf);
     this.omEpoch = OmUtils.getOMEpoch();
-    start(conf);
+    try {
+      start(conf);
+    } catch (IOException | RuntimeException e) {
+      try {
+        stop();
+      } catch (IOException | RuntimeException cleanupException) {
+        e.addSuppressed(cleanupException);
+      }
+      throw e;
+    }
   }
 
   /**

@@ -21,10 +21,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
@@ -35,7 +38,9 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -149,6 +154,33 @@ public class TestOzoneManagerRatisServer {
     assertEquals(LifeCycle.State.RUNNING,
         omRatisServer.getServerState(),
         "Ratis Server should be in running state");
+  }
+
+  @Test
+  public void testStopUnstartedServerReleasesMetrics() throws Exception {
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    OzoneManagerRatisServer unstarted = null;
+    try {
+      unstarted = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager, omNodeDetails,
+          Collections.emptyMap(), secConfig, certClient, true);
+      Field metricsField = OzoneManagerStateMachine.class.getDeclaredField("nettyMetrics");
+      metricsField.setAccessible(true);
+      NettyMetrics metrics = (NettyMetrics) metricsField.get(unstarted.getOmStateMachine());
+      Field nameField = NettyMetrics.class.getDeclaredField("sourceName");
+      nameField.setAccessible(true);
+      String sourceName = (String) nameField.get(metrics);
+      assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
+      unstarted.stop();
+      assertNull(DefaultMetricsSystem.instance().getSource(sourceName));
+      unstarted.stop();
+      assertNull(DefaultMetricsSystem.instance().getSource(sourceName));
+    } finally {
+      if (unstarted != null) {
+        unstarted.getOmStateMachine().stop();
+      }
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+    }
   }
 
   /**

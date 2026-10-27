@@ -42,6 +42,11 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
     return CHECK_TYPE;
   }
 
+  @Override
+  public void close() {
+    containerClient.close();
+  }
+
   public BlockExistenceVerifier(OzoneConfiguration conf) throws IOException {
     this.containerClient = new ContainerOperationClient(conf);
     this.xceiverClientManager = containerClient.getXceiverClientManager();
