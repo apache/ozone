@@ -123,7 +123,6 @@ public class TestECKeyOutputStream {
     configuration.setTimeDuration(
         "hdds.ratis.raft.server.notification.no-leader.timeout", 300,
         TimeUnit.SECONDS);
-    configuration.setQuietMode(false);
     configuration.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
     configuration.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 500,

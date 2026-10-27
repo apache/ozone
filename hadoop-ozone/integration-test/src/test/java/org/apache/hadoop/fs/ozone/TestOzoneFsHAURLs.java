@@ -175,7 +175,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
   @Test
   public void testWithQualifiedDefaultFS() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
-    clientConf.setQuietMode(false);
     clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     // fs.defaultFS = o3fs://bucketName.volumeName.omServiceId/
     clientConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
@@ -270,7 +269,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
    */
   private void testWithDefaultFS(String defaultFS) throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
-    clientConf.setQuietMode(false);
     clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     // fs.defaultFS = file:///
     clientConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
@@ -315,7 +313,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
   @Test
   public void testIncorrectAuthorityInURI() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
-    clientConf.setQuietMode(false);
     clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     clientConf.set(OFS_IMPL_KEY, OFS_IMPL_VALUE);
     FsShell shell = new FsShell(clientConf);

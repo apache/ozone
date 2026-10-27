@@ -135,6 +135,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
     newBucketInfo.setCreationTime(initialTime)
         .setModificationTime(initialTime);
 
+    // reset usage counters to 0 to prevent arbitrary values set in the request by any other client
+    newBucketInfo.clearUsedBytes()
+        .clearUsedNamespace()
+        .clearSnapshotUsedBytes()
+        .clearSnapshotUsedNamespace();
+
     if (bucketInfo.hasBeinfo()) {
       newBucketInfo.setBeinfo(
           BekInfoUtils.getBekInfo(kmsProvider, bucketInfo.getBeinfo()));
