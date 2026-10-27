@@ -65,10 +65,12 @@ public class GrpcOMFollowerReadFailoverProxyProvider extends FollowerReadFailove
 
   /**
    * Submit the request to an OM follower if follower read is used, otherwise to the leader OM.
+   * A failure that needs the OM retry policy, such as
+   * {@link org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException}, is thrown to the caller.
    *
    * @param payload the request to submit.
    * @param submitToHost submits a request to the OM at the given gRPC address.
-   * @param submitToLeader submits a request to the leader OM, failing over between the OMs if needed.
+   * @param submitToLeader submits a request to the current leader OM.
    * @return the response of the request.
    */
   public OMResponse submitRequest(OMRequest payload,
@@ -100,7 +102,7 @@ public class GrpcOMFollowerReadFailoverProxyProvider extends FollowerReadFailove
             break;
           }
           if (getLeaderNotReadyException(unwrapped) != null) {
-            break;
+            throw e;
           }
           ReadIndexException readIndexException = getReadIndexException(unwrapped);
           ReadException readException = getReadException(unwrapped);
