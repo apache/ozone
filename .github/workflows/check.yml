@@ -196,6 +196,24 @@ jobs:
           restore-keys: |
             maven-repo-
 
+      # Hard-coded for the acceptance suites that download Apache releases, to avoid the need for another input.
+      - name: Get versions of Apache releases used by tests
+        id: apache-release-versions
+        if: ${{ inputs.script == 'acceptance' && (inputs.split == 'ranger' || inputs.split == 's3a') }}
+        run: |
+          hadoop=$(sed -n 's@.*<hadoop.version>\(.*\)</hadoop.version>.*@\1@p' pom.xml)
+          ranger=$(sed -n 's@.*<ranger.version>\(.*\)</ranger.version>.*@\1@p' pom.xml)
+          echo "versions=hadoop-${hadoop}-ranger-${ranger}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache for Apache releases used by tests
+        if: ${{ steps.apache-release-versions.outcome == 'success' }}
+        uses: actions/cache@v6
+        with:
+          path: |
+            /tmp/*ranger-*.tar.gz*
+            target/hadoop-src.tar.gz
+          key: apache-releases-${{ inputs.split }}-${{ steps.apache-release-versions.outputs.versions }}
+
       - name: Download Ozone repo
         id: download-ozone-repo
         if: ${{ inputs.needs-ozone-repo }}
