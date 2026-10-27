@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -26,6 +25,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
+import org.apache.hadoop.ozone.recon.api.types.BucketDeletedBytesCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.slf4j.Logger;
@@ -40,16 +40,16 @@ import org.slf4j.LoggerFactory;
 @Produces("application/json")
 public class PendingDeletionEndpoint {
   private static final Logger LOG = LoggerFactory.getLogger(PendingDeletionEndpoint.class);
-  private final ReconGlobalMetricsService reconGlobalMetricsService;
+  private final BucketDeletedBytesMetricsService bucketDeletedBytesMetricsService;
   private final DataNodeMetricsService dataNodeMetricsService;
   private final StorageContainerLocationInternalInterface scmClient;
 
   @Inject
   public PendingDeletionEndpoint(
-      ReconGlobalMetricsService reconGlobalMetricsService,
+      BucketDeletedBytesMetricsService bucketDeletedBytesMetricsService,
       DataNodeMetricsService dataNodeMetricsService,
       StorageContainerLocationInternalInterface scmClient) {
-    this.reconGlobalMetricsService = reconGlobalMetricsService;
+    this.bucketDeletedBytesMetricsService = bucketDeletedBytesMetricsService;
     this.dataNodeMetricsService = dataNodeMetricsService;
     this.scmClient = scmClient;
   }
@@ -114,7 +114,10 @@ public class PendingDeletionEndpoint {
   }
 
   private Response handleOmPendingDeletion() {
-    Map<String, Long> pendingDeletion = reconGlobalMetricsService.calculatePendingSizes();
-    return Response.ok(pendingDeletion).build();
+    Object response = bucketDeletedBytesMetricsService.getCollectedMetrics();
+    if (response instanceof BucketDeletedBytesCompleteResponse) {
+      return Response.ok(response).build();
+    }
+    return Response.accepted(response).build();
   }
 }

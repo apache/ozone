@@ -3821,6 +3821,39 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.bucket.deleted.bytes.collection.minimum.api.delay</name>
+    <value>30s</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Minimum delay in API to start a new task for collecting per-bucket
+      snapshot-trapped/purgeable deleted bytes from OM.
+      It behaves like a rate limiter to avoid unnecessary task creation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.bucket.deleted.bytes.collection.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Maximum time taken for the api to complete.
+      If it exceeds pending tasks will be cancelled.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.bucket.deleted.bytes.collection.thread.count</name>
+    <value>0</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Size of the thread pool Recon uses to collect per-bucket deleted bytes
+      from OM. A value of 0 (or any non-positive value) means "auto" and
+      selects 2 x Runtime.availableProcessors() at startup. Each task issues
+      an admin RPC to OM that traverses the bucket's snapshot chain, which is
+      heavier than a DataNode JMX fetch, so operators of large clusters with
+      many buckets or deep snapshot chains may want to set this explicitly
+      lower than the DataNode metrics thread pool.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>

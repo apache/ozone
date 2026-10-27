@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collection;
+import org.apache.hadoop.ozone.recon.api.BucketDeletedBytesMetricsService;
 
 /**
  * Class that represents the API response structure of Buckets.
@@ -36,10 +37,18 @@ public class BucketsResponse {
   @JsonProperty("buckets")
   private Collection<BucketObjectDBInfo> buckets;
 
+  /**
+   * Status of the per-bucket trapped/purgeable deleted-bytes collection.
+   */
+  @JsonProperty("trappedBytesCollectionStatus")
+  private BucketDeletedBytesMetricsService.MetricCollectionStatus trappedBytesCollectionStatus;
+
   public BucketsResponse(long totalCount,
-      Collection<BucketObjectDBInfo> buckets) {
+      Collection<BucketObjectDBInfo> buckets,
+      BucketDeletedBytesMetricsService.MetricCollectionStatus trappedBytesCollectionStatus) {
     this.totalCount = totalCount;
     this.buckets = buckets;
+    this.trappedBytesCollectionStatus = trappedBytesCollectionStatus;
   }
 
   public long getTotalCount() {
@@ -48,5 +57,9 @@ public class BucketsResponse {
 
   public Collection<BucketObjectDBInfo> getBuckets() {
     return buckets;
+  }
+
+  public BucketDeletedBytesMetricsService.MetricCollectionStatus getTrappedBytesCollectionStatus() {
+    return trappedBytesCollectionStatus;
   }
 }

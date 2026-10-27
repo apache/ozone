@@ -61,6 +61,12 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
   @JsonProperty("owner")
   private String owner;
 
+  @JsonProperty("trappedBytes")
+  private long trappedBytes = -1L;
+
+  @JsonProperty("trappedKeys")
+  private long trappedKeys = -1L;
+
   public BucketObjectDBInfo() {
 
   }
@@ -170,6 +176,22 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
 
   public void setOwner(String owner) {
     this.owner = owner;
+  }
+
+  public long getTrappedBytes() {
+    return trappedBytes;
+  }
+
+  public void setTrappedBytes(long trappedBytes) {
+    this.trappedBytes = trappedBytes;
+  }
+
+  public long getTrappedKeys() {
+    return trappedKeys;
+  }
+
+  public void setTrappedKeys(long trappedKeys) {
+    this.trappedKeys = trappedKeys;
   }
 
 }

@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -587,6 +588,11 @@ public class OzoneManagerServiceProviderImpl
           "Manual OM DB rebuild could not be queued. Buffer might be full or another rebuild is "
               + "pending. Please retry.");
     }
+  }
+
+  @Override
+  public BucketDeletedBytes getBucketDeletedBytes(String bucketPath) throws IOException {
+    return ozoneManagerClient.getBucketDeletedBytes(bucketPath);
   }
 
   /**

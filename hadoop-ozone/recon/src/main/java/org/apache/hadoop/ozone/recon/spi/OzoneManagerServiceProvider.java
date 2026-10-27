@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.spi;
 
+import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.recon.api.types.OMDBReprocessResponse;
 
 /**
@@ -52,4 +54,11 @@ public interface OzoneManagerServiceProvider {
    * @return OMDBReprocessResponse containing the status of the request.
    */
   OMDBReprocessResponse triggerTaskRebuild();
+
+  /**
+   * Get the snapshot-trapped vs purgeable deleted bytes split for a bucket.
+   * @param bucketPath bucket path in volume/bucket format.
+   * @return the deleted bytes split for the bucket.
+   */
+  BucketDeletedBytes getBucketDeletedBytes(String bucketPath) throws IOException;
 }

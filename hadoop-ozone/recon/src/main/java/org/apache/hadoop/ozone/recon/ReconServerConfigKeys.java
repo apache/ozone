@@ -238,6 +238,19 @@ public final class  ReconServerConfigKeys {
   public static final int OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT =
       Runtime.getRuntime().availableProcessors() * 2;
 
+  public static final String OZONE_RECON_BUCKET_DELETED_BYTES_COLLECTION_MINIMUM_API_DELAY =
+      "ozone.recon.bucket.deleted.bytes.collection.minimum.api.delay";
+  public static final String OZONE_RECON_BUCKET_DELETED_BYTES_COLLECTION_MINIMUM_API_DELAY_DEFAULT = "30s";
+
+  public static final String OZONE_RECON_BUCKET_DELETED_BYTES_COLLECTION_TIMEOUT =
+      "ozone.recon.bucket.deleted.bytes.collection.timeout";
+  public static final String OZONE_RECON_BUCKET_DELETED_BYTES_COLLECTION_TIMEOUT_DEFAULT = "10m";
+
+  public static final String OZONE_RECON_BUCKET_DELETED_BYTES_COLLECTION_THREAD_COUNT =
+      "ozone.recon.bucket.deleted.bytes.collection.thread.count";
+  public static final int OZONE_RECON_BUCKET_DELETED_BYTES_COLLECTION_THREAD_COUNT_DEFAULT =
+      Runtime.getRuntime().availableProcessors() * 2;
+
   /**
    * Application-level ceiling on the number of ContainerIDs fetched from SCM
    * per RPC call during container sync. The effective batch size is
