@@ -58,6 +58,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -234,9 +235,9 @@ public class RpcClient implements ClientProtocol {
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private static final long OM_VERSION_REFRESH_INTERVAL = TimeUnit.MINUTES.toMillis(10);
-  private final Object omVersionLock = new Object();
+  private static final long OM_VERSION_REFRESHING = -1L;
   private volatile OzoneManagerVersion omVersion;
-  private volatile long omVersionLastUpdate;
+  private final AtomicLong omVersionLastUpdate = new AtomicLong();
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -285,7 +286,7 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
-    omVersionLastUpdate = Time.monotonicNow();
+    omVersionLastUpdate.set(Time.monotonicNow());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -2978,18 +2979,18 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public OzoneManagerVersion getOmVersion() {
-    if (Time.monotonicNow() - omVersionLastUpdate >= OM_VERSION_REFRESH_INTERVAL) {
-      synchronized (omVersionLock) {
-        if (Time.monotonicNow() - omVersionLastUpdate >= OM_VERSION_REFRESH_INTERVAL) {
-          try {
-            omVersion = getOmVersion(ozoneManagerClient.getServiceInfo());
-          } catch (IOException e) {
-            LOG.warn("Could not refresh OM version; retaining {}.", omVersion, e);
-          } finally {
-            // Throttle retries after failures as well as successful refreshes.
-            omVersionLastUpdate = Time.monotonicNow();
-          }
-        }
+    long lastUpdate = omVersionLastUpdate.get();
+    if (lastUpdate == OM_VERSION_REFRESHING || Time.monotonicNow() - lastUpdate < OM_VERSION_REFRESH_INTERVAL) {
+      return omVersion;
+    }
+    if (omVersionLastUpdate.compareAndSet(lastUpdate, OM_VERSION_REFRESHING)) {
+      try {
+        omVersion = getOmVersion(ozoneManagerClient.getServiceInfo());
+      } catch (IOException e) {
+        LOG.warn("Could not refresh OM version; retaining {}.", omVersion, e);
+      } finally {
+        // Throttle retries after failures as well as successful refreshes.
+        omVersionLastUpdate.set(Time.monotonicNow());
       }
     }
     return omVersion;

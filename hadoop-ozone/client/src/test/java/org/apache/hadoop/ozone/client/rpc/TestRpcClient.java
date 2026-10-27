@@ -48,6 +48,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -446,33 +447,26 @@ public class TestRpcClient {
     VersionedOmTransport transport = new VersionedOmTransport();
     RpcClient client = createRpcClient(transport);
     ExecutorService executor = Executors.newFixedThreadPool(8);
-    CountDownLatch readersStarted = new CountDownLatch(7);
-    Thread[] readers = new Thread[7];
     transport.refreshStarted = new CountDownLatch(1);
     transport.releaseRefresh = new CountDownLatch(1);
     try {
       transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
-      FieldUtils.writeField(client, "omVersionLastUpdate", Time.monotonicNow() - TimeUnit.MINUTES.toMillis(10), true);
-      List<Future<OzoneManagerVersion>> versions = new ArrayList<>();
-      versions.add(executor.submit(() -> client.getOmVersion()));
+      ((AtomicLong) FieldUtils.readField(client, "omVersionLastUpdate", true))
+          .set(Time.monotonicNow() - TimeUnit.MINUTES.toMillis(10));
+      Future<OzoneManagerVersion> refresh = executor.submit(() -> client.getOmVersion());
       assertTrue(transport.refreshStarted.await(10, TimeUnit.SECONDS));
-      for (int i = 0; i < readers.length; i++) {
-        int index = i;
-        versions.add(executor.submit(() -> {
-          readers[index] = Thread.currentThread();
-          readersStarted.countDown();
-          return client.getOmVersion();
-        }));
+      List<Future<OzoneManagerVersion>> versions = new ArrayList<>();
+      for (int i = 0; i < 7; i++) {
+        versions.add(executor.submit(() -> client.getOmVersion()));
       }
-      assertTrue(readersStarted.await(10, TimeUnit.SECONDS));
-      // Keep the refresh in flight until every other reader is waiting for the version lock.
-      GenericTestUtils.waitFor(() -> Arrays.stream(readers).allMatch(t -> t.getState() == Thread.State.BLOCKED),
-          10, 5000);
+      // Other readers must return the cached version while the refresh is still in flight.
+      for (Future<OzoneManagerVersion> version : versions) {
+        assertEquals(OzoneManagerVersion.DEFAULT_VERSION, version.get(5, TimeUnit.SECONDS));
+      }
       assertEquals(2, transport.serviceInfoCalls.get());
       transport.releaseRefresh.countDown();
-      for (Future<OzoneManagerVersion> version : versions) {
-        assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, version.get(10, TimeUnit.SECONDS));
-      }
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, refresh.get(10, TimeUnit.SECONDS));
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
       assertEquals(2, transport.serviceInfoCalls.get());
     } finally {
       transport.releaseRefresh.countDown();
@@ -488,7 +482,8 @@ public class TestRpcClient {
     try {
       client.setThreadLocalS3Auth(new S3Auth("stringToSign", "signature", "alice", "alice"));
       transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
-      FieldUtils.writeField(client, "omVersionLastUpdate", Time.monotonicNow() - TimeUnit.MINUTES.toMillis(10), true);
+      ((AtomicLong) FieldUtils.readField(client, "omVersionLastUpdate", true))
+          .set(Time.monotonicNow() - TimeUnit.MINUTES.toMillis(10));
       assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
       assertEquals("alice", transport.lastServiceInfoRequest.getS3Authentication().getAccessId());
       assertEquals("signature", transport.lastServiceInfoRequest.getS3Authentication().getSignature());
