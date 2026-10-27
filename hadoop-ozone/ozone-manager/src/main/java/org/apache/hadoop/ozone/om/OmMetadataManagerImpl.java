@@ -1050,11 +1050,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       while (currentCount < maxKeys && openKeyIter.hasNext()) {
         kv = openKeyIter.next();
         if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
-          String dbKey = kv.getKey();
+          final OpenKeyDBKey openKey = new OpenKeyDBKey(kv.getKey());
           // The open key of a multipart upload ends with the upload ID and has no client ID, so it is listed with
           // client ID 0, which no real client has
-          final boolean isUpload = OMMultipartUploadUtils.getUploadIdFromDbKey(dbKey) != null;
-          long clientID = isUpload ? 0 : OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
+          long clientID = openKey.isUpload() ? 0 : openKey.getClientId();
           OmKeyInfo omKeyInfo = kv.getValue();
           // Note with HDDS-10077, there is no need to check KeyTable for hsync metadata
           openKeySessionList.add(
@@ -1111,7 +1110,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     String seekKey;
     boolean skipStartKey = false;
-    if (StringUtils.isNotBlank(startKey)) {
+    // Every key matching keyPrefix sorts after a startKey that sorts before keyPrefix,
+    // so seek to keyPrefix; seeking to startKey would stop at the first non-matching key.
+    if (StringUtils.isNotBlank(startKey)
+        && (StringUtils.isEmpty(keyPrefix) || startKey.compareTo(keyPrefix) >= 0)) {
       // Seek to the specified key.
       seekKey = getOzoneKey(volumeName, bucketName, startKey);
       skipStartKey = true;
@@ -1412,28 +1414,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Decide whether the open key is a multipart upload related key.
    * @param openKeyInfo open key related to multipart upload
-   * @param openDbKey db key of open key related to multipart upload, which
-   *                  might have different format depending on the bucket
-   *                  layout
+   * @param openKey db key of open key related to multipart upload
    * @return true open key is a multipart upload related key.
    *         false otherwise.
    */
-  private boolean isOpenMultipartKey(OmKeyInfo openKeyInfo, String openDbKey)
+  private boolean isOpenMultipartKey(OmKeyInfo openKeyInfo, OpenKeyDBKey openKey)
       throws IOException {
     if (OMMultipartUploadUtils.isMultipartKeySet(openKeyInfo)) {
       return true;
     }
 
-    String multipartUploadId =
-        OMMultipartUploadUtils.getUploadIdFromDbKey(openDbKey);
-
-    if (StringUtils.isEmpty(multipartUploadId)) {
+    if (!openKey.isUpload()) {
       return false;
     }
 
     String multipartInfoDbKey = getMultipartKey(openKeyInfo.getVolumeName(),
         openKeyInfo.getBucketName(), openKeyInfo.getKeyName(),
-        multipartUploadId);
+        openKey.getUploadId());
 
     // In addition to checking isMultipartKey flag in the open key info,
     // multipartInfoTable needs to be checked to handle multipart upload
@@ -1481,24 +1478,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       while (num < count && keyValueTableIterator.hasNext()) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String dbOpenKeyName = openKeyValue.getKey();
-
-        final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
-        final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
+        final OpenKeyDBKey openKey = new OpenKeyDBKey(dbOpenKeyName);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
-        if (isOpenMultipartKey(openKeyInfo, dbOpenKeyName)) {
+        if (isOpenMultipartKey(openKeyInfo, openKey)) {
           continue;
         }
 
         if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp ||
             openKeyInfo.getModificationTime() <= expiredLeaseTimestamp) {
-          final String clientIdString
-              = dbOpenKeyName.substring(lastPrefix + 1);
-
-          final boolean isHsync = Optional.of(openKeyInfo)
+          final boolean isHsync = !openKey.isUpload() && Optional.of(openKeyInfo)
               .map(WithMetadata::getMetadata)
               .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
-              .filter(id -> id.equals(clientIdString))
+              .filter(id -> id.equals(String.valueOf(openKey.getClientId())))
               .isPresent();
 
           if ((!isHsync && openKeyInfo.getCreationTime() <= expiredCreationTimestamp) ||
@@ -1511,7 +1503,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           } else if (isHsync && openKeyInfo.getModificationTime() <= expiredLeaseTimestamp &&
               !openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
             // add hsync'ed keys
-            final OmKeyInfo info = kt.get(dbKeyName);
+            final OmKeyInfo info = kt.get(openKey.getKeyTableDBKey());
             // Set keyName from openFileTable which contains keyName with full path like(/a/b/c/d/e/file1),
             // which is required in commit key request.
             // Whereas fileTable contains only leaf in keyName(like file1) and so cannot be used in commit request.
@@ -1531,7 +1523,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             OzoneManagerProtocolClientSideTranslatorPB.setReplicationConfig(
                 info.getReplicationConfig(), keyArgs);
 
-            expiredKeys.addHsyncKey(keyArgs, Long.parseLong(clientIdString));
+            expiredKeys.addHsyncKey(keyArgs, openKey.getClientId());
             num++;
           }
         }
