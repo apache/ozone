@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.io.File;
@@ -596,7 +597,7 @@ public class TestOzoneManagerSnapshotAcl {
     // user3 with bucket LIST only: listing snapshots and diff jobs is allowed, everything else is denied.
     objectStore.removeAcl(bucketObj, user3Read);
     objectStore.addAcl(bucketObj, user3List);
-    objectStore3.listSnapshot(volumeName, bucketName, null, null).hasNext();
+    assertTrue(objectStore3.listSnapshot(volumeName, bucketName, null, null).hasNext());
     objectStore3.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
     assertPermissionDenied(() -> objectStore3.getVolume(volumeName).getBucket(bucketName));
     assertPermissionDenied(() -> objectStore3.getSnapshotInfo(volumeName, bucketName, snapshot1));
