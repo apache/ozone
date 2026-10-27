@@ -102,12 +102,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     Table<String, OmBucketInfo> bucketTable = omMetadataManager.getBucketTable();
 
     // Per-worker maps for lockless updates
-    Map<Thread, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
-    ThreadLocal<Map<Long, NSSummary>> workerMaps = ThreadLocal.withInitial(() -> {
-      Map<Long, NSSummary> workerMap = new HashMap<>();
-      allWorkerMaps.put(Thread.currentThread(), workerMap);
-      return workerMap;
-    });
+    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
     // Cache only the last bucket, since keys within each iterator batch are sorted by volume and bucket.
     ThreadLocal<OmBucketInfo> lastBucket = new ThreadLocal<>();
 
@@ -116,7 +111,8 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
       // Get this worker's private map
-      Map<Long, NSSummary> workerMap = workerMaps.get();
+      long threadId = Thread.currentThread().getId();
+      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
 
       try {
         OmKeyInfo keyInfo = kv.getValue();
@@ -145,9 +141,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           if (workerMap.size() >= perWorkerThreshold) {
             asyncFlusher.submitForFlush(workerMap);
             // Get fresh map for this worker
-            Map<Long, NSSummary> newWorkerMap = new HashMap<>();
-            workerMaps.set(newWorkerMap);
-            allWorkerMaps.put(Thread.currentThread(), newWorkerMap);
+            allWorkerMaps.put(threadId, new HashMap<>());
           }
         }
       } catch (IOException e) {
@@ -172,8 +166,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     } finally {
       // The small-table fallback in ParallelTableIteratorOperation runs the
       // per-key operation on this (reused Recon pool) thread, so clear the
-      // per-worker ThreadLocals here.
-      workerMaps.remove();
+      // bucket cache here.
       lastBucket.remove();
     }
     
