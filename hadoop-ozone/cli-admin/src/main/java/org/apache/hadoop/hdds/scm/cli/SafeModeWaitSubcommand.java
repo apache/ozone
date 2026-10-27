@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -60,7 +59,6 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
     return null;
   }
 
-  @VisibleForTesting
   void execute(ScmClient scmClient) throws Exception {
     final long deadline = Time.monotonicNow() + TimeUnit.SECONDS.toMillis(timeoutSeconds);
     // Call SCM in another thread, so that the timeout also applies to a call that is still retrying.
