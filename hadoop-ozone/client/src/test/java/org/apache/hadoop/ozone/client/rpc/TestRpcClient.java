@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -380,14 +381,14 @@ public class TestRpcClient {
         transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
         time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(10) - 1);
         assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
-        assertEquals(1, transport.serviceInfoCalls);
+        assertEquals(1, transport.serviceInfoCalls.get());
 
         time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(10));
         // Idle clients do not poll, even when their cached version has expired.
-        assertEquals(1, transport.serviceInfoCalls);
+        assertEquals(1, transport.serviceInfoCalls.get());
         assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
         assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
-        assertEquals(2, transport.serviceInfoCalls);
+        assertEquals(2, transport.serviceInfoCalls.get());
       } finally {
         client.close();
       }
@@ -405,13 +406,13 @@ public class TestRpcClient {
         time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(10));
         assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
         assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
-        assertEquals(2, transport.serviceInfoCalls);
+        assertEquals(2, transport.serviceInfoCalls.get());
 
         transport.failRefresh = false;
         transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
         time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(20));
         assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
-        assertEquals(3, transport.serviceInfoCalls);
+        assertEquals(3, transport.serviceInfoCalls.get());
       } finally {
         client.close();
       }
@@ -433,7 +434,7 @@ public class TestRpcClient {
         IOException reachedOm = assertThrows(IOException.class,
             () -> client.getObjectTagging("volume", "bucket", "key"));
         assertThat(reachedOm).hasMessage("Reached OM after version check");
-        assertEquals(2, transport.serviceInfoCalls);
+        assertEquals(2, transport.serviceInfoCalls.get());
       } finally {
         client.close();
       }
@@ -445,24 +446,36 @@ public class TestRpcClient {
     VersionedOmTransport transport = new VersionedOmTransport();
     RpcClient client = createRpcClient(transport);
     ExecutorService executor = Executors.newFixedThreadPool(8);
-    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch readersStarted = new CountDownLatch(7);
+    Thread[] readers = new Thread[7];
+    transport.refreshStarted = new CountDownLatch(1);
+    transport.releaseRefresh = new CountDownLatch(1);
     try {
       transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
       FieldUtils.writeField(client, "omVersionLastUpdate", Time.monotonicNow() - TimeUnit.MINUTES.toMillis(10), true);
       List<Future<OzoneManagerVersion>> versions = new ArrayList<>();
-      for (int i = 0; i < 8; i++) {
+      versions.add(executor.submit(() -> client.getOmVersion()));
+      assertTrue(transport.refreshStarted.await(10, TimeUnit.SECONDS));
+      for (int i = 0; i < readers.length; i++) {
+        int index = i;
         versions.add(executor.submit(() -> {
-          start.await();
+          readers[index] = Thread.currentThread();
+          readersStarted.countDown();
           return client.getOmVersion();
         }));
       }
-      start.countDown();
+      assertTrue(readersStarted.await(10, TimeUnit.SECONDS));
+      // Keep the refresh in flight until every other reader is waiting for the version lock.
+      GenericTestUtils.waitFor(() -> Arrays.stream(readers).allMatch(t -> t.getState() == Thread.State.BLOCKED),
+          10, 5000);
+      assertEquals(2, transport.serviceInfoCalls.get());
+      transport.releaseRefresh.countDown();
       for (Future<OzoneManagerVersion> version : versions) {
         assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, version.get(10, TimeUnit.SECONDS));
       }
-      assertEquals(2, transport.serviceInfoCalls);
+      assertEquals(2, transport.serviceInfoCalls.get());
     } finally {
-      start.countDown();
+      transport.releaseRefresh.countDown();
       executor.shutdownNow();
       client.close();
     }
@@ -487,14 +500,27 @@ public class TestRpcClient {
 
   private static final class VersionedOmTransport extends MockOmTransport {
     private OzoneManagerVersion version = OzoneManagerVersion.DEFAULT_VERSION;
-    private int serviceInfoCalls;
+    private final AtomicInteger serviceInfoCalls = new AtomicInteger();
+    private CountDownLatch refreshStarted;
+    private CountDownLatch releaseRefresh;
     private boolean failRefresh;
     private OMRequest lastServiceInfoRequest;
 
     @Override
     public OMResponse submitRequest(OMRequest request) throws IOException {
       if (request.getCmdType() == Type.ServiceList) {
-        serviceInfoCalls++;
+        int calls = serviceInfoCalls.incrementAndGet();
+        if (calls == 2 && refreshStarted != null) {
+          refreshStarted.countDown();
+          try {
+            if (!releaseRefresh.await(10, TimeUnit.SECONDS)) {
+              throw new IOException("Timed out waiting to release OM version refresh");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting to release OM version refresh", e);
+          }
+        }
         lastServiceInfoRequest = request;
         if (failRefresh) {
           throw new IOException("Service info temporarily unavailable");
