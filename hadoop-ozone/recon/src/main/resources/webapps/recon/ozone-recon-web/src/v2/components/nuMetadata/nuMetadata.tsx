@@ -278,7 +278,6 @@ const NUMetadata: React.FC<MetadataProps> = ({
       // Error checks for summary response
       if (summaryResponse.status === 'INITIALIZING') {
         summaryResponsePresent = false;
-        showDataFetchError(`The metadata is currently initializing. Please wait a moment and try again later`);
       }
 
       if (summaryResponse.status === 'PATH_NOT_FOUND' || quotaResponse.status === 'PATH_NOT_FOUND') {
