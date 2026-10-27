@@ -205,7 +205,8 @@ final class Receiver implements Runnable {
               "This command is not supported through DomainSocket channel.")
               .build();
         }
-        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock) {
+        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock
+            && responseProto.getGetBlock().getShortCircuitAccessGranted()) {
           // get FileDescriptor
           Handler handler = dispatcher.getHandler(ContainerProtos.ContainerType.KeyValueContainer);
           RandomAccessFile file = handler.getBlockFile(request);
@@ -258,10 +259,12 @@ final class Receiver implements Runnable {
     } finally {
       lock.unlock();
       entry.setSendFinishTimeNs();
-      try {
-        entry.getFile().close();
-      } catch (IOException e) {
-        LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+      if (entry.getFile() != null) {
+        try {
+          entry.getFile().close();
+        } catch (IOException e) {
+          LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+        }
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Request {} {}:{}, receive {} ns, in queue {} ns, " +
