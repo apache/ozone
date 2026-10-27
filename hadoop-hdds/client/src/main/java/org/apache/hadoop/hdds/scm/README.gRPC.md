@@ -84,12 +84,21 @@ Channel manages the communication properties, and the socket level connection.
 Messages in our case are sent via bi-directional streaming with the help of
 StreamObservers.
 
-When we initiate a connection we create a stub, and a channel, and when we send
-a request (a message) we create the bi-directional stream, we send in a 
-request proto message, and we get back a response proto message, then we close
-the stream.
-We never send multiple requests via the same stream, although we can if we want
-to, there are reasons that will be discussed with more details later on.
+When we initiate a connection we create a stub, and a channel. A blocking call
+without a trace context (the production default, tracing is off) takes an idle
+pooled stream of the channel to the datanode, or opens one, and sends exactly
+one request on it at a time. The datanode answers the requests of a stream in
+order, so the next reply belongs to the current request. After the reply the
+stream returns to the pool; it is half-closed when the channel leaves READY,
+and dropped when a request on it fails or is abandoned. The reply is delivered
+on the waiting thread (`CallerRunsReplyFuture` is the call's executor).
+Traced blocking calls, `sendCommandOnAllNodes` and the async path (the
+one-argument `sendCommandAsync`) still open one bi-directional stream per call
+with a gRPC deadline, send in one request proto message, get back the response
+proto message, and close the stream. A traced blocking call still completes on
+the waiting thread (the `CallerRunsReplyFuture` is its call executor too);
+`sendCommandOnAllNodes` and the async path complete on gRPC's executor. The reasons for not sending multiple requests
+at once via the same stream are discussed with more details later on.
 
 The server side of communication processes the requests in the same thread in
 which they arrive, via `HDDSDispatcher` in `GrpcXceiverService`, and this also
@@ -221,6 +230,9 @@ successfully before issuing a `PutBlock` request.
 ## A possible solution
 During experiments, there was a solution that started to show its shape slowly,
 and got frightening at the end. Here is what we could end up with.
+The sync-request part of this design is now implemented for untraced blocking
+calls, with a pool of streams per channel and no request IDs, because the
+client sends one request per stream at a time.
 
 We have one StreamObserver pair, or a pool of a few pairs, which we can use to 
 send sync requests over, as sync requests are mostly coming from the main client
