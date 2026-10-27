@@ -627,6 +627,10 @@ public class RpcClient implements ClientProtocol {
     Objects.requireNonNull(bucketArgs, "bucketArgs == null");
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
+    if (bucketArgs.getVersioning()) {
+      throw new OMException("Bucket versioning cannot be set while the bucket is being created; create the bucket"
+          + " first and then set its versioning.", OMException.ResultCodes.INVALID_REQUEST);
+    }
     if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
       if (bucketArgs.getDefaultReplicationConfig() != null &&
           bucketArgs.getDefaultReplicationConfig().getType()
@@ -707,10 +711,6 @@ public class RpcClient implements ClientProtocol {
         bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes());
 
     ozoneManagerClient.createBucket(builder.build());
-    // Versioning can only be set after the bucket is created.
-    if (isVersionEnabled) {
-      setBucketVersioning(volumeName, bucketName, true);
-    }
   }
 
   private static void verifyVolumeName(String volumeName) throws OMException {

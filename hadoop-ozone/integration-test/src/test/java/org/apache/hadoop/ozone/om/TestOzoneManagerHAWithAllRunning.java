@@ -258,11 +258,11 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
     OzoneVolume retVolume = createAndCheckVolume(volumeName);
 
     BucketArgs bucketArgs =
-        BucketArgs.newBuilder().setStorageType(StorageType.DISK)
-            .setVersioning(true).build();
+        BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
 
 
     retVolume.createBucket(bucketName, bucketArgs);
+    retVolume.getBucket(bucketName).setVersioning(true);
 
 
     OzoneBucket ozoneBucket = retVolume.getBucket(bucketName);
