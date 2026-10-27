@@ -3154,7 +3154,7 @@ public class RpcClient implements ClientProtocol {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
-    if (assumeS3Context && !OzoneManagerVersion.S3_OBJECT_TAGGING_WITH_VOLUME_CONTEXT
+    if (assumeS3Context && !OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION
         .isSupportedBy(omVersion)) {
       return getObjectTagging(getS3VolumeContext().getOmVolumeArgs().getVolume(), bucketName, keyName);
     }

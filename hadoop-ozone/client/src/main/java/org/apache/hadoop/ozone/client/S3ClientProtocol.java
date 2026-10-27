@@ -893,6 +893,12 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public Map<String, String> getObjectTagging(String volumeName, String bucketName,
+      String keyName, boolean assumeS3Context) throws IOException {
+    return delegate.getObjectTagging(volumeName, bucketName, keyName, assumeS3Context);
+  }
+
+  @Override
   public void putObjectTagging(String volumeName, String bucketName, String keyName, Map<String, String> tags)
       throws IOException {
     delegate.putObjectTagging(volumeName, bucketName, keyName, tags);

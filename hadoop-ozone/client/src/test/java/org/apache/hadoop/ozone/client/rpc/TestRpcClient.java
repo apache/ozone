@@ -399,7 +399,7 @@ public class TestRpcClient {
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
-      names = {"ZDU", "S3_OBJECT_TAGGING_WITH_VOLUME_CONTEXT"})
+      names = {"ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
   void testGetObjectTaggingWithS3Context(OzoneManagerVersion version)
       throws Exception {
     RpcClient client = spy(createRpcClient());
@@ -410,7 +410,7 @@ public class TestRpcClient {
       doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
           .setOwnerName("owner").setAdminName("admin").build(), "owner"))
           .when(client).getS3VolumeContext();
-      boolean assumeContext = version == OzoneManagerVersion.S3_OBJECT_TAGGING_WITH_VOLUME_CONTEXT;
+      boolean assumeContext = version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION;
 
       client.getObjectTagging("", "bucket", "key", true);
 
