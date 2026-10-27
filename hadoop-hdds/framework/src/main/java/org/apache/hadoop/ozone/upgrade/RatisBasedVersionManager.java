@@ -58,6 +58,19 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
     }
   }
 
+  /**
+   * Finalizes up to the apparent version recorded in the DB if the VERSION file is behind it, for example because the
+   * process stopped during a snapshot install after the DB was replaced and before the VERSION file was updated.
+   */
+  public void finalizeToDBVersionIfRequired(Table<String, String> finalizationStore) throws IOException {
+    ComponentVersion apparentVersionInDB = getApparentVersionInDB(finalizationStore);
+    if (apparentVersionInDB != null && !isAllowed(apparentVersionInDB)) {
+      LOG.warn("Version file has lower apparent version ({}) than DB ({}). Finalizing to the DB version.",
+          getApparentVersion(), apparentVersionInDB);
+      finalizeUpgrade(apparentVersionInDB);
+    }
+  }
+
   protected abstract ComponentVersion computeApparentVersion(int serializedVersion) throws IOException;
 
   private ComponentVersion getApparentVersionInDB(Table<String, String> finalizationStore) throws IOException {
