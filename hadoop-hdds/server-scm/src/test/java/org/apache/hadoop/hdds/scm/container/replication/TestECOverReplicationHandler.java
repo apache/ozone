@@ -48,7 +48,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -58,6 +57,8 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeCommand;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.NodeOperationalStateAndIndex;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -80,7 +81,7 @@ public class TestECOverReplicationHandler {
   private ReplicationManager replicationManager;
   private PlacementPolicy policy;
   private DatanodeDetails staleNode;
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private Set<DatanodeCommand> commandsSent;
 
   @BeforeEach
   void setup(@TempDir File testDir) throws NodeNotFoundException, NotLeaderException,
@@ -117,9 +118,9 @@ public class TestECOverReplicationHandler {
   public void testNoOverReplication()
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
     testOverReplicationWithIndexes(availableReplicas, Collections.emptyMap(),
         ImmutableList.of());
   }
@@ -128,9 +129,9 @@ public class TestECOverReplicationHandler {
   public void testOverReplicationFixedByPendingDelete()
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
     ContainerReplica excess = ReplicationTestUtil.createContainerReplica(
         container.containerID(), 5, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED);
@@ -146,10 +147,10 @@ public class TestECOverReplicationHandler {
   public void testOverReplicationWithDecommissionIndexes()
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5),
-            Pair.of(DECOMMISSIONING, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5),
+            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 5));
     testOverReplicationWithIndexes(availableReplicas, Collections.emptyMap(),
         ImmutableList.of());
   }
@@ -158,9 +159,9 @@ public class TestECOverReplicationHandler {
   public void testOverReplicationWithStaleIndexes()
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
     ContainerReplica stale = ReplicationTestUtil.createContainerReplica(
         container.containerID(), 5, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED);
@@ -176,9 +177,9 @@ public class TestECOverReplicationHandler {
   public void testOverReplicationWithOpenReplica()
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
     ContainerReplica open = ReplicationTestUtil.createContainerReplica(
         container.containerID(), 5, IN_SERVICE,
         ContainerReplicaProto.State.OPEN);
@@ -196,9 +197,9 @@ public class TestECOverReplicationHandler {
   public void testOverReplicationButPolicyReturnsWrongIndexes()
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5),
-            Pair.of(IN_SERVICE, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
     ContainerReplica toReturn = ReplicationTestUtil.createContainerReplica(
         container.containerID(), 1, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED);
@@ -213,10 +214,10 @@ public class TestECOverReplicationHandler {
   public void testOverReplicationWithOneSameIndexes()
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
 
     testOverReplicationWithIndexes(availableReplicas,
         //num of index 1 is 3, but it should be 1, so 2 excess
@@ -228,13 +229,13 @@ public class TestECOverReplicationHandler {
   public void testOverReplicationWithMultiSameIndexes()
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 2),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 4),
-            Pair.of(IN_SERVICE, 5), Pair.of(IN_SERVICE, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 5), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
 
     testOverReplicationWithIndexes(availableReplicas,
         //num of index 1 is 3, but it should be 1, so 2 excess
@@ -253,10 +254,10 @@ public class TestECOverReplicationHandler {
       throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(
-            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4),
-            Pair.of(IN_SERVICE, 5));
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
 
     ContainerHealthResult.UnderReplicatedHealthResult health =
         new ContainerHealthResult.UnderReplicatedHealthResult(
@@ -269,19 +270,17 @@ public class TestECOverReplicationHandler {
         health, 1);
 
     assertEquals(1, commandsSent.size());
-    SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
+    SCMCommand<?> cmd = commandsSent.iterator().next().getCommand();
     assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
   }
 
   @Test
   public void testDeleteThrottling() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(
-            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 2),
-            Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4),
-            Pair.of(IN_SERVICE, 5));
+        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
+            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
 
     ContainerHealthResult.UnderReplicatedHealthResult health =
         new ContainerHealthResult.UnderReplicatedHealthResult(
@@ -302,7 +301,7 @@ public class TestECOverReplicationHandler {
       DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
           containerInfo.getContainerID(), forceDelete);
       deleteCommand.setReplicaIndex(replicaIndex);
-      commandsSent.add(Pair.of(target, deleteCommand));
+      commandsSent.add(DatanodeCommand.of(target, deleteCommand));
       return null;
     }).when(replicationManager)
         .sendThrottledDeleteCommand(any(), anyInt(), any(), anyBoolean());
@@ -337,7 +336,7 @@ public class TestECOverReplicationHandler {
 
     // Each command should have a non-zero replica index
     commandsSent.forEach(pair -> assertNotEquals(0,
-        ((DeleteContainerCommand) pair.getValue()).getReplicaIndex()));
+        ((DeleteContainerCommand) pair.getCommand()).getReplicaIndex()));
 
     // command num of each index should be equal to the excess num
     // of this index
@@ -347,7 +346,7 @@ public class TestECOverReplicationHandler {
             ContainerReplica::getReplicaIndex));
     Map<Integer, Integer> index2commandNum = new HashMap<>();
     commandsSent.forEach(pair -> index2commandNum.merge(
-        datanodeDetails2Index.get(pair.getKey()), 1, Integer::sum)
+        datanodeDetails2Index.get(pair.getDatanode()), 1, Integer::sum)
     );
 
     index2commandNum.keySet().forEach(i -> {

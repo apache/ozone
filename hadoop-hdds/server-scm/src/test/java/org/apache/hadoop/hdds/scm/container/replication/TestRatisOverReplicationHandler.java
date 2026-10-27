@@ -47,7 +47,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -58,10 +57,10 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeCommand;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,7 +77,7 @@ public class TestRatisOverReplicationHandler {
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
   private ReplicationManager replicationManager;
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private Set<DatanodeCommand> commandsSent;
 
   @BeforeEach
   public void setup() throws NodeNotFoundException, NotLeaderException,
@@ -238,13 +237,11 @@ public class TestRatisOverReplicationHandler {
             State.UNHEALTHY);
     replicas.add(unhealthyReplica);
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        testProcessing(replicas, Collections.emptyList(),
-            getOverReplicatedHealthResult(),
-            1);
-    Pair<DatanodeDetails, SCMCommand<?>> command = commands.iterator().next();
+    Set<DatanodeCommand> commands =
+        testProcessing(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+    DatanodeCommand command = commands.iterator().next();
     assertEquals(unhealthyReplica.getDatanodeDetails(),
-        command.getKey());
+        command.getDatanode());
   }
 
   /**
@@ -310,13 +307,10 @@ public class TestRatisOverReplicationHandler {
         .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
         .findFirst().get();
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        testProcessing(replicas, Collections.emptyList(),
-        getOverReplicatedHealthResult(), 1);
-    Pair<DatanodeDetails, SCMCommand<?>> commandPair
-        = commands.iterator().next();
-    assertEquals(shouldDelete.getDatanodeDetails(),
-        commandPair.getKey());
+    Set<DatanodeCommand> commands =
+        testProcessing(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+    DatanodeCommand commandPair = commands.iterator().next();
+    assertEquals(shouldDelete.getDatanodeDetails(), commandPair.getDatanode());
   }
 
   @Test
@@ -331,13 +325,10 @@ public class TestRatisOverReplicationHandler {
       replicas.add(createContainerReplica(container.containerID(), 0,
           IN_SERVICE, State.UNHEALTHY, sequenceID + i));
     }
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        testProcessing(replicas, Collections.emptyList(),
-            getOverReplicatedHealthResult(), 1);
-    Pair<DatanodeDetails, SCMCommand<?>> commandPair
-        = commands.iterator().next();
-    assertEquals(lowestSequenceIDReplica.getDatanodeDetails(),
-        commandPair.getKey());
+    Set<DatanodeCommand> commands = testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 1);
+    DatanodeCommand commandPair = commands.iterator().next();
+    assertEquals(lowestSequenceIDReplica.getDatanodeDetails(), commandPair.getDatanode());
   }
 
   /**
@@ -366,10 +357,9 @@ public class TestRatisOverReplicationHandler {
             argThat(list -> list.size() <= 4), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(
+    Set<DatanodeCommand> commands = testProcessing(
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 2);
-    Set<DatanodeDetails> datanodes =
-        commands.stream().map(Pair::getKey).collect(Collectors.toSet());
+    Set<DatanodeDetails> datanodes = commands.stream().map(DatanodeCommand::getDatanode).collect(Collectors.toSet());
     assertThat(datanodes).contains(quasiClosedReplica.getDatanodeDetails());
   }
 
@@ -389,10 +379,9 @@ public class TestRatisOverReplicationHandler {
     replicas.add(decommissioningReplica);
     replicas.add(maintenanceReplica);
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(
+    Set<DatanodeCommand> commands = testProcessing(
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
-    Set<DatanodeDetails> datanodes =
-        commands.stream().map(Pair::getKey).collect(Collectors.toSet());
+    Set<DatanodeDetails> datanodes = commands.stream().map(DatanodeCommand::getDatanode).collect(Collectors.toSet());
     assertThat(datanodes).doesNotContain(decommissioningReplica.getDatanodeDetails());
     assertThat(datanodes).doesNotContain(maintenanceReplica.getDatanodeDetails());
   }
@@ -476,9 +465,8 @@ public class TestRatisOverReplicationHandler {
         () -> handler.processAndSendCommands(replicas, Collections.emptyList(),
             getOverReplicatedHealthResult(), 2));
     assertEquals(1, commandsSent.size());
-    Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    assertNotEquals(quasiClosedReplica.getDatanodeDetails(),
-        cmd.getKey());
+    DatanodeCommand cmd = commandsSent.iterator().next();
+    assertNotEquals(quasiClosedReplica.getDatanodeDetails(), cmd.getDatanode());
   }
 
   @Test
@@ -501,7 +489,7 @@ public class TestRatisOverReplicationHandler {
       DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
           containerInfo.getContainerID(), forceDelete);
       deleteCommand.setReplicaIndex(replicaIndex);
-      commandsSent.add(Pair.of(target, deleteCommand));
+      commandsSent.add(DatanodeCommand.of(target, deleteCommand));
       return null;
     }).when(replicationManager)
         .sendThrottledDeleteCommand(any(), anyInt(), any(), anyBoolean());
@@ -530,7 +518,7 @@ public class TestRatisOverReplicationHandler {
    *                          the handler
    * @return set of commands
    */
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> testProcessing(
+  private Set<DatanodeCommand> testProcessing(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult healthResult,
       int expectNumCommands) throws IOException {

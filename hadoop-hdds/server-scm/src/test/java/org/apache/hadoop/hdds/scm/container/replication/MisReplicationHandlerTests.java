@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -55,6 +54,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeCommand;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -74,7 +74,7 @@ public abstract class MisReplicationHandlerTests {
   private ContainerInfo container;
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private Set<DatanodeCommand> commandsSent;
   private final AtomicBoolean throwThrottledException =
       new AtomicBoolean(false);
   private ReplicationManagerMetrics metrics;
@@ -229,14 +229,12 @@ public abstract class MisReplicationHandlerTests {
           pendingOp, result, maintenanceCnt);
     } finally {
       assertEquals(expectedNumberOfCommands, commandsSent.size());
-      for (Pair<DatanodeDetails, SCMCommand<?>> pair : commandsSent) {
-        SCMCommand<?> command = pair.getValue();
+      for (DatanodeCommand datanodeCommand : commandsSent) {
+        SCMCommand<?> command = datanodeCommand.getCommand();
         assertSame(replicateContainerCommand, command.getType());
-        ReplicateContainerCommand replicateContainerCommand =
-            (ReplicateContainerCommand) command;
-        assertEquals(replicateContainerCommand.getContainerID(),
-            container.getContainerID());
-        DatanodeDetails replicateSrcDn = pair.getKey();
+        ReplicateContainerCommand replicateContainerCommand = (ReplicateContainerCommand) command;
+        assertEquals(replicateContainerCommand.getContainerID(), container.getContainerID());
+        DatanodeDetails replicateSrcDn = datanodeCommand.getDatanode();
         DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
         assertThat(sourceDns).contains(replicateSrcDn);
         assertThat(targetNodes).contains(target);
