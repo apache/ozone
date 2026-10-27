@@ -418,7 +418,6 @@ jobs:
 
   # same as integration, but runs tests in specific modules instead of profiles
   junit:
-    name: integration
     needs:
       - build-info
       - build
@@ -430,6 +429,7 @@ jobs:
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
+      display-name: junit
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-repo: true
       pre-script: sudo hostname localhost
