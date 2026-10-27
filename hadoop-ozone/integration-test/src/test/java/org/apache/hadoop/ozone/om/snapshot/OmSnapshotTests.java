@@ -170,7 +170,9 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.TestInstance;
 import org.rocksdb.LiveFileMetaData;
 
@@ -232,6 +234,10 @@ public abstract class OmSnapshotTests {
     if (!disableNativeDiff) {
       assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
     }
+  }
+
+  protected boolean isOptimizedSnapshotDiffOnlySuite() {
+    return false;
   }
 
   protected MiniOzoneCluster getCluster() {
@@ -369,6 +375,17 @@ public abstract class OmSnapshotTests {
         .getClientProxy().getOzoneManagerClient();
     omClient.finalizeUpgrade();
     OMUpgradeTestUtils.waitForFinalization(omClient);
+  }
+
+  @BeforeEach
+  void skipInheritedTestsOnOptimizedSnapshotDiffOnlySuite(TestInfo testInfo) {
+    if (!isOptimizedSnapshotDiffOnlySuite()) {
+      return;
+    }
+    if (testInfo.getTestMethod().isEmpty()) {
+      return;
+    }
+    assumeTrue(testInfo.getTestMethod().get().getDeclaringClass().equals(getClass()));
   }
 
   @AfterAll

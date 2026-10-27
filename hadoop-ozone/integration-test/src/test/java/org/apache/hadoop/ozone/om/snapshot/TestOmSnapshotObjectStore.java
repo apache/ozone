@@ -18,16 +18,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import java.io.IOException;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Test;
 
 /**
  * Test OmSnapshot for Object Store bucket type.
@@ -35,37 +25,6 @@ import org.junit.jupiter.api.Test;
 public class TestOmSnapshotObjectStore extends OmSnapshotTests {
 
   public TestOmSnapshotObjectStore() throws Exception {
-    super(OBJECT_STORE, false, false, false, false, true);
-  }
-
-  @Test
-  public void testOptimizedObsDiff() throws Exception {
-    String snap1 = "snap1";
-    String snap2 = "snap2";
-    String key1 = "key1";
-    String key2 = "key2";
-    String renamedKey = "key3";
-    OzoneBucket bucket = getOzoneBucket();
-    createFileKey(bucket, key1);
-    createFileKey(bucket, key2);
-    createSnapshot(getVolumeName(), getBucketName(), snap1);
-    bucket.renameKey(key2, renamedKey);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        bucket.getKey(renamedKey);
-        return true;
-      } catch (IOException e) {
-        return false;
-      }
-    }, 300, 10000);
-    bucket.deleteKey(key1);
-    createSnapshot(getVolumeName(), getBucketName(), snap2);
-
-    SnapshotDiffResponse response = waitForDoneReportAfterOrderedSubmit(
-        getVolumeName(), getBucketName(), snap1, snap2, false);
-    assertEquals("Report is dependency ordered.", response.getReason());
-    assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
-        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, key1),
-        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.RENAME, key2, renamedKey));
+    super(OBJECT_STORE, false, false, false, false, false);
   }
 }

@@ -1884,13 +1884,27 @@ public class TestSnapshotDiffManager {
 
     SnapDiffTestContext orderedCtx = setupRandomSnapDiffTestContext();
     String orderedJobId = UUID.randomUUID().toString();
-    snapshotDiffManager.getSnapDiffJobTable().put(orderedCtx.diffJobKey,
-        new SnapshotDiffJob(0L, orderedJobId, IN_PROGRESS, orderedCtx.volumeName, orderedCtx.bucketName,
-            orderedCtx.fromSnapshotName, orderedCtx.toSnapshotName, false, false, 0L, null, 0.0, null));
+    SnapshotDiffJob orderedJob = new SnapshotDiffJob(0L, orderedJobId, IN_PROGRESS, orderedCtx.volumeName,
+        orderedCtx.bucketName, orderedCtx.fromSnapshotName, orderedCtx.toSnapshotName, false, false,
+        0L, null, 0.0, null);
+    orderedJob.setOrderedReport(true);
+    snapshotDiffManager.getSnapDiffJobTable().put(orderedCtx.diffJobKey, orderedJob);
     snapshotDiffManager.updateJobStatusToDone(orderedCtx.diffJobKey, orderedJobId, 2L, "ordKey", true);
     SnapshotDiffJob orderedDone = snapshotDiffManager.getSnapDiffJobTable().get(orderedCtx.diffJobKey);
     assertTrue(orderedDone.isOrderedReport());
     assertEquals("Report is dependency ordered.", orderedDone.getReason());
+
+    SnapDiffTestContext fallbackCtx = setupRandomSnapDiffTestContext();
+    String fallbackJobId = UUID.randomUUID().toString();
+    SnapshotDiffJob fallbackJob = new SnapshotDiffJob(0L, fallbackJobId, IN_PROGRESS, fallbackCtx.volumeName,
+        fallbackCtx.bucketName, fallbackCtx.fromSnapshotName, fallbackCtx.toSnapshotName, false, false,
+        0L, null, 0.0, null);
+    fallbackJob.setOrderedReport(true);
+    snapshotDiffManager.getSnapDiffJobTable().put(fallbackCtx.diffJobKey, fallbackJob);
+    snapshotDiffManager.updateJobStatusToDone(fallbackCtx.diffJobKey, fallbackJobId, 6L, "fallbackKey", false);
+    SnapshotDiffJob fallbackDone = snapshotDiffManager.getSnapDiffJobTable().get(fallbackCtx.diffJobKey);
+    assertTrue(fallbackDone.isOrderedReport());
+    assertEquals("Report is dependency unordered.", fallbackDone.getReason());
   }
 
   @Test
