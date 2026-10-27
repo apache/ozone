@@ -113,7 +113,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
           recoverLeaseRequest.getKeyName(),
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
     } catch (IOException ex) {
-      // Ensure audit log captures preExecute failures
       Map<String, String> auditMap = new LinkedHashMap<>();
       auditMap.put(OzoneConsts.VOLUME, recoverLeaseRequest.getVolumeName());
       auditMap.put(OzoneConsts.BUCKET, recoverLeaseRequest.getBucketName());

@@ -21,8 +21,8 @@ import static org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSi
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.verify;
 
 import jakarta.annotation.Nonnull;
@@ -38,11 +38,12 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -68,6 +69,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests OMRecoverLeaseRequest.
@@ -98,7 +100,11 @@ public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
     // Simulate what OMExecutionFlow does in its catch block: flush the audit builder
     OMAuditLogger.log(req.getAuditBuilder());
-    verify(auditLogger).logWrite(any(AuditMessage.class));
+    ArgumentCaptor<AuditMessage> captor = ArgumentCaptor.forClass(AuditMessage.class);
+    verify(auditLogger).logWrite(captor.capture());
+    AuditMessage message = captor.getValue();
+    assertEquals(OMAction.RECOVER_LEASE.getAction(), message.getOp());
+    assertSame(e, message.getThrowable());
   }
 
   /**
