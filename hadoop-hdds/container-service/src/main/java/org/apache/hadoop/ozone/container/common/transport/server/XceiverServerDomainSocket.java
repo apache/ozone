@@ -230,6 +230,14 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         // usually when the xceiver count limit is hit.
         LOG.warn("Got an exception. Peer {}", peer, ie);
         IOUtils.closeQuietly(peer);
+        if (peer == null) {
+          // accept() itself failed, for example with no file descriptor left, and would fail again right away
+          try {
+            Thread.sleep(TimeUnit.SECONDS.toMillis(1L));
+          } catch (InterruptedException e) {
+            // not restored: stop() clears isRunning before interrupting, and a set flag would make the pause a spin
+          }
+        }
       } catch (OutOfMemoryError ie) {
         IOUtils.closeQuietly(peer);
         // DataNode can run out of memory if there is too many transfers.

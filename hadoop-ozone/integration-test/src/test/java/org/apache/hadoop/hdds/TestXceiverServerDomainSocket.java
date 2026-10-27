@@ -27,7 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
@@ -51,6 +54,7 @@ import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -94,6 +98,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.MockedStatic;
 
 /**
  * Tests the XceiverServerDomainSocket class.
@@ -625,6 +630,36 @@ public class TestXceiverServerDomainSocket {
       assertFalse(lastSock.isOpen());
     } finally {
       factory.close();
+      server.stop();
+    }
+  }
+
+  /**
+   * A failed accept(), for example with no file descriptor left, is retried after a pause instead of at once.
+   */
+  @Test
+  public void testAcceptFailureIsRetriedAfterPause() throws Exception {
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, dir.getAbsolutePath());
+    AtomicInteger accepts = new AtomicInteger();
+    DomainSocket listener = mock(DomainSocket.class, RETURNS_DEEP_STUBS);
+    when(listener.accept()).thenAnswer(invocation -> {
+      accepts.incrementAndGet();
+      throw new SocketException("accept(2) error: Too many open files");
+    });
+    DomainSocketFactory factory = mock(DomainSocketFactory.class);
+    when(factory.isServiceEnabled()).thenReturn(true);
+    when(factory.isServiceReady()).thenReturn(true);
+    XceiverServerDomainSocket server;
+    try (MockedStatic<DomainSocket> domainSocket = mockStatic(DomainSocket.class)) {
+      domainSocket.when(() -> DomainSocket.bindAndListen(any())).thenReturn(listener);
+      server = new XceiverServerDomainSocket(randomDatanodeDetails(), conf, null, readExecutors, metrics, factory);
+    }
+    try {
+      server.start();
+      GenericTestUtils.waitFor(() -> accepts.get() > 0, 10, 5000);
+      Thread.sleep(500);
+      assertTrue(accepts.get() <= 2, "accept() was called " + accepts.get() + " times");
+    } finally {
       server.stop();
     }
   }
