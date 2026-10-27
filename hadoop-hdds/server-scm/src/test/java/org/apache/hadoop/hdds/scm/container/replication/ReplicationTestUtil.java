@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -457,8 +458,8 @@ public final class ReplicationTestUtil {
       }
       List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
-      ReplicateContainerCommand command = ReplicateContainerCommand
-          .toTarget(containerInfo.getContainerID(),
+      ReplicateContainerCommand command = ContainerTestUtils
+          .getReplicateContainerCommand(containerInfo.getContainerID(),
               invocationOnMock.getArgument(2));
       command.setReplicaIndex(invocationOnMock.getArgument(3));
       commandsSent.add(Pair.of(sources.get(0), command));

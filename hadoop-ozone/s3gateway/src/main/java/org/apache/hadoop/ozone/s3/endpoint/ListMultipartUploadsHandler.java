@@ -35,6 +35,11 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
 class ListMultipartUploadsHandler extends BucketOperationHandler {
 
   @Override
+  S3GAction getAction() {
+    return queryParams().get(QueryParams.UPLOADS) == null ? null : S3GAction.NOT_IMPLEMENTED;
+  }
+
+  @Override
   Response handleGetRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
 
@@ -57,12 +62,14 @@ class ListMultipartUploadsHandler extends BucketOperationHandler {
 
     long startNanos = context.getStartNanos();
 
-    OzoneBucket bucket = context.getVolume().getBucket(bucketName);
-
     try {
-      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+      if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
+        OzoneBucket bucket = context.getVolume().getBucket(bucketName);
+        S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+      }
       OzoneMultipartUploadList ozoneMultipartUploadList =
-          bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
+          getClientProtocol().listMultipartUploads(context.getVolume().getName(), bucketName, prefix,
+              keyMarker, uploadIdMarker, maxUploads);
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
       result.setBucket(bucketName);

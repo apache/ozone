@@ -93,10 +93,6 @@
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
     </dependency>
@@ -214,8 +210,12 @@
       <artifactId>bcprov-jdk18on</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-webapp</artifactId>
+      <groupId>org.eclipse.jetty.ee8</groupId>
+      <artifactId>jetty-ee8-webapp</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.toolchain</groupId>
+      <artifactId>jetty-servlet-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.reflections</groupId>
@@ -236,11 +236,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-annotation-processing</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-docs</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -378,12 +373,6 @@
                   <artifactId>hdds-server-framework</artifactId>
                   <outputDirectory>${project.build.outputDirectory}</outputDirectory>
                   <includes>webapps/static/**/*.*</includes>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.ozone</groupId>
-                  <artifactId>hdds-docs</artifactId>
-                  <outputDirectory>${project.build.outputDirectory}/webapps/ozoneManager</outputDirectory>
-                  <includes>docs/**/*.*</includes>
                 </artifactItem>
               </artifactItems>
               <overWriteSnapshots>true</overWriteSnapshots>

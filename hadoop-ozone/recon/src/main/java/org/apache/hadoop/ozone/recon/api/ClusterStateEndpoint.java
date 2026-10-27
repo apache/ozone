@@ -117,8 +117,7 @@ public class ClusterStateEndpoint {
             HddsProtos.LifeCycleState.DELETED));
 
     int healthyDataNodes =
-        nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
-            nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
+        nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
 
     SCMNodeStat stats = nodeManager.getStats();
     long fsCapacity = 0;
@@ -139,7 +138,7 @@ public class ClusterStateEndpoint {
           reportedNodes++;
         } else {
           LOG.debug("DataNode {} has not reported filesystem usage",
-              datanode.getUuidString());
+              datanode);
         }
       }
       if (reportedNodes < totalNodes) {

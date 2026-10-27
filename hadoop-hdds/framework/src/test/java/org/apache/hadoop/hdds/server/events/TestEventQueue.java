@@ -160,7 +160,7 @@ public class TestEventQueue {
     @Override
     public void onMessage(Object payload, EventPublisher publisher) {
       try {
-        Thread.sleep(2000);
+        Thread.sleep(500);
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
       }

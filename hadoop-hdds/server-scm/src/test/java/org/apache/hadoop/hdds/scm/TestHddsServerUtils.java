@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
@@ -30,17 +32,21 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.jupiter.api.Test;
 
@@ -216,6 +222,25 @@ public class TestHddsServerUtils {
     assertThat(HddsServerUtil.isValidInetForCsr(InetAddress.getByName("2001:db8::1"))).isTrue();
   }
 
+  /**
+   * A network interface reports every IPv6 address with a scope. Only a link-local address keeps it and stays excluded.
+   */
+  @Test
+  public void testScopeDroppedFromRoutableIPv6ForCsr() throws UnknownHostException {
+    InetAddress routable = Inet6Address.getByAddress(null, InetAddress.getByName("2001:db8::1").getAddress(), 1);
+    assertThat(HddsServerUtil.isValidInetForCsr(routable)).isFalse();
+    InetAddress dropped = HddsServerUtil.dropScopeUnlessLinkLocal(routable);
+    assertThat(dropped.getHostAddress()).isEqualTo("2001:db8:0:0:0:0:0:1");
+    assertThat(HddsServerUtil.isValidInetForCsr(dropped)).isTrue();
+
+    InetAddress linkLocal = Inet6Address.getByAddress(null, InetAddress.getByName("fe80::1").getAddress(), 1);
+    assertThat(HddsServerUtil.dropScopeUnlessLinkLocal(linkLocal)).isSameAs(linkLocal);
+    assertThat(HddsServerUtil.isValidInetForCsr(linkLocal)).isFalse();
+
+    InetAddress ipv4 = InetAddress.getByName("1.2.3.4");
+    assertThat(HddsServerUtil.dropScopeUnlessLinkLocal(ipv4)).isSameAs(ipv4);
+  }
+
   @Test
   public void testGetStaleNodeInterval() {
     final OzoneConfiguration conf = new OzoneConfiguration();
@@ -264,5 +289,50 @@ public class TestHddsServerUtils {
     } finally {
       FileUtils.deleteQuietly(metaDir);
     }
+  }
+
+  @Test
+  public void testGetSCMAddressForDatanodesRejectsWildcardSCMName() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsServerUtil.getSCMAddressForDatanodes(conf));
+
+    assertThat(e.getMessage()).contains(OZONE_SCM_NAMES).contains("0.0.0.0");
+  }
+
+  @Test
+  public void testGetSCMAddressForDatanodesRejectsWildcardHASCMAddress() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    final String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        "scmservice", "scm1");
+    conf.set(addressKey, "::");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsServerUtil.getSCMAddressForDatanodes(conf, "scmservice",
+            Collections.singleton("scm1")));
+
+    assertThat(e.getMessage()).contains(addressKey).contains("::");
+  }
+
+  @Test
+  public void testGetReconAddressForDatanodesRejectsWildcardAddress() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_RECON_ADDRESS_KEY, "0.0.0.0:9891");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsServerUtil.getReconAddressForDatanodes(conf));
+
+    assertThat(e.getMessage()).contains(OZONE_RECON_ADDRESS_KEY);
+  }
+
+  @Test
+  public void testGetReconAddressForDatanodesAcceptsHostname() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_RECON_ADDRESS_KEY, "recon.example.com:9891");
+
+    assertEquals("recon.example.com:9891",
+        HddsServerUtil.getReconAddressForDatanodes(conf).getHostAndPortString());
   }
 }

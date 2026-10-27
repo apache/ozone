@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -51,14 +50,10 @@ import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
-import org.apache.hadoop.ozone.security.STSSecurityUtil;
-import org.apache.hadoop.ozone.security.STSTokenIdentifier;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
@@ -69,7 +64,6 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
@@ -104,6 +98,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
+  private final Object applyTransactionMonitor = new Object();
+  private volatile boolean applyTransactionPaused = false;
+  private int inFlightApplyTransactions = 0;
+  // Highest index whose apply was rejected while paused. Reset when a pause starts (not by a nested pause).
+  private long lastRejectedApplyIndex = RaftLog.INVALID_LOG_INDEX;
   private final String threadPrefix;
 
   /**
@@ -412,52 +411,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .build();
   }
 
-  @Override
-  public TransactionContext preAppendTransaction(TransactionContext trx)
-      throws IOException {
-    final OMRequest request = (OMRequest) trx.getStateMachineContext();
-    OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
-
-    OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("{}: preAppendTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
-    }
-
-    if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
-      // Must authenticate prepare requests here, since we must determine
-      // whether or not to apply the prepare gate before proceeding with the
-      // prepare request.
-      UserGroupInformation userGroupInformation =
-          UserGroupInformation.createRemoteUser(
-          request.getUserInfo().getUserName());
-      if (ozoneManager.isAdminAuthorizationEnabled()
-          && !ozoneManager.isAdmin(userGroupInformation)) {
-        String message = "Access denied for user " + userGroupInformation
-            + ". Superuser privilege is required to prepare upgrade/downgrade.";
-        OMException cause =
-            new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
-        // Leader should not step down because of this failure.
-        throw new StateMachineException(message, cause, false);
-      } else {
-        prepareState.enablePrepareGate();
-      }
-    }
-
-    // In prepare mode, only prepare and cancel requests are allowed to go
-    // through.
-    if (prepareState.requestAllowed(cmdType)) {
-      return trx;
-    } else {
-      String message = "Cannot apply write request " +
-          request.getCmdType().name() + " when OM is in prepare mode.";
-      OMException cause = new OMException(message,
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
-      // Indicate that the leader should not step down because of this failure.
-      throw new StateMachineException(message, cause, false);
-    }
-  }
-
   /*
    * Apply a committed log entry to the state machine.
    */
@@ -486,12 +439,37 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // lastAppliedIndex in OzoneManager StateMachine, even if other
       // executor has completed the transactions with id more.
 
-      //if there are too many pending requests, wait for doubleBuffer flushing
-      ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
+      if (!tryEnterApplyTransaction(termIndex.getIndex())) {
+        return completeExceptionally(new IOException("Cannot apply transaction while state machine is paused."));
+      }
+      try {
+        //if there are too many pending requests, wait for doubleBuffer flushing
+        ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
+      } catch (Exception ex) {
+        exitApplyTransaction();
+        throw ex;
+      }
 
-      return CompletableFuture.supplyAsync(() -> runCommand(request, termIndex), executorService)
-          .thenApply(this::processResponse);
+      final CompletableFuture<OMResponse> runFuture;
+      try {
+        runFuture = CompletableFuture.supplyAsync(() -> {
+          try {
+            return runCommand(request, termIndex);
+          } finally {
+            exitApplyTransaction();
+          }
+        }, executorService);
+      } catch (RuntimeException ex) {
+        ozoneManagerDoubleBuffer.releaseUnFlushedTransactions(1);
+        exitApplyTransaction();
+        throw ex;
+      }
+
+      return runFuture.thenApply(this::processResponse);
     } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       return completeExceptionally(e);
     }
   }
@@ -537,19 +515,37 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public synchronized void pause() {
-    LOG.info("OzoneManagerStateMachine is pausing");
-    statePausedCount.incrementAndGet();
-    final LifeCycle.State state = getLifeCycleState();
-    if (state == LifeCycle.State.PAUSED) {
-      return;
-    }
-    if (state != LifeCycle.State.NEW) {
-      getLifeCycle().transition(LifeCycle.State.PAUSING);
-      getLifeCycle().transition(LifeCycle.State.PAUSED);
+  public void pause() {
+    synchronized (this) {
+      LOG.info("OzoneManagerStateMachine is pausing");
+      statePausedCount.incrementAndGet();
+      final LifeCycle.State state = getLifeCycleState();
+      if (state == LifeCycle.State.PAUSED) {
+        return;
+      }
+      if (state != LifeCycle.State.NEW) {
+        getLifeCycle().transition(LifeCycle.State.PAUSING);
+        getLifeCycle().transition(LifeCycle.State.PAUSED);
+      }
     }
 
-    ozoneManagerDoubleBuffer.stop();
+    pauseApplyTransaction();
+    boolean interrupted = false;
+    while (true) {
+      try {
+        ozoneManagerDoubleBuffer.awaitFlush();
+        break;
+      } catch (InterruptedException ex) {
+        interrupted = true;
+        LOG.warn("Interrupted while waiting for OM double buffer to flush during pause.", ex);
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
+    synchronized (this) {
+      ozoneManagerDoubleBuffer.stop();
+    }
   }
 
   /**
@@ -559,15 +555,28 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
+    unpause(newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex, false);
+  }
+
+  /**
+   * Same as {@link #unpause(long, long)}. If oldDbKept, Ratis does not reload the state machine, so it never
+   * retries an apply rejected while paused: if one is above the restored index, keep rejecting applies and throw.
+   */
+  public synchronized void unpause(long newLastAppliedSnaphsotIndex,
+      long newLastAppliedSnapShotTermIndex, boolean oldDbKept) {
     if (statePausedCount.decrementAndGet() == 0) {
-      getLifeCycle().startAndTransition(() -> {
-        this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-        restoreLastAppliedTermIndex(TermIndex.valueOf(
-            newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
-        LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
-            "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
-                getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
-      });
+      try {
+        getLifeCycle().startAndTransition(() -> {
+          this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
+          restoreLastAppliedTermIndex(TermIndex.valueOf(
+              newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
+          LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
+                  "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
+              getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
+        });
+      } finally {
+        resumeApplyTransaction(oldDbKept ? newLastAppliedSnaphsotIndex : Long.MAX_VALUE);
+      }
     }
   }
 
@@ -697,37 +706,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
-    boolean isS3AuthThreadLocalSet = false;
-    boolean isStsThreadLocalSet = false;
-    try {
-      if (ozoneManager.isSecurityEnabled() && request.hasS3Authentication()) {
-        // STS token verification runs on the leader RPC path so we don't need to recheck here on the apply
-        // after the log is committed
-        STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
-
-        final OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
-        // ThreadLocal carries S3 action for OmMetadataReader.
-        OzoneManager.setS3Auth(s3Auth);
-        isS3AuthThreadLocalSet = true;
-
-        // ThreadLocal carries session policy for OmMetadataReader
-        final STSTokenIdentifier rehydratedTokenIdentifier = STSSecurityUtil.rehydrateStsTokenIdentifier(s3Auth);
-        if (rehydratedTokenIdentifier != null) {
-          OzoneManager.setStsTokenIdentifier(rehydratedTokenIdentifier);
-          isStsThreadLocalSet = true;
-        }
-      }
+    try (OMThreadContext.Scope ignored =
+             OMThreadContext.forWrite(request, ozoneManager).applyToCurrentThread()) {
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
-      OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
-      OMResponse omResponse = omClientResponse.getOMResponse();
-      if (omLockDetails != null) {
-        return omResponse.toBuilder()
-            .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
-      } else {
-        return omResponse;
-      }
+      OMLockDetails lockDetails = omClientResponse.getOmLockDetails();
+      OMResponse response = omClientResponse.getOMResponse();
+      return lockDetails == null ? response
+          : response.toBuilder().setOmLockDetails(lockDetails.toProtobufBuilder()).build();
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);
@@ -735,13 +722,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
-    } finally {
-      if (isS3AuthThreadLocalSet) {
-        OzoneManager.setS3Auth(null);
-      }
-      if (isStsThreadLocalSet) {
-        OzoneManager.setStsTokenIdentifier(null);
-      }
     }
     return null;
   }
@@ -785,9 +765,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param request OMRequest
    * @return response from OM
    */
-  private Message queryCommand(OMRequest request) {
-    OMResponse response = handler.handleReadRequest(request);
-    return OMRatisHelper.convertResponseToMessage(response);
+  private Message queryCommand(OMRequest request) throws IOException {
+    try (OMThreadContext.Scope context =
+             OMThreadContext.forRead(request, ozoneManager).applyToCurrentThread()) {
+      OMResponse response = handler.handleReadRequest(request);
+      return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
+    }
   }
 
   private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
@@ -807,6 +790,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   public void stop() {
+    resumeApplyTransaction();
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
@@ -824,8 +808,82 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManagerDoubleBuffer.awaitFlush();
   }
 
+  /** Wait until the state machine has applied and flushed up to the given index. */
+  public void awaitApplied(long index) throws IOException {
+    while (getLastAppliedTermIndex().getIndex() < index) {
+      if (ozoneManager.isStopped()) {
+        throw new IOException("OzoneManager is already stopped: " + ozoneManager.getNodeDetails());
+      }
+      try {
+        ozoneManagerDoubleBuffer.awaitFlush();
+      } catch (InterruptedException e) {
+        throw IOUtils.toInterruptedIOException("Interrupted ozoneManagerDoubleBuffer.awaitFlush", e);
+      }
+    }
+  }
+
   @VisibleForTesting
   public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
     return ozoneManagerDoubleBuffer;
+  }
+
+  private void pauseApplyTransaction() {
+    synchronized (applyTransactionMonitor) {
+      if (applyTransactionPaused) {
+        return;
+      }
+      applyTransactionPaused = true;
+      lastRejectedApplyIndex = RaftLog.INVALID_LOG_INDEX;
+      boolean interrupted = false;
+      while (inFlightApplyTransactions > 0) {
+        try {
+          applyTransactionMonitor.wait();
+        } catch (InterruptedException ex) {
+          LOG.warn("Interrupted while waiting for in-flight apply transactions to complete.");
+          interrupted = true;
+        }
+      }
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private void resumeApplyTransaction() {
+    resumeApplyTransaction(Long.MAX_VALUE);
+  }
+
+  private void resumeApplyTransaction(long restoredIndex) {
+    synchronized (applyTransactionMonitor) {
+      if (!applyTransactionPaused) {
+        return;
+      }
+      if (lastRejectedApplyIndex > restoredIndex) {
+        throw new IllegalStateException("Transactions up to index " + lastRejectedApplyIndex
+            + " were rejected while the state machine was paused, above the restored index " + restoredIndex);
+      }
+      applyTransactionPaused = false;
+      applyTransactionMonitor.notifyAll();
+    }
+  }
+
+  private boolean tryEnterApplyTransaction(long index) {
+    synchronized (applyTransactionMonitor) {
+      if (applyTransactionPaused) {
+        lastRejectedApplyIndex = Math.max(lastRejectedApplyIndex, index);
+        return false;
+      }
+      inFlightApplyTransactions++;
+      return true;
+    }
+  }
+
+  private void exitApplyTransaction() {
+    synchronized (applyTransactionMonitor) {
+      inFlightApplyTransactions--;
+      if (inFlightApplyTransactions == 0) {
+        applyTransactionMonitor.notifyAll();
+      }
+    }
   }
 }

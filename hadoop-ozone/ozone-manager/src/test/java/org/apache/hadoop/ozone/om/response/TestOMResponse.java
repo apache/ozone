@@ -18,21 +18,30 @@
 package org.apache.hadoop.ozone.om.response;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.ozone.test.GenericTestUtils;
@@ -49,6 +58,8 @@ public class TestOMResponse {
   private Path folder;
 
   private OzoneManagerProtocolServerSideTranslatorPB translator;
+  private OzoneManager ozoneManager;
+  private OzoneManagerRatisServer ratisServer;
   private GenericTestUtils.LogCapturer logCapturer;
   private static final long IPC_MAX_LEN = 1024 * 1024; // 1MB
   private static final long WARN_THRESHOLD = IPC_MAX_LEN / 2; // 512KB
@@ -61,7 +72,7 @@ public class TestOMResponse {
     configuration.setLong(
         "ipc.maximum.response.length", IPC_MAX_LEN);
 
-    OzoneManager ozoneManager = mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
         configuration, ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -73,7 +84,7 @@ public class TestOMResponse {
     OMExecutionFlow omExecutionFlow = new OMExecutionFlow(ozoneManager);
     when(ozoneManager.getOmExecutionFlow()).thenReturn(omExecutionFlow);
 
-    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
+    ratisServer = mock(OzoneManagerRatisServer.class);
     when(ratisServer.checkRetryCache()).thenReturn(null);
 
     ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type> protocolMessageMetrics =
@@ -145,5 +156,41 @@ public class TestOMResponse {
 
     long responseSize = smallResponse.getSerializedSize();
     assertThat(responseSize).isLessThan(WARN_THRESHOLD);
+  }
+
+  @Test
+  public void testRatisReadLockDetailsAddedToCurrentCall() throws Exception {
+    OMExecutionFlow executionFlow = mock(OMExecutionFlow.class);
+    when(ozoneManager.getOmExecutionFlow()).thenReturn(executionFlow);
+    when(ozoneManager.getMetrics()).thenReturn(mock(OMMetrics.class));
+    when(ratisServer.getLeaderStatus()).thenReturn(RaftServerStatus.LEADER_AND_READY);
+    when(ratisServer.isLinearizableRead()).thenReturn(true);
+
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.ServiceList)
+        .setClientId("test-client")
+        .build();
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(request.getCmdType())
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setSuccess(true)
+        .setOmLockDetails(OzoneManagerProtocolProtos.OMLockDetailsProto.newBuilder()
+            .setWaitLockNanos(11)
+            .setReadLockNanos(22)
+            .setWriteLockNanos(33))
+        .build();
+    when(executionFlow.submit(any(OMRequest.class), eq(false))).thenReturn(response);
+
+    Server.Call call = new Server.Call(1, 0, null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER, new byte[0]);
+    Server.getCurCall().set(call);
+    try {
+      translator.processRequest(request);
+
+      assertThat(call.getProcessingDetails().get(Timing.LOCKWAIT, TimeUnit.NANOSECONDS)).isEqualTo(11);
+      assertThat(call.getProcessingDetails().get(Timing.LOCKSHARED, TimeUnit.NANOSECONDS)).isEqualTo(22);
+      assertThat(call.getProcessingDetails().get(Timing.LOCKEXCLUSIVE, TimeUnit.NANOSECONDS)).isEqualTo(33);
+    } finally {
+      Server.getCurCall().remove();
+    }
   }
 }

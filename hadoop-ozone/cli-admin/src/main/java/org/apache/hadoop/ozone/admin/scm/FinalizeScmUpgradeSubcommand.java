@@ -44,13 +44,17 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import picocli.CommandLine;
 
 /**
- * Handler of Finalize SCM command.
+ * Handler of `ozone admin scm finalizeUpgrade` command for new clients to finalize old servers that do not support the
+ * current `ozone admin upgrade finalize` command.
  */
 @CommandLine.Command(
     name = "finalizeupgrade",
     description = "Finalize SCM Upgrade",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
+    versionProvider = HddsVersionProvider.class,
+    hidden = true
+)
+@Deprecated
 public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
 
   @CommandLine.ParentCommand

@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.createPipelineCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteBlocksCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteContainerCommand;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.refreshVolumeUsageInfo;
@@ -58,7 +58,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
@@ -94,7 +95,7 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -230,7 +231,7 @@ public class SCMDatanodeProtocolServer implements
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto layoutInfo)
+      DatanodeVersionProto versionInfo)
       throws IOException {
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(extendedDatanodeDetailsProto);
@@ -238,10 +239,12 @@ public class SCMDatanodeProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeDetails", datanodeDetails.toString());
 
+    // Read before the decision, so that a rejection made before this SCM became the ready leader is not final.
+    final boolean leaderReady = scmContext == null || scmContext.isLeaderReady();
     // TODO : Return the list of Nodes that forms the SCM HA.
     RegisteredCommand registeredCommand = scm.getScmNodeManager()
         .register(datanodeDetails, nodeReport, pipelineReportsProto,
-            layoutInfo);
+            versionInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
       eventPublisher.fireEvent(CONTAINER_REPORT,
@@ -255,6 +258,13 @@ public class SCMDatanodeProtocolServer implements
                       pipelineReportsProto));
     }
     try {
+      if (registeredCommand.getError() == SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted && !leaderReady) {
+        // The datanode shuts down on this error. An SCM that is not the ready leader may not have applied the
+        // latest state yet, for example a finalization the leader already sent to the datanode, so let the
+        // datanode retry and leave the final decision to the leader. The RPC server does not log this exception.
+        throw new ServerNotLeaderException("SCM is not the ready leader, so its rejection of datanode "
+            + datanodeDetails + " is not final. The datanode should retry the registration.");
+      }
       return getRegisteredResponse(registeredCommand);
     } catch (Exception ex) {
       auditSuccess = false;
@@ -419,11 +429,11 @@ public class SCMDatanodeProtocolServer implements
             .setSetNodeOperationalStateCommandProto(
                 ((SetNodeOperationalStateCommand)cmd).getProto())
             .build();
-    case finalizeNewLayoutVersionCommand:
+    case finalizeNewDatanodeVersionCommand:
       return builder
-            .setCommandType(finalizeNewLayoutVersionCommand)
-            .setFinalizeNewLayoutVersionCommandProto(
-                ((FinalizeNewLayoutVersionCommand)cmd).getProto())
+            .setCommandType(finalizeNewDatanodeVersionCommand)
+            .setFinalizeNewDatanodeVersionCommandProto(
+                ((FinalizeVersionCommand)cmd).getProto())
             .build();
     case refreshVolumeUsageInfo:
       return builder

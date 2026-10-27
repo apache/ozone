@@ -100,7 +100,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.commons.io.file.PathUtils;
@@ -119,6 +118,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -165,13 +166,14 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final Map<DiffType, String> DIFF_TYPE_STRING_MAP =
-      new EnumMap<>(ImmutableMap.of(DELETE, "1", RENAME, "2", CREATE, "3", MODIFY, "4"));
+      new EnumMap<>(ImmutableMap.of(DELETE, "1", MODIFY, "2", RENAME, "3", CREATE, "4"));
 
   private final ManagedRocksDB db;
   private final OzoneManager ozoneManager;
   private final OMMetadataManager activeOmMetadataManager;
   private final CodecRegistry codecRegistry;
   private final ManagedColumnFamilyOptions familyOptions;
+  private final ColumnFamilyHandle snapDiffReportCfh;
   private final ColumnFamilyHandle snapDiffPurgedJobCfh;
   // TODO: [SNAPSHOT] Use different wait time based of job status.
   private final long defaultWaitTime;
@@ -227,6 +229,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     this.activeOmMetadataManager = ozoneManager.getMetadataManager();
     this.familyOptions = familyOptions;
     this.codecRegistry = codecRegistry;
+    this.snapDiffReportCfh = snapDiffReportCfh;
     this.snapDiffPurgedJobCfh = snapDiffPurgedJobCfh;
     this.defaultWaitTime = ozoneManager.getConfiguration().getTimeDuration(
         OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME,
@@ -355,7 +358,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
   }
 
-  static String getReportKeyForIndex(String jobId, String index) {
+  public static String getReportKeyForIndex(String jobId, String index) {
     return jobId + DELIMITER + index;
   }
 
@@ -396,7 +399,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
    *     1. Rename "B" to "C"
    *     2. Create "B"
    */
-  static String getReportKeyForIndex(String jobId, DiffType diffType, long index) {
+  public static String getReportKeyForIndex(String jobId, DiffType diffType, long index) {
     return getReportKeyForIndex(jobId, DIFF_TYPE_STRING_MAP.get(diffType) + leftPad(String.valueOf(index), 20, '0'));
   }
 
@@ -714,7 +717,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final String index,
       final int pageSize
   ) throws IOException {
-    if (!isBlank(index)) {
+    if (!isBlank(index) && !index.startsWith("0")) {
       if (DIFF_TYPE_STRING_MAP.values().stream().noneMatch(index::startsWith)) {
         throw new IOException("Token " + index + " has invalid prefix. Valid prefixes: "
             + DIFF_TYPE_STRING_MAP.values().stream().map(String::valueOf).collect(Collectors.joining(",")));
@@ -725,11 +728,12 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     if (isBlank(index)) {
       idx = 0;
     } else {
+      String idxString = index.startsWith("0") ? index : index.substring(1);
       try {
-        idx = Integer.parseInt(index.substring(1));
+        idx = Integer.parseInt(idxString);
       } catch (NumberFormatException e) {
-        throw new IOException("Token " + index + " has invalid numeric part: " +
-            index.substring(1) + ". It should be a valid integer.", e);
+        throw new IOException("Token " + index + " has invalid numeric part: " + idxString +
+            ". It should be a valid integer.", e);
       }
     }
     if (idx < 0 ||
@@ -1185,7 +1189,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
                 LOG.debug("Generated snapshot diff report, entry count: {}, elapsed: {}ms, jobId: {}",
                     reportEntries.getKey(), Time.monotonicNow() - reportGenStart, jobId);
               }
-              updateJobStatusToDone(jobKey, reportEntries.getKey(), reportEntries.getValue());
+              updateJobStatusToDone(jobKey, jobId, reportEntries.getKey(), reportEntries.getValue());
             }
             return null;
           }
@@ -1399,97 +1403,117 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
    * chain cannot be resolved in the live from-snapshot directory graph, so the
    * delete entry can be skipped from the final report.
    *
-   * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
-   *     objectId; must not be the to-snapshot graph
-   * @param renamedDirectoryIds objectIds of directories renamed in the diff (from
-   *     snapshot objectIds, not destination paths)
+   * @param deletedDirectoryIds membership test for deleted directory object ids
+   * @param renamedDirectoryIds membership test for renamed directory object ids
+   *     (from snapshot objectIds, not destination paths)
+   * @param ancestorMemo LRU cache of ancestor object ids to deleted-ancestor results
    */
   @VisibleForTesting
-  boolean hasDeletedAncestor(long parentObjectId, Set<Long> deletedDirectoryIds,
-      Set<Long> renamedDirectoryIds, Map<Long, Long> objectIdToParentId,
-      long bucketObjectId, Map<Long, Boolean> ancestorMemo) {
-    Objects.requireNonNull(objectIdToParentId, "objectIdToParentId must not be null");
+  public boolean[] hasDeletedAncestors(List<Long> parentObjectIds,
+      DirectoryIdCheck deletedDirectoryIds, DirectoryIdCheck renamedDirectoryIds,
+      ParentIdBatchLookup parentLookup, long bucketObjectId,
+      Map<Long, Boolean> ancestorMemo) throws IOException {
+    Objects.requireNonNull(parentObjectIds, "parentObjectIds must not be null");
+    Objects.requireNonNull(deletedDirectoryIds, "deletedDirectoryIds must not be null");
+    Objects.requireNonNull(parentLookup, "parentLookup must not be null");
     Objects.requireNonNull(renamedDirectoryIds, "renamedDirectoryIds must not be null");
+    Objects.requireNonNull(ancestorMemo, "ancestorMemo must not be null");
 
-    if (parentObjectId == bucketObjectId) {
-      return false;
-    }
-    Boolean cached = ancestorMemo.get(parentObjectId);
-    if (cached != null) {
-      return cached;
+    int batchSize = parentObjectIds.size();
+    boolean[] hasDeletedAncestor = new boolean[batchSize];
+    long[] currentAncestors = new long[batchSize];
+    boolean[] resolved = new boolean[batchSize];
+    List<List<Long>> ancestorPaths = new ArrayList<>(batchSize);
+    for (int i = 0; i < batchSize; i++) {
+      ancestorPaths.add(new ArrayList<>());
+      currentAncestors[i] = parentObjectIds.get(i);
     }
 
-    List<Long> path = new ArrayList<>();
-    long current = parentObjectId;
-    boolean result;
     while (true) {
-      if (current == bucketObjectId) {
-        result = false;
+      Map<Long, List<Integer>> frontier = new HashMap<>();
+      boolean hasUnresolved = false;
+      for (int i = 0; i < batchSize; i++) {
+        if (resolved[i]) {
+          continue;
+        }
+        hasUnresolved = true;
+        long current = currentAncestors[i];
+        if (current == bucketObjectId) {
+          resolved[i] = true;
+          continue;
+        }
+        Boolean cached = ancestorMemo.get(current);
+        if (cached != null) {
+          resolved[i] = true;
+          hasDeletedAncestor[i] = cached;
+          continue;
+        }
+        if (renamedDirectoryIds.contains(current)) {
+          resolved[i] = true;
+          ancestorMemo.put(current, false);
+          continue;
+        }
+        if (deletedDirectoryIds.contains(current)) {
+          resolved[i] = true;
+          ancestorMemo.put(current, true);
+          hasDeletedAncestor[i] = true;
+          continue;
+        }
+        frontier.computeIfAbsent(current, ignored -> new ArrayList<>()).add(i);
+      }
+
+      if (!hasUnresolved || frontier.isEmpty()) {
         break;
       }
-      cached = ancestorMemo.get(current);
-      if (cached != null) {
-        result = cached;
-        break;
+
+      List<Long> lookupObjectIds = new ArrayList<>(frontier.keySet());
+      List<Long> nextParents = parentLookup.getParentIds(lookupObjectIds);
+      Objects.requireNonNull(nextParents, "nextParents must not be null");
+      if (nextParents.size() != lookupObjectIds.size()) {
+        throw new IOException("Batch parent lookup returned " + nextParents.size()
+            + " values for " + lookupObjectIds.size() + " objectIds");
       }
-      if (renamedDirectoryIds.contains(current)) {
-        result = false;
-        ancestorMemo.put(current, false);
-        break;
+      for (int i = 0; i < lookupObjectIds.size(); i++) {
+        long current = lookupObjectIds.get(i);
+        Long nextParent = nextParents.get(i);
+        List<Integer> positions = frontier.get(current);
+        if (nextParent == null) {
+          ancestorMemo.put(current, true);
+          for (int position : positions) {
+            resolved[position] = true;
+            hasDeletedAncestor[position] = true;
+          }
+          continue;
+        }
+        for (int position : positions) {
+          ancestorPaths.get(position).add(current);
+          currentAncestors[position] = nextParent;
+        }
       }
-      if (deletedDirectoryIds.contains(current)) {
-        result = true;
-        ancestorMemo.put(current, true);
-        break;
-      }
-      Long nextParent = objectIdToParentId.get(current);
-      if (nextParent == null) {
-        result = true;
-        ancestorMemo.put(current, true);
-        break;
-      }
-      path.add(current);
-      current = nextParent;
     }
-    for (Long node : path) {
-      ancestorMemo.put(node, result);
+
+    for (int i = 0; i < batchSize; i++) {
+      for (Long ancestor : ancestorPaths.get(i)) {
+        ancestorMemo.put(ancestor, hasDeletedAncestor[i]);
+      }
     }
-    return result;
+    return hasDeletedAncestor;
   }
 
   /**
-   * Filters mixed directory and file delete entries, retaining only those without
-   * a deleted directory ancestor. FSO buckets only.
-   *
-   * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
-   *     objectId, built from a full fromSnapshot directoryTable scan
-   * @param renamedDirectoryIds objectIds of directories renamed in the diff (from
-   *     snapshot objectIds); pass an empty set when there are no renames
+   * Checks membership of a directory object id in a snap diff set.
    */
-  @VisibleForTesting
-  <T extends WithParentObjectId> List<T> filterTopLevelDeletedEntries(
-      Collection<T> deletedEntries,
-      Predicate<T> isDirectory,
-      Map<Long, Long> objectIdToParentId,
-      Set<Long> renamedDirectoryIds,
-      long bucketObjectId) {
-    Objects.requireNonNull(objectIdToParentId, "objectIdToParentId must not be null");
-    Objects.requireNonNull(renamedDirectoryIds, "renamedDirectoryIds must not be null");
-    Set<Long> deletedDirectoryIds = new HashSet<>();
-    for (T deletedEntry : deletedEntries) {
-      if (isDirectory.test(deletedEntry)) {
-        deletedDirectoryIds.add(deletedEntry.getObjectID());
-      }
-    }
-    Map<Long, Boolean> ancestorMemo = new HashMap<>();
-    List<T> filteredDeletes = new ArrayList<>();
-    for (T deletedEntry : deletedEntries) {
-      if (!hasDeletedAncestor(deletedEntry.getParentObjectID(), deletedDirectoryIds,
-          renamedDirectoryIds, objectIdToParentId, bucketObjectId, ancestorMemo)) {
-        filteredDeletes.add(deletedEntry);
-      }
-    }
-    return filteredDeletes;
+  @FunctionalInterface
+  public interface DirectoryIdCheck {
+    boolean contains(long objectId) throws IOException;
+  }
+
+  /**
+   * Batch-resolves parent object ids for ancestor walks.
+   */
+  @FunctionalInterface
+  public interface ParentIdBatchLookup {
+    List<Long> getParentIds(List<Long> objectIds) throws IOException;
   }
 
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
@@ -1672,7 +1696,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
             familyOptions));
   }
 
-  private String addToReport(String jobId, long index, DiffReportEntry diffReportEntry) throws IOException {
+  private String addToReport(String jobId, long index, DiffReportEntry diffReportEntry)
+      throws IOException {
     String jobReportKey = getReportKeyForIndex(jobId, diffReportEntry.getType(), index);
     snapDiffReportTable.put(codecRegistry.asRawData(jobReportKey), codecRegistry.asRawData(diffReportEntry));
     return jobReportKey;
@@ -1744,10 +1769,17 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
-  private synchronized void updateJobStatusToDone(String jobKey,
-                                                  long totalDiffEntries,
-                                                  String largestJobKey) {
+  synchronized void updateJobStatusToDone(String jobKey,
+                                          String jobId,
+                                          long totalDiffEntries,
+                                          String largestJobKey) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+    // A cancelled job's task keeps running, and a resubmit reuses the jobKey with a new jobId.
+    if (!snapshotDiffJob.getJobId().equals(jobId)) {
+      LOG.warn("Not marking snapshot diff job {} as DONE: task jobId {} was superseded by jobId {}.",
+          jobKey, jobId, snapshotDiffJob.getJobId());
+      return;
+    }
     if (snapshotDiffJob.getStatus() != IN_PROGRESS) {
       throw new IllegalStateException("Invalid job status for jobID: " +
           snapshotDiffJob.getJobId() + ". Job's current status is '" +
@@ -1799,6 +1831,23 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
    * When client re-submits previously queued job, workflow will pick it and
    * execute it.
    */
+  /**
+   * Deletes all persisted report rows for {@code jobId}. Resume after OM restart
+   * regenerates the report from scratch; without this, partial rows from an earlier
+   * run (including under a previous diff-type key prefix) would remain visible.
+   */
+  private void deleteReportEntriesForJob(String jobId) throws IOException {
+    try (ManagedWriteBatch writeBatch = new ManagedWriteBatch();
+         ManagedWriteOptions writeOptions = new ManagedWriteOptions()) {
+      byte[] beginKey = codecRegistry.asRawData(jobId + DELIMITER + 0);
+      byte[] endKey = codecRegistry.asRawData(getLexicographicallyHigherString(jobId + DELIMITER));
+      writeBatch.deleteRange(snapDiffReportCfh, beginKey, endKey);
+      db.get().write(writeOptions, writeBatch);
+    } catch (RocksDBException e) {
+      throw new IOException(e);
+    }
+  }
+
   @VisibleForTesting
   void loadJobsOnStartUp() {
 
@@ -1809,6 +1858,14 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
         String jobKey = next.getKey();
         SnapshotDiffJob snapshotDiffJob = next.getValue();
         if (snapshotDiffJob.getStatus() == IN_PROGRESS) {
+          try {
+            deleteReportEntriesForJob(snapshotDiffJob.getJobId());
+          } catch (IOException e) {
+            LOG.error("Failed to clear partial snap diff report for job {} on OM restart",
+                snapshotDiffJob.getJobId(), e);
+            updateJobStatusToFailed(jobKey, e.getMessage());
+            continue;
+          }
           // This is done just to be in parity of the workflow.
           // If job status is not updated to QUEUED, workflow will fail when
           // job gets submitted to executor and its status is IN_PROGRESS.

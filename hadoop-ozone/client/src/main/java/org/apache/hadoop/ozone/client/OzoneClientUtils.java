@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,23 +221,31 @@ public final class OzoneClientUtils {
         .parse(clientReplicationType, clientReplication, clientSideConfig);
   }
 
-  public static FileChecksum getFileChecksumWithCombineMode(OzoneVolume volume,
-      OzoneBucket bucket, String keyName, long length,
+  /**
+   * Computes the checksum of a key.
+   *
+   * @param useLookupFile when true the key is read with {@code lookupFile}, which rejects OBJECT_STORE buckets
+   *     server-side; when false {@code lookupKey} is used, which accepts any bucket layout
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public static FileChecksum getFileChecksumWithCombineMode(String volumeName,
+      String bucketName, String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode combineMode,
-      ClientProtocol rpcClient) throws IOException {
+      ClientProtocol rpcClient, boolean useLookupFile) throws IOException {
     Preconditions.checkArgument(length >= 0);
 
     if (keyName.isEmpty()) {
       return null;
     }
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volume.getName())
-        .setBucketName(bucket.getName()).setKeyName(keyName)
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setKeyName(keyName)
         .setSortDatanodesInPipeline(true)
         .setLatestVersionLocation(true).build();
-    OmKeyInfo keyInfo = rpcClient.getOzoneManagerClient().lookupKey(keyArgs);
+    OzoneManagerProtocol omClient = rpcClient.getOzoneManagerClient();
+    OmKeyInfo keyInfo = useLookupFile ? omClient.lookupFile(keyArgs) : omClient.lookupKey(keyArgs);
     BaseFileChecksumHelper helper = ChecksumHelperFactory
         .getChecksumHelper(keyInfo.getReplicationConfig().getReplicationType(),
-            volume, bucket, keyName, length, combineMode, rpcClient, keyInfo);
+            volumeName, bucketName, keyName, length, combineMode, rpcClient, keyInfo);
     helper.compute();
     return helper.getFileChecksum();
   }

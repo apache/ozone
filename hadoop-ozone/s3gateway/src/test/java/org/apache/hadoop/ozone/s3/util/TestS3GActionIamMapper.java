@@ -30,6 +30,7 @@ public class TestS3GActionIamMapper {
   public void mapsCoreObjectActions() {
     assertEquals("ListBucket", S3GActionIamMapper.toS3ActionString(S3GAction.GET_BUCKET));
     assertEquals("ListBucket", S3GActionIamMapper.toS3ActionString(S3GAction.HEAD_BUCKET));
+    assertEquals("ListBucketVersions", S3GActionIamMapper.toS3ActionString(S3GAction.LIST_OBJECT_VERSIONS));
     assertEquals("CreateBucket", S3GActionIamMapper.toS3ActionString(S3GAction.CREATE_BUCKET));
     assertEquals("DeleteBucket", S3GActionIamMapper.toS3ActionString(S3GAction.DELETE_BUCKET));
     assertEquals("GetBucketAcl", S3GActionIamMapper.toS3ActionString(S3GAction.GET_ACL));
@@ -50,7 +51,15 @@ public class TestS3GActionIamMapper {
     assertEquals("GetObjectTagging", S3GActionIamMapper.toS3ActionString(S3GAction.GET_OBJECT_TAGGING));
     assertEquals("PutObjectTagging", S3GActionIamMapper.toS3ActionString(S3GAction.PUT_OBJECT_TAGGING));
     assertEquals("DeleteObjectTagging", S3GActionIamMapper.toS3ActionString(S3GAction.DELETE_OBJECT_TAGGING));
+    assertEquals("GetObjectAcl", S3GActionIamMapper.toS3ActionString(S3GAction.GET_OBJECT_ACL));
     assertEquals("PutObjectAcl", S3GActionIamMapper.toS3ActionString(S3GAction.PUT_OBJECT_ACL));
+    assertEquals("GetObjectAttributes", S3GActionIamMapper.toS3ActionString(S3GAction.GET_OBJECT_ATTRIBUTES));
+    assertEquals("GetBucketTagging", S3GActionIamMapper.toS3ActionString(S3GAction.GET_BUCKET_TAGGING));
+    assertEquals("PutBucketTagging", S3GActionIamMapper.toS3ActionString(S3GAction.PUT_BUCKET_TAGGING));
+    assertEquals("PutBucketTagging", S3GActionIamMapper.toS3ActionString(S3GAction.DELETE_BUCKET_TAGGING));
+    assertEquals("GetLifecycleConfiguration", S3GActionIamMapper.toS3ActionString(S3GAction.GET_BUCKET_LIFECYCLE));
+    assertEquals("PutLifecycleConfiguration", S3GActionIamMapper.toS3ActionString(S3GAction.PUT_BUCKET_LIFECYCLE));
+    assertEquals("PutLifecycleConfiguration", S3GActionIamMapper.toS3ActionString(S3GAction.DELETE_BUCKET_LIFECYCLE));
   }
 
   @Test
@@ -64,6 +73,7 @@ public class TestS3GActionIamMapper {
     assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.ASSUME_ROLE));
     assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.GET_CALLER_IDENTITY));
     assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.GENERATE_SECRET));
+    assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.NOT_IMPLEMENTED));
     assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.REVOKE_SECRET));
   }
 }

@@ -780,7 +780,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OMRequest.newBuilder()
         .setCreateBucketRequest(req)
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
         .setClientId(UUID.randomUUID().toString());
   }
@@ -1381,7 +1381,8 @@ public final class OMRequestTestUtils {
               .setKey(deletedKey.getKey())
               .addAllKeyInfos(
                   deletedKey.getValue().stream()
-                  .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT_VERSION)).collect(Collectors.toList()))
+                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT))
+                      .collect(Collectors.toList()))
               .build();
       deletedMoveKeys.add(snapshotMoveKeyInfos);
     }
@@ -1393,7 +1394,7 @@ public final class OMRequestTestUtils {
               .setKey(deletedKey.getKey())
               .addAllKeyInfos(
                   deletedKey.getValue().stream()
-                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT_VERSION))
+                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT))
                       .collect(Collectors.toList()))
               .build();
       deletedDirMoveKeys.add(snapshotMoveKeyInfos);
@@ -1746,4 +1747,11 @@ public final class OMRequestTestUtils {
         .build();
   }
 
+  /**
+   * @return an EC replication config with an unknown codec
+   */
+  public static HddsProtos.ECReplicationConfig invalidEcReplicationConfig() {
+    return HddsProtos.ECReplicationConfig.newBuilder().setData(3).setParity(2).setCodec("NO_SUCH_CODEC")
+        .setEcChunkSize(1024 * 1024).build();
+  }
 }

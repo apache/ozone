@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -367,7 +368,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
-   * Removes the Container matching with specified containerId.
+   * Removes the container matching the specified containerId and its recovering entry, if present.
    * @param containerId ID of the container to remove
    * @return If container is removed from containerMap returns true, otherwise
    * false
@@ -382,6 +383,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     if (markMissing) {
       missingContainerSet.add(containerId);
     }
+    removeRecoveringContainer(containerId);
     Container<?> removed = containerMap.remove(containerId);
     if (removeFromDB) {
       deleteFromContainerTable(containerId);
@@ -518,6 +520,29 @@ public class ContainerSet implements Iterable<Container<?>> {
   public long containerCount(HddsVolume volume) {
     Objects.requireNonNull(volume, "volume == null");
     return volume.getContainerCount();
+  }
+
+  /**
+   * Count the OPEN containers on each storage volume, keyed by volume storageID.
+   * Used by the node report so Recon can show open-container distribution per disk.
+   *
+   * @return map of volume storageID to its OPEN container count
+   */
+  public Map<String, Long> getOpenContainerCountsByVolume() {
+    Map<String, Long> counts = new HashMap<>();
+    Iterator<Map.Entry<Long, Container<?>>> iterator = getContainerMapIterator();
+    while (iterator.hasNext()) {
+      Container<?> container = iterator.next().getValue();
+      if (container.getContainerState() != State.OPEN) {
+        continue;
+      }
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume == null) {
+        continue;
+      }
+      counts.merge(volume.getStorageID(), 1L, Long::sum);
+    }
+    return counts;
   }
 
   /**

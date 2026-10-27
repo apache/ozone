@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -156,6 +157,7 @@ final class DiskBalancerSubCommandUtil {
    *   <li>"hostname:port" - Uses the specified port</li>
    *   <li>"hostname" - Uses the default CLIENT_RPC port (HDDS_DATANODE_CLIENT_PORT_DEFAULT)</li>
    * </ul>
+   * An IPv6 literal has to be bracketed, e.g. "[2001:db8::1]:port" or "[2001:db8::1]".
    * 
    * @param address the datanode address in "host:port" or "host" format
    * @return DiskBalancerProtocol proxy
@@ -167,14 +169,10 @@ final class DiskBalancerSubCommandUtil {
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     
     // Parse address and add default port if not specified
-    InetSocketAddress nodeAddr;
-    if (address.contains(":")) {
-      // Port is specified, use NetUtils to parse
-      nodeAddr = NetUtils.createSocketAddr(address);
-    } else {
-      // Port not specified, use default
-      nodeAddr = NetUtils.createSocketAddr(address, HDDS_DATANODE_CLIENT_PORT_DEFAULT);
-    }
+    HddsUtils.validateHostPortAuthority("Datanode address", address);
+    int port = HddsUtils.getHostPort(address).orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT);
+    InetSocketAddress nodeAddr = NetUtils.createSocketAddr(
+        HddsUtils.getHostPortString(HddsUtils.getHostName(address).get(), port));
     return new DiskBalancerProtocolClientSideTranslatorPB(
         nodeAddr, user, ozoneConf);
   }
@@ -217,7 +215,7 @@ final class DiskBalancerSubCommandUtil {
       throw new IOException(String.format("host: %s(%s) %s port not found",
           details.getHostName(), details.getIpAddress(), Port.Name.CLIENT_RPC.name()));
     }
-    return details.getIpAddress() + ":" + port.getValue();
+    return HddsUtils.getHostPortString(details.getIpAddress(), port.getValue());
   }
 
   /**
@@ -237,7 +235,7 @@ final class DiskBalancerSubCommandUtil {
         .findFirst()
         .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT); // Default port if not found
 
-    String addressPort = ipAddress + ":" + port;
+    String addressPort = HddsUtils.getHostPortString(ipAddress, port);
     if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
       return hostname + " (" + addressPort + ")";
     }

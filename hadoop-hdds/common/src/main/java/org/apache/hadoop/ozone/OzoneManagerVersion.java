@@ -21,13 +21,17 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
-import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
 
 /**
  * Versioning for Ozone Manager.
  */
 public enum OzoneManagerVersion implements ComponentVersion {
+
+  //////////////////////////////  //////////////////////////////
+
   DEFAULT_VERSION(0, "Initial version"),
   S3G_PERSISTENT_CONNECTIONS(1,
       "New S3G persistent connection support is present in OM."),
@@ -57,24 +61,47 @@ public enum OzoneManagerVersion implements ComponentVersion {
 
   ATOMIC_CREATE_IF_NOT_EXISTS(12,
       "OzoneManager version that supports explicit create-if-not-exists key semantics"),
-
   S3_BUCKET_TAGGING_API(13,
       "OzoneManager version that supports S3 bucket tagging APIs, such as "
           + "PutBucketTagging, GetBucketTagging, and DeleteBucketTagging"),
-
   GET_FILE_STATUS_REJECTS_OBS(14,
       "OzoneManager version that rejects getFileStatus on OBJECT_STORE "
           + "buckets server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check"),
+  LOOKUP_FILE_REJECTS_OBS(15,
+      "OzoneManager version that rejects lookupFile on OBJECT_STORE buckets "
+          + "server-side, so file system clients no longer need the "
+          + "client-side InfoBucket layout check for getFileChecksum"),
+  // Derived keys predate ZDU and are available before finalization.
+  S3_DERIVED_KEY(16, "OzoneManager version that returns derived S3 signing keys for chunk verification"),
+  ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
+  LIST_STATUS_REJECTS_OBS(101,
+      "OzoneManager version that rejects listStatus on OBJECT_STORE buckets "
+          + "server-side when the request sets requireFileSystemLayout, so file "
+          + "system clients no longer need the client-side InfoBucket layout "
+          + "check for listStatus"),
 
-  FUTURE_VERSION(-1, "Used internally in the client when the server side is "
-      + " newer and an unknown server version has arrived to the client.");
+  // Only operations included in the first release with version 102 may share it.
+  // S3 volume context support added later needs a new version.
+  S3_VOLUME_CONTEXT_RESOLUTION(102,
+      "OzoneManager version that supports server-side S3 volume context resolution"),
+  GET_KEY_INFO_REJECTS_OBS(103,
+      "OzoneManager version that rejects getKeyInfo on OBJECT_STORE buckets "
+          + "server-side when the request sets requireFileSystemLayout, so file "
+          + "system clients no longer need the client-side InfoBucket layout "
+          + "check for open"),
 
-  public static final OzoneManagerVersion CURRENT = latest();
+  S3_IF_NONE_MATCH_ETAG(104,
+      "OzoneManager version that supports If-None-Match entity ETags for writes"),
 
-  private static final Map<Integer, OzoneManagerVersion> BY_PROTO_VALUE =
+  UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
+      " component, which may indicate it came from a component in a newer version");
+
+  private static final SortedMap<Integer, OzoneManagerVersion> BY_VALUE =
       Arrays.stream(values())
-          .collect(toMap(OzoneManagerVersion::toProtoValue, identity()));
+          .collect(toMap(OzoneManagerVersion::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
+
+  public static final OzoneManagerVersion SOFTWARE_VERSION = BY_VALUE.get(BY_VALUE.lastKey());
 
   private final int version;
   private final String description;
@@ -90,16 +117,35 @@ public enum OzoneManagerVersion implements ComponentVersion {
   }
 
   @Override
-  public int toProtoValue() {
+  public int serialize() {
     return version;
   }
 
-  public static OzoneManagerVersion fromProtoValue(int value) {
-    return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
+  /**
+   * @param value The serialized version to convert.
+   * @return The version corresponding to this serialized value, or {@link #UNKNOWN_VERSION} if no matching version is
+   *    found.
+   */
+  public static OzoneManagerVersion deserialize(int value) {
+    return BY_VALUE.getOrDefault(value, UNKNOWN_VERSION);
   }
 
-  private static OzoneManagerVersion latest() {
-    OzoneManagerVersion[] versions = OzoneManagerVersion.values();
-    return versions[versions.length - 2];
+
+  /**
+   * @return The next version immediately following this one and excluding {@link #UNKNOWN_VERSION},
+   *    or null if there is no such version.
+   */
+  @Override
+  public OzoneManagerVersion nextVersion() {
+    int nextOrdinal = ordinal() + 1;
+    if (nextOrdinal >= values().length - 1) {
+      return null;
+    }
+    return values()[nextOrdinal];
+  }
+
+  @Override
+  public String toString() {
+    return name() + " (" + serialize() + ")";
   }
 }
