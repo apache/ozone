@@ -372,6 +372,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
     Map<Integer, IndexReadResult> results = new TreeMap<>();
     Throwable unexpected = runIndexReads(tasks, results);
+    // A concurrent close fails the reads, although the locations are not bad, so they must not be reported.
+    checkOpen();
     if (unexpected != null) {
       Throwables.throwIfUnchecked(unexpected);
       throw new IOException(unexpected);
@@ -772,8 +774,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void close() {
     LOG.debug("{}: close", this);
-    closeStreams();
+    // before closing the streams, so that a positioned read failing on a closed stream sees the stream closed
     closed = true;
+    closeStreams();
   }
 
   protected synchronized void closeStreams() {

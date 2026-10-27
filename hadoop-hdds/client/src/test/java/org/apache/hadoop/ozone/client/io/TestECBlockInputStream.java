@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.SplittableRandom;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -61,6 +62,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -888,6 +890,34 @@ public class TestECBlockInputStream {
       assertDataMatches(buf, 0, 300);
       assertEquals(3, dataStreamFactory.getBlockStreams().size());
       assertEquals(50, ecb.getPos());
+    }
+  }
+
+  @Test
+  public void testPositionedReadFailingOnConcurrentCloseDoesNotReportLocations() throws Exception {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300;
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    // the positioned read waits in the index stream until the test has closed the stream
+    CountDownLatch barrier = new CountDownLatch(2);
+    dataStreamFactory.setReadBarrier(barrier);
+
+    ExecutorService reader = Executors.newSingleThreadExecutor();
+    try (ECBlockInputStream ecb = createStream(keyInfo, dataStreamFactory, conf.getObject(OzoneClientConfig.class))) {
+      Future<Integer> pread = reader.submit(() -> ecb.read(10, ByteBuffer.allocate(50)));
+      GenericTestUtils.waitFor(() -> barrier.getCount() == 1, 10, 10_000);
+      ecb.close();
+      // closing the stream closed the index stream, so the read in progress fails
+      dataStreamFactory.getBlockStream(1).setShouldError(true);
+      barrier.countDown();
+
+      ExecutionException e = assertThrows(ExecutionException.class, () -> pread.get(10, TimeUnit.SECONDS));
+      // the location is not bad, so it must not be reported as failed
+      assertThat(e.getCause()).isInstanceOf(IOException.class).isNotInstanceOf(BadDataLocationException.class);
+    } finally {
+      reader.shutdownNow();
     }
   }
 

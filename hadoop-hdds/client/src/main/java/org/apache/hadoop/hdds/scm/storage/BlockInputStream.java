@@ -149,6 +149,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (initialized) {
       return;
     }
+    // A closed stream has no client to get the block with.
+    checkOpen();
 
     List<ChunkInfo> chunks = null;
     IOException catchEx = null;

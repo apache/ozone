@@ -351,10 +351,10 @@ public final class ECStreamTestUtil {
         return EOF;
       }
       int n = (int) Math.min(buffer.remaining(), length - position);
+      awaitReadBarrier();
       if (shouldError && position + n > shouldErrorPosition) {
         throwError();
       }
-      awaitReadBarrier();
       ByteBuffer source = data.duplicate();
       source.position((int) position);
       source.limit(source.position() + n);
