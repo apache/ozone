@@ -62,4 +62,24 @@ class TestContainerReportQueue {
     assertThat(queue).hasSize(1);
     assertThat(queue.poll()).isSameAs(incrementalReport);
   }
+
+  @Test
+  void rejectsFullReportFromDifferentDatanodeAtCapacity() {
+    ContainerReportQueue queue = new ContainerReportQueue(1);
+
+    // Each call creates a datanode with a newly generated ID.
+    DatanodeDetails datanodeA = randomDatanodeDetails();
+    DatanodeDetails datanodeB = randomDatanodeDetails();
+    ContainerReportFromDatanode queuedReport = new ContainerReportFromDatanode(
+        datanodeA, ContainerReportsProto.getDefaultInstance());
+    ContainerReportFromDatanode newReport = new ContainerReportFromDatanode(
+        datanodeB, ContainerReportsProto.getDefaultInstance());
+
+    assertThat(queue.add(queuedReport)).isTrue();
+    assertThatIllegalStateException()
+        .isThrownBy(() -> queue.add(newReport))
+        .withMessage("capacity not available");
+    assertThat(queue).hasSize(1);
+    assertThat(queue.poll()).isSameAs(queuedReport);
+  }
 }
