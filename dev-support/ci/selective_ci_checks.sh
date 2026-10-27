@@ -170,7 +170,6 @@ function filter_changed_files() {
 
 SOURCES_TRIGGERING_TESTS=(
     "^.github"
-    "^design"
     "^dev-support"
     "^hadoop-hdds"
     "^hadoop-ozone"
@@ -248,18 +247,6 @@ function get_count_compose_files() {
     filter_changed_files true
     COUNT_COMPOSE_CHANGED_FILES=${match_count}
     readonly COUNT_COMPOSE_CHANGED_FILES
-    start_end::group_end
-}
-
-# Design docs in the top-level design/ directory are handled by the
-# rat basic check only; adding them to matched_files keeps them from triggering
-# the functional test matrix.
-function get_count_design_files() {
-    start_end::group_start "Count design doc files"
-    local pattern_array=(
-        "^design"
-    )
-    filter_changed_files true
     start_end::group_end
 }
 
@@ -635,7 +622,6 @@ run_all_tests_if_environment_files_changed
 
 get_count_all_files
 get_count_compose_files
-get_count_design_files
 get_changed_test_classes
 get_count_integration_files
 get_count_kubernetes_files

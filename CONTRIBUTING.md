@@ -12,10 +12,7 @@ We welcome contributions of:
  * **Code**. File a bug and submit a patch, or pick up any one of the unassigned Jiras.
    * [Newbie Ozone jiras](https://s.apache.org/OzoneNewbieJiras)
    * [All open and unassigned Ozone jiras](https://s.apache.org/OzoneUnassignedJiras)
- * **Documentation Improvements**: You can submit improvements to either:
-     * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/OZONE/Modifying+the+Ozone+Website)
-     * Developer design docs. These are markdown files [checked into the Apache Ozone Source tree](https://github.com/apache/ozone/tree/master/design).
- * The [wiki pages](https://cwiki.apache.org/confluence/display/OZONE/Contributing+to+Ozone): Please contact us at dev@ozone.apache.org and we can provide you write access to the wiki.
+ * **Documentation Improvements**: You can submit improvements to the Ozone website at https://github.com/apache/ozone-site
  * **Testing**: We always need help to improve our testing
       * Unit Tests (JUnit / Java)
       * Acceptance Tests (docker + robot framework)

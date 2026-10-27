@@ -276,23 +276,6 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
-# TODO: Re-enable as a "design only" test once a change under the top-level
-# design/ directory is committed upstream. The former "docs only" case pinned
-# commit 474457cb3, which only touched hadoop-hdds/docs (removed along with the
-# Hugo site). No historical commit exercises the new ^design matcher, so update
-# this to a design/-only commit SHA and assert basic-checks=["rat"] with all
-# needs-* false.
-# @test "design only" {
-#   run dev-support/ci/selective_ci_checks.sh <design-only-sha>
-#
-#   assert_output -p 'basic-checks=["rat"]'
-#   assert_output -p needs-build=false
-#   assert_output -p needs-compile=false
-#   assert_output -p needs-compose-tests=false
-#   assert_output -p needs-integration-tests=false
-#   assert_output -p needs-kubernetes-tests=false
-# }
-
 @test "main/java change" {
   run dev-support/ci/selective_ci_checks.sh 86a771dfe
 
