@@ -71,6 +71,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // is FILE_SYSTEM_OPTIMIZED.
   private final boolean requireFileSystemOptimized;
   private final String expectedETag;
+  private final String excludedETag;
   private final boolean derivedKeyPiggyBacking;
 
   private OmKeyArgs(Builder b) {
@@ -97,6 +98,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.requireFileSystemLayout = b.requireFileSystemLayout;
     this.requireFileSystemOptimized = b.requireFileSystemOptimized;
     this.expectedETag = b.expectedETag;
+    this.excludedETag = b.excludedETag;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
   }
 
@@ -208,6 +210,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return expectedETag;
   }
 
+  public String getExcludedETag() {
+    return excludedETag;
+  }
+
   public boolean isDerivedKeyPiggyBacking() {
     return derivedKeyPiggyBacking;
   }
@@ -260,6 +266,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     if (expectedETag != null) {
       builder.setExpectedETag(expectedETag);
     }
+    if (excludedETag != null) {
+      builder.setExcludedETag(excludedETag);
+    }
     return builder.build();
   }
 
@@ -289,6 +298,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private boolean requireFileSystemLayout;
     private boolean requireFileSystemOptimized;
     private String expectedETag;
+    private String excludedETag;
     private boolean derivedKeyPiggyBacking;
 
     public Builder() {
@@ -336,6 +346,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
+      this.excludedETag = obj.excludedETag;
       this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
@@ -492,6 +503,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setExpectedETag(String eTag) {
       this.expectedETag = eTag;
+      return this;
+    }
+
+    public Builder setExcludedETag(String eTag) {
+      this.excludedETag = eTag;
       return this;
     }
 

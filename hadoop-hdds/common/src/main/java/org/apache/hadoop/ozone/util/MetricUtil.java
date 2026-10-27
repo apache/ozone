@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableStat;
@@ -124,5 +125,24 @@ public final class MetricUtil {
         }
       }
     }
+  }
+
+  /**
+   * Returns a source name that is unique for a service in a mini cluster.
+   */
+  public static String getMetricsSourceName(String sourceName, String id) {
+    return DefaultMetricsSystem.inMiniClusterMode() && id != null
+        ? sourceName + '-' + id : sourceName;
+  }
+
+  /**
+   * Returns a source name that is unique for a service instance in a mini
+   * cluster.
+   */
+  public static String getMetricsSourceName(String sourceName,
+      String serviceId, String id) {
+    String metricsId = serviceId == null || serviceId.isEmpty()
+        ? id : serviceId + '-' + id;
+    return getMetricsSourceName(sourceName, metricsId);
   }
 }

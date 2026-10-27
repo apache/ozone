@@ -71,3 +71,24 @@ Check Bucket Ownership Verification
 
     ${correct_owner} =    Get bucket owner                   ${BUCKET}
     Execute AWSS3APICli using bucket ownership verification  head-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1    ${correct_owner}
+
+Head object with range
+                        Execute                            printf '0123456789' > /tmp/headrange
+                        Execute                            touch /tmp/headrange-empty
+    ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range --body /tmp/headrange   0
+    ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range-empty --body /tmp/headrange-empty   0
+
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range --range bytes=0-4   0
+                        Should contain          ${result}    "ContentLength": 5
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range --range bytes=-   0
+                        Should contain          ${result}    "ContentLength": 10
+                        Should not contain      ${result}    ContentRange
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range --range bytes=10-   255
+                        Should contain          ${result}    416
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range --range bytes=-0   255
+                        Should contain          ${result}    416
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range-empty --range bytes=-5   255
+                        Should contain          ${result}    416
+
+    ${result} =         Execute AWSS3APICli and checkrc    delete-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range   0
+    ${result} =         Execute AWSS3APICli and checkrc    delete-object --bucket ${BUCKET} --key ${PREFIX}/headobject/range-empty   0
