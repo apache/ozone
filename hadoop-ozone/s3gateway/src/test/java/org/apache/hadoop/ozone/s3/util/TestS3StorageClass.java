@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -249,7 +250,7 @@ class TestS3StorageClass {
       conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, policy);
       conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, policy);
       S3StorageClassResolver resolver = new S3StorageClassResolver(conf);
-      if (policy.trim().isEmpty()) {
+      if (StringUtils.isBlank(policy)) {
         assertNull(resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
         assertNull(resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
       }

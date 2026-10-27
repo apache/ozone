@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.s3;
 
-import com.google.common.annotations.VisibleForTesting;
 import javax.enterprise.inject.Produces;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.s3.util.S3StorageClassResolver;
@@ -46,7 +45,6 @@ public final class OzoneConfigurationHolder {
     return storageClassResolver;
   }
 
-  @VisibleForTesting
   public static void setConfiguration(
       OzoneConfiguration conf) {
     // Nullity check is used in case the configuration was already set
@@ -58,7 +56,6 @@ public final class OzoneConfigurationHolder {
     }
   }
 
-  @VisibleForTesting
   public static void resetConfiguration() {
     configuration = null;
     storageClassResolver = null;
