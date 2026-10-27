@@ -180,6 +180,11 @@ public final class OzoneConsts {
 
   public static final String OM_KEY_PREFIX = "/";
   public static final String DOUBLE_SLASH_OM_KEY_PREFIX  = "//";
+  /**
+   * Separates the key name from the versionId in versionedKeyTable DB keys.
+   * Not '/', since key names may contain it.
+   */
+  public static final String OM_VERSIONED_KEY_SEPARATOR = "\0";
   public static final String OM_USER_PREFIX = "$";
   public static final String OM_S3_PREFIX = "S3:";
   public static final String OM_S3_CALLER_CONTEXT_PREFIX = "S3Auth:S3G|";
@@ -299,6 +304,7 @@ public final class OzoneConsts {
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
+  public static final String VERSIONING_STATUS = "versioningStatus";
   public static final String CREATION_TIME = "creationTime";
   public static final String MODIFICATION_TIME = "modificationTime";
   public static final String DATA_SIZE = "dataSize";

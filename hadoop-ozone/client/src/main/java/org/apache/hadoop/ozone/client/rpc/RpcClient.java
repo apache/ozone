@@ -136,6 +136,7 @@ import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -626,6 +627,10 @@ public class RpcClient implements ClientProtocol {
     Objects.requireNonNull(bucketArgs, "bucketArgs == null");
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
+    if (bucketArgs.getVersioning()) {
+      throw new OMException("Bucket versioning cannot be set while the bucket is being created; create the bucket"
+          + " first and then set its versioning.", OMException.ResultCodes.INVALID_REQUEST);
+    }
     if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
       if (bucketArgs.getDefaultReplicationConfig() != null &&
           bucketArgs.getDefaultReplicationConfig().getType()
@@ -661,7 +666,6 @@ public class RpcClient implements ClientProtocol {
     OmBucketInfo.Builder builder = OmBucketInfo.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setIsVersionEnabled(isVersionEnabled)
         .addAllMetadata(bucketArgs.getMetadata())
         .setStorageType(storageType)
         .setSourceVolume(bucketArgs.getSourceVolume())
@@ -1231,10 +1235,14 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(versioning, "versioning == null");
+    if (!OzoneManagerVersion.S3_OBJECT_VERSIONING.isSupportedBy(omVersion)) {
+      throw new IOException("Can not set bucket versioning, as OzoneManager does not support S3 object versioning.");
+    }
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setIsVersionEnabled(versioning);
+        .setVersioningStatus(versioning
+            ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED);
     ozoneManagerClient.setBucketProperty(builder.build());
   }
 
@@ -1342,7 +1350,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(bucketInfo.getVolumeName())
         .setName(bucketInfo.getBucketName())
         .setStorageType(bucketInfo.getStorageType())
-        .setVersioning(bucketInfo.getIsVersionEnabled())
+        .setVersioning(bucketInfo.isVersionEnabled())
         .setCreationTime(bucketInfo.getCreationTime())
         .setModificationTime(bucketInfo.getModificationTime())
         .setMetadata(bucketInfo.getMetadata())
@@ -1375,7 +1383,7 @@ public class RpcClient implements ClientProtocol {
                 .setVolumeName(bucket.getVolumeName())
                 .setName(bucket.getBucketName())
                 .setStorageType(bucket.getStorageType())
-                .setVersioning(bucket.getIsVersionEnabled())
+                .setVersioning(bucket.isVersionEnabled())
                 .setCreationTime(bucket.getCreationTime())
                 .setModificationTime(bucket.getModificationTime())
                 .setMetadata(bucket.getMetadata())

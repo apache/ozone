@@ -342,7 +342,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
         boolean isNamespaceUpdate = false;
-        if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        if (keyToDelete != null && !omBucketInfo.isVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
               keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
           // Remove any block from oldKeyVersionsToDelete that shares the same

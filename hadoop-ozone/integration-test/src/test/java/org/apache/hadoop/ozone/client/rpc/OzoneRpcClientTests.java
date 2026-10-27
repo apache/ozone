@@ -746,7 +746,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVersioning(true);
-    volume.createBucket(bucketName, builder.build());
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_REQUEST,
+        () -> volume.createBucket(bucketName, builder.build()));
+
+    // versioning can only be set after the bucket is created
+    volume.createBucket(bucketName);
+    volume.getBucket(bucketName).setVersioning(true);
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
     assertTrue(bucket.getVersioning());
@@ -812,14 +817,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setVersioning(true)
-        .setStorageType(StorageType.SSD)
+    builder.setStorageType(StorageType.SSD)
         .addAcl(userAcl)
         .setDefaultReplicationConfig(new DefaultReplicationConfig(repConfig));
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
-    assertTrue(bucket.getVersioning());
     assertEquals(StorageType.SSD, bucket.getStorageType());
     assertThat(bucket.getAcls()).contains(userAcl);
     assertEquals(repConfig, bucket.getReplicationConfig());
@@ -1827,9 +1830,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     store.createVolume(volumeName);
     volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setBucketLayout(bucketLayout).setVersioning(true).build();
+        .setBucketLayout(bucketLayout).build();
     volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
+    bucket.setVersioning(true);
     String keyName = UUID.randomUUID().toString();
 
     writeKey(bucket, keyName, ONE, value, valueLength);
@@ -5039,9 +5043,11 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // This test inspects RocksDB delete table to check for versioning
     // information. This is easier to do with object store keys.
     volume.createBucket(bucketName, BucketArgs.newBuilder()
-        .setVersioning(versioning)
         .setBucketLayout(VERSIONING_TEST_BUCKET_LAYOUT).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
+    if (versioning) {
+      bucket.setVersioning(true);
+    }
 
     DataTestUtil.createKey(bucket, keyName,
         replicationConfig, value.getBytes(UTF_8));
@@ -5141,12 +5147,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private OzoneBucket getBucket(OzoneVolume volume) throws IOException {
     String bucketName = UUID.randomUUID().toString();
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setVersioning(true).setDefaultReplicationConfig(
+    builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
             StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE)));
     volume.createBucket(bucketName, builder.build());
-    return volume.getBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    bucket.setVersioning(true);
+    return bucket;
   }
 
   private static ReplicationConfig anyReplication() {

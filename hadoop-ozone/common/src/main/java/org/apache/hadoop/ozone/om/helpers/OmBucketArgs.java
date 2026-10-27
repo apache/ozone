@@ -41,9 +41,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private final String bucketName;
   /**
-   * Bucket Version flag.
+   * S3-compatible versioning status; null when not being changed.
    */
-  private final Boolean isVersionEnabled;
+  private final BucketVersioningStatus versioningStatus;
   /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
@@ -72,7 +72,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
-    this.isVersionEnabled = b.isVersionEnabled;
+    this.versioningStatus = b.versioningStatus;
     this.storageType = b.storageType;
     this.ownerName = b.ownerName;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
@@ -101,11 +101,22 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   /**
-   * Returns true if bucket version is enabled, else false.
-   * @return isVersionEnabled
+   * Returns whether versioning is being enabled, or null if it is not being
+   * changed.
+   * @deprecated use {@link #getVersioningStatus()}.
    */
+  @Deprecated
   public Boolean getIsVersionEnabled() {
-    return isVersionEnabled;
+    return versioningStatus == null ? null
+        : versioningStatus == BucketVersioningStatus.ENABLED;
+  }
+
+  /**
+   * Returns the requested versioning status, or null if not being changed.
+   * @return BucketVersioningStatus
+   */
+  public BucketVersioningStatus getVersioningStatus() {
+    return versioningStatus;
   }
 
   /**
@@ -188,8 +199,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.GDPR_FLAG,
         getMetadata().get(OzoneConsts.GDPR_FLAG));
-    auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
-                String.valueOf(this.isVersionEnabled));
+    if (this.versioningStatus != null) {
+      auditMap.put(OzoneConsts.VERSIONING_STATUS, this.versioningStatus.name());
+    }
     if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
     }
@@ -226,7 +238,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   public static class Builder extends WithMetadata.Builder {
     private String volumeName;
     private String bucketName;
-    private Boolean isVersionEnabled;
+    private BucketVersioningStatus versioningStatus;
     private StorageType storageType;
     private boolean quotaInBytesSet = false;
     private long quotaInBytes;
@@ -256,8 +268,20 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    /**
+     * Maps the legacy flag onto the versioning status: true enables
+     * versioning, false suspends it.
+     * @deprecated use {@link #setVersioningStatus(BucketVersioningStatus)}.
+     */
+    @Deprecated
     public Builder setIsVersionEnabled(Boolean versionFlag) {
-      this.isVersionEnabled = versionFlag;
+      this.versioningStatus = versionFlag == null ? null : versionFlag
+          ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED;
+      return this;
+    }
+
+    public Builder setVersioningStatus(BucketVersioningStatus status) {
+      this.versioningStatus = status;
       return this;
     }
 
@@ -336,8 +360,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName);
-    if (isVersionEnabled != null) {
-      builder.setIsVersionEnabled(isVersionEnabled);
+    if (versioningStatus != null) {
+      builder.setVersioningStatus(versioningStatus.toProto());
     }
     if (storageType != null) {
       builder.setStorageType(storageType.toProto());
@@ -378,7 +402,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         .setBucketName(bucketArgs.getBucketName())
         .addAllMetadata(KeyValueUtil.getFromProtobuf(bucketArgs.getMetadataList()));
 
-    if (bucketArgs.hasIsVersionEnabled()) {
+    if (bucketArgs.hasVersioningStatus()) {
+      builder.setVersioningStatus(
+          BucketVersioningStatus.fromProto(bucketArgs.getVersioningStatus()));
+    } else if (bucketArgs.hasIsVersionEnabled()) {
+      // Deprecated flag, still sent by older clients.
       builder.setIsVersionEnabled(bucketArgs.getIsVersionEnabled());
     }
     if (bucketArgs.hasStorageType()) {
