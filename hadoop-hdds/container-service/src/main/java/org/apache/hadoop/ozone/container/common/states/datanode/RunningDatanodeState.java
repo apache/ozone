@@ -140,7 +140,6 @@ public class RunningDatanodeState implements DatanodeState {
    * which can be longer than the SCM heartbeat interval.
    * @return true if the endpoint is Recon in HEARTBEAT state and its next heartbeat is not due yet
    */
-  @VisibleForTesting
   boolean isReconHeartbeatNotDue(EndpointStateMachine endpoint) {
     if (!endpoint.isPassive() || endpoint.getState() != EndPointStates.HEARTBEAT) {
       return false;
