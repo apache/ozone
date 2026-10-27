@@ -125,6 +125,7 @@ We use GitHub pull requests for contributing changes to the repository. The main
 ### Pull request guidelines
 
 * Keep distinct issues in separate PRs, and avoid unrelated changes, such as reformatting or renaming adjacent code.
+* Submit user-facing documentation changes as a separate PR to [apache/ozone-site](https://github.com/apache/ozone-site), not to this repository. Design docs and configuration descriptions in `ozone-default.xml` stay in this repository.
 * Move build changes, refactoring or cleanup into a follow-up PR when they obscure the functional change.
 * For cleanup, consider compatibility and deprecation before removing public interfaces, and notify the original authors when practical.
 * For test fixes, inspect the failure evidence and address the cause instead of only increasing a timeout.

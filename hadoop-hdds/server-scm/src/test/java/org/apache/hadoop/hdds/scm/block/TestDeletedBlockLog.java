@@ -39,6 +39,7 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -81,6 +82,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
@@ -127,12 +129,15 @@ public class TestDeletedBlockLog {
   private static final int ONE = ReplicationFactor.ONE_VALUE;
 
   private ReplicationManager replicationManager;
+  private ContainerReplicaPendingOps pendingOps;
 
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     replicationManager = mock(ReplicationManager.class);
+    pendingOps = new ContainerReplicaPendingOps(Clock.systemUTC(), null);
+    when(replicationManager.getContainerReplicaPendingOps()).thenReturn(pendingOps);
     // This test runs a real SCM, whose startup builds a NodeDecommissionManager that reads
     // rm.getConfig(), so the injected mock RM must return a real config, not null.
     when(replicationManager.getConfig()).thenReturn(
@@ -422,6 +427,93 @@ public class TestDeletedBlockLog {
 
     blocks = getTransactions(50 * BLOCKS_PER_TXN * THREE);
     assertEquals(0, blocks.size());
+  }
+
+  // The tests below exercise SCM's purge decision in SCMDeletedBlockTransactionStatusManager#commitTransactions.
+  // TestKeyValueContainer#testExportCarriesOnlyDeletionsRecordedBeforeExport covers the datanode side: a copy
+  // exported before the source recorded the deletion keeps the blocks with no pending-delete record, while a copy
+  // exported later carries it. These tests verify that SCM keeps the transaction for resend whenever it cannot rule
+  // out a replica of the first kind.
+  @Test
+  public void testCommitTransactionsDefersPurgeOnlyForContainerWithPendingAdd() throws Exception {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    mockContainerHealthResult(true);
+    addTransactions(generateData(2), true);
+    List<DeletedBlocksTransaction> blocks = getTransactions(2 * BLOCKS_PER_TXN * THREE);
+    Collection<DeletedBlocksTransaction> bothTxns = blocks.stream()
+        .collect(Collectors.toMap(DeletedBlocksTransaction::getTxID, t -> t, (a, b) -> a))
+        .values();
+    assertEquals(2, bothTxns.size());
+
+    // A copy of the first container is in flight; the other container has none. The pending op does not
+    // depend on the order in which the candidates are checked.
+    final ContainerID pendingCid = ContainerID.valueOf(bothTxns.iterator().next().getContainerID());
+    pendingOps.scheduleAddReplica(pendingCid, DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build(),
+        0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, 0L);
+
+    commitTransactions(bothTxns, dnList.get(0), dnList.get(1), dnList.get(2));
+
+    assertEquals(1, deletedBlockLog.getNumOfValidTransactions(),
+        "only the container without an in-flight replica ADD may be purged");
+    assertEquals(1, deletedBlockLog.getTransactionToDNsCommitMapSize());
+  }
+
+  @Test
+  public void testCommitTransactionsPurgesAfterCopiedReplicaAcknowledges() throws Exception {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    addTransactions(generateData(1), true);
+    mockContainerHealthResult(true);
+    List<DeletedBlocksTransaction> blocks = getTransactions(BLOCKS_PER_TXN * THREE);
+    List<DeletedBlocksTransaction> singleTxn = Collections.singletonList(blocks.get(0));
+    final ContainerID cid = ContainerID.valueOf(blocks.get(0).getContainerID());
+
+    // A copy is scheduled, so its export may predate the source recording the deletion, and all original replicas
+    // acknowledge before the copy is imported: the transaction must be kept.
+    DatanodeDetails copyTarget = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+    pendingOps.scheduleAddReplica(cid, copyTarget, 0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, 0L);
+    commitTransactions(singleTxn, dnList.get(0), dnList.get(1), dnList.get(2));
+    assertEquals(1, deletedBlockLog.getNumOfValidTransactions(), "purged while a replica was being copied");
+
+    // The copy is imported and registered; the original replicas' acks alone no longer suffice.
+    replicas.get(cid).add(ContainerReplica.newBuilder()
+        .setContainerID(cid)
+        .setContainerState(ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(copyTarget)
+        .build());
+    pendingOps.completeAddReplica(cid, copyTarget, 0);
+    commitTransactions(singleTxn, dnList.get(0));
+    assertEquals(1, deletedBlockLog.getNumOfValidTransactions(), "purged before the copied replica acknowledged");
+
+    // Once the copied replica acknowledges the resent transaction it is purged.
+    commitTransactions(singleTxn, copyTarget);
+    assertEquals(0, deletedBlockLog.getNumOfValidTransactions());
+    assertEquals(0, deletedBlockLog.getTransactionToDNsCommitMapSize());
+  }
+
+  @Test
+  public void testDeferredPurgeCompletesOnScanWhenCopyNeverRegisters() throws Exception {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    addTransactions(generateData(1), true);
+    mockContainerHealthResult(true);
+    List<DeletedBlocksTransaction> blocks = getTransactions(BLOCKS_PER_TXN * THREE);
+    List<DeletedBlocksTransaction> singleTxn = Collections.singletonList(blocks.get(0));
+    final ContainerID cid = ContainerID.valueOf(blocks.get(0).getContainerID());
+
+    DatanodeDetails copyTarget = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+    pendingOps.scheduleAddReplica(cid, copyTarget, 0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, 0L);
+    commitTransactions(singleTxn, dnList.get(0), dnList.get(1), dnList.get(2));
+    assertEquals(1, deletedBlockLog.getNumOfValidTransactions());
+
+    // While the copy is still pending, a scan must neither resend nor purge: every replica already acknowledged.
+    assertEquals(0, getTransactions(BLOCKS_PER_TXN * THREE).size());
+    assertEquals(1, deletedBlockLog.getNumOfValidTransactions());
+
+    // The copy is abandoned (failed or expired) without a replica ever registering. No replica is left to
+    // acknowledge a resend, so the next scan has to purge the transaction itself.
+    pendingOps.completeAddReplica(cid, copyTarget, 0);
+    assertEquals(0, getTransactions(BLOCKS_PER_TXN * THREE).size());
+    assertEquals(0, deletedBlockLog.getNumOfValidTransactions());
+    assertEquals(0, deletedBlockLog.getTransactionToDNsCommitMapSize());
   }
 
   private void recordScmCommandToStatusManager(
@@ -1001,7 +1093,7 @@ public class TestDeletedBlockLog {
         new SCMDeletedBlockTransactionStatusManager(
             mockStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
-            containerManager, metrics, Long.MAX_VALUE);
+            containerManager, () -> pendingOps, metrics, Long.MAX_VALUE);
 
     assertThrows(IOException.class, () -> statusManager.addTransactions(txList));
     // Increment must NOT be rolled back: the late commit can still apply.
@@ -1039,7 +1131,7 @@ public class TestDeletedBlockLog {
         new SCMDeletedBlockTransactionStatusManager(
             mockStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
-            containerManager, metrics, Long.MAX_VALUE);
+            containerManager, () -> pendingOps, metrics, Long.MAX_VALUE);
 
     assertThrows(IOException.class, () -> statusManager.addTransactions(txList));
     // Hard failure: write did not land, rollback must restore summary to 0.
@@ -1064,7 +1156,7 @@ public class TestDeletedBlockLog {
         new SCMDeletedBlockTransactionStatusManager(
             mockStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
-            containerManager, metrics, Long.MAX_VALUE);
+            containerManager, () -> pendingOps, metrics, Long.MAX_VALUE);
 
     statusManager.addTransactions(new ArrayList<>(
         Collections.singletonList(buildTx(txId, containerId, blockSize, blockCount))));
@@ -1104,7 +1196,7 @@ public class TestDeletedBlockLog {
         new SCMDeletedBlockTransactionStatusManager(
             mockStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
-            containerManager, metrics, Long.MAX_VALUE);
+            containerManager, () -> pendingOps, metrics, Long.MAX_VALUE);
 
     statusManager.addTransactions(new ArrayList<>(
         Collections.singletonList(buildTx(txId, containerId, blockSize, blockCount))));
@@ -1283,7 +1375,8 @@ public class TestDeletedBlockLog {
   private SCMDeletedBlockTransactionStatusManager newStatusManager(DeletedBlockLogStateManager stateManager)
       throws IOException {
     return new SCMDeletedBlockTransactionStatusManager(stateManager,
-        scm.getScmMetadataStore().getStatefulServiceConfigTable(), containerManager, metrics, Long.MAX_VALUE);
+        scm.getScmMetadataStore().getStatefulServiceConfigTable(), containerManager, () -> pendingOps, metrics,
+        Long.MAX_VALUE);
   }
 
   private void persistSummary(long txCount) throws IOException {

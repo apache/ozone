@@ -140,19 +140,23 @@ public abstract class AbstractBackgroundContainerScanner implements Runnable {
   }
 
   /**
-   * Shutdown the current container scanning thread.
-   * If the thread is already being shutdown, the call will block until the
-   * shutdown completes.
+   * Requests shutdown and waits for the scanning thread to exit, unless called by the scanning thread itself.
+   * Concurrent callers also wait for shutdown to complete, unless interrupted.
+   *
+   * <p>Do not hold this object's monitor while calling this method: the scanning thread may also call shutdown.
    */
-  public synchronized void shutdown() {
+  public void shutdown() {
     if (stopping.compareAndSet(false, true)) {
       scannerThread.interrupt();
-      try {
-        scannerThread.join();
-      } catch (InterruptedException ex) {
-        LOG.warn("Unexpected exception while stopping data scanner.", ex);
-        Thread.currentThread().interrupt();
-      }
+    }
+    if (Thread.currentThread() == scannerThread) {
+      return;
+    }
+    try {
+      scannerThread.join();
+    } catch (InterruptedException ex) {
+      LOG.warn("Unexpected exception while stopping data scanner.", ex);
+      Thread.currentThread().interrupt();
     }
   }
 

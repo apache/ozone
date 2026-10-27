@@ -93,6 +93,19 @@ public class TestOMNodeDetails {
     assertEquals(RATIS_PORT, nodeDetails.getRatisPort());
   }
 
+  @Test
+  public void testIpv6HostAddress() {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setHostAddress("2001:db8::10")
+        .setRpcPort(RPC_PORT)
+        .setRatisPort(RATIS_PORT)
+        .build();
+
+    assertEquals(new InetSocketAddress("2001:db8::10", RPC_PORT), nodeDetails.getRpcAddress());
+  }
+
   /**
    * Test isRatisListener flag.
    */

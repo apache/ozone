@@ -34,12 +34,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -47,6 +51,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.storage.TestClientThreadShutdown;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
@@ -63,6 +68,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
@@ -72,6 +78,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -84,6 +91,23 @@ import org.slf4j.event.Level;
  * Run RPC Client tests.
  */
 public class TestRpcClient {
+  @Test
+  void ratisWriteDoesNotPreventJvmShutdown(@TempDir Path tempDir) throws Exception {
+    TestClientThreadShutdown.assertExitsWithoutClosingClient(
+        tempDir.resolve("ratis-write.log"), RatisWriteClient.class, "RATIS_WRITE");
+  }
+
+  /** Child JVM for the HDDS-10564 regression test, using the actual RpcClient write executor. */
+  public static final class RatisWriteClient {
+    public static void main(String[] args) throws Exception {
+      RpcClient client = createRpcClient();
+      @SuppressWarnings("unchecked")
+      Supplier<ExecutorService> executor =
+          (Supplier<ExecutorService>) FieldUtils.readField(client, "writeExecutor", true);
+      TestClientThreadShutdown.writeRatisBlock(executor.get());
+    }
+  }
+
   private enum ValidateOmVersionTestCases {
     NULL_EXPECTED_NO_OM(
         null, // Expected version
@@ -373,6 +397,40 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * S3 Gateway serves all users with one RpcClient. A request from bob on another thread must not change the owner
+   * of the key that alice creates.
+   */
+  @Test
+  public void testKeyOwnerComesFromS3AuthOfCallingThread() throws Exception {
+    List<String> owners = new ArrayList<>();
+    RpcClient client = createRpcClient(new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.CreateKey) {
+          owners.add(request.getCreateKeyRequest().getKeyArgs().getOwnerName());
+        }
+        return super.submitRequest(request);
+      }
+    });
+    try {
+      client.createVolume("vol1");
+      client.createBucket("vol1", "bucket1");
+      client.setThreadLocalS3Auth(new S3Auth("stringToSign", "signature", "alice", "alice"));
+      Thread otherRequest = new Thread(
+          () -> client.setThreadLocalS3Auth(new S3Auth("stringToSign", "signature", "bob", "bob")));
+      otherRequest.start();
+      otherRequest.join();
+
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+      client.createKey("vol1", "bucket1", "key1", 0, replication, Collections.emptyMap()).close();
+      assertThat(owners).containsExactly("alice");
+    } finally {
+      client.clearThreadLocalS3Auth();
+      client.close();
+    }
+  }
+
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
       names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
@@ -589,6 +647,56 @@ public class TestRpcClient {
       assertThat(error).hasMessage("Captured CreateKey request");
       assertThat(captured.get()).isNotNull();
       assertThat(captured.get().getDerivedKeyPiggyBacking()).isEqualTo(expected);
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testIfNoneMatchETagReachesOMOrRejectsOldVersion(OzoneManagerVersion version) throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList)
+              .setStatus(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK)
+              .setSuccess(true).setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(
+                  new ServiceInfo.Builder().setNodeType(HddsProtos.NodeType.OM).setHostname("localhost")
+                      .setOmVersion(version).build().getProtobuf())).build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          requests.add(request.getCreateKeyRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        if (request.getCmdType() == Type.CompleteMultiPartUpload) {
+          requests.add(request.getCompleteMultiPartUploadRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      IOException putError = assertThrows(IOException.class, () -> client.createKeyIfNoneMatch("vol", "bucket", "key",
+          1L, "excluded-etag", replication, Collections.emptyMap(), Collections.emptyMap(), false));
+      IOException streamError = assertThrows(IOException.class, () -> client.createStreamKeyIfNoneMatch("vol", "bucket",
+          "key", 1L, "excluded-etag", replication, Collections.emptyMap(), Collections.emptyMap(), false));
+      IOException completeError = assertThrows(IOException.class, () -> client.completeMultipartUpload("vol", "bucket",
+          "key", "upload-id", Collections.singletonMap(1, "part-etag"), null, null, "excluded-etag"));
+      if (version == OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) {
+        assertEquals("captured", putError.getMessage());
+        assertEquals("captured", streamError.getMessage());
+        assertEquals("captured", completeError.getMessage());
+        assertThat(requests).hasSize(3).allSatisfy(args -> assertEquals("excluded-etag", args.getExcludedETag()));
+      } else {
+        assertThat(requests).isEmpty();
+        assertThat(putError.getMessage()).contains("does not support If-None-Match");
+        assertThat(streamError.getMessage()).contains("does not support If-None-Match");
+        assertThat(completeError.getMessage()).contains("does not support If-None-Match");
+      }
     } finally {
       client.close();
     }

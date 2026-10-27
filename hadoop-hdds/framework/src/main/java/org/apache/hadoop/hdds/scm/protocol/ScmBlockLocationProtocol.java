@@ -113,6 +113,15 @@ public interface ScmBlockLocationProtocol extends Closeable {
       deleteKeyBlocks(List<BlockGroup> keyBlocksInfoList) throws IOException;
 
   /**
+   * Returns the SCM Ratis follower replication lag (in Raft log entries) most
+   * recently reported by SCM on a {@link #deleteKeyBlocks} response, or 0 if no
+   * value has been observed yet.
+   */
+  default long getLastKnownFollowerReplicationLag() {
+    return 0;
+  }
+
+  /**
    * Gets the Clusterid and SCM Id from SCM.
    */
   ScmInfo getScmInfo() throws IOException;
