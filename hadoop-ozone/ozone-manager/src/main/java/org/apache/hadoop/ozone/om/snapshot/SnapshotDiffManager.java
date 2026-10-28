@@ -814,9 +814,12 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
               "Largest Page entry: {}", diffJob.getLargestEntryKey(), largestPageIndex);
       // The job is stored under jobKey (fromSnapshotId + DELIMITER + toSnapshotId), not
       // under its jobId; passing the jobId here would look up a missing row.
-      SnapshotDiffJob currentJob = snapDiffJobTable.get(jobKey);
-      if (currentJob != null && currentJob.getJobId().equals(diffJob.getJobId()) && currentJob.getStatus() == DONE) {
-        updateJobStatus(jobKey, DONE, FAILED);
+      // Cleanup deletes job rows without the manager lock, so share the DB monitor with cleanup as well.
+      synchronized (db) {
+        SnapshotDiffJob currentJob = snapDiffJobTable.get(jobKey);
+        if (currentJob != null && currentJob.getJobId().equals(diffJob.getJobId()) && currentJob.getStatus() == DONE) {
+          updateJobStatus(jobKey, DONE, FAILED);
+        }
       }
       throw new IOException("Report integrity check failed. Retry after: " +
           ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval());
