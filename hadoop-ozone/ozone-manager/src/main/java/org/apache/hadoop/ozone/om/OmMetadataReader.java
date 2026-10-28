@@ -265,7 +265,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         validateFileSystemLayout(bucket);
       }
       if (isAclEnabled) {
-        checkListStatusAcls(args, bucket);
+        checkListStatusAcls(args, bucket, allowPartialPrefixes);
       }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
@@ -299,7 +299,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         validateFileSystemLayout(bucket);
       }
       if (isAclEnabled) {
-        checkListStatusAcls(resolvedArgs, bucket);
+        checkListStatusAcls(resolvedArgs, bucket, allowPartialPrefixes);
       }
       metrics.incNumListStatus();
       List<OzoneFileStatus> ozoneFileStatuses = keyManager.listStatus(
@@ -886,7 +886,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     return getS3Auth() != null && OzoneManager.getStsTokenIdentifier() != null;
   }
 
-  private void checkListStatusAcls(OmKeyArgs args, ResolvedBucket bucket) throws IOException {
+  private void checkListStatusAcls(OmKeyArgs args, ResolvedBucket bucket, boolean allowPartialPrefixes)
+      throws IOException {
     if (isStsS3Request()) {
       checkAcls(
           ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(),
@@ -894,6 +895,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       return;
     }
 
+    // Listing the bucket root, or the keys matching a name prefix, also needs LIST on the bucket, as listKeys does.
+    if (allowPartialPrefixes || getResourceType(args) == ResourceType.BUCKET) {
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, bucket, args.getKeyName());
+    }
     checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
   }
 

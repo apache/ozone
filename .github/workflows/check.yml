@@ -45,6 +45,12 @@ on:
         default: ''
         required: false
 
+      display-name:
+        type: string
+        description: "To be displayed instead of the script's name (default: none)"
+        default: ''
+        required: false
+
       needs-maven-cache:
         type: boolean
         description: "Whether to restore Maven cache before run (default: yes)"
@@ -113,7 +119,7 @@ on:
 
       split:
         type: string
-        description: "Name of split for matrix jobs, only used in display name"
+        description: "Name of split for matrix jobs, used in display name and artifact name"
         default: ''
         required: false
 
@@ -141,6 +147,7 @@ env:
   OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_VOLUME_OWNER: 1000
+  DISPLAY_NAME: ${{ inputs.display-name }}
   SCRIPT: ${{ inputs.script }}
   SPLIT: ${{ inputs.split }}
 
@@ -148,7 +155,7 @@ permissions: { }
 
 jobs:
   check:
-    name: ${{ (inputs.split && format('{0} ({1})', inputs.script, inputs.split)) || inputs.script }}
+    name: ${{ (inputs.split && format('{0} ({1})', (inputs.display-name || inputs.script), inputs.split)) || inputs.display-name || inputs.script }}
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
@@ -275,13 +282,12 @@ jobs:
         id: artifact-name
         if: ${{ !cancelled() }}
         run: |
-          if [[ -z "${SPLIT:-}" ]]; then
-            artifact="$SCRIPT"
-          else
-            split=$(echo "$SPLIT" | sed -e 's!/!-!g' -e 's/.sh$//')
-            artifact="${SCRIPT}-${split}"
+          job="${DISPLAY_NAME:-$SCRIPT}"
+          split=""
+          if [[ -n "${SPLIT:-}" ]]; then
+            split=$(echo "-$SPLIT" | sed -e 's!/!-!g' -e 's/.sh$//')
           fi
-          echo "ARTIFACT=$artifact" >> $GITHUB_ENV
+          echo "ARTIFACT=${job}${split}" >> $GITHUB_ENV
 
       - name: Archive build results
         id: archive
