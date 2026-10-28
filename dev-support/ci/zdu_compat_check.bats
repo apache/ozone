@@ -23,7 +23,8 @@
 # Runs the check on the diff of commit $1 and leaves its output in $output.
 check_commit() {
   local commit="$1"
-  git cat-file -e "${commit}^{commit}" || skip "commit ${commit} is not in this clone. Fetch the full history to run this test."
+  git cat-file -e "${commit}^{commit}" ||
+    skip "commit ${commit} is not in this clone. Fetch the full history to run this test."
   # Get the change the commit made against its first parent, and feed that diff to the script under test.
   run "${BATS_TEST_DIRNAME}/zdu_compat_check.sh" < <(git diff "${commit}~1" "${commit}")
   [ "$status" -eq 0 ]
@@ -66,6 +67,12 @@ check_commit() {
   # HDDS-16110. [STS] Update key in sts revocation table
   check_commit dc169f6e87
   [[ "$output" == *"S3RevokeSTSTokenRequest.java\`: RocksDB write changed"* ]]
+}
+
+@test "OM response RocksDB write" {
+  # HDDS-16110. [STS] Update key in sts revocation table
+  check_commit dc169f6e87
+  [[ "$output" == *"S3RevokeSTSTokenResponse.java\`: RocksDB write changed in an OM response"* ]]
 }
 
 @test "client side translator change" {
@@ -142,6 +149,12 @@ check_commit() {
   # HDDS-17357. Initialize Netty in background when Ozone client is created
   check_commit 88119243f9
   [[ "$output" == *"OzoneClientConfig.java\`: Configuration default changed"* ]]
+}
+
+@test "configuration default change in a config keys class" {
+  # HDDS-17075. Throttle OM block deletion to SCM when SCM followers are highly lagged
+  check_commit 182fb5f470
+  [[ "$output" == *"OMConfigKeys.java\`: Configuration default changed"* ]]
 }
 
 @test "each warning is reported once per file" {

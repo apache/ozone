@@ -26,12 +26,14 @@ GUIDE_URL='https://ozone.apache.org/docs/next/developer-guide/develop/upgrade-co
 
 # Files, matched against the path of the changed file.
 OM_REQUEST_FILE='^hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/request/.*\.java$'
+OM_RESPONSE_FILE='^hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/response/.*\.java$'
 CLIENT_TRANSLATOR_FILE='ClientSideTranslatorPB\.java$'
 SERVER_TRANSLATOR_FILE='ServerSideTranslatorPB\.java$'
 PROTO_FILE='/src/main/proto/.*\.proto$'
-PEER_PROTOCOL_FILE='/(OMAdminProtocol|OMInterServiceProtocol|ScmBlockLocationProtocol|StorageContainerLocationProtocol)\.java$'
+PEER_PROTOCOL_FILE='/(OMAdminProtocol|OMInterServiceProtocol|ScmBlockLocationProtocol|'
+PEER_PROTOCOL_FILE+='StorageContainerLocationProtocol)\.java$'
 DB_DEFINITION_FILE='DBDefinition\.java$'
-CONFIG_FILE='(/ozone-default\.xml|Config(uration)?\.java)$'
+CONFIG_FILE='(/ozone-default\.xml|Config(Keys|uration)?\.java)$'
 TEST_FILE='/src/test/'
 
 # Added or removed lines, matched against the diff line including its leading + or -.
@@ -42,10 +44,12 @@ THROW_LINE='^[+-].*throw new '
 # any enum change.
 PROTO_RPC_LINE='^\+ *rpc '
 PROTO_ENUM_LINE='^[+-] *[A-Za-z_][A-Za-z0-9_]* *= *-?[0-9]+ *(\[.*\])? *;'
-PROTO_FIELD_LINE='^\+ *((optional|required|repeated) +)?[A-Za-z_][A-Za-z0-9_.]*(<[^>]*>)? +[A-Za-z_][A-Za-z0-9_]* *= *[0-9]+'
+PROTO_FIELD_LINE='^\+ *((optional|required|repeated) +)?[A-Za-z_][A-Za-z0-9_.]*(<[^>]*>)? +'
+PROTO_FIELD_LINE+='[A-Za-z_][A-Za-z0-9_]* *= *[0-9]+'
 
-# Matches either `defaultValue` in a Java configuration object, or a `<value>` xml tag in ozone-default.xml.
-CONFIG_DEFAULT_LINE='^[+-].*(defaultValue *=|<value>)'
+# Matches `defaultValue` in a Java configuration object, a `*_DEFAULT` constant in a Java config keys class, or a
+# `<value>` xml tag in ozone-default.xml.
+CONFIG_DEFAULT_LINE='^[+-].*(defaultValue *=|_DEFAULT *=|<value>)'
 
 warn() {
   echo "- \`${file}\`: $*"
@@ -66,11 +70,13 @@ while IFS= read -r line; do
   # Checks for OM Request files
   if [[ "$file" =~ $OM_REQUEST_FILE ]]; then
     warn "OM request changed. If validateAndUpdateCache was modified such that an old and new OM would arrive at" \
-      "different DB state when replaying the same transaction, then gate the new behavior with an \`OzoneManagerVersion\`." \
+      "different DB state when replaying the same transaction, then gate the new behavior with an" \
+      "\`OzoneManagerVersion\`." \
       "If this adds a new request, block it until its feature is finalized with" \
       "\`@DisallowedUntilOmVersion(OzoneManagerVersion.X)\` on its \`preExecute\` method."
     if [[ "$line" =~ $DB_WRITE_LINE ]]; then
-      warn "RocksDB write changed in an OM request. Changes to what is persisted must be gated with an \`OzoneManagerVersion\`."
+      warn "RocksDB write changed in an OM request. Changes to what is persisted must be gated with an" \
+        "\`OzoneManagerVersion\`."
     fi
     if [[ "$line" =~ $THROW_LINE ]]; then
       warn "Exception added or removed in an OM request. OMs at different apparent versions must reach the same" \
@@ -78,11 +84,17 @@ while IFS= read -r line; do
     fi
   fi
 
+  # Checks for OM Response files
+  if [[ "$file" =~ $OM_RESPONSE_FILE && "$line" =~ $DB_WRITE_LINE ]]; then
+    warn "RocksDB write changed in an OM response. Changes to what is persisted must be gated with an" \
+      "\`OzoneManagerVersion\`."
+  fi
+
   # Checks for client side translator files.
   if [[ "$file" =~ $CLIENT_TRANSLATOR_FILE ]]; then
-    warn "Client side translator changed. An internal client that calls a version gated API needs a gate of its own, so it" \
-      "does not call the API and fail before the server has finalized it. An external client that calls a version gated" \
-      "API must handle a pre-finalized server gracefully."
+    warn "Client side translator changed. An internal client that calls a version gated API needs a gate of its own," \
+      "so it does not call the API and fail before the server has finalized it. An external client that calls a" \
+      "version gated API must handle a pre-finalized server gracefully."
   fi
 
   # Checks for server side translator files.
@@ -93,14 +105,14 @@ while IFS= read -r line; do
 
   # Checks for Proto files. These only flag additional cases that protolock may not.
   if [[ "$file" =~ $PROTO_FILE ]]; then
-    warn "Proto file changed. Protolock alone does not guarantee full ZDU compatibility, so ensure that mixed reader/writer" \
-      "scenarios like old client/new server and disk state on downgrade are handled correctly."
+    warn "Proto file changed. Protolock alone does not guarantee full ZDU compatibility, so ensure that mixed" \
+      "reader/writer scenarios like old client/new server and disk state on downgrade are handled correctly."
     if [[ "$line" =~ $PROTO_RPC_LINE ]]; then
       warn "RPC added. Any new APIs that modify disk state that could impact downgrade must be version gated."
     fi
     if [[ "$line" =~ $PROTO_ENUM_LINE ]]; then
-      warn "Enum value added, removed or changed. Removing an enum value is incompatible, so its usage must be changed" \
-        "to a no-op. Usage of new enum values must be version gated so they are not written" \
+      warn "Enum value added, removed or changed. Removing an enum value is incompatible, so its usage must be" \
+        "changed to a no-op. Usage of new enum values must be version gated so they are not written" \
         "until finalization, since old readers have no correct branch for them."
     fi
     if [[ "$line" =~ $PROTO_FIELD_LINE ]]; then
@@ -112,8 +124,8 @@ while IFS= read -r line; do
 
   # Checks for Ratis peer protocol files.
   if [[ "$file" =~ $PEER_PROTOCOL_FILE ]]; then
-    warn "Internal OM peer, SCM peer, or OM to SCM protocol changed. Callers must not use a new method until its version is" \
-      "finalized, and servers must stay backwards compatible with older clients."
+    warn "Internal OM peer, SCM peer, or OM to SCM protocol changed. Callers must not use a new method until its" \
+      "version is finalized, and servers must stay backwards compatible with older clients."
   fi
 
   # Checks for database definition/schema files.
@@ -125,8 +137,9 @@ while IFS= read -r line; do
   # Checks for configuration files.
   if [[ "$file" =~ $CONFIG_FILE && "$line" =~ $CONFIG_DEFAULT_LINE ]]; then
     warn "Configuration default changed. For clusters where this configuration is unset, different mixed version" \
-      "components will use different values during an upgrade. If this is not safe, usage of the new default value must be version gated." \
-      "Additionally, ensure that any configuration change taking affect on startup does not alter disk state in a way that is incompatible with downgrade. "
+      "components will use different values during an upgrade. If this is not safe, usage of the new default value" \
+      "must be version gated. Additionally, ensure that any configuration change taking effect on startup does not" \
+      "alter disk state in a way that is incompatible with downgrade."
   fi
 done | sort -u | {
   warnings=$(cat)

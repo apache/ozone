@@ -47,7 +47,8 @@ process_pr() {
           and (.body | startswith($marker)))] | last | .body // empty' \
       | tr -d '\r') || return 1
 
-  # The PR comment already contains the sha of the latest commit, meaning it has not been updated since our last comment.
+  # The PR comment already contains the sha of the latest commit, meaning it has not been updated since our last
+  # comment.
   if [[ "$latest" == "${COMMENT_MARKER}${head_sha} -->"* ]]; then
     echo "#${number}: already commented for this commit"
     return 0
@@ -98,8 +99,11 @@ else
 fi
 
 # Get one PR number and sha per line.
-prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 1000 --search "$search" \
-    --json number,headRefOid --jq '.[] | "\(.number) \(.headRefOid)"')
+if ! prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 1000 --search "$search" \
+    --json number,headRefOid --jq '.[] | "\(.number) \(.headRefOid)"'); then
+  echo "::error::Failed to list pull requests" >&2
+  exit 1
+fi
 
 # Run the scan on each selected PR.
 checked=0
@@ -114,3 +118,5 @@ while read -r number head_sha; do
 done <<< "$prs"
 
 echo "Checked ${checked} pull requests, ${failures} failed"
+# Exit non-zero if there were any failures.
+[[ "$failures" -eq 0 ]]
