@@ -17,7 +17,11 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteRevokedSTSTokensRequest.ORIGINALACCESSKEYID_FIELD_NUMBER;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteRevokedSTSTokensRequest.REVOCATIONTIMEMILLIS_FIELD_NUMBER;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.time.Clock;
@@ -112,6 +116,11 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     return submittedDeletedEntryCount.get();
   }
 
+  @VisibleForTesting
+  public int getRatisByteLimit() {
+    return ratisByteLimit;
+  }
+
   @Override
   public BackgroundTaskQueue getTasks() {
     final BackgroundTaskQueue queue = new BackgroundTaskQueue();
@@ -136,8 +145,13 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
       // Read the metadata manager on every run, since installing a checkpoint replaces it
       final Table<String, Long> revokedStsTokenTable = ozoneManager.getMetadataManager().getS3RevokedStsTokenTable();
 
-      long deletedInRun = 0;
+      // This is called submittedInRun because the submitted originalAccessKeyId and revocationTimeCutoffMillis pair
+      // might not actually get deleted if at time of deletion the revocationTimeCutoffMillis was updated to a later
+      // value
+      long submittedInRun = 0;
       final List<String> batch = new ArrayList<>();
+      final List<Long> batchRevocationTimeMillis = new ArrayList<>();
+      int batchSerializedSize = 0;
 
       try (Table.KeyValueIterator<String, Long> iterator = revokedStsTokenTable.iterator()) {
         iterator.seekToFirst();
@@ -147,68 +161,63 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
           final Long revocationTimeMillis = entry.getValue();
 
           if (shouldCleanup(revocationTimeMillis)) {
-            // Calculate the size this originalAccessKeyId would add to the protobuf message.
-            // Make a copy of the batch to do the size check
-            final List<String> batchCopyWithCandidate = new ArrayList<>(batch);
-            batchCopyWithCandidate.add(originalAccessKeyId);
-            int batchWithCandidateSize = getBatchSerializedSize(batchCopyWithCandidate);
+            // Calculate the size this originalAccessKeyId and its cutoff would add to the protobuf message.
+            final int entrySerializedSize = getEntrySerializedSize(originalAccessKeyId, revocationTimeMillis);
 
             // If adding this originalAccessKeyId would exceed the limit, submit the current batch
-            if (batchWithCandidateSize > ratisByteLimit) {
+            if (batchSerializedSize + entrySerializedSize > ratisByteLimit) {
               if (!batch.isEmpty()) {
-                if (submitCleanupRequest(batch)) {
-                  deletedInRun += batch.size();
+                if (submitCleanupRequest(batch, batchRevocationTimeMillis)) {
+                  submittedInRun += batch.size();
                 } else {
                   LOG.warn("Failed to submit batch of {} revoked tokens.", batch.size());
                 }
                 batch.clear();
-
-                // Re-calculate the size of the candidate key alone in an empty batch
-                // to check if it exceeds the limit by itself.
-                final List<String> singleCandidateBatch = new ArrayList<>();
-                singleCandidateBatch.add(originalAccessKeyId);
-                batchWithCandidateSize = getBatchSerializedSize(singleCandidateBatch);
+                batchRevocationTimeMillis.clear();
+                batchSerializedSize = 0;
               }
 
               // Check if the single key exceeds the limit (either strictly single or after flush)
-              if (batchWithCandidateSize > ratisByteLimit) {
+              if (entrySerializedSize > ratisByteLimit) {
                 LOG.error(
                     "Single originalAccessKeyId entry size ({}) would exceed the ratisByteLimit ({}). " +
-                    "revocationTimeMillis: {}", batchWithCandidateSize, ratisByteLimit, revocationTimeMillis);
+                    "revocationTimeMillis: {}", entrySerializedSize, ratisByteLimit, revocationTimeMillis);
                 continue;
               }
             }
             batch.add(originalAccessKeyId);
+            batchRevocationTimeMillis.add(revocationTimeMillis);
+            batchSerializedSize += entrySerializedSize;
           }
         }
       } catch (IOException e) {
         LOG.error("Failure while scanning s3RevokedStsTokenTable.  It will be retried in the next interval", e);
-        if (deletedInRun == 0) {
+        if (submittedInRun == 0) {
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
       }
 
       // Submit any remaining tokens
       if (!batch.isEmpty()) {
-        if (submitCleanupRequest(batch)) {
-          deletedInRun += batch.size();
+        if (submitCleanupRequest(batch, batchRevocationTimeMillis)) {
+          submittedInRun += batch.size();
         } else {
           LOG.warn("Failed to submit final batch of {} revoked tokens.", batch.size());
         }
       }
 
       // Update stats
-      if (deletedInRun > 0) {
-        submittedDeletedEntryCount.addAndGet(deletedInRun);
-        LOG.info("Found and removed {} revoked STS token entries.", deletedInRun);
+      if (submittedInRun > 0) {
+        submittedDeletedEntryCount.addAndGet(submittedInRun);
+        LOG.info("Submitted {} revoked STS token entries for deletion.", submittedInRun);
       }
 
       final long elapsed = Time.monotonicNow() - startTime;
-      LOG.info("RevokedSTSTokenCleanupService run completed. deletedEntriesInRun={}, totalDeletedEntries={}, " +
-          "callIdCount={}, elapsedTimeMs={}", deletedInRun, submittedDeletedEntryCount.get(), callIdCount.get(),
+      LOG.info("RevokedSTSTokenCleanupService run completed. submittedEntriesInRun={}, totalSubmittedEntries={}, " +
+          "callIdCount={}, elapsedTimeMs={}", submittedInRun, submittedDeletedEntryCount.get(), callIdCount.get(),
           elapsed);
 
-      final long resultCount = deletedInRun;
+      final long resultCount = submittedInRun;
       return () -> (int) resultCount;
     }
 
@@ -230,11 +239,13 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     }
 
     /**
-     * Builds and submits an OMRequest to delete the provided originalAccessKeyId revocation entries.
+     * Builds and submits an OMRequest to delete the provided originalAccessKeyId revocation entries, each only if its
+     * cutoff is still the one the scan read.
      */
-    private boolean submitCleanupRequest(List<String> originalAccessKeyIds) {
+    private boolean submitCleanupRequest(List<String> originalAccessKeyIds, List<Long> revocationTimeMillis) {
       final DeleteRevokedSTSTokensRequest request = DeleteRevokedSTSTokensRequest.newBuilder()
           .addAllOriginalAccessKeyId(originalAccessKeyIds)
+          .addAllRevocationTimeMillis(revocationTimeMillis)
           .build();
 
       final OMRequest omRequest = OMRequest.newBuilder()
@@ -254,12 +265,13 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
       }
     }
 
-    private int getBatchSerializedSize(List<String> originalAccessKeyIdBatch) {
-      final DeleteRevokedSTSTokensRequest request = DeleteRevokedSTSTokensRequest.newBuilder()
-          .addAllOriginalAccessKeyId(originalAccessKeyIdBatch)
-          .build();
-
-      return request.getSerializedSize();
+    /**
+     * Returns the bytes one originalAccessKeyId and its cutoff add to a serialized DeleteRevokedSTSTokensRequest.
+     * Both repeated fields are unpacked, so a batch's serialized size is the sum of its entries' sizes.
+     */
+    private int getEntrySerializedSize(String originalAccessKeyId, long revocationTimeMillis) {
+      return CodedOutputStream.computeStringSize(ORIGINALACCESSKEYID_FIELD_NUMBER, originalAccessKeyId)
+          + CodedOutputStream.computeUInt64Size(REVOCATIONTIMEMILLIS_FIELD_NUMBER, revocationTimeMillis);
     }
   }
 }

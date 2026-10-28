@@ -27,11 +27,14 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
@@ -53,6 +56,12 @@ import org.mockito.MockedStatic;
  * Unit tests for {@link RevokedSTSTokenCleanupService}.
  */
 public class TestRevokedSTSTokenCleanupService {
+
+  private static final int SMALL_RATIS_BYTE_LIMIT = 100;
+
+  // Fixed so each entry's serialized size does not depend on when the test runs.
+  private static final long EXPIRED_CUTOFF_MILLIS = 1_700_000_000_000L;
+
   private OzoneManager ozoneManager;
   private StringInMemoryTestTable<Long> revokedStsTokenTable;
   private MockClock testClock;
@@ -101,6 +110,8 @@ public class TestRevokedSTSTokenCleanupService {
       final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
           omRequest.getDeleteRevokedSTSTokensRequest();
       assertThat(deleteRevokedSTSTokensRequest.getOriginalAccessKeyIdList()).containsExactly("original-access-key-a");
+      assertThat(deleteRevokedSTSTokensRequest.getRevocationTimeMillisList())
+          .containsExactly(expiredCreationTimeMillis);
     }
   }
 
@@ -219,17 +230,25 @@ public class TestRevokedSTSTokenCleanupService {
   @Test
   public void submitsMultipleRequestsWhenBatchSizeIsExceeded() throws Exception {
     // If the tokens exceed the configured batch size, multiple requests should be submitted
-    final long nowMillis = testClock.millis();
-
-    // Create 10 expired originalAccessKeyIds
-    for (int i = 0; i < 10; i++) {
-      revokedStsTokenTable.put(String.format("AKIA%07d", i), nowMillis - TimeUnit.HOURS.toMillis(13));
-    }
-
-    // Set a very small ratisByteLimit (100 bytes) to force batching. A single token request will be small, but 10
-    // will exceed this. The effective limit will be 90 bytes (90% of 100).
+    // Set a very small ratisByteLimit (100 bytes) to force batching. The effective limit is 90% of the configured
+    // value (see RevokedSTSTokenCleanupService#getRatisByteLimit).
     ozoneConfiguration.setStorageSize(
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, SMALL_RATIS_BYTE_LIMIT, StorageUnit.BYTES);
+    final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createCleanupService();
+    final int limit = revokedSTSTokenCleanupService.getRatisByteLimit();
+    final int entrySize = entrySerializedSize("AKIA0000000", EXPIRED_CUTOFF_MILLIS);
+    final int entriesPerBatch = limit / entrySize;
+    final int tokenCount = 10;
+    final int expectedBatches = (tokenCount + entriesPerBatch - 1) / entriesPerBatch;
+
+    // Create expired originalAccessKeyIds, each with a distinct cutoff so a misaligned pairing is detected
+    final Map<String, Long> revocationTimeMillisById = new HashMap<>();
+    for (int i = 0; i < tokenCount; i++) {
+      final String originalAccessKeyId = String.format("AKIA%07d", i);
+      final long revocationTimeMillis = EXPIRED_CUTOFF_MILLIS - i;
+      revocationTimeMillisById.put(originalAccessKeyId, revocationTimeMillis);
+      revokedStsTokenTable.put(originalAccessKeyId, revocationTimeMillis);
+    }
 
     final List<OMRequest> capturedRequests = new ArrayList<>();
 
@@ -237,38 +256,54 @@ public class TestRevokedSTSTokenCleanupService {
       mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
 
       // Run the cleanup service
-      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+      revokedSTSTokenCleanupService.runPeriodicalTaskNow();
 
       assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
       // There should be multiple requests
-      assertThat(capturedRequests.size()).isEqualTo(2);
+      assertThat(capturedRequests.size()).isGreaterThan(1);
+      assertThat(capturedRequests.size()).isEqualTo(expectedBatches);
 
       // Verify all tokens were included across the requests
       final int totalTokens = capturedRequests.stream()
           .mapToInt(r -> r.getDeleteRevokedSTSTokensRequest().getOriginalAccessKeyIdList().size())
           .sum();
-      assertThat(totalTokens).isEqualTo(10);
-      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(10);
+      assertThat(totalTokens).isEqualTo(tokenCount);
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(tokenCount);
+
+      // Every batch except the last should be full (greedy packing).
+      for (int i = 0; i < capturedRequests.size() - 1; i++) {
+        assertThat(capturedRequests.get(i).getDeleteRevokedSTSTokensRequest().getOriginalAccessKeyIdList().size())
+            .isEqualTo(entriesPerBatch);
+      }
+
+      // Verify each request pairs every originalAccessKeyId with the cutoff the scan read for it
+      for (OMRequest capturedRequest : capturedRequests) {
+        final DeleteRevokedSTSTokensRequest deleteRequest = capturedRequest.getDeleteRevokedSTSTokensRequest();
+        assertThat(deleteRequest.getRevocationTimeMillisList()).containsExactlyElementsOf(
+            deleteRequest.getOriginalAccessKeyIdList().stream().map(revocationTimeMillisById::get)
+                .collect(Collectors.toList()));
+        assertThat(deleteRequest.getSerializedSize()).isLessThanOrEqualTo(limit);
+      }
     }
   }
 
   @Test
   public void testSingleOversizedExpiredTokenAndItIsTheOnlyExpiredToken() throws Exception {
     // One originalAccessKeyId is larger than the ratisByteLimit, and it is the only expired entry
-    final long nowMillis = testClock.millis();
-    // Serialized size for largeToken is 102 > 90 (the effective ratisByteLimit) .
-    final String largeToken = new String(new char[100]).replace('\0', 'a');
-    revokedStsTokenTable.put(largeToken, nowMillis - TimeUnit.HOURS.toMillis(13));
-
     ozoneConfiguration.setStorageSize(
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, SMALL_RATIS_BYTE_LIMIT, StorageUnit.BYTES);
+    final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createCleanupService();
+    final int limit = revokedSTSTokenCleanupService.getRatisByteLimit();
+    final String largeToken = originalAccessKeyIdOfEntrySize("", limit + 1);
+    revokedStsTokenTable.put(largeToken, EXPIRED_CUTOFF_MILLIS);
 
     final List<OMRequest> capturedRequests = new ArrayList<>();
 
     try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
       mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
 
-      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+      // Run the cleanup service
+      revokedSTSTokenCleanupService.runPeriodicalTaskNow();
 
       assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
       // Single token exceeding ratisByteLimit is skipped
@@ -280,47 +315,55 @@ public class TestRevokedSTSTokenCleanupService {
   @Test
   public void testSingleOversizedExpiredTokenAndThereAreMultipleExpiredTokens() throws Exception {
     // One originalAccessKeyId is larger than the ratisByteLimit, and it is not the only expired entry
-    final long nowMillis = testClock.millis();
-    final String smallToken = "AKIASMALL01";
-    final String largeToken = "AKIALARGE-" + new String(new char[90]).replace('\0', 'a'); // > 90 bytes
-
-    revokedStsTokenTable.put(smallToken, nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put(largeToken, nowMillis - TimeUnit.HOURS.toMillis(13));
-
     ozoneConfiguration.setStorageSize(
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, SMALL_RATIS_BYTE_LIMIT, StorageUnit.BYTES);
+    final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createCleanupService();
+    final int limit = revokedSTSTokenCleanupService.getRatisByteLimit();
+    final String smallToken = "AKIASMALL01";
+    final String largeToken = originalAccessKeyIdOfEntrySize("AKIALARGE-", limit + 1);
+
+    revokedStsTokenTable.put(smallToken, EXPIRED_CUTOFF_MILLIS);
+    revokedStsTokenTable.put(largeToken, EXPIRED_CUTOFF_MILLIS);
 
     final List<OMRequest> capturedRequests = new ArrayList<>();
 
     try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
       mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
 
-      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+      // Run the cleanup service
+      revokedSTSTokenCleanupService.runPeriodicalTaskNow();
 
       assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
       assertThat(capturedRequests).hasSize(1);
       assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(1);
+      assertThat(capturedRequests.get(0).getDeleteRevokedSTSTokensRequest().getOriginalAccessKeyIdList())
+          .containsExactly(smallToken);
     }
   }
 
   @Test
   public void testExpiredAndNonExpiredTokensWithSmallRatisByteLimit() throws Exception {
     // Expired and non-expired entries with ratisByteLimit of 100
-    final long nowMillis = testClock.millis();
-
-    revokedStsTokenTable.put("original-access-key-l", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("original-access-key-m", nowMillis - TimeUnit.HOURS.toMillis(1)); // Should be skipped
-    revokedStsTokenTable.put("original-access-key-n", nowMillis - TimeUnit.HOURS.toMillis(13));
-
     ozoneConfiguration.setStorageSize(
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, SMALL_RATIS_BYTE_LIMIT, StorageUnit.BYTES);
+    final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createCleanupService();
+    final int limit = revokedSTSTokenCleanupService.getRatisByteLimit();
+    final int expiredEntrySizeL = entrySerializedSize("original-access-key-l", EXPIRED_CUTOFF_MILLIS);
+    final int expiredEntrySizeN = entrySerializedSize("original-access-key-n", EXPIRED_CUTOFF_MILLIS);
+    assertThat(expiredEntrySizeL + expiredEntrySizeN).isLessThanOrEqualTo(limit);
+
+    revokedStsTokenTable.put("original-access-key-l", EXPIRED_CUTOFF_MILLIS);
+    // The following should be skipped
+    revokedStsTokenTable.put("original-access-key-m", testClock.millis() - TimeUnit.HOURS.toMillis(1));
+    revokedStsTokenTable.put("original-access-key-n", EXPIRED_CUTOFF_MILLIS);
 
     final List<OMRequest> capturedRequests = new ArrayList<>();
 
     try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
       mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
 
-      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+      // Run the cleanup service
+      revokedSTSTokenCleanupService.runPeriodicalTaskNow();
 
       assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
       // original-access-key-l and original-access-key-n fit in one batch.
@@ -335,39 +378,45 @@ public class TestRevokedSTSTokenCleanupService {
   @Test
   public void testExpiredTokenMatchesRatisByteLimitExactly() throws Exception {
     // Force small batch of 100 bytes and test when the batch size is exactly ratisByteLimit
-    final long nowMillis = testClock.millis();
-    final String tokenMatchingRatisByteLimitWhenSerialized = new String(new char[88]).replace('\0', 'a');
-
-    revokedStsTokenTable.put(tokenMatchingRatisByteLimitWhenSerialized, nowMillis - TimeUnit.HOURS.toMillis(13));
-
     ozoneConfiguration.setStorageSize(
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, SMALL_RATIS_BYTE_LIMIT, StorageUnit.BYTES);
+    final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createCleanupService();
+    final int limit = revokedSTSTokenCleanupService.getRatisByteLimit();
+    final String tokenMatchingRatisByteLimitWhenSerialized = originalAccessKeyIdOfEntrySize("", limit);
+
+    revokedStsTokenTable.put(tokenMatchingRatisByteLimitWhenSerialized, EXPIRED_CUTOFF_MILLIS);
 
     final List<OMRequest> capturedRequests = new ArrayList<>();
 
     try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
       mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
 
-      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+      // Run the cleanup service
+      revokedSTSTokenCleanupService.runPeriodicalTaskNow();
 
       assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
       assertThat(capturedRequests).hasSize(1);
       assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(1);
+      assertThat(capturedRequests.get(0).getDeleteRevokedSTSTokensRequest().getSerializedSize())
+          .isEqualTo(revokedSTSTokenCleanupService.getRatisByteLimit());
     }
   }
 
   @Test
   public void testCallIdCountIncreasesAcrossBatches() throws Exception {
-    // Force small batch of 40 bytes (which should trigger multiple calls to OzoneManagerRatisUtils.submitRequest)
-    // and ensure the callIdCount increases across each batch
-    // AKIA0000001 and AKIA0000002 are in first batch, and AKIA0000003 is in second batch.
-    final long nowMillis = testClock.millis();
+    // One more key than fits in a batch forces exactly two submissions to OzoneManagerRatisUtils.submitRequest,
+    // and the callIdCount increases across each batch.
+    ozoneConfiguration.setStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, SMALL_RATIS_BYTE_LIMIT, StorageUnit.BYTES);
+    final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createCleanupService();
+    final int limit = revokedSTSTokenCleanupService.getRatisByteLimit();
+    final int entrySize = entrySerializedSize("AKIA0000000", EXPIRED_CUTOFF_MILLIS);
+    final int entriesPerBatch = limit / entrySize;
+    final int keyCount = entriesPerBatch + 1;
 
-    revokedStsTokenTable.put("AKIA0000001", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("AKIA0000002", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("AKIA0000003", nowMillis - TimeUnit.HOURS.toMillis(13));
-
-    ozoneConfiguration.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 40, StorageUnit.BYTES);
+    for (int i = 0; i < keyCount; i++) {
+      revokedStsTokenTable.put(String.format("AKIA%07d", i), EXPIRED_CUTOFF_MILLIS);
+    }
 
     final List<Long> capturedCallIdCounts = new ArrayList<>();
 
@@ -380,10 +429,11 @@ public class TestRevokedSTSTokenCleanupService {
             return buildOkResponse(invocation.getArgument(1));
           });
 
-      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+      // Run the cleanup service
+      revokedSTSTokenCleanupService.runPeriodicalTaskNow();
 
       assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
-      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(3);
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(keyCount);
       assertThat(capturedCallIdCounts).hasSize(2);
       assertThat(capturedCallIdCounts.get(1)).isGreaterThan(capturedCallIdCounts.get(0));
     }
@@ -420,11 +470,34 @@ public class TestRevokedSTSTokenCleanupService {
     }
   }
 
+  private RevokedSTSTokenCleanupService createCleanupService() {
+    return new RevokedSTSTokenCleanupService(1, TimeUnit.HOURS, 1_000, ozoneManager);
+  }
+
   private RevokedSTSTokenCleanupService createAndRunCleanupService() throws Exception {
-    final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService =
-        new RevokedSTSTokenCleanupService(1, TimeUnit.HOURS, 1_000, ozoneManager);
+    final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createCleanupService();
     revokedSTSTokenCleanupService.runPeriodicalTaskNow();
     return revokedSTSTokenCleanupService;
+  }
+
+  private static int entrySerializedSize(String originalAccessKeyId, long revocationTimeMillis) {
+    return DeleteRevokedSTSTokensRequest.newBuilder()
+        .addOriginalAccessKeyId(originalAccessKeyId)
+        .addRevocationTimeMillis(revocationTimeMillis)
+        .build().getSerializedSize();
+  }
+
+  /**
+   * Returns prefix padded with 'a' so one entry with {@link #EXPIRED_CUTOFF_MILLIS} serializes to exactly targetSize
+   * bytes.
+   */
+  private static String originalAccessKeyIdOfEntrySize(String prefix, int targetSize) {
+    final StringBuilder originalAccessKeyId = new StringBuilder(prefix);
+    while (entrySerializedSize(originalAccessKeyId.toString(), EXPIRED_CUTOFF_MILLIS) < targetSize) {
+      originalAccessKeyId.append('a');
+    }
+    assertThat(entrySerializedSize(originalAccessKeyId.toString(), EXPIRED_CUTOFF_MILLIS)).isEqualTo(targetSize);
+    return originalAccessKeyId.toString();
   }
 
   private void mockRatisSubmitAndCapture(MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock,
