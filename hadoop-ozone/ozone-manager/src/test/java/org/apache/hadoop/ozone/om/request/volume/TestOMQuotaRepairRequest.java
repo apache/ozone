@@ -163,15 +163,24 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
     // Volume changes applied after those rows were flushed, still waiting for the next flush.
     Table<String, OmVolumeArgs> volumeTable = omMetadataManager.getVolumeTable();
     volumeTable.addCacheEntry(new CacheKey<>(deletedVolumeKey), CacheValue.get(2L));
-    volumeTable.addCacheEntry(new CacheKey<>(usedVolumeKey), CacheValue.get(3L,
-        volumeTable.get(usedVolumeKey).toBuilder().setUsedNamespace(1).incRefCount().build()));
-    volumeTable.addCacheEntry(new CacheKey<>(quotaSetVolumeKey), CacheValue.get(4L,
-        volumeTable.get(quotaSetVolumeKey).toBuilder().setQuotaInNamespace(10).build()));
+    OmVolumeArgs unflushedUsedVolume = volumeTable.get(usedVolumeKey)
+        .toBuilder()
+        .setUsedNamespace(1)
+        .incRefCount()
+        .build();
+    volumeTable.addCacheEntry(new CacheKey<>(usedVolumeKey), CacheValue.get(3L, unflushedUsedVolume));
+    OmVolumeArgs unflushedQuotaSetVolume = volumeTable.get(quotaSetVolumeKey)
+        .toBuilder()
+        .setQuotaInNamespace(10)
+        .build();
+    volumeTable.addCacheEntry(new CacheKey<>(quotaSetVolumeKey), CacheValue.get(4L, unflushedQuotaSetVolume));
 
     OMRequest omRequest = OMRequest.newBuilder()
         .setClientId("test-client")
         .setCmdType(Type.QuotaRepair)
-        .setQuotaRepairRequest(QuotaRepairRequest.newBuilder().setSupportVolumeOldQuota(true).build())
+        .setQuotaRepairRequest(QuotaRepairRequest.newBuilder()
+            .setSupportVolumeOldQuota(true)
+            .build())
         .build();
     OMClientResponse omClientResponse = new OMQuotaRepairRequest(omRequest).validateAndUpdateCache(ozoneManager, 5L);
     assertThat(omClientResponse.getOMResponse().getStatus()).isEqualTo(Status.OK);
@@ -199,9 +208,10 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
         .build();
     String volumeKey = omMetadataManager.getVolumeKey(volumeName);
     if (flushed) {
-      omMetadataManager.getVolumeTable().put(volumeKey, volumeArgs);
+      OMRequestTestUtils.addVolumeToOM(omMetadataManager, volumeArgs);
+    } else {
+      omMetadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey), CacheValue.get(1L, volumeArgs));
     }
-    omMetadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey), CacheValue.get(1L, volumeArgs));
     return volumeKey;
   }
 }

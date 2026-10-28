@@ -174,8 +174,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
     LOG.info("Starting volume quota support update");
     Map<String, OmVolumeArgs> volUpdateMap = new HashMap<>();
     // The volume table is fully cached; iterate the cache to see volume changes not flushed yet.
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>> iterator =
-        metadataManager.getVolumeTable().cacheIterator();
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>> iterator = metadataManager.getVolumeIterator();
     while (iterator.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry = iterator.next();
       String volumeKey = entry.getKey().getCacheKey();
