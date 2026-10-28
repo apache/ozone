@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
@@ -85,6 +86,10 @@ public final class TestSpanCollector implements SpanProcessor, AutoCloseable {
     SpanData span = onlySpan(spanName);
     assertEquals(StatusCode.ERROR, span.getStatus().getStatusCode(), () -> spanName + " status");
     assertEquals(expectedDescription, span.getStatus().getDescription(), () -> spanName + " status description");
+  }
+
+  public void assertKind(String spanName, SpanKind expected) {
+    assertEquals(expected, onlySpan(spanName).getKind(), () -> spanName + " kind");
   }
 
   public void assertNotError(String spanName) {

@@ -276,7 +276,7 @@ public class RpcClient implements ClientProtocol {
         ozoneManagerProtocolClientSideTranslatorPB =
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
         clientId.toString());
-    this.ozoneManagerClient = TracingUtil.createProxy(
+    this.ozoneManagerClient = TracingUtil.createClientProxy(
         ozoneManagerProtocolClientSideTranslatorPB,
         OzoneManagerClientProtocol.class, conf);
     dtService = omTransport.getDelegationTokenService();

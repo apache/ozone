@@ -394,13 +394,22 @@ public final class TracingUtil {
    */
   public static <T> T createProxy(
       T delegate, Class<T> itf, ConfigurationSource conf) {
+    return createProxy(delegate, itf, conf, SpanKind.INTERNAL);
+  }
+
+  /** Same as {@link #createProxy(Object, Class, ConfigurationSource)}, with CLIENT spans for an RPC delegate. */
+  public static <T> T createClientProxy(T delegate, Class<T> itf, ConfigurationSource conf) {
+    return createProxy(delegate, itf, conf, SpanKind.CLIENT);
+  }
+
+  private static <T> T createProxy(T delegate, Class<T> itf, ConfigurationSource conf, SpanKind spanKind) {
     if (!shouldCreateTracingProxy(conf)) {
       return delegate;
     }
     Class<?> aClass = delegate.getClass();
     return itf.cast(Proxy.newProxyInstance(aClass.getClassLoader(),
         new Class<?>[] {itf},
-        new TraceAllMethod<>(delegate, itf.getSimpleName())));
+        new TraceAllMethod<>(delegate, itf.getSimpleName(), spanKind)));
   }
 
   public static boolean isTracingEnabled(ConfigurationSource conf) {
