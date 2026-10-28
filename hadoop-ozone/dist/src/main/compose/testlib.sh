@@ -102,7 +102,11 @@ find_tests(){
       exit 1
     fi
   elif [[ -n "${OZONE_TEST_SELECTOR:-}" ]]; then
-    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}" || echo "")
+    if [[ -f "${OZONE_TEST_SELECTOR}" ]] && [[ "$(realpath "${OZONE_TEST_SELECTOR}")" == "$(pwd -P)/${OZONE_TEST_SELECTOR}" ]]; then
+      tests="${OZONE_TEST_SELECTOR}"
+    else
+      tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}" || echo "")
+    fi
 
     if [[ -z "${tests}" ]]; then
       echo "No tests found for filter ${OZONE_TEST_SELECTOR}"
