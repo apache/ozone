@@ -58,6 +58,7 @@ jobs:
       acceptance-versions: ${{ steps.acceptance-suites.outputs.versions }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
+      junit-modules: ${{ steps.junit-modules.outputs.modules }}
       kubernetes-suites: ${{ steps.kubernetes-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
@@ -118,6 +119,9 @@ jobs:
       - name: Integration suites
         id: integration-suites
         run: dev-support/ci/integration_suites.sh
+      - name: Modules with Java tests
+        id: junit-modules
+        run: dev-support/ci/junit_modules.sh
       - name: Kubernetes suites
         id: kubernetes-suites
         run: dev-support/ci/kubernetes_suites.sh
@@ -384,6 +388,7 @@ jobs:
         suite: ${{ fromJson(needs.build-info.outputs.kubernetes-suites) }}
       fail-fast: false
 
+  # runs only ozone-integration-test, split by profiles
   integration:
     needs:
       - build-info
@@ -397,7 +402,7 @@ jobs:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: ${{ matrix.profile == 'filesystem' }}
+      needs-ozone-repo: true
       pre-script: sudo hostname localhost
       ratis-args: ${{ inputs.ratis_args }}
       script: integration
@@ -410,6 +415,36 @@ jobs:
       matrix:
         profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
       fail-fast: false
+
+  # same as integration, but runs tests in specific modules instead of profiles
+  junit:
+    needs:
+      - build-info
+      - build
+      - basic
+      - dependency
+      - license
+    if: needs.build-info.outputs.needs-integration-tests == 'true'
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      display-name: junit
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      pre-script: sudo hostname localhost
+      ratis-args: ${{ inputs.ratis_args }}
+      script: integration
+      script-args: -pl :${{ matrix.module }} -Pmodule-test -Phadoop-native-lib -Drocks_tools_native
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: ${{ matrix.module }}
+      timeout-minutes: 60
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    strategy:
+      matrix:
+        module: ${{ fromJson(needs.build-info.outputs.junit-modules) }}
+      fail-fast: false
+      max-parallel: 10
 
   # same as integration, but runs specific tests instead of profiles
   specific-tests:
@@ -445,6 +480,7 @@ jobs:
       - acceptance
       - compat-old
       - integration
+      - junit
     steps:
       - name: Checkout project
         uses: actions/checkout@v7
