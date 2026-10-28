@@ -556,6 +556,63 @@ public final class TracingUtil {
     return Span.current();
   }
 
+  public static Span createSpan(String spanName) {
+    return createSpan(spanName, SpanKind.INTERNAL);
+  }
+
+  public static Span createSpan(String spanName, SpanKind spanKind) {
+    return buildSpan(spanName, spanKind);
+  }
+
+  public static void recordExceptionInCurrentSpan(Throwable t) {
+    recordException(Span.current(), t);
+  }
+
+  public static void recordException(Span span, Throwable t) {
+    if (t == null || !span.isRecording()) {
+      return;
+    }
+    span.recordException(t);
+    if (t.getMessage() == null) {
+      span.setStatus(StatusCode.ERROR);
+    } else {
+      span.setStatus(StatusCode.ERROR, t.getMessage());
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, String value) {
+    Span span = Span.current();
+    if (value != null && span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, long value) {
+    Span span = Span.current();
+    if (span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, boolean value) {
+    Span span = Span.current();
+    if (span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addEventToCurrentSpan(String name, String key, String value) {
+    Span span = Span.current();
+    if (!span.isRecording()) {
+      return;
+    }
+    if (value == null) {
+      span.addEvent(name);
+    } else {
+      span.addEvent(name, Attributes.of(AttributeKey.stringKey(key), value));
+    }
+  }
+
   /**
    * AutoCloseable interface for tracing span but no exception is thrown in close.
    */
