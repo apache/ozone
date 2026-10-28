@@ -357,6 +357,7 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
     assertEquals(partialPurge ? INTERNAL_ERROR : FILE_NOT_FOUND, omSnapshotPurgeResponse.getOMResponse().getStatus());
     if (partialPurge) {
       assertNull(snapshotInfoTable.get(snapshotKeys.get(2)));
+      assertThat(omSnapshotPurgeResponse.getOMResponse().getMessage()).contains("transaction index 200 ");
     } else {
       assertNotNull(snapshotInfoTable.get(snapshotKeys.get(2)));
     }

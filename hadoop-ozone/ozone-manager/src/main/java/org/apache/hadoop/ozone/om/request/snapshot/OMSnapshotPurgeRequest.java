@@ -158,8 +158,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       // Cache and snapshot chain updates made before the failure cannot be rolled back, so report INTERNAL_ERROR
       // to terminate OM instead of continuing with a partially purged state.
       IOException reported = stateChanged && ex instanceof OMException
-          ? new OMException("Snapshot purge failed after partially updating the snapshot cache and chain: "
-              + ex.getMessage(), ex, OMException.ResultCodes.INTERNAL_ERROR) : ex;
+          ? new OMException("Snapshot purge at transaction index " + trxnLogIndex
+              + " failed after partially updating the snapshot cache and chain: " + ex.getMessage(), ex,
+              OMException.ResultCodes.INTERNAL_ERROR) : ex;
       omClientResponse = new OMSnapshotPurgeResponse(createErrorOMResponse(omResponse, reported));
       omSnapshotIntMetrics.incNumSnapshotPurgeFails();
       LOG.error("Failed to execute snapshotPurgeRequest:{{}}.", snapshotPurgeRequest, ex);
