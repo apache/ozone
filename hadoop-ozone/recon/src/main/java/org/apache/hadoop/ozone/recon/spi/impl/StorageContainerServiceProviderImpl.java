@@ -17,41 +17,50 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_HTTP_AUTH_TYPE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.ratisSnapshotComplete;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_POLICY_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
-import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
-import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
-import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.ratis.proto.RaftProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +78,6 @@ public class StorageContainerServiceProviderImpl
   private final OzoneConfiguration configuration;
   private File scmSnapshotDBParentDir;
   private ReconUtils reconUtils;
-  private ReconStorageConfig reconStorage;
   private ReconContext reconContext;
 
   @Inject
@@ -77,7 +85,6 @@ public class StorageContainerServiceProviderImpl
       StorageContainerLocationInternalInterface scmClient,
       ReconUtils reconUtils,
       OzoneConfiguration configuration,
-      ReconStorageConfig reconStorage,
       ReconContext reconContext) {
 
     scmSnapshotDBParentDir = ReconUtils.getReconScmDbDir(configuration);
@@ -85,7 +92,6 @@ public class StorageContainerServiceProviderImpl
     this.reconUtils = reconUtils;
     this.scmClient = scmClient;
     this.configuration = configuration;
-    this.reconStorage = reconStorage;
     this.reconContext = reconContext;
   }
 
@@ -141,25 +147,7 @@ public class StorageContainerServiceProviderImpl
         for (String ratisRole : ratisRoles) {
           String[] role = HddsUtils.parseRatisRoleString(ratisRole);
           if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
-            String hostAddress = role[4].trim();
-            int grpcPort = configuration.getInt(
-                ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
-                ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
-
-            SecurityConfig secConf = new SecurityConfig(configuration);
-            SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
-                getScmSecurityClientWithMaxRetry(
-                    configuration, getCurrentUser());
-            try (ReconCertificateClient certClient =
-                     new ReconCertificateClient(
-                         secConf, scmSecurityClient, reconStorage, null, null);
-                 SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
-                     hostAddress, grpcPort, configuration, certClient)) {
-              downloadClient.download(targetFile.toPath()).get();
-            } catch (ExecutionException | InterruptedException e) {
-              LOG.error("Rocks DB checkpoint downloading failed: {}", e);
-              throw new IOException(e);
-            }
+            downloadSCMDBCheckpoint(getSCMDBCheckpointUrl(role[0]), targetFile);
             LOG.info("Downloaded SCM Snapshot from Leader SCM");
             break;
           }
@@ -183,7 +171,61 @@ public class StorageContainerServiceProviderImpl
         snapshotFileName);
     reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
     FileUtils.deleteQuietly(targetFile);
+    // SCM writes this flag last, so a checkpoint without it was cut short.
+    if (!ratisSnapshotComplete(untarredDbDir)) {
+      FileUtils.deleteQuietly(untarredDbDir.toFile());
+      throw new IOException("Incomplete SCM DB checkpoint: " + OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME + " not found");
+    }
     return new RocksDBCheckpoint(untarredDbDir);
+  }
+
+  /**
+   * Downloads the SCM DB checkpoint over HTTP(S), authenticated with SPNEGO when SCM requires it.
+   * SCM's inter-SCM gRPC endpoint is not used, because it accepts SCM certificates only.
+   */
+  private void downloadSCMDBCheckpoint(String url, File targetFile) throws IOException {
+    LOG.info("Downloading SCM DB checkpoint from {}", url);
+    URLConnectionFactory connectionFactory = URLConnectionFactory.newDefaultURLConnectionFactory(configuration);
+    boolean spnegoEnabled = "kerberos".equals(configuration.get(HDDS_SCM_HTTP_AUTH_TYPE, "simple"));
+    try {
+      SecurityUtil.doAsLoginUser(() -> {
+        try (InputStream inputStream = reconUtils.makeHttpCall(connectionFactory, url, spnegoEnabled)
+            .getInputStream()) {
+          FileUtils.copyInputStreamToFile(inputStream, targetFile);
+        }
+        return null;
+      });
+    } finally {
+      connectionFactory.destroy();
+    }
+  }
+
+  /**
+   * Returns the DB checkpoint URL of the SCM at {@code host}. The HTTP(S) port is taken from the address configured
+   * for the SCM node with that host, else from the common SCM HTTP(S) address.
+   */
+  private String getSCMDBCheckpointUrl(String host) {
+    boolean httpsEnabled = HttpConfig.getHttpPolicy(configuration).isHttpsEnabled();
+    SecurityConfig securityConfig = new SecurityConfig(configuration);
+    if (!httpsEnabled && securityConfig.isSecurityEnabled() && securityConfig.isGrpcTlsEnabled()) {
+      LOG.warn("Downloading the SCM DB unencrypted over HTTP although {} is true. Set {} to HTTPS_ONLY or "
+          + "HTTP_AND_HTTPS to encrypt it.", HDDS_GRPC_TLS_ENABLED, OZONE_HTTP_POLICY_KEY);
+    }
+    String addressKey = httpsEnabled ? OZONE_SCM_HTTPS_ADDRESS_KEY : OZONE_SCM_HTTP_ADDRESS_KEY;
+    List<String> addressKeys = new ArrayList<>();
+    String serviceId = HddsUtils.getScmServiceId(configuration);
+    if (serviceId != null) {
+      for (String nodeId : HddsUtils.getSCMNodeIds(configuration, serviceId)) {
+        if (host.equals(configuration.getTrimmed(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, serviceId, nodeId)))) {
+          addressKeys.add(ConfUtils.addKeySuffixes(addressKey, serviceId, nodeId));
+        }
+      }
+    }
+    addressKeys.add(addressKey);
+    int port = HddsUtils.getPortNumberFromConfigKeys(configuration, addressKeys.toArray(new String[0]))
+        .orElse(httpsEnabled ? OZONE_SCM_HTTPS_BIND_PORT_DEFAULT : OZONE_SCM_HTTP_BIND_PORT_DEFAULT);
+    return (httpsEnabled ? "https://" : "http://") + HddsUtils.getHostPortString(host, port)
+        + OZONE_DB_CHECKPOINT_HTTP_ENDPOINT + "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
   }
 
   @Override
