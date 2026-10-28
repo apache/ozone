@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.security.symmetric;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -30,10 +32,35 @@ import java.time.Duration;
 import java.time.Instant;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
 /** Tests refreshing the signing key through the composite client. */
 class TestDefaultSecretKeyClient {
+  @Test
+  void pollerKeepsRefreshingAfterFailedPolls() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "1d");
+    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "10ms");
+    SecretKeyProtocol scm = mock(SecretKeyProtocol.class);
+    ManagedSecretKey oldKey = SecretKeyTestUtil.generateHmac(
+        Instant.now().minus(Duration.ofDays(2)), Duration.ofDays(9));
+    ManagedSecretKey newKey = SecretKeyTestUtil.generateHmac(Instant.now(), Duration.ofDays(9));
+    when(scm.getCurrentSecretKey()).thenReturn(oldKey)
+        .thenThrow(new IOException("SCM fetch failed"))
+        .thenThrow(new IllegalStateException("Unexpected failure"))
+        .thenThrow(new LinkageError("Unexpected error"))
+        .thenReturn(newKey);
+    SecretKeyClient client = DefaultSecretKeyClient.create(conf, scm, "test-");
+    try {
+      client.start(conf);
+      GenericTestUtils.waitFor(() -> newKey.equals(client.getCurrentSecretKey()), 10, 5_000);
+      verify(scm, times(5)).getCurrentSecretKey();
+    } finally {
+      client.stop();
+    }
+  }
+
   @Test
   void refetchSecretKeyUpdatesCurrentKey() throws Exception {
     SecretKeyProtocol scm = mock(SecretKeyProtocol.class);

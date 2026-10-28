@@ -148,9 +148,14 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
 
     LOG.info("Scheduling SecretKeyPoller with initial delay of {} " +
         "and interval of {}", initialDelay, interval);
-    executorService.scheduleAtFixedRate(() -> checkAndRefresh(rotateDuration),
-        initialDelay.toMillis(), interval.toMillis(),
-        TimeUnit.MILLISECONDS);
+    executorService.scheduleAtFixedRate(() -> {
+      try {
+        checkAndRefresh(rotateDuration);
+      } catch (Throwable t) {
+        // Anything thrown from a periodic task suppresses all subsequent executions.
+        LOG.warn("Failed to refresh the secret key, will retry at the next check", t);
+      }
+    }, initialDelay.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
   }
 
   private synchronized void checkAndRefresh(Duration rotateDuration) {
