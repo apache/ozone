@@ -37,6 +37,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -99,8 +100,10 @@ public class TestOptimizedSnapshotDiff extends OmSnapshotTests {
   public void testOptimizedObsDiff() throws Exception {
     String volume = uniqueObjectName("vol-opt-obs-");
     String bucket = uniqueObjectName("buc-opt-obs-");
-    OzoneBucket obsBucket = DataTestUtil.createVolumeAndBucket(
-        getCluster().newClient(), volume, bucket, OBJECT_STORE);
+    OzoneBucket obsBucket;
+    try (OzoneClient obsClient = getCluster().newClient()) {
+      obsBucket = DataTestUtil.createVolumeAndBucket(obsClient, volume, bucket, OBJECT_STORE);
+    }
 
     String snap1 = "snap1";
     String snap2 = "snap2";

@@ -1757,9 +1757,10 @@ public class TestSnapshotDiffManager {
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
         DONE, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
         false, false, 1L, null, 0.0, null);
-    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+    SnapshotDiffManager optimizedManager = newSnapshotDiffManagerWithOptimizedEnabled(true);
+    optimizedManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
 
-    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    SnapshotDiffManager spy = spy(optimizedManager);
     doReturn(OBJECT_STORE).when(spy).getBucketLayout(anyString(), anyString(), any());
 
     spy.submitSnapshotDiff(ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName,
@@ -1779,9 +1780,11 @@ public class TestSnapshotDiffManager {
         DONE, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
         false, false, 1L, null, 0.0, null);
     existing.setOrderedReport(true);
-    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+    existing.setReason("Report is dependency unordered.");
+    SnapshotDiffManager optimizedManager = newSnapshotDiffManagerWithOptimizedEnabled(true);
+    optimizedManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
 
-    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    SnapshotDiffManager spy = spy(optimizedManager);
     doReturn(FILE_SYSTEM_OPTIMIZED).when(spy).getBucketLayout(anyString(), anyString(), any());
 
     spy.submitSnapshotDiff(ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName,
