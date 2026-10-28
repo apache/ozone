@@ -52,7 +52,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.util.LimitInputStream;
 import org.apache.ratis.thirdparty.com.google.protobuf.CodedInputStream;
 import org.slf4j.Logger;
@@ -198,17 +198,19 @@ final class Receiver implements Runnable {
           request.getTraceID());
       try (Scope ignore = span.makeCurrent()) {
         ContainerCommandResponseProto responseProto;
+        final DispatcherContext context =
+            DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ).build();
         if (isSupportedCmdType(type)) {
-          responseProto = dispatcher.dispatch(request, null);
+          responseProto = dispatcher.dispatch(request, context);
         } else {
           responseProto = getContainerCommandResponse(request, ContainerProtos.Result.UNSUPPORTED_REQUEST,
               "This command is not supported through DomainSocket channel.")
               .build();
         }
-        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock) {
+        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock
+            && responseProto.getGetBlock().getShortCircuitAccessGranted()) {
           // get FileDescriptor
-          Handler handler = dispatcher.getHandler(ContainerProtos.ContainerType.KeyValueContainer);
-          RandomAccessFile file = handler.getBlockFile(request);
+          RandomAccessFile file = context.getShortCircuitBlockFile();
           Objects.requireNonNull(file,
               "Failed to get block file for block " + request.getGetBlock().getBlockID());
           entry.setFile(file);
@@ -258,10 +260,12 @@ final class Receiver implements Runnable {
     } finally {
       lock.unlock();
       entry.setSendFinishTimeNs();
-      try {
-        entry.getFile().close();
-      } catch (IOException e) {
-        LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+      if (entry.getFile() != null) {
+        try {
+          entry.getFile().close();
+        } catch (IOException e) {
+          LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+        }
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Request {} {}:{}, receive {} ns, in queue {} ns, " +

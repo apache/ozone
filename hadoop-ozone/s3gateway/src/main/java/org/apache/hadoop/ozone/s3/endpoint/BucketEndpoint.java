@@ -120,9 +120,8 @@ public class BucketEndpoint extends BucketOperationHandler {
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     // AWS S3 treats an empty continuation-token as no token: list from the
     // start and echo the empty token back (see setContinueToken below).
-    ContinueToken decodedToken =
-        (continueToken == null || continueToken.isEmpty())
-            ? null : ContinueToken.decodeFromString(continueToken);
+    ContinueToken decodedToken = (continueToken == null || continueToken.isEmpty())
+        ? null : ContinueToken.decodeFromString(continueToken);
     OzoneBucket bucket = null;
 
     try {
@@ -135,13 +134,11 @@ public class BucketEndpoint extends BucketOperationHandler {
 
       // If continuation token and start after both are provided, then we
       // ignore start After
-      String prevKey = decodedToken != null ? decodedToken.getLastKey()
-          : startAfter;
+      String prevKey = decodedToken != null ? decodedToken.getLastKey() : startAfter;
 
       // If shallow is true, only list immediate children
       // delimited by OZONE_URI_DELIMITER
-      boolean shallow = listKeysShallowEnabled
-          && OZONE_URI_DELIMITER.equals(delimiter);
+      boolean shallow = listKeysShallowEnabled && OZONE_URI_DELIMITER.equals(delimiter);
 
       bucket = context.getVolume().getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
@@ -202,9 +199,13 @@ public class BucketEndpoint extends BucketOperationHandler {
               // delimiter /) also hit this branch and become a common prefix.
               String dirName = relativeKeyName.substring(0, delimiterIndex);
               if (!dirName.equals(prevDir)) {
-                response.addPrefix(EncodingTypeObject.createNullable(
-                    prefix + dirName + delimiter, encodingType));
                 prevDir = dirName;
+                String commonPrefix = prefix + dirName + delimiter;
+                // AWS omits common prefixes at or before start-after; startAfter also holds marker and key-marker.
+                if (StringUtils.startsWith(startAfter, commonPrefix)) {
+                  continue;
+                }
+                response.addPrefix(EncodingTypeObject.createNullable(commonPrefix, encodingType));
                 count++;
               }
             } else {

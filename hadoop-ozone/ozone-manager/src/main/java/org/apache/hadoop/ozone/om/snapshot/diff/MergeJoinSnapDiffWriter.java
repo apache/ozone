@@ -106,20 +106,20 @@ public final class MergeJoinSnapDiffWriter {
   private static void classifyMergeJoin(SnapDiffJobStore store, boolean isFso) throws IOException {
     try (SnapDiffJobStore.ListIterator newHead = store.newListIterator();
          SnapDiffJobStore.ListIterator oldHead = store.oldListIterator()) {
-      Map.Entry<Long, byte[]> newEntry = newHead.hasNext() ? newHead.next() : null;
-      Map.Entry<Long, byte[]> oldEntry = oldHead.hasNext() ? oldHead.next() : null;
+      Map.Entry<Long, byte[]> newEntry = newHead.nextOrNull();
+      Map.Entry<Long, byte[]> oldEntry = oldHead.nextOrNull();
 
       while (newEntry != null || oldEntry != null) {
         if (oldEntry == null || (newEntry != null && newEntry.getKey() < oldEntry.getKey())) {
           emitCreate(store, newEntry, isFso);
-          newEntry = newHead.hasNext() ? newHead.next() : null;
+          newEntry = newHead.nextOrNull();
         } else if (newEntry == null || newEntry.getKey() > oldEntry.getKey()) {
           emitDelete(store, oldEntry, isFso);
-          oldEntry = oldHead.hasNext() ? oldHead.next() : null;
+          oldEntry = oldHead.nextOrNull();
         } else {
           emitBothPresent(store, newEntry, oldEntry, isFso);
-          newEntry = newHead.hasNext() ? newHead.next() : null;
-          oldEntry = oldHead.hasNext() ? oldHead.next() : null;
+          newEntry = newHead.nextOrNull();
+          oldEntry = oldHead.nextOrNull();
         }
       }
     } catch (RocksDatabaseException e) {
