@@ -796,8 +796,7 @@ public class TestSnapshotDiffManager {
     db.get().put(snapDiffReportTable, codecRegistry.asRawData(reportKey),
         codecRegistry.asRawData(reportEntry));
 
-    // Round-trip through the production codec to confirm a legacy job deserializes
-    // with a null largestEntryKey (this is byte-for-byte what an upgraded OM loads).
+    // Round-trip a completed job without a stored last-entry key through the production codec.
     SnapshotDiffJob legacyJob = new SnapshotDiffJob(0, jobId, DONE, VOLUME_NAME,
         BUCKET_NAME, "fs", "ts", false, true, 1, null, 0.0, null);
     SnapshotDiffJob loaded = SnapshotDiffJob.codec().fromPersistedFormat(
@@ -808,7 +807,7 @@ public class TestSnapshotDiffManager {
 
     SnapshotDiffReportOzone report = snapshotDiffManager.createPageResponse(loaded,
         jobKey, VOLUME_NAME, BUCKET_NAME, "fs", "ts", "", Integer.MAX_VALUE);
-    assertThat(report.getDiffList()).hasSize(1);
+    assertThat(report.getDiffList()).containsExactly(reportEntry);
     SnapshotDiffJob afterJob = codecRegistry.asObject(
         db.get().get(snapDiffJobTable, codecRegistry.asRawData(jobKey)),
         SnapshotDiffJob.class);
@@ -853,6 +852,43 @@ public class TestSnapshotDiffManager {
         db.get().get(snapDiffJobTable, codecRegistry.asRawData(jobKey)),
         SnapshotDiffJob.class);
     assertEquals(FAILED, afterJob.getStatus());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"DONE,true", "IN_PROGRESS,true", "QUEUED,true", "FAILED,true", "FAILED,false"})
+  public void testIntegrityFailureDoesNotUpdateChangedJob(JobStatus currentStatus, boolean replacement)
+      throws IOException {
+    String jobKey = UUID.randomUUID() + DELIMITER + UUID.randomUUID();
+    String jobId = UUID.randomUUID().toString();
+    SnapshotDiffJob oldJob = new SnapshotDiffJob(0, jobId, DONE, VOLUME_NAME,
+        BUCKET_NAME, "fs", "ts", false, true, 1, null, 0.0, jobId + DELIMITER + "missing-tail");
+    String currentJobId = replacement ? UUID.randomUUID().toString() : jobId;
+    SnapshotDiffJob currentJob = new SnapshotDiffJob(0, currentJobId, currentStatus, VOLUME_NAME,
+        BUCKET_NAME, "fs", "ts", false, true, 0, null, 0.0, "");
+    snapshotDiffManager.getSnapDiffJobTable().put(jobKey, currentJob);
+
+    IOException ex = assertThrows(IOException.class, () ->
+        snapshotDiffManager.createPageResponse(oldJob, jobKey, VOLUME_NAME,
+            BUCKET_NAME, "fs", "ts", "", Integer.MAX_VALUE));
+    assertThat(ex).hasMessageContaining("Report integrity check failed");
+    SnapshotDiffJob afterJob = snapshotDiffManager.getSnapDiffJobTable().get(jobKey);
+    assertEquals(currentJobId, afterJob.getJobId());
+    assertEquals(currentStatus, afterJob.getStatus());
+    assertEquals("", afterJob.getLargestEntryKey());
+  }
+
+  @Test
+  public void testIntegrityFailureDoesNotRecreateRemovedJob() throws IOException {
+    String jobKey = UUID.randomUUID() + DELIMITER + UUID.randomUUID();
+    String jobId = UUID.randomUUID().toString();
+    SnapshotDiffJob oldJob = new SnapshotDiffJob(0, jobId, DONE, VOLUME_NAME,
+        BUCKET_NAME, "fs", "ts", false, true, 1, null, 0.0, jobId + DELIMITER + "missing-tail");
+
+    IOException ex = assertThrows(IOException.class, () ->
+        snapshotDiffManager.createPageResponse(oldJob, jobKey, VOLUME_NAME,
+            BUCKET_NAME, "fs", "ts", "", Integer.MAX_VALUE));
+    assertThat(ex).hasMessageContaining("Report integrity check failed");
+    assertNull(snapshotDiffManager.getSnapDiffJobTable().get(jobKey));
   }
 
   @Test

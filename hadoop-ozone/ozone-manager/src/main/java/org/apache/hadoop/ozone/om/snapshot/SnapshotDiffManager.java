@@ -801,7 +801,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
    * service and throws the exception to client.
    */
   @VisibleForTesting
-  void checkReportsIntegrity(final SnapshotDiffJob diffJob,
+  synchronized void checkReportsIntegrity(final SnapshotDiffJob diffJob,
                              final String jobKey,
                              final String largestPageIndex,
                              boolean lastPage) throws IOException {
@@ -814,7 +814,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
               "Largest Page entry: {}", diffJob.getLargestEntryKey(), largestPageIndex);
       // The job is stored under jobKey (fromSnapshotId + DELIMITER + toSnapshotId), not
       // under its jobId; passing the jobId here would look up a missing row.
-      updateJobStatus(jobKey, DONE, FAILED);
+      SnapshotDiffJob currentJob = snapDiffJobTable.get(jobKey);
+      if (currentJob != null && currentJob.getJobId().equals(diffJob.getJobId()) && currentJob.getStatus() == DONE) {
+        updateJobStatus(jobKey, DONE, FAILED);
+      }
       throw new IOException("Report integrity check failed. Retry after: " +
           ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval());
     }
@@ -1727,11 +1730,6 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
                                             JobStatus oldStatus,
                                             JobStatus newStatus) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
-    if (snapshotDiffJob == null) {
-      LOG.warn("Cannot transition snapshot diff job {} from {} to {}: " +
-          "no job found for the key.", jobKey, oldStatus, newStatus);
-      return;
-    }
     if (snapshotDiffJob.getStatus() != oldStatus) {
       throw new IllegalStateException("Invalid job status for jobID: " +
           snapshotDiffJob.getJobId() + ". Job's current status is '" +
