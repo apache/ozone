@@ -19,15 +19,18 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -39,11 +42,36 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OMFileCreateRequest - prefix layout.
  */
 public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
+
+  @ParameterizedTest
+  @CsvSource({"d/./f,d/f", "x/../y,y", "/a//b,a/b"})
+  public void testPreExecuteNormalizesKeyName(String key, String normalizedKey) throws Exception {
+    OMRequest omRequest = createFileRequest(volumeName, bucketName, key, ONE, HddsProtos.ReplicationType.RATIS,
+        false, true);
+
+    OMRequest modifiedOmRequest = getOMFileCreateRequest(omRequest).preExecute(ozoneManager);
+
+    assertThat(modifiedOmRequest.getCreateFileRequest().getKeyArgs().getKeyName()).isEqualTo(normalizedKey);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {".", "a/..", "../f", "./.snapshot/f"})
+  public void testPreExecuteRejectsInvalidKeyPath(String key) throws Exception {
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(createFileRequest(volumeName, bucketName, key,
+        ONE, HddsProtos.ReplicationType.RATIS, false, true));
+
+    OMException e = assertThrows(OMException.class, () -> omFileCreateRequest.preExecute(ozoneManager));
+
+    assertThat(e.getResult()).isEqualTo(OMException.ResultCodes.INVALID_KEY_NAME);
+  }
 
   @Override
   @Test

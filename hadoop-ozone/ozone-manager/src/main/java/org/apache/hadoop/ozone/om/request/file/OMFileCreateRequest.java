@@ -89,6 +89,11 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Objects.requireNonNull(createFileRequest, "createFileRequest == null");
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
+    if (!keyArgs.getKeyName().isEmpty()) {
+      String keyName = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName(),
+          getBucketLayout());
+      keyArgs = keyArgs.toBuilder().setKeyName(keyName).build();
+    }
     if (keyArgs.getIsMultipartKey()) {
       OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     }
