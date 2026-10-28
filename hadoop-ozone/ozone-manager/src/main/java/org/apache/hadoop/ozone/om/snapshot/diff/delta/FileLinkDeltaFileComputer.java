@@ -139,7 +139,7 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
 
   UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(SnapshotInfo snapshotInfo) throws IOException {
     return omSnapshotManager.getActiveSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
-        snapshotInfo.getName());
+        snapshotInfo.getName(), snapshotInfo.getSnapshotId());
   }
 
   OMMetadataManager getActiveMetadataManager() {
