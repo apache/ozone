@@ -69,7 +69,7 @@ while IFS= read -r line; do
 
   # Checks for OM Request files
   if [[ "$file" =~ $OM_REQUEST_FILE ]]; then
-    warn "OM request changed. If validateAndUpdateCache was modified such that an old and new OM would arrive at" \
+    warn "OM request changed. If \`validateAndUpdateCache\` was modified such that an old and new OM would arrive at" \
       "different DB state when replaying the same transaction, then gate the new behavior with an" \
       "\`OzoneManagerVersion\`." \
       "If this adds a new request, block it until its feature is finalized with" \
