@@ -32,6 +32,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -39,9 +41,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -182,6 +186,25 @@ public class TestOMMultiTenantManagerImpl {
         "seed-accessId1");
     assertTrue(optionalTenant.isPresent());
     assertEquals(TENANT_ID, optionalTenant.get());
+  }
+
+  @Test
+  public void testIsTenantAdminSkipsMissingAccessId() throws IOException {
+    final String missingAccessId = "tenant1$bob";
+    final String adminAccessId = "tenant2$bob";
+    omMetadataManager.getPrincipalToAccessIdsTable().put("bob",
+        new OmDBUserPrincipalInfo(new HashSet<>(Arrays.asList(missingAccessId, adminAccessId))));
+    assignUserToTenantInDB("tenant2", adminAccessId, "bob", true, false);
+    // An unlocked reader can still see an accessId in the principal row after its accessId row is removed.
+    // Ensure the missing entry is checked before the valid admin entry to exercise the regression.
+    assertThat(omMetadataManager.getPrincipalToAccessIdsTable().get("bob").getAccessIds())
+        .first().isEqualTo(missingAccessId);
+
+    final UserGroupInformation bob = UserGroupInformation.createRemoteUser("bob");
+    assertThat(tenantManager.isTenantAdmin(bob, "tenant2", false)).isTrue();
+    assertThat(tenantManager.isTenantAdmin(bob, "tenant2", true)).isFalse();
+    assertThat(tenantManager.isTenantAdmin(bob, TENANT_ID, false)).isFalse();
+    assertThat(tenantManager.isTenantAdmin(bob, "tenant3", false)).isFalse();
   }
 
   /**
