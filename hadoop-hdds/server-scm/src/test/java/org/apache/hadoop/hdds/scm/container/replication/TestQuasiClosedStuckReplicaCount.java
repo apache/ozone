@@ -82,8 +82,8 @@ public class TestQuasiClosedStuckReplicaCount {
   public void testCorrectReplicationWithOneOrigin() {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE), NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE), new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());
@@ -156,7 +156,7 @@ public class TestQuasiClosedStuckReplicaCount {
   public void testUnderReplicationWithOneOrigin() {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertTrue(replicaCount.isUnderReplicated());
@@ -203,9 +203,8 @@ public class TestQuasiClosedStuckReplicaCount {
   public void testOverReplicationWithOneOrigin() {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE), NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE), new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE), new NodeOperationalStateAndOrigin(origin1, IN_SERVICE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());
@@ -253,9 +252,9 @@ public class TestQuasiClosedStuckReplicaCount {
   public void testUnderReplicationDueToDecommissionWithOneOrigin() {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, DECOMMISSIONING),
-        NodeOperationalStateAndOrigin.of(origin1, DECOMMISSIONING));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, DECOMMISSIONING),
+        new NodeOperationalStateAndOrigin(origin1, DECOMMISSIONING));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertTrue(replicaCount.isUnderReplicated());
@@ -304,9 +303,9 @@ public class TestQuasiClosedStuckReplicaCount {
   public void testNoOverReplicationWithOutOfServiceReplicasWithOneOrigin() {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE), NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, DECOMMISSIONED));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE), new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, DECOMMISSIONED));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());
@@ -317,8 +316,8 @@ public class TestQuasiClosedStuckReplicaCount {
   public void testUnderReplicationWithMaintenanceWithOneOrigin() {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE), NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, ENTERING_MAINTENANCE));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE), new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, ENTERING_MAINTENANCE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());
@@ -326,9 +325,9 @@ public class TestQuasiClosedStuckReplicaCount {
 
     replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, ENTERING_MAINTENANCE),
-        NodeOperationalStateAndOrigin.of(origin1, ENTERING_MAINTENANCE));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, ENTERING_MAINTENANCE),
+        new NodeOperationalStateAndOrigin(origin1, ENTERING_MAINTENANCE));
 
     replicaCount = new QuasiClosedStuckReplicaCount(replicas, 2, 3, 2);
     assertTrue(replicaCount.isUnderReplicated());
@@ -389,9 +388,9 @@ public class TestQuasiClosedStuckReplicaCount {
   public void testNoOverReplicationWithExcessMaintenanceReplicasOneOrigin() {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE), NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_MAINTENANCE));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE), new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, IN_MAINTENANCE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());

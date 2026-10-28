@@ -327,8 +327,9 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithMissingIndex34() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(3, 4),
         availableReplicas, 0, 0, policy);
   }
@@ -363,14 +364,14 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithDecomIndex1() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     Set<DatanodeCommand> cmds = testUnderReplicationWithMissingIndexes(
             Lists.emptyList(), availableReplicas, 1, 0, policy);
     assertEquals(1, cmds.size());
     // Check the replicate command has index 1 set
-    ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds.iterator().next().getCommand();
+    ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds.iterator().next().command();
     assertEquals(1, cmd.getReplicaIndex());
   }
 
@@ -398,9 +399,9 @@ public class TestECUnderReplicationHandler {
     };
 
     availableReplicas.addAll(ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5)));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5)));
 
     // Note that maintenanceIndexes is set to zero as we do not expect any
     // maintenance commands to be created, as they are solved by the earlier
@@ -411,7 +412,7 @@ public class TestECUnderReplicationHandler {
     // Check the replicate command has index 1 set
     for (DatanodeCommand c : cmds) {
       // Ensure neither of the commands are for the dead maintenance node
-      assertNotEquals(deadMaintenance.getDatanodeDetails(), c.getDatanode());
+      assertNotEquals(deadMaintenance.getDatanodeDetails(), c.datanode());
     }
   }
 
@@ -419,9 +420,9 @@ public class TestECUnderReplicationHandler {
   public void testUnderReplicationWithDecomNodesOverloaded()
       throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(
             any(), anyList(), any(), anyInt());
@@ -436,9 +437,9 @@ public class TestECUnderReplicationHandler {
       throws IOException {
     replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     // Mock node 1 as highly loaded
     DatanodeDetails decomNode = availableReplicas.stream()
@@ -460,11 +461,11 @@ public class TestECUnderReplicationHandler {
     int replicateCommand = 0;
     int reconstructCommand = 0;
     for (DatanodeCommand dnCommand : commandsSent) {
-      if (dnCommand.getCommand() instanceof ReplicateContainerCommand) {
+      if (dnCommand.command() instanceof ReplicateContainerCommand) {
         replicateCommand++;
-      } else if (dnCommand.getCommand() instanceof ReconstructECContainersCommand) {
+      } else if (dnCommand.command() instanceof ReconstructECContainersCommand) {
         reconstructCommand++;
-        ReconstructECContainersCommand reconCmd = (ReconstructECContainersCommand) dnCommand.getCommand();
+        ReconstructECContainersCommand reconCmd = (ReconstructECContainersCommand) dnCommand.command();
         assertEquals(ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
             reconCmd.getMissingContainerIndexes());
 
@@ -490,9 +491,9 @@ public class TestECUnderReplicationHandler {
       throws IOException {
     replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     DatanodeDetails decomNode = availableReplicas.stream()
         .filter(r -> r.getReplicaIndex() == 1)
@@ -511,9 +512,9 @@ public class TestECUnderReplicationHandler {
         result, remainingMaintenanceRedundancy);
 
     assertTrue(commandsSent.stream()
-        .anyMatch(c -> c.getCommand() instanceof ReplicateContainerCommand));
+        .anyMatch(c -> c.command() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
-        .noneMatch(c -> c.getCommand() instanceof ReconstructECContainersCommand));
+        .noneMatch(c -> c.command() instanceof ReconstructECContainersCommand));
     assertEquals(0, metrics.getEcReconstructionDecommissionTriggeredTotal());
     assertEquals(1, metrics.getEcReconstructionGlobalLimitReachedTotal());
   }
@@ -523,9 +524,9 @@ public class TestECUnderReplicationHandler {
       throws IOException {
     replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     DatanodeDetails decomNode = availableReplicas.stream()
         .filter(r -> r.getReplicaIndex() == 1)
@@ -544,9 +545,9 @@ public class TestECUnderReplicationHandler {
         result, remainingMaintenanceRedundancy);
 
     assertTrue(commandsSent.stream()
-        .anyMatch(c -> c.getCommand() instanceof ReplicateContainerCommand));
+        .anyMatch(c -> c.command() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
-        .noneMatch(c -> c.getCommand() instanceof ReconstructECContainersCommand));
+        .noneMatch(c -> c.command() instanceof ReconstructECContainersCommand));
     assertEquals(1, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
   }
 
@@ -555,9 +556,9 @@ public class TestECUnderReplicationHandler {
       throws IOException {
     replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     DatanodeDetails decomNode = availableReplicas.stream()
         .filter(r -> r.getReplicaIndex() == 1)
@@ -582,9 +583,9 @@ public class TestECUnderReplicationHandler {
     assertEquals(2, spy.callCount());
     assertEquals(spy.usedNodes(0).size(), spy.usedNodes(1).size());
     assertTrue(commandsSent.stream()
-        .anyMatch(c -> c.getCommand() instanceof ReplicateContainerCommand));
+        .anyMatch(c -> c.command() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
-        .noneMatch(c -> c.getCommand() instanceof ReconstructECContainersCommand));
+        .noneMatch(c -> c.command() instanceof ReconstructECContainersCommand));
     assertEquals(1, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
   }
 
@@ -593,9 +594,9 @@ public class TestECUnderReplicationHandler {
       throws IOException {
     replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 2), NodeOperationalStateAndIndex.of(DECOMMISSIONING, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 2), new NodeOperationalStateAndIndex(DECOMMISSIONING, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     DatanodeDetails decomNode = availableReplicas.stream()
         .filter(r -> r.getReplicaIndex() == 1)
@@ -613,9 +614,9 @@ public class TestECUnderReplicationHandler {
         result, remainingMaintenanceRedundancy);
 
     assertTrue(commandsSent.stream()
-        .anyMatch(c -> c.getCommand() instanceof ReplicateContainerCommand));
+        .anyMatch(c -> c.command() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
-        .noneMatch(c -> c.getCommand() instanceof ReconstructECContainersCommand));
+        .noneMatch(c -> c.command() instanceof ReconstructECContainersCommand));
     assertEquals(1, metrics.getEcDecommissionReconstructionFallbackInsufficientSourcesTotal());
   }
 
@@ -624,9 +625,9 @@ public class TestECUnderReplicationHandler {
       throws IOException {
     replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     DatanodeDetails decomNode = availableReplicas.stream()
         .filter(r -> r.getReplicaIndex() == 1)
@@ -663,9 +664,9 @@ public class TestECUnderReplicationHandler {
     assertEquals(0, metrics.getEcDecommissionReconstructionFallbackInsufficientSourcesTotal());
     assertEquals(0, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
     assertTrue(commandsSent.stream()
-        .anyMatch(c -> c.getCommand() instanceof ReplicateContainerCommand));
+        .anyMatch(c -> c.command() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
-        .noneMatch(c -> c.getCommand() instanceof ReconstructECContainersCommand));
+        .noneMatch(c -> c.command() instanceof ReconstructECContainersCommand));
   }
 
   @Test
@@ -673,9 +674,9 @@ public class TestECUnderReplicationHandler {
       throws IOException {
     replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     DatanodeDetails decomNode = availableReplicas.stream()
         .filter(r -> r.getReplicaIndex() == 1)
@@ -708,10 +709,10 @@ public class TestECUnderReplicationHandler {
             result, remainingMaintenanceRedundancy));
 
     assertEquals(1, commandsSent.stream()
-        .filter(c -> c.getCommand() instanceof ReconstructECContainersCommand)
+        .filter(c -> c.command() instanceof ReconstructECContainersCommand)
         .count());
     assertEquals(0, commandsSent.stream()
-        .filter(c -> c.getCommand() instanceof ReplicateContainerCommand)
+        .filter(c -> c.command() instanceof ReplicateContainerCommand)
         .count());
     assertEquals(0, metrics.getEcDecommissionReconstructionFallbackNoOpTotal());
     assertEquals(1, metrics.getEcReconstructionDecommissionTriggeredTotal());
@@ -720,9 +721,9 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithDecomIndex12() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
         2, 0, policy);
   }
@@ -731,9 +732,9 @@ public class TestECUnderReplicationHandler {
   public void testUnderReplicationWithMixedDecomAndMissingIndexes()
       throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 2, 0, policy);
   }
@@ -741,9 +742,9 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithMaintenanceIndex12() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
         0, 2, policy);
   }
@@ -752,9 +753,9 @@ public class TestECUnderReplicationHandler {
   public void testUnderReplicationWithMaintenanceAndMissingIndexes()
       throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 0, 2, policy);
   }
@@ -763,9 +764,9 @@ public class TestECUnderReplicationHandler {
   public void testUnderReplicationWithMissingDecomAndMaintenanceIndexes()
       throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 2), NodeOperationalStateAndIndex.of(DECOMMISSIONING, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 2), new NodeOperationalStateAndIndex(DECOMMISSIONING, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 1, 2, policy);
   }
@@ -778,9 +779,9 @@ public class TestECUnderReplicationHandler {
   public void testUnderReplicationWithInvalidPlacement()
           throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4));
     PlacementPolicy mockedPolicy = spy(policy);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             mock(ContainerPlacementStatus.class);
@@ -807,9 +808,9 @@ public class TestECUnderReplicationHandler {
     PlacementPolicy noNodesPolicy = ReplicationTestUtil
         .getNoNodesTestPlacementPolicy(nodeManager, conf);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4));
     assertThrows(SCMException.class, () ->
         testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
             availableReplicas, 2, 0, noNodesPolicy));
@@ -925,9 +926,9 @@ public class TestECUnderReplicationHandler {
     for (ContainerReplica toAdd : replicasToAdd) {
       clearInvocations(replicationManager);
       Set<ContainerReplica> existingReplicas = ReplicationTestUtil
-          .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 5),
-              NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-              NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+          .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 5),
+              new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+              new NodeOperationalStateAndIndex(IN_SERVICE, 4));
       if (toAdd != null) {
         existingReplicas.add(toAdd);
       }
@@ -957,7 +958,7 @@ public class TestECUnderReplicationHandler {
       */
       commandsSent.clear();
       doAnswer(invocation -> {
-        commandsSent.add(DatanodeCommand.of(invocation.getArgument(2),
+        commandsSent.add(new DatanodeCommand(invocation.getArgument(2),
             createDeleteContainerCommand(invocation.getArgument(0), invocation.getArgument(1))));
         return null;
       })
@@ -975,9 +976,9 @@ public class TestECUnderReplicationHandler {
               unhealthyReplica.getDatanodeDetails(), true);
       assertEquals(1, commandsSent.size());
       DatanodeCommand command = commandsSent.iterator().next();
-      assertEquals(SCMCommandProto.Type.deleteContainerCommand, command.getCommand().getType());
-      DeleteContainerCommand deleteCommand = (DeleteContainerCommand) command.getCommand();
-      assertEquals(unhealthyReplica.getDatanodeDetails(), command.getDatanode());
+      assertEquals(SCMCommandProto.Type.deleteContainerCommand, command.command().getType());
+      DeleteContainerCommand deleteCommand = (DeleteContainerCommand) command.command();
+      assertEquals(unhealthyReplica.getDatanodeDetails(), command.datanode());
       assertEquals(container.containerID(), ContainerID.valueOf(deleteCommand.getContainerID()));
       assertEquals(unhealthyReplica.getReplicaIndex(), deleteCommand.getReplicaIndex());
     }
@@ -999,7 +1000,7 @@ public class TestECUnderReplicationHandler {
         ecURH.processAndSendCommands(availableReplicas, emptyList(),
             underRep, 1));
     assertEquals(1, commandsSent.size());
-    ReconstructECContainersCommand cmd = (ReconstructECContainersCommand) commandsSent.iterator().next().getCommand();
+    ReconstructECContainersCommand cmd = (ReconstructECContainersCommand) commandsSent.iterator().next().command();
     assertEquals(1, cmd.getTargetDatanodes().size());
     assertEquals(1, metrics.getEcPartialReconstructionNoneOverloadedTotal());
   }
@@ -1007,8 +1008,8 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testOverloadedReconstructionContinuesNextStages() {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(DECOMMISSIONING, 3));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(DECOMMISSIONING, 3));
     ECUnderReplicationHandler ecURH = new ECUnderReplicationHandler(policy, conf, replicationManager);
 
     UnderReplicatedHealthResult underRep =
@@ -1022,16 +1023,16 @@ public class TestECUnderReplicationHandler {
         ecURH.processAndSendCommands(availableReplicas, emptyList(),
             underRep, 1));
     assertEquals(1, commandsSent.size());
-    SCMCommand<?> cmd = commandsSent.iterator().next().getCommand();
+    SCMCommand<?> cmd = commandsSent.iterator().next().command();
     assertEquals(SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
   }
 
   @Test
   public void testPartialDecommissionIfNotEnoughNodes() {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 4), NodeOperationalStateAndIndex.of(DECOMMISSIONING, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 4), new NodeOperationalStateAndIndex(DECOMMISSIONING, 5));
     PlacementPolicy placementPolicy = ReplicationTestUtil
         .getInsufficientNodesTestPlacementPolicy(nodeManager, conf, 2);
     ECUnderReplicationHandler ecURH = new ECUnderReplicationHandler(
@@ -1045,7 +1046,7 @@ public class TestECUnderReplicationHandler {
         ecURH.processAndSendCommands(availableReplicas, emptyList(),
             underRep, 1));
     assertEquals(1, commandsSent.size());
-    SCMCommand<?> cmd = commandsSent.iterator().next().getCommand();
+    SCMCommand<?> cmd = commandsSent.iterator().next().command();
     assertEquals(SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
     assertEquals(1, metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
@@ -1053,9 +1054,9 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testPartialDecommissionOverloadedNodes() {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 4), NodeOperationalStateAndIndex.of(DECOMMISSIONING, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 4), new NodeOperationalStateAndIndex(DECOMMISSIONING, 5));
     ECUnderReplicationHandler ecURH = new ECUnderReplicationHandler(
         policy, conf, replicationManager);
 
@@ -1068,7 +1069,7 @@ public class TestECUnderReplicationHandler {
         ecURH.processAndSendCommands(availableReplicas, emptyList(),
             underRep, 1));
     assertEquals(1, commandsSent.size());
-    SCMCommand<?> cmd = commandsSent.iterator().next().getCommand();
+    SCMCommand<?> cmd = commandsSent.iterator().next().command();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
     // The partial recovery here is due to overloaded nodes, not insufficient
@@ -1081,10 +1082,10 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testPartialMaintenanceIfNotEnoughNodes() {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(ENTERING_MAINTENANCE, 4),
-            NodeOperationalStateAndIndex.of(ENTERING_MAINTENANCE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(ENTERING_MAINTENANCE, 4),
+            new NodeOperationalStateAndIndex(ENTERING_MAINTENANCE, 5));
     PlacementPolicy placementPolicy = ReplicationTestUtil
         .getInsufficientNodesTestPlacementPolicy(nodeManager, conf, 2);
     ECUnderReplicationHandler ecURH = new ECUnderReplicationHandler(
@@ -1098,7 +1099,7 @@ public class TestECUnderReplicationHandler {
         ecURH.processAndSendCommands(availableReplicas, emptyList(),
             underRep, 2));
     assertEquals(1, commandsSent.size());
-    SCMCommand<?> cmd = commandsSent.iterator().next().getCommand();
+    SCMCommand<?> cmd = commandsSent.iterator().next().command();
     assertEquals(SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
     assertEquals(1, metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
@@ -1106,10 +1107,10 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testPartialMaintenanceOverloadedNodes() {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(ENTERING_MAINTENANCE, 4),
-            NodeOperationalStateAndIndex.of(ENTERING_MAINTENANCE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(ENTERING_MAINTENANCE, 4),
+            new NodeOperationalStateAndIndex(ENTERING_MAINTENANCE, 5));
     ECUnderReplicationHandler ecURH = new ECUnderReplicationHandler(
         policy, conf, replicationManager);
 
@@ -1122,7 +1123,7 @@ public class TestECUnderReplicationHandler {
         ecURH.processAndSendCommands(availableReplicas, emptyList(),
             underRep, 2));
     assertEquals(1, commandsSent.size());
-    SCMCommand<?> cmd = commandsSent.iterator().next().getCommand();
+    SCMCommand<?> cmd = commandsSent.iterator().next().command();
     assertEquals(SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
     // The partial recovery here is due to overloaded nodes, not insufficient
     // nodes. The "deferred" metric should be updated when all sources are
@@ -1167,8 +1168,8 @@ public class TestECUnderReplicationHandler {
       // entering_maintenance replica 5.
       Set<ContainerReplica> availableReplicas = ReplicationTestUtil
           .createReplicas(
-              NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-              NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+              new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+              new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 4));
       if (toAdd != null) {
         availableReplicas.add(toAdd);
       }
@@ -1181,9 +1182,9 @@ public class TestECUnderReplicationHandler {
           .processOverReplicatedContainer(underRep);
       assertEquals(1, commandsSent.size());
       DatanodeCommand pair = commandsSent.iterator().next();
-      assertEquals(newNode, pair.getDatanode());
+      assertEquals(newNode, pair.datanode());
       assertEquals(SCMCommandProto.Type.reconstructECContainersCommand,
-          pair.getCommand().getType());
+          pair.command().getType());
       clearInvocations(replicationManager);
       commandsSent.clear();
     }
@@ -1198,9 +1199,10 @@ public class TestECUnderReplicationHandler {
     // found. This will cause an exception to be thrown out, as the container is
     // not also over replicated.
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONING, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+            new NodeOperationalStateAndIndex(DECOMMISSIONING, 5));
 
     ECUnderReplicationHandler ecURH =
         new ECUnderReplicationHandler(
@@ -1222,7 +1224,7 @@ public class TestECUnderReplicationHandler {
     availableReplicas.add(overRepReplica);
 
     Set<DatanodeCommand> expectedDelete = new HashSet<>();
-    expectedDelete.add(DatanodeCommand.of(overRepReplica.getDatanodeDetails(), createDeleteContainerCommand(container,
+    expectedDelete.add(new DatanodeCommand(overRepReplica.getDatanodeDetails(), createDeleteContainerCommand(container,
             overRepReplica.getReplicaIndex())));
 
     when(replicationManager.processOverReplicatedContainer(
@@ -1245,8 +1247,9 @@ public class TestECUnderReplicationHandler {
         .getSameNodeTestPlacementPolicy(nodeManager, conf, newDn);
     // Just have a missing index, this should return OK.
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4));
     // Passing zero for decommIndexes, as we don't expect the decom command to
     // get created due to the placement policy returning an already used node
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
@@ -1258,9 +1261,9 @@ public class TestECUnderReplicationHandler {
     // come up the stack and be thrown out to indicate this container must be
     // retried.
     Set<ContainerReplica> replicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 4));
 
     assertThrows(SCMException.class, () ->
         testUnderReplicationWithMissingIndexes(ImmutableList.of(5), replicas,
@@ -1270,15 +1273,15 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderAndOverReplication() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     Set<DatanodeCommand> cmds = testUnderReplicationWithMissingIndexes(ImmutableList.of(2, 3),
             availableReplicas, 0, 0, policy);
     assertEquals(1, cmds.size());
     ReconstructECContainersCommand cmd =
-        (ReconstructECContainersCommand) cmds.iterator().next().getCommand();
+        (ReconstructECContainersCommand) cmds.iterator().next().command();
     // Ensure that all source nodes are IN_SERVICE, we should not have picked
     // the non in-service nodes for index 1.
     for (ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex s
@@ -1296,9 +1299,9 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testMaintenanceDoesNotRequestZeroNodes() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(),
             isNull(), anyInt(), anyLong(), anyLong()))
@@ -1365,14 +1368,14 @@ public class TestECUnderReplicationHandler {
 
     handler.processAndSendCommands(availableReplicas, pendingOps, result, 1);
     assertEquals(1, commandsSent.size());
-    assertNotEquals(dn, commandsSent.iterator().next().getDatanode());
+    assertNotEquals(dn, commandsSent.iterator().next().datanode());
   }
 
   @Test
   public void testDecommissioningIndexCopiedWhenContainerUnRecoverable()
       throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1));
     ContainerReplica decomReplica = createContainerReplica(
         container.containerID(), 2, DECOMMISSIONING, CLOSED);
     availableReplicas.add(decomReplica);
@@ -1380,7 +1383,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(1, cmds.size());
     // With push replication the command should always be sent to the
     // decommissioning source.
-    DatanodeDetails target = cmds.iterator().next().getDatanode();
+    DatanodeDetails target = cmds.iterator().next().datanode();
     assertEquals(decomReplica.getDatanodeDetails(), target);
   }
 
@@ -1388,7 +1391,7 @@ public class TestECUnderReplicationHandler {
   public void testMaintenanceIndexCopiedWhenContainerUnRecoverable()
       throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1));
     ContainerReplica maintReplica = createContainerReplica(container.containerID(), 2, ENTERING_MAINTENANCE, CLOSED);
     availableReplicas.add(maintReplica);
 
@@ -1404,7 +1407,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(1, cmds.size());
     // With push replication the command should always be sent to the
     // entering_maintenance source.
-    DatanodeDetails target = cmds.iterator().next().getDatanode();
+    DatanodeDetails target = cmds.iterator().next().datanode();
     assertEquals(maintReplica.getDatanodeDetails(), target);
   }
 
@@ -1428,12 +1431,12 @@ public class TestECUnderReplicationHandler {
         !missingIndexes.isEmpty() && missingIndexes.size() <= repConfig
             .getParity();
     for (DatanodeCommand dnCommand : commandsSent) {
-      if (dnCommand.getCommand() instanceof ReplicateContainerCommand) {
+      if (dnCommand.command() instanceof ReplicateContainerCommand) {
         replicateCommand++;
-      } else if (dnCommand.getCommand() instanceof ReconstructECContainersCommand) {
+      } else if (dnCommand.command() instanceof ReconstructECContainersCommand) {
         if (shouldReconstructCommandExist) {
           assertEquals(ECUnderReplicationHandler.integers2ByteString(missingIndexes),
-              ((ReconstructECContainersCommand) dnCommand.getCommand()).getMissingContainerIndexes());
+              ((ReconstructECContainersCommand) dnCommand.command()).getMissingContainerIndexes());
         }
         reconstructCommand++;
       }

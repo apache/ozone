@@ -114,9 +114,9 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testReturnsZeroIfNotUnderReplicated() throws IOException {
     final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        QUASI_CLOSED, NodeOperationalStateAndOrigin.of(origin, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin, IN_SERVICE));
+        QUASI_CLOSED, new NodeOperationalStateAndOrigin(origin, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin, IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1);
     assertEquals(0, count);
@@ -126,8 +126,8 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testNoCommandsScheduledIfPendingOps() throws IOException {
     final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        QUASI_CLOSED, NodeOperationalStateAndOrigin.of(origin, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin, IN_SERVICE));
+        QUASI_CLOSED, new NodeOperationalStateAndOrigin(origin, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin, IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
@@ -140,7 +140,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testCommandScheduledForUnderReplicatedContainer() throws IOException {
     final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        QUASI_CLOSED, NodeOperationalStateAndOrigin.of(origin, IN_SERVICE));
+        QUASI_CLOSED, new NodeOperationalStateAndOrigin(origin, IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1);
     assertEquals(2, count);
@@ -171,8 +171,8 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     final DatanodeID origin1 = DatanodeID.randomID();
     final DatanodeID origin2 = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        QUASI_CLOSED, NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE));
+        QUASI_CLOSED, new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin2, IN_SERVICE));
 
     PlacementPolicy policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager, conf);
     handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);
@@ -186,7 +186,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testPartialReplicationExceptionThrown() {
     final DatanodeID origin1 = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        QUASI_CLOSED, NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE));
+        QUASI_CLOSED, new NodeOperationalStateAndOrigin(origin1, IN_SERVICE));
 
     PlacementPolicy policy = ReplicationTestUtil.getInsufficientNodesTestPlacementPolicy(nodeManager, conf, 2);
     handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);

@@ -179,8 +179,8 @@ public class TestRatisUnderReplicationHandler {
   public void testUnderReplicatedBecauseOfDecommissioningReplica()
       throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 0),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 0),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0));
 
     testProcessing(replicas, Collections.emptyList(),
         getUnderReplicatedHealthResult(), 2, 1);
@@ -195,8 +195,8 @@ public class TestRatisUnderReplicationHandler {
   public void testUnderReplicatedBecauseOfMaintenanceReplica()
       throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(ENTERING_MAINTENANCE, 0),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0));
+        .createReplicas(new NodeOperationalStateAndIndex(ENTERING_MAINTENANCE, 0),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0));
 
     testProcessing(replicas, Collections.emptyList(),
         getUnderReplicatedHealthResult(), 3, 1);
@@ -210,8 +210,8 @@ public class TestRatisUnderReplicationHandler {
   public void testSufficientlyReplicatedDespiteMaintenanceReplica()
       throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(ENTERING_MAINTENANCE, 0),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0));
+        .createReplicas(new NodeOperationalStateAndIndex(ENTERING_MAINTENANCE, 0),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0));
 
     testProcessing(replicas, Collections.emptyList(),
         getUnderReplicatedHealthResult(), 2, 0);
@@ -316,9 +316,9 @@ public class TestRatisUnderReplicationHandler {
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
     assertEquals(1, commandsSent.size());
     DatanodeCommand cmd = commandsSent.iterator().next();
-    assertEquals(shouldDelete.getDatanodeDetails(), cmd.getDatanode());
+    assertEquals(shouldDelete.getDatanodeDetails(), cmd.datanode());
     assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
-        .Type.deleteContainerCommand, cmd.getCommand().getType());
+        .Type.deleteContainerCommand, cmd.command().getType());
   }
 
   @Test
@@ -376,9 +376,9 @@ public class TestRatisUnderReplicationHandler {
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
     assertEquals(1, commandsSent.size());
     DatanodeCommand cmd = commandsSent.iterator().next();
-    assertEquals(shouldDelete.getDatanodeDetails(), cmd.getDatanode());
+    assertEquals(shouldDelete.getDatanodeDetails(), cmd.datanode());
     assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
-        .Type.deleteContainerCommand, cmd.getCommand().getType());
+        .Type.deleteContainerCommand, cmd.command().getType());
   }
 
   @Test
@@ -400,7 +400,7 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.UNHEALTHY, 0, 0);
     replicas.addAll(createReplicas(container.containerID(), State.UNHEALTHY,
-        NodeOperationalStateAndIndex.of(DECOMMISSIONING, 0)));
+        new NodeOperationalStateAndIndex(DECOMMISSIONING, 0)));
 
     testProcessing(replicas, Collections.emptyList(),
         getUnderReplicatedHealthResult(), 2, 1);
@@ -418,7 +418,7 @@ public class TestRatisUnderReplicationHandler {
     Set<DatanodeCommand> commands =
         testProcessing(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2, 2);
     commands.forEach(command -> assertEquals(closedReplica.getDatanodeDetails(),
-            command.getDatanode()));
+            command.datanode()));
   }
 
   /**
@@ -439,7 +439,7 @@ public class TestRatisUnderReplicationHandler {
     Set<DatanodeCommand> commands = testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 1);
     commands.forEach(command -> assertNotEquals(unhealthyReplica.getDatanodeDetails(),
-            command.getDatanode()));
+            command.datanode()));
   }
 
   @Test
@@ -542,7 +542,7 @@ public class TestRatisUnderReplicationHandler {
     final Set<DatanodeCommand> commands =
         testProcessing(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2, 2);
     commands.forEach(command -> assertNotEquals(quasiClosedReplica.getDatanodeDetails(),
-            command.getDatanode()));
+            command.datanode()));
   }
 
   /**
@@ -569,7 +569,7 @@ public class TestRatisUnderReplicationHandler {
     when(result.hasVulnerableUnhealthy()).thenReturn(true);
 
     final Set<DatanodeCommand> commands = testProcessing(replicas, Collections.emptyList(), result, 2, 1);
-    assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().getDatanode());
+    assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().datanode());
   }
 
   /**
@@ -597,7 +597,7 @@ public class TestRatisUnderReplicationHandler {
     when(result.hasVulnerableUnhealthy()).thenReturn(true);
 
     final Set<DatanodeCommand> commands = testProcessing(replicas, Collections.emptyList(), result, 2, 1);
-    assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().getDatanode());
+    assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().datanode());
   }
 
   /**
@@ -638,7 +638,7 @@ public class TestRatisUnderReplicationHandler {
     assertThrows(CommandTargetOverloadedException.class, () -> handler.processAndSendCommands(replicas,
         Collections.emptyList(), result, 2));
     assertEquals(1, commandsSent.size());
-    DatanodeDetails dn = commandsSent.iterator().next().getDatanode();
+    DatanodeDetails dn = commandsSent.iterator().next().datanode();
     assertTrue(unhealthyReplica.getDatanodeDetails().equals(dn) || unhealthyReplica2.getDatanodeDetails().equals(dn));
   }
 
@@ -658,7 +658,7 @@ public class TestRatisUnderReplicationHandler {
     final Set<DatanodeCommand> commands = testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 2);
     commands.forEach(command -> assertEquals(quasiClosedReplica.getDatanodeDetails(),
-            command.getDatanode()));
+            command.datanode()));
   }
 
   @Test
@@ -678,7 +678,7 @@ public class TestRatisUnderReplicationHandler {
     final Set<DatanodeCommand> commands =
         testProcessing(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2, 1);
     commands.forEach(command -> assertEquals(closedReplica.getDatanodeDetails(),
-            command.getDatanode()));
+            command.datanode()));
   }
 
   @Test

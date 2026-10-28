@@ -230,11 +230,11 @@ public abstract class MisReplicationHandlerTests {
     } finally {
       assertEquals(expectedNumberOfCommands, commandsSent.size());
       for (DatanodeCommand datanodeCommand : commandsSent) {
-        SCMCommand<?> command = datanodeCommand.getCommand();
+        SCMCommand<?> command = datanodeCommand.command();
         assertSame(replicateContainerCommand, command.getType());
         ReplicateContainerCommand replicateContainerCommand = (ReplicateContainerCommand) command;
         assertEquals(replicateContainerCommand.getContainerID(), container.getContainerID());
-        DatanodeDetails replicateSrcDn = datanodeCommand.getDatanode();
+        DatanodeDetails replicateSrcDn = datanodeCommand.datanode();
         DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
         assertThat(sourceDns).contains(replicateSrcDn);
         assertThat(targetNodes).contains(target);

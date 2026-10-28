@@ -220,8 +220,8 @@ public class TestRatisReplicationCheckHandler {
   public void testUnderReplicatedDueToOutOfService() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(DECOMMISSIONING, 0),
-        NodeOperationalStateAndIndex.of(DECOMMISSIONED, 0));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(DECOMMISSIONING, 0),
+        new NodeOperationalStateAndIndex(DECOMMISSIONED, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);
@@ -243,7 +243,7 @@ public class TestRatisReplicationCheckHandler {
   @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#outOfServiceStates")
   void testUnderReplicatedDueToAllOutOfService(
       HddsProtos.NodeOperationalState state) {
-    NodeOperationalStateAndIndex pair = NodeOperationalStateAndIndex.of(state, 0);
+    NodeOperationalStateAndIndex pair = new NodeOperationalStateAndIndex(state, 0);
 
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
@@ -275,8 +275,8 @@ public class TestRatisReplicationCheckHandler {
   public void testUnderReplicatedDueToOutOfServiceFixedWithPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0),
-        NodeOperationalStateAndIndex.of(DECOMMISSIONED, 0));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(DECOMMISSIONED, 0));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
@@ -304,7 +304,7 @@ public class TestRatisReplicationCheckHandler {
   public void testUnderReplicatedDueToOutOfServiceAndMissing() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(DECOMMISSIONED, 0));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(DECOMMISSIONED, 0));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
@@ -450,10 +450,10 @@ public class TestRatisReplicationCheckHandler {
   public void testOverReplicatedContainer() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0));
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
@@ -666,8 +666,8 @@ public class TestRatisReplicationCheckHandler {
   public void testOverReplicatedContainerFixedByPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0));
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
@@ -695,9 +695,9 @@ public class TestRatisReplicationCheckHandler {
   public void testOverReplicatedContainerWithMaintenance() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0),
-        NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 0), NodeOperationalStateAndIndex.of(DECOMMISSIONED, 0));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_MAINTENANCE, 0), new NodeOperationalStateAndIndex(DECOMMISSIONED, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);
@@ -718,9 +718,9 @@ public class TestRatisReplicationCheckHandler {
   public void testOverReplicatedContainerDueToMaintenanceIsHealthy() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_SERVICE, 0),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 0), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 0),
-        NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 0));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 0),
+        new NodeOperationalStateAndIndex(IN_MAINTENANCE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);

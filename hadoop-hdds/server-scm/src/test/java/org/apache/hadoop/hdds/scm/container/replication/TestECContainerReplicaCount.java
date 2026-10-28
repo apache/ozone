@@ -66,9 +66,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testPerfectlyReplicatedContainer() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
             Collections.emptyList(), 1);
@@ -79,8 +79,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testContainerMissingReplica() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4));
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
             Collections.emptyList(), 1);
@@ -101,9 +102,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testContainerMissingReplicaDueToPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
@@ -139,10 +140,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testContainerExcessReplicasAndPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5), NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2));
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1, 2));
 
@@ -155,10 +156,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testUnderRepContainerWithExcessReplicasAndPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5), NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2));
 
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1, 2, 2));
@@ -173,9 +174,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testContainerWithMaintenanceReplicasSufficientlyReplicated() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 4),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 4), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5));
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
             Collections.emptyList(), 0);
@@ -192,10 +193,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testOverReplicatedContainer() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5), NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2));
 
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
@@ -220,10 +221,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testOverReplicatedContainerFixedWithPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5), NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2));
 
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
@@ -243,10 +244,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testOverReplicatedAndUnderReplicatedContainer() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2));
     // this copy of index 4 is unhealthy, so it should not cause over
     // replication of index 4
     ContainerReplica unhealthyIndex4 =
@@ -267,12 +268,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testAdditionalMaintenanceCopiesAllMaintenance() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1),
-            NodeOperationalStateAndIndex.of(ENTERING_MAINTENANCE, 2),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 3),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 4),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+            new NodeOperationalStateAndIndex(ENTERING_MAINTENANCE, 2),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 3), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 4),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1));
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
             Collections.emptyList(), 1);
@@ -296,9 +295,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testAdditionalMaintenanceCopiesAlreadyReplicated() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1));
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
             Collections.emptyList(), 1);
@@ -325,9 +325,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testAdditionalMaintenanceCopiesAlreadyReplicatedWithDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1));
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
 
@@ -347,10 +348,11 @@ public class TestECContainerReplicaCount {
   @Test
   public void testAdditionalMaintenanceCopiesDuplicatesInMaintenance() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5));
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
             Collections.emptyList(), 1);
@@ -377,9 +379,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testMaintenanceRedundancyGreaterThanParity() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 4),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 4), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5));
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
             Collections.emptyList(), 5);
@@ -389,10 +391,10 @@ public class TestECContainerReplicaCount {
     assertEquals(2, rcnt.additionalMaintenanceCopiesNeeded(false));
     // After replication, zero should be needed
     replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 4),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 4), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 5);
     assertEquals(0, rcnt.additionalMaintenanceCopiesNeeded(false));
@@ -402,8 +404,8 @@ public class TestECContainerReplicaCount {
   @Test
   public void testUnderReplicatedNoMaintenance() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3));
 
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
@@ -423,11 +425,10 @@ public class TestECContainerReplicaCount {
   @Test
   public void testMaintenanceRedundancyIsMetWithPendingAdd() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1),
-            NodeOperationalStateAndIndex.of(ENTERING_MAINTENANCE, 2),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 3),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 4),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+            new NodeOperationalStateAndIndex(ENTERING_MAINTENANCE, 2),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 3), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 4),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5));
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(1, 2, 3, 4),
             ImmutableList.of(1));
@@ -448,8 +449,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testUnderReplicatedFixedWithPending() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 3));
 
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(4, 5), ImmutableList.of());
@@ -472,9 +474,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testMissingNonMaintenanceReplicas() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 4));
 
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
@@ -492,9 +494,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testMissingNonMaintenanceReplicasAllMaintenance() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 1),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 2), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 3),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 4), NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 2), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 3),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 4), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 5));
 
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(1), ImmutableList.of());
@@ -514,8 +516,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testMissingNonMaintenanceReplicasPendingAdd() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4));
 
     // 5 is missing, but there is a pending add.
     List<ContainerReplicaOp> pending =
@@ -558,20 +561,20 @@ public class TestECContainerReplicaCount {
     assertEquals(5, rcnt.unavailableIndexes(true).size());
 
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_MAINTENANCE, 2));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_MAINTENANCE, 2));
     // The unhealthy replica does not help with recovery even though we now
     // have 3 replicas.
-    replica.addAll(ReplicationTestUtil.createReplicas(UNHEALTHY, NodeOperationalStateAndIndex.of(IN_SERVICE, 3)));
+    replica.addAll(ReplicationTestUtil.createReplicas(UNHEALTHY, new NodeOperationalStateAndIndex(IN_SERVICE, 3)));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     assertTrue(rcnt.isUnrecoverable());
     assertEquals(3, rcnt.unavailableIndexes(true).size());
     assertEquals(0, rcnt.additionalMaintenanceCopiesNeeded(false));
 
-    replica = ReplicationTestUtil.createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONED, 1),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONED, 2), NodeOperationalStateAndIndex.of(DECOMMISSIONED, 3),
-            NodeOperationalStateAndIndex.of(DECOMMISSIONED, 4), NodeOperationalStateAndIndex.of(DECOMMISSIONED, 5));
+    replica = ReplicationTestUtil.createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONED, 1),
+            new NodeOperationalStateAndIndex(DECOMMISSIONED, 2), new NodeOperationalStateAndIndex(DECOMMISSIONED, 3),
+            new NodeOperationalStateAndIndex(DECOMMISSIONED, 4), new NodeOperationalStateAndIndex(DECOMMISSIONED, 5));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     // Not missing as the decommission replicas are still online
@@ -579,9 +582,9 @@ public class TestECContainerReplicaCount {
     assertEquals(0, rcnt.unavailableIndexes(true).size());
 
     // All unhealthy replicas is still un-recoverable.
-    replica = ReplicationTestUtil.createReplicas(UNHEALTHY, NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+    replica = ReplicationTestUtil.createReplicas(UNHEALTHY, new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     // Not missing as the decommission replicas are still online
@@ -599,23 +602,23 @@ public class TestECContainerReplicaCount {
 
     // 1 unhealthy
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(UNHEALTHY, NodeOperationalStateAndIndex.of(IN_SERVICE, 1));
+        .createReplicas(UNHEALTHY, new NodeOperationalStateAndIndex(IN_SERVICE, 1));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     assertTrue(rcnt.isMissing());
     assertTrue(rcnt.isUnrecoverable());
 
     // 2 unhealthy
-    replica = ReplicationTestUtil.createReplicas(UNHEALTHY, NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2));
+    replica = ReplicationTestUtil.createReplicas(UNHEALTHY, new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     assertTrue(rcnt.isMissing());
     assertTrue(rcnt.isUnrecoverable());
 
     // 3 unhealthy
-    replica = ReplicationTestUtil.createReplicas(UNHEALTHY, NodeOperationalStateAndIndex.of(IN_SERVICE, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3));
+    replica = ReplicationTestUtil.createReplicas(UNHEALTHY, new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     assertFalse(rcnt.isMissing());
@@ -624,8 +627,9 @@ public class TestECContainerReplicaCount {
 
     // 3 replicas, with 1 unhealthy
     replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2));
-    replica.addAll(ReplicationTestUtil.createReplicas(UNHEALTHY, NodeOperationalStateAndIndex.of(IN_SERVICE, 3)));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2));
+    replica.addAll(ReplicationTestUtil.createReplicas(UNHEALTHY, new NodeOperationalStateAndIndex(IN_SERVICE, 3)));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     assertFalse(rcnt.isMissing());
@@ -633,9 +637,9 @@ public class TestECContainerReplicaCount {
 
     // 4 replicas, with 1 unhealthy
     replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3));
-    replica.addAll(ReplicationTestUtil.createReplicas(UNHEALTHY, NodeOperationalStateAndIndex.of(IN_SERVICE, 4)));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3));
+    replica.addAll(ReplicationTestUtil.createReplicas(UNHEALTHY, new NodeOperationalStateAndIndex(IN_SERVICE, 4)));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     assertFalse(rcnt.isMissing());
@@ -645,9 +649,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testDecommissioningOnlyIndexes() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(DECOMMISSIONING, 1),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 2), NodeOperationalStateAndIndex.of(IN_SERVICE, 3),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 4), NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(1), ImmutableList.of());
 
@@ -661,7 +665,7 @@ public class TestECContainerReplicaCount {
   @Test
   public void testSufficientlyReplicatedForOffline() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 2));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 2));
 
     ContainerReplica inServiceReplica =
         ReplicationTestUtil.createContainerReplica(container.containerID(),
@@ -700,9 +704,9 @@ public class TestECContainerReplicaCount {
   @Test
   public void testSufficientlyReplicatedWithUnhealthyAndPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
-        .createReplicas(NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-            NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     ContainerReplica unhealthyReplica =
         ReplicationTestUtil.createContainerReplica(container.containerID(),

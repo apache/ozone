@@ -664,9 +664,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       return null;
     }
     // Put the least loaded datanode first
-    datanodes.sort(Comparator.comparingInt(DatanodeCommandCount::getCommandCount));
-    DatanodeDetails datanode = datanodes.get(0).getDatanode();
-    int currentCount = datanodes.get(0).getCommandCount();
+    datanodes.sort(Comparator.comparingInt(DatanodeCommandCount::commandCount));
+    DatanodeDetails datanode = datanodes.get(0).datanode();
+    int currentCount = datanodes.get(0).commandCount();
     if (currentCount + additionalCmdCount >= getReplicationLimit(datanode)) {
       addExcludedNode(datanode);
     }
@@ -1893,28 +1893,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * A datanode paired with its current queued replication command count,
    * used to pick the least loaded datanode for a new command.
    */
-  private static final class DatanodeCommandCount {
-    private final int commandCount;
-    private final DatanodeDetails datanode;
-
-    DatanodeCommandCount(int commandCount, DatanodeDetails datanode) {
-      this.commandCount = commandCount;
-      this.datanode = datanode;
-    }
-
-    int getCommandCount() {
-      return commandCount;
-    }
-
-    DatanodeDetails getDatanode() {
-      return datanode;
-    }
-
-    @Override
-    public String toString() {
-      return "DatanodeCommandCount{commandCount=" + commandCount
-          + ", datanode=" + datanode + '}';
-    }
-  }
+  private record DatanodeCommandCount(int commandCount, DatanodeDetails datanode) { }
 }
 

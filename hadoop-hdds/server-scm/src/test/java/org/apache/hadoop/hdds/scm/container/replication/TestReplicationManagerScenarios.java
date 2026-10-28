@@ -179,7 +179,7 @@ public class TestReplicationManagerScenarios {
     commandsSent = new HashSet<>();
     eventPublisher = mock(EventPublisher.class);
     doAnswer(invocation -> {
-      commandsSent.add(DatanodeIdCommand.of(invocation.getArgument(0), invocation.getArgument(1)));
+      commandsSent.add(new DatanodeIdCommand(invocation.getArgument(0), invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
@@ -341,10 +341,10 @@ public class TestReplicationManagerScenarios {
     for (ExpectedCommands expectedCommand : expectedCommands) {
       boolean found = false;
       for (DatanodeIdCommand command : commandsSent) {
-        if (command.getCommand().getType() == expectedCommand.getType()) {
+        if (command.command().getType() == expectedCommand.getType()) {
           if (expectedCommand.hasExpectedDatanode()) {
             // We need to assert against the command the datanode is sent to
-            DatanodeDetails commandDatanode = findDatanode(command.getDatanodeId());
+            DatanodeDetails commandDatanode = findDatanode(command.datanodeId());
             if (commandDatanode != null && expectedCommand.isTargetExpected(commandDatanode)) {
               found = true;
               commandsSent.remove(command);

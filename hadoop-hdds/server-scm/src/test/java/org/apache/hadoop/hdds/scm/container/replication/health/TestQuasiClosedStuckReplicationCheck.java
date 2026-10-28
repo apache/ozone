@@ -77,7 +77,7 @@ public class TestQuasiClosedStuckReplicationCheck {
 
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicasWithOriginAndOpState(containerInfo.containerID(), State.QUASI_CLOSED,
-            NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE));
+            new NodeOperationalStateAndOrigin(origin1, IN_SERVICE));
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
@@ -100,9 +100,9 @@ public class TestQuasiClosedStuckReplicationCheck {
 
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicasWithOriginAndOpState(containerInfo.containerID(), State.QUASI_CLOSED,
-            NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-            NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE),
-            NodeOperationalStateAndOrigin.of(origin3, IN_SERVICE));
+            new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+            new NodeOperationalStateAndOrigin(origin2, IN_SERVICE),
+            new NodeOperationalStateAndOrigin(origin3, IN_SERVICE));
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(report)
@@ -125,11 +125,11 @@ public class TestQuasiClosedStuckReplicationCheck {
 
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicasWithOriginAndOpState(containerInfo.containerID(), State.QUASI_CLOSED,
-            NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-            NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE));
+            new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+            new NodeOperationalStateAndOrigin(origin2, IN_SERVICE));
     containerReplicas.addAll(ReplicationTestUtil
         .createReplicasWithOriginAndOpState(containerInfo.containerID(), State.OPEN,
-            NodeOperationalStateAndOrigin.of(origin3, IN_SERVICE)));
+            new NodeOperationalStateAndOrigin(origin3, IN_SERVICE)));
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(report)
@@ -203,8 +203,8 @@ public class TestQuasiClosedStuckReplicationCheck {
 
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicasWithOriginAndOpState(containerInfo.containerID(), State.QUASI_CLOSED,
-            NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-            NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE));
+            new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+            new NodeOperationalStateAndOrigin(origin1, IN_SERVICE));
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -224,8 +224,8 @@ public class TestQuasiClosedStuckReplicationCheck {
 
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicasWithOriginAndOpState(containerInfo.containerID(), State.QUASI_CLOSED,
-            NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-            NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE));
+            new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+            new NodeOperationalStateAndOrigin(origin2, IN_SERVICE));
 
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(

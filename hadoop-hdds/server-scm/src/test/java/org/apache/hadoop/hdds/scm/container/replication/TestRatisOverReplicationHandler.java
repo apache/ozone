@@ -241,7 +241,7 @@ public class TestRatisOverReplicationHandler {
         testProcessing(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     DatanodeCommand command = commands.iterator().next();
     assertEquals(unhealthyReplica.getDatanodeDetails(),
-        command.getDatanode());
+        command.datanode());
   }
 
   /**
@@ -310,7 +310,7 @@ public class TestRatisOverReplicationHandler {
     Set<DatanodeCommand> commands =
         testProcessing(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     DatanodeCommand commandPair = commands.iterator().next();
-    assertEquals(shouldDelete.getDatanodeDetails(), commandPair.getDatanode());
+    assertEquals(shouldDelete.getDatanodeDetails(), commandPair.datanode());
   }
 
   @Test
@@ -328,7 +328,7 @@ public class TestRatisOverReplicationHandler {
     Set<DatanodeCommand> commands = testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 1);
     DatanodeCommand commandPair = commands.iterator().next();
-    assertEquals(lowestSequenceIDReplica.getDatanodeDetails(), commandPair.getDatanode());
+    assertEquals(lowestSequenceIDReplica.getDatanodeDetails(), commandPair.datanode());
   }
 
   /**
@@ -359,7 +359,7 @@ public class TestRatisOverReplicationHandler {
 
     Set<DatanodeCommand> commands = testProcessing(
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 2);
-    Set<DatanodeDetails> datanodes = commands.stream().map(DatanodeCommand::getDatanode).collect(Collectors.toSet());
+    Set<DatanodeDetails> datanodes = commands.stream().map(DatanodeCommand::datanode).collect(Collectors.toSet());
     assertThat(datanodes).contains(quasiClosedReplica.getDatanodeDetails());
   }
 
@@ -381,7 +381,7 @@ public class TestRatisOverReplicationHandler {
 
     Set<DatanodeCommand> commands = testProcessing(
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
-    Set<DatanodeDetails> datanodes = commands.stream().map(DatanodeCommand::getDatanode).collect(Collectors.toSet());
+    Set<DatanodeDetails> datanodes = commands.stream().map(DatanodeCommand::datanode).collect(Collectors.toSet());
     assertThat(datanodes).doesNotContain(decommissioningReplica.getDatanodeDetails());
     assertThat(datanodes).doesNotContain(maintenanceReplica.getDatanodeDetails());
   }
@@ -466,7 +466,7 @@ public class TestRatisOverReplicationHandler {
             getOverReplicatedHealthResult(), 2));
     assertEquals(1, commandsSent.size());
     DatanodeCommand cmd = commandsSent.iterator().next();
-    assertNotEquals(quasiClosedReplica.getDatanodeDetails(), cmd.getDatanode());
+    assertNotEquals(quasiClosedReplica.getDatanodeDetails(), cmd.datanode());
   }
 
   @Test
@@ -489,7 +489,7 @@ public class TestRatisOverReplicationHandler {
       DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
           containerInfo.getContainerID(), forceDelete);
       deleteCommand.setReplicaIndex(replicaIndex);
-      commandsSent.add(DatanodeCommand.of(target, deleteCommand));
+      commandsSent.add(new DatanodeCommand(target, deleteCommand));
       return null;
     }).when(replicationManager)
         .sendThrottledDeleteCommand(any(), anyInt(), any(), anyBoolean());

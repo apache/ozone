@@ -134,9 +134,9 @@ public class TestECMisReplicationCheckHandler {
         new ContainerPlacementStatusDefault(4, 5, 9));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -180,9 +180,9 @@ public class TestECMisReplicationCheckHandler {
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -225,9 +225,9 @@ public class TestECMisReplicationCheckHandler {
     });
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 1), NodeOperationalStateAndIndex.of(IN_SERVICE, 2),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 3), NodeOperationalStateAndIndex.of(IN_SERVICE, 4),
-        NodeOperationalStateAndIndex.of(IN_SERVICE, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     ContainerReplica unhealthyReplica =
         createContainerReplica(container.containerID(), 1, IN_SERVICE,
             State.UNHEALTHY);

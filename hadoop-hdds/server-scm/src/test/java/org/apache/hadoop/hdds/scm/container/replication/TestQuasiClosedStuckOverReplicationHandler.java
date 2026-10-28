@@ -99,10 +99,10 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   public void testReturnsZeroIfNotOverReplicated() throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin2, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin2, IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     assertEquals(0, count);
@@ -112,12 +112,12 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   public void testNoCommandsScheduledIfPendingOps() throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         QUASI_CLOSED,
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin1, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE),
-        NodeOperationalStateAndOrigin.of(origin2, IN_SERVICE));
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin1, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin2, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin2, IN_SERVICE),
+        new NodeOperationalStateAndOrigin(origin2, IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
@@ -151,7 +151,7 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     assertEquals(1, count);
-    SCMCommand<?> command = commandsSent.iterator().next().getCommand();
+    SCMCommand<?> command = commandsSent.iterator().next().command();
     assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteContainerCommand, command.getType());
   }
 
