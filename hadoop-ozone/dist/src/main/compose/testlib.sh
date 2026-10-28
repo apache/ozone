@@ -27,11 +27,20 @@ RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 source ${_testlib_dir}/compose_v2_compatibility.sh
 source "${_testlib_dir}/../smoketest/testlib.sh"
 
+: ${DOWNLOAD_DIR:="${HOME}/.cache/ozone"}
 : ${OZONE_COMPOSE_RUNNING:=false}
 : "${OZONE_VOLUME_OWNER:=}"
 : ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
 : ${SKIP_APACHE_VERIFY_DOWNLOAD:=${CI:-false}}
+
+if [[ -z ${HADOOP_VERSION:-} ]]; then
+  export HADOOP_VERSION="${hadoop.version}"
+fi
+
+if [[ -z "${RANGER_VERSION:-}" ]]; then
+  export RANGER_VERSION="${ranger.version}"
+fi
 
 # Check if running from output of Maven build or from source
 _is_build() {
@@ -695,11 +704,19 @@ download_if_not_exists() {
   local f="$2"
 
   if [[ -e "${f}" ]]; then
-    echo "${f} already downloaded"
+    echo "${f} already downloaded" >&2
   else
-    echo "Downloading ${f} from ${url}"
-    curl --fail --location --output "${f}" --show-error --silent "${url}" || rm -fv "${f}"
+    download_with_retry "${url}" "${f}" >&2 || rm -fv "${f}"
   fi
+}
+
+import_keys() {
+  local url="$1"
+
+  keys=$(mktemp)
+  download_with_retry "$url" "$keys"
+  gpg --import "$keys"
+  rm -f "$keys"
 }
 
 download_and_verify_apache_release() {
@@ -708,11 +725,46 @@ download_and_verify_apache_release() {
   local f="$(basename "${remote_path}")"
   local base_url="${APACHE_MIRROR_URL:-https://www.apache.org/dyn/closer.lua?action=download&filename=}"
   local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
-  local download_dir="${DOWNLOAD_DIR:-/tmp}"
 
-  download_if_not_exists "${base_url}${remote_path}" "${download_dir}/${f}"
+  download_if_not_exists "${base_url}${remote_path}" "${DOWNLOAD_DIR}/${f}" >&2
   if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
-    download_if_not_exists "${checksum_base_url}${remote_path}.asc"  "${download_dir}/${f}.asc"
-    gpg --verify "${download_dir}/${f}.asc" "${download_dir}/${f}" || exit 1
+    download_if_not_exists "${checksum_base_url}${remote_path}.asc" "${DOWNLOAD_DIR}/${f}.asc" >&2
+    gpg --verify "${DOWNLOAD_DIR}/${f}.asc" "${DOWNLOAD_DIR}/${f}" >&2 || exit 1
   fi
+  echo "${DOWNLOAD_DIR}/${f}"
+}
+
+# retry at two levels:
+# 1. curl --retry 3
+# 2. re-run curl 3x
+download_with_retry() {
+  local url=$1
+  local output=$2
+
+  local rc=1
+
+  mkdir -p "$(dirname "${output}")"
+
+  for i in {1..3}; do
+    echo "Downloading ${output} from ${url}, attempt ${i}"
+    if curl --continue-at - --fail --location -o "${output}" --retry 3 --show-error --silent "${url}"; then
+      rc=0
+      break
+    fi
+    sleep 2
+  done
+
+  return ${rc}
+}
+
+download_hadoop() {
+  download_and_verify_apache_release "hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz"
+}
+
+download_ranger() {
+  download_and_verify_apache_release "ranger/${RANGER_VERSION}/apache-ranger-${RANGER_VERSION}.tar.gz"
+}
+
+download_ranger_ozone_plugin() {
+  download_and_verify_apache_release "ranger/${RANGER_VERSION}/plugins/ozone/ranger-${RANGER_VERSION}-ozone-plugin.tar.gz"
 }
