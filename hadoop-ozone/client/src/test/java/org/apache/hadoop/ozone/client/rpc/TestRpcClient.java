@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.getOmVersion;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.validateOmVersion;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,6 +94,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.slf4j.event.Level;
@@ -371,20 +374,28 @@ public class TestRpcClient {
             om(OzoneManagerVersion.UNKNOWN_VERSION))));
   }
 
-  @Test
-  void testOmVersionRefreshesOnDemandAfterExpiry() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testOmVersionRefreshesOnDemandAfterExpiry(boolean customInterval) throws Exception {
+    OzoneConfiguration config = new OzoneConfiguration();
+    if (customInterval) {
+      config.set(OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL, "37s");
+    }
+    long interval = config.getTimeDuration(
+        OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL, OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
     VersionedOmTransport transport = new VersionedOmTransport();
     try (MockedStatic<Time> time = mockStatic(Time.class)) {
       time.when(Time::monotonicNow).thenReturn(0L);
-      RpcClient client = createRpcClient(transport);
+      RpcClient client = createRpcClient(transport, config);
       try {
         assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
         transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
-        time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(10) - 1);
+        time.when(Time::monotonicNow).thenReturn(interval - 1);
         assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
         assertEquals(1, transport.serviceInfoCalls.get());
 
-        time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(10));
+        time.when(Time::monotonicNow).thenReturn(interval);
         // Idle clients do not poll, even when their cached version has expired.
         assertEquals(1, transport.serviceInfoCalls.get());
         assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
@@ -404,14 +415,14 @@ public class TestRpcClient {
       RpcClient client = createRpcClient(transport);
       try {
         transport.failRefresh = true;
-        time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(10));
+        time.when(Time::monotonicNow).thenReturn(omVersionRefreshInterval());
         assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
         assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
         assertEquals(2, transport.serviceInfoCalls.get());
 
         transport.failRefresh = false;
         transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
-        time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(20));
+        time.when(Time::monotonicNow).thenReturn(2 * omVersionRefreshInterval());
         assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
         assertEquals(3, transport.serviceInfoCalls.get());
       } finally {
@@ -431,7 +442,7 @@ public class TestRpcClient {
             () -> client.getObjectTagging("volume", "bucket", "key"));
         assertThat(unsupported).hasMessageContaining("does not support S3 object tagging API");
         transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
-        time.when(Time::monotonicNow).thenReturn(TimeUnit.MINUTES.toMillis(10));
+        time.when(Time::monotonicNow).thenReturn(omVersionRefreshInterval());
         IOException reachedOm = assertThrows(IOException.class,
             () -> client.getObjectTagging("volume", "bucket", "key"));
         assertThat(reachedOm).hasMessage("Reached OM after version check");
@@ -452,7 +463,7 @@ public class TestRpcClient {
     try {
       transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
       ((AtomicLong) FieldUtils.readField(client, "omVersionLastUpdate", true))
-          .set(Time.monotonicNow() - TimeUnit.MINUTES.toMillis(10));
+          .set(Time.monotonicNow() - omVersionRefreshInterval());
       Future<OzoneManagerVersion> refresh = executor.submit(() -> client.getOmVersion());
       assertTrue(transport.refreshStarted.await(10, TimeUnit.SECONDS));
       List<Future<OzoneManagerVersion>> versions = new ArrayList<>();
@@ -483,7 +494,7 @@ public class TestRpcClient {
       client.setThreadLocalS3Auth(new S3Auth("stringToSign", "signature", "alice", "alice"));
       transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
       ((AtomicLong) FieldUtils.readField(client, "omVersionLastUpdate", true))
-          .set(Time.monotonicNow() - TimeUnit.MINUTES.toMillis(10));
+          .set(Time.monotonicNow() - omVersionRefreshInterval());
       assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
       assertEquals("alice", transport.lastServiceInfoRequest.getS3Authentication().getAccessId());
       assertEquals("signature", transport.lastServiceInfoRequest.getS3Authentication().getSignature());
@@ -888,7 +899,16 @@ public class TestRpcClient {
   }
 
   private static RpcClient createRpcClient(OmTransport transport) throws IOException {
-    OzoneConfiguration config = new OzoneConfiguration();
+    return createRpcClient(transport, new OzoneConfiguration());
+  }
+
+  private static long omVersionRefreshInterval() {
+    return new OzoneConfiguration().getTimeDuration(
+        OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL, OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+  }
+
+  private static RpcClient createRpcClient(OmTransport transport, OzoneConfiguration config) throws IOException {
     return new RpcClient(config, null) {
       @Override
       protected OmTransport createOmTransport(String omServiceId) {

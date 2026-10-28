@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT;
@@ -234,7 +236,7 @@ public class RpcClient implements ClientProtocol {
   private final boolean getLatestVersionLocation;
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
-  private static final long OM_VERSION_REFRESH_INTERVAL = TimeUnit.MINUTES.toMillis(10);
+  private final long omVersionRefreshInterval;
   private static final long OM_VERSION_REFRESHING = -1L;
   private volatile OzoneManagerVersion omVersion;
   private final AtomicLong omVersionLastUpdate = new AtomicLong();
@@ -258,6 +260,9 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     Objects.requireNonNull(conf, "conf == null");
     this.conf = conf;
+    this.omVersionRefreshInterval = conf.getTimeDuration(
+        OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL, OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
     TracingUtil.initTracing("client", conf);
     this.ugi = UserGroupInformation.getCurrentUser();
     replicationConfigValidator =
@@ -2980,7 +2985,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneManagerVersion getOmVersion() {
     long lastUpdate = omVersionLastUpdate.get();
-    if (lastUpdate == OM_VERSION_REFRESHING || Time.monotonicNow() - lastUpdate < OM_VERSION_REFRESH_INTERVAL) {
+    if (lastUpdate == OM_VERSION_REFRESHING || Time.monotonicNow() - lastUpdate < omVersionRefreshInterval) {
       return omVersion;
     }
     if (omVersionLastUpdate.compareAndSet(lastUpdate, OM_VERSION_REFRESHING)) {

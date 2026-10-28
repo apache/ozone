@@ -4027,6 +4027,18 @@
   </property>
 
   <property>
+    <name>ozone.client.om.version.refresh.interval</name>
+    <value>10m</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The interval after which the cached OM version is refreshed on the next version check.
+      Clients do not poll in the background. Failed refreshes retain the cached version and wait
+      for this interval before retrying. Supports time unit suffixes; milliseconds are assumed
+      if no unit is specified.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.client.server-defaults.validity.period.ms</name>
     <tag>OZONE, CLIENT, SECURITY</tag>
     <value>3600000</value>

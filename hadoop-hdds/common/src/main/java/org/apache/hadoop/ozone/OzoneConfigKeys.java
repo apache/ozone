@@ -606,6 +606,10 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
 
+  public static final String OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL =
+      "ozone.client.om.version.refresh.interval";
+  public static final long OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT = TimeUnit.MINUTES.toMillis(10);
+
   public static final String OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS =
       "ozone.client.server-defaults.validity.period.ms";
 
