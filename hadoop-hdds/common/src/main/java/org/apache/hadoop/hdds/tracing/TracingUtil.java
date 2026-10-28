@@ -508,7 +508,7 @@ public final class TracingUtil {
       return supplier.get();
     } catch (Exception ex) {
       span.addEvent("Failed with exception: " + ex.getMessage());
-      span.setStatus(StatusCode.ERROR);
+      recordException(span, ex);
       throw ex;
     } finally {
       span.end();
@@ -524,7 +524,7 @@ public final class TracingUtil {
       runnable.run();
     } catch (Exception ex) {
       span.addEvent("Failed with exception: " + ex.getMessage());
-      span.setStatus(StatusCode.ERROR);
+      recordException(span, ex);
       throw ex;
     } finally {
       span.end();

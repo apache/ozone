@@ -217,6 +217,33 @@ public class TestTracingUtil {
   }
 
   @Test
+  public void testExecuteInSpanRecordsException() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      assertThrows(IOException.class, () -> TracingUtil.executeInNewSpan("supplier", () -> {
+        throw new IOException("supplier failed");
+      }));
+      Span parent = TracingUtil.createSpan("parent");
+      try (Scope ignored = parent.makeCurrent()) {
+        String parentContext = TracingUtil.exportCurrentSpan();
+        assertThrows(IllegalStateException.class, () -> TracingUtil.executeAsChildSpan("runnable", parentContext,
+            () -> {
+              throw new IllegalStateException("runnable failed");
+            }));
+      } finally {
+        parent.end();
+      }
+
+      collector.assertError("supplier", "supplier failed");
+      collector.assertExceptionRecorded("supplier", IOException.class);
+      assertEquals("Failed with exception: supplier failed", firstEventName(collector, "supplier"));
+      collector.assertError("runnable", "runnable failed");
+      collector.assertExceptionRecorded("runnable", IllegalStateException.class);
+      assertEquals("Failed with exception: runnable failed", firstEventName(collector, "runnable"));
+      collector.assertNotError("parent");
+    }
+  }
+
+  @Test
   public void testTextExtractorAsTextMapGetter() {
     TracingUtil.TextExtractor getter = new TracingUtil.TextExtractor();
     String carrier =
@@ -507,5 +534,9 @@ public class TestTracingUtil {
     List<ReadableSpan> spans = collector.named(name);
     assertEquals(1, spans.size(), () -> "spans named " + name + ": " + collector.getSpans());
     return spans.get(0).toSpanData();
+  }
+
+  private static String firstEventName(TestSpanCollector collector, String name) {
+    return finishedSpan(collector, name).getEvents().get(0).getName();
   }
 }
