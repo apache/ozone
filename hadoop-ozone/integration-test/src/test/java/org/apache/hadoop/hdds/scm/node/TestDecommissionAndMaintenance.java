@@ -38,7 +38,6 @@ import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachHealthState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachPersistedOpState;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -151,8 +150,10 @@ public class TestDecommissionAndMaintenance {
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(DATANODE_COUNT)
+        // Clusters overlap via MiniOzoneClusterProvider, so the metrics leak
+        // assertion would see a concurrent cluster's sources.
+        .setMetricsLeakAssertEnabled(false)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(maxLayoutVersion())
             .build());
 
     clusterProvider = new MiniOzoneClusterProvider(builder, 9);
@@ -241,10 +242,10 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(ecContainer, 5);
 
     cluster.restartHddsDatanode(dnIndex, true);
-    scmClient.recommissionNodes(Arrays.asList(
-        getDNHostAndPort(toDecommission)));
-    waitForDnToReachOpState(nm, toDecommission, IN_SERVICE);
-    waitForDnToReachPersistedOpState(toDecommission, IN_SERVICE);
+    DatanodeDetails newDn = nm.getNode(dnID);
+    scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(newDn)));
+    waitForDnToReachOpState(nm, newDn, IN_SERVICE);
+    waitForDnToReachPersistedOpState(newDn, IN_SERVICE);
   }
 
   @Test
@@ -486,7 +487,7 @@ public class TestDecommissionAndMaintenance {
     // has, then the SCM state should be used and the DN state updated.
     waitForDnToReachHealthState(nm, newDn, HEALTHY);
     waitForDnToReachOpState(nm, newDn, IN_SERVICE);
-    waitForDnToReachPersistedOpState(dn, IN_SERVICE);
+    waitForDnToReachPersistedOpState(newDn, IN_SERVICE);
   }
 
   @Test

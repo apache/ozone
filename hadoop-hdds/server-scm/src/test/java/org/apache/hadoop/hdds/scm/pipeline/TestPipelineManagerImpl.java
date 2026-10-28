@@ -108,6 +108,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.MockClock;
@@ -1133,7 +1134,7 @@ public class TestPipelineManagerImpl {
         .setId(PipelineID.randomId())
         .build();
     pipelineManager.getStateManager().addPipeline(
-        pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+        pipeline.getProtobufMessage(ClientVersion.CURRENT));
     return pipeline;
   }
 
@@ -1220,7 +1221,7 @@ public class TestPipelineManagerImpl {
           .setId(PipelineID.randomId())
           .build();
       pipelineManager.getStateManager().addPipeline(
-          ec.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+          ec.getProtobufMessage(ClientVersion.CURRENT));
 
       pipelineManager.closePipelinesMissingDataStreamPort();
 
@@ -1240,7 +1241,7 @@ public class TestPipelineManagerImpl {
       for (int i = 0; i < 3; i++) {
         final DatanodeDetails portless = portlessDatanode(DatanodeID.randomID());
         nodeManager.register(new DatanodeInfo(portless,
-            NodeStatus.inServiceHealthy(), null,
+            NodeStatus.inServiceHealthy(), UpgradeUtils.defaultVersionProto(),
             HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT), null, null);
         nodes.add(portless);
       }

@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -219,17 +217,6 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return bytes of DB key.
    */
   String getOpenKey(String volume, String bucket, String key, String clientId);
-
-  /**
-   * Returns client ID in Long of an OpenKeyTable DB Key String.
-   * @param dbOpenKeyName An OpenKeyTable DB Key String.
-   * @return Client ID (Long)
-   */
-  static long getClientIDFromOpenKeyDBKey(String dbOpenKeyName) {
-    final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
-    final String clientIdString = dbOpenKeyName.substring(lastPrefix + 1);
-    return Long.parseLong(clientIdString);
-  }
 
   /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.

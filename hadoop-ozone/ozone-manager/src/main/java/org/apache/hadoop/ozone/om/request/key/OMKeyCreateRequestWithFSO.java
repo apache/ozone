@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -127,7 +128,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
                 omMetadataManager, dbFileKey, keyName);
       }
       validateAtomicRewrite(dbFileInfo, keyArgs);
-      keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(
+      keyArgs = validateAndRewriteETagConditionsAsExpectedGeneration(
           keyArgs, dbFileInfo);
 
       // Check if a file or directory exists with same key name.
@@ -217,7 +218,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
-      int clientVersion = getOmRequest().getVersion();
+      ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
       createKeyResponseBuilder.setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
                   keyArgs.getLatestVersionLocation()))
               .setID(clientID)

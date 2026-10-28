@@ -43,7 +43,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -61,6 +60,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -244,11 +244,11 @@ class TestReconAndAdminContainerCLI {
   void testNodesInDecommissionOrMaintenance(
       NodeOperationalState initialState, NodeOperationalState finalState,
       boolean isMaintenance) throws Exception {
-    Pipeline pipeline =
-        scmClient.getContainerWithPipeline(containerIdR3).getPipeline();
+    OzoneTestHelper.waitForStableReplicaCount(containerIdR3, 3, cluster);
 
     List<DatanodeDetails> details =
-        pipeline.getNodes().stream()
+        scmContainerManager.getContainerReplicas(ContainerID.valueOf(containerIdR3)).stream()
+            .map(ContainerReplica::getDatanodeDetails)
             .filter(d -> d.getPersistedOpState().equals(IN_SERVICE))
             .collect(Collectors.toList());
 
@@ -281,7 +281,7 @@ class TestReconAndAdminContainerCLI {
     // a new replica-copy is made to another node.
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
-      waitForReplicaCount(containerIdR3, 4);
+      OzoneTestHelper.waitForStableReplicaCount(containerIdR3, 4, cluster);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
@@ -308,7 +308,7 @@ class TestReconAndAdminContainerCLI {
     // There will be a replica copy for both maintenance and decommission.
     // maintenance 3 -> 4, decommission 4 -> 5.
     int expectedReplicaNum = isMaintenance ? 4 : 5;
-    waitForReplicaCount(containerIdR3, expectedReplicaNum);
+    OzoneTestHelper.waitForStableReplicaCount(containerIdR3, expectedReplicaNum, cluster);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
@@ -325,16 +325,10 @@ class TestReconAndAdminContainerCLI {
     NodeTestUtil.waitForDnToReachPersistedOpState(nodeToGoOffline1, IN_SERVICE);
     NodeTestUtil.waitForDnToReachPersistedOpState(nodeToGoOffline2, IN_SERVICE);
 
-    waitForReplicaCount(containerIdR3, 3);
+    OzoneTestHelper.waitForStableReplicaCount(containerIdR3, 3, cluster);
+
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
-  }
-
-  private static void waitForReplicaCount(long containerID, int count)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(
-        () -> OzoneTestHelper.countReplicas(containerID, cluster) == count,
-        200, REPLICA_COUNT_WAIT_MS);
   }
 
   /**
@@ -433,15 +427,8 @@ class TestReconAndAdminContainerCLI {
 
     // Verify Recon picked up the new keys and
     // updated its container key mappings.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return reconContainerMetadataManager
-                   .getKeyCountForContainer(containerID) > 0;
-      } catch (IOException e) {
-        LOG.debug("Recon container metadata is temporarily unavailable", e);
-        return false;
-      }
-    }, 1000, 20000);
+    ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts(reconContainerMetadataManager,
+        Collections.singletonMap(containerID, 1));
 
     return containerID;
   }

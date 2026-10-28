@@ -78,6 +78,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -189,6 +190,12 @@ public class TestOMRatisSnapshotTransfer {
     }
   }
 
+  @AfterAll
+  public static void deleteAuditLogs() {
+    AuditLogTestUtils.deleteAuditLogFile();
+    AuditLogTestUtils.deleteSystemAuditLogFile();
+  }
+
   @Test
   public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
     // Get the leader OM
@@ -284,7 +291,7 @@ public class TestOMRatisSnapshotTransfer {
     String toMatch = String.format(
         "op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"%s\",\"term\":\"%d\",\"lastAppliedIndex\":\"%d\"}",
         leaderOMNodeId, leaderOMSnapshotTermIndex, followerOMLastAppliedIndex);
-    assertTrue(AuditLogTestUtils.auditLogContains(toMatch));
+    assertTrue(AuditLogTestUtils.systemAuditLogContains(toMatch));
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);

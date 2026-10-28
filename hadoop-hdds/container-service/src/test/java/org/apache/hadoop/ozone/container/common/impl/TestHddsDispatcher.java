@@ -1279,6 +1279,7 @@ public class TestHddsDispatcher {
           Op.HANDLE_PUT_SMALL_FILE,
           Op.HANDLE_READ_CHUNK,
           Op.HANDLE_WRITE_CHUNK,
+          Op.HANDLE_SHORT_CIRCUIT_READ,
           Op.STREAM_INIT,
       };
 

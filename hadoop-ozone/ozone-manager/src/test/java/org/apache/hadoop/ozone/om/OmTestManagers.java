@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -96,10 +96,10 @@ public final class OmTestManagers {
 
   public OmTestManagers(OzoneConfiguration conf,
                         ScmBlockLocationProtocol blockClient,
-                        StorageContainerLocationProtocol containerClient)
+                        StorageContainerLocationInternalInterface containerClient)
       throws AuthenticationException, IOException, InterruptedException, TimeoutException {
     if (containerClient == null) {
-      containerClient = mock(StorageContainerLocationProtocol.class);
+      containerClient = mock(StorageContainerLocationInternalInterface.class);
     }
     scmBlockClient = blockClient != null ? blockClient :
         new ScmBlockLocationTestingClient(null, null, 0);

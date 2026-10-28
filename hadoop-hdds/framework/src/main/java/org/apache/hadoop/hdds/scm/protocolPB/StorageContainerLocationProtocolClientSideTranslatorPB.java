@@ -37,6 +37,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
@@ -140,7 +141,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io_.retry.RetryProxy;
@@ -157,12 +158,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class is the client-side translator to translate the requests made on
- * the {@link StorageContainerLocationProtocol} interface to the RPC server
+ * the {@link StorageContainerLocationInternalInterface} interface to the RPC server
  * implementing {@link StorageContainerLocationProtocolPB}.
  */
 @InterfaceAudience.Private
 public final class StorageContainerLocationProtocolClientSideTranslatorPB
-    implements StorageContainerLocationProtocol, ProtocolTranslator, Closeable {
+    implements StorageContainerLocationInternalInterface, ProtocolTranslator, Closeable {
 
   /**
    * RpcController is not used and hence is set to null.
@@ -212,7 +213,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     try {
       Builder builder = ScmContainerLocationRequest.newBuilder()
           .setCmdType(type)
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .setTraceID(TracingUtil.exportCurrentSpan());
       builderConsumer.accept(builder);
       ScmContainerLocationRequest wrapper = builder.build();
@@ -344,7 +345,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
-      long containerID, int clientVersion) throws IOException {
+      long containerID, ClientVersion clientVersion) throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative");
 
@@ -566,7 +567,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState
       nodeState, HddsProtos.QueryScope queryScope, String poolName,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     // TODO : We support only cluster wide query right now. So ignoring checking
     // queryScope and poolName
     NodeQueryRequestProto.Builder builder = NodeQueryRequestProto.newBuilder()
@@ -1120,7 +1121,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String address, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, ClientVersion clientVersion) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
@@ -1146,7 +1147,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count, int clientVersion) throws IOException {
+      boolean mostUsed, int count, ClientVersion clientVersion) throws IOException {
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
             .setMostUsed(mostUsed)
@@ -1162,6 +1163,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Deprecated
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException {
     FinalizeScmUpgradeRequestProto req = FinalizeScmUpgradeRequestProto.
@@ -1181,6 +1183,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Deprecated
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException {
@@ -1201,6 +1204,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     return new StatusAndMessages(
         UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList());
+  }
+
+  @Override
+  public HDDSVersion getPeerUpgradeStatus() throws IOException {
+    StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusRequestProto req =
+        StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusRequestProto
+            .newBuilder()
+            .build();
+
+    StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusResponseProto response =
+        submitRequest(Type.GetPeerUpgradeStatus, builder -> builder.setGetPeerUpgradeStatusRequest(req))
+            .getGetPeerUpgradeStatusResponse();
+    return HDDSVersion.deserialize(response.getScmSoftwareVersion());
   }
 
   @Override
