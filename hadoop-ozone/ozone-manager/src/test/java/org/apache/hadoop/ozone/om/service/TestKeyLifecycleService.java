@@ -2567,6 +2567,46 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
     }
 
+    @Test
+    void testMoveToTrashSkipsRecreatedBucket() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String oldOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-old";
+      String keyName = createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, oldOwner, 1, 1, "dir1/key", null)
+          .get(0).getKeyName();
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>) () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+      // The task handles the expired key before the expired directory, so it pauses before deleting the key
+      // and moves the directory to trash after the pause.
+      keyLifecycleService.setMoveToTrashEnabled(false);
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      FaultInjectorImpl beforeDelete = new FaultInjectorImpl();
+      taskStart.release();
+      installInjectors(taskStart, beforeDelete, new FaultInjectorImpl());
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+      beforeDelete.awaitPaused(30000);
+
+      // While the task runs, the bucket is emptied, deleted and recreated by another owner.
+      for (String name : Arrays.asList(keyName, "dir1")) {
+        writeClient.deleteKey(new OmKeyArgs.Builder().setVolumeName(volumeName).setBucketName(bucketName)
+            .setKeyName(name).build());
+      }
+      writeClient.deleteBucket(volumeName, bucketName);
+      writeClient.createBucket(OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+          .setBucketLayout(FILE_SYSTEM_OPTIMIZED).setOwner(oldOwner + "-new").build());
+      keyLifecycleService.setMoveToTrashEnabled(true);
+      beforeDelete.resume();
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+          WAIT_CHECK_INTERVAL, 30000);
+
+      OMException ex = assertThrows(OMException.class, () -> getDirectory(volumeName, bucketName, TRASH_PREFIX));
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+      writeClient.deleteBucket(volumeName, bucketName);
+    }
+
     @ParameterizedTest
     @MethodSource("parameters7")
     void testMoveToTrashWithTrashPrefix(BucketLayout bucketLayout, String prefix) throws IOException,

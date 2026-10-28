@@ -1650,6 +1650,14 @@ public class KeyLifecycleService extends BackgroundService {
         if (e instanceof OMException &&
             (((OMException) e).getResult() == OMException.ResultCodes.FILE_NOT_FOUND ||
                 ((OMException) e).getResult() == OMException.ResultCodes.DIRECTORY_NOT_FOUND)) {
+          // The bucket may have been deleted and recreated since the task checked it, do not create
+          // the old owner's trash directory in the new bucket.
+          OmBucketInfo current = omMetadataManager.getBucketTable().get(
+              omMetadataManager.getBucketKey(bucket.getVolumeName(), bucket.getBucketName()));
+          if (current == null || current.getObjectID() != bucket.getObjectID()) {
+            throw new IOException("Bucket " + bucket.getVolumeName() + "/" + bucket.getBucketName() +
+                " was deleted or recreated, not creating trash directory " + dirPath);
+          }
           // create the trash/Current directory for user
           KeyArgs keyArgs = KeyArgs.newBuilder().setVolumeName(bucket.getVolumeName())
               .setBucketName(bucket.getBucketName()).setKeyName(dirPath.toString())
