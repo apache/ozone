@@ -5950,8 +5950,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -5992,8 +5991,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -6034,8 +6032,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -6052,6 +6049,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             auditMap));
       }
     }
+  }
+
+  /**
+   * Snapshot diff reads snapshot info, as getSnapshotInfo does, and lists key names, as listKeys does.
+   */
+  private void checkSnapshotDiffAcls(ResolvedBucket resolvedBucket) throws IOException {
+    omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
   }
 
   @Override
