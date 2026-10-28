@@ -97,6 +97,13 @@ public class Client implements AutoCloseable {
     retryCount.set(rc);
   }
 
+  /**
+   * Clear a call id set for the next call but never consumed by a {@link Call}.
+   */
+  public static void clearCallId() {
+    callId.remove();
+  }
+
   private final ConcurrentMap<ConnectionId, Connection> connections =
       new ConcurrentHashMap<>();
   private final Object putLock = new Object();
