@@ -97,9 +97,11 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 
   log=$(mktemp)
+  set -x
   mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" ${CLEAN} "${PHASE}" \
       | tee "${log}"
   irc=$?
+  set +x
 
   mkdir -p "${REPORT_DIR}"
   mv -f "${log}" "${REPORT_DIR}"/output.log
