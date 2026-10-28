@@ -131,10 +131,13 @@ while IFS= read -r line; do
 done | sort -u | {
   warnings=$(cat)
   if [[ -n "$warnings" ]]; then
-    echo "# This Change May Have Compatibility Issues"
+    echo "# Potential Zero Downtime Upgrade Incompatibility"
     echo
-    echo "Reviewers should manually check the warnings below to ensure the" \
-      "change is compatible with zero-downtime upgrade and downgrade."
+    echo "This pull request changes code that is commonly involved in ZDU compatibility problems." \
+        "This is an automated, pattern based heads-up and may be a false positive." \
+        "Reviewers should manually check the warnings below to ensure the" \
+        "change is compatible with zero-downtime upgrade and downgrade."
+    echo
     echo "See the [ZDU compatibility developer guide](${GUIDE_URL}) for details on handling these changes."
     echo
     echo "$warnings"
