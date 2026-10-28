@@ -268,6 +268,17 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     assertEquals(1, mismatches.size());
     assertEquals(containerId, mismatches.get(0).getContainerId());
 
+    when(container.isSuppressed()).thenReturn(true);
+    reconRM.processAll();
+    assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
+        "Suppressed containers should have existing checksum mismatches removed");
+
+    when(container.isSuppressed()).thenReturn(false);
+    reconRM.processAll();
+    mismatches = schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10);
+    assertEquals(1, mismatches.size());
+    assertEquals(containerId, mismatches.get(0).getContainerId());
+
     when(duplicate.getDataChecksum()).thenReturn(1000L + duplicateIndex);
     reconRM.processAll();
     assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
