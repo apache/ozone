@@ -420,7 +420,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OMClientResponse omClientResponse = new OMKeyRenameResponseWithFSO(
         omResponse.setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
         dbFromKey, dbToKey, fromKeyParent, toKeyParent, fromKeyValue,
-        omBucketInfo, isRenameDirectory, getBucketLayout());
+        omBucketInfo == null ? null : omBucketInfo.copyObject(), isRenameDirectory, getBucketLayout());
     return omClientResponse;
   }
 

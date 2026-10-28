@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -116,6 +117,27 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     }
     assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(dbFromKey).getUpdateID())
         .isEqualTo(fromKeyInfo.getUpdateID());
+  }
+
+  @Test
+  public void testFlushedBucketExcludesLaterUsageChange() throws Exception {
+    addKeyToTable(fromKeyInfo);
+    // The destination parent is the bucket, so the rename response carries the bucket.
+    OMRequest omRequest = doPreExecute(createRenameKeyRequest(volumeName, bucketName, fromKeyName, "toKey"));
+    OMClientResponse response = getOMKeyRenameRequest(omRequest).validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+
+    // Changes the cached bucket after the rename, before its response is flushed.
+    OmBucketInfo cachedBucket = OMKeyRequest.getBucketInfo(omMetadataManager, volumeName, bucketName);
+    long usedNamespace = cachedBucket.getUsedNamespace();
+    cachedBucket.incrUsedNamespace(1L);
+
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    assertEquals(usedNamespace, omMetadataManager.getBucketTable().getSkipCache(bucketKey).getUsedNamespace());
   }
 
   @Test
