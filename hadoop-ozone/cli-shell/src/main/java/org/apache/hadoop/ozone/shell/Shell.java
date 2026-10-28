@@ -18,8 +18,16 @@
 package org.apache.hadoop.ozone.shell;
 
 import io.opentelemetry.api.trace.SpanKind;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -51,6 +59,11 @@ public abstract class Shell extends GenericCli {
           "%nvol1/bucket1%n" +
           "Any unspecified information will be identified from%n" +
           "the config files.%n";
+
+  /** Options whose values are never recorded in the root span: S3 secrets, token files, page tokens, config. */
+  static final Set<String> REDACTED_OPTIONS = new HashSet<>(Arrays.asList("--secret", "--token", "--set"));
+
+  static final String REDACTED = "***";
 
   private String name;
 
@@ -100,9 +113,55 @@ public abstract class Shell extends GenericCli {
       return 0;
     }
 
-    String spanName = spec.name() + " " + String.join(" ", parseResult.originalArgs());
-    return TracingUtil.execute("shell", spanName, SpanKind.INTERNAL, getOzoneConf(),
-        () -> new CommandLine.RunLast().execute(parseResult));
+    return TracingUtil.execute("shell", parseCommandName(parseResult), SpanKind.CLIENT, getOzoneConf(), () -> {
+      parseCommandAttributes(parseResult).forEach(TracingUtil::addAttributesToCurrentSpan);
+      return new CommandLine.RunLast().execute(parseResult);
+    });
+  }
+
+  /** @return the sub-command path that was run, for example {@code ozone sh key put}, without any arguments. */
+  static String parseCommandName(CommandLine.ParseResult parseResult) {
+    List<CommandLine.ParseResult> chain = commandChain(parseResult);
+    return chain.get(chain.size() - 1).commandSpec().qualifiedName();
+  }
+
+  /**
+   * @return the command, its positional arguments and each matched option as span attributes.
+   * Values of interactive options and of {@link #REDACTED_OPTIONS} are replaced by {@link #REDACTED}.
+   */
+  static Map<String, String> parseCommandAttributes(CommandLine.ParseResult parseResult) {
+    List<CommandLine.ParseResult> chain = commandChain(parseResult);
+    Map<String, String> attributes = new LinkedHashMap<>();
+    attributes.put(ShellTracingAttributes.CLI_COMMAND, parseCommandName(parseResult));
+    chain.stream().flatMap(pr -> pr.matchedOptions().stream()).distinct()
+        .forEach(option -> attributes.put(ShellTracingAttributes.CLI_OPTION_PREFIX + option.longestName(),
+            optionValue(option)));
+    String args = chain.stream().flatMap(pr -> pr.matchedPositionals().stream()).distinct()
+        .flatMap(positional -> positional.interactive() ? Stream.of(REDACTED) : positional.stringValues().stream())
+        .collect(Collectors.joining(" "));
+    if (!args.isEmpty()) {
+      attributes.put(ShellTracingAttributes.CLI_ARGS, args);
+    }
+    return attributes;
+  }
+
+  /**
+   * @return {@code parseResult} followed by each nested sub-command result, ending with the command that runs.
+   * Ozone commands do not use repeatable sub-commands, so each level has at most one sub-command.
+   */
+  private static List<CommandLine.ParseResult> commandChain(CommandLine.ParseResult parseResult) {
+    List<CommandLine.ParseResult> chain = new ArrayList<>();
+    for (CommandLine.ParseResult pr = parseResult; pr != null; pr = pr.subcommand()) {
+      chain.add(pr);
+    }
+    return chain;
+  }
+
+  private static String optionValue(CommandLine.Model.OptionSpec option) {
+    if (option.interactive() || REDACTED_OPTIONS.contains(option.longestName())) {
+      return REDACTED;
+    }
+    return option.stringValues().isEmpty() ? "true" : String.join(",", option.stringValues());
   }
 
   private void installBatchExceptionHandler() {
