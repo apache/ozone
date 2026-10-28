@@ -153,6 +153,7 @@ public final class S3Consts {
   public static final String S3_STORAGE_CLASS_STANDARD = "STANDARD";
   public static final String S3_STORAGE_CLASS_STANDARD_IA = "STANDARD_IA";
   public static final String S3_STORAGE_CLASS_GLACIER = "GLACIER";
+  public static final String S3_STORAGE_CLASS_DEEP_ARCHIVE = "DEEP_ARCHIVE";
 
   //Never Constructed
   private S3Consts() {

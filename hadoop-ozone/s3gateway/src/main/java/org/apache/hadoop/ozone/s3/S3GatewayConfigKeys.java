@@ -118,6 +118,13 @@ public final class S3GatewayConfigKeys {
       "ozone.s3g.storage-class.reduced-redundancy.storage-policy";
 
   /**
+   * Storage policy for writes that request the STANDARD_IA storage class: HOT, WARM, or empty to
+   * inherit the bucket's policy. COLD is not allowed, because those writes would report DEEP_ARCHIVE.
+   */
+  public static final String OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY =
+      "ozone.s3g.storage-class.standard-ia.storage-policy";
+
+  /**
    * Never constructed.
    */
   private S3GatewayConfigKeys() {

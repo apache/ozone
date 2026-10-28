@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_DEEP_ARCHIVE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_GLACIER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_REDUCED_REDUNDANCY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD;
@@ -43,6 +45,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /** Tests the S3 storage class mapping to Ozone replication and storage policy. */
 class TestS3StorageClass {
@@ -79,6 +83,8 @@ class TestS3StorageClass {
         S3StorageClass.fromS3StorageClass(S3_STORAGE_CLASS_STANDARD_IA));
     assertEquals(S3StorageClass.GLACIER,
         S3StorageClass.fromS3StorageClass(S3_STORAGE_CLASS_GLACIER));
+    assertEquals(S3StorageClass.DEEP_ARCHIVE, S3StorageClass.fromS3StorageClass("DEEP_ARCHIVE"));
+    assertEquals("DEEP_ARCHIVE", S3StorageClass.DEEP_ARCHIVE.getS3StorageClass());
     assertThrows(IllegalArgumentException.class,
         () -> S3StorageClass.fromS3StorageClass("standard"));
     assertThrows(IllegalArgumentException.class,
@@ -99,7 +105,8 @@ class TestS3StorageClass {
 
   @Test
   void testFromS3StorageClassRejectsCaseMismatchAndBlankValues() {
-    for (String input : Arrays.asList("Standard", "standard_ia", "glacier", " standard ", "", " \t ", "STANDARD IA")) {
+    for (String input : Arrays.asList("Standard", "standard_ia", "glacier", " standard ", "", " \t ", "STANDARD IA",
+        "deep_archive", "Deep_Archive", "GLACIER_DEEP_ARCHIVE")) {
       assertThrows(IllegalArgumentException.class, () -> S3StorageClass.fromS3StorageClass(input));
     }
   }
@@ -152,18 +159,25 @@ class TestS3StorageClass {
         S3StorageClassResolver.toS3StorageClass(RATIS_THREE, OzoneStoragePolicy.COLD));
     assertEquals(S3StorageClass.GLACIER,
         S3StorageClassResolver.toS3StorageClass(RATIS_ONE, OzoneStoragePolicy.COLD));
-    // There is no EC + COLD class yet, so EC still reports STANDARD_IA.
-    assertEquals(S3StorageClass.STANDARD_IA,
+    assertEquals(S3StorageClass.DEEP_ARCHIVE,
         S3StorageClassResolver.toS3StorageClass(EC_6_3, OzoneStoragePolicy.COLD));
+    assertEquals(S3StorageClass.REDUCED_REDUNDANCY,
+        S3StorageClassResolver.toS3StorageClass(STANDALONE_ONE, OzoneStoragePolicy.COLD));
+    assertEquals(S3StorageClass.REDUCED_REDUNDANCY,
+        S3StorageClassResolver.toS3StorageClass(STANDALONE_THREE, OzoneStoragePolicy.COLD));
   }
 
-  /** Any EC layout reports STANDARD_IA, not just 3-2. */
+  /** The policy determines the EC class; changing the EC layout does not change it. */
   @Test
   void testReverseIgnoresEcLayout() {
     for (ReplicationConfig replication : REPLICATIONS) {
       if (replication.getReplicationType() == ReplicationType.EC) {
-        assertEquals(S3StorageClass.STANDARD_IA,
-            S3StorageClassResolver.toS3StorageClass(replication, OzoneStoragePolicy.WARM));
+        for (StoragePolicy policy : Arrays.asList(null, OzoneStoragePolicy.HOT, OzoneStoragePolicy.WARM)) {
+          assertEquals(S3StorageClass.STANDARD_IA,
+              S3StorageClassResolver.toS3StorageClass(replication, policy));
+        }
+        assertEquals(S3StorageClass.DEEP_ARCHIVE,
+            S3StorageClassResolver.toS3StorageClass(replication, OzoneStoragePolicy.COLD));
       }
     }
   }
@@ -181,10 +195,17 @@ class TestS3StorageClass {
     assertEquals(ReplicationFactor.ONE, reduced.getReplicationFactor());
     assertNull(reduced.getStoragePolicy());
 
-    assertEquals(OzoneStoragePolicy.WARM,
-        resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
+    S3StorageClassSpec standardIa = resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA);
+    assertEquals(ReplicationType.EC, standardIa.getReplicationType());
+    assertNull(standardIa.getReplicationFactor());
+    assertNull(standardIa.getStoragePolicy());
     assertEquals(OzoneStoragePolicy.COLD,
         resolver.toSpec(S3_STORAGE_CLASS_GLACIER).getStoragePolicy());
+
+    S3StorageClassSpec deepArchive = resolver.toSpec(S3_STORAGE_CLASS_DEEP_ARCHIVE);
+    assertEquals(ReplicationType.EC, deepArchive.getReplicationType());
+    assertNull(deepArchive.getReplicationFactor());
+    assertEquals(OzoneStoragePolicy.COLD, deepArchive.getStoragePolicy());
 
     for (String input : Arrays.asList(null, "", " \t ", "INVALID", "standard")) {
       assertThrows(IllegalArgumentException.class, () -> resolver.toSpec(input));
@@ -196,21 +217,26 @@ class TestS3StorageClass {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "hot");
     conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, " WARM ");
+    conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY, " hot ");
     S3StorageClassResolver resolver = new S3StorageClassResolver(conf);
 
     assertEquals(OzoneStoragePolicy.HOT,
         resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
+    assertEquals(OzoneStoragePolicy.HOT, resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
+    assertNull(S3StorageClass.STANDARD_IA.getSpec().getStoragePolicy());
     // The setting applies only to its own class.
     assertEquals(OzoneStoragePolicy.COLD,
         resolver.toSpec(S3_STORAGE_CLASS_GLACIER).getStoragePolicy());
+    assertEquals(OzoneStoragePolicy.COLD, resolver.toSpec(S3_STORAGE_CLASS_DEEP_ARCHIVE).getStoragePolicy());
   }
 
-  /** COLD would make STANDARD writes report GLACIER, so it is rejected. */
+  /** COLD would make these writes report an archive class, so it is rejected. */
   @Test
   void testConstructionRejectsColdAndUnknownPolicy() {
     for (String key : Arrays.asList(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY,
-        OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY)) {
+        OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY,
+        OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY)) {
       for (String value : Arrays.asList("COLD", " cold ", "LUKEWARM")) {
         OzoneConfiguration conf = new OzoneConfiguration();
         conf.set(key, value);
@@ -227,16 +253,21 @@ class TestS3StorageClass {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "HOT");
     conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "WARM");
+    conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY, "HOT");
     S3StorageClassResolver resolver = new S3StorageClassResolver(conf);
     S3StorageClassSpec standard = resolver.toSpec(S3_STORAGE_CLASS_STANDARD);
     S3StorageClassSpec reduced = resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY);
+    S3StorageClassSpec standardIa = resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA);
 
     conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "COLD");
     conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "INVALID");
+    conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY, "COLD");
     assertSame(standard, resolver.toSpec(S3_STORAGE_CLASS_STANDARD));
     assertSame(reduced, resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY));
+    assertSame(standardIa, resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA));
     assertEquals(OzoneStoragePolicy.HOT, standard.getStoragePolicy());
     assertEquals(OzoneStoragePolicy.WARM, reduced.getStoragePolicy());
+    assertEquals(OzoneStoragePolicy.HOT, standardIa.getStoragePolicy());
   }
 
   /**
@@ -249,10 +280,12 @@ class TestS3StorageClass {
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, policy);
       conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, policy);
+      conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY, policy);
       S3StorageClassResolver resolver = new S3StorageClassResolver(conf);
       if (StringUtils.isBlank(policy)) {
         assertNull(resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
         assertNull(resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
+        assertNull(resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
       }
       for (S3StorageClass storageClass : S3StorageClass.values()) {
         S3StorageClassSpec spec = resolver.toSpec(storageClass.getS3StorageClass());
@@ -266,10 +299,11 @@ class TestS3StorageClass {
   }
 
   /** EC layout comes from the request header, then the bucket, then defaults to 3-2. */
-  @Test
-  void testForwardEcLayoutOrder() {
+  @ParameterizedTest
+  @EnumSource(value = S3StorageClass.class, names = {"STANDARD_IA", "DEEP_ARCHIVE"})
+  void testForwardEcLayoutOrder(S3StorageClass storageClass) {
     S3StorageClassResolver resolver = new S3StorageClassResolver(new OzoneConfiguration());
-    S3StorageClassSpec ec = resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA);
+    S3StorageClassSpec ec = resolver.toSpec(storageClass.getS3StorageClass());
 
     assertEquals(new ECReplicationConfig("rs-6-3-1024k"),
         S3StorageClassResolver.toReplicationConfig(ec, "rs-6-3-1024k", EC_3_2));

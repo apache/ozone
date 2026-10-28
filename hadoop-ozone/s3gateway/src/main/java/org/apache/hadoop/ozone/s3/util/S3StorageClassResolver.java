@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY;
 
 import jakarta.annotation.Nonnull;
@@ -52,26 +53,29 @@ public final class S3StorageClassResolver {
 
   private final S3StorageClassSpec standardSpec;
   private final S3StorageClassSpec reducedRedundancySpec;
+  private final S3StorageClassSpec standardIaSpec;
 
   /**
-   * Resolves both gateway storage policy settings once, before the gateway accepts requests.
+   * Resolves gateway storage policy settings once, before the gateway accepts requests.
    *
    * @param conf gateway configuration
-   * @throws IllegalArgumentException if either configured storage policy is not valid
+   * @throws IllegalArgumentException if any configured storage policy is not valid
    */
   public S3StorageClassResolver(ConfigurationSource conf) {
     standardSpec = S3StorageClass.STANDARD.getSpec().withStoragePolicy(
         getConfiguredStoragePolicy(conf, OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY));
     reducedRedundancySpec = S3StorageClass.REDUCED_REDUNDANCY.getSpec().withStoragePolicy(
         getConfiguredStoragePolicy(conf, OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY));
+    standardIaSpec = S3StorageClass.STANDARD_IA.getSpec().withStoragePolicy(
+        getConfiguredStoragePolicy(conf, OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY));
   }
 
   /**
    * Forward mapping: the spec for a write that requests the given storage class.
    *
-   * <p>For {@code STANDARD} and {@code REDUCED_REDUNDANCY}, the storage policy comes from the
-   * class's gateway setting resolved at startup. When the setting is empty, the spec has no storage
-   * policy and the write inherits the bucket's. Configuration is not read during request lookup.
+   * <p>For {@code STANDARD}, {@code REDUCED_REDUNDANCY}, and {@code STANDARD_IA}, the storage policy comes from the
+   * class's gateway setting resolved at startup. When the setting is empty, the spec has no storage policy and the
+   * write path uses the bucket's policy or the cluster default. Configuration is not read during request lookup.
    *
    * @param s3StorageClass the {@code x-amz-storage-class} header value
    * @throws IllegalArgumentException if the storage class is null or unknown
@@ -84,6 +88,8 @@ public final class S3StorageClassResolver {
       return standardSpec;
     case REDUCED_REDUNDANCY:
       return reducedRedundancySpec;
+    case STANDARD_IA:
+      return standardIaSpec;
     default:
       return storageClass.getSpec();
     }
@@ -130,6 +136,7 @@ public final class S3StorageClassResolver {
    * <p>This never fails. Replication decides the class, and only a COLD storage policy changes it:
    * <pre>
    *   COLD + RATIS                       -&gt; GLACIER
+   *   COLD + EC                          -&gt; DEEP_ARCHIVE
    *   otherwise, by replication:
    *     EC                               -&gt; STANDARD_IA
    *     STAND_ALONE, or a single replica -&gt; REDUCED_REDUNDANCY
@@ -137,6 +144,9 @@ public final class S3StorageClassResolver {
    * </pre>
    * A null storage policy, as on keys written before storage policy support, uses replication
    * alone. A null replication reports {@code STANDARD}.
+   * The policy is taken from the stored key, not the current gateway configuration. HOT and WARM
+   * share the same class for a given replication configuration; COLD has a distinct archive class
+   * for RATIS and EC. Changes between EC layouts, such as 3-2 and 6-3, do not change the class.
    *
    * @param replicationConfig the key's replication, or null
    * @param storagePolicy the key's storage policy, or null
@@ -147,9 +157,13 @@ public final class S3StorageClassResolver {
     if (replicationConfig == null) {
       return S3StorageClass.STANDARD;
     }
-    if (storagePolicy == OzoneStoragePolicy.COLD
-        && replicationConfig.getReplicationType() == ReplicationType.RATIS) {
-      return S3StorageClass.GLACIER;
+    if (storagePolicy == OzoneStoragePolicy.COLD) {
+      if (replicationConfig.getReplicationType() == ReplicationType.RATIS) {
+        return S3StorageClass.GLACIER;
+      }
+      if (replicationConfig.getReplicationType() == ReplicationType.EC) {
+        return S3StorageClass.DEEP_ARCHIVE;
+      }
     }
     return fromReplicationConfig(replicationConfig);
   }
@@ -189,7 +203,7 @@ public final class S3StorageClassResolver {
           + ". Expected HOT, WARM or empty.", e);
     }
     if (policy == OzoneStoragePolicy.COLD) {
-      // COLD would make these writes report GLACIER instead of the class they asked for.
+      // COLD would make these writes report an archive class instead of the class they asked for.
       throw new IllegalArgumentException("Storage policy COLD is not allowed for " + key
           + ". Expected HOT, WARM or empty.");
     }

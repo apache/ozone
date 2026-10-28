@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static org.apache.hadoop.hdds.client.OzoneStoragePolicy.COLD;
-import static org.apache.hadoop.hdds.client.OzoneStoragePolicy.WARM;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_DEEP_ARCHIVE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_GLACIER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_REDUCED_REDUNDANCY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD;
@@ -34,9 +34,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
  * <p>This enum is the vocabulary only. The rules for mapping a class to Ozone settings and back are
  * in {@link S3StorageClassResolver}.
  *
- * <p>{@code STANDARD} and {@code REDUCED_REDUNDANCY} have no storage policy here. The policy is set
- * per deployment through a gateway setting and is unset by default, so writes inherit the bucket's
- * policy.
+ * <p>{@code STANDARD}, {@code REDUCED_REDUNDANCY}, and {@code STANDARD_IA} define replication only.
+ * Their storage policy is selected through a gateway setting and is unset by default, leaving the
+ * write path to use the bucket's policy or the cluster default.
+ * {@code GLACIER} and {@code DEEP_ARCHIVE} define both replication and a COLD storage policy.
  */
 public enum S3StorageClass {
 
@@ -50,11 +51,14 @@ public enum S3StorageClass {
       .build()),
   STANDARD_IA(S3_STORAGE_CLASS_STANDARD_IA, S3StorageClassSpec.newBuilder()
       .setReplicationType(ReplicationType.EC)
-      .setStoragePolicy(WARM)
       .build()),
   GLACIER(S3_STORAGE_CLASS_GLACIER, S3StorageClassSpec.newBuilder()
       .setReplicationType(ReplicationType.RATIS)
       .setReplicationFactor(ReplicationFactor.THREE)
+      .setStoragePolicy(COLD)
+      .build()),
+  DEEP_ARCHIVE(S3_STORAGE_CLASS_DEEP_ARCHIVE, S3StorageClassSpec.newBuilder()
+      .setReplicationType(ReplicationType.EC)
       .setStoragePolicy(COLD)
       .build());
 
