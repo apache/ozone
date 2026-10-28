@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -60,6 +62,8 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
 /**
@@ -77,6 +81,7 @@ public class TestNodeDecommissionManager {
   void setup(@TempDir File dir) throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL, 1, TimeUnit.HOURS);
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     containerManager = mock(ContainerManager.class);
@@ -1026,6 +1031,62 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.NodeState.class, names = {"STALE", "DEAD"})
+  void testDecommissionCountsOnlyHealthyTargets(HddsProtos.NodeState health)
+      throws IOException, NodeNotFoundException {
+    // The container requires three replicas, but only two healthy datanodes are available.
+    DatanodeDetails target = prepareTargetWithContainer(health, 2);
+
+    List<DatanodeAdminError> errors = decom.decommissionNodes(singletonList(target.getIpAddress()), false);
+    assertThat(errors).singleElement().extracting(DatanodeAdminError::getHostname).isEqualTo("AllHosts");
+    assertThat(nodeManager.getNodeStatus(target).getOperationalState())
+        .isEqualTo(HddsProtos.NodeOperationalState.IN_SERVICE);
+
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+
+    assertThat(decom.decommissionNodes(singletonList(target.getIpAddress()), false)).isEmpty();
+    assertThat(nodeManager.getNodeStatus(target).getOperationalState())
+        .isEqualTo(HddsProtos.NodeOperationalState.DECOMMISSIONING);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.NodeState.class, names = {"STALE", "DEAD"})
+  void testMaintenanceCountsOnlyHealthyTargets(HddsProtos.NodeState health)
+      throws IOException, NodeNotFoundException {
+    int minimumHealthyNodes = decom.getMaintenanceReplicaMinimum();
+    DatanodeDetails target = prepareTargetWithContainer(health, minimumHealthyNodes - 1);
+
+    List<DatanodeAdminError> errors = decom.startMaintenanceNodes(singletonList(target.getIpAddress()), 1, false);
+    assertThat(errors).singleElement().extracting(DatanodeAdminError::getHostname).isEqualTo("AllHosts");
+    assertThat(nodeManager.getNodeStatus(target).getOperationalState())
+        .isEqualTo(HddsProtos.NodeOperationalState.IN_SERVICE);
+
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+
+    assertThat(decom.startMaintenanceNodes(singletonList(target.getIpAddress()), 1, false)).isEmpty();
+    assertThat(nodeManager.getNodeStatus(target).getOperationalState())
+        .isEqualTo(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE);
+  }
+
+  private DatanodeDetails prepareTargetWithContainer(HddsProtos.NodeState health, int healthyNodes)
+      throws IOException, NodeNotFoundException {
+    nodeManager.getNodeStateManager().pause();
+    int totalNodes = healthyNodes + 1;
+    for (int index = 0; index < totalNodes; index++) {
+      nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+    }
+    DatanodeDetails target = nodeManager.getAllNodes().get(0);
+    nodeManager.getNodeStateManager().getNode(target).setNodeStatus(
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.IN_SERVICE, health));
+    assertThat(nodeManager.getNodeCount(NodeStatus.inServiceHealthy())).isEqualTo(healthyNodes);
+    ContainerID containerID = ContainerID.valueOf(1);
+    setContainers(target, new HashSet<>(singletonList(containerID)));
+    when(containerManager.getContainer(containerID)).thenReturn(
+        getMockContainer(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), containerID));
+    return target;
   }
 
   private List<DatanodeDetails> getDatanodeDetailsList(String ipaddress, List<DatanodeDetails> dns) {
