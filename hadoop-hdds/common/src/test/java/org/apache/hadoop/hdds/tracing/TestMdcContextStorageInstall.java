@@ -31,6 +31,8 @@ import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.ContextStorage;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
@@ -68,6 +70,9 @@ public class TestMdcContextStorageInstall {
   }
 
   private static void initTracing(boolean enabled) {
+    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
+    GlobalOpenTelemetry.set(sdk);
     MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
     conf.setBoolean("ozone.tracing.enabled", enabled);
     TracingUtil.initTracing("mdc-install", conf);
