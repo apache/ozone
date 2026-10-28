@@ -103,34 +103,33 @@ public class TestOptimizedSnapshotDiff extends OmSnapshotTests {
     OzoneBucket obsBucket;
     try (OzoneClient obsClient = getCluster().newClient()) {
       obsBucket = DataTestUtil.createVolumeAndBucket(obsClient, volume, bucket, OBJECT_STORE);
+      String snap1 = "snap1";
+      String snap2 = "snap2";
+      String key1 = "key1";
+      String key2 = "key2";
+      String renamedKey = "key3";
+      createObsKey(obsBucket, key1);
+      createObsKey(obsBucket, key2);
+      createSnapshot(volume, bucket, snap1);
+      obsBucket.renameKey(key2, renamedKey);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          obsBucket.getKey(renamedKey);
+          return true;
+        } catch (IOException e) {
+          return false;
+        }
+      }, 300, 10000);
+      obsBucket.deleteKey(key1);
+      createSnapshot(volume, bucket, snap2);
+
+      SnapshotDiffResponse response = waitForDoneReportAfterOrderedSubmit(
+          volume, bucket, snap1, snap2, false);
+      assertEquals("Report is dependency ordered.", response.getReason());
+      assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
+          SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, key1),
+          SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.RENAME, key2, renamedKey));
     }
-
-    String snap1 = "snap1";
-    String snap2 = "snap2";
-    String key1 = "key1";
-    String key2 = "key2";
-    String renamedKey = "key3";
-    createObsKey(obsBucket, key1);
-    createObsKey(obsBucket, key2);
-    createSnapshot(volume, bucket, snap1);
-    obsBucket.renameKey(key2, renamedKey);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        obsBucket.getKey(renamedKey);
-        return true;
-      } catch (IOException e) {
-        return false;
-      }
-    }, 300, 10000);
-    obsBucket.deleteKey(key1);
-    createSnapshot(volume, bucket, snap2);
-
-    SnapshotDiffResponse response = waitForDoneReportAfterOrderedSubmit(
-        volume, bucket, snap1, snap2, false);
-    assertEquals("Report is dependency ordered.", response.getReason());
-    assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
-        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, key1),
-        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.RENAME, key2, renamedKey));
   }
 
   private static void createObsKey(OzoneBucket bucket, String key) throws Exception {
