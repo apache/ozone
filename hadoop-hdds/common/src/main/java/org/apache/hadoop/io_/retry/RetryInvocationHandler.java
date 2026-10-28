@@ -157,7 +157,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
         return retryInvocationHandler.invokeMethod(method, args);
       } finally {
         if (isRpc) {
-          Client.clearCallId();
+          Client.clearCallIdAndRetryCount();
         }
       }
     }

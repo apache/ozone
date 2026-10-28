@@ -499,17 +499,20 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   }
 
   @Test
-  void testReadAfterDnsRefreshOfCurrentProxy() throws Exception {
+  void testReadAfterAddressRefreshDropsCachedProxy() throws Exception {
     setupProxyProvider(3);
     doRead();
     assertHandledBy(0);
 
-    // Re-resolving the address after it changed discards the cached proxy of that node.
+    // Stand in for the node having been rescheduled to a new IP: the cached address has to differ
+    // from what re-resolving localhost returns, so refreshAddressIfChanged() swaps it and drops the
+    // cached proxy. The port stays the node's own, since createOMProxy maps it back to its mock.
     OMProxyInfo<OzoneManagerProtocolPB> current = proxyProvider.getCurrentProxy();
-    current.setCachedAddressForTest(new InetSocketAddress(InetAddress.getByAddress(new byte[] {127, 0, 0, 99}), 0));
+    current.setCachedAddressForTest(new InetSocketAddress(InetAddress.getByName("127.0.0.99"), 0));
     assertTrue(current.refreshAddressIfChanged());
     assertNull(current.getProxy());
 
+    // The read has to recreate the dropped proxy rather than dial the null one.
     doRead();
     assertHandledBy(0);
   }
