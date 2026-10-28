@@ -1781,13 +1781,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
     GetObjectTaggingResponse.Builder resp =
         GetObjectTaggingResponse.newBuilder();
 
-    Map<String, String> result = impl.getObjectTagging(omKeyArgs,
-        assumeS3Context);
+    Map<String, String> result = impl.getObjectTagging(omKeyArgs);
 
     resp.addAllTags(KeyValueUtil.toProtobuf(result));
     return resp.build();

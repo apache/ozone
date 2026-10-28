@@ -87,7 +87,7 @@ public class TestObjectTaggingGet {
     verify(volume, never()).getName();
     verify(volume, never()).getBucket(anyString());
     verify(protocol, never()).getBucketDetails(anyString(), anyString());
-    verify(protocol).getObjectTagging("", BUCKET_NAME, KEY_WITH_TAG, true);
+    verify(protocol).getObjectTagging(null, BUCKET_NAME, KEY_WITH_TAG);
   }
 
   @Test

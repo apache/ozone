@@ -202,10 +202,11 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
 
     ArgumentCaptor<OMRequest> captor = ArgumentCaptor.forClass(OMRequest.class);
     pb.getObjectTagging(new OmKeyArgs.Builder()
-        .setVolumeName("")
+        .setVolumeName(null)
         .setBucketName("bucket")
         .setKeyName("key")
-        .build(), true);
+        .setAssumeS3Context(true)
+        .build());
 
     verify(omTransport).submitRequest(captor.capture());
     assertThat(captor.getValue().getAssumeS3Context()).isTrue();

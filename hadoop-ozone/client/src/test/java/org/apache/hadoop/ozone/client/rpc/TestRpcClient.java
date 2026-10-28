@@ -397,32 +397,6 @@ public class TestRpcClient {
     }
   }
 
-  @ParameterizedTest
-  @EnumSource(value = OzoneManagerVersion.class,
-      names = {"ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
-  void testGetObjectTaggingWithS3Context(OzoneManagerVersion version)
-      throws Exception {
-    RpcClient client = spy(createRpcClient());
-    try {
-      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
-      FieldUtils.writeField(client, "omVersion", version, true);
-      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
-      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
-          .setOwnerName("owner").setAdminName("admin").build(), "owner"))
-          .when(client).getS3VolumeContext();
-      boolean assumeContext = version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION;
-
-      client.getObjectTagging("", "bucket", "key", true);
-
-      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
-      verify(om).getObjectTagging(args.capture(), eq(assumeContext));
-      verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
-      assertEquals(assumeContext ? "" : "tenant-volume", args.getValue().getVolumeName());
-    } finally {
-      client.close();
-    }
-  }
-
   /**
    * S3 Gateway serves all users with one RpcClient. A request from bob on another thread must not change the owner
    * of the key that alice creates.

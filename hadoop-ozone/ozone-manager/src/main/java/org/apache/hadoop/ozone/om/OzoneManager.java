@@ -5801,14 +5801,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public Map<String, String> getObjectTagging(final OmKeyArgs args)
       throws IOException {
-    return getObjectTagging(args, false);
-  }
-
-  @Override
-  public Map<String, String> getObjectTagging(final OmKeyArgs args,
-      boolean assumeS3Context) throws IOException {
     OmKeyArgs keyArgs = args;
-    if (assumeS3Context) {
+    if (args.isAssumeS3Context()) {
       keyArgs = args.toBuilder().setVolumeName(
           getS3VolumeContext(true).getOmVolumeArgs().getVolume()).build();
     }

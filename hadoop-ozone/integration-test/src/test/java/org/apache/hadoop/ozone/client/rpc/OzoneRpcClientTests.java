@@ -5683,8 +5683,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         .newBuilder().setAccessId(accessId).build());
     try {
       Map<String, String> tagsRetrieved = ozoneManager.getObjectTagging(
-          new OmKeyArgs.Builder().setVolumeName("").setBucketName(bucketName)
-              .setKeyName(keyName).build(), true);
+          new OmKeyArgs.Builder().setVolumeName(null).setBucketName(bucketName)
+              .setKeyName(keyName).setAssumeS3Context(true).build());
 
       assertThat(tagsRetrieved).containsExactlyInAnyOrderEntriesOf(tags);
     } finally {
