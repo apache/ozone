@@ -56,10 +56,11 @@ final class OzoneAclStorage {
 
   public static OzoneAcl fromProtobuf(OzoneAclInfo protoAcl) {
     BitSet aclRights = BitSet.valueOf(protoAcl.getRights().toByteArray());
+    final IAccessAuthorizer.ACLType[] values = IAccessAuthorizer.ACLType.values();
     EnumSet<IAccessAuthorizer.ACLType> aclSet = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
     // Skip bits that are not a known ACL type.
-    aclRights.stream().filter(a -> a < IAccessAuthorizer.ACLType.values().length)
-        .forEach(a -> aclSet.add(IAccessAuthorizer.ACLType.values()[a]));
+    aclRights.stream().filter(a -> a < values.length)
+        .forEach(a -> aclSet.add(values[a]));
     return OzoneAcl.of(ACLIdentityType.valueOf(protoAcl.getType().name()),
         protoAcl.getName(), AclScope.valueOf(protoAcl.getAclScope().name()), aclSet);
   }

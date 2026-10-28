@@ -59,6 +59,8 @@ import org.apache.ratis.util.MemoizedSupplier;
 @Immutable
 public final class OzoneAcl {
 
+  private static final int KNOWN_ACL_BITS = (int) ((1L << ACLType.values().length) - 1);
+
   private static final String ACL_SCOPE_REGEX = ".*\\[(ACCESS|DEFAULT)\\]";
   /**
    * Link bucket default acl defined [world::rw]
@@ -317,7 +319,7 @@ public final class OzoneAcl {
    * @return true if the rights include bits that are not a known {@link ACLType}
    */
   public boolean hasUnknownRights() {
-    return (aclBits >>> ACLType.values().length) != 0;
+    return (aclBits & ~KNOWN_ACL_BITS) != 0;
   }
 
   @JsonIgnore
