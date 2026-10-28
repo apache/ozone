@@ -536,6 +536,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     checkKeyShallowList("", null, Collections.emptyList(), bucket);
     bucket.createDirectory("a");
     checkKeyShallowList("", null, Collections.singletonList("a/"), bucket);
+    createAndAssertKeys(bucket, Collections.singletonList("a/child"));
 
     List<String> files = Arrays.asList("b0", "b1", "b2", "b3", "b4");
     createAndAssertKeys(bucket, files);
