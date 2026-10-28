@@ -69,6 +69,7 @@ public class SCMConnectionManager
   private final ConfigurationSource conf;
   private ObjectName jmxBean;
 
+  // no change
   public SCMConnectionManager(ConfigurationSource conf) {
     this.mapLock = new ReentrantReadWriteLock();
     Long timeOut = getScmRpcTimeOutInMilliseconds(conf);
