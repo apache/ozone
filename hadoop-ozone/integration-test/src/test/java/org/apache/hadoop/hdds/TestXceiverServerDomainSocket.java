@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.XceiverClientShortCircuit.vintPrefixed;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -571,7 +572,7 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  public void testMaxXceiverCount() throws IOException, InterruptedException {
+  public void testMaxXceiverCount() throws Exception {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DatanodeConfiguration datanodeConfiguration = conf.getObject(DatanodeConfiguration.class);
     datanodeConfiguration.setNumReadThreadPerVolume(10);
@@ -599,7 +600,7 @@ public class TestXceiverServerDomainSocket {
       assertTrue(lastSock.isOpen());
 
       // write to first 10 sockets should be OK
-      for (int i = 0; i < count - 2; i++) {
+      for (int i = 0; i <= count - 2; i++) {
         DomainSocket sock = list.get(i);
         assertTrue(sock.isOpen());
         sock.getOutputStream().write(1);
@@ -623,6 +624,11 @@ public class TestXceiverServerDomainSocket {
       }
       lastSock.close();
       assertFalse(lastSock.isOpen());
+
+      // the rejected connection must not hold a slot once every accepted connection is closed
+      GenericTestUtils.waitFor(() -> Thread.getAllStackTraces().keySet().stream()
+          .noneMatch(t -> t.getName().contains(XceiverServerDomainSocket.class.getSimpleName() + "@")), 100, 10000);
+      assertThat(server.getXceiverCount()).isZero();
     } finally {
       factory.close();
       server.stop();

@@ -1244,7 +1244,11 @@
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
-      The heartbeat interval from a Datanode to Recon.
+      The heartbeat interval from a Datanode to Recon. The Datanode sends
+      the heartbeat to Recon together with a heartbeat to SCM, so the
+      interval is at least hdds.heartbeat.interval. It is at most a third
+      of ozone.scm.stale.node.interval, so that Recon does not mark the
+      Datanode as stale.
     </description>
   </property>
   <property>

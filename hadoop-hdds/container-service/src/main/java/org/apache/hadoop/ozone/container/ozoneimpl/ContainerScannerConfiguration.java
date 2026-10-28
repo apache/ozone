@@ -41,10 +41,6 @@ public class ContainerScannerConfiguration {
   // only for log
   public static final String HDDS_CONTAINER_SCRUB_ENABLED =
       "hdds.container.scrub.enabled";
-  public static final String HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED =
-      "hdds.container.scrub.dev.data.enabled";
-  public static final String HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED =
-      "hdds.container.scrub.dev.metadata.enabled";
   public static final String METADATA_SCAN_INTERVAL_KEY =
       "hdds.container.scrub.metadata.scan.interval";
   public static final String DATA_SCAN_INTERVAL_KEY =
@@ -186,8 +182,16 @@ public class ContainerScannerConfiguration {
     return dataScanEnabled;
   }
 
+  public void setDataScanEnabled(boolean dataScanEnabled) {
+    this.dataScanEnabled = dataScanEnabled;
+  }
+
   public boolean isMetadataScanEnabled() {
     return metadataScanEnabled;
+  }
+
+  public void setMetadataScanEnabled(boolean metadataScanEnabled) {
+    this.metadataScanEnabled = metadataScanEnabled;
   }
 
   public void setMetadataScanInterval(long metadataScanInterval) {
