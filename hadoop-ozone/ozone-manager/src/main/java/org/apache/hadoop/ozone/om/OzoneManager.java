@@ -312,6 +312,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
@@ -767,8 +768,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
 
     metrics = OMMetrics.create(conf);
-
-    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create(getOMServiceId(),
+        getOMNodeId());
     perfMetrics = OMPerformanceMetrics.register();
     omDeletionMetrics = DeletingServiceMetrics.create();
     // Get admin list
@@ -829,7 +830,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omState = State.INITIALIZED;
     }
 
-    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager);
+    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager,
+        getOMServiceId(), getOMNodeId());
     bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
     omHostName = HddsUtils.getHostName(conf);
   }
@@ -2129,6 +2131,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
+    omSnapshotIntMetrics.register();
 
     instantiateServices(false);
 
@@ -2638,6 +2641,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       serviceManager.stop();
       DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
+      omSnapshotIntMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
       if (certClient != null) {
@@ -4515,6 +4519,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
           Integer.toString(partNumberMarker));
       auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
+      OMMultipartUploadUtils.validateUploadId(uploadID);
 
       if (getAclsEnabled()) {
         omMetadataReader.checkAcls(
@@ -5945,8 +5950,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -5987,8 +5991,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -6029,8 +6032,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -6047,6 +6049,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             auditMap));
       }
     }
+  }
+
+  /**
+   * Snapshot diff reads snapshot info, as getSnapshotInfo does, and lists key names, as listKeys does.
+   */
+  private void checkSnapshotDiffAcls(ResolvedBucket resolvedBucket) throws IOException {
+    omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
   }
 
   @Override

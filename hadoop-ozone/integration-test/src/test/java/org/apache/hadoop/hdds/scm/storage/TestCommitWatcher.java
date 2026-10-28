@@ -115,7 +115,6 @@ public class TestCommitWatcher {
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
-    conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
     cluster = MiniOzoneCluster.newBuilder(conf)
