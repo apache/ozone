@@ -402,14 +402,26 @@ public final class TracingUtil {
     return createProxy(delegate, itf, conf, SpanKind.CLIENT);
   }
 
+  /** Creates a proxy with spans named {@code <delegate class>.<method>}, also usable at startup without a span. */
+  public static <T> T createProxy(T delegate, Class<T> itf, SpanKind spanKind) {
+    if (!tracingEnabled && !applicationAware) {
+      return delegate;
+    }
+    return newProxy(delegate, itf, delegate.getClass().getSimpleName(), spanKind);
+  }
+
   private static <T> T createProxy(T delegate, Class<T> itf, ConfigurationSource conf, SpanKind spanKind) {
     if (!shouldCreateTracingProxy(conf)) {
       return delegate;
     }
+    return newProxy(delegate, itf, itf.getSimpleName(), spanKind);
+  }
+
+  private static <T> T newProxy(T delegate, Class<T> itf, String name, SpanKind spanKind) {
     Class<?> aClass = delegate.getClass();
     return itf.cast(Proxy.newProxyInstance(aClass.getClassLoader(),
         new Class<?>[] {itf},
-        new TraceAllMethod<>(delegate, itf.getSimpleName(), spanKind)));
+        new TraceAllMethod<>(delegate, name, spanKind)));
   }
 
   public static boolean isTracingEnabled(ConfigurationSource conf) {

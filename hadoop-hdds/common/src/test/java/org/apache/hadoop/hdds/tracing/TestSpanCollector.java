@@ -125,6 +125,14 @@ public final class TestSpanCollector implements SpanProcessor, AutoCloseable {
     assertEquals(Collections.singletonList(type.getName()), types, () -> spanName + " exception events");
   }
 
+  /** Fails unless the span named {@code childName} is a direct child of the span named {@code parentName}. */
+  public void assertParent(String childName, String parentName) {
+    SpanData child = onlySpan(childName);
+    SpanData parent = onlySpan(parentName);
+    assertEquals(parent.getTraceId(), child.getTraceId(), () -> childName + " trace ID");
+    assertEquals(parent.getSpanId(), child.getParentSpanId(), () -> childName + " parent");
+  }
+
   private SpanData onlySpan(String spanName) {
     List<ReadableSpan> matches = named(spanName);
     assertEquals(1, matches.size(), () -> "spans named " + spanName + ": " + spans);

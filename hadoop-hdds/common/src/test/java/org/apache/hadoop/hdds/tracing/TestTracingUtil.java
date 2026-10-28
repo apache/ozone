@@ -133,6 +133,45 @@ public class TestTracingUtil {
   }
 
   @Test
+  public void testSpanKindProxyReturnsDelegateWhenTracingOff() {
+    ServiceImpl delegate = new ServiceImpl();
+    assertSame(delegate, createProxy(delegate, Service.class, SpanKind.INTERNAL));
+  }
+
+  @Test
+  public void testSpanKindProxyCreatesRootSpanWithoutParent() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test-service")) {
+      Service proxy = createProxy(new ServiceImpl(), Service.class, SpanKind.INTERNAL);
+      assertEquals("normal", proxy.normalMethod());
+      collector.assertKind("ServiceImpl.normalMethod", SpanKind.INTERNAL);
+      assertFalse(finishedSpan(collector, "ServiceImpl.normalMethod").getParentSpanContext().isValid());
+    }
+  }
+
+  @Test
+  public void testSpanKindProxyCreatesChildSpans() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test-service")) {
+      Service proxy = createProxy(new ServiceImpl(), Service.class, SpanKind.CLIENT);
+      Span parent = TracingUtil.createSpan("parent");
+      try (Scope ignored = parent.makeCurrent()) {
+        assertEquals("normal", proxy.normalMethod());
+        assertEquals("skipped", proxy.skippedMethod());
+        assertThrows(IOException.class, proxy::tracedThrowingMethod);
+      } finally {
+        parent.end();
+      }
+
+      collector.assertParent("ServiceImpl.normalMethod", "parent");
+      collector.assertKind("ServiceImpl.normalMethod", SpanKind.CLIENT);
+      assertTrue(collector.named("ServiceImpl.skippedMethod").isEmpty());
+      collector.assertParent("ServiceImpl.tracedThrowingMethod", "parent");
+      collector.assertError("ServiceImpl.tracedThrowingMethod", "Failed");
+      collector.assertExceptionRecorded("ServiceImpl.tracedThrowingMethod", IOException.class);
+      collector.assertNotError("parent");
+    }
+  }
+
+  @Test
   public void testInitTracing() {
     TracingUtil.initTracing("testInitTracing", tracingEnabled());
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("initTracing")) {
