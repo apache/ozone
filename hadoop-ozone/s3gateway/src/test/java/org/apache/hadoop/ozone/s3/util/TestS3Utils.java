@@ -99,6 +99,8 @@ public class TestS3Utils {
 
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), error.getCode());
     assertEquals(400, error.getHttpCode());
+    assertEquals("An error occurred (InvalidArgument): The " + S3Consts.X_AMZ_CONTENT_SHA256 +
+        " header must contain 64 hexadecimal characters", error.getErrorMessage());
   }
 
   @ParameterizedTest
@@ -116,20 +118,6 @@ public class TestS3Utils {
     when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(hash);
 
     assertEquals(hash, S3Utils.validateSignatureHeader(headers, "key", true));
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-      "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
-      "0123456789ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef"
-  })
-  void testNormalizeContentSha256(String hash) throws OS3Exception {
-    HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(hash);
-
-    assertEquals("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        S3Utils.validateSignatureHeader(headers, "key", true));
   }
 
   @Test

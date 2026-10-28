@@ -32,7 +32,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Locale;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
  * Utilities.
  */
 public final class S3Utils {
+  private static final Pattern SHA256_HEX_PATTERN = Pattern.compile("[0-9a-fA-F]{64}");
 
   public static String urlDecode(String str)
       throws UnsupportedEncodingException {
@@ -194,13 +195,14 @@ public final class S3Utils {
     if (payloadType.isUnsigned() || payloadType.isStreaming()) {
       return xAmzContentSha256Header;
     }
-    if (!xAmzContentSha256Header.matches("[0-9a-fA-F]{64}")) {
+    if (!SHA256_HEX_PATTERN.matcher(xAmzContentSha256Header).matches()) {
       OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
-      ex.setErrorMessage("The " + X_AMZ_CONTENT_SHA256 + " header must contain 64 hexadecimal characters");
+      ex.setErrorMessage("An error occurred (InvalidArgument): " +
+          "The " + X_AMZ_CONTENT_SHA256 + " header must contain 64 hexadecimal characters");
       throw ex;
     }
 
-    return xAmzContentSha256Header.toLowerCase(Locale.ROOT);
+    return xAmzContentSha256Header;
   }
 
   /**
