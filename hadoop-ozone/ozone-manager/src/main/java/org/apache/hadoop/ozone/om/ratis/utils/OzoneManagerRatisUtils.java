@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -133,12 +134,21 @@ public final class OzoneManagerRatisUtils {
 
   /**
    * Create OMClientRequest which encapsulates the OMRequest.
+   * When tracing is enabled or application-aware, the request is wrapped in a tracing proxy, so every
+   * {@link IOMClientRequest} call (preExecute, validateAndUpdateCache, ...) made while the current span is recording
+   * gets a {@code <request class>.<method>} span, for example {@code OMKeyCreateRequest.preExecute}.
    * @param omRequest
-   * @return OMClientRequest
+   * @return OMClientRequest, or its tracing proxy
    * @throws IOException
    */
+  public static IOMClientRequest createClientRequest(OMRequest omRequest, OzoneManager ozoneManager)
+      throws IOException {
+    OMClientRequest request = createClientRequestImpl(omRequest, ozoneManager);
+    return TracingUtil.createInternalProxy(request, IOMClientRequest.class, ozoneManager.getConfiguration());
+  }
+
   @SuppressWarnings("checkstyle:methodlength")
-  public static IOMClientRequest createClientRequest(OMRequest omRequest,
+  private static OMClientRequest createClientRequestImpl(OMRequest omRequest,
       OzoneManager ozoneManager) throws IOException {
 
     // Handling of exception by createClientRequest(OMRequest, OzoneManger):

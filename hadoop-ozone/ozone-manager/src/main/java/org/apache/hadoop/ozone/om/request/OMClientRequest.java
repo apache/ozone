@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -88,6 +89,7 @@ public abstract class OMClientRequest implements IOMClientRequest {
   private final OMAuditLogger.Builder auditBuilder = OMAuditLogger.newBuilder();
 
   @Override
+  @SkipTracing
   public OMAuditLogger.Builder getAuditBuilder() {
     return auditBuilder;
   }
@@ -181,6 +183,7 @@ public abstract class OMClientRequest implements IOMClientRequest {
   }
 
   @Override
+  @SkipTracing
   @VisibleForTesting
   public OMRequest getOmRequest() {
     return omRequest;
@@ -191,6 +194,7 @@ public abstract class OMClientRequest implements IOMClientRequest {
    * @return User Info.
    */
   @Override
+  @SkipTracing
   public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
     return getUserInfo(omRequest, true);
   }
@@ -566,6 +570,7 @@ public abstract class OMClientRequest implements IOMClientRequest {
   }
 
   @Override
+  @SkipTracing
   public OMAuditLogger.Builder buildAuditMessage(AuditAction op,
       Map< String, String > auditMap, Throwable throwable,
       OzoneManagerProtocolProtos.UserInfo userInfo) {
@@ -582,6 +587,7 @@ public abstract class OMClientRequest implements IOMClientRequest {
   }
 
   @Override
+  @SkipTracing
   public Map<String, String> buildVolumeAuditMap(String volume) {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volume);

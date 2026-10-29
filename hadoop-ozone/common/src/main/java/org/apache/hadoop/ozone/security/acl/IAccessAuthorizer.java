@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
@@ -72,6 +73,7 @@ public interface IAccessAuthorizer {
   /**
    * @return true for Ozone-native authorizer
    */
+  @SkipTracing
   default boolean isNative() {
     return false;
   }

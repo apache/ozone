@@ -30,6 +30,7 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc_.Server;
@@ -95,7 +96,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
 
-    this.handler = new OzoneManagerRequestHandler(impl);
+    this.handler = TracingUtil.createInternalProxy(new OzoneManagerRequestHandler(impl), RequestHandler.class,
+        impl.getConfiguration());
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
