@@ -31,10 +31,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -47,6 +49,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCompleteFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
@@ -114,6 +117,40 @@ public class TestOzoneManagerRatisRequest {
     OzoneManager mockOm = mock(OzoneManager.class);
     assertInstanceOf(OMStartFinalizeUpgradeRequest.class,
         OzoneManagerRatisUtils.createClientRequest(omRequest, mockOm));
+  }
+
+  @Test
+  public void testClientRequestStagesAreTraced() throws IOException {
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade)
+            .setClientId("test-client-id")
+            .build();
+    OzoneManager mockOm = mock(OzoneManager.class);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      IOMClientRequest request = OzoneManagerRatisUtils.createClientRequest(omRequest, mockOm);
+      request.handleRequestFailure(mockOm);
+
+      collector.assertKind("OMStartFinalizeUpgradeRequest.handleRequestFailure", SpanKind.INTERNAL);
+    }
+  }
+
+  @Test
+  public void testClientRequestAccessorsAreNotTraced() throws IOException {
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade)
+            .setClientId("test-client-id")
+            .build();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      IOMClientRequest request = OzoneManagerRatisUtils.createClientRequest(omRequest, mock(OzoneManager.class));
+      assertEquals(omRequest, request.getOmRequest());
+      request.getAuditBuilder();
+
+      assertThat(collector.getSpans()).isEmpty();
+    }
   }
 
   @Test

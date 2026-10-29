@@ -27,9 +27,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc_.Server;
@@ -95,7 +97,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
 
-    this.handler = new OzoneManagerRequestHandler(impl);
+    this.handler = TracingUtil.createProxy(new OzoneManagerRequestHandler(impl), RequestHandler.class,
+        SpanKind.INTERNAL);
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);

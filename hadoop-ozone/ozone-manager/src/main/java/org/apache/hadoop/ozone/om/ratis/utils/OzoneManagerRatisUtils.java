@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -133,12 +135,21 @@ public final class OzoneManagerRatisUtils {
 
   /**
    * Create OMClientRequest which encapsulates the OMRequest.
+   * When tracing is enabled or application-aware, the request is wrapped in a tracing proxy, so every
+   * {@link IOMClientRequest} call (preExecute, validateAndUpdateCache, ...) made while the current span is recording
+   * gets a {@code <request class>.<method>} span, for example {@code OMKeyCreateRequest.preExecute}.
    * @param omRequest
-   * @return OMClientRequest
+   * @return OMClientRequest, or its tracing proxy
    * @throws IOException
    */
+  public static IOMClientRequest createClientRequest(OMRequest omRequest, OzoneManager ozoneManager)
+      throws IOException {
+    OMClientRequest request = createClientRequestImpl(omRequest, ozoneManager);
+    return TracingUtil.createProxy(request, IOMClientRequest.class, SpanKind.INTERNAL);
+  }
+
   @SuppressWarnings("checkstyle:methodlength")
-  public static IOMClientRequest createClientRequest(OMRequest omRequest,
+  private static OMClientRequest createClientRequestImpl(OMRequest omRequest,
       OzoneManager ozoneManager) throws IOException {
 
     // Handling of exception by createClientRequest(OMRequest, OzoneManger):

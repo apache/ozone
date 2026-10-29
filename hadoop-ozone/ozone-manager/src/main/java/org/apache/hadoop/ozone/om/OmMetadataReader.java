@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Collections;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -121,8 +123,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     this.audit = audit;
     this.metrics = omMetadataReaderMetrics;
     this.perfMetrics = ozoneManager.getPerfMetrics();
-    this.accessAuthorizer = accessAuthorizer != null ? accessAuthorizer
-        : OzoneAccessAuthorizer.get();
+    this.accessAuthorizer = TracingUtil.createProxy(
+        accessAuthorizer != null ? accessAuthorizer : OzoneAccessAuthorizer.get(),
+        IAccessAuthorizer.class, SpanKind.INTERNAL);
   }
 
   /**

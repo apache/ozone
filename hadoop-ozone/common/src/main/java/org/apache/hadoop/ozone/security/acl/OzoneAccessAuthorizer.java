@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
@@ -38,6 +39,7 @@ public class OzoneAccessAuthorizer implements IAccessAuthorizer {
   }
 
   @Override
+  @SkipTracing
   public boolean isNative() {
     return true;
   }

@@ -23,6 +23,9 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -42,6 +46,7 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -127,7 +132,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-    this.handler = new OzoneManagerRequestHandler(ozoneManager);
+    this.handler = TracingUtil.createProxy(new OzoneManagerRequestHandler(ozoneManager), RequestHandler.class,
+        SpanKind.INTERNAL);
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat(threadPrefix +
@@ -390,9 +396,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     Preconditions.checkArgument(raftClientRequest.getRaftGroupId().equals(
         getGroupId()));
-    try {
+    Span span = TracingUtil.importAndCreateSpan("OM.startTransaction", omRequest.getTraceID());
+    try (Scope ignored = span.makeCurrent()) {
       handler.validateRequest(omRequest);
     } catch (IOException ioe) {
+      TracingUtil.recordException(span, ioe);
       TransactionContext ctxt = TransactionContext.newBuilder()
           .setClientRequest(raftClientRequest)
           .setStateMachine(this)
@@ -400,6 +408,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           .build();
       ctxt.setException(ioe);
       return ctxt;
+    } finally {
+      span.end();
     }
 
     return TransactionContext.newBuilder()
@@ -453,9 +463,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final CompletableFuture<OMResponse> runFuture;
       try {
         runFuture = CompletableFuture.supplyAsync(() -> {
-          try {
+          // Runs on the executor thread, so the parent comes from the request's trace ID.
+          Span span = TracingUtil.importAndCreateSpan("OM.applyTransaction", request.getTraceID());
+          try (Scope ignored = span.makeCurrent()) {
+            span.setAttribute(OmTracingAttributes.OM_ROLE, context != null ? "leader" : "follower");
             return runCommand(request, termIndex);
           } finally {
+            span.end();
             exitApplyTransaction();
           }
         }, executorService);
@@ -719,6 +733,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);
     } catch (Throwable e) {
+      TracingUtil.recordExceptionInCurrentSpan(e);
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
@@ -766,10 +781,16 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    */
   private Message queryCommand(OMRequest request) throws IOException {
-    try (OMThreadContext.Scope context =
-             OMThreadContext.forRead(request, ozoneManager).applyToCurrentThread()) {
+    Span span = TracingUtil.importAndCreateSpan("OM.query", request.getTraceID());
+    try (Scope ignored = span.makeCurrent();
+         OMThreadContext.Scope context = OMThreadContext.forRead(request, ozoneManager).applyToCurrentThread()) {
       OMResponse response = handler.handleReadRequest(request);
       return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
+    } catch (IOException e) {
+      TracingUtil.recordException(span, e);
+      throw e;
+    } finally {
+      span.end();
     }
   }
 
