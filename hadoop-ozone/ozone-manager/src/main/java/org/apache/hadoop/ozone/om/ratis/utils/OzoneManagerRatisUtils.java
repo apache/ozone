@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
@@ -137,7 +138,7 @@ public final class OzoneManagerRatisUtils {
    * @throws IOException
    */
   @SuppressWarnings("checkstyle:methodlength")
-  public static OMClientRequest createClientRequest(OMRequest omRequest,
+  public static IOMClientRequest createClientRequest(OMRequest omRequest,
       OzoneManager ozoneManager) throws IOException {
 
     // Handling of exception by createClientRequest(OMRequest, OzoneManger):
