@@ -436,13 +436,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     checkOpen();
     long flushPos = totalDataFlushedLength;
     final List<StreamBuffer> byteBufferList;
-    if (!sync && !close) {
-        Objects.requireNonNull(bufferList, "bufferList == null");
-        byteBufferList = buffersForPutBlock;
-        buffersForPutBlock = null;
-        Objects.requireNonNull(byteBufferList, "byteBufferList == null");
+    if (buffersForPutBlock != null) {
+      Objects.requireNonNull(bufferList, "bufferList == null");
+      byteBufferList = buffersForPutBlock;
+      buffersForPutBlock = null;
+      Objects.requireNonNull(byteBufferList, "byteBufferList == null");
     } else {
-        byteBufferList = null;
+      // no data was written since the most recent putBlock
+      byteBufferList = null;
     }
     waitFuturesComplete();
     if (close && putBlockWithoutRaft) {
@@ -490,7 +491,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               throw new CompletionException(sce);
             }
             // if the ioException is not set, putBlock is successful
-            if (getIoException() == null) {
+            if (getIoException() == null && byteBufferList != null) {
               BlockID responseBlockID = BlockID.getFromProtobuf(
                   e.getPutBlock().getCommittedBlockLength().getBlockID());
               Preconditions.checkState(blockID.get().getContainerBlockID()
