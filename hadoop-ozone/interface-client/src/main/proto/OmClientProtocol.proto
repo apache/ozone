@@ -1165,6 +1165,9 @@ message KeyArgs {
     // the given ETag for the operation to succeed. This is used for
     // S3 conditional writes with the If-Match header.
     optional string expectedETag = 24;
+
+    // If-None-Match entity ETag: an absent key or a different ETag is allowed.
+    optional string excludedETag = 25;
 }
 
 message KeyLocation {
@@ -1853,6 +1856,8 @@ message GetBucketDeletedBytesResponse {
   optional uint64 purgeableKeys = 4;
   optional uint64 snapshotTrappedDirs = 5;
   optional uint64 purgeableDirs = 6;
+  optional uint64 purgeableKeyBytes = 7;
+  optional uint64 purgeableDirBytes = 8;
 }
 
 message ServicePort {
@@ -2521,7 +2526,7 @@ message S3Authentication {
     optional string resolvedStsTempAccessKeyId = 8;
     optional string resolvedStsSecretKeyId = 9;
     // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
-    // in finer-grained STS permissions.
+    // in S3 action-based authorization (STS session policies and authorizers such as Ranger).
     optional string s3Action = 10;
     // Resolved so GetCallerIdentity can return the assumed-role identity from the session token.
     optional string resolvedStsAssumedRoleId = 11;

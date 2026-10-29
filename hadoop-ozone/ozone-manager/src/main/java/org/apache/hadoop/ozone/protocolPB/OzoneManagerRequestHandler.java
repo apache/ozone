@@ -1034,6 +1034,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setPurgeableKeys(bytes.getPurgeableKeys())
         .setSnapshotTrappedDirs(bytes.getSnapshotTrappedDirs())
         .setPurgeableDirs(bytes.getPurgeableDirs())
+        .setPurgeableKeyBytes(bytes.getPurgeableKeyBytes())
+        .setPurgeableDirBytes(bytes.getPurgeableDirBytes())
         .build();
   }
 

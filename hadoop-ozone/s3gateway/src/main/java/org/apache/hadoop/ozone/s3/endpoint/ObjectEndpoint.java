@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.normalizeContentEncoding;
@@ -101,6 +102,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -185,10 +187,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             " considered as Unix Paths. Path has Violated FS Semantics " +
             "which caused put operation to fail.");
         throw os3Exception;
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
-          && getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
-        // If-Match failed because the key doesn't exist
-        throw newError(PRECOND_FAILED, keyPath, ex);
       }
 
       throw newError(bucketName, keyPath, ex);
@@ -255,6 +253,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           StringUtils.endsWith(keyPath, "/")
       ) {
         context.setAction(S3GAction.CREATE_DIRECTORY);
+        if (STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(getHeaders().getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256))) {
+          S3ChunkInputStreamInfo info = getS3ChunkInputStreamInfo(body, length, amzDecodedLength, keyPath);
+          multiDigestInputStream = info.getMultiDigestInputStream();
+          validateContentLength(info.getEffectiveLength(), 0, keyPath).run();
+          ((UnsignedChunksInputStream) multiDigestInputStream.getWrappedStream()).verifyComplete();
+        }
         getClientProtocol()
             .createDirectory(bucket.getVolumeName(), bucketName, keyPath);
         long metadataLatencyNs =
@@ -630,6 +634,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
 
     OzoneKey key;
+    RangeHeader rangeHeader = null;
     try {
       if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
         OzoneBucket bucket = context.getBucket();
@@ -649,7 +654,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         auditReadSuccess(context.getAction());
         return conditionalResponse;
       }
-      // TODO: return the specified range bytes of this object.
+
+      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
+      if (rangeHeaderVal != null) {
+        rangeHeader = RangeHeaderParserUtil.parseRangeHeader(rangeHeaderVal, key.getDataSize());
+        if (rangeHeader.isInValidRange()) {
+          throw newError(S3ErrorTable.INVALID_RANGE, rangeHeaderVal);
+        }
+      }
     } catch (OMException ex) {
       auditReadFailure(context.getAction(), ex);
       getMetrics().updateHeadKeyFailureStats(startNanos);
@@ -667,6 +679,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
     } catch (Exception ex) {
       auditReadFailure(context.getAction(), ex);
+      getMetrics().updateHeadKeyFailureStats(startNanos);
       throw ex;
     }
 
@@ -674,10 +687,21 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         S3StorageType.STANDARD :
         S3StorageType.fromReplicationConfig(key.getReplicationConfig());
 
-    ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
-        .header(HttpHeaders.CONTENT_LENGTH, key.getDataSize())
-        .header(HttpHeaders.CONTENT_TYPE, contentTypeOf(key))
-        .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
+    ResponseBuilder response;
+    if (rangeHeader == null || rangeHeader.isReadFull()) {
+      response = Response.ok().status(HttpStatus.SC_OK).header(HttpHeaders.CONTENT_LENGTH, key.getDataSize());
+    } else {
+      long startOffset = rangeHeader.getStartOffset();
+      long endOffset = rangeHeader.getEndOffset();
+      String contentRangeVal = RANGE_HEADER_SUPPORTED_UNIT + " " +
+          startOffset + "-" + endOffset + "/" + key.getDataSize();
+      response = Response.status(Status.PARTIAL_CONTENT)
+          .header(HttpHeaders.CONTENT_LENGTH, endOffset - startOffset + 1)
+          .header(CONTENT_RANGE_HEADER, contentRangeVal);
+    }
+    response.header(HttpHeaders.CONTENT_TYPE, contentTypeOf(key))
+        .header(STORAGE_CLASS_HEADER, s3StorageType.toString())
+        .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
     addEntityTagHeader(response, key);
     addStoredObjectHeaders(response, key);
 
@@ -848,14 +872,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       Long expectedDataGeneration = null;
       String expectedETag = null;
-      if (writeConditions.hasIfNoneMatch()) {
+      if (writeConditions.isCreateIfAbsent()) {
         expectedDataGeneration = OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
       } else if (writeConditions.hasIfMatch()) {
         expectedETag = writeConditions.getExpectedETag();
       }
 
       omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(
-          key, uploadID, partsMap, expectedDataGeneration, expectedETag);
+          key, uploadID, partsMap, expectedDataGeneration, expectedETag, writeConditions.getExcludedETag());
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
@@ -884,9 +908,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
           || ex.getResult() == ResultCodes.ETAG_MISMATCH
           || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
-        throw newError(PRECOND_FAILED, key, ex);
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
-          && writeConditions.hasIfMatch()) {
         throw newError(PRECOND_FAILED, key, ex);
       }
       throw newError(bucket, key, ex);
@@ -1180,6 +1201,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     String sourceBucket = result.getLeft();
     String sourceKey = result.getRight();
+    String keyForError = sourceKey;
     final MessageDigest md5Digest = getMD5DigestInstance();
 
     if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
@@ -1283,6 +1305,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           // Nothing reads the digest in this case, so do not hash the copied bytes at all.
           sourceDigestInputStream.on(false);
         }
+        keyForError = destkey;
         final CopyResult copyResult = runWithS3ActionString("PutObject", () ->
             copy(sourceDigestInputStream, reusedETag, sourceKeyLen, destkey, destinationBucket,
               replicationConfig, customMetadata, perf, startNanos, tags, writeConditions));
@@ -1295,10 +1318,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        if (getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
-          throw newError(PRECOND_FAILED, destkey, ex);
-        }
-        throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
+        throw newError(S3ErrorTable.NO_SUCH_KEY, keyForError, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket, ex);
       } else if (ex.getResult() == ResultCodes.ATOMIC_WRITE_CONFLICT
@@ -1326,10 +1346,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> tags,
       S3ConditionalRequest.WriteConditions writeConditions, boolean derivedKeyPiggyBacking)
       throws IOException {
-    if (writeConditions.hasIfNoneMatch()) {
+    if (writeConditions.isCreateIfAbsent()) {
       return getClientProtocol().createKeyIfNotExists(
           volumeName, bucketName, keyPath, length, replicationConfig,
           customMetadata, tags, derivedKeyPiggyBacking);
+    } else if (writeConditions.hasIfNoneMatch()) {
+      return getClientProtocol().createKeyIfNoneMatch(volumeName, bucketName, keyPath, length,
+          writeConditions.getExcludedETag(), replicationConfig, customMetadata, tags, derivedKeyPiggyBacking);
     } else if (writeConditions.hasIfMatch()) {
       return getClientProtocol().rewriteKeyIfMatch(
           volumeName, bucketName, keyPath, length,

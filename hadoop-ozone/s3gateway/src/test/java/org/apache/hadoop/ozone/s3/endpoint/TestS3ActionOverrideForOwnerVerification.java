@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -67,6 +66,7 @@ import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -86,19 +86,16 @@ public class TestS3ActionOverrideForOwnerVerification {
     S3GatewayMetrics.create(new OzoneConfiguration());
   }
 
-  @Test
-  public void testListObjectVersionsUsesListBucketVersionsAction() throws Exception {
-    assertEquals("ListBucketVersions", listBucketAction(true, true));
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListObjectVersionsUsesListBucketVersionsAction(boolean isStsEnabled) throws Exception {
+    assertEquals("ListBucketVersions", listBucketAction(true, isStsEnabled));
   }
 
-  @Test
-  public void testListObjectsUsesListBucketAction() throws Exception {
-    assertEquals("ListBucket", listBucketAction(false, true));
-  }
-
-  @Test
-  public void testListObjectVersionsDoesNotSetActionWhenStsDisabled() throws Exception {
-    assertNull(listBucketAction(true, false));
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListObjectsUsesListBucketAction(boolean isStsEnabled) throws Exception {
+    assertEquals("ListBucket", listBucketAction(false, isStsEnabled));
   }
 
   @Test
@@ -110,59 +107,38 @@ public class TestS3ActionOverrideForOwnerVerification {
     assertEquals(S3GAction.LIST_OBJECT_VERSIONS, auditAction.get());
   }
 
-  @Test
-  public void testUploadPartCopyUsesGetObjectActionForSourceBucketOwnerLookup() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testUploadPartCopyUsesGetObjectActionForSourceBucketOwnerLookup(boolean isStsEnabled) throws Exception {
     final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, true);
+    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, isStsEnabled);
 
     // Trigger UploadPartCopy (MPU part upload with copy header).
     final String uploadId = "upload-id";
     assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, 1, uploadId, ""));
 
     assertEquals("GetObject", actionAtSourceBucketOwnerLookup.get());
-  }
-
-  @Test
-  public void testCopyObjectUsesGetObjectActionForSourceBucketOwnerLookup() throws Exception {
-    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, true);
-
-    // Trigger CopyObject (PUT with copy header, no upload ID).
-    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
-
-    assertEquals("GetObject", actionAtSourceBucketOwnerLookup.get());
-  }
-
-  @Test
-  public void testUploadPartCopyDoesNotSetActionWhenStsDisabled() throws Exception {
-    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, false);
-
-    // Trigger UploadPartCopy (MPU part upload with copy header).
-    final String uploadId = "upload-id";
-    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, 1, uploadId, ""));
-
-    assertNull(actionAtSourceBucketOwnerLookup.get());
-  }
-
-  @Test
-  public void testCopyObjectDoesNotSetActionWhenStsDisabled() throws Exception {
-    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, false);
-
-    // Trigger CopyObject (PUT with copy header, no upload ID).
-    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
-
-    assertNull(actionAtSourceBucketOwnerLookup.get());
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ETag", "ObjectParts"})
-  public void testGetObjectAttributesSendsSingleOmRequestWithGetObjectAttributesAction(String attribute)
-      throws Exception {
+  @ValueSource(booleans = {true, false})
+  public void testCopyObjectUsesGetObjectActionForSourceBucketOwnerLookup(boolean isStsEnabled) throws Exception {
+    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
+    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, isStsEnabled);
+
+    // Trigger CopyObject (PUT with copy header, no upload ID).
+    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
+
+    assertEquals("GetObject", actionAtSourceBucketOwnerLookup.get());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"ETag,true", "ETag,false", "ObjectParts,true", "ObjectParts,false"})
+  public void testGetObjectAttributesSendsSingleOmRequestWithGetObjectAttributesAction(
+      String attribute, boolean isStsEnabled) throws Exception {
     final List<String> actions = new ArrayList<>();
     final ClientProtocol clientProtocol = mock(ClientProtocol.class);
-    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, true, clientProtocol, false);
+    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, isStsEnabled, clientProtocol, false);
 
     final Response response = getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute);
 
@@ -170,19 +146,6 @@ public class TestS3ActionOverrideForOwnerVerification {
     // OM enforces the dependent GetObject action itself, so S3 Gateway makes exactly one OM request.
     assertEquals(Collections.singletonList("GetObjectAttributes"), actions);
     verifySingleMetadataLookup(clientProtocol, attribute);
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"ETag", "ObjectParts"})
-  public void testGetObjectAttributesSkipsAdditionalCheckWhenStsDisabled(String attribute) throws Exception {
-    final List<String> actions = new ArrayList<>();
-    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, false);
-
-    final Response response = getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute);
-
-    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    // With STS disabled, no S3 action is sent to OM.
-    assertEquals(Collections.singletonList(null), actions);
   }
 
   @ParameterizedTest
@@ -267,11 +230,6 @@ public class TestS3ActionOverrideForOwnerVerification {
         .setHeaders(headers)
         .setSignatureInfo(signatureInfo)
         .build();
-  }
-
-  private static ObjectEndpoint newGetObjectAttributesEndpoint(List<String> actions, boolean isStsEnabled)
-      throws Exception {
-    return newGetObjectAttributesEndpoint(actions, isStsEnabled, mock(ClientProtocol.class), false);
   }
 
   private static ObjectEndpoint newGetObjectAttributesEndpoint(List<String> actions, boolean isStsEnabled,
