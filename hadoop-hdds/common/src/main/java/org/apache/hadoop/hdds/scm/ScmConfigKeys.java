@@ -133,7 +133,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES =
       "ozone.scm.max.full.container.report.leases";
   public static final int
-      OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES_DEFAULT = 6;
+      OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES_DEFAULT = 10;
 
   public static final String OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION =
       "ozone.scm.full.container.report.lease.duration";

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +36,8 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -44,12 +47,16 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -68,8 +75,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.server.ContainerReportProcessingLifecycle;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -169,6 +179,95 @@ public class TestSCMSafeModeManager {
     assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
 
+  }
+
+  @Test
+  public void testSafeModeProgressWithBatchedRegistrationReports() throws Exception {
+    config.setDouble(HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT, 0.8);
+    containers = HddsTestUtils.getContainerInfo(5);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    for (ContainerInfo container : containers) {
+      container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
+      when(containerManager.getContainer(container.containerID())).thenReturn(container);
+    }
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
+    MockNodeManager nodeManager = new MockNodeManager(true, 5);
+    List<DatanodeDetails> datanodes = new ArrayList<>(nodeManager.getAllNodes());
+    AtomicLong now = new AtomicLong(1_000L);
+    SCMFullContainerReportLeaseManager leaseManager =
+        new SCMFullContainerReportLeaseManager(2, 100L, now::get, null);
+    doAnswer(invocation -> {
+      ContainerReplica replica = invocation.getArgument(1);
+      assertThat(leaseManager.requestLease(replica.getDatanodeDetails(), 7L))
+          .as("A report must retain its lease until processing completes").isEmpty();
+      return null;
+    }).when(containerManager).updateContainerReplica(any(), any());
+    ContainerReportHandler reportHandler =
+        new ContainerReportHandler(nodeManager, containerManager, scmContext, config);
+    scmSafeModeManager = new SCMSafeModeManager(config, nodeManager, null, containerManager,
+        serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+
+    try {
+      for (DatanodeDetails datanode : datanodes) {
+        leaseManager.markFullContainerReportDeferred(datanode);
+      }
+      SafeModeMetrics metrics = scmSafeModeManager.getSafeModeMetrics();
+      assertTrue(scmSafeModeManager.getInSafeMode());
+      assertEquals(4, metrics.getNumContainerWithOneReplicaReportedThreshold().value());
+      assertEquals(0, metrics.getCurrentContainersWithOneReplicaReportedCount().value());
+
+      for (int batch = 0; batch < 2; batch++) {
+        List<ContainerReportFromDatanode> reports = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+          DatanodeDetails datanode = datanodes.get(batch == 0 ? i : i + 3);
+          ContainerInfo container = containers.get(batch * 2 + i);
+          OptionalLong lease = leaseManager.requestLease(datanode, 7L);
+          assertThat(lease).isPresent();
+          ContainerReportProcessingLifecycle claim =
+              leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease.getAsLong())
+                  .orElseThrow(AssertionError::new);
+          ContainerReportsProto report = HddsTestUtils.getContainerReports(ContainerReplicaProto.newBuilder()
+              .setContainerID(container.getContainerID())
+              .setState(ContainerReplicaProto.State.CLOSED)
+              .setOriginNodeId(datanode.getUuidString())
+              .setKeyCount(10)
+              .build());
+          reports.add(new ContainerReportFromDatanode(datanode, report, true, claim));
+          queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
+              new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanode,
+                  ContainerReportsProto.getDefaultInstance()));
+        }
+        queue.processAll(5000);
+
+        // Queued reports retain capacity even after their original grant expiry.
+        now.addAndGet(101L);
+        if (batch == 0) {
+          // Datanode 2 never retries; its denied request must not block datanodes 3 and 4.
+          for (int i = 2; i < datanodes.size(); i++) {
+            assertThat(leaseManager.requestLease(datanodes.get(i), 7L)).isEmpty();
+          }
+        }
+        assertThat(leaseManager.requestLease(datanodes.get(batch == 0 ? 4 : 0), 7L)).isEmpty();
+        assertEquals(batch * 2, metrics.getCurrentContainersWithOneReplicaReportedCount().value());
+        assertTrue(scmSafeModeManager.getInSafeMode());
+
+        for (int i = 0; i < reports.size(); i++) {
+          reportHandler.onMessage(reports.get(i), queue);
+          queue.processAll(5000);
+          int processedReports = batch * 2 + i + 1;
+          assertEquals(processedReports, metrics.getCurrentContainersWithOneReplicaReportedCount().value());
+          assertEquals(processedReports < 4, scmSafeModeManager.getInSafeMode());
+          assertEquals(4, metrics.getNumContainerWithOneReplicaReportedThreshold().value());
+        }
+      }
+      assertEquals(0, metrics.getScmInSafeMode().value());
+    } finally {
+      scmSafeModeManager.stop();
+      queue.close();
+      nodeManager.close();
+    }
   }
 
   @Test

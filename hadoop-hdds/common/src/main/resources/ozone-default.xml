@@ -169,7 +169,7 @@
   </property>
   <property>
     <name>ozone.scm.max.full.container.report.leases</name>
-    <value>6</value>
+    <value>10</value>
     <tag>OZONE, SCM, CONTAINER</tag>
     <description>The max number of outstanding full container report leases
       SCM can grant to datanodes.</description>
@@ -1230,6 +1230,9 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Heartbeat interval used during Datanode initialization for SCM.
+      For lease-capable SCMs, this is also the base interval for retrying
+      the registration full container report, with an additional random
+      delay of up to 50 percent of this interval.
     </description>
   </property>
   <property>
