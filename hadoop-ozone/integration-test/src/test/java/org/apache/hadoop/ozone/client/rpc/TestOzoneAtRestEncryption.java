@@ -46,6 +46,7 @@ import static org.mockito.Mockito.verify;
 import com.google.common.cache.Cache;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -80,6 +81,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
@@ -98,6 +100,9 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
+import org.apache.hadoop.ozone.client.io.KeyInputStream;
+import org.apache.hadoop.ozone.client.io.LengthInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -669,6 +674,46 @@ class TestOzoneAtRestEncryption {
     OzoneBucket linkBucket = createLinkVolumeAndBucket(volumeName, bucketName,
         linkVolumeName, linkBucketName);
     testMultipartUploadWithEncryption(linkBucket, 2);
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void mpuPartsHaveOwnIv(BucketLayout bucketLayout) throws Exception {
+    OzoneBucket bucket = createVolumeAndBucket(UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        bucketLayout);
+    String keyName = "mpu_same_content";
+    byte[] data = generateRandomData(MPU_PART_MIN_SIZE);
+    String uploadID = initiateMultipartUpload(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
+    Map<Integer, String> partsMap = new TreeMap<>();
+    partsMap.put(1, uploadPart(bucket, keyName, uploadID, 1, data));
+    partsMap.put(2, uploadPart(bucket, keyName, uploadID, 2, data));
+    completeMultipartUpload(bucket, keyName, uploadID, partsMap);
+
+    byte[] expected = new byte[2 * data.length];
+    System.arraycopy(data, 0, expected, 0, data.length);
+    System.arraycopy(data, 0, expected, data.length, data.length);
+    try (OzoneInputStream in = bucket.readKey(keyName)) {
+      assertArrayEquals(expected, in.readAllBytes());
+    }
+
+    // Read the stored bytes of each part without decrypting them.
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(keyName)
+        .build();
+    OmKeyInfo keyInfo = ozoneManager.getKeyInfo(keyArgs, false).getKeyInfo();
+    List<byte[]> storedParts = new ArrayList<>();
+    for (LengthInputStream part : KeyInputStream.getStreamsFromKeyInfo(keyInfo,
+        ((RpcClient) ozClient.getProxy()).getXceiverClientManager(), null, new BlockInputStreamFactoryImpl(),
+        conf.getObject(OzoneClientConfig.class)).values()) {
+      try (InputStream in = part) {
+        storedParts.add(in.readAllBytes());
+      }
+    }
+    assertThat(storedParts).hasSize(2);
+    assertThat(storedParts.get(0)).hasSameSizeAs(data).isNotEqualTo(data);
+    assertThat(storedParts.get(1)).hasSameSizeAs(data).isNotEqualTo(data).isNotEqualTo(storedParts.get(0));
   }
 
   private void testMultipartUploadWithEncryption(OzoneBucket bucket,

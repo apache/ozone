@@ -31,6 +31,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -52,6 +55,16 @@ public class TestS3InitiateMultipartUploadRequest
   public void testPreExecute() throws Exception {
     doPreExecuteInitiateMPU(UUID.randomUUID().toString(),
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedIsAudited() throws Exception {
+    OMRequest omRequest = OMRequestTestUtils.createInitiateMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    AuditMessage message = assertPreExecuteAclDenialIsAudited(getS3InitiateMultipartUploadReq(omRequest),
+        OMAction.INITIATE_MULTIPART_UPLOAD);
+    // No upload exists for a rejected request, so its generated upload ID is not audited.
+    assertThat(message.getFormattedMessage()).doesNotContain(OzoneConsts.UPLOAD_ID);
   }
 
   @Test
