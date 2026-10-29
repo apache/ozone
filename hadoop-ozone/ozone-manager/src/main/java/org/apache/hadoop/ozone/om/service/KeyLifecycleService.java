@@ -101,7 +101,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
@@ -1600,7 +1600,7 @@ public class KeyLifecycleService extends BackgroundService {
             long startTime = System.nanoTime();
             final OzoneManagerProtocolProtos.OMResponse response;
             try {
-              final OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(
+              final IOMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(
                   omRequestRaw, getOzoneManager());
               response = ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {
                 @Override
@@ -1727,7 +1727,7 @@ public class KeyLifecycleService extends BackgroundService {
             .build();
         try {
           // perform preExecute as ratis submit do no perform preExecute
-          OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+          IOMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
           UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bucket.getOwner());
           OzoneManagerProtocolProtos.OMResponse omResponse =
               ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {
@@ -1790,7 +1790,8 @@ public class KeyLifecycleService extends BackgroundService {
               .build();
           try {
             // perform preExecute as ratis submit do no perform preExecute
-            final OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+            final IOMClientRequest omClientRequest =
+                OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
             UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bucket.getOwner());
             OzoneManagerProtocolProtos.OMResponse omResponse =
                 ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {

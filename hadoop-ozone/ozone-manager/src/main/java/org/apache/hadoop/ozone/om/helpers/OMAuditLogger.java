@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
@@ -139,7 +139,7 @@ public final class OMAuditLogger {
     }
   }
 
-  public static void log(OMAuditLogger.Builder builder, OMClientRequest request, OzoneManager om,
+  public static void log(OMAuditLogger.Builder builder, IOMClientRequest request, OzoneManager om,
                          TermIndex termIndex, Throwable th) {
     if (builder.isLog.get()) {
       builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
