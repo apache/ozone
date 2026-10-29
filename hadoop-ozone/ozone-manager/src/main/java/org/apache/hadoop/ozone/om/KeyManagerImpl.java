@@ -421,6 +421,12 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
+  @Override
+  public void restartSnapshotSstFilteringService(OzoneConfiguration conf) {
+    stopSnapshotSstFilteringService();
+    startSnapshotSstFilteringService(conf);
+  }
+
   /**
    * Start the snapshot defrag service if interval is not set to disabled value.
    * @param conf
