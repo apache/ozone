@@ -20,7 +20,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 POM_FILES=(hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml)
-if ! git diff --quiet -- "${POM_FILES[@]}" || ! git diff --cached --quiet -- "${POM_FILES[@]}"; then
+# CI removes .git before running checks; only check local edits in Git checkouts.
+if [[ -e .git ]] && {
+  ! git diff --quiet -- "${POM_FILES[@]}" || ! git diff --cached --quiet -- "${POM_FILES[@]}"
+}; then
   echo "Infer requires clean ozonefs POMs. Commit or stash changes to these files first:" >&2
   printf '  %s\n' "${POM_FILES[@]}" >&2
   exit 1

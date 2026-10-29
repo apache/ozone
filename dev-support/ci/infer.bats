@@ -108,6 +108,20 @@ teardown() {
   cmp expected hadoop-ozone/dev-support/checks/_lib.sh
 }
 
+@test "Infer runs without Git metadata and restores both POMs" {
+  mv .git saved-git
+  cp "${POMS[0]}" expected0
+  cp "${POMS[1]}" expected1
+
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 0 ]
+  [ -e infer-called ]
+  [ -f target/infer/report.txt ]
+  cmp expected0 "${POMS[0]}"
+  cmp expected1 "${POMS[1]}"
+}
+
 @test "Infer restores POMs after an analysis failure" {
   export INFER_EXIT_CODE=2
 
