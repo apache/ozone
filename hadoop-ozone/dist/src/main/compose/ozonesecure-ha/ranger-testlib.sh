@@ -43,8 +43,6 @@ setup_ranger_acceptance_env() {
 
   # where tarballs will be extracted
   : "${TEMP_DIR:=/tmp}"
-  # where tarballs will be downloaded
-  : "${DOWNLOAD_DIR:=${TEMP_DIR}}"
 
   export COMPOSE_FILE=docker-compose.yaml:ranger.yaml:../common/ranger.yaml
   export OM_SERVICE_ID="omservice"
