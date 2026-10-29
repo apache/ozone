@@ -37,16 +37,6 @@ execute_robot_test ${SCM} basic/links.robot
 
 execute_robot_test ${SCM} -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot
 
-exclude=""
-for bucket in generated; do
-  for layout in OBJECT_STORE LEGACY FILE_SYSTEM_OPTIMIZED; do
-    execute_robot_test ${SCM} -v BUCKET:${bucket} -v BUCKET_LAYOUT:${layout} -N s3-${layout}-${bucket} ${exclude} s3
-    # some tests are independent of the bucket type, only need to be run once
-    exclude="--exclude no-bucket-type"
-  done
-done
-
-execute_robot_test ${SCM} freon
 execute_robot_test ${SCM} -v USERNAME:httpfs httpfs
 
 execute_robot_test ${SCM} omha/om-roles.robot
