@@ -22,15 +22,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -40,9 +46,14 @@ import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
@@ -51,6 +62,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQu
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 
 class TestOzoneManagerProtocolClientSideTranslatorPB {
@@ -59,6 +72,167 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   private final OzoneManagerProtocolClientSideTranslatorPB pb = new OzoneManagerProtocolClientSideTranslatorPB(
       omTransport, "test-client-id");
   private static final OmDeleteKeys DELETE_KEYS = new OmDeleteKeys("vol", "bucket", Arrays.asList("key1", "key2"));
+
+  @ParameterizedTest
+  @EnumSource(value = Type.class, names = {"CreateKey", "CreateFile", "AllocateBlock"})
+  void retriesMissingPipelineAllocationForEachClientOperation(Type operation) throws Exception {
+    OzoneManagerProtocolClientSideTranslatorPB client = retryingClient();
+    when(omTransport.submitRequest(any(OMRequest.class)))
+        .thenReturn(errorResponse(operation, Status.KEY_ALLOCATION_ERROR), successResponse(operation));
+
+    invokeBlockAllocation(client, operation);
+
+    ArgumentCaptor<OMRequest> requests = ArgumentCaptor.forClass(OMRequest.class);
+    verify(omTransport, times(2)).submitRequest(requests.capture());
+    assertThat(requests.getAllValues().get(0)).isEqualTo(requests.getAllValues().get(1));
+    assertThat(requests.getValue().getCmdType()).isEqualTo(operation);
+  }
+
+  @Test
+  void stopsRetryingMissingPipelineAndPreservesLastError() throws Exception {
+    Type operation = Type.CreateKey;
+    when(omTransport.submitRequest(any(OMRequest.class)))
+        .thenReturn(errorResponse(operation, Status.KEY_ALLOCATION_ERROR));
+
+    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+    PrintStream originalErr = System.err;
+    OMException error;
+    try {
+      System.setErr(new PrintStream(stderr, false, StandardCharsets.UTF_8.name()));
+      error = assertThrows(OMException.class, () -> retryingClient().openKey(keyArgs()));
+    } finally {
+      System.setErr(originalErr);
+    }
+
+    assertThat(error.getResult()).isEqualTo(ResultCodes.KEY_ALLOCATION_ERROR);
+    assertThat(error).hasMessage("allocation failed");
+    assertThat(stderr.toString(StandardCharsets.UTF_8.name()))
+        .contains("KEY_ALLOCATION_ERROR", "2 retries left", "1 retries left")
+        .doesNotContain("0 retries left");
+    verify(omTransport, times(3)).submitRequest(any(OMRequest.class));
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = Status.class, names = {"INTERNAL_ERROR", "INVALID_REQUEST"})
+  void doesNotRetryUnrelatedErrors(Status status) throws Exception {
+    when(omTransport.submitRequest(any(OMRequest.class)))
+        .thenReturn(errorResponse(Type.CreateKey, status));
+
+    OMException error = assertThrows(OMException.class,
+        () -> retryingClient().openKey(keyArgs()));
+
+    assertThat(error.getResult()).isEqualTo(ResultCodes.valueOf(status.name()));
+    verify(omTransport).submitRequest(any(OMRequest.class));
+  }
+
+  @Test
+  void stillRetriesScmSafeMode() throws Exception {
+    when(omTransport.submitRequest(any(OMRequest.class)))
+        .thenReturn(errorResponse(Type.CreateKey, Status.SCM_IN_SAFE_MODE), successResponse(Type.CreateKey));
+
+    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+    PrintStream originalErr = System.err;
+    try {
+      System.setErr(new PrintStream(stderr, false, StandardCharsets.UTF_8.name()));
+      retryingClient().openKey(keyArgs());
+    } finally {
+      System.setErr(originalErr);
+    }
+
+    assertThat(stderr.toString(StandardCharsets.UTF_8.name())).contains("SCM_IN_SAFE_MODE", "retrying");
+    verify(omTransport, times(2)).submitRequest(any(OMRequest.class));
+  }
+
+  @Test
+  void interruptedRetryRestoresInterruptFlagAndPreservesError() throws Exception {
+    when(omTransport.submitRequest(any(OMRequest.class)))
+        .thenReturn(errorResponse(Type.CreateKey, Status.KEY_ALLOCATION_ERROR));
+
+    Thread.currentThread().interrupt();
+    try {
+      OMException error = assertThrows(OMException.class,
+          () -> retryingClient().openKey(keyArgs()));
+      assertThat(error.getResult()).isEqualTo(ResultCodes.KEY_ALLOCATION_ERROR);
+      assertThat(Thread.currentThread().isInterrupted()).isTrue();
+      verify(omTransport).submitRequest(any(OMRequest.class));
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  private OzoneManagerProtocolClientSideTranslatorPB retryingClient() {
+    return new OzoneManagerProtocolClientSideTranslatorPB(omTransport, "test-client-id", 2, 0);
+  }
+
+  private static OmKeyArgs keyArgs() {
+    return new OmKeyArgs.Builder()
+        .setVolumeName("vol")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setDataSize(1)
+        .setOwnerName("owner")
+        .build();
+  }
+
+  private static OMResponse errorResponse(Type operation, Status status) {
+    return OMResponse.newBuilder()
+        .setCmdType(operation)
+        .setStatus(status)
+        .setSuccess(false)
+        .setMessage("allocation failed")
+        .build();
+  }
+
+  private static OMResponse successResponse(Type operation) {
+    KeyInfo keyInfo = KeyInfo.newBuilder()
+        .setVolumeName("vol")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setDataSize(1)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setCreationTime(1)
+        .setModificationTime(1)
+        .build();
+    OMResponse.Builder response = OMResponse.newBuilder()
+        .setCmdType(operation)
+        .setStatus(Status.OK);
+    switch (operation) {
+    case CreateKey:
+      response.setCreateKeyResponse(CreateKeyResponse.newBuilder().setKeyInfo(keyInfo).setID(1).setOpenVersion(0));
+      break;
+    case CreateFile:
+      response.setCreateFileResponse(CreateFileResponse.newBuilder().setKeyInfo(keyInfo).setID(1).setOpenVersion(0));
+      break;
+    case AllocateBlock:
+      HddsProtos.BlockID blockId = HddsProtos.BlockID.newBuilder()
+          .setContainerBlockID(HddsProtos.ContainerBlockID.newBuilder().setContainerID(1).setLocalID(1))
+          .build();
+      response.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
+          .setKeyLocation(KeyLocation.newBuilder().setBlockID(blockId).setLength(1).setOffset(0)));
+      break;
+    default:
+      throw new IllegalArgumentException("Unexpected operation " + operation);
+    }
+    return response.build();
+  }
+
+  private static void invokeBlockAllocation(OzoneManagerProtocolClientSideTranslatorPB client, Type operation)
+      throws IOException {
+    switch (operation) {
+    case CreateKey:
+      client.openKey(keyArgs());
+      break;
+    case CreateFile:
+      client.createFile(keyArgs(), false, false);
+      break;
+    case AllocateBlock:
+      client.allocateBlock(keyArgs(), 1, new ExcludeList());
+      break;
+    default:
+      throw new IllegalArgumentException("Unexpected operation " + operation);
+    }
+  }
 
   @Test
   void testStartQuotaRepair() throws IOException {

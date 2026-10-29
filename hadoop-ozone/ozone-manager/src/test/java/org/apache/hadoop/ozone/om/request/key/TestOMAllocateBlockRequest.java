@@ -49,12 +49,14 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -74,6 +76,51 @@ import org.mockito.MockedStatic;
  * Tests OMAllocateBlockRequest class.
  */
 public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
+
+  @Test
+  public void testMissingPipelineMapsToRetryableError() throws Exception {
+    String message = "Waited pipeline disappeared";
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), anyString()))
+        .thenThrow(new SCMException(message, SCMException.ResultCodes.PIPELINE_NOT_FOUND));
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    OMException error = assertThrows(OMException.class,
+        () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
+            UserInfo.newBuilder().build(), ozoneManager));
+
+    assertEquals(OMException.ResultCodes.KEY_ALLOCATION_ERROR, error.getResult());
+    assertEquals(message, error.getMessage());
+  }
+
+  @Test
+  public void testScmSafeModeMappingIsPreserved() throws Exception {
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), anyString()))
+        .thenThrow(new SCMException("SCM is in safe mode", SCMException.ResultCodes.SAFE_MODE_EXCEPTION));
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    OMException error = assertThrows(OMException.class,
+        () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
+            UserInfo.newBuilder().build(), ozoneManager));
+
+    assertEquals(OMException.ResultCodes.SCM_IN_SAFE_MODE, error.getResult());
+  }
+
+  @Test
+  public void testOtherScmAllocationFailureIsNotReclassified() throws Exception {
+    SCMException cause = new SCMException("No suitable datanode",
+        SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), anyString())).thenThrow(cause);
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    SCMException error = assertThrows(SCMException.class,
+        () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
+            UserInfo.newBuilder().build(), ozoneManager));
+
+    assertSame(cause, error);
+  }
 
   @Test
   public void testPreExecute() throws Exception {

@@ -24,6 +24,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -36,17 +38,22 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Testing the RequestValidations class that is used to run the validation for
@@ -75,6 +82,34 @@ public class TestRequestValidations {
   public void tearDown() {
     validationListener.detach();
     finishValidatorTest();
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
+  public void testVersionThreeCreateKeyUsesActualBucketLayoutValidation(BucketLayout layout) throws Exception {
+    ValidationContext ctx = mock(ValidationContext.class);
+    OMVersionManager versionManager = aFinalizedVersionManager();
+    when(ctx.versionManager()).thenReturn(versionManager);
+    when(ctx.getBucketLayout("vol", "bucket")).thenReturn(layout);
+    RequestValidations validations = new RequestValidations()
+        .fromPackage("org.apache.hadoop.ozone.om.request.key")
+        .withinContext(ctx)
+        .load();
+    OMRequest request = OMRequest.newBuilder()
+        .setVersion(ClientVersion.BUCKET_LAYOUT_SUPPORT.serialize())
+        .setCmdType(CreateKey)
+        .setClientId("TestClient")
+        .setCreateKeyRequest(CreateKeyRequest.newBuilder()
+            .setKeyArgs(KeyArgs.newBuilder().setVolumeName("vol").setBucketName("bucket").setKeyName("key")))
+        .build();
+
+    assertEquals(3, ClientVersion.CURRENT.serialize());
+    assertSame(request, validations.validateRequest(request));
+
+    OMException error = assertThrows(OMException.class,
+        () -> validations.validateRequest(request.toBuilder()
+            .setVersion(ClientVersion.ERASURE_CODING_SUPPORT.serialize()).build()));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION, error.getResult());
   }
 
   @Test
@@ -384,5 +419,3 @@ public class TestRequestValidations {
     }
   }
 }
-
-
