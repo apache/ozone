@@ -190,7 +190,7 @@ Two new fields: objectLockEnabled & defaultRetention.
   
   message RetentionDuration {
     required TimeUnit timeUnit = 1;
-    required uint64 amount = 2;
+    required uint64 duration = 2;
   }
   
   enum TimeUnit {
