@@ -138,9 +138,9 @@ public final class OmTestManagers {
         .getObjectStore().getClientProxy().getOzoneManagerClient();
     metadataManager = (OmMetadataManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(om, "metadataManager");
-    volumeManager = (VolumeManagerImpl)HddsWhiteboxTestUtils
+    volumeManager = (VolumeManager)HddsWhiteboxTestUtils
         .getInternalState(om, "volumeManager");
-    bucketManager = (BucketManagerImpl)HddsWhiteboxTestUtils
+    bucketManager = (BucketManager)HddsWhiteboxTestUtils
         .getInternalState(om, "bucketManager");
     prefixManager = (PrefixManagerImpl)HddsWhiteboxTestUtils
         .getInternalState(om, "prefixManager");

@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -138,7 +138,7 @@ public class TestOzoneManagerSnapshotAcl {
     objectStore = client.getObjectStore();
 
     ozoneManager = cluster.getOzoneManager();
-    final KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+    final KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
 
     // stop the deletion services so that keys can still be read

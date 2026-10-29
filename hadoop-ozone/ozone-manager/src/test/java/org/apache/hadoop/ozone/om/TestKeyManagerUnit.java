@@ -104,7 +104,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
   private OMMetadataManager metadataManager;
   private StorageContainerLocationInternalInterface containerClient;
-  private KeyManagerImpl keyManager;
+  private KeyManager keyManager;
 
   private Instant startDate;
   private ScmBlockLocationProtocol blockClient;
@@ -127,7 +127,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         = new OmTestManagers(configuration, blockClient, containerClient);
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
-    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
+    keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
   }
 
