@@ -432,7 +432,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    *              it applies only to a PutBlock committed in the middle of the stream without Raft
    * @param close whether putBlock is happening as part of closing the stream
    */
-  private void executePutBlock(boolean sync, boolean close) throws IOException {
+  public void executePutBlock(boolean sync, boolean close) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
     final List<StreamBuffer> byteBufferList;
