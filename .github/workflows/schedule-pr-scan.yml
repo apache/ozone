@@ -22,12 +22,16 @@ on:
   schedule:
     - cron: '*/30 * * * *'
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: { }
 
 jobs:
   label:
+    permissions:
+      contents: read
+      pull-requests: write
     uses: $/.github/workflows/label-pr.yml
   zdu-compat:
+    permissions:
+      contents: read
+      pull-requests: write
     uses: $/.github/workflows/zdu-compat-pr.yml
