@@ -30,9 +30,8 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-exclude=""
-for bucket in generated; do
-  execute_robot_test ${SCM} -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
-  # some tests are independent of the bucket type, only need to be run once
-  exclude="--exclude no-bucket-type"
-done
+# some S3 tests are independent of the bucket type, only need to be run once, in ozonesecure-ha/test-haproxy-s3g.sh
+exclude="--exclude no-bucket-type"
+bucket=generated
+layout=LEGACY
+execute_robot_test ${SCM} -v BUCKET:${bucket} -v BUCKET_LAYOUT:${layout} -N s3-${layout}-${bucket} ${exclude} s3
