@@ -97,9 +97,17 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath).build();
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckOpenKeyAcls(newKeyArgs,
-        ozoneManager, ACLType.WRITE,
-        multipartCommitUploadPartRequest.getClientID());
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckOpenKeyAcls(newKeyArgs, ozoneManager, ACLType.WRITE,
+          multipartCommitUploadPartRequest.getClientID());
+    } catch (IOException ex) {
+      Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
+      auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
+          OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY, auditMap, ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
     return getOmRequest().toBuilder().setCommitMultiPartUploadRequest(
         multipartCommitUploadPartRequest.toBuilder().setKeyArgs(
             resolvedArgs)).setUserInfo(getUserInfo()).build();
@@ -182,10 +190,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       // set the data size and location info list
       omKeyInfo.setDataSize(keyArgs.getDataSize());
-      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
-          keyArgs.getKeyLocationsList().stream()
+      List<OmKeyLocationInfo> locations = keyArgs.getKeyLocationsList().stream()
           .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()), true);
+          .collect(Collectors.toList());
+      // Blocks carry the part's IV, which is set by OM on the open key.
+      final byte[] partIv = omKeyInfo.getPartIv();
+      locations.forEach(location -> location.setPartIv(partIv));
+      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(locations, true);
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
 

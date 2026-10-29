@@ -21,13 +21,17 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.XceiverClientShortCircuit.vintPrefixed;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
@@ -51,6 +55,7 @@ import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -94,6 +99,8 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.MockedStatic;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests the XceiverServerDomainSocket class.
@@ -571,7 +578,7 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  public void testMaxXceiverCount() throws IOException, InterruptedException {
+  public void testMaxXceiverCount() throws Exception {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DatanodeConfiguration datanodeConfiguration = conf.getObject(DatanodeConfiguration.class);
     datanodeConfiguration.setNumReadThreadPerVolume(10);
@@ -599,7 +606,7 @@ public class TestXceiverServerDomainSocket {
       assertTrue(lastSock.isOpen());
 
       // write to first 10 sockets should be OK
-      for (int i = 0; i < count - 2; i++) {
+      for (int i = 0; i <= count - 2; i++) {
         DomainSocket sock = list.get(i);
         assertTrue(sock.isOpen());
         sock.getOutputStream().write(1);
@@ -623,8 +630,43 @@ public class TestXceiverServerDomainSocket {
       }
       lastSock.close();
       assertFalse(lastSock.isOpen());
+
+      // the rejected connection must not hold a slot once every accepted connection is closed
+      GenericTestUtils.waitFor(() -> Thread.getAllStackTraces().keySet().stream()
+          .noneMatch(t -> t.getName().contains(XceiverServerDomainSocket.class.getSimpleName() + "@")), 100, 10000);
+      assertThat(server.getXceiverCount()).isZero();
     } finally {
       factory.close();
+      server.stop();
+    }
+  }
+
+  /**
+   * A failed accept(), for example with no file descriptor left, is retried after a pause instead of at once.
+   */
+  @Test
+  public void testAcceptFailureIsRetriedAfterPause() throws Exception {
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, dir.getAbsolutePath());
+    AtomicInteger accepts = new AtomicInteger();
+    DomainSocket listener = mock(DomainSocket.class, RETURNS_DEEP_STUBS);
+    when(listener.accept()).thenAnswer(invocation -> {
+      accepts.incrementAndGet();
+      throw new SocketException("accept(2) error: Too many open files");
+    });
+    DomainSocketFactory factory = mock(DomainSocketFactory.class);
+    when(factory.isServiceEnabled()).thenReturn(true);
+    when(factory.isServiceReady()).thenReturn(true);
+    XceiverServerDomainSocket server;
+    try (MockedStatic<DomainSocket> domainSocket = mockStatic(DomainSocket.class)) {
+      domainSocket.when(() -> DomainSocket.bindAndListen(any())).thenReturn(listener);
+      server = new XceiverServerDomainSocket(randomDatanodeDetails(), conf, null, readExecutors, metrics, factory);
+    }
+    try {
+      server.start();
+      GenericTestUtils.waitFor(() -> accepts.get() > 0, 10, 5000);
+      Thread.sleep(500);
+      assertTrue(accepts.get() <= 2, "accept() was called " + accepts.get() + " times");
+    } finally {
       server.stop();
     }
   }
@@ -693,13 +735,124 @@ public class TestXceiverServerDomainSocket {
     }
   }
 
+  /**
+   * Echo and a failed GetBlock carry no block file. Their responses are sent without an error on the datanode.
+   */
+  @Test
+  public void testResponseWithoutBlockFile() throws IOException {
+    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+        conf, null, readExecutors, metrics, factory);
+    // Receiver is package-private, so its logger is looked up by name
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+        LoggerFactory.getLogger(XceiverServerDomainSocket.class.getPackage().getName() + ".Receiver"));
+    DomainSocket sock = null;
+    try {
+      server.setContainerDispatcher(createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics));
+      server.start();
+      sock = factory.createSocket(readTimeout, writeTimeout, localhost);
+      DataOutputStream outputStream = new DataOutputStream(sock.getOutputStream());
+      DataInputStream inputStream = new DataInputStream(sock.getInputStream());
+
+      sendRequest(outputStream, getEchoRequest());
+      assertEquals(ContainerProtos.Result.SUCCESS, receiveResponse(inputStream).getResult());
+      sendRequest(outputStream, getBlockRequest(2, true));
+      assertEquals(ContainerProtos.Result.NO_SUCH_BLOCK, receiveResponse(inputStream).getResult());
+
+      // the single read thread handles requests in order, so the ones above are done once this one is answered
+      sendRequest(outputStream, getBlockRequest(1, true));
+      assertTrue(receiveResponse(inputStream).getGetBlock().getShortCircuitAccessGranted());
+      receiveBlockFile(sock);
+      assertFalse(logCapturer.getOutput().contains("Failed to processRequest"), logCapturer.getOutput());
+    } finally {
+      logCapturer.stopCapturing();
+      factory.close();
+      IOUtils.closeQuietly(sock);
+      server.stop();
+    }
+  }
+
+  /**
+   * A GetBlock without the short-circuit flag gets a SUCCESS response that grants no access and carries no file.
+   */
+  @Test
+  public void testGetBlockWithoutShortCircuitAccess() throws IOException {
+    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+        conf, null, readExecutors, metrics, factory);
+    DomainSocket sock = null;
+    try {
+      server.setContainerDispatcher(createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics));
+      server.start();
+      sock = factory.createSocket(readTimeout, writeTimeout, localhost);
+      DataOutputStream outputStream = new DataOutputStream(sock.getOutputStream());
+      DataInputStream inputStream = new DataInputStream(sock.getInputStream());
+
+      sendRequest(outputStream, getBlockRequest(1, false));
+      ContainerProtos.ContainerCommandResponseProto responseProto = receiveResponse(inputStream);
+      assertEquals(ContainerProtos.Result.SUCCESS, responseProto.getResult());
+      assertTrue(responseProto.getGetBlock().hasBlockData());
+      assertFalse(responseProto.getGetBlock().getShortCircuitAccessGranted());
+
+      // no file descriptor was sent above, so the next response on the same connection is read in sync
+      sendRequest(outputStream, getBlockRequest(1, true));
+      assertTrue(receiveResponse(inputStream).getGetBlock().getShortCircuitAccessGranted());
+      receiveBlockFile(sock);
+    } finally {
+      factory.close();
+      IOUtils.closeQuietly(sock);
+      server.stop();
+    }
+  }
+
+  private static void sendRequest(DataOutputStream outputStream, ContainerProtos.ContainerCommandRequestProto request)
+      throws IOException {
+    outputStream.writeShort(OzoneClientConfig.DATA_TRANSFER_VERSION);
+    outputStream.writeShort(request.getCmdType().getNumber());
+    request.writeDelimitedTo(outputStream);
+    outputStream.flush();
+  }
+
+  private static ContainerProtos.ContainerCommandResponseProto receiveResponse(DataInputStream inputStream)
+      throws IOException {
+    assertEquals(OzoneClientConfig.DATA_TRANSFER_VERSION, inputStream.readShort());
+    short type = inputStream.readShort();
+    ContainerProtos.ContainerCommandResponseProto responseProto =
+        ContainerProtos.ContainerCommandResponseProto.parseFrom(vintPrefixed(inputStream));
+    assertEquals(responseProto.getCmdType().getNumber(), type);
+    return responseProto;
+  }
+
+  private static void receiveBlockFile(DomainSocket sock) throws IOException {
+    FileInputStream[] fis = new FileInputStream[1];
+    byte[] buf = new byte[1];
+    sock.recvFileInputStreams(fis, buf, 0, buf.length);
+    assertNotNull(fis[0]);
+    fis[0].close();
+  }
+
+  private ContainerProtos.ContainerCommandRequestProto getEchoRequest() {
+    return ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.Echo)
+        .setContainerID(1)
+        .setEcho(ContainerProtos.EchoRequestProto.newBuilder())
+        .setDatanodeUuid(UUID.randomUUID().toString())
+        .build();
+  }
+
   private ContainerProtos.ContainerCommandRequestProto getBlockRequest() {
+    return getBlockRequest(1, true);
+  }
+
+  private ContainerProtos.ContainerCommandRequestProto getBlockRequest(long localID, boolean shortCircuit) {
     long value = 1;
     String datanodeUUID = UUID.randomUUID().toString();
     ContainerProtos.GetBlockRequestProto.Builder getBlock =
         ContainerProtos.GetBlockRequestProto.newBuilder()
-            .setBlockID(new BlockID(value, value).getDatanodeBlockIDProtobuf())
-            .setRequestShortCircuitAccess(true);
+            .setBlockID(new BlockID(value, localID).getDatanodeBlockIDProtobuf())
+            .setRequestShortCircuitAccess(shortCircuit);
     return ContainerProtos.ContainerCommandRequestProto.newBuilder()
         .setCmdType(GetBlock)
         .setContainerID(value)
