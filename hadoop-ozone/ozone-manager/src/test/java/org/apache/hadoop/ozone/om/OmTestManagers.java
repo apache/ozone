@@ -105,6 +105,7 @@ public final class OmTestManagers {
         new ScmBlockLocationTestingClient(null, null, 0);
 
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
+    conf.setIfUnset(OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED, "false");
     DefaultMetricsSystem.setMiniClusterMode(true);
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId("omtest");

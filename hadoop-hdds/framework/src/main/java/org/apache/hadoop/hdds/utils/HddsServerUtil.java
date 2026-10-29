@@ -416,13 +416,22 @@ public final class HddsServerUtil {
   /**
    * Heartbeat Interval - Defines the heartbeat frequency from a datanode to
    * Recon.
+   * The datanode heartbeats Recon together with SCM, so the interval is at least the SCM heartbeat interval.
+   * It is at most a third of the stale node interval, so that Recon does not flag the datanode as stale.
    *
    * @param conf - Ozone Config
    * @return - HB interval in milli seconds.
    */
   public static long getReconHeartbeatInterval(ConfigurationSource conf) {
-    return conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
+    long interval = conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
         HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+    final long max = getStaleNodeInterval(conf) / 3;
+    if (interval > max) {
+      LOG.warn("{} = {}ms is larger than a third of {}, using {}ms instead.",
+          HDDS_RECON_HEARTBEAT_INTERVAL, interval, OZONE_SCM_STALENODE_INTERVAL, max);
+      interval = max;
+    }
+    return Math.max(interval, getScmHeartbeatInterval(conf));
   }
 
   /**
