@@ -135,7 +135,7 @@ public class HeartbeatEndpointTask
     try {
       boolean fcrReadyAfterLeaseGrant = sendHeartbeat();
       if (fcrReadyAfterLeaseGrant) {
-        // Send one follow-up; further work waits for the next scheduled heartbeat.
+        // If an FCR lease is granted, we should send the FCR immediately
         sendHeartbeat();
       }
     } finally {
