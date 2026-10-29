@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,8 +45,7 @@ public final class OzoneConfigUtil {
     ReplicationConfig replicationConfig = null;
     if (clientType != HddsProtos.ReplicationType.NONE) {
       // Client passed the replication config, so let's use it.
-      replicationConfig = ReplicationConfig
-          .fromProto(clientType, clientFactor, clientECReplicationConfig);
+      replicationConfig = toReplicationConfig(clientType, clientFactor, clientECReplicationConfig);
 
       ozoneManager.validateReplicationConfig(replicationConfig);
     } else if (bucketDefaultReplicationConfig != null) {
@@ -55,6 +56,32 @@ public final class OzoneConfigUtil {
       replicationConfig = ozoneManager.getDefaultReplicationConfig();
     }
     return replicationConfig;
+  }
+
+  /**
+   * Converts the replication config sent by the client.
+   * @throws OMException with INVALID_REQUEST if it is not valid
+   */
+  public static ReplicationConfig toReplicationConfig(HddsProtos.ReplicationType type,
+      HddsProtos.ReplicationFactor factor, HddsProtos.ECReplicationConfig ecConfig) throws OMException {
+    try {
+      return ReplicationConfig.fromProto(type, factor, ecConfig);
+    } catch (IllegalArgumentException | UnsupportedOperationException e) {
+      throw new OMException("Invalid replication config: " + e.getMessage(), INVALID_REQUEST);
+    }
+  }
+
+  /**
+   * Converts the default replication config of a bucket sent by the client.
+   * @throws OMException with INVALID_REQUEST if it is not valid
+   */
+  public static DefaultReplicationConfig toDefaultReplicationConfig(HddsProtos.DefaultReplicationConfig proto)
+      throws OMException {
+    try {
+      return DefaultReplicationConfig.fromProto(proto);
+    } catch (IllegalArgumentException | UnsupportedOperationException e) {
+      throw new OMException("Invalid replication config: " + e.getMessage(), INVALID_REQUEST);
+    }
   }
 
   /**

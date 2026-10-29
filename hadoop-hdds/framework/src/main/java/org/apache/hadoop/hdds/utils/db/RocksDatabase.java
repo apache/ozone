@@ -39,6 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.StringUtils;
@@ -76,6 +77,8 @@ import org.slf4j.LoggerFactory;
  */
 public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
+
+  private static final Pattern VANISHED_WAL_FILE = Pattern.compile("/\\d+\\.log: No such file or directory");
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
@@ -780,10 +783,48 @@ public final class RocksDatabase implements Closeable {
   public ManagedTransactionLogIterator getUpdatesSince(long sequenceNumber)
       throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
-      return managed(db.get().getUpdatesSince(sequenceNumber));
+      return getUpdatesSinceRetryingWalRace(sequenceNumber);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      if (!isVanishedWalFile(e)) {
+        closeOnError(e);
+      }
       throw toRocksDatabaseException(this, "getUpdatesSince " + sequenceNumber, e);
+    }
+  }
+
+  private ManagedTransactionLogIterator getUpdatesSinceRetryingWalRace(long sequenceNumber)
+      throws RocksDBException {
+    try {
+      return getUpdatesSinceFromRocksDB(sequenceNumber);
+    } catch (RocksDBException e) {
+      if (!isVanishedWalFile(e)) {
+        throw e;
+      }
+      LOG.warn("getUpdatesSince {} raced with WAL archive/purge, retrying once", sequenceNumber, e);
+      return getUpdatesSinceFromRocksDB(sequenceNumber);
+    }
+  }
+
+  @VisibleForTesting
+  ManagedTransactionLogIterator getUpdatesSinceFromRocksDB(long sequenceNumber) throws RocksDBException {
+    return managed(db.get().getUpdatesSince(sequenceNumber));
+  }
+
+  /**
+   * A WAL file was archived or purged while RocksDB was listing or opening it; this does not affect recovery.
+   * The message is matched because rocksdbjni's Status.SubCode has no PathNotFound.
+   */
+  @VisibleForTesting
+  static boolean isVanishedWalFile(RocksDBException e) {
+    if (e.getStatus() == null) {
+      return false;
+    }
+    switch (e.getStatus().getCode()) {
+    case IOError:
+      final String state = e.getStatus().getState();
+      return state != null && VANISHED_WAL_FILE.matcher(state).find();
+    default:
+      return false;
     }
   }
 
