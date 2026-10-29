@@ -139,6 +139,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVol
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
@@ -1325,6 +1326,60 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           .build();
     }
     return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupKey
+  )
+  public static OMResponse disallowLookupKeyWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasLookupKeyResponse() || !hasMultipartPartIv(resp.getLookupKeyResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getLookupKeyResponse().getKeyInfo(), resp.toBuilder().clearLookupKeyResponse());
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.GetKeyInfo
+  )
+  public static OMResponse disallowGetKeyInfoWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasGetKeyInfoResponse() || !hasMultipartPartIv(resp.getGetKeyInfoResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getGetKeyInfoResponse().getKeyInfo(),
+        resp.toBuilder().clearGetKeyInfoResponse());
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupFile
+  )
+  public static OMResponse disallowLookupFileWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasLookupFileResponse() || !hasMultipartPartIv(resp.getLookupFileResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getLookupFileResponse().getKeyInfo(),
+        resp.toBuilder().clearLookupFileResponse());
+  }
+
+  private static boolean hasMultipartPartIv(KeyInfo keyInfo) {
+    return keyInfo.getKeyLocationListList().stream()
+        .anyMatch(list -> list.getKeyLocationsList().stream().anyMatch(KeyLocation::hasPartIv));
+  }
+
+  private static OMResponse disallowMultipartPartIv(KeyInfo keyInfo, OMResponse.Builder resp) {
+    return resp.setStatus(Status.NOT_SUPPORTED_OPERATION)
+        .setMessage("Key " + keyInfo.getVolumeName() + "/" + keyInfo.getBucketName() + "/" + keyInfo.getKeyName()
+            + " is a multipart key whose parts have their own encryption IV, which the client can not read."
+            + " Please upgrade the client before trying to read the key.")
+        .build();
   }
 
   private ListStatusResponse listStatus(
