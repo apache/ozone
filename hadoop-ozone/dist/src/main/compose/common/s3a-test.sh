@@ -22,7 +22,7 @@
 # Otherwise it will try to download Hadoop ${HADOOP_VERSION}, defaults to ${hadoop.version}.
 
 if [[ -z "${HADOOP_AWS_DIR:-}" ]]; then
-  export HADOOP_AWS_DIR="${TEMP_DIR:-/tmp}"
+  export HADOOP_AWS_DIR="${TEMP_DIR:-"/tmp/hadoop-aws-${HADOOP_VERSION}"}"
 fi
 
 # shellcheck source=/dev/null
