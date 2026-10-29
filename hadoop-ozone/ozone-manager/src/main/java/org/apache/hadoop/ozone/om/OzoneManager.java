@@ -1959,13 +1959,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     checkAdminUserPrivilege("get bucket deleted bytes.");
     BucketDeletedDataCalculator.BucketDeletedBytesStats stats =
         calculateDeletedBytesForBucket(bucketPath);
-    return new BucketDeletedBytes(
-        stats.getSnapshotTrappedBytes(),
-        stats.getPurgeableBytes(),
-        stats.getSnapshotTrappedKeys(),
-        stats.getPurgeableKeys(),
-        stats.getSnapshotTrappedDirs(),
-        stats.getPurgeableDirs());
+    return BucketDeletedBytes.newBuilder()
+        .setSnapshotTrappedBytes(stats.getSnapshotTrappedBytes())
+        .setPurgeableBytes(stats.getPurgeableBytes())
+        .setSnapshotTrappedKeys(stats.getSnapshotTrappedKeys())
+        .setPurgeableKeys(stats.getPurgeableKeys())
+        .setSnapshotTrappedDirs(stats.getSnapshotTrappedDirs())
+        .setPurgeableDirs(stats.getPurgeableDirs())
+        .setPurgeableKeyBytes(stats.getPurgeableKeyBytes())
+        .setPurgeableDirBytes(stats.getPurgeableDirBytes())
+        .build();
   }
 
   /**

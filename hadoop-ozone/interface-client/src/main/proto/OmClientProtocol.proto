@@ -1855,6 +1855,8 @@ message GetBucketDeletedBytesResponse {
   optional uint64 purgeableKeys = 4;
   optional uint64 snapshotTrappedDirs = 5;
   optional uint64 purgeableDirs = 6;
+  optional uint64 purgeableKeyBytes = 7;
+  optional uint64 purgeableDirBytes = 8;
 }
 
 message ServicePort {
