@@ -165,5 +165,10 @@ public class TestSCMInstallSnapshot {
     assertEquals(100,
         scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo()
             .getTermIndex().getIndex());
+
+    // The SCM must serve checkpoints of the installed DB, not of the closed one.
+    DBCheckpoint served = scm.getScmHAManager().getSCMSnapshotProvider().getSCMDBSnapshot("scm1");
+    assertEquals(100, HAUtils.getTrxnInfoFromCheckpoint(conf, served.getCheckpointLocation(), SCMDBDefinition.get())
+        .getTransactionIndex());
   }
 }

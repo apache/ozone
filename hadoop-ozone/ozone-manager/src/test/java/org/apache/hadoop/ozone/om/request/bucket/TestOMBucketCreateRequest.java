@@ -127,6 +127,26 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
   }
 
   @Test
+  public void testNewBucketIgnoresUsageCountersFromRequest() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(newBucketInfoBuilder(bucketName, volumeName)
+        .setUsedBytes(1000L)
+        .setUsedNamespace(10L)
+        .setSnapshotUsedBytes(100L)
+        .setSnapshotUsedNamespace(1L));
+    doValidateAndUpdateCache(volumeName, bucketName, omBucketCreateRequest.getOmRequest());
+
+    OmBucketInfo bucketInfo =
+        omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertEquals(0, bucketInfo.getUsedBytes());
+    assertEquals(0, bucketInfo.getUsedNamespace());
+    assertEquals(0, bucketInfo.getSnapshotUsedBytes());
+    assertEquals(0, bucketInfo.getSnapshotUsedNamespace());
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithNoVolume() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

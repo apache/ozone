@@ -727,6 +727,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setForceUpdateContainerCacheFromSCM(
             keyArgs.getForceUpdateContainerCacheFromSCM())
         .setMultipartUploadPartNumber(keyArgs.getMultipartNumber())
+        .setRequireFileSystemLayout(request.getRequireFileSystemLayout())
         .build();
     KeyInfoWithVolumeContext keyInfo = impl.getKeyInfo(omKeyArgs,
         request.getAssumeS3Context());
@@ -1028,6 +1029,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setPurgeableKeys(bytes.getPurgeableKeys())
         .setSnapshotTrappedDirs(bytes.getSnapshotTrappedDirs())
         .setPurgeableDirs(bytes.getPurgeableDirs())
+        .setPurgeableKeyBytes(bytes.getPurgeableKeyBytes())
+        .setPurgeableDirBytes(bytes.getPurgeableDirBytes())
         .build();
   }
 
