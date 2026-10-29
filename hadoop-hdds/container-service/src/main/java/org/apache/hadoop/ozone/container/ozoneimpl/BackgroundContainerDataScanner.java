@@ -77,11 +77,11 @@ public class BackgroundContainerDataScanner extends
   }
 
   @Override
-  public synchronized void shutdown() {
+  public void shutdown() {
     shutdown("");
   }
 
-  private synchronized void shutdown(String reason) {
+  private void shutdown(String reason) {
     String shutdownMessage = String.format(NAME_FORMAT, volume) + " is " +
         "shutting down. " + reason;
     LOG.info(shutdownMessage);
