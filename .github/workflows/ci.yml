@@ -41,9 +41,8 @@ env:
   # BUILD_ARGS and TEST_JAVA_VERSION are duplicated in populate-cache.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   TEST_JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
-  # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml and populate-cache.yml, please keep in sync
-  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
-  # Maven 3.9 downloads dependencies via maven-resolver-transport-http, which reads aether.* and ignores both maven.wagon.* and JDK-level http.*
+  # MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 
@@ -59,6 +58,7 @@ jobs:
       acceptance-versions: ${{ steps.acceptance-suites.outputs.versions }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
+      junit-modules: ${{ steps.junit-modules.outputs.modules }}
       kubernetes-suites: ${{ steps.kubernetes-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
@@ -119,6 +119,9 @@ jobs:
       - name: Integration suites
         id: integration-suites
         run: dev-support/ci/integration_suites.sh
+      - name: Modules with Java tests
+        id: junit-modules
+        run: dev-support/ci/junit_modules.sh
       - name: Kubernetes suites
         id: kubernetes-suites
         run: dev-support/ci/kubernetes_suites.sh
@@ -324,14 +327,15 @@ jobs:
       script-args: ${{ matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.suite }}
-      timeout-minutes: 150
+      timeout-minutes: 60
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
         exclude:
-          - suite: compat-old
+          - suite: xcompat/test-old.sh
       fail-fast: false
+      max-parallel: 10
 
   # acceptance (compat-old), split by old Ozone version
   compat-old:
@@ -350,7 +354,7 @@ jobs:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: acceptance
-      script-args: compat-old ${{ matrix.version }}
+      script-args: xcompat/test-old.sh ${{ matrix.version }}
       sha: ${{ needs.build-info.outputs.sha }}
       split: compat-old-${{ matrix.version }}
       timeout-minutes: 30
@@ -359,6 +363,7 @@ jobs:
       matrix:
         version: ${{ fromJson(needs.build-info.outputs.acceptance-versions) }}
       fail-fast: false
+      max-parallel: 3
 
   kubernetes:
     needs:
@@ -384,7 +389,9 @@ jobs:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.kubernetes-suites) }}
       fail-fast: false
+      max-parallel: 3
 
+  # runs only ozone-integration-test, split by profiles
   integration:
     needs:
       - build-info
@@ -398,7 +405,7 @@ jobs:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: ${{ matrix.profile == 'filesystem' }}
+      needs-ozone-repo: true
       pre-script: sudo hostname localhost
       ratis-args: ${{ inputs.ratis_args }}
       script: integration
@@ -411,6 +418,36 @@ jobs:
       matrix:
         profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
       fail-fast: false
+
+  # same as integration, but runs tests in specific modules instead of profiles
+  junit:
+    needs:
+      - build-info
+      - build
+      - basic
+      - dependency
+      - license
+    if: needs.build-info.outputs.needs-integration-tests == 'true'
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      display-name: junit
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      pre-script: sudo hostname localhost
+      ratis-args: ${{ inputs.ratis_args }}
+      script: integration
+      script-args: -pl :${{ matrix.module }} -Pmodule-test -Phadoop-native-lib -Drocks_tools_native
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: ${{ matrix.module }}
+      timeout-minutes: 60
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    strategy:
+      matrix:
+        module: ${{ fromJson(needs.build-info.outputs.junit-modules) }}
+      fail-fast: false
+      max-parallel: 10
 
   # same as integration, but runs specific tests instead of profiles
   specific-tests:
@@ -446,6 +483,7 @@ jobs:
       - acceptance
       - compat-old
       - integration
+      - junit
     steps:
       - name: Checkout project
         uses: actions/checkout@v7

@@ -17,14 +17,20 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -38,6 +44,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -47,8 +54,10 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -66,6 +75,7 @@ import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Base test class for S3 Multipart upload request.
@@ -79,6 +89,7 @@ public class S3MultipartRequestTests {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
+  protected OmMetadataReader omMetadataReader;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -96,7 +107,7 @@ public class S3MultipartRequestTests {
         mock(UncheckedAutoCloseableSupplier.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     // Init OmMetadataReader to let the test pass
-    OmMetadataReader omMetadataReader = mock(OmMetadataReader.class);
+    omMetadataReader = mock(OmMetadataReader.class);
     when(omMetadataReader.isNativeAuthorizerEnabled()).thenReturn(true);
     when(rcOmMetadataReader.get()).thenReturn(omMetadataReader);
     when(ozoneManager.getAccessAuthorizer())
@@ -322,6 +333,31 @@ public class S3MultipartRequestTests {
 
     return modifiedRequest;
 
+  }
+
+  /**
+   * Deny the ACL check in preExecute of the given request and verify that the rejection is audited.
+   * @return the audit message of the rejection
+   */
+  protected AuditMessage assertPreExecuteAclDenialIsAudited(OMClientRequest request, OMAction action)
+      throws IOException {
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    when(omMetadataReader.checkAcls(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any()))
+        .thenThrow(new OMException("denied", PERMISSION_DENIED));
+    request.setUGI(UserGroupInformation.getCurrentUser());
+
+    OMException e = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+    assertEquals(PERMISSION_DENIED, e.getResult());
+
+    // OMExecutionFlow writes the audit builder of a request whose preExecute failed.
+    OMAuditLogger.log(request.getAuditBuilder());
+    ArgumentCaptor<AuditMessage> captor = ArgumentCaptor.forClass(AuditMessage.class);
+    verify(auditLogger).logWrite(captor.capture());
+    AuditMessage message = captor.getValue();
+    assertEquals(action.getAction(), message.getOp());
+    assertThat(message.getFormattedMessage()).contains("ret=FAILURE");
+    assertSame(e, message.getThrowable());
+    return message;
   }
 
   /**

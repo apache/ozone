@@ -773,8 +773,7 @@ public class KeyManagerImpl implements KeyManager {
           for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
             ContainerWithPipeline cp = containerWithPipelineMap.get(
                 omKeyLocationInfo.getContainerID());
-            if (cp != null &&
-                !cp.getPipeline().equals(omKeyLocationInfo.getPipeline())) {
+            if (cp != null && cp.getPipeline() != null) {
               omKeyLocationInfo.setPipeline(cp.getPipeline());
             }
           }
@@ -2572,8 +2571,7 @@ public class KeyManagerImpl implements KeyManager {
         for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
           Pipeline pipeline = containerLocations.get(
               omKeyLocationInfo.getContainerID());
-          if (pipeline != null &&
-              !pipeline.equals(omKeyLocationInfo.getPipeline())) {
+          if (pipeline != null) {
             omKeyLocationInfo.setPipeline(pipeline);
           }
         }

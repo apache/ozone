@@ -22,6 +22,11 @@ x-debug-tools-config:
   env_file:
     - ./docker-config
 
+# test-repair-tools.sh crashes OMs, whose shutdown hook then blocks until this timeout
+x-om-shutdown-timeout:
+  &om-shutdown-timeout
+  OZONE-SITE.XML_ozone.service.shutdown.timeout: 20s
+
 x-volumes:
   - &keytabs ../_keytabs:/etc/security/keytabs
   - &krb5conf ./krb5.conf:/etc/krb5.conf
@@ -104,6 +109,8 @@ services:
       - *ozone-dir
   om1:
     <<: *common-env-file
+    environment:
+      <<: *om-shutdown-timeout
     volumes:
       - ${OZONE_VOLUME}/om1:/data
       - *keytabs
@@ -111,6 +118,8 @@ services:
       - *ozone-dir
   om2:
     <<: *common-env-file
+    environment:
+      <<: *om-shutdown-timeout
     volumes:
       - ${OZONE_VOLUME}/om2:/data
       - *keytabs
@@ -118,6 +127,8 @@ services:
       - *ozone-dir
   om3:
     <<: *common-env-file
+    environment:
+      <<: *om-shutdown-timeout
     volumes:
       - ${OZONE_VOLUME}/om3:/data
       - *keytabs

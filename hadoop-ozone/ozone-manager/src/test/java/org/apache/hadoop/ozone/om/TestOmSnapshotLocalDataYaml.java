@@ -232,6 +232,31 @@ public class TestOmSnapshotLocalDataYaml {
   }
 
   @Test
+  public void testLoadWithoutSstFiles() throws IOException {
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot7", TransactionInfo.valueOf(1, 2)).getLeft();
+    OmSnapshotLocalData fullData = omSnapshotLocalDataSerializer.load(yamlFile);
+    OmSnapshotLocalData metaData = OmSnapshotLocalDataYaml.loadWithoutSstFiles(yamlFile);
+
+    assertEquals(fullData.getSnapshotId(), metaData.getSnapshotId());
+    assertEquals(fullData.getPreviousSnapshotId(), metaData.getPreviousSnapshotId());
+    assertEquals(fullData.getVersion(), metaData.getVersion());
+    assertThat(metaData.getVersionSstFileInfos()).hasSameSizeAs(fullData.getVersionSstFileInfos());
+    fullData.getVersionSstFileInfos().forEach((version, versionMeta) -> {
+      assertThat(versionMeta.getSstFiles()).isNotEmpty();
+      assertThat(metaData.getVersionSstFileInfos()).containsKey(version);
+      VersionMeta metaOnly = metaData.getVersionSstFileInfos().get(version);
+      assertEquals(versionMeta.getPreviousSnapshotVersion(), metaOnly.getPreviousSnapshotVersion());
+      assertThat(metaOnly.getSstFiles()).isEmpty();
+    });
+
+    File noSnapshotId = new File(testRoot, "noSnapshotId.yaml");
+    FileUtils.writeStringToFile(noSnapshotId, FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8)
+        .replaceFirst("(?m)^" + OzoneConsts.OM_SLD_SNAP_ID + ": .*\\n", ""), StandardCharsets.UTF_8);
+    IOException ex = assertThrows(IOException.class, () -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(noSnapshotId));
+    assertThat(ex).hasMessageContaining("Missing " + OzoneConsts.OM_SLD_SNAP_ID);
+  }
+
+  @Test
   public void testEmptyFile() throws IOException {
     File emptyFile = new File(testRoot, "empty.yaml");
     assertTrue(emptyFile.createNewFile());
@@ -239,6 +264,7 @@ public class TestOmSnapshotLocalDataYaml {
     IOException ex = assertThrows(IOException.class, () -> omSnapshotLocalDataSerializer.load(emptyFile));
 
     assertThat(ex).hasMessageContaining("Failed to load file. File is empty.");
+    assertThrows(IOException.class, () -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(emptyFile));
   }
 
   @Test
