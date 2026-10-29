@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -88,6 +89,15 @@ public class TestS3MultipartUploadCommitPartRequest
     OMException e = assertThrows(OMException.class,
         () -> getS3MultipartUploadCommitReq(omRequest).preExecute(ozoneManager));
     assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedIsAudited() throws Exception {
+    OMRequest omRequest = OMRequestTestUtils.createCommitPartMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), getKeyName(), Time.now(), 0, UUID.randomUUID().toString(), 1,
+        Collections.emptyList());
+    assertPreExecuteAclDenialIsAudited(getS3MultipartUploadCommitReq(omRequest),
+        OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY);
   }
 
   @Test
