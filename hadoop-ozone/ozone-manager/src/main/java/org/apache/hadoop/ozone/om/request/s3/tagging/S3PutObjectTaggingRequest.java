@@ -77,18 +77,16 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
         keyArgs.toBuilder()
             .setKeyName(keyPath);
 
-    KeyArgs requestedArgs = newKeyArgs.build();
-    KeyArgs resolvedArgs = null;
-    try {
-      resolvedArgs = resolveBucketLink(ozoneManager, requestedArgs);
-      checkKeyAcls(ozoneManager, resolvedArgs.getVolumeName(), resolvedArgs.getBucketName(),
-          requestedArgs.getKeyName(), ACLType.WRITE, OzoneObj.ResourceType.KEY);
-    } catch (IOException ex) {
-      // Like the success entry, audit the resolved bucket unless the bucket could not be resolved.
-      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.PUT_OBJECT_TAGGING,
-          buildKeyArgsAuditMap(resolvedArgs != null ? resolvedArgs : requestedArgs), ex,
-          getOmRequest().getUserInfo()));
-      throw ex;
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, newKeyArgs.build());
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY, OzoneObj.StoreType.OZONE, ACLType.WRITE,
+            resolvedArgs.getVolumeName(), resolvedArgs.getBucketName(), keyPath);
+      } catch (IOException ex) {
+        markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.PUT_OBJECT_TAGGING,
+            buildKeyArgsAuditMap(resolvedArgs), ex, getOmRequest().getUserInfo()));
+        throw ex;
+      }
     }
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
