@@ -44,6 +44,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,6 +54,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -935,6 +941,78 @@ class TestNetworkTopologyImpl {
       assertThat(nodeList).containsAll(ret);
       reset(mockedShuffleOperation);
       length--;
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("topologies")
+  void testSortByDistanceCostDoesNotTakeLockPerNode(NodeSchema[] schemas, Node[] nodeArray) {
+    initNetworkTopology(schemas, nodeArray);
+    NetworkTopology spyCluster = spy(cluster);
+    List<Node> nodeList = Arrays.asList(dataNodes);
+
+    List<? extends Node> ret = spyCluster.sortByDistanceCost(dataNodes[0], nodeList, nodeList.size());
+
+    assertEquals(dataNodes[0], ret.get(0));
+    verify(spyCluster, never()).getDistanceCost(any(), any());
+  }
+
+  @Test
+  void testDistanceCostIsMaxWhenNodeIsRemovedDuringWalk() {
+    initNetworkTopology(new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA},
+        new Node[] {createDatanode("1.1.1.1", "/r1"), createDatanode("2.2.2.2", "/r1")});
+    // Passes the ancestor check, then loses its parent, as if removed concurrently.
+    Node removed = mock(Node.class);
+    when(removed.getLevel()).thenReturn(dataNodes[1].getLevel());
+    when(removed.getAncestor(dataNodes[1].getLevel() - 1)).thenReturn(cluster.getNode(ROOT));
+    when(removed.getNetworkFullPath()).thenReturn(dataNodes[1].getNetworkFullPath());
+
+    assertEquals(2, cluster.getDistanceCost(dataNodes[0], dataNodes[1]));
+    assertEquals(Integer.MAX_VALUE, cluster.getDistanceCost(dataNodes[0], removed));
+  }
+
+  @ParameterizedTest
+  @MethodSource("topologies")
+  void testSortByDistanceCostWhileTopologyChanges(NodeSchema[] schemas, Node[] nodeArray) throws Exception {
+    initNetworkTopology(schemas, nodeArray);
+    List<Node> allNodes = Arrays.asList(dataNodes);
+    List<Node> stableNodes = new ArrayList<>();
+    List<Node> changingNodes = new ArrayList<>();
+    for (int i = 0; i < dataNodes.length; i++) {
+      (i % 2 == 0 ? stableNodes : changingNodes).add(dataNodes[i]);
+    }
+    Node reader = stableNodes.get(0);
+    AtomicBoolean done = new AtomicBoolean();
+    ExecutorService executor = Executors.newFixedThreadPool(5);
+    try {
+      Future<?> writer = executor.submit(() -> {
+        while (!done.get()) {
+          changingNodes.forEach(cluster::remove);
+          changingNodes.forEach(cluster::add);
+        }
+      });
+      List<Future<?>> sorters = new ArrayList<>();
+      for (int t = 0; t < 4; t++) {
+        sorters.add(executor.submit(() -> {
+          for (int i = 0; i < 2000; i++) {
+            assertThat(cluster.sortByDistanceCost(reader, allNodes, allNodes.size()))
+                .containsExactlyInAnyOrderElementsOf(allNodes);
+            List<? extends Node> sorted = cluster.sortByDistanceCost(reader, stableNodes, stableNodes.size());
+            for (int j = 0; j + 1 < sorted.size(); j++) {
+              assertThat(cluster.getDistanceCost(reader, sorted.get(j)))
+                  .isLessThanOrEqualTo(cluster.getDistanceCost(reader, sorted.get(j + 1)));
+            }
+          }
+        }));
+      }
+      for (Future<?> sorter : sorters) {
+        sorter.get(1, TimeUnit.MINUTES);
+      }
+      done.set(true);
+      writer.get(1, TimeUnit.MINUTES);
+    } finally {
+      done.set(true);
+      executor.shutdownNow();
     }
   }
 

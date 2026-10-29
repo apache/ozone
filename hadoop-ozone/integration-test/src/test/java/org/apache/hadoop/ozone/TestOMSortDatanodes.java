@@ -19,9 +19,15 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 
@@ -36,6 +42,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -45,6 +55,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -79,6 +90,8 @@ public class TestOMSortDatanodes {
     config.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class.getName());
     config.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
+    // Also the expiry of OM's resolved client nodes.
+    config.set(OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION, "2s");
     List<DatanodeDetails> datanodes = new ArrayList<>(NODE_COUNT);
     List<String> nodeMapping = new ArrayList<>(NODE_COUNT);
     for (int i = 0; i < NODE_COUNT; i++) {
@@ -227,6 +240,46 @@ public class TestOMSortDatanodes {
         keyManager.sortDatanodesForWrite(nodes, unresolved, om.getClusterMap());
     assertEquals(original, result,
         "Write pipeline order must be preserved when client is unresolved");
+  }
+
+  @Test
+  public void cachesResolvedClientPerClusterMap() {
+    NetworkTopology clusterMap = om.getClusterMap();
+    Node client = keyManager.getOtherNode("edge0", clusterMap);
+    assertNotNull(client);
+    assertEquals("/rack0", client.getNetworkLocation());
+    assertSame(client, keyManager.getOtherNode("edge0", clusterMap));
+
+    Node refreshedClient = keyManager.getOtherNode("edge0", newClusterMapInstance(clusterMap));
+    assertNotSame(client, refreshedClient);
+    assertEquals(client.getNetworkFullPath(), refreshedClient.getNetworkFullPath());
+  }
+
+  @Test
+  public void cachesClientOnRackWithoutDatanodes() {
+    NetworkTopology clusterMap = om.getClusterMap();
+    String client = "edge-on-rack-without-datanodes";
+    StaticMapping.addNodeToRack(client, "/rack-without-datanodes");
+    assertNull(keyManager.getOtherNode(client, clusterMap));
+
+    StaticMapping.addNodeToRack(client, "/rack0");
+    assertNull(keyManager.getOtherNode(client, clusterMap));
+    assertEquals("/rack0", keyManager.getOtherNode(client, newClusterMapInstance(clusterMap)).getNetworkLocation());
+  }
+
+  @Test
+  public void cachedClientExpiresAfterTopologyRefreshInterval() throws Exception {
+    NetworkTopology clusterMap = om.getClusterMap();
+    Node client = keyManager.getOtherNode("edge1", clusterMap);
+    assertNotNull(client);
+
+    GenericTestUtils.waitFor(() -> keyManager.getOtherNode("edge1", clusterMap) != client, 100, 10_000);
+  }
+
+  private NetworkTopology newClusterMapInstance(NetworkTopology clusterMap) {
+    return new NetworkTopologyImpl(
+        config.get(OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+        (InnerNode) clusterMap.getNode(ROOT));
   }
 
   private String nodeAddress(DatanodeDetails dn) {

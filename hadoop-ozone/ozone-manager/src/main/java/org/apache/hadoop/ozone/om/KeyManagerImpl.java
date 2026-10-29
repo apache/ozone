@@ -91,6 +91,8 @@ import static org.apache.hadoop.util.Time.monotonicNow;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Maps;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -114,6 +116,7 @@ import java.util.SortedMap;
 import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -129,6 +132,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -227,6 +231,8 @@ public class KeyManagerImpl implements KeyManager {
   private BackgroundService openKeyCleanupService;
   private BackgroundService multipartUploadCleanupService;
   private DNSToSwitchMapping dnsToSwitchMapping;
+  private final AtomicReference<ClientNodeCache> clientNodeCache = new AtomicReference<>();
+  private final Duration clientNodeCacheExpiry;
   private CompactionService compactionService;
   private KeyLifecycleService keyLifecycleService;
 
@@ -254,6 +260,7 @@ public class KeyManagerImpl implements KeyManager {
     this.secretManager = secretManager;
     this.kmsProvider = kmsProvider;
     this.metrics = metrics;
+    this.clientNodeCacheExpiry = ScmTopologyClient.parseRefreshDuration(conf);
   }
 
   @Override
@@ -2381,23 +2388,57 @@ public class KeyManagerImpl implements KeyManager {
     return getOtherNode(clientMachine, clusterMap);
   }
 
-  private Node getOtherNode(String clientMachine,
-                            NetworkTopology clusterMap) {
+  @VisibleForTesting
+  public Node getOtherNode(String clientMachine,
+                           NetworkTopology clusterMap) {
+    ClientNodeCache cache = clientNodeCache.get();
+    if (cache == null || cache.clusterMap != clusterMap) {
+      cache = new ClientNodeCache(clusterMap, clientNodeCacheExpiry);
+      clientNodeCache.set(cache);
+    }
+    Optional<Node> cached = cache.nodes.getIfPresent(clientMachine);
+    if (cached != null) {
+      return cached.orElse(null);
+    }
     try {
       String clientLocation = resolveNodeLocation(clientMachine);
-      if (clientLocation != null) {
-        Node rack = clusterMap.getNode(clientLocation);
-        if (rack instanceof InnerNode) {
-          return new NodeImpl(clientMachine, clientLocation,
-              (InnerNode) rack, rack.getLevel() + 1,
-              NODE_COST_DEFAULT);
-        }
+      if (clientLocation == null) {
+        return null;
       }
+      // A client whose rack is not in this map is cached too: that only changes with the map.
+      Node rack = clusterMap.getNode(clientLocation);
+      Optional<Node> node = rack instanceof InnerNode
+          ? Optional.of(new NodeImpl(clientMachine, clientLocation, (InnerNode) rack, rack.getLevel() + 1,
+              NODE_COST_DEFAULT))
+          : Optional.empty();
+      cache.nodes.put(clientMachine, node);
+      return node.orElse(null);
     } catch (Exception e) {
       LOG.info("Could not resolve client {}: {}",
           clientMachine, e.getMessage());
+      return null;
     }
-    return null;
+  }
+
+  /**
+   * Non-datanode clients resolved against one cluster map. The client node is linked to that map's
+   * rack, and OM replaces the map instance on refresh, so the cache is replaced along with it.
+   * Entries also expire after the topology refresh interval, which bounds staleness for mappings
+   * that do not cache their own results.
+   */
+  private static final class ClientNodeCache {
+    private static final int MAX_SIZE = 10_000;
+
+    private final NetworkTopology clusterMap;
+    private final Cache<String, Optional<Node>> nodes;
+
+    private ClientNodeCache(NetworkTopology clusterMap, Duration expiry) {
+      this.clusterMap = clusterMap;
+      this.nodes = CacheBuilder.newBuilder()
+          .maximumSize(MAX_SIZE)
+          .expireAfterWrite(expiry.toMillis(), TimeUnit.MILLISECONDS)
+          .build();
+    }
   }
 
   private String resolveNodeLocation(String hostname) {
