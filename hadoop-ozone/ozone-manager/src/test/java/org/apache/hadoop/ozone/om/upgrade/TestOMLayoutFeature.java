@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -46,6 +47,9 @@ public class TestOMLayoutFeature {
   /**
    * All incompatible changes to OM should now be added to {@link OzoneManagerVersion}.
    */
+  // TODO(HDDS-17527): This test must be re-enabled after OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT
+  //  is moved to OzoneManagerVersion
+  @Unhealthy("HDDS-17527")
   @Test
   public void testNoNewOMLayoutFeaturesAdded() {
     int numOMLayoutFeatures = OMLayoutFeature.values().length;

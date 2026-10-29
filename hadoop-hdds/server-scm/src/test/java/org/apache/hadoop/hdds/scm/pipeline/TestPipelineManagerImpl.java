@@ -1031,11 +1031,11 @@ public class TestPipelineManagerImpl {
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeInfo dnInfo1 = new DatanodeInfo(dn1, NodeStatus.inServiceHealthy(),
-        null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+        UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     DatanodeInfo dnInfo2 = new DatanodeInfo(dn2, NodeStatus.inServiceHealthy(),
-        null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+        UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     DatanodeInfo dnInfo3 = new DatanodeInfo(dn3, NodeStatus.inServiceHealthy(),
-        null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+        UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setNodes(ImmutableList.of(dn1, dn2, dn3))

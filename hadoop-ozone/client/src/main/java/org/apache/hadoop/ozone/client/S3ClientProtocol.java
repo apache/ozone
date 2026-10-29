@@ -246,6 +246,15 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createKey(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      StoragePolicy storagePolicy) throws IOException {
+    return delegate.createKey(volumeName, bucketName, keyName, size, replicationConfig, metadata, tags, storagePolicy);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName, long size,
       long existingKeyGeneration, ReplicationConfig replicationConfig, Map<String, String> metadata)
       throws IOException {

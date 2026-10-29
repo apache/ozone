@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTierProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
@@ -174,7 +175,8 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
 
   @Test
   public void testAllocateContainerCurrentVersion() throws Exception {
-    when(impl.allocateContainer(any(ReplicationConfig.class), anyString())).thenReturn(containerWithPipeline());
+    when(impl.allocateContainer(any(ReplicationConfig.class), anyString(), any(StorageTierProto.class)))
+        .thenReturn(containerWithPipeline());
 
     List<DatanodeDetailsProto> members = service.allocateContainer(
         ContainerRequestProto.newBuilder()
