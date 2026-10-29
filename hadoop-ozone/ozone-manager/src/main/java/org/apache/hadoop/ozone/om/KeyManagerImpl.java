@@ -2309,8 +2309,7 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  @VisibleForTesting
-  public List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes,
+  private List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes,
                                              String clientMachine) {
     final NetworkTopology clusterMap = ozoneManager.getClusterMap();
     final Node client = getClientNode(clientMachine, nodes, clusterMap);
