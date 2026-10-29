@@ -288,6 +288,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
               + " has been lost and cannot be recreated on this DataNode",
           ContainerProtos.Result.CONTAINER_MISSING);
       audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
+      // EC writes arrive directly over gRPC without a Ratis dispatch context and carry a positive replica index.
+      // Ask SCM to close the affected container so it stops allocating writes and can repair the missing replica.
       if (dispatcherContext == null && getReplicaIndex(msg) > 0) {
         sendCloseActionForMissingEcContainer(containerID);
       }
