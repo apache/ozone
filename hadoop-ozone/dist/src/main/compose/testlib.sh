@@ -748,7 +748,7 @@ download_with_retry() {
 
   for i in {1..3}; do
     echo "Downloading ${output} from ${url}, attempt ${i}"
-    if curl --continue-at - --fail --location -o "${output}" --retry 3 --show-error --silent "${url}"; then
+    if curl --connect-timeout 10 --continue-at - --fail --location -o "${output}" --retry 3 --show-error --silent "${url}"; then
       rc=0
       break
     fi
