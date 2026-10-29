@@ -56,6 +56,12 @@ public interface StorageContainerServiceProvider {
       throws IOException;
 
   /**
+   * Returns container metadata without requiring a pipeline.
+   * @throws IOException if the SCM RPC call fails
+   */
+  ContainerInfo getContainerInfo(long containerId) throws IOException;
+
+  /**
    * Requests SCM for which containers in given ID list.
    * @param containerIDs containerId list
    * @return list of ContainerInfo + Pipeline info exists in SCM
@@ -126,18 +132,5 @@ public interface StorageContainerServiceProvider {
   List<ContainerInfo> getListOfContainerInfos(ContainerID startContainerID,
                                               int count,
                                               HddsProtos.LifeCycleState state)
-      throws IOException;
-
-  /**
-   * Returns a page of the containers that SCM has suppressed from the
-   * container report, starting at {@code startContainerID}, in container ID
-   * order.
-   *
-   * @param startContainerID first container ID to return (inclusive)
-   * @param count            maximum number of containers to return (&gt; 0)
-   * @return list of suppressed {@link ContainerInfo} objects
-   * @throws IOException if the SCM RPC call fails
-   */
-  List<ContainerInfo> getListOfSuppressedContainerInfos(ContainerID startContainerID, int count)
       throws IOException;
 }

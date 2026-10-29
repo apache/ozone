@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -40,11 +41,13 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -98,6 +101,17 @@ public class TestStorageContainerServiceProviderImpl {
         injector.getInstance(StorageContainerLocationInternalInterface.class);
     scmProvider.getPipelines();
     verify(scmClient, times(1)).listPipelines();
+  }
+
+  @Test
+  void testGetContainerInfoUnwrapsMissingContainer() throws IOException {
+    StorageContainerServiceProvider scmProvider = injector.getInstance(StorageContainerServiceProvider.class);
+    StorageContainerLocationInternalInterface scmClient =
+        injector.getInstance(StorageContainerLocationInternalInterface.class);
+    when(scmClient.getContainer(1L)).thenThrow(
+        new RemoteException(ContainerNotFoundException.class.getName(), "Container 1 not found"));
+
+    assertThrows(ContainerNotFoundException.class, () -> scmProvider.getContainerInfo(1L));
   }
 
   @Test

@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInter
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -104,6 +106,15 @@ public class StorageContainerServiceProviderImpl
   public ContainerWithPipeline getContainerWithPipeline(long containerId)
       throws IOException {
     return scmClient.getContainerWithPipeline(containerId);
+  }
+
+  @Override
+  public ContainerInfo getContainerInfo(long containerId) throws IOException {
+    try {
+      return scmClient.getContainer(containerId);
+    } catch (RemoteException e) {
+      throw e.unwrapRemoteException(ContainerNotFoundException.class);
+    }
   }
 
   @Override
@@ -208,10 +219,4 @@ public class StorageContainerServiceProviderImpl
         startContainerID.getId(), count, state).getContainerInfoList();
   }
 
-  @Override
-  public List<ContainerInfo> getListOfSuppressedContainerInfos(
-      ContainerID startContainerID, int count) throws IOException {
-    return scmClient.listContainer(startContainerID.getId(), count, null, null, null, Boolean.TRUE)
-        .getContainerInfoList();
-  }
 }

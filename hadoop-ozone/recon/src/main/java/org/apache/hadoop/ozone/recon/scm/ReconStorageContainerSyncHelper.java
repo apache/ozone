@@ -31,8 +31,10 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SC
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -427,51 +429,50 @@ class ReconStorageContainerSyncHelper {
   }
 
   /**
-   * Copies SCM's suppressed flag to the containers Recon already has. The
-   * passes above compare only the lifecycle state, and Recon's health sweep
-   * skips suppressed containers. SCM is asked only for the suppressed
-   * containers, which are normally few.
+   * Copies SCM's suppressed flag to the containers Recon already has. Fetching
+   * explicit IDs avoids SCM's full container scan for each filtered list page.
    *
    * @return {@code true} if all RPC calls completed without error
    */
   private boolean syncSuppressedFlags() {
     try {
-      Set<ContainerID> suppressedInScm = new HashSet<>();
-      // A ContainerInfo is smaller than a ContainerWithPipeline, so that page size is safe here.
-      int batchSize = safeContainerWithPipelineBatchSize(Integer.MAX_VALUE);
+      int batchSize = safeContainerWithPipelineBatchSize((int) getContainerCountPerCall(Integer.MAX_VALUE));
       ContainerID start = ContainerID.valueOf(1);
-      boolean more = true;
-      while (more) {
-        List<ContainerInfo> page = scmServiceProvider.getListOfSuppressedContainerInfos(start, batchSize);
-        more = !page.isEmpty();
-        for (ContainerInfo info : page) {
-          if (!info.isSuppressed()) {
-            // The filter came with the flag, so an SCM that ignores it has no suppressed container.
-            LOG.debug("SCM listed unsuppressed container {}, so it has no suppressed containers.", info.containerID());
-            more = false;
-            break;
-          }
-          suppressedInScm.add(info.containerID());
-        }
-        if (more) {
-          start = ContainerID.valueOf(page.get(page.size() - 1).getContainerID() + 1);
-        }
-      }
-
       int updated = 0;
-      for (ContainerInfo container : containerManager.getContainers()) {
-        boolean suppressed = suppressedInScm.contains(container.containerID());
-        if (container.isSuppressed() != suppressed) {
+      while (true) {
+        List<ContainerInfo> containers = containerManager.getContainers(start, batchSize);
+        if (containers.isEmpty()) {
+          break;
+        }
+        List<Long> ids = new ArrayList<>(containers.size());
+        for (ContainerInfo container : containers) {
+          ids.add(container.getContainerID());
+        }
+        Map<ContainerID, ContainerInfo> scmContainers = new HashMap<>();
+        for (ContainerWithPipeline container : scmServiceProvider.getExistContainerWithPipelinesInBatch(ids)) {
+          ContainerInfo info = container.getContainerInfo();
+          scmContainers.put(info.containerID(), info);
+        }
+        for (ContainerInfo container : containers) {
+          ContainerID id = container.containerID();
           try {
-            containerManager.updateContainerInfo(container.containerID(),
-                container.getProtobuf().toBuilder().setSuppressed(suppressed).build());
-            updated++;
+            ContainerInfo scmContainer = scmContainers.get(id);
+            if (scmContainer == null) {
+              // The batch RPC omits containers whose pipeline cannot be resolved.
+              scmContainer = scmServiceProvider.getContainerInfo(id.getId());
+            }
+            if (container.isSuppressed() != scmContainer.isSuppressed()) {
+              containerManager.updateContainerInfo(id,
+                  container.getProtobuf().toBuilder().setSuppressed(scmContainer.isSuppressed()).build());
+              updated++;
+            }
           } catch (ContainerNotFoundException e) {
-            LOG.debug("Container {} vanished from Recon during suppressed flag sync.", container.containerID());
+            LOG.debug("Container {} vanished from SCM or Recon during suppressed flag sync.", id);
           }
         }
+        start = ContainerID.valueOf(containers.get(containers.size() - 1).getContainerID() + 1);
       }
-      LOG.info("Suppressed flag sync complete, suppressed in SCM {}, updated {}.", suppressedInScm.size(), updated);
+      LOG.info("Suppressed flag sync complete, updated {}.", updated);
       return true;
     } catch (Exception e) {
       LOG.error("Suppressed flag sync: unexpected error.", e);
