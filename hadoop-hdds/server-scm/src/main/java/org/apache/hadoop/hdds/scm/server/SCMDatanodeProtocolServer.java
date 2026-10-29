@@ -264,7 +264,7 @@ public class SCMDatanodeProtocolServer implements
     if (containerReportsProto.getFullContainerReportDeferred()
         && !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)) {
       // Preserve the rejection if finalization advances before the response is sent.
-      registeredCommand = scm.getScmNodeManager().getRegistrationError(datanodeDetails, versionInfo)
+      registeredCommand = scm.getScmNodeManager().getRegistrationVersionError(datanodeDetails, versionInfo)
           .orElseThrow(() -> new IOException(
               "Full container report leases must be finalized before deferring registration reports."));
     } else {
@@ -282,7 +282,7 @@ public class SCMDatanodeProtocolServer implements
                 datanodeDetails, containerReportsProto, true));
       }
       eventPublisher.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-          new NodeRegistrationContainerReport(datanodeDetails, ContainerReportsProto.getDefaultInstance()));
+          new NodeRegistrationContainerReport(datanodeDetails));
       eventPublisher.fireEvent(PIPELINE_REPORT,
               new PipelineReportFromDatanode(datanodeDetails,
                       pipelineReportsProto));
@@ -686,6 +686,10 @@ public class SCMDatanodeProtocolServer implements
   public static class NodeRegistrationContainerReport {
     private final DatanodeDetails datanodeDetails;
     private final long[] containerIDs;
+
+    public NodeRegistrationContainerReport(DatanodeDetails datanodeDetails) {
+      this(datanodeDetails, ContainerReportsProto.getDefaultInstance());
+    }
 
     public NodeRegistrationContainerReport(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {

@@ -100,7 +100,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Returns a version-related registration rejection, if any, without changing node state.
    */
-  Optional<RegisteredCommand> getRegistrationError(DatanodeDetails datanodeDetails, DatanodeVersionProto versionReport);
+  Optional<RegisteredCommand> getRegistrationVersionError(DatanodeDetails datanodeDetails, DatanodeVersionProto versionReport);
 
   /**
    * Register a SendCommandNotify handler for a specific type of SCMCommand.

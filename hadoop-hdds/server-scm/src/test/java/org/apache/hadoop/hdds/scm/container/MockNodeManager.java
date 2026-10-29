@@ -783,7 +783,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public Optional<RegisteredCommand> getRegistrationError(DatanodeDetails datanodeDetails,
+  public Optional<RegisteredCommand> getRegistrationVersionError(DatanodeDetails datanodeDetails,
       DatanodeVersionProto versionReport) {
     return Optional.empty();
   }

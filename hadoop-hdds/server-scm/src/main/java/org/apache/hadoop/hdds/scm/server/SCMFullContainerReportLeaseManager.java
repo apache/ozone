@@ -37,7 +37,6 @@ public class SCMFullContainerReportLeaseManager {
   private final Map<String, Lease> pendingLeases = new HashMap<>();
   private final Map<String, Long> deferredRegistrationReports = new HashMap<>();
   private long nextDeferredRegistrationId;
-  // Guarded by this, together with pendingLeases.
   private boolean rateLimitEnabled = true;
 
   public SCMFullContainerReportLeaseManager(int maxOutstandingLeases,
