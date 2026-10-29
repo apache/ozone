@@ -364,6 +364,8 @@ With such items, a data writer cannot set its own retention with a header, and a
 **How it works**: S3 Gateway sends one RPC with the main S3 action. In `preExecute`, the OM request runs the normal ACL check for that action, then looks at the request itself:
 each Object Lock header or flag it carries adds one (access type, S3 action) check on the same resource, for example (`WRITE`, `PutObjectRetention`) for retention headers,
 or (`WRITE`, `BypassGovernanceRetention`) and (`DELETE`, `BypassGovernanceRetention`) for the bypass flag. OM calls `checkAccess` once per check.
+The main action always comes from S3 Gateway; OM never maps an API to its action. OM only adds dependent actions, as the existing `DEPENDENT_S3_ACTIONS` map already does,
+because their conditions are headers and flags that OM parses anyway.
 
 Whether a check is needed depends only on what the request carries (a header or the bypass flag), not on whether the key is currently locked, so `preExecute` does not read the key.
 The WORM check in `validateAndUpdateCache` decides whether the lock allows the operation.
