@@ -279,7 +279,7 @@ Requests that carry Object Lock headers also need the owner or an administrator,
 | `CreateBucket`                                                      | `x-amz-bucket-object-lock-enabled: true`                                                               | Owner                                                    |
 | `PutObject`, `CopyObject` (destination), `CreateMultipartUpload`    | `x-amz-object-lock-mode`, `-retain-until-date`, `-event-hold`, `-event-hold-duration-days` / `-years` | Owner (`GOVERNANCE`), Ozone administrator (`COMPLIANCE`) |
 | `PutObject`, `CopyObject` (destination), `CreateMultipartUpload`    | `x-amz-object-lock-legal-hold`                                                                         | Owner                                                    |
-| `DeleteObject`, `DeleteObjects`, overwrite, rename (native clients) | `bypassGovernanceRetention` on a key under Governance retention                                        | Owner                                                    |
+| `DeleteObject`, `DeleteObjects`, overwrite, rename (native clients) | `bypassGovernanceRetention`                                                                            | Owner                                                    |
 
 If the check fails, the request fails (`DeleteObjects` reports a per-key `AccessDenied`). `GetObject` / `HeadObject` need no extra check and always return the lock headers.
 So a user who can only write data cannot set a lock by adding a header.
@@ -332,31 +332,36 @@ The S3 actions are the AWS permission names; `GetBucketObjectLockConfiguration` 
 ##### Dependent Permissions
 
 As in AWS S3 ([required permissions for S3 API operations](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html)),
-some requests also need a second action, depending on their headers or on the key:
+some requests also need a second action, depending on their headers, the bypass flag or the bucket:
 
 | S3 API                                                    | Main S3 action       | Header or condition                                                                                    | Dependent S3 action                        | Access type             | If denied                                   |
 |:----------------------------------------------------------|:---------------------|:-------------------------------------------------------------------------------------------------------|:-------------------------------------------|:------------------------|:--------------------------------------------|
 | `CreateBucket`                                            | `CreateBucket`       | `x-amz-bucket-object-lock-enabled: true`                                                               | `PutBucketObjectLockConfiguration`         | `WRITE` (bucket)        | Request fails                               |
 | `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `PutObject`   | `x-amz-object-lock-mode`, `-retain-until-date`, `-event-hold`, `-event-hold-duration-days` / `-years` | `PutObjectRetention`                       | `WRITE` (key)           | Request fails                               |
 | `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `PutObject`   | `x-amz-object-lock-legal-hold`                                                                         | `PutObjectLegalHold`                       | `WRITE` (key)           | Request fails                               |
-| `GetObject`, `HeadObject`                                 | `GetObject`          | The key has a retention or a legal hold                                                                | `GetObjectRetention`, `GetObjectLegalHold` | `READ` (key)            | OM drops the lock information, so S3 Gateway omits the `x-amz-object-lock-*` headers; the read succeeds |
-| `DeleteObject`, `DeleteObjects`                           | `DeleteObject`       | `x-amz-bypass-governance-retention: true` on a key under Governance retention                          | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails (`DeleteObjects`: per-key `AccessDenied`) |
-| `PutObjectRetention`                                      | `PutObjectRetention` | Shortens or removes a Governance retention                                                             | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails                               |
+| `GetObject`, `HeadObject`                                 | `GetObject`          | The bucket has Object Lock enabled                                                                     | `GetObjectRetention`, `GetObjectLegalHold` | `READ` (key)            | OM drops the lock information, so S3 Gateway omits the `x-amz-object-lock-*` headers; the read succeeds |
+| `DeleteObject`, `DeleteObjects`                           | `DeleteObject`       | `x-amz-bypass-governance-retention: true`                                                              | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails (`DeleteObjects`: per-key `AccessDenied`) |
+| `PutObjectRetention`                                      | `PutObjectRetention` | `x-amz-bypass-governance-retention: true` (required to shorten or remove a Governance retention)       | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails                               |
 | `PutObjectRetention`                                      | `PutObjectRetention` | Shortens, removes or downgrades a Compliance retention                                                 | None; OM checks the Ozone administrator role | -                     | Request fails                               |
-| `PutObject`, `CopyObject`, `CompleteMultipartUpload`, rename (native clients) | `PutObject` | Overwrites or renames a key under Governance retention with `bypassGovernanceRetention`    | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails                               |
+| `PutObject`, `CopyObject`, `CompleteMultipartUpload`, rename (native clients) | `PutObject` | `bypassGovernanceRetention` (required to overwrite or rename a key under Governance retention) | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails                               |
 
 The dependent actions use the same access types as the direct lock changes (`READ` or `WRITE`; `WRITE` and `DELETE` for the bypass), so they mostly matter for policy items with `action-matches`.
 With such items, a data writer cannot set its own retention with a header, and a retention manager cannot upload data.
 
-**How it works**: S3 Gateway sends one RPC with the main action. OM calls `checkAccess` once per action, each with one access type and one action, and every call must pass.
-For example, `PutObject` with retention headers is checked as (`CREATE` / `WRITE`, `PutObject`) and then (`WRITE`, `PutObjectRetention`). Each call is its own Ranger audit record.
+**How it works**: S3 Gateway sends one RPC with the main S3 action. In `preExecute`, the OM request runs the normal ACL check for that action, then looks at the request itself:
+each Object Lock header or flag it carries adds one (access type, S3 action) check on the same resource, for example (`WRITE`, `PutObjectRetention`) for retention headers,
+or (`WRITE`, `BypassGovernanceRetention`) and (`DELETE`, `BypassGovernanceRetention`) for the bypass flag. OM calls `checkAccess` once per check.
 
-This extends the existing `DEPENDENT_S3_ACTIONS` check in `OmMetadataReader` (today `GetObjectAttributes` → `GetObject`; write requests reach it through `OMClientRequest#checkAcls`).
-Instead of a fixed map, the OM request passes the (access type, action) pairs to check:
-1. Only when the condition holds, for example `PutObjectRetention` only when the request has retention headers.
-2. Each with its own access type and resource, for example `WRITE` on the key for `PutObjectRetention`, while `PutObject` also checks `CREATE` on the bucket.
-3. For `GetObject` / `HeadObject`, only when the key has lock information, and a denial does not fail the read: OM drops the lock information.
-   This needs no extra RPC. Listings do not return lock information, so they need no check per key.
+Whether a check is needed depends only on what the request carries (a header or the bypass flag), not on whether the key is currently locked, so `preExecute` does not read the key.
+The WORM check in `validateAndUpdateCache` decides whether the lock allows the operation.
+`GetObject` / `HeadObject` also check `GetObjectRetention` and `GetObjectLegalHold` with `READ`, before the lookup, when the bucket has Object Lock enabled.
+
+What happens when a check is denied is in the "If denied" column of the table above. The dependent checks apply to the target resource only (the parent volume check is not repeated),
+and they also run for requests without an S3 action, by access type alone. Listings do not return lock information, so they need no check per key.
+
+Each `checkAccess` is an in-process evaluation against the Ranger plugin's cached policies and one Ranger audit record, not a round trip.
+This generalizes the existing `DEPENDENT_S3_ACTIONS` map in `OmMetadataReader` (today `GetObjectAttributes` → `GetObject`): `OMClientRequest.checkAcls` takes the checks declared by the request,
+and `OmMetadataReader.checkAcls` accepts the S3 action per call instead of taking it only from the thread-local `S3Auth`.
 
 These checks also run for requests without an S3 action, by access type only.
 
@@ -556,11 +561,11 @@ strict OS access control, limited SSH / root access to OM and datanode hosts, an
   1. Pass several actions to one `checkAccess` call and extend `action-matches` to match a list.
   2. Let S3 Gateway send an extra RPC per dependent action, as `CopyObject` does for its source and destination.
 * **Why rejected**:
-  1. One call has one access type, but the actions may need different ones (for example `CREATE` on the bucket for `PutObject`).
-     Matching any action would let an item that only allows `PutObject` grant `PutObjectRetention`; matching all would force both actions into one item,
-     although they usually belong to different roles. It also needs a Ranger plugin change.
-  2. S3 Gateway does not know the key state (whether a key has a lock or is under Governance retention), native clients do not use S3 Gateway,
-     and a separate check adds an RPC and a gap between the check and the write.
+  1. It is much more work for little gain. A `RangerAccessRequest` carries one access type and one action, and `RangerActionMatcher` compares that one action,
+     so a list needs changes to the Ranger plugin and policy engine, and a new matching rule (matching any action would let an item that only allows `PutObject`
+     grant `PutObjectRetention`; matching all would force both actions into one item). Extra `checkAccess` calls cost little: the plugin evaluates in-process
+     against cached policies, so they add no round trip.
+  2. It adds one RPC per dependent action to the same operation. OM already has the request and the bucket in hand, so it can run every check in the one RPC it receives.
 
 ### 3. Why Not an Offline Repair Command for Compliance Retention?
 
