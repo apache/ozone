@@ -37,7 +37,6 @@ import java.io.RandomAccessFile;
 import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Objects;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -71,23 +70,21 @@ final class Receiver implements Runnable {
   private final InputStream socketIn;
   private OutputStream socketOut;
   private final int bufferSize;
-  private final ThreadPoolExecutor readExecutors;
   private DataInputStream input;
   private Lock lock = new ReentrantLock();
 
   public static Receiver create(DomainPeer peer, ConfigurationSource conf, XceiverServerDomainSocket server,
-      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, ContainerMetrics metrics) throws IOException {
-    return new Receiver(peer, conf, server, dispatcher, executor, metrics);
+      ContainerDispatcher dispatcher, ContainerMetrics metrics) throws IOException {
+    return new Receiver(peer, conf, server, dispatcher, metrics);
   }
   
   private Receiver(DomainPeer peer, ConfigurationSource conf, XceiverServerDomainSocket server,
-      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, ContainerMetrics metrics) throws IOException {
+      ContainerDispatcher dispatcher, ContainerMetrics metrics) throws IOException {
     this.peer = peer;
     this.socketIn = peer.getInputStream();
     this.socketOut = peer.getOutputStream();
     this.domainSocketServer = server;
     this.dispatcher = dispatcher;
-    this.readExecutors = executor;
     this.metrics = metrics;
     this.bufferSize = conf.getObject(OzoneClientConfig.class).getShortCircuitBufferSize();
   }
@@ -115,7 +112,8 @@ final class Receiver implements Runnable {
           throw e;
         }
 
-        readExecutors.submit(new ProcessRequestTask(entry, opsHandled));
+        // Processed on this connection's thread, so a response that waits for its reader holds no shared thread.
+        new ProcessRequestTask(entry, opsHandled).run();
         ++opsReceived;
         // reset request variable
         entry = null;

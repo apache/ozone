@@ -278,7 +278,7 @@ public class OzoneContainer {
     domainSocketFactory = DomainSocketFactory.getInstance(config);
     if (domainSocketFactory.isServiceEnabled() && domainSocketFactory.isServiceReady()) {
       readDomainSocketChannel = new XceiverServerDomainSocket(datanodeDetails, config,
-          hddsDispatcher, readExecutors, metrics, domainSocketFactory);
+          hddsDispatcher, metrics, domainSocketFactory);
     } else {
       readDomainSocketChannel = null;
     }
