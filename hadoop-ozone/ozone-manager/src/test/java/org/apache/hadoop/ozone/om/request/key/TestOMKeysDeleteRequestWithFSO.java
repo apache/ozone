@@ -101,6 +101,18 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
     checkDeleteKeysResponse(omKeysDeleteRequest);
   }
 
+  @Test
+  public void testDuplicatePathsReleaseQuotaOnce() throws Exception {
+    createPreRequisites();
+    DeleteKeyArgs keys = getOmRequest().getDeleteKeysRequest().getDeleteKeys();
+    OMRequest request = getOmRequest().toBuilder()
+        .setDeleteKeysRequest(getOmRequest().getDeleteKeysRequest().toBuilder()
+            .setDeleteKeys(keys.toBuilder().clearKeys()
+                .addKeys("dir0/file0").addKeys("dir0//file0").addKeys("/dir0/file0")
+                .addKeys("dir1/").addKeys("/dir1"))).build();
+    checkDuplicateKeysReleaseQuotaOnce(request, 2);
+  }
+
   @Override
   protected void createPreRequisites() throws Exception {
     createPreRequisites(RequestSource.USER);

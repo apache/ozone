@@ -90,11 +90,14 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "server-side when the request sets requireFileSystemLayout, so file "
           + "system clients no longer need the client-side InfoBucket layout "
           + "check for open"),
-
   S3_IF_NONE_MATCH_ETAG(104,
       "OzoneManager version that supports If-None-Match entity ETags for writes"),
 
-  RENAME_KEY_REJECTS_NON_FSO(105,
+  MULTIPART_PART_IV(105,
+      "OzoneManager version that gives each multipart upload part in an "
+          + "encrypted bucket its own IV"),
+
+  RENAME_KEY_REJECTS_NON_FSO(106,
       "OzoneManager version that rejects renameKey on buckets that are not "
           + "FILE_SYSTEM_OPTIMIZED when the request sets requireFileSystemOptimized, "
           + "so file system clients no longer need the client-side InfoBucket "

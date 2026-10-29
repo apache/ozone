@@ -1167,6 +1167,11 @@ message KeyArgs {
 
     // If-None-Match entity ETag: an absent key or a different ETag is allowed.
     optional string excludedETag = 25;
+
+    // IV of a multipart upload part in an encrypted bucket. Set by OM when the
+    // part is created, the part is encrypted with it instead of the IV in the
+    // FileEncryptionInfo, which is still used to decrypt the EDEK.
+    optional bytes partIv = 26;
 }
 
 message KeyLocation {
@@ -1185,6 +1190,9 @@ message KeyLocation {
     optional hadoop.hdds.Pipeline pipeline = 7;
 
     optional int32 partNumber = 9 [default = -1];
+    // IV of the multipart upload part this block belongs to. When set, it
+    // overrides the IV in the key's FileEncryptionInfo for this part.
+    optional bytes partIv = 10;
 }
 
 message KeyLocationList {
@@ -1260,6 +1268,8 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+    // See KeyArgs.partIv. Only set on the open key of a multipart upload part.
+    optional bytes partIv = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -1859,6 +1869,8 @@ message GetBucketDeletedBytesResponse {
   optional uint64 purgeableKeys = 4;
   optional uint64 snapshotTrappedDirs = 5;
   optional uint64 purgeableDirs = 6;
+  optional uint64 purgeableKeyBytes = 7;
+  optional uint64 purgeableDirBytes = 8;
 }
 
 message ServicePort {
@@ -2527,7 +2539,7 @@ message S3Authentication {
     optional string resolvedStsTempAccessKeyId = 8;
     optional string resolvedStsSecretKeyId = 9;
     // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
-    // in finer-grained STS permissions.
+    // in S3 action-based authorization (STS session policies and authorizers such as Ranger).
     optional string s3Action = 10;
     // Resolved so GetCallerIdentity can return the assumed-role identity from the session token.
     optional string resolvedStsAssumedRoleId = 11;
