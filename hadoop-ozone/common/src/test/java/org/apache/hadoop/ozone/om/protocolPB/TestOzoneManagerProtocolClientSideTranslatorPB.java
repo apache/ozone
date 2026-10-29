@@ -34,6 +34,7 @@ import java.util.Map;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
@@ -281,6 +283,36 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
             .build());
 
     assertThat(pb.deleteKeys(DELETE_KEYS, true)).isEmpty();
+  }
+
+  @Test
+  void testGetBucketDeletedBytesFromOlderOmWithoutPurgeableBytesSplit() throws IOException {
+    // Older OM does not set purgeableKeyBytes / purgeableDirBytes in the response.
+    GetBucketDeletedBytesResponse response = GetBucketDeletedBytesResponse.newBuilder()
+        .setSnapshotTrappedBytes(100L)
+        .setPurgeableBytes(200L)
+        .setSnapshotTrappedKeys(1L)
+        .setPurgeableKeys(2L)
+        .setSnapshotTrappedDirs(3L)
+        .setPurgeableDirs(4L)
+        .build();
+    when(omTransport.submitRequest(any(OMRequest.class))).thenReturn(
+        OMResponse.newBuilder()
+            .setCmdType(Type.GetBucketDeletedBytes)
+            .setStatus(Status.OK)
+            .setGetBucketDeletedBytesResponse(response)
+            .build());
+
+    BucketDeletedBytes bytes = pb.getBucketDeletedBytes("/vol/bucket");
+
+    assertThat(bytes.getSnapshotTrappedBytes()).isEqualTo(100L);
+    assertThat(bytes.getPurgeableBytes()).isEqualTo(200L);
+    assertThat(bytes.getSnapshotTrappedKeys()).isEqualTo(1L);
+    assertThat(bytes.getPurgeableKeys()).isEqualTo(2L);
+    assertThat(bytes.getSnapshotTrappedDirs()).isEqualTo(3L);
+    assertThat(bytes.getPurgeableDirs()).isEqualTo(4L);
+    assertThat(bytes.getPurgeableKeyBytes()).isEqualTo(-1L);
+    assertThat(bytes.getPurgeableDirBytes()).isEqualTo(-1L);
   }
 
   private static final class CapturingTransport implements OmTransport {

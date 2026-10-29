@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -158,15 +159,17 @@ public class TestOMMetadataReader {
     verifySessionPolicyPassedToAuthorizer(accessAuthorizer, obj, null);
   }
 
-  @Test
-  public void testCheckAclsAttachesS3ActionFromThreadLocal() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCheckAclsAttachesS3ActionFromThreadLocal(boolean isS3StsEnabled) throws Exception {
     OzoneManager.setS3Auth(S3Authentication.newBuilder()
         .setAccessId(ACCESS_KEY_ID)
         .setS3Action("GetObject")
         .build());
 
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
-    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+    final OmMetadataReader omMetadataReader = createMetadataReader(
+        accessAuthorizer, mock(KeyManager.class), isS3StsEnabled);
 
     final RequestContext.Builder contextWithoutS3ActionBuilder = createTestRequestContextBuilder();
     final OzoneObj obj = createTestOzoneObj();
@@ -176,15 +179,17 @@ public class TestOMMetadataReader {
     verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, "GetObject");
   }
 
-  @Test
-  public void testCheckAclsAlsoChecksGetObjectForGetObjectAttributes() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCheckAclsAlsoChecksGetObjectForGetObjectAttributes(boolean isS3StsEnabled) throws Exception {
     OzoneManager.setS3Auth(S3Authentication.newBuilder()
         .setAccessId(ACCESS_KEY_ID)
         .setS3Action("GetObjectAttributes")
         .build());
 
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
-    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+    final OmMetadataReader omMetadataReader = createMetadataReader(
+        accessAuthorizer, mock(KeyManager.class), isS3StsEnabled);
     final OzoneObj obj = createTestOzoneObj();
 
     assertTrue(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
@@ -233,10 +238,12 @@ public class TestOMMetadataReader {
   }
 
   @Test
-  public void testCheckAclsDoesNotCheckDependentActionWhenStsFeatureDisabled() throws Exception {
+  public void testCheckAclsDoesNotAttachSessionPolicyWhenStsFeatureDisabled() throws Exception {
+    setupStsTokenIdentifier();
+
     OzoneManager.setS3Auth(S3Authentication.newBuilder()
         .setAccessId(ACCESS_KEY_ID)
-        .setS3Action("GetObjectAttributes")
+        .setS3Action("PutObject")
         .build());
 
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
@@ -245,23 +252,45 @@ public class TestOMMetadataReader {
 
     assertTrue(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
 
-    verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, null);
+    final ArgumentCaptor<RequestContext> captor = ArgumentCaptor.forClass(RequestContext.class);
+    verify(accessAuthorizer).checkAccess(eq(obj), captor.capture());
+    assertNull(captor.getValue().getSessionPolicy());
+    assertEquals("PutObject", captor.getValue().getS3Action());
   }
 
-  @Test
-  public void testCheckAclsDoesNotAttachS3ActionWhenStsFeatureDisabled() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCheckAclsSkipsDependentActionForNativeAuthorizer(boolean isS3StsEnabled) throws Exception {
     OzoneManager.setS3Auth(S3Authentication.newBuilder()
         .setAccessId(ACCESS_KEY_ID)
-        .setS3Action("GetObject")
+        .setS3Action("GetObjectAttributes")
         .build());
 
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
-    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, mock(KeyManager.class), false);
-
-    final RequestContext.Builder contextWithoutS3ActionBuilder = createTestRequestContextBuilder();
+    when(accessAuthorizer.isNative()).thenReturn(true);
+    final OmMetadataReader omMetadataReader = createMetadataReader(
+        accessAuthorizer, mock(KeyManager.class), isS3StsEnabled);
     final OzoneObj obj = createTestOzoneObj();
 
-    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3ActionBuilder, true));
+    assertTrue(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
+
+    verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, "GetObjectAttributes");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCheckAclsLeavesS3ActionUnsetWhenS3ActionEmpty(boolean isS3StsEnabled) throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(
+        accessAuthorizer, mock(KeyManager.class), isS3StsEnabled);
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
 
     verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, null);
   }
@@ -339,6 +368,47 @@ public class TestOMMetadataReader {
 
     assertContainsVolumeReadCheck(checks);
     // We want to ensure the current behavior for non-STS requests remains the same
+    assertContainsKeyReadCheckWithName(checks);
+  }
+
+  @Test
+  public void testListStatusUsesListAclOnBucketRootForNonStsRequest() throws Exception {
+    setupNonStsS3Request();
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final KeyManager keyManager = createListStatusKeyManagerReturningEmpty();
+
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, keyManager);
+    final OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName("")
+        .build();
+
+    final List<OzoneFileStatus> statuses = omMetadataReader.listStatus(args, false, "", MAX_KEYS, false);
+    assertTrue(statuses.isEmpty());
+
+    // Volume READ with each of bucket LIST and bucket READ.
+    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 4);
+    assertContainsVolumeReadCheck(checks);
+    assertContainsBucketListCheck(checks);
+    assertTrue(checks.stream().anyMatch(check -> check.getObj().getResourceType() == OzoneObj.ResourceType.BUCKET
+        && check.getContext().getAclRights() == READ), "Expected a BUCKET READ ACL check");
+  }
+
+  @Test
+  public void testListStatusLightUsesListAclForPartialPrefixForNonStsRequest() throws Exception {
+    setupNonStsS3Request();
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, mock(KeyManager.class));
+
+    omMetadataReader.listStatusLight(createOmKeyArgs(), false, "", MAX_KEYS, true);
+
+    // Volume READ with each of bucket LIST and key READ on the prefix.
+    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 4);
+    assertContainsVolumeReadCheck(checks);
+    assertContainsBucketListCheck(checks);
     assertContainsKeyReadCheckWithName(checks);
   }
 
