@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
  * schedules work.
  *
  * <p>Retention: only the {@code maxRetained} most recently finished jobs stay queryable through
- * {@link #getExportStatus}, and only the {@code maxRetained} newest completed archives stay on disk. Older
+ * {@link #getContainerExportStatus}, and only the {@code maxRetained} newest completed archives stay on disk. Older
  * ones are dropped when a job finishes and when the manager starts, so an unknown job id can also mean an
  * evicted one.
  */
@@ -169,9 +169,38 @@ public class ContainerExportManager {
     return job;
   }
 
-  public ExportJob.Status getExportStatus(ExportJob.Id jobId) {
-    ExportJob job = jobMap.get(jobId);
-    return job != null ? job.getStatus() : null;
+  /**
+   * Returns the status of a job in the form reported to clients.
+   *
+   * @return the status, or {@code null} if the job is unknown, for example because it was evicted or SCM restarted
+   */
+  public ContainerExportStatus getContainerExportStatus(String jobId) {
+    final ExportJob job = jobMap.get(ExportJob.Id.of(jobId));
+    if (job == null) {
+      return null;
+    }
+    final ExportJob.Status status = job.getStatus();
+    final ContainerExportStatus.Builder builder = ContainerExportStatus.newBuilder()
+        .setJobId(jobId)
+        .setLifeCycleState(job.getLifeCycleState())
+        .setHealthState(job.getHealthState())
+        .setMaxRows(job.getMaxRows())
+        .setBatchSize(job.getBatchSize())
+        .setPartSize(job.getPartSize())
+        .setElapsedMs(status.getElapsedMs());
+    if (!status.isDone()) {
+      return builder.setState(ContainerExportStatus.State.RUNNING).build();
+    }
+    final Throwable failure = status.getException();
+    if (failure != null) {
+      return builder.setState(ContainerExportStatus.State.FAILED)
+          .setErrorMessage(failure.getMessage() != null ? failure.getMessage() : failure.toString()).build();
+    }
+    builder.setState(ContainerExportStatus.State.SUCCEEDED).setIdsWritten(status.getIdsWritten());
+    if (status.getIdsWritten() > 0) {
+      builder.setTarPath(fileManager.getArchivePath(job.getFileName()));
+    }
+    return builder.build();
   }
 
   public void shutdown() {
@@ -197,7 +226,7 @@ public class ContainerExportManager {
     // A job accepted but drained from the executor queue by shutdownNow() never ran; fail it.
     final ExportJob notStarted = runningJob.getAndSet(null);
     if (notStarted != null) {
-      notStarted.getFuture().completeExceptionally(new InterruptedException("Export cancelled: SCM shutting down"));
+      notStarted.fail(new InterruptedException("Export cancelled: SCM shutting down"));
     }
     try {
       fileManager.unlock();
@@ -237,9 +266,9 @@ public class ContainerExportManager {
       retain(job, failure == null && idsWritten > 0);
       final boolean cleared = runningJob.compareAndSet(job, null);
       if (failure == null) {
-        job.getFuture().complete(idsWritten);
+        job.complete(idsWritten);
       } else {
-        job.getFuture().completeExceptionally(failure);
+        job.fail(failure);
       }
       Preconditions.assertTrue(cleared);
     }
