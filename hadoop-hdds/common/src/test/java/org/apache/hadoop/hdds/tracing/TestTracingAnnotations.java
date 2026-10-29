@@ -28,6 +28,8 @@ import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -62,7 +64,8 @@ public class TestTracingAnnotations {
    * Puts a real GlobalOpenTelemetry in place with no exporter, so tests stay offline.
    */
   private static void installNoExportGlobalOpenTelemetry() {
-    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    SdkTracerProvider provider =
+        SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.noop())).build();
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
   }
