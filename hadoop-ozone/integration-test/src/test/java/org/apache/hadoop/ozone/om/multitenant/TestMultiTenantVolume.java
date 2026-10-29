@@ -225,6 +225,7 @@ public class TestMultiTenantVolume {
     store.deleteVolume(sourceVolumeName);
 
     // Delete bucket.
+    bucket.deleteKey(tagKey);
     store.deleteS3Bucket(BUCKET_NAME);
     assertS3BucketNotFound(store, BUCKET_NAME);
 
