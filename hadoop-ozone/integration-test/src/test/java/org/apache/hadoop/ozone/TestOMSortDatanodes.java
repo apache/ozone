@@ -145,6 +145,22 @@ public class TestOMSortDatanodes {
   }
 
   @Test
+  public void sortDatanodesSortsRpcDeserializedNodesByRack() {
+    List<DatanodeDetails> rpcNodes = new ArrayList<>();
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      rpcNodes.add(DatanodeDetails.getFromProtoBuf(dn.getProtoBufMessage()));
+    }
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      List<? extends DatanodeDetails> sorted = keyManager.sortDatanodes(rpcNodes, nodeAddress(dn));
+      assertEquals(dn, sorted.get(0), "Source node should be sorted very first");
+      assertRackOrder(dn.getNetworkLocation(), sorted);
+    }
+    for (Map.Entry<String, String> entry : EDGE_NODES.entrySet()) {
+      assertRackOrder(entry.getValue(), keyManager.sortDatanodes(rpcNodes, entry.getKey()));
+    }
+  }
+
+  @Test
   public void testSortDatanodes() {
     List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
 
