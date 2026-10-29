@@ -595,10 +595,10 @@ public class Client implements AutoCloseable {
               InetAddress localAddr = NetUtils.getLocalInetAddress(host);
               if (localAddr != null) {
                 this.socket.setReuseAddress(true);
-                localAddr = NetUtils.bindToLocalAddress(localAddr, bindToWildCardAddress);
+                InetAddress bindTo = bindToWildCardAddress ? null : localAddr;
                 LOG.debug("Binding {} to {}", principal,
                     (bindToWildCardAddress) ? "0.0.0.0" : localAddr);
-                this.socket.bind(new InetSocketAddress(localAddr, 0));
+                this.socket.bind(new InetSocketAddress(bindTo, 0));
               }
             }
           }
