@@ -700,9 +700,7 @@ public class KeyValueHandler extends Handler {
       blockData.setBlockCommitSequenceId(bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
       if (request.getPutBlock().getSync()) {
-        try (DBHandle db = BlockUtils.getDB(kvContainer.getContainerData(), conf)) {
-          db.getStore().flushLog(true);
-        }
+        kvContainer.flushAndSyncDB();
       }
 
       blockDataProto = blockData.getProtoBufMessage();

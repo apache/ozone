@@ -147,8 +147,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private boolean isDatastreamPipelineMode;
   // Whether PutBlock is committed through the data stream instead of the Raft log; fixed for the stream lifetime.
   private final boolean putBlockWithoutRaft;
-  // Whether the most recent PutBlock command was not synced to disk by the datanodes.
-  private boolean unsyncedPutBlock = false;
 
   /**
    * Creates a new BlockDataStreamOutput.
@@ -430,34 +428,17 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   /**
+   * @param sync  whether the datanodes sync the data and the PutBlock to disk before replying;
+   *              it applies only to a PutBlock committed in the middle of the stream without Raft
    * @param close whether putBlock is happening as part of closing the stream
-   * @param force true if no data was written since most recent putBlock and
-   *            stream is being closed
    */
-  public void executePutBlock(boolean close,
-      boolean force) throws IOException {
-    executePutBlock(close, force, false);
-  }
-
-  /**
-   * @param close whether putBlock is happening as part of closing the stream
-   * @param force true if no data was written since most recent putBlock and
-   *            either the stream is being closed or the previous putBlock is to be synced
-   * @param sync whether the datanodes sync the data and the PutBlock to disk before replying;
-   *             it applies only to a PutBlock committed in the middle of the stream without Raft
-   */
-  private void executePutBlock(boolean close, boolean force, boolean sync) throws IOException {
+  public void executePutBlock(boolean sync, boolean close) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
-    final List<StreamBuffer> byteBufferList;
-    if (!force) {
-      Objects.requireNonNull(bufferList, "bufferList == null");
-      byteBufferList = buffersForPutBlock;
-      buffersForPutBlock = null;
-      Objects.requireNonNull(byteBufferList, "byteBufferList == null");
-    } else {
-      byteBufferList = null;
-    }
+    Objects.requireNonNull(bufferList, "bufferList == null");
+    // null if no data was written since the most recent putBlock
+    final List<StreamBuffer> byteBufferList = buffersForPutBlock;
+    buffersForPutBlock = null;
     waitFuturesComplete();
     if (close && putBlockWithoutRaft) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
@@ -471,14 +452,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       // Then, old datanodes will fail since they expect a PutBlock.
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
-              xceiverClient.getPipeline(), blockData, true, tokenString);
+              xceiverClient.getPipeline(), blockData, false, true, tokenString);
       dataStreamCloseReply = executePutBlockClose(putBlockRequest,
           PUT_BLOCK_REQUEST_LENGTH_MAX, out);
       dataStreamCloseReply.whenComplete((reply, e) -> {
         if (e != null || reply == null || !reply.isSuccess()) {
           LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
           try {
-            executePutBlock(true, false);
+            executePutBlock(false, true);
           } catch (IOException ex) {
             throw new CompletionException(ex);
           }
@@ -504,7 +485,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               throw new CompletionException(sce);
             }
             // if the ioException is not set, putBlock is successful
-            if (getIoException() == null && !force) {
+            if (getIoException() == null && byteBufferList != null) {
               BlockID responseBlockID = BlockID.getFromProtobuf(
                   e.getPutBlock().getCommittedBlockLength().getBlockID());
               Preconditions.checkState(blockID.get().getContainerBlockID()
@@ -553,15 +534,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    */
   private void executePutBlockCommand(BlockData blockData,
       List<StreamBuffer> byteBufferList, boolean sync) throws IOException {
-    ContainerCommandRequestProto putBlockRequest
+    final ContainerCommandRequestProto putBlockRequest
         = ContainerProtocolCalls.getPutBlockRequest(
-            xceiverClient.getPipeline(), blockData, false, tokenString);
-    if (sync) {
-      final ContainerCommandRequestProto.Builder builder = putBlockRequest.toBuilder();
-      builder.getPutBlockBuilder().setSync(true);
-      putBlockRequest = builder.build();
-    }
-    unsyncedPutBlock = !sync;
+            xceiverClient.getPipeline(), blockData, sync, false, tokenString);
     final ByteBuffer command = ContainerCommandRequestMessage.toMessage(
         putBlockRequest, null).getContent().asReadOnlyByteBuffer();
     Preconditions.checkState(command.remaining() <= PUT_BLOCK_REQUEST_LENGTH_MAX,
@@ -636,14 +611,18 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   @Override
   public void hflush() throws IOException {
-    hsync();
+    flushOrSync(false);
   }
 
   @Override
   public void hsync() throws IOException {
+    flushOrSync(true);
+  }
+
+  private void flushOrSync(boolean sync) throws IOException {
     try {
       if (!isClosed()) {
-        handleFlush(false);
+        handleFlush(sync, false);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -677,13 +656,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   /**
+   * @param sync  whether the datanodes sync the data and the PutBlock to disk before replying
    * @param close whether the flush is happening as part of closing the stream
    */
-  private void handleFlush(boolean close)
+  private void handleFlush(boolean sync, boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
-    // Only hsync flushes without closing.
-    final boolean sync = !close && config.isDatastreamHsyncEnabled();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
       // This can be a partially filled chunk. Since we are flushing the buffer
@@ -695,14 +673,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         currentBuffer = null;
       }
       updateFlushLength();
-      executePutBlock(close, false, sync);
+      executePutBlock(sync, close);
     } else if (close) {
       // forcing an "empty" putBlock if stream is being closed without new
       // data since latest flush - we need to send the "EOF" flag
-      executePutBlock(true, true);
-    } else if (sync && putBlockWithoutRaft && unsyncedPutBlock) {
+      executePutBlock(false, true);
+    } else if (sync && putBlockWithoutRaft) {
       // hsync without new data: the data is committed by a previous PutBlock but not yet synced.
-      executePutBlock(false, true, true);
+      executePutBlock(true, false);
     }
     CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
     CompletableFuture.allOf(putBlockCommandFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
@@ -719,7 +697,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   public void close() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null) {
       try {
-        handleFlush(true);
+        handleFlush(false, true);
         dataStreamCloseReply.get();
       } catch (ExecutionException e) {
         handleExecutionException(e);

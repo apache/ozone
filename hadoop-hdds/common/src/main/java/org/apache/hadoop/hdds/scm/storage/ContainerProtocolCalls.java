@@ -335,7 +335,7 @@ public final class ContainerProtocolCalls  {
                                                  boolean containerAutoCreate)
       throws IOException, InterruptedException, ExecutionException {
     final ContainerCommandRequestProto request = getPutBlockRequest(
-        xceiverClient.getPipeline(), containerBlockData, eof, tokenString,
+        xceiverClient.getPipeline(), containerBlockData, false, eof, tokenString,
         containerAutoCreate);
     return xceiverClient.sendCommandAsync(request);
   }
@@ -372,17 +372,18 @@ public final class ContainerProtocolCalls  {
   }
 
   public static ContainerCommandRequestProto getPutBlockRequest(
-      Pipeline pipeline, BlockData containerBlockData, boolean eof,
+      Pipeline pipeline, BlockData containerBlockData, boolean sync, boolean eof,
       String tokenString) throws IOException {
-    return getPutBlockRequest(pipeline, containerBlockData, eof, tokenString, true);
+    return getPutBlockRequest(pipeline, containerBlockData, sync, eof, tokenString, true);
   }
 
   public static ContainerCommandRequestProto getPutBlockRequest(
-      Pipeline pipeline, BlockData containerBlockData, boolean eof,
+      Pipeline pipeline, BlockData containerBlockData, boolean sync, boolean eof,
       String tokenString, boolean containerAutoCreate) throws IOException {
     PutBlockRequestProto.Builder createBlockRequest =
         PutBlockRequestProto.newBuilder()
             .setBlockData(containerBlockData)
+            .setSync(sync)
             .setEof(eof);
     if (!containerAutoCreate) {
       createBlockRequest.setContainerAutoCreate(false);

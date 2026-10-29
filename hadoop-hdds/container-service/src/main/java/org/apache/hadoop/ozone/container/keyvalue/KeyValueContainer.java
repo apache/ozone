@@ -531,7 +531,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
   }
 
-  private void flushAndSyncDB() throws StorageContainerException {
+  void flushAndSyncDB() throws StorageContainerException {
     try {
       try (DBHandle db = BlockUtils.getDB(containerData, config)) {
         db.getStore().flushLog(true);
