@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.security.symmetric;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -30,6 +32,11 @@ import java.time.Duration;
 import java.time.Instant;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.junit.jupiter.api.Test;
 
 /** Tests refreshing the signing key through the composite client. */
@@ -67,5 +74,18 @@ class TestDefaultSecretKeyClient {
     } finally {
       client.stop();
     }
+  }
+
+  @Test
+  void initialSecretKeyRetryWaitIsCapped() throws Exception {
+    RetryPolicy policy = DefaultSecretKeySignerClient.initialSecretKeyRetryPolicy();
+    Exception notInitialized = new SCMSecretKeyException("not initialized", ErrorCode.SECRET_KEY_NOT_INITIALIZED);
+    for (int retries = 1; retries < 100; retries++) {
+      RetryAction action = policy.shouldRetry(notInitialized, retries, 0, true);
+      assertEquals(RetryDecision.RETRY, action.action);
+      assertThat(action.delayMillis).isBetween(retries < 3 ? 2000L : 8000L, 23000L);
+    }
+    assertEquals(RetryDecision.FAIL, policy.shouldRetry(notInitialized, 100, 0, true).action);
+    assertEquals(RetryDecision.FAIL, policy.shouldRetry(new IOException("SCM fetch failed"), 0, 0, true).action);
   }
 }
