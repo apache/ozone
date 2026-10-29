@@ -60,7 +60,7 @@ Performs unit tests (if necessary) in two parts:
 If they don't match, it describes how to make the updates to include the changes, (if they are intentional).  Otherwise, the changes should be removed.
 
 #### acceptance job
-[Runs](../hadoop-ozone/dev-support/checks/acceptance.sh) smoketests using robot framework and a real docker compose cluster.  There are three iterations, "secure", "unsecure", and "misc", each running in parallel, as different matrix configs.
+[Runs](../hadoop-ozone/dev-support/checks/acceptance.sh) smoketests using robot framework and a real docker compose cluster.
 
 #### kubernetes job
 [Runs](../hadoop-ozone/dev-support/checks/kubernetes.sh) k8s tests

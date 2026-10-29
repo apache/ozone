@@ -27,9 +27,9 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -38,6 +38,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,6 +48,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -61,9 +63,11 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -83,59 +87,59 @@ public class TestS3ActionOverrideForOwnerVerification {
     S3GatewayMetrics.create(new OzoneConfiguration());
   }
 
-  @Test
-  public void testUploadPartCopyUsesGetObjectActionForSourceBucketOwnerLookup() throws Exception {
-    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, true);
-
-    // Trigger UploadPartCopy (MPU part upload with copy header).
-    final String uploadId = "upload-id";
-    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, 1, uploadId, ""));
-
-    assertEquals("GetObject", actionAtSourceBucketOwnerLookup.get());
-  }
-
-  @Test
-  public void testCopyObjectUsesGetObjectActionForSourceBucketOwnerLookup() throws Exception {
-    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, true);
-
-    // Trigger CopyObject (PUT with copy header, no upload ID).
-    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
-
-    assertEquals("GetObject", actionAtSourceBucketOwnerLookup.get());
-  }
-
-  @Test
-  public void testUploadPartCopyDoesNotSetActionWhenStsDisabled() throws Exception {
-    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, false);
-
-    // Trigger UploadPartCopy (MPU part upload with copy header).
-    final String uploadId = "upload-id";
-    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, 1, uploadId, ""));
-
-    assertNull(actionAtSourceBucketOwnerLookup.get());
-  }
-
-  @Test
-  public void testCopyObjectDoesNotSetActionWhenStsDisabled() throws Exception {
-    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, false);
-
-    // Trigger CopyObject (PUT with copy header, no upload ID).
-    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
-
-    assertNull(actionAtSourceBucketOwnerLookup.get());
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListObjectVersionsUsesListBucketVersionsAction(boolean isStsEnabled) throws Exception {
+    assertEquals("ListBucketVersions", listBucketAction(true, isStsEnabled));
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ETag", "ObjectParts"})
-  public void testGetObjectAttributesSendsSingleOmRequestWithGetObjectAttributesAction(String attribute)
-      throws Exception {
+  @ValueSource(booleans = {true, false})
+  public void testListObjectsUsesListBucketAction(boolean isStsEnabled) throws Exception {
+    assertEquals("ListBucket", listBucketAction(false, isStsEnabled));
+  }
+
+  @Test
+  public void testListObjectVersionsUsesListObjectVersionsAuditAction() throws Exception {
+    final AtomicReference<S3GAction> auditAction = new AtomicReference<>();
+    final BucketEndpoint endpoint = newBucketEndpoint(new AtomicReference<>(), true, auditAction);
+    endpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    endpoint.get("bucket");
+    assertEquals(S3GAction.LIST_OBJECT_VERSIONS, auditAction.get());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testUploadPartCopyUsesGetObjectActionForSourceBucketOwnerLookup(boolean isStsEnabled) throws Exception {
+    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
+    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, isStsEnabled);
+
+    // Trigger UploadPartCopy (MPU part upload with copy header).
+    final String uploadId = "upload-id";
+    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, 1, uploadId, ""));
+
+    assertEquals("GetObject", actionAtSourceBucketOwnerLookup.get());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCopyObjectUsesGetObjectActionForSourceBucketOwnerLookup(boolean isStsEnabled) throws Exception {
+    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
+    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, isStsEnabled);
+
+    // Trigger CopyObject (PUT with copy header, no upload ID).
+    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
+
+    assertEquals("GetObject", actionAtSourceBucketOwnerLookup.get());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"ETag,true", "ETag,false", "ObjectParts,true", "ObjectParts,false"})
+  public void testGetObjectAttributesSendsSingleOmRequestWithGetObjectAttributesAction(
+      String attribute, boolean isStsEnabled) throws Exception {
     final List<String> actions = new ArrayList<>();
     final ClientProtocol clientProtocol = mock(ClientProtocol.class);
-    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, true, clientProtocol, false);
+    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, isStsEnabled, clientProtocol, false);
 
     final Response response = getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute);
 
@@ -143,19 +147,6 @@ public class TestS3ActionOverrideForOwnerVerification {
     // OM enforces the dependent GetObject action itself, so S3 Gateway makes exactly one OM request.
     assertEquals(Collections.singletonList("GetObjectAttributes"), actions);
     verifySingleMetadataLookup(clientProtocol, attribute);
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"ETag", "ObjectParts"})
-  public void testGetObjectAttributesSkipsAdditionalCheckWhenStsDisabled(String attribute) throws Exception {
-    final List<String> actions = new ArrayList<>();
-    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, false);
-
-    final Response response = getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute);
-
-    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    // With STS disabled, no S3 action is sent to OM.
-    assertEquals(Collections.singletonList(null), actions);
   }
 
   @ParameterizedTest
@@ -245,11 +236,6 @@ public class TestS3ActionOverrideForOwnerVerification {
         .build();
   }
 
-  private static ObjectEndpoint newGetObjectAttributesEndpoint(List<String> actions, boolean isStsEnabled)
-      throws Exception {
-    return newGetObjectAttributesEndpoint(actions, isStsEnabled, mock(ClientProtocol.class), false);
-  }
-
   private static ObjectEndpoint newGetObjectAttributesEndpoint(List<String> actions, boolean isStsEnabled,
       ClientProtocol clientProtocol, boolean denyAccess) throws Exception {
     final HttpHeaders headers = mock(HttpHeaders.class);
@@ -294,6 +280,65 @@ public class TestS3ActionOverrideForOwnerVerification {
         .setConfig(conf)
         .setHeaders(headers)
         .setSignatureInfo(signatureInfo)
+        .build();
+  }
+
+  private static String listBucketAction(boolean listObjectVersions, boolean isStsEnabled) throws Exception {
+    final AtomicReference<String> actionAtBucketLookup = new AtomicReference<>();
+    final BucketEndpoint endpoint = newBucketEndpoint(actionAtBucketLookup, isStsEnabled);
+    if (listObjectVersions) {
+      endpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    }
+    endpoint.get("bucket");
+    return actionAtBucketLookup.get();
+  }
+
+  private static BucketEndpoint newBucketEndpoint(AtomicReference<String> actionAtBucketLookup,
+      boolean isStsEnabled) throws Exception {
+    return newBucketEndpoint(actionAtBucketLookup, isStsEnabled, null);
+  }
+
+  private static BucketEndpoint newBucketEndpoint(AtomicReference<String> actionAtBucketLookup,
+      boolean isStsEnabled, AtomicReference<S3GAction> auditActionAtList) throws Exception {
+    final OzoneClient client = mock(OzoneClient.class);
+    final ObjectStore objectStore = mock(ObjectStore.class);
+    final ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    final OzoneVolume volume = mock(OzoneVolume.class);
+    final OzoneBucket bucket = mock(OzoneBucket.class);
+    final AtomicReference<S3Auth> s3AuthRef = new AtomicReference<>();
+
+    doAnswer(invocationOnMock -> {
+      s3AuthRef.set(invocationOnMock.getArgument(0));
+      return null;
+    }).when(clientProtocol).setThreadLocalS3Auth(any(S3Auth.class));
+
+    when(client.getObjectStore()).thenReturn(objectStore);
+    when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket("bucket")).thenAnswer(invocationOnMock -> {
+      final S3Auth s3Auth = s3AuthRef.get();
+      actionAtBucketLookup.set(s3Auth == null ? null : s3Auth.getS3Action());
+      return bucket;
+    });
+    when(bucket.listKeys(anyString(), any(), anyBoolean())).thenReturn(Collections.emptyIterator());
+
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, isStsEnabled);
+    final BucketEndpoint base = new BucketEndpoint() {
+      @Override
+      Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
+        final Response response = super.handleGetRequest(context, bucketName);
+        if (auditActionAtList != null) {
+          auditActionAtList.set(context.getAction());
+        }
+        return response;
+      }
+    };
+    return EndpointBuilder.newBucketEndpointBuilder()
+        .setBase(base)
+        .setClient(client)
+        .setConfig(conf)
         .build();
   }
 

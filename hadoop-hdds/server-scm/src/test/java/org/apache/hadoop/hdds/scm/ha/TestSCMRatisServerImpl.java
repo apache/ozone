@@ -18,11 +18,13 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
@@ -32,16 +34,22 @@ import static org.mockito.Mockito.when;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Path;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
+import javax.net.ssl.X509TrustManager;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.client.RaftClient;
@@ -243,6 +251,45 @@ public class TestSCMRatisServerImpl {
       assertThat(roles.get(0)).startsWith("localhost:9894:LEADER:peer1:");
       assertThat(roles.get(0)).doesNotEndWith(":");
     }
+  }
+
+  @Test
+  public void testTlsConfigAcceptsOnlyScmCertificates() throws Exception {
+    SecurityConfig securityConfig = mock(SecurityConfig.class);
+    when(securityConfig.isSecurityEnabled()).thenReturn(true);
+    when(securityConfig.isGrpcTlsEnabled()).thenReturn(true);
+    ReloadingX509TrustManager clusterTrustManager = mock(ReloadingX509TrustManager.class);
+    CertificateClient certificateClient = mock(CertificateClient.class);
+    when(certificateClient.getKeyManager()).thenReturn(mock(ReloadingX509KeyManager.class));
+    when(certificateClient.getTrustManager()).thenReturn(clusterTrustManager);
+
+    X509TrustManager trustManager = (X509TrustManager) HASecurityUtils
+        .createSCMRatisTLSConfig(securityConfig, certificateClient).getTrustManager().getTrustManager();
+
+    X509Certificate scmCert = mock(X509Certificate.class);
+    when(scmCert.getBasicConstraints()).thenReturn(Integer.MAX_VALUE);
+    X509Certificate[] scmChain = {scmCert};
+    trustManager.checkClientTrusted(scmChain, "RSA");
+    trustManager.checkServerTrusted(scmChain, "RSA");
+
+    X509Certificate leafCert = mock(X509Certificate.class);
+    when(leafCert.getBasicConstraints()).thenReturn(-1);
+    X509Certificate[] leafChain = {leafCert};
+    assertThatThrownBy(() -> trustManager.checkClientTrusted(leafChain, "RSA"))
+        .isInstanceOf(CertificateException.class)
+        .hasMessageStartingWith("Not an SCM certificate");
+    assertThatThrownBy(() -> trustManager.checkServerTrusted(leafChain, "RSA"))
+        .isInstanceOf(CertificateException.class)
+        .hasMessageStartingWith("Not an SCM certificate");
+    // Only the peer certificate counts, not the CA certificates that follow it in the chain.
+    X509Certificate[] leafWithIssuerChain = {leafCert, scmCert};
+    assertThatThrownBy(() -> trustManager.checkClientTrusted(leafWithIssuerChain, "RSA"))
+        .isInstanceOf(CertificateException.class)
+        .hasMessageStartingWith("Not an SCM certificate");
+
+    // A chain the cluster trust manager rejects stays rejected.
+    doThrow(new CertificateException("untrusted chain")).when(clusterTrustManager).checkClientTrusted(scmChain, "RSA");
+    assertThatThrownBy(() -> trustManager.checkClientTrusted(scmChain, "RSA")).hasMessage("untrusted chain");
   }
 
   @Test

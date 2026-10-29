@@ -199,6 +199,7 @@ message OMRequest {
   optional LayoutVersion layoutVersion = 6;
 
   optional ReadConsistencyHint readConsistencyHint = 7;
+  optional bool assumeS3Context = 8;
 
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
@@ -1163,6 +1164,9 @@ message KeyArgs {
     // the given ETag for the operation to succeed. This is used for
     // S3 conditional writes with the If-Match header.
     optional string expectedETag = 24;
+
+    // If-None-Match entity ETag: an absent key or a different ETag is allowed.
+    optional string excludedETag = 25;
 }
 
 message KeyLocation {
@@ -1386,10 +1390,14 @@ message ListStatusRequest {
 
 message ListStatusResponse {
     repeated OzoneFileStatusProto statuses = 1;
+    // Set by OM: false means no entries follow this page. Absent from older OMs.
+    optional bool isTruncated = 2;
 }
 
 message ListStatusLightResponse {
     repeated OzoneFileStatusProtoLight statuses = 1;
+    // Set by OM: false means no entries follow this page. Absent from older OMs.
+    optional bool isTruncated = 2;
 }
 
 message CreateKeyRequest {
@@ -1425,6 +1433,9 @@ message LookupKeyResponse {
 message GetKeyInfoRequest {
   required KeyArgs keyArgs = 1;
   optional bool assumeS3Context = 2;
+  // Set by file system clients: OM rejects the request with
+  // NOT_SUPPORTED_OPERATION if the resolved bucket layout is OBJECT_STORE.
+  optional bool requireFileSystemLayout = 3;
 }
 
 message GetKeyInfoResponse {
@@ -1844,6 +1855,8 @@ message GetBucketDeletedBytesResponse {
   optional uint64 purgeableKeys = 4;
   optional uint64 snapshotTrappedDirs = 5;
   optional uint64 purgeableDirs = 6;
+  optional uint64 purgeableKeyBytes = 7;
+  optional uint64 purgeableDirBytes = 8;
 }
 
 message ServicePort {
@@ -2512,7 +2525,7 @@ message S3Authentication {
     optional string resolvedStsTempAccessKeyId = 8;
     optional string resolvedStsSecretKeyId = 9;
     // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
-    // in finer-grained STS permissions.
+    // in S3 action-based authorization (STS session policies and authorizers such as Ranger).
     optional string s3Action = 10;
     // Resolved so GetCallerIdentity can return the assumed-role identity from the session token.
     optional string resolvedStsAssumedRoleId = 11;

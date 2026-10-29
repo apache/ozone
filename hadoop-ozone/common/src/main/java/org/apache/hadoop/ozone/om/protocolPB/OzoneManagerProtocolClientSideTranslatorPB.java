@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -790,6 +791,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getExpectedETag() != null) {
       keyArgs.setExpectedETag(args.getExpectedETag());
     }
+    if (args.getExcludedETag() != null) {
+      keyArgs.setExcludedETag(args.getExcludedETag());
+    }
 
     req.setKeyArgs(keyArgs.build());
     req.setDerivedKeyPiggyBacking(args.isDerivedKeyPiggyBacking());
@@ -943,6 +947,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     GetKeyInfoRequest.Builder req = GetKeyInfoRequest.newBuilder();
     req.setKeyArgs(args.toProtobuf());
     req.setAssumeS3Context(assumeS3Context);
+    if (args.isRequireFileSystemLayout()) {
+      req.setRequireFileSystemLayout(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.GetKeyInfo)
         .setGetKeyInfoRequest(req)
@@ -1901,6 +1908,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (omKeyArgs.getExpectedETag() != null) {
       keyArgs.setExpectedETag(omKeyArgs.getExpectedETag());
     }
+    if (omKeyArgs.getExcludedETag() != null) {
+      keyArgs.setExcludedETag(omKeyArgs.getExcludedETag());
+    }
 
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());
     multipartUploadCompleteRequest.addAllPartsList(multipartUploadList
@@ -1923,6 +1933,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
+    abortMultipartUpload(omKeyArgs, false);
+  }
+
+  @Override
+  public void abortMultipartUpload(OmKeyArgs omKeyArgs, boolean assumeS3Context) throws IOException {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(omKeyArgs.getVolumeName())
         .setBucketName(omKeyArgs.getBucketName())
@@ -1936,6 +1951,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(
         Type.AbortMultiPartUpload)
         .setAbortMultiPartUploadRequest(multipartUploadAbortRequest.build())
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
     handleError(submitRequest(omRequest));
@@ -2094,13 +2110,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     GetBucketDeletedBytesResponse response = handleError(submitRequest(omRequest))
         .getGetBucketDeletedBytesResponse();
-    return new BucketDeletedBytes(
-        response.getSnapshotTrappedBytes(),
-        response.getPurgeableBytes(),
-        response.getSnapshotTrappedKeys(),
-        response.getPurgeableKeys(),
-        response.getSnapshotTrappedDirs(),
-        response.getPurgeableDirs());
+    BucketDeletedBytes.Builder builder = BucketDeletedBytes.newBuilder()
+        .setSnapshotTrappedBytes(response.getSnapshotTrappedBytes())
+        .setPurgeableBytes(response.getPurgeableBytes())
+        .setSnapshotTrappedKeys(response.getSnapshotTrappedKeys())
+        .setPurgeableKeys(response.getPurgeableKeys())
+        .setSnapshotTrappedDirs(response.getSnapshotTrappedDirs())
+        .setPurgeableDirs(response.getPurgeableDirs());
+    if (response.hasPurgeableKeyBytes()) {
+      builder.setPurgeableKeyBytes(response.getPurgeableKeyBytes());
+    }
+    if (response.hasPurgeableDirBytes()) {
+      builder.setPurgeableDirBytes(response.getPurgeableDirBytes());
+    }
+    return builder.build();
   }
 
   @Override
@@ -2359,6 +2382,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @SkipTracing
   public ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return this.threadLocalS3Auth;
+  }
+
+  @Override
+  @SkipTracing
+  public ThreadLocal<ReadConsistencyHint> getReadConsistencyHintProvider() {
+    return this.threadLocalReadConsistencyHint;
   }
 
   @Override
@@ -2640,6 +2669,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
+    return listStatusPage(args, recursive, startKey, numEntries, allowPartialPrefixes).getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<OzoneFileStatus> listStatusPage(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries, boolean allowPartialPrefixes) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -2665,13 +2700,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .getStatusesList()) {
       statusList.add(OzoneFileStatus.getFromProtobuf(fileStatus));
     }
-    return statusList;
+    return listStatusResponse.hasIsTruncated()
+        ? ListStatusResult.of(statusList, listStatusResponse.getIsTruncated())
+        : ListStatusResult.unknown(statusList);
   }
 
   @Override
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
+    return listStatusLightPage(args, recursive, startKey, numEntries, allowPartialPrefixes).getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<OzoneFileStatusLight> listStatusLightPage(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries, boolean allowPartialPrefixes) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -2702,7 +2745,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       statusList.add(OzoneFileStatusLight.getFromProtobuf(fileStatus));
     }
-    return statusList;
+    return listStatusLightResponse.hasIsTruncated()
+        ? ListStatusResult.of(statusList, listStatusLightResponse.getIsTruncated())
+        : ListStatusResult.unknown(statusList);
   }
 
   private ListStatusRequest.Builder createListStatusRequestBuilder(KeyArgs keyArgs, boolean recursive, String startKey,

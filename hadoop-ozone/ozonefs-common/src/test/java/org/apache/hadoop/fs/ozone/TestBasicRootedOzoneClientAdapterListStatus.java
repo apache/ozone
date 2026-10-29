@@ -19,6 +19,7 @@ package org.apache.hadoop.fs.ozone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,6 +39,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.fs.Path;
@@ -45,11 +47,15 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -77,7 +83,8 @@ public class TestBasicRootedOzoneClientAdapterListStatus {
   @BeforeEach
   public void setUp() throws Exception {
     adapter = mock(BasicRootedOzoneClientAdapterImpl.class, CALLS_REAL_METHODS);
-    proxy = mock(ClientProtocol.class);
+    // Real default methods, so the page methods delegate to the stubbed listStatus / listStatusLight.
+    proxy = mock(ClientProtocol.class, CALLS_REAL_METHODS);
     objectStore = mock(ObjectStore.class);
     bucket = mock(OzoneBucket.class);
 
@@ -109,6 +116,10 @@ public class TestBasicRootedOzoneClientAdapterListStatus {
 
   private List<FileStatusAdapter> listStatus(boolean lite) throws IOException {
     return adapter.listStatus(DIR_PATH, false, "", 100, OFS_URI, new Path("/"), "user", lite);
+  }
+
+  private ListStatusResult<FileStatusAdapter> listStatusPage(String path, boolean lite) throws IOException {
+    return adapter.listStatusPage(path, false, "", 100, OFS_URI, new Path("/"), "user", lite);
   }
 
   private void failListing(OMException e) throws IOException {
@@ -144,6 +155,38 @@ public class TestBasicRootedOzoneClientAdapterListStatus {
     }
     verify(proxy, never()).getBucketDetails(anyString(), anyString());
     verify(objectStore, never()).getVolume(anyString());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void listingPassesOnWhetherOmReportedTheListingComplete(boolean lite) throws IOException {
+    for (boolean truncated : new boolean[] {true, false}) {
+      when(proxy.listStatusLightPage(any(ListStatusLightOptions.class)))
+          .thenReturn(ListStatusResult.<OzoneFileStatusLight>of(Collections.emptyList(), truncated));
+      when(proxy.listStatusPage(any(ListStatusLightOptions.class)))
+          .thenReturn(ListStatusResult.<OzoneFileStatus>of(Collections.emptyList(), truncated));
+
+      assertEquals(!truncated, listStatusPage(DIR_PATH, lite).isComplete());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void listingWithoutOmReportIsNotComplete(boolean lite) throws IOException {
+    // The default page methods wrap listStatus / listStatusLight, as for an OM that does not set the flag.
+    assertFalse(listStatusPage(DIR_PATH, lite).isComplete());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"/", "/vol"})
+  public void rootAndVolumeListingsAreNotComplete(String path) throws IOException {
+    // Root and volume listings do not come from ListStatus, so they cannot report completeness.
+    when(objectStore.listVolumesByUser(anyString(), any(), any())).thenAnswer(i -> Collections.emptyIterator());
+    OzoneVolume volume = mock(OzoneVolume.class);
+    when(objectStore.getVolume("vol")).thenReturn(volume);
+    when(volume.listBuckets(any(), any())).thenAnswer(i -> Collections.emptyIterator());
+
+    assertFalse(listStatusPage(path, true).isComplete());
   }
 
   @ParameterizedTest

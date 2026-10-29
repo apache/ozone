@@ -26,7 +26,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
-import java.security.MessageDigest;
 import java.util.Map;
 import java.util.function.Consumer;
 import javax.ws.rs.core.HttpHeaders;
@@ -143,18 +142,7 @@ final class ObjectEndpointStreaming {
         writeGuard.addPreCommit(checkContentMD5Hook);
       }
 
-      // If sha256Digest exists, this request must validate x-amz-content-sha256
-      MessageDigest sha256Digest = body.getMessageDigest(OzoneConsts.FILE_HASH);
-      if (sha256Digest != null) {
-        final String actualSha256 = DatatypeConverter.printHexBinary(
-            sha256Digest.digest()).toLowerCase();
-        CheckedRunnable<IOException> checkSha256Hook = () -> {
-          if (!amzContentSha256Header.equals(actualSha256)) {
-            throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
-          }
-        };
-        writeGuard.addPreCommit(checkSha256Hook);
-      }
+      writeGuard.checkContentSha256(body, amzContentSha256Header);
     }
     return Pair.of(md5Hash, writeLen);
   }
@@ -167,9 +155,13 @@ final class ObjectEndpointStreaming {
       boolean derivedKeyPiggyBacking) throws IOException {
     // Only signed multi-chunk uploads ask OM to piggyback the derived key; every
     // other stream PUT passes false.
-    if (writeConditions.hasIfNoneMatch()) {
+    if (writeConditions.isCreateIfAbsent()) {
       return bucket.createStreamKeyIfNotExists(keyPath, length, replicationConfig, keyMetadata, tags,
           derivedKeyPiggyBacking);
+    }
+    if (writeConditions.hasIfNoneMatch()) {
+      return bucket.createStreamKeyIfNoneMatch(keyPath, length, writeConditions.getExcludedETag(), replicationConfig,
+          keyMetadata, tags, derivedKeyPiggyBacking);
     }
     if (writeConditions.hasIfMatch()) {
       return bucket.rewriteStreamKeyIfMatch(keyPath, length, writeConditions.getExpectedETag(),
@@ -240,6 +232,7 @@ final class ObjectEndpointStreaming {
           };
           writeGuard.addPreCommit(checkContentMD5Hook);
         }
+        writeGuard.checkContentSha256(body, headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256));
         writeGuard.getMetadata().put(OzoneConsts.ETAG, eTag);
         METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);

@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
@@ -51,17 +50,14 @@ class TestBackgroundContainerDataScannerIntegration
   @BeforeAll
   static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED, true);
+    ContainerScannerConfiguration scannerConfig = ozoneConfig.getObject(ContainerScannerConfiguration.class);
+    scannerConfig.setEnabled(true);
     // Make sure the background metadata scanner does not detect failures
     // before the data scanner under test does.
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED,
-        false);
+    scannerConfig.setMetadataScanEnabled(false);
     // Make the background data scanner run frequently to reduce test time.
-    ozoneConfig.setTimeDuration(
-        ContainerScannerConfiguration.DATA_SCAN_INTERVAL_KEY,
-        SCAN_INTERVAL.getSeconds(), TimeUnit.SECONDS);
+    scannerConfig.setDataScanInterval(SCAN_INTERVAL.toMillis());
+    ozoneConfig.setFromObject(scannerConfig);
     buildCluster(ozoneConfig);
   }
 
