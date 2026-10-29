@@ -727,10 +727,10 @@ download_and_verify_apache_release() {
   local base_url="${APACHE_MIRROR_URL:-https://www.apache.org/dyn/closer.lua?action=download&filename=}"
   local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
 
-  download_if_not_exists "${base_url}${remote_path}" "${DOWNLOAD_DIR}/${f}" >&2
+  download_if_not_exists "${base_url}${remote_path}" "${DOWNLOAD_DIR}/${f}" >&2 || return 1
   if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
     download_if_not_exists "${checksum_base_url}${remote_path}.asc" "${DOWNLOAD_DIR}/${f}.asc" >&2
-    gpg --verify "${DOWNLOAD_DIR}/${f}.asc" "${DOWNLOAD_DIR}/${f}" >&2 || exit 1
+    gpg --verify "${DOWNLOAD_DIR}/${f}.asc" "${DOWNLOAD_DIR}/${f}" >&2 || return 1
   fi
   echo "${DOWNLOAD_DIR}/${f}"
 }

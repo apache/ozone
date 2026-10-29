@@ -53,7 +53,7 @@ setup_ranger_acceptance_env() {
     import_keys https://downloads.apache.org/ranger/KEYS
   fi
 
-  tar -C "${TEMP_DIR}" -x -z -f "$(download_ranger)"
+  ( tarball=$(download_ranger) && tar -C "${TEMP_DIR}" -x -z -f "${tarball}" ) || return 1
   export RANGER_SOURCE_DIR="${TEMP_DIR}/apache-ranger-${RANGER_VERSION}"
   chmod -R a+rX "${RANGER_SOURCE_DIR}"
   export RANGER_INIT_POSTGRES_SH="${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/rdbms/init_postgres.sh"
@@ -84,7 +84,7 @@ setup_ranger_acceptance_env() {
   if [[ -d "${RANGER_SOURCE_DIR}/dev-support/ranger-docker" ]]; then
     find "${RANGER_SOURCE_DIR}/dev-support/ranger-docker" -type f -name '*.sh' -exec chmod a+x {} +
   fi
-  tar -C "${TEMP_DIR}" -x -z -f "$(download_ranger_ozone_plugin)"
+  ( tarball=$(download_ranger_ozone_plugin) && tar -C "${TEMP_DIR}" -x -z -f "${tarball}" ) || return 1
   export RANGER_OZONE_PLUGIN_DIR="${TEMP_DIR}/ranger-${RANGER_VERSION}-ozone-plugin"
   chmod -R a+rX "${RANGER_OZONE_PLUGIN_DIR}"
   chmod a+x "${RANGER_OZONE_PLUGIN_DIR}"/*.sh
