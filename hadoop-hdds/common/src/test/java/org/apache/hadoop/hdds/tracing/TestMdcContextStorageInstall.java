@@ -35,6 +35,8 @@ import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.junit.jupiter.api.AfterEach;
@@ -70,7 +72,8 @@ public class TestMdcContextStorageInstall {
   }
 
   private static void initTracing(boolean enabled) {
-    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    SdkTracerProvider provider = SdkTracerProvider.builder()
+        .addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.noop())).build();
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
     MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
@@ -136,7 +139,7 @@ public class TestMdcContextStorageInstall {
     try {
       try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("span")) {
         String[] inTask = executor.submit(Context.current().wrap(
-            () -> new String[] {MDC.get(MDC_TRACE_ID), MDC.get(MDC_SPAN_ID)})).get();
+            () -> new String[]{MDC.get(MDC_TRACE_ID), MDC.get(MDC_SPAN_ID)})).get();
         assertEquals(MDC.get(MDC_TRACE_ID), inTask[0]);
         assertEquals(MDC.get(MDC_SPAN_ID), inTask[1]);
       }
