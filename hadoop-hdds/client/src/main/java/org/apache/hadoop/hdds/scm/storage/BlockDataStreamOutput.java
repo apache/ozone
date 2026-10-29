@@ -432,13 +432,18 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    *              it applies only to a PutBlock committed in the middle of the stream without Raft
    * @param close whether putBlock is happening as part of closing the stream
    */
-  public void executePutBlock(boolean sync, boolean close) throws IOException {
+  private void executePutBlock(boolean sync, boolean close) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
-    Objects.requireNonNull(bufferList, "bufferList == null");
-    // null if no data was written since the most recent putBlock
-    final List<StreamBuffer> byteBufferList = buffersForPutBlock;
-    buffersForPutBlock = null;
+    final List<StreamBuffer> byteBufferList;
+    if (!sync && !close) {
+        Objects.requireNonNull(bufferList, "bufferList == null");
+        byteBufferList = buffersForPutBlock;
+        buffersForPutBlock = null;
+        Objects.requireNonNull(byteBufferList, "byteBufferList == null");
+    } else {
+        byteBufferList = null;
+    }
     waitFuturesComplete();
     if (close && putBlockWithoutRaft) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
@@ -485,7 +490,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               throw new CompletionException(sce);
             }
             // if the ioException is not set, putBlock is successful
-            if (getIoException() == null && byteBufferList != null) {
+            if (getIoException() == null) {
               BlockID responseBlockID = BlockID.getFromProtobuf(
                   e.getPutBlock().getCommittedBlockLength().getBlockID());
               Preconditions.checkState(blockID.get().getContainerBlockID()
