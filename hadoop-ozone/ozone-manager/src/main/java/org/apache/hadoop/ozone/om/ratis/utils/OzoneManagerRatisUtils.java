@@ -361,6 +361,13 @@ public final class OzoneManagerRatisUtils {
       return new OMQuotaRepairRequest(omRequest);
     case PutObjectTagging:
       keyArgs = omRequest.getPutObjectTaggingRequest().getKeyArgs();
+      if (omRequest.getAssumeS3Context()) {
+        // Resolve before choosing the bucket layout and write the resolved volume to Ratis.
+        keyArgs = keyArgs.toBuilder().setVolumeName(
+            ozoneManager.getS3VolumeContext().getOmVolumeArgs().getVolume()).build();
+        omRequest = omRequest.toBuilder().setPutObjectTaggingRequest(
+            omRequest.getPutObjectTaggingRequest().toBuilder().setKeyArgs(keyArgs)).build();
+      }
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;

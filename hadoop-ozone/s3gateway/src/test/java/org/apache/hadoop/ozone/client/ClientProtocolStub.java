@@ -1026,6 +1026,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void putS3ObjectTagging(String bucketName, String keyName, Map<String, String> tags) throws IOException {
+    objectStoreStub.getS3Volume().getBucket(bucketName).putObjectTagging(keyName, tags);
+  }
+
+  @Override
   public void putObjectTagging(String volumeName, String bucketName, String keyName, Map<String, String> tags)
       throws IOException {
     getBucket(volumeName, bucketName).putObjectTagging(keyName, tags);

@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +32,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -51,6 +56,31 @@ public class TestS3PutObjectTaggingRequest extends OMKeyRequestTests {
     Map<String, String> tags = new HashMap<>();
     getTags(2);
     doPreExecute(volumeName, bucketName, keyName, tags);
+  }
+
+  @Test
+  public void testAssumeS3Context() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+    when(ozoneManager.getS3VolumeContext()).thenReturn(new S3VolumeContext(
+        OmVolumeArgs.newBuilder().setVolume(volumeName).setOwnerName("owner").setAdminName("admin").build(), "owner"));
+    Map<String, String> tags = getTags(2);
+    OMRequest original = createPutObjectTaggingRequest("s3v", bucketName, keyName, tags)
+        .toBuilder().setAssumeS3Context(true).build();
+
+    S3PutObjectTaggingRequest resolved =
+        (S3PutObjectTaggingRequest) OzoneManagerRatisUtils.createClientRequest(original, ozoneManager);
+    assertEquals(getBucketLayout(), resolved.getBucketLayout());
+    OMRequest replicated = resolved.preExecute(ozoneManager).toBuilder().clearAssumeS3Context().build();
+    assertEquals(volumeName, replicated.getPutObjectTaggingRequest().getKeyArgs().getVolumeName());
+
+    S3PutObjectTaggingRequest request =
+        (S3PutObjectTaggingRequest) OzoneManagerRatisUtils.createClientRequest(replicated, ozoneManager);
+    assertEquals(getBucketLayout(), request.getBucketLayout());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        request.validateAndUpdateCache(ozoneManager, 2L).getOMResponse().getStatus());
+    assertEquals(tags, omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey).getTags());
+    verify(ozoneManager).getS3VolumeContext();
   }
 
   @Test

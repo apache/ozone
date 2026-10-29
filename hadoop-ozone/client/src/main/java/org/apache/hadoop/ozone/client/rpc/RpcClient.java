@@ -3159,6 +3159,24 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void putS3ObjectTagging(String bucketName, String keyName, Map<String, String> tags) throws IOException {
+    if (!OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion)) {
+      putObjectTagging(getS3VolumeContext().getOmVolumeArgs().getVolume(), bucketName, keyName, tags);
+      return;
+    }
+    verifyBucketName(bucketName);
+    Objects.requireNonNull(keyName, "keyName == null");
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .addAllTags(tags)
+        .setAssumeS3Context(true)
+        .build();
+    ozoneManagerClient.putObjectTagging(keyArgs);
+  }
+
+  @Override
   public void putObjectTagging(String volumeName, String bucketName,
                                String keyName, Map<String, String> tags) throws IOException {
     if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(omVersion)) {

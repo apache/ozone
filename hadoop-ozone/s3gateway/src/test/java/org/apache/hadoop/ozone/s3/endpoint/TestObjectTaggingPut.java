@@ -81,16 +81,18 @@ public class TestObjectTaggingPut {
   }
 
   @Test
-  public void testPutTaggingWithoutBucketLookup() throws Exception {
+  public void testPutTaggingWithoutVolumeOrBucketLookup() throws Exception {
     OzoneVolume volume = mock(OzoneVolume.class);
     ClientProtocol protocol = mock(ClientProtocol.class);
     ObjectEndpoint endpoint = createObjectEndpoint(protocol, volume, BUCKET_NAME);
 
     putTagging(endpoint, BUCKET_NAME, KEY_NAME, twoTags());
 
+    verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
+    verify(protocol, never()).getS3VolumeContext();
     verify(volume, never()).getBucket(anyString());
     verify(protocol, never()).getBucketDetails(anyString(), anyString());
-    verify(protocol).putObjectTagging("s3Volume", BUCKET_NAME, KEY_NAME, TAGS);
+    verify(protocol).putS3ObjectTagging(BUCKET_NAME, KEY_NAME, TAGS);
   }
 
   @Test
@@ -170,7 +172,7 @@ public class TestObjectTaggingPut {
         .build();
 
     doThrow(new OMException("PutObjectTagging is not currently supported for FSO directory",
-        ResultCodes.NOT_SUPPORTED_OPERATION)).when(protocol).putObjectTagging("s3Volume", "fsoBucket", "dir/", TAGS);
+        ResultCodes.NOT_SUPPORTED_OPERATION)).when(protocol).putS3ObjectTagging("fsoBucket", "dir/", TAGS);
 
     assertErrorResponse(NOT_IMPLEMENTED, () -> putTagging(endpoint, "fsoBucket", "dir/", twoTags()));
   }

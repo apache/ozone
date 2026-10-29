@@ -63,7 +63,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
           S3Tagging.Tag::getValue
       );
 
-      getClientProtocol().putObjectTagging(context.getVolume().getName(), context.getBucketName(), keyName, tags);
+      getClientProtocol().putS3ObjectTagging(context.getBucketName(), keyName, tags);
 
       getMetrics().updatePutObjectTaggingSuccessStats(context.getStartNanos());
 
