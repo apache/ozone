@@ -1346,7 +1346,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public List<DatanodeStorageTypeUsageInfoProto> listStorageTypeUsageInfo(
-      ListStorageTypeUsageInfoRequestProto requestProto, int clientVersion) throws IOException {
+      ListStorageTypeUsageInfoRequestProto requestProto, ClientVersion clientVersion) throws IOException {
     ListStorageTypeUsageInfoResponseProto response =
         submitRequest(Type.ListStorageTypeUsageInfo,
             builder -> builder.setListStorageTypeUsageInfoRequestProto(requestProto))

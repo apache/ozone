@@ -366,7 +366,7 @@ public class TestSCMBlockProtocolServer {
 
   private List<AllocatedBlock> allocateBlock() throws IOException {
     return server.allocateBlock(128 * MB, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "o",
-        new ExcludeList(), null);
+        new ExcludeList(), null, OzoneStoragePolicy.getDefaultPolicy(), false);
   }
 
   @Test

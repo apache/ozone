@@ -125,7 +125,7 @@ public class TestContainerProtocolCalls {
         response(Type.PutSmallFile));
 
     ContainerProtocolCalls.writeSmallFile(client, new BlockID(1, 1),
-        "data".getBytes(StandardCharsets.UTF_8), null);
+        "data".getBytes(StandardCharsets.UTF_8), null, null);
 
     assertEquals(VERSION, sentRequest(client).getWritePipelineVersion());
   }

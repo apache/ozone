@@ -703,7 +703,7 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void chooseNodeWhenUsedNodeRackHasOnlyDecommissionedNodes() throws SCMException {
-    setup(3 * NODE_PER_RACK);
+    setup(3 * NODE_PER_RACK, StorageType.DEFAULT);
     // rack1 has no usable node left: node5 already has a replica, and nodes 6-9 are decommissioned.
     for (int i = 6; i < 10; i++) {
       dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
@@ -721,7 +721,7 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void fallbackWhenUsedNodeRacksHaveOnlyDecommissionedNodes() throws SCMException {
-    setup(3 * NODE_PER_RACK);
+    setup(3 * NODE_PER_RACK, StorageType.DEFAULT);
     // The replicas are on node0 (rack0) and node5 (rack1), and neither rack has another usable node:
     // node1 and node6 are excluded because their replicas are being decommissioned, and the rest are decommissioned.
     dnInfos.get(1).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
@@ -740,7 +740,7 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void fallbackDoesNotSkipRackOfExcludedNode() throws SCMException {
-    setup(4 * NODE_PER_RACK);
+    setup(4 * NODE_PER_RACK, StorageType.DEFAULT);
     // The replicas are on node0 (rack0), node5 (rack1) and node15 (rack3), and those racks have no other usable
     // node. node10 on rack2 has a replica that is being decommissioned, so it is excluded.
     for (int i : new int[] {1, 2, 3, 4, 6, 7, 8, 9, 16, 17, 18, 19}) {
@@ -762,7 +762,7 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void fallbackToSameRackWhenOtherRackHasOnlyDecommissionedNodes() throws SCMException {
-    setup(2 * NODE_PER_RACK);
+    setup(2 * NODE_PER_RACK, StorageType.DEFAULT);
     // All of rack1 is being decommissioned. node5 has a replica that is being decommissioned, so it is excluded,
     // and nodes 6-9 are already decommissioned.
     dnInfos.get(5).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
@@ -786,7 +786,7 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void fallbackThrowsWhenNoRackHasUsableNode() {
-    setup(2 * NODE_PER_RACK);
+    setup(2 * NODE_PER_RACK, StorageType.DEFAULT);
     // Two replicas are on rack0, and every other node is decommissioned.
     for (int i = 2; i < 2 * NODE_PER_RACK; i++) {
       dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));

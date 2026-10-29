@@ -1785,7 +1785,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<DatanodeStorageTypeUsageInfoProto> listStorageTypeUsageInfo(
-      ListStorageTypeUsageInfoRequestProto requestProto, int clientVersion) throws IOException {
+      ListStorageTypeUsageInfoRequestProto requestProto, ClientVersion clientVersion) throws IOException {
     NodeOperationalState opState = requestProto.hasOpState() ? requestProto.getOpState() : null;
     NodeState state = requestProto.hasState() ? requestProto.getState() : null;
 

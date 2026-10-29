@@ -215,7 +215,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
     NetworkTopology topology = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     NodeManager nodeManager = mock(NodeManager.class);
     when(nodeManager.getClusterNetworkTopologyMap()).thenReturn(topology);
-    when(nodeManager.hasAvailableSpace(any())).thenReturn(true);
+    when(nodeManager.hasAvailableSpace(any(), any())).thenReturn(true);
     List<DatanodeDetails> nodes = new ArrayList<>();
     List<DatanodeInfo> nodeInfos = new ArrayList<>();
     for (int i = 0; i < 6; i++) {

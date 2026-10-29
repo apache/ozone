@@ -79,8 +79,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -666,7 +666,7 @@ public class TestKeyValueContainer {
     containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
     KeyValueContainer container = new KeyValueContainer(containerData, CONF);
     HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, StorageType.DISK);
     container.populatePathFields(scmId, containerVolume);
     try (InputStream in = Files.newInputStream(tarFile)) {
       container.importContainerData(in, packer);

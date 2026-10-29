@@ -1211,7 +1211,7 @@ public class TestKeyValueHandler {
         containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(), DATANODE_UUID);
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID, StorageType.DISK);
     containerSet.addContainer(container);
     return container;
   }

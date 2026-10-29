@@ -108,7 +108,7 @@ public class TestClientThreadShutdown {
         pipeline.getPipeline().getReplicationConfig(), config);
     RatisBlockOutputStream stream = new RatisBlockOutputStream(pipeline.getBlockID(), -1,
         pipeline.getClientFactory(), pipeline.getPipeline(), new BufferPool(100, 8), config, null,
-        ContainerClientMetrics.acquire(), bufferArgs, () -> executor);
+        ContainerClientMetrics.acquire(), bufferArgs, () -> executor, null);
     retainedClient = stream;
     stream.write(new byte[100]);
     stream.getResponseExecutor().submit(() -> { }).get(10, TimeUnit.SECONDS);

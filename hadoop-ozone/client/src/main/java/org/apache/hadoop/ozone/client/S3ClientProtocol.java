@@ -27,8 +27,8 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -183,8 +184,14 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
-  public void setBucketStorageType(String volumeName, String bucketName, StorageType storageType) throws IOException {
-    delegate.setBucketStorageType(volumeName, bucketName, storageType);
+  public void setBucketStoragePolicy(String volumeName, String bucketName, StoragePolicy storagePolicy)
+      throws IOException {
+    delegate.setBucketStoragePolicy(volumeName, bucketName, storagePolicy);
+  }
+
+  @Override
+  public void setBucketStoragePolicy(OmBucketArgs args) throws IOException {
+    delegate.setBucketStoragePolicy(args);
   }
 
   @Override

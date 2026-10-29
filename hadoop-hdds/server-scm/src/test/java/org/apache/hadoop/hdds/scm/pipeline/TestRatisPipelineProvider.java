@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -700,7 +699,7 @@ public class TestRatisPipelineProvider {
 
   private static DatanodeInfo datanodeInfoWithDiskAndSsd(DatanodeDetails dn) {
     DatanodeInfo datanodeInfo = new DatanodeInfo(
-        dn, NodeStatus.inServiceHealthy(), UpgradeUtils.defaultLayoutVersionProto(),
+        dn, NodeStatus.inServiceHealthy(), UpgradeUtils.defaultVersionProto(),
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     List<StorageReportProto> storageReports = new ArrayList<>();
     long capacity = 10L * 1024 * 1024 * 1024;

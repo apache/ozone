@@ -78,6 +78,7 @@ import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -281,8 +282,10 @@ public class TestSCMClientProtocolServer {
   public void testListStorageTypeUsageInfoAggregatesPerDatanodeAndGatesZeroCapacity() throws Exception {
     DatanodeDetails dnDetails1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dnDetails2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeInfo dn1 = new DatanodeInfo(dnDetails1, NodeStatus.inServiceHealthy(), null, 0);
-    DatanodeInfo dn2 = new DatanodeInfo(dnDetails2, NodeStatus.inServiceHealthy(), null, 0);
+    DatanodeInfo dn1 = new DatanodeInfo(dnDetails1, NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultVersionProto(), 0);
+    DatanodeInfo dn2 = new DatanodeInfo(dnDetails2, NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultVersionProto(), 0);
 
     // dn1 only reports DISK; every other StorageType stays at the default zero capacity
     // and must be gated out of the response.

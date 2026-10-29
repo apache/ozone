@@ -449,7 +449,7 @@ public class TestDeletedBlockLog {
     // depend on the order in which the candidates are checked.
     final ContainerID pendingCid = ContainerID.valueOf(bothTxns.iterator().next().getContainerID());
     pendingOps.scheduleAddReplica(pendingCid, DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build(),
-        0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, 0L);
+        0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, null, 0L);
 
     commitTransactions(bothTxns, dnList.get(0), dnList.get(1), dnList.get(2));
 
@@ -470,7 +470,7 @@ public class TestDeletedBlockLog {
     // A copy is scheduled, so its export may predate the source recording the deletion, and all original replicas
     // acknowledge before the copy is imported: the transaction must be kept.
     DatanodeDetails copyTarget = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
-    pendingOps.scheduleAddReplica(cid, copyTarget, 0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, 0L);
+    pendingOps.scheduleAddReplica(cid, copyTarget, 0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, null, 0L);
     commitTransactions(singleTxn, dnList.get(0), dnList.get(1), dnList.get(2));
     assertEquals(1, deletedBlockLog.getNumOfValidTransactions(), "purged while a replica was being copied");
 
@@ -500,7 +500,7 @@ public class TestDeletedBlockLog {
     final ContainerID cid = ContainerID.valueOf(blocks.get(0).getContainerID());
 
     DatanodeDetails copyTarget = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
-    pendingOps.scheduleAddReplica(cid, copyTarget, 0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, 0L);
+    pendingOps.scheduleAddReplica(cid, copyTarget, 0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, null, 0L);
     commitTransactions(singleTxn, dnList.get(0), dnList.get(1), dnList.get(2));
     assertEquals(1, deletedBlockLog.getNumOfValidTransactions());
 

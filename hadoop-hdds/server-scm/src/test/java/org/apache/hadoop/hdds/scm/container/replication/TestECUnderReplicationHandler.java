@@ -71,7 +71,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -642,7 +641,7 @@ public class TestECUnderReplicationHandler {
     when(replicationManager.isNodeHighlyLoaded(decomNode)).thenReturn(true);
 
     AtomicInteger chooseCallCount = new AtomicInteger(0);
-    when(ecPlacementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong()))
+    when(ecPlacementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(), any()))
         .thenAnswer(invocation -> {
           if (chooseCallCount.getAndIncrement() == 0) {
             return emptyList();
@@ -690,7 +689,7 @@ public class TestECUnderReplicationHandler {
         .findFirst().get().getDatanodeDetails();
     when(replicationManager.isNodeHighlyLoaded(decomNode)).thenReturn(true);
 
-    when(ecPlacementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong()))
+    when(ecPlacementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(), any()))
         .thenAnswer(invocation -> {
           int nodesRequired = invocation.getArgument(3);
           if (nodesRequired == 2) {

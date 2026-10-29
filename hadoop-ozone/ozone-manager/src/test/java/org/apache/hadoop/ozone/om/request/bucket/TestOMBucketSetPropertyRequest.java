@@ -49,11 +49,11 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 
@@ -646,7 +646,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
   public void testAllowSetStoragePolicyAfterFinalization() throws Exception {
     OMRequest request = storagePolicyRequest(OzoneStoragePolicy.COLD, null, true);
 
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    OMVersionManager versionManager = mock(OMVersionManager.class);
     when(versionManager.isAllowed(
         OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(true);
 
@@ -687,7 +687,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
   }
 
   private ValidationContext preFinalizedContext() {
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    OMVersionManager versionManager = mock(OMVersionManager.class);
     when(versionManager.isAllowed(
         OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(false);
     return of(versionManager, omMetadataManager);

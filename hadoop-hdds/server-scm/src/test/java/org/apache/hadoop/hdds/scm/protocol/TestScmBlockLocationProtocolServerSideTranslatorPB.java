@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -101,7 +103,8 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     AllocatedBlock block = blockInPipeline(1L, pipeline);
 
     when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(), anyString())).thenReturn(Collections.singletonList(block));
+        anyString(), any(), anyString(), any(StoragePolicy.class), anyBoolean()))
+        .thenReturn(Collections.singletonList(block));
 
     service = new ScmBlockLocationProtocolServerSideTranslatorPB(impl, scm, mock(ProtocolMessageMetrics.class));
   }
@@ -161,7 +164,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
   private void setAllocatedBlocks(List<AllocatedBlock> blocks) throws Exception {
     when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(), anyString())).thenReturn(blocks);
+        anyString(), any(), anyString(), any(StoragePolicy.class), anyBoolean())).thenReturn(blocks);
   }
 
   private void assertAllMembersHaveVersion(int expected,

@@ -787,7 +787,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setListStorageTypeUsageInfoResponseProto(
                 getListStorageTypeUsageInfo(
-                    request.getListStorageTypeUsageInfoRequestProto(), request.getVersion()))
+                    request.getListStorageTypeUsageInfoRequestProto(), clientVersion))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -1489,7 +1489,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public ListStorageTypeUsageInfoResponseProto getListStorageTypeUsageInfo(
-      ListStorageTypeUsageInfoRequestProto request, int clientVersion) throws IOException {
+      ListStorageTypeUsageInfoRequestProto request, ClientVersion clientVersion) throws IOException {
     List<DatanodeStorageTypeUsageInfoProto> usageInfoProtos =
         impl.listStorageTypeUsageInfo(request, clientVersion);
     return ListStorageTypeUsageInfoResponseProto.newBuilder()

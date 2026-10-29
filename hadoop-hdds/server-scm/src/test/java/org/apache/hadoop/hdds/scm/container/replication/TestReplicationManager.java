@@ -1994,7 +1994,7 @@ public class TestReplicationManager {
     // Complete one fragment of cmd1
     ContainerReplicaOp op1 = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        cmd1.getTargetDatanodes().get(0), 1, cmd1, Long.MAX_VALUE, 0);
+        cmd1.getTargetDatanodes().get(0), 1, cmd1, Long.MAX_VALUE, 0, null);
     rm.opCompleted(op1, container.containerID(), false);
     // Still 2 because cmd1 is not fully finished
     assertEquals(2, rm.getInflightReconstructionCount());
@@ -2002,7 +2002,7 @@ public class TestReplicationManager {
     // Complete second fragment of cmd1
     ContainerReplicaOp op2 = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        cmd1.getTargetDatanodes().get(1), 2, cmd1, Long.MAX_VALUE, 0);
+        cmd1.getTargetDatanodes().get(1), 2, cmd1, Long.MAX_VALUE, 0, null);
     rm.opCompleted(op2, container.containerID(), false);
     // Now 1
     assertEquals(1, rm.getInflightReconstructionCount());
@@ -2011,7 +2011,7 @@ public class TestReplicationManager {
     // Complete cmd2
     ContainerReplicaOp op3 = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        cmd2.getTargetDatanodes().get(0), 3, cmd2, Long.MAX_VALUE, 0);
+        cmd2.getTargetDatanodes().get(0), 3, cmd2, Long.MAX_VALUE, 0, null);
     rm.opCompleted(op3, container.containerID(), false);
     assertEquals(0, rm.getInflightReconstructionCount());
   }
@@ -2106,10 +2106,10 @@ public class TestReplicationManager {
 
     ContainerReplicaOp op1 = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0);
+        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0, null);
     ContainerReplicaOp op2 = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        cmd.getTargetDatanodes().get(1), 2, cmd, Long.MAX_VALUE, 0);
+        cmd.getTargetDatanodes().get(1), 2, cmd, Long.MAX_VALUE, 0, null);
 
     rm.opCompleted(op1, container.containerID(), false);
     assertEquals(0, rm.getInflightReconstructionCount());
@@ -2221,7 +2221,7 @@ public class TestReplicationManager {
 
     ContainerReplicaOp op = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0);
+        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0, null);
     rm.opCompleted(op, container.containerID(), false);
     assertEquals(1, rm.getReconstructionPendingFragmentCount(cmd.getId()));
     assertEquals(1, rm.getInflightReconstructionCount());
@@ -2249,14 +2249,14 @@ public class TestReplicationManager {
 
     ContainerReplicaOp firstAdd = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0);
+        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0, null);
     rm.opCompleted(firstAdd, container.containerID(), true);
     assertEquals(1, rm.getReconstructionPendingFragmentCount(cmd.getId()));
     assertEquals(1, rm.getInflightReconstructionCount());
 
     ContainerReplicaOp secondAdd = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        cmd.getTargetDatanodes().get(1), 2, cmd, Long.MAX_VALUE, 0);
+        cmd.getTargetDatanodes().get(1), 2, cmd, Long.MAX_VALUE, 0, null);
     rm.opCompleted(secondAdd, container.containerID(), true);
     assertEquals(0, rm.getReconstructionPendingFragmentCount(cmd.getId()));
     assertEquals(0, rm.getInflightReconstructionCount());

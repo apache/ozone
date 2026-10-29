@@ -212,7 +212,7 @@ public class TestSimplePipelineProvider {
       HddsProtos.StorageTypeProto... storageTypes) {
     DatanodeInfo datanodeInfo = new DatanodeInfo(
         MockDatanodeDetails.randomDatanodeDetails(),
-        NodeStatus.inServiceHealthy(), UpgradeUtils.defaultLayoutVersionProto(),
+        NodeStatus.inServiceHealthy(), UpgradeUtils.defaultVersionProto(),
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     List<StorageReportProto> storageReports = new ArrayList<>();
     for (HddsProtos.StorageTypeProto storageType : storageTypes) {
