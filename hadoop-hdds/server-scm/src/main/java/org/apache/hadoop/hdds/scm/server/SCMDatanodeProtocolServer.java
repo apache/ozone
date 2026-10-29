@@ -83,6 +83,7 @@ import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -341,28 +342,11 @@ public class SCMDatanodeProtocolServer implements
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
-    SCMHeartbeatRequestProto heartbeatToDispatch = heartbeat;
-    SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode leasedReport =
-        null;
-    boolean leasedReportRejected = false;
-    if (heartbeat.hasContainerReport()
-        && hasFullContainerReportLease(heartbeat.getContainerReport())) {
-      leasedReport = claimLeasedFCR(heartbeat);
-      if (leasedReport == null) {
-        leasedReportRejected = true;
-        heartbeatToDispatch = heartbeat.toBuilder().clearContainerReport().build();
-      }
-    }
+    ContainerReportFromDatanode containerReport = prepareFullContainerReport(heartbeat);
+    boolean leasedReportRejected = heartbeat.hasContainerReport() && containerReport == null;
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
-    try {
-      for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeatToDispatch, leasedReport)) {
-        cmdResponses.add(getCommandResponse(cmd, scm));
-      }
-    } catch (RuntimeException | Error ex) {
-      if (leasedReport != null) {
-        leasedReport.completeIfNotDispatched();
-      }
-      throw ex;
+    for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeat, containerReport)) {
+      cmdResponses.add(getCommandResponse(cmd, scm));
     }
     final OptionalLong term = getTermIfLeader();
     boolean auditSuccess = true;
@@ -427,11 +411,21 @@ public class SCMDatanodeProtocolServer implements
     fcrLeaseManager.removeDatanode(datanode);
   }
 
-  private SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode claimLeasedFCR(
-      SCMHeartbeatRequestProto heartbeat) {
+  /**
+   * Prepares the FCR for dispatch, claiming its lease when present.
+   *
+   * @return the accepted report, or null if no FCR was supplied or its lease was rejected
+   */
+  private ContainerReportFromDatanode prepareFullContainerReport(SCMHeartbeatRequestProto heartbeat) {
+    if (!heartbeat.hasContainerReport()) {
+      return null;
+    }
     DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
         heartbeat.getDatanodeDetails());
     ContainerReportsProto containerReport = heartbeat.getContainerReport();
+    if (!containerReport.hasFullContainerReportLease()) {
+      return new ContainerReportFromDatanode(datanodeDetails, containerReport);
+    }
     FullContainerReportLeaseProto lease =
         containerReport.getFullContainerReportLease();
     OptionalLong currentTerm = getFCRLeaseTerm();
@@ -440,7 +434,7 @@ public class SCMDatanodeProtocolServer implements
             lease.getTerm(), lease.getId());
     if (claim.isPresent()) {
       SCMFullContainerReportLeaseManager.LeaseClaim leaseClaim = claim.get();
-      return new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
+      return new ContainerReportFromDatanode(
           datanodeDetails, containerReport, leaseClaim.isRegistrationReport(),
           leaseClaim);
     }
@@ -449,10 +443,6 @@ public class SCMDatanodeProtocolServer implements
             + "lease id {} and term {}.", datanodeDetails.getUuidString(),
         lease.getId(), lease.getTerm());
     return null;
-  }
-
-  private boolean hasFullContainerReportLease(ContainerReportsProto report) {
-    return report.hasFullContainerReportLease();
   }
 
   private void addFCRLeaseIfRequested(SCMHeartbeatRequestProto heartbeat,

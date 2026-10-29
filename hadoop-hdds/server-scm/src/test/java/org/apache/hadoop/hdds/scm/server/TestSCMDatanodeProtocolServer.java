@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.INCREMENTAL_CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REGISTRATION_CONT_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.ozone.test.MetricsAsserts.assertGauge;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -61,6 +63,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
@@ -109,6 +112,7 @@ class TestSCMDatanodeProtocolServer {
     publisher = mock(EventPublisher.class);
     datanode = MockDatanodeDetails.randomDatanodeDetails();
     when(nodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(nodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
     when(nodeManager.register(any(), any(), any(), any())).thenReturn(
         new RegisteredCommand(SCMRegisteredResponseProto.ErrorCode.success, datanode, "cluster"));
     server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, SCMContext.emptyContext());
@@ -325,7 +329,12 @@ class TestSCMDatanodeProtocolServer {
         .setContainerReport(ContainerReportsProto.getDefaultInstance()).build();
 
     assertFalse(server.sendHeartbeat(request).getFullContainerReportLeaseRejected());
-    verify(publisher).fireEvent(eq(CONTAINER_REPORT), any());
+    ArgumentCaptor<ContainerReportFromDatanode> report = ArgumentCaptor.forClass(ContainerReportFromDatanode.class);
+    verify(publisher).fireEvent(eq(CONTAINER_REPORT), report.capture());
+    assertEquals(request.getContainerReport(), report.getValue().getReport());
+    assertFalse(report.getValue().isRegister());
+    assertTrue(report.getValue().startProcessing());
+    report.getValue().complete(true);
   }
 
   @Test
@@ -338,10 +347,12 @@ class TestSCMDatanodeProtocolServer {
         .setContainerReport(ContainerReportsProto.newBuilder()
             .setFullContainerReportLease(
                 FullContainerReportLeaseProto.newBuilder().setId(leaseId).setTerm(SCMContext.INVALID_TERM)))
-        .setNodeReport(NodeReportProto.getDefaultInstance()).build();
+        .setNodeReport(NodeReportProto.getDefaultInstance())
+        .addIncrementalContainerReport(IncrementalContainerReportProto.getDefaultInstance()).build();
 
     assertTrue(server.sendHeartbeat(request).getFullContainerReportLeaseRejected());
     verify(publisher).fireEvent(eq(NODE_REPORT), any());
+    verify(publisher).fireEvent(eq(INCREMENTAL_CONTAINER_REPORT), any());
     verify(publisher, never()).fireEvent(eq(CONTAINER_REPORT), any());
 
     versionManager.finalizeUpgrade();
