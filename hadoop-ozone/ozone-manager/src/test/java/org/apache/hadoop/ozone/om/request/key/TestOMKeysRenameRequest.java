@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -155,20 +156,31 @@ public class TestOMKeysRenameRequest extends OMKeyRequestTests {
    * matches the cache. A transaction with a pair that shares a key with an earlier pair is rejected by preExecute.
    */
   @ParameterizedTest
-  // The key names of the first two cases are chosen so that the code without the check shows the defect.
-  @CsvSource({"key, key_b, key_b, key_c, true", "key, key_b, other, key, true", "key, key_b, other, other_b, false"})
-  public void testCommittedKeyTableMatchesCache(String from1, String to1, String from2, String to2,
-      boolean expectRejected) throws Exception {
+  // Without the check the first three cases leave the DB different from the cache (the first two only for these key
+  // names); the a to d pair replaces the response entry of the a to b pair. The next three commit correctly.
+  @CsvSource(delimiter = '|', value = {
+      "key>key_b key_b>key_c | key | true",
+      "key>key_b other>key | key other | true",
+      "a>b c>a a>d | a c | true",
+      "a>b a>c | a | true",
+      "a>c b>c | a b | true",
+      "a>b c>d b>e | a c | true",
+      "key>key_b other>other_b | key other | false"})
+  public void testCommittedKeyTableMatchesCache(String pairs, String existingKeys, boolean expectRejected)
+      throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
-    for (String name : new String[] {from1, from2}) {
-      if (!name.equals(to1)) {
-        OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, name, 0L,
-            RatisReplicationConfig.getInstance(THREE), omMetadataManager);
-      }
+    for (String name : existingKeys.split(" ")) {
+      OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, name, 0L,
+          RatisReplicationConfig.getInstance(THREE), omMetadataManager);
     }
-    OMRequest omRequest = createRenameKeyRequest(Arrays.asList(
-        RenameKeysMap.newBuilder().setFromKeyName(from1).setToKeyName(to1).build(),
-        RenameKeysMap.newBuilder().setFromKeyName(from2).setToKeyName(to2).build()));
+    List<RenameKeysMap> renameKeys = new ArrayList<>();
+    List<String> names = new ArrayList<>();
+    for (String pair : pairs.split(" ")) {
+      String[] fromTo = pair.split(">");
+      renameKeys.add(RenameKeysMap.newBuilder().setFromKeyName(fromTo[0]).setToKeyName(fromTo[1]).build());
+      names.addAll(Arrays.asList(fromTo));
+    }
+    OMRequest omRequest = createRenameKeyRequest(renameKeys);
 
     OMException rejected = null;
     try {
@@ -183,11 +195,37 @@ public class TestOMKeysRenameRequest extends OMKeyRequestTests {
     }
 
     Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(getBucketLayout());
-    for (String name : new String[] {from1, to1, from2, to2}) {
+    for (String name : names) {
       String dbKey = omMetadataManager.getOzoneKey(volumeName, bucketName, name);
       assertThat(objectId(keyTable.getSkipCache(dbKey))).as(name).isEqualTo(objectId(keyTable.get(dbKey)));
     }
     assertThat(rejected == null ? null : rejected.getResult()).isEqualTo(expectRejected ? INVALID_REQUEST : null);
+  }
+
+  /**
+   * The check rejects a transaction whose pairs share a key even when the pair sharing it would not be applied:
+   * with only a present, b to c fails for its missing source and a to b succeeds, a partial rename before the check.
+   * A transaction of that shape already in the Raft log is still applied as a partial rename.
+   */
+  @Test
+  public void testPairsSharingKeyRejectedInsteadOfPartialRename() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, "a", 0L,
+        RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+    OMRequest omRequest = createRenameKeyRequest(Arrays.asList(
+        RenameKeysMap.newBuilder().setFromKeyName("b").setToKeyName("c").build(),
+        RenameKeysMap.newBuilder().setFromKeyName("a").setToKeyName("b").build()));
+
+    OMException e = assertThrows(OMException.class,
+        () -> new OMKeysRenameRequest(omRequest, getBucketLayout()).preExecute(ozoneManager));
+    assertThat(e.getResult()).isEqualTo(INVALID_REQUEST);
+
+    OMClientResponse response = new OMKeysRenameRequest(omRequest, getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.PARTIAL_RENAME);
+    Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(getBucketLayout());
+    assertThat(keyTable.get(omMetadataManager.getOzoneKey(volumeName, bucketName, "a"))).isNull();
+    assertThat(keyTable.get(omMetadataManager.getOzoneKey(volumeName, bucketName, "b"))).isNotNull();
   }
 
   private static Long objectId(OmKeyInfo keyInfo) {
