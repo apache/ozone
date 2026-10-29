@@ -59,7 +59,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   public void reinitialize(Table<String, String> newFinalizationStore) throws IOException {
     try {
       this.finalizationStore = newFinalizationStore;
-      versionManager.finalizeFromSnapshotIfRequired(finalizationStore);
+      versionManager.finalizeIfRequired(finalizationStore, true);
     } catch (Exception ex) {
       LOG.error("Failed to reinitialize finalization state", ex);
       throw new IOException(ex);

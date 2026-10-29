@@ -90,18 +90,8 @@ public abstract class ComponentVersionManager implements Closeable {
   public abstract int getPersistedApparentVersion();
 
   public void finalizeUpgrade() throws UpgradeException {
-    finalizeUpgrade(softwareVersion);
-  }
-
-  /**
-   * Finalizes the versions after the current apparent version, up to and including {@code lastVersion}.
-   */
-  protected void finalizeUpgrade(ComponentVersion lastVersion) throws UpgradeException {
     ComponentVersion prevVersion = apparentVersion;
     for (ComponentVersion newVersion : getUnfinalizedVersions()) {
-      if (!newVersion.isSupportedBy(lastVersion)) {
-        break;
-      }
       validateForFinalization(newVersion);
       runUpgradeAction(newVersion);
       persistApparentVersion(newVersion, prevVersion);

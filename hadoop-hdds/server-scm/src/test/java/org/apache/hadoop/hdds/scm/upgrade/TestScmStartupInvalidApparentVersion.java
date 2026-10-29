@@ -18,8 +18,7 @@
 package org.apache.hadoop.hdds.scm.upgrade;
 
 import static org.apache.hadoop.hdds.HDDSVersion.SOFTWARE_VERSION;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.ZDU;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_HA;
@@ -82,19 +81,37 @@ public class TestScmStartupInvalidApparentVersion {
       assertThat(scm.getScmMetadataStore().getMetaTable().get(APPARENT_VERSION_KEY)).isNull();
       assertThat(scm.getVersionManager().getApparentVersion()).isEqualTo(INITIAL_VERSION);
 
-      // The DB is ahead of the VERSION file, as the interrupted install leaves it. The SCM finalizes to the DB
-      // version, not to its software version.
-      scm = restartWithDBVersion(scm, ERASURE_CODED_STORAGE_SUPPORT);
-      assertVersions(scm, ERASURE_CODED_STORAGE_SUPPORT, ERASURE_CODED_STORAGE_SUPPORT);
-
-      // The DB is behind the VERSION file, as when the SCM stops after applying a finalize and before its
-      // transaction buffer was flushed. Nothing changes.
-      scm = restartWithDBVersion(scm, DATANODE_SCHEMA_V2);
-      assertVersions(scm, ERASURE_CODED_STORAGE_SUPPORT, DATANODE_SCHEMA_V2);
-
+      // The DB is ahead of the VERSION file, as the interrupted install leaves it. The SCM finalizes to the
+      // software version
       scm = restartWithDBVersion(scm, SOFTWARE_VERSION);
       assertVersions(scm, SOFTWARE_VERSION, SOFTWARE_VERSION);
       assertThat(scm.getVersionManager().needsFinalization()).isFalse();
+    } finally {
+      scm.stop();
+      scm.join();
+    }
+  }
+
+  /**
+   * The VERSION file is ahead of the DB. This can happen if finalization wrote the VERSION file (inside Ratis
+   * applyTransaction) but the process crashed before the Ratis transaction buffer was flushed to RocksDB.
+   * Ratis log replay should correct this, but finalizeFromSnapshotIfRequired also updates the DB as a safety net.
+   */
+  @Test
+  public void testStartupUpdatesDBWhenVersionFileAheadOfDB() throws Exception {
+    // Create an SCM whose VERSION file is already at SOFTWARE_VERSION (simulates the crash scenario where the
+    // VERSION file was written during finalization but the DB was not yet flushed).
+    OzoneConfiguration conf = createScmStorage(SOFTWARE_VERSION.serialize());
+    StorageContainerManager scm = HddsTestUtils.getScm(conf, new SCMConfigurator());
+    try {
+      // Force the DB to a lower version to simulate the unflushed transaction buffer.
+      scm.getScmMetadataStore().getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(ZDU.serialize()));
+      scm.stop();
+      scm.join();
+
+      // On restart, finalizeFromSnapshotIfRequired should detect VERSION file > DB and update the DB.
+      scm = HddsTestUtils.getScm(scm.getConfiguration(), new SCMConfigurator());
+      assertVersions(scm, SOFTWARE_VERSION, SOFTWARE_VERSION);
     } finally {
       scm.stop();
       scm.join();

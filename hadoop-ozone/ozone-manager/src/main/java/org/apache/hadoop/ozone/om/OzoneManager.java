@@ -1156,7 +1156,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     updateActiveSnapshotMetrics();
 
     if (withNewSnapshot) {
-      versionManager.finalizeFromSnapshotIfRequired(metadataManager.getMetaTable());
+      versionManager.finalizeIfRequired(metadataManager.getMetaTable(), true);
     }
   }
 
