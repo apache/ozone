@@ -151,6 +151,8 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
     executorService.scheduleAtFixedRate(() -> {
       try {
         checkAndRefresh(rotateDuration);
+      } catch (VirtualMachineError | ThreadDeath t) {
+        throw t;
       } catch (Throwable t) {
         // Anything thrown from a periodic task suppresses all subsequent executions.
         LOG.warn("Failed to refresh the secret key, will retry at the next check", t);
