@@ -254,7 +254,7 @@ public class TestStateContext {
     assertFalse(context.isFullContainerReportReady(scm1));
     assertFalse(context.isFullContainerReportReady(scm2));
 
-    context.putBackFullContainerReport(scm1);
+    context.markFullContainerReportPending(scm1);
 
     assertTrue(context.isFullContainerReportReady(scm1));
     assertFalse(context.isFullContainerReportReady(scm2));

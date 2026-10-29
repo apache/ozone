@@ -173,7 +173,7 @@ public class HeartbeatEndpointTask
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
           .sendHeartbeat(request);
       if (isFullContainerReportLeaseRejected(request, response)) {
-        context.putBackFullContainerReport(rpcEndpoint.getAddress());
+        context.markFullContainerReportPending(rpcEndpoint.getAddress());
       }
       processResponse(response, datanodeDetailsProto);
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
@@ -184,7 +184,7 @@ public class HeartbeatEndpointTask
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
       if (requestBuilder.hasContainerReport() && rpcEndpoint.supportsFullContainerReportLease()) {
-        context.putBackFullContainerReport(rpcEndpoint.getAddress());
+        context.markFullContainerReportPending(rpcEndpoint.getAddress());
       }
       rpcEndpoint.logIfNeeded(ex);
       maybeRefreshScmAddress(ex);

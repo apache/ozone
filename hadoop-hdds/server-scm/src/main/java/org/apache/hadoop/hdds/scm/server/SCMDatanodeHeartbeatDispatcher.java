@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.INCREMENTAL_CONTAINER_REPORT;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REGISTRATION_CONT_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
@@ -77,15 +76,12 @@ public final class SCMDatanodeHeartbeatDispatcher {
    * Dispatches heartbeat to registered event handlers.
    *
    * @param heartbeat heartbeat to be dispatched.
+   * @param leasedReport report carrying a validated lease claim, or null for an unleased report
    *
    * @return list of SCMCommand
    */
-  public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat) {
-    return dispatch(heartbeat, null);
-  }
-
   public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat,
-      ContainerReportFromDatanode fullContainerReport) {
+      ContainerReportFromDatanode leasedReport) {
     DatanodeDetails datanodeDetails =
         DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
     List<SCMCommand<?>> commands;
@@ -95,8 +91,8 @@ public final class SCMDatanodeHeartbeatDispatcher {
     if (!nodeManager.isNodeRegistered(datanodeDetails)) {
       LOG.info("SCM received heartbeat from an unregistered datanode {}. " +
           "Asking datanode to re-register.", datanodeDetails);
-      if (fullContainerReport != null) {
-        fullContainerReport.complete(false);
+      if (leasedReport != null) {
+        leasedReport.complete(false);
       }
       DatanodeID dnID = datanodeDetails.getID();
       nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
@@ -142,13 +138,8 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
       if (heartbeat.hasContainerReport()) {
         LOG.debug("Dispatching Container Report.");
-        if (fullContainerReport != null && fullContainerReport.isRegister()) {
-          eventPublisher.fireEvent(NODE_REGISTRATION_CONT_REPORT,
-              new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(
-                  datanodeDetails, ContainerReportsProto.getDefaultInstance()));
-        }
-        ContainerReportFromDatanode report = fullContainerReport != null
-            ? fullContainerReport : new ContainerReportFromDatanode(
+        ContainerReportFromDatanode report = leasedReport != null
+            ? leasedReport : new ContainerReportFromDatanode(
                 datanodeDetails, heartbeat.getContainerReport());
         eventPublisher.fireEvent(CONTAINER_REPORT, report);
         report.markDispatched();

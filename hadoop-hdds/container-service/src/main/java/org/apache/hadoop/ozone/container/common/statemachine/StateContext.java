@@ -400,7 +400,7 @@ public class StateContext {
         && mp.get(CONTAINER_REPORTS_PROTO_NAME).get();
   }
 
-  public void putBackFullContainerReport(HostAndPort endpoint) {
+  public void markFullContainerReportPending(HostAndPort endpoint) {
     Map<String, AtomicBoolean> reports = isFullReportReadyToBeSent.get(endpoint);
     if (reports != null) {
       reports.get(CONTAINER_REPORTS_PROTO_NAME).set(true);

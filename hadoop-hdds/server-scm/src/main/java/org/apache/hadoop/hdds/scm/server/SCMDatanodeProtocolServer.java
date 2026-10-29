@@ -279,10 +279,9 @@ public class SCMDatanodeProtocolServer implements
         eventPublisher.fireEvent(CONTAINER_REPORT,
             new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
                 datanodeDetails, containerReportsProto, true));
-        eventPublisher.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-            new NodeRegistrationContainerReport(datanodeDetails,
-                ContainerReportsProto.getDefaultInstance()));
       }
+      eventPublisher.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
+          new NodeRegistrationContainerReport(datanodeDetails, ContainerReportsProto.getDefaultInstance()));
       eventPublisher.fireEvent(PIPELINE_REPORT,
               new PipelineReportFromDatanode(datanodeDetails,
                       pipelineReportsProto));
@@ -356,8 +355,7 @@ public class SCMDatanodeProtocolServer implements
     }
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
     try {
-      for (SCMCommand<?> cmd :
-          heartbeatDispatcher.dispatch(heartbeatToDispatch, leasedReport)) {
+      for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeatToDispatch, leasedReport)) {
         cmdResponses.add(getCommandResponse(cmd, scm));
       }
     } catch (RuntimeException | Error ex) {

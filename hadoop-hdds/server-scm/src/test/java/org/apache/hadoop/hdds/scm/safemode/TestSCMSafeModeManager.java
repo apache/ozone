@@ -184,6 +184,7 @@ public class TestSCMSafeModeManager {
   @Test
   public void testSafeModeProgressWithBatchedRegistrationReports() throws Exception {
     config.setDouble(HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT, 0.8);
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 5);
     containers = HddsTestUtils.getContainerInfo(5);
     ContainerManager containerManager = mock(ContainerManager.class);
     for (ContainerInfo container : containers) {
@@ -212,8 +213,13 @@ public class TestSCMSafeModeManager {
     try {
       for (DatanodeDetails datanode : datanodes) {
         leaseManager.markFullContainerReportDeferred(datanode);
+        queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
+            new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanode,
+                ContainerReportsProto.getDefaultInstance()));
       }
+      queue.processAll(5000);
       SafeModeMetrics metrics = scmSafeModeManager.getSafeModeMetrics();
+      assertEquals(datanodes.size(), metrics.getCurrentRegisteredDatanodesCount().value());
       assertTrue(scmSafeModeManager.getInSafeMode());
       assertEquals(4, metrics.getNumContainerWithOneReplicaReportedThreshold().value());
       assertEquals(0, metrics.getCurrentContainersWithOneReplicaReportedCount().value());
@@ -235,9 +241,6 @@ public class TestSCMSafeModeManager {
               .setKeyCount(10)
               .build());
           reports.add(new ContainerReportFromDatanode(datanode, report, true, claim));
-          queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-              new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanode,
-                  ContainerReportsProto.getDefaultInstance()));
         }
         queue.processAll(5000);
 

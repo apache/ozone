@@ -298,7 +298,11 @@ class TestSCMDatanodeProtocolServer {
     ContainerReportsProto deferred = ContainerReportsProto.newBuilder().setFullContainerReportDeferred(true).build();
     assertEquals(SCMRegisteredResponseProto.ErrorCode.success, register(deferred).getErrorCode());
     verify(publisher, never()).fireEvent(eq(CONTAINER_REPORT), any());
-    verify(publisher, never()).fireEvent(eq(NODE_REGISTRATION_CONT_REPORT), any());
+    ArgumentCaptor<SCMDatanodeProtocolServer.NodeRegistrationContainerReport> registration =
+        ArgumentCaptor.forClass(SCMDatanodeProtocolServer.NodeRegistrationContainerReport.class);
+    verify(publisher).fireEvent(eq(NODE_REGISTRATION_CONT_REPORT), registration.capture());
+    assertEquals(datanode.getID(), registration.getValue().getDatanodeDetails().getID());
+    assertEquals(0, registration.getValue().getContainerIDs().length);
     SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
         .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
     FullContainerReportLeaseProto lease = server.sendHeartbeat(request).getFullContainerReportLease();

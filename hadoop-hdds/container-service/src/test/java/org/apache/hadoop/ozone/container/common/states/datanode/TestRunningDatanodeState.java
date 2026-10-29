@@ -155,7 +155,7 @@ public class TestRunningDatanodeState {
       verify(datanode, never()).setNextHB(anyLong());
 
       periodicReport.set(true);
-      context.putBackFullContainerReport(endpoint.getAddress());
+      context.markFullContainerReportPending(endpoint.getAddress());
       running.execute(executor);
       running.await(5, TimeUnit.SECONDS);
       assertThat(context.isFullContainerReportReady(endpoint.getAddress())).isTrue();
