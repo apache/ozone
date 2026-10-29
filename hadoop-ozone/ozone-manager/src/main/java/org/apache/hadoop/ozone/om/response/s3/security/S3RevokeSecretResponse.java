@@ -33,13 +33,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 public class S3RevokeSecretResponse extends OMClientResponse {
 
   private final String kerberosID;
+  private final Long stsRevocationCutoffMillis;
   private final S3SecretManager s3SecretManager;
 
   public S3RevokeSecretResponse(@Nullable String kerberosID,
+                                @Nullable Long stsRevocationCutoffMillis,
                                 @Nonnull S3SecretManager s3SecretManager,
                                 @Nonnull OMResponse omResponse) {
     super(omResponse);
     this.kerberosID = kerberosID;
+    this.stsRevocationCutoffMillis = stsRevocationCutoffMillis;
     this.s3SecretManager = s3SecretManager;
   }
 
@@ -53,6 +56,10 @@ public class S3RevokeSecretResponse extends OMClientResponse {
         s3SecretManager.batcher().deleteWithBatch(batchOperation, kerberosID);
       } else {
         s3SecretManager.revokeSecret(kerberosID);
+      }
+      if (stsRevocationCutoffMillis != null) {
+        omMetadataManager.getS3RevokedStsTokenTable().putWithBatch(batchOperation, kerberosID,
+            stsRevocationCutoffMillis);
       }
     }
   }
