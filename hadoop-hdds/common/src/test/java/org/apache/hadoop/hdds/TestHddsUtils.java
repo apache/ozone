@@ -33,7 +33,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -117,6 +119,17 @@ public class TestHddsUtils {
 
     // Already-bracketed IPv6 literals keep a single pair of brackets.
     assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("[2001:db8::1]", 9858));
+  }
+
+  @Test
+  void testIpAddressTextForms() {
+    assertTrue(HddsUtils.isSameIpAddress(
+        "2001:db8:0:0:0:0:0:1", "2001:db8::1"));
+    assertFalse(HddsUtils.isSameIpAddress("2001:db8::1", "2001:db8::2"));
+    assertFalse(HddsUtils.isSameIpAddress("dn1", "dn1"));
+    assertEquals("2001:db8::1",
+        HddsUtils.normalizeIpAddress("2001:db8:0:0:0:0:0:1"));
+    assertEquals("dn1", HddsUtils.normalizeIpAddress("dn1"));
   }
 
   @Test

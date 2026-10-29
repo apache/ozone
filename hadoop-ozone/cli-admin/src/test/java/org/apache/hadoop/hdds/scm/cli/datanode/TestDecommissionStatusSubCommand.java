@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,12 +31,15 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import org.apache.hadoop.hdds.client.DecommissionUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -214,6 +218,20 @@ public class TestDecommissionStatusSubCommand {
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
     assertFalse(m.find());
+  }
+
+  @Test
+  public void testDecommissioningNodesMatchEquivalentIpv6TextForms() {
+    HddsProtos.Node original = nodes.get(0);
+    HddsProtos.Node ipv6Node = HddsProtos.Node.newBuilder(original)
+        .setNodeID(original.getNodeID().toBuilder()
+            .setIpAddress("2001:db8:0:0:0:0:0:1")
+            .build())
+        .build();
+
+    assertEquals(Collections.singletonList(ipv6Node),
+        DecommissionUtils.getDecommissioningNodesList(
+            Stream.of(ipv6Node), "", "2001:db8::1"));
   }
 
   @Test

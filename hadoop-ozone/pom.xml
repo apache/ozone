@@ -28,6 +28,8 @@
     <module>cli-admin</module>
     <module>cli-debug</module>
     <module>cli-interactive</module>
+    <module>cli-local</module>
+    <module>cli-other</module>
     <module>cli-repair</module>
     <module>cli-shell</module>
     <module>client</module>
@@ -40,8 +42,11 @@
     <module>iceberg</module>
     <module>insight</module>
     <module>integration-test</module>
+    <module>integration-test-freon</module>
+    <module>integration-test-full-deps</module>
     <module>integration-test-recon</module>
     <module>integration-test-s3</module>
+    <module>integration-test-tools</module>
     <module>interface-client</module>
     <module>interface-storage</module>
     <module>mini-cluster</module>
@@ -53,7 +58,6 @@
     <module>recon-codegen</module>
     <module>s3-secret-store</module>
     <module>s3gateway</module>
-    <module>tools</module>
     <module>vapor</module>
   </modules>
 
