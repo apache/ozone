@@ -704,9 +704,10 @@ download_if_not_exists() {
   local f="$2"
 
   if [[ -e "${f}" ]]; then
-    echo "${f} already downloaded" >&2
-  else
-    download_with_retry "${url}" "${f}" >&2 || rm -fv "${f}"
+    echo "${f} already downloaded"
+  elif ! download_with_retry "${url}" "${f}"; then
+    rm -fv "${f}"
+    return 1
   fi
 }
 
