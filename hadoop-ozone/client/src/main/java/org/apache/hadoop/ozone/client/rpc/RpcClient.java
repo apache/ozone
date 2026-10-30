@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT;
@@ -43,6 +45,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,6 +62,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -93,6 +97,7 @@ import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.SlidingWindow.MonotonicClock;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -234,7 +239,11 @@ public class RpcClient implements ClientProtocol {
   private final boolean getLatestVersionLocation;
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
-  private final OzoneManagerVersion omVersion;
+  private final long omVersionRefreshInterval;
+  private final Clock clock;
+  private static final long OM_VERSION_REFRESHING = -1L;
+  private volatile OzoneManagerVersion omVersion;
+  private final AtomicLong omVersionLastUpdate = new AtomicLong();
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -253,8 +262,17 @@ public class RpcClient implements ClientProtocol {
    */
   public RpcClient(ConfigurationSource conf, String omServiceId)
       throws IOException {
+    this(conf, omServiceId, new MonotonicClock());
+  }
+
+  @VisibleForTesting
+  RpcClient(ConfigurationSource conf, String omServiceId, Clock clock) throws IOException {
+    this.clock = Objects.requireNonNull(clock, "clock == null");
     Objects.requireNonNull(conf, "conf == null");
     this.conf = conf;
+    this.omVersionRefreshInterval = conf.getTimeDuration(
+        OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL, OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
     TracingUtil.initTracing("client", conf);
     this.ugi = UserGroupInformation.getCurrentUser();
     replicationConfigValidator =
@@ -283,6 +301,7 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
+    omVersionLastUpdate.set(clock.millis());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -363,14 +382,23 @@ public class RpcClient implements ClientProtocol {
   }
 
   public static OzoneManagerVersion getOmVersion(ServiceInfoEx info) {
+    return getOmVersion(info, OzoneManagerVersion.SOFTWARE_VERSION);
+  }
+
+  private static OzoneManagerVersion getOmVersion(ServiceInfoEx info, OzoneManagerVersion fallback) {
     OzoneManagerVersion minOMVersion = OzoneManagerVersion.SOFTWARE_VERSION;
+    boolean hasOm = false;
     for (ServiceInfo si : info.getServiceInfoList()) {
       if (si.getNodeType() == HddsProtos.NodeType.OM) {
+        hasOm = true;
         OzoneManagerVersion omVersion = OzoneManagerVersion.deserialize(si.getProtobuf().getOMVersion());
         if (!minOMVersion.isSupportedBy(omVersion)) {
           minOMVersion = omVersion;
         }
       }
+    }
+    if (!hasOm) {
+      minOMVersion = fallback;
     }
     LOG.trace("Ozone Manager version is {}", minOMVersion);
     return minOMVersion;
@@ -627,7 +655,7 @@ public class RpcClient implements ClientProtocol {
     Objects.requireNonNull(bucketArgs, "bucketArgs == null");
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
-    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(getOmVersion())) {
       if (bucketArgs.getDefaultReplicationConfig() != null &&
           bucketArgs.getDefaultReplicationConfig().getType()
           == ReplicationType.EC) {
@@ -1302,7 +1330,7 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(replicationConfig, "replicationConfig == null");
-    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(getOmVersion())) {
       if (replicationConfig.getReplicationType()
           == HddsProtos.ReplicationType.EC) {
         throw new IOException("Can not set the default replication of the"
@@ -1445,7 +1473,7 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
       long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
       Map<String, String> metadata) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support atomic key rewrite.");
     }
     Preconditions.checkArgument(existingKeyGeneration > 0,
@@ -1472,7 +1500,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(getOmVersion())) {
       throw new IOException(
           "OzoneManager does not support atomic key creation.");
     }
@@ -1499,7 +1527,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(getOmVersion())) {
       throw new IOException(
           "OzoneManager does not support conditional key rewrite.");
     }
@@ -1535,7 +1563,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private void checkIfNoneMatchETagSupport() throws IOException {
-    if (omVersion.compareTo(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) < 0) {
+    if (getOmVersion().compareTo(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) < 0) {
       throw new IOException("OzoneManager does not support If-None-Match entity ETags for writes.");
     }
   }
@@ -1558,12 +1586,12 @@ public class RpcClient implements ClientProtocol {
   }
 
   private boolean shouldPiggybackDerivedKey(boolean requested) {
-    return requested && OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(omVersion);
+    return requested && OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(getOmVersion());
   }
 
   private void validateObjectTagsSupport(Map<String, String> tags)
       throws IOException {
-    if (!OzoneManagerVersion.OBJECT_TAG.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.OBJECT_TAG.isSupportedBy(getOmVersion())) {
       if (tags != null && !tags.isEmpty()) {
         throw new IOException("OzoneManager does not support object tags");
       }
@@ -1578,7 +1606,7 @@ public class RpcClient implements ClientProtocol {
       HddsClientUtils.verifyKeyName(keyName);
     }
     HddsClientUtils.checkNotNull(keyName);
-    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(getOmVersion())) {
       if (replicationConfig != null &&
           replicationConfig.getReplicationType()
               == HddsProtos.ReplicationType.EC) {
@@ -1639,7 +1667,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(getOmVersion())) {
       throw new IOException(
           "OzoneManager does not support atomic key creation.");
     }
@@ -1667,7 +1695,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(getOmVersion())) {
       throw new IOException(
           "OzoneManager does not support conditional key rewrite.");
     }
@@ -1902,7 +1930,7 @@ public class RpcClient implements ClientProtocol {
                                  int maxListResult)
       throws IOException {
 
-    if (OzoneManagerVersion.LIGHTWEIGHT_LIST_KEYS.isSupportedBy(omVersion)) {
+    if (OzoneManagerVersion.LIGHTWEIGHT_LIST_KEYS.isSupportedBy(getOmVersion())) {
       List<BasicOmKeyInfo> keys = ozoneManagerClient.listKeysLight(
           volumeName, bucketName, prevKey, keyPrefix, maxListResult).getKeys();
 
@@ -2016,7 +2044,7 @@ public class RpcClient implements ClientProtocol {
   private OmKeyInfo getS3PartOmKeyInfo(String bucketName, String keyName,
       int partNumber, boolean isHeadOp) throws IOException {
     OmKeyInfo keyInfo;
-    if (OzoneManagerVersion.S3_PART_AWARE_GET.isSupportedBy(omVersion)) {
+    if (OzoneManagerVersion.S3_PART_AWARE_GET.isSupportedBy(getOmVersion())) {
       keyInfo = getS3PartKeyInfo(bucketName, keyName, partNumber, isHeadOp);
     } else {
       keyInfo = getS3KeyInfo(bucketName, keyName, isHeadOp);
@@ -2113,7 +2141,7 @@ public class RpcClient implements ClientProtocol {
 
   private OmKeyInfo getKeyInfo(OmKeyArgs keyArgs) throws IOException {
     final OmKeyInfo keyInfo;
-    if (OzoneManagerVersion.OPTIMIZED_GET_KEY_INFO.isSupportedBy(omVersion)) {
+    if (OzoneManagerVersion.OPTIMIZED_GET_KEY_INFO.isSupportedBy(getOmVersion())) {
       keyInfo = ozoneManagerClient.getKeyInfo(keyArgs, false)
           .getKeyInfo();
     } else {
@@ -2186,7 +2214,7 @@ public class RpcClient implements ClientProtocol {
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName);
     String ownerName = getRealUserInfo().getShortUserName();
-    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(getOmVersion())) {
       if (replicationConfig != null && replicationConfig.getReplicationType()
           == HddsProtos.ReplicationType.EC) {
         throw new IOException("Can not set the replication of the file to"
@@ -2195,7 +2223,7 @@ public class RpcClient implements ClientProtocol {
       }
     }
 
-    if (!OzoneManagerVersion.OBJECT_TAG.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.OBJECT_TAG.isSupportedBy(getOmVersion())) {
       if (tags != null && !tags.isEmpty()) {
         throw new IOException("OzoneManager does not support object tags");
       }
@@ -2402,7 +2430,7 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
-    if (!OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion())) {
       abortMultipartUpload(getS3VolumeContext().getOmVolumeArgs().getVolume(), bucketName, keyName, uploadID);
       return;
     }
@@ -2472,7 +2500,7 @@ public class RpcClient implements ClientProtocol {
     verifyBucketName(bucketName);
 
     OmMultipartUploadList omMultipartUploadList;
-    if (OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION.isSupportedBy(omVersion)) {
+    if (OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION.isSupportedBy(getOmVersion())) {
       omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
           uploadIdMarker, maxUploads, true);
     } else {
@@ -2539,7 +2567,7 @@ public class RpcClient implements ClientProtocol {
         .setRequireFileSystemLayout(requireFileSystemLayout)
         .build();
     final OmKeyInfo keyInfo;
-    if (OzoneManagerVersion.OPTIMIZED_GET_KEY_INFO.isSupportedBy(omVersion)) {
+    if (OzoneManagerVersion.OPTIMIZED_GET_KEY_INFO.isSupportedBy(getOmVersion())) {
       keyInfo = ozoneManagerClient.getKeyInfo(keyArgs, false)
           .getKeyInfo();
       if (!keyInfo.isFile()) {
@@ -2590,7 +2618,7 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException {
-    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(getOmVersion())) {
       if (replicationConfig.getReplicationType()
           == HddsProtos.ReplicationType.EC) {
         throw new IOException("Can not set the replication of the file to"
@@ -2700,7 +2728,7 @@ public class RpcClient implements ClientProtocol {
   public ListStatusResult<OzoneFileStatusLight> listStatusLightPage(ListStatusLightOptions options)
       throws IOException {
     final OmKeyArgs keyArgs = prepareListStatusKeyArgs(options);
-    if (OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS.isSupportedBy(omVersion)) {
+    if (OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS.isSupportedBy(getOmVersion())) {
       return ozoneManagerClient.listStatusLightPage(
           keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
           options.isAllowPartialPrefixes());
@@ -2960,7 +2988,7 @@ public class RpcClient implements ClientProtocol {
         .setClientMetrics(clientMetrics)
         .setExecutorServiceSupplier(writeExecutor)
         .setStreamBufferArgs(streamBufferArgs)
-        .setOmVersion(omVersion);
+        .setOmVersion(getOmVersion());
   }
 
   @Override
@@ -2985,6 +3013,20 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public OzoneManagerVersion getOmVersion() {
+    long lastUpdate = omVersionLastUpdate.get();
+    if (lastUpdate == OM_VERSION_REFRESHING || clock.millis() - lastUpdate < omVersionRefreshInterval) {
+      return omVersion;
+    }
+    if (omVersionLastUpdate.compareAndSet(lastUpdate, OM_VERSION_REFRESHING)) {
+      try {
+        omVersion = getOmVersion(ozoneManagerClient.getServiceInfo(), omVersion);
+      } catch (Exception e) {
+        LOG.warn("Could not refresh OM version; retaining {}.", omVersion, e);
+      } finally {
+        // Throttle retries after failures as well as successful refreshes.
+        omVersionLastUpdate.set(clock.millis());
+      }
+    }
     return omVersion;
   }
 
@@ -3133,20 +3175,22 @@ public class RpcClient implements ClientProtocol {
   public LeaseKeyInfo recoverLease(String volumeName, String bucketName,
                                    String keyName, boolean force)
       throws IOException {
-    if (!OzoneManagerVersion.HBASE_SUPPORT.isSupportedBy(omVersion)) {
+    OzoneManagerVersion version = getOmVersion();
+    if (!OzoneManagerVersion.HBASE_SUPPORT.isSupportedBy(version)) {
       throw new UnsupportedOperationException("Lease recovery API requires OM version "
           + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
-          + omVersion);
+          + version);
     }
     return ozoneManagerClient.recoverLease(volumeName, bucketName, keyName, force);
   }
 
   @Override
   public void recoverKey(OmKeyArgs args, long clientID) throws IOException {
-    if (!OzoneManagerVersion.HBASE_SUPPORT.isSupportedBy(omVersion)) {
+    OzoneManagerVersion version = getOmVersion();
+    if (!OzoneManagerVersion.HBASE_SUPPORT.isSupportedBy(version)) {
       throw new UnsupportedOperationException("Lease recovery API requires OM version "
           + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
-          + omVersion);
+          + version);
     }
     ozoneManagerClient.recoverKey(args, clientID);
   }
@@ -3154,7 +3198,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException {
-    if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
@@ -3172,7 +3216,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void putObjectTagging(String volumeName, String bucketName,
                                String keyName, Map<String, String> tags) throws IOException {
-    if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
@@ -3191,7 +3235,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void deleteObjectTagging(String volumeName, String bucketName,
                                   String keyName) throws IOException {
-    if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
@@ -3257,7 +3301,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public Map<String, String> getBucketTagging(String volumeName, String bucketName)
       throws IOException {
-    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support S3 bucket tagging API");
     }
 
@@ -3273,7 +3317,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void putBucketTagging(String volumeName, String bucketName,
       Map<String, String> tags) throws IOException {
-    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support S3 bucket tagging API");
     }
 
@@ -3290,7 +3334,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void deleteBucketTagging(String volumeName, String bucketName)
       throws IOException {
-    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support S3 bucket tagging API");
     }
 

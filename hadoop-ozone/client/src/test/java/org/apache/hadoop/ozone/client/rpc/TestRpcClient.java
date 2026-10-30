@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.getOmVersion;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.validateOmVersion;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -35,12 +38,17 @@ import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -52,6 +60,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.TestClientThreadShutdown;
+import org.apache.hadoop.hdds.utils.SlidingWindow.MonotonicClock;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
@@ -76,6 +85,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
@@ -84,6 +94,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.event.Level;
 
@@ -360,6 +371,203 @@ public class TestRpcClient {
         getOmVersion(serviceInfoEx(
             om(OzoneManagerVersion.UNKNOWN_VERSION),
             om(OzoneManagerVersion.UNKNOWN_VERSION))));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testOmVersionRefreshesOnDemandAfterExpiry(boolean customInterval) throws Exception {
+    OzoneConfiguration config = new OzoneConfiguration();
+    if (customInterval) {
+      config.set(OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL, "37s");
+    }
+    long interval = config.getTimeDuration(
+        OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL, OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    VersionedOmTransport transport = new VersionedOmTransport();
+    MockClock clock = MockClock.newInstance();
+    RpcClient client = createRpcClient(transport, config, clock);
+    try {
+      assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
+      transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
+      clock.fastForward(interval - 1);
+      assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
+      assertEquals(1, transport.serviceInfoCalls.get());
+
+      clock.fastForward(1);
+      // Idle clients do not poll, even when their cached version has expired.
+      assertEquals(1, transport.serviceInfoCalls.get());
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
+      assertEquals(2, transport.serviceInfoCalls.get());
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testOmVersionRefreshFailureRetainsVersionAndThrottlesRetries(boolean unchecked) throws Exception {
+    VersionedOmTransport transport = new VersionedOmTransport();
+    MockClock clock = MockClock.newInstance();
+    RpcClient client = createRpcClient(transport, new OzoneConfiguration(), clock);
+    try {
+      transport.failRefresh = true;
+      transport.uncheckedFailure = unchecked;
+      clock.fastForward(omVersionRefreshInterval());
+      assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
+      assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
+      assertEquals(2, transport.serviceInfoCalls.get());
+
+      transport.failRefresh = false;
+      transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
+      clock.fastForward(omVersionRefreshInterval());
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
+      assertEquals(3, transport.serviceInfoCalls.get());
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testOmVersionRefreshWithoutOmRetainsVersion(boolean nonOmService) throws Exception {
+    VersionedOmTransport transport = new VersionedOmTransport();
+    MockClock clock = MockClock.newInstance();
+    RpcClient client = createRpcClient(transport, new OzoneConfiguration(), clock);
+    try {
+      transport.services = nonOmService
+          ? Collections.singletonList(ServiceInfo.newBuilder().setNodeType(HddsProtos.NodeType.SCM)
+              .setHostname("scm").build()) : Collections.emptyList();
+      clock.fastForward(omVersionRefreshInterval());
+      assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
+      assertEquals(OzoneManagerVersion.DEFAULT_VERSION, client.getOmVersion());
+      assertEquals(2, transport.serviceInfoCalls.get());
+      transport.services = null;
+      transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
+      clock.fastForward(omVersionRefreshInterval());
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
+      assertEquals(3, transport.serviceInfoCalls.get());
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  void testFeatureCheckDiscoversFinalizedOmVersion() throws Exception {
+    VersionedOmTransport transport = new VersionedOmTransport();
+    MockClock clock = MockClock.newInstance();
+    RpcClient client = createRpcClient(transport, new OzoneConfiguration(), clock);
+    try {
+      IOException unsupported = assertThrows(IOException.class,
+          () -> client.getObjectTagging("volume", "bucket", "key"));
+      assertThat(unsupported).hasMessageContaining("does not support S3 object tagging API");
+      transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
+      clock.fastForward(omVersionRefreshInterval());
+      IOException reachedOm = assertThrows(IOException.class,
+          () -> client.getObjectTagging("volume", "bucket", "key"));
+      assertThat(reachedOm).hasMessage("Reached OM after version check");
+      assertEquals(2, transport.serviceInfoCalls.get());
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  void testConcurrentOmVersionReadersShareRefresh() throws Exception {
+    VersionedOmTransport transport = new VersionedOmTransport();
+    MockClock clock = MockClock.newInstance();
+    RpcClient client = createRpcClient(transport, new OzoneConfiguration(), clock);
+    ExecutorService executor = Executors.newFixedThreadPool(8);
+    transport.refreshStarted = new CountDownLatch(1);
+    transport.releaseRefresh = new CountDownLatch(1);
+    try {
+      transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
+      clock.fastForward(omVersionRefreshInterval());
+      Future<OzoneManagerVersion> refresh = executor.submit(() -> client.getOmVersion());
+      assertTrue(transport.refreshStarted.await(10, TimeUnit.SECONDS));
+      List<Future<OzoneManagerVersion>> versions = new ArrayList<>();
+      for (int i = 0; i < 7; i++) {
+        versions.add(executor.submit(() -> client.getOmVersion()));
+      }
+      // Other readers must return the cached version while the refresh is still in flight.
+      for (Future<OzoneManagerVersion> version : versions) {
+        assertEquals(OzoneManagerVersion.DEFAULT_VERSION, version.get(5, TimeUnit.SECONDS));
+      }
+      assertEquals(2, transport.serviceInfoCalls.get());
+      transport.releaseRefresh.countDown();
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, refresh.get(10, TimeUnit.SECONDS));
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
+      assertEquals(2, transport.serviceInfoCalls.get());
+    } finally {
+      transport.releaseRefresh.countDown();
+      executor.shutdownNow();
+      client.close();
+    }
+  }
+
+  @Test
+  void testOmVersionRefreshUsesCallingThreadsS3Auth() throws Exception {
+    VersionedOmTransport transport = new VersionedOmTransport();
+    MockClock clock = MockClock.newInstance();
+    RpcClient client = createRpcClient(transport, new OzoneConfiguration(), clock);
+    try {
+      client.setThreadLocalS3Auth(new S3Auth("stringToSign", "signature", "alice", "alice"));
+      transport.version = OzoneManagerVersion.SOFTWARE_VERSION;
+      clock.fastForward(omVersionRefreshInterval());
+      assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, client.getOmVersion());
+      assertEquals("alice", transport.lastServiceInfoRequest.getS3Authentication().getAccessId());
+      assertEquals("signature", transport.lastServiceInfoRequest.getS3Authentication().getSignature());
+    } finally {
+      client.clearThreadLocalS3Auth();
+      client.close();
+    }
+  }
+
+  private static final class VersionedOmTransport extends MockOmTransport {
+    private OzoneManagerVersion version = OzoneManagerVersion.DEFAULT_VERSION;
+    private final AtomicInteger serviceInfoCalls = new AtomicInteger();
+    private CountDownLatch refreshStarted;
+    private CountDownLatch releaseRefresh;
+    private boolean failRefresh;
+    private boolean uncheckedFailure;
+    private List<ServiceInfo> services;
+    private OMRequest lastServiceInfoRequest;
+
+    @Override
+    public OMResponse submitRequest(OMRequest request) throws IOException {
+      if (request.getCmdType() == Type.ServiceList) {
+        int calls = serviceInfoCalls.incrementAndGet();
+        if (calls == 2 && refreshStarted != null) {
+          refreshStarted.countDown();
+          try {
+            if (!releaseRefresh.await(10, TimeUnit.SECONDS)) {
+              throw new IOException("Timed out waiting to release OM version refresh");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting to release OM version refresh", e);
+          }
+        }
+        lastServiceInfoRequest = request;
+        if (failRefresh) {
+          if (uncheckedFailure) {
+            throw new IllegalStateException("Service info temporarily unavailable");
+          }
+          throw new IOException("Service info temporarily unavailable");
+        }
+        ServiceListResponse.Builder response = ServiceListResponse.newBuilder();
+        for (ServiceInfo service : services == null ? Collections.singletonList(om(version)) : services) {
+          response.addServiceInfo(service.getProtobuf());
+        }
+        return super.submitRequest(request).toBuilder()
+            .setServiceListResponse(response)
+            .build();
+      }
+      if (request.getCmdType() == Type.GetObjectTagging) {
+        throw new IOException("Reached OM after version check");
+      }
+      return super.submitRequest(request);
+    }
   }
 
   @Test
@@ -719,8 +927,22 @@ public class TestRpcClient {
   }
 
   private static RpcClient createRpcClient(OmTransport transport) throws IOException {
-    OzoneConfiguration config = new OzoneConfiguration();
-    return new RpcClient(config, null) {
+    return createRpcClient(transport, new OzoneConfiguration());
+  }
+
+  private static long omVersionRefreshInterval() {
+    return new OzoneConfiguration().getTimeDuration(
+        OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL, OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+  }
+
+  private static RpcClient createRpcClient(OmTransport transport, OzoneConfiguration config) throws IOException {
+    return createRpcClient(transport, config, new MonotonicClock());
+  }
+
+  private static RpcClient createRpcClient(OmTransport transport, OzoneConfiguration config, Clock clock)
+      throws IOException {
+    return new RpcClient(config, null, clock) {
       @Override
       protected OmTransport createOmTransport(String omServiceId) {
         return transport;
