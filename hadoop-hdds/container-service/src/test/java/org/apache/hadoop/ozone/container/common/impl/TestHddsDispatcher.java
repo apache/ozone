@@ -654,6 +654,11 @@ public class TestHddsDispatcher {
 
   static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier) throws IOException {
+    return createDispatcher(dd, scmId, conf, tokenVerifier, ContainerTestUtils.getMockContext(dd, conf));
+  }
+
+  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+      OzoneConfiguration conf, TokenVerifier tokenVerifier, StateContext context) throws IOException {
     ContainerSet containerSet = newContainerSet();
     MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -666,7 +671,6 @@ public class TestHddsDispatcher {
       }
     });
     volumeSet.startAllVolume();
-    StateContext context = ContainerTestUtils.getMockContext(dd, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     Map<ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerType containerType : ContainerType.values()) {
@@ -1082,6 +1086,60 @@ public class TestHddsDispatcher {
         null);
     assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
     assertNull(dispatcher.getContainer(containerId));
+  }
+
+  /**
+   * A write over gRPC to an EC container that is missing on this datanode asks SCM to close the container, as nothing
+   * else would; only the first such write triggers an immediate heartbeat.
+   */
+  @Test
+  public void testCloseActionForMissingEcContainer() throws IOException {
+    String testDirPath = testDir.getPath();
+    UUID scmId = UUID.randomUUID();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+    HddsDispatcher dispatcher = createDispatcher(dd, scmId, conf, null, context);
+    long ecContainer = 7L;
+    long otherContainer = 8L;
+    dispatcher.getMissingContainerSet().add(ecContainer);
+    dispatcher.getMissingContainerSet().add(otherContainer);
+
+    // EC writes (replica index > 0) over gRPC: WriteChunk and PutBlock
+    assertEquals(ContainerProtos.Result.CONTAINER_MISSING, dispatcher.dispatch(
+        withReplicaIndex(getWriteChunkRequest(dd.getUuidString(), ecContainer, 1L), 2), null).getResult());
+    assertEquals(ContainerProtos.Result.CONTAINER_MISSING, dispatcher.dispatch(
+        withReplicaIndex(getEmptyPutBlockRequest(dd.getUuidString(), ecContainer, 1L), 2), null).getResult());
+
+    ContainerAction close = ContainerAction.newBuilder()
+        .setContainerID(ecContainer)
+        .setAction(ContainerAction.Action.CLOSE)
+        .setReason(ContainerAction.Reason.CONTAINER_UNHEALTHY)
+        .build();
+    verify(context, times(2)).addContainerActionIfAbsent(close);
+    verify(context.getParent(), times(1)).triggerHeartbeat();
+
+    // a non-EC write over gRPC, and an EC write through Ratis: no action
+    assertEquals(ContainerProtos.Result.CONTAINER_MISSING, dispatcher.dispatch(
+        getWriteChunkRequest(dd.getUuidString(), otherContainer, 1L), null).getResult());
+    assertEquals(ContainerProtos.Result.CONTAINER_MISSING, dispatcher.dispatch(
+        withReplicaIndex(getWriteChunkRequest(dd.getUuidString(), otherContainer, 2L), 2),
+        newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA)).getResult());
+    verify(context, times(2)).addContainerActionIfAbsent(any(ContainerAction.class));
+  }
+
+  private static ContainerCommandRequestProto withReplicaIndex(ContainerCommandRequestProto request,
+      int replicaIndex) {
+    ContainerCommandRequestProto.Builder builder = request.toBuilder();
+    if (request.hasWriteChunk()) {
+      builder.getWriteChunkBuilder().getBlockIDBuilder().setReplicaIndex(replicaIndex);
+    }
+    if (request.hasPutBlock()) {
+      builder.getPutBlockBuilder().getBlockDataBuilder().getBlockIDBuilder().setReplicaIndex(replicaIndex);
+    }
+    return builder.build();
   }
 
   static DispatcherContext newContext(Op op) {
