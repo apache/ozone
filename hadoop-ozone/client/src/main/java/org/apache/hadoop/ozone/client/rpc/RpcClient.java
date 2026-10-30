@@ -45,6 +45,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -95,6 +96,7 @@ import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.SlidingWindow.MonotonicClock;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -237,6 +239,7 @@ public class RpcClient implements ClientProtocol {
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final long omVersionRefreshInterval;
+  private final Clock clock;
   private static final long OM_VERSION_REFRESHING = -1L;
   private volatile OzoneManagerVersion omVersion;
   private final AtomicLong omVersionLastUpdate = new AtomicLong();
@@ -258,6 +261,12 @@ public class RpcClient implements ClientProtocol {
    */
   public RpcClient(ConfigurationSource conf, String omServiceId)
       throws IOException {
+    this(conf, omServiceId, new MonotonicClock());
+  }
+
+  @VisibleForTesting
+  RpcClient(ConfigurationSource conf, String omServiceId, Clock clock) throws IOException {
+    this.clock = Objects.requireNonNull(clock, "clock == null");
     Objects.requireNonNull(conf, "conf == null");
     this.conf = conf;
     this.omVersionRefreshInterval = conf.getTimeDuration(
@@ -291,7 +300,7 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
-    omVersionLastUpdate.set(Time.monotonicNow());
+    omVersionLastUpdate.set(clock.millis());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -372,14 +381,23 @@ public class RpcClient implements ClientProtocol {
   }
 
   public static OzoneManagerVersion getOmVersion(ServiceInfoEx info) {
+    return getOmVersion(info, OzoneManagerVersion.SOFTWARE_VERSION);
+  }
+
+  private static OzoneManagerVersion getOmVersion(ServiceInfoEx info, OzoneManagerVersion fallback) {
     OzoneManagerVersion minOMVersion = OzoneManagerVersion.SOFTWARE_VERSION;
+    boolean hasOm = false;
     for (ServiceInfo si : info.getServiceInfoList()) {
       if (si.getNodeType() == HddsProtos.NodeType.OM) {
+        hasOm = true;
         OzoneManagerVersion omVersion = OzoneManagerVersion.deserialize(si.getProtobuf().getOMVersion());
         if (!minOMVersion.isSupportedBy(omVersion)) {
           minOMVersion = omVersion;
         }
       }
+    }
+    if (!hasOm) {
+      minOMVersion = fallback;
     }
     LOG.trace("Ozone Manager version is {}", minOMVersion);
     return minOMVersion;
@@ -2985,17 +3003,17 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneManagerVersion getOmVersion() {
     long lastUpdate = omVersionLastUpdate.get();
-    if (lastUpdate == OM_VERSION_REFRESHING || Time.monotonicNow() - lastUpdate < omVersionRefreshInterval) {
+    if (lastUpdate == OM_VERSION_REFRESHING || clock.millis() - lastUpdate < omVersionRefreshInterval) {
       return omVersion;
     }
     if (omVersionLastUpdate.compareAndSet(lastUpdate, OM_VERSION_REFRESHING)) {
       try {
-        omVersion = getOmVersion(ozoneManagerClient.getServiceInfo());
-      } catch (IOException e) {
+        omVersion = getOmVersion(ozoneManagerClient.getServiceInfo(), omVersion);
+      } catch (Exception e) {
         LOG.warn("Could not refresh OM version; retaining {}.", omVersion, e);
       } finally {
         // Throttle retries after failures as well as successful refreshes.
-        omVersionLastUpdate.set(Time.monotonicNow());
+        omVersionLastUpdate.set(clock.millis());
       }
     }
     return omVersion;
