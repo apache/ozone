@@ -124,6 +124,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         super.preExecute(ozoneManager).getCompleteMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     if (keyArgs.hasExcludedETag()) {
       ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
     }
@@ -133,8 +134,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     KeyArgs newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath).build();
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,
-        ozoneManager, ACLType.WRITE);
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs, ozoneManager, ACLType.WRITE);
+    } catch (IOException ex) {
+      Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
+      auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
+          OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
 
     return getOmRequest().toBuilder().setCompleteMultiPartUploadRequest(
         multipartUploadCompleteRequest.toBuilder().setKeyArgs(

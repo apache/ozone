@@ -340,16 +340,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public void close() {
     if (!closed) {
       synchronized (this) {
-        if (!closed) {
-          closed = true;
-          if (scheduler != null) {
-            LOG.info("Shutting down {}.", DAG_PRUNING_SERVICE_NAME);
-            scheduler.close();
-          }
-          if (sstFilePruningMetrics != null) {
-            sstFilePruningMetrics.unRegister();
-          }
+        if (closed) {
+          return;
         }
+        closed = true;
+      }
+      // Not under the lock: a task waiting for it must be able to get it, see closed and stop.
+      if (scheduler != null) {
+        LOG.info("Shutting down {}.", DAG_PRUNING_SERVICE_NAME);
+        scheduler.close();
+      }
+      if (sstFilePruningMetrics != null) {
+        sstFilePruningMetrics.unRegister();
       }
     }
   }
@@ -1123,6 +1125,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * older than the maximum allowed in the compaction DAG.
    */
   private synchronized Pair<Set<String>, List<byte[]>> getOlderFileNodes() {
+    if (closed) {
+      return Pair.of(Collections.emptySet(), Collections.emptyList());
+    }
     long compactionLogPruneStartTime = System.currentTimeMillis();
     Set<String> compactionNodes = new HashSet<>();
     List<byte[]> keysToRemove = new ArrayList<>();
@@ -1156,6 +1161,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private synchronized void removeKeyFromCompactionLogTable(
       List<byte[]> keysToRemove) {
+    if (closed) {
+      return;
+    }
     try {
       for (byte[] key: keysToRemove) {
         activeRocksDB.get().delete(compactionLogTableCFHandle, key);
@@ -1340,6 +1348,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         CompactionLogEntry compactionLogEntry;
         // Get the compaction log entry.
         synchronized (this) {
+          // close() waits for this task only up to a timeout, then the DB is freed.
+          if (closed) {
+            break;
+          }
           try {
             compactionLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
                 activeRocksDB.get().get(compactionLogTableCFHandle, compactionLogEntryKey));

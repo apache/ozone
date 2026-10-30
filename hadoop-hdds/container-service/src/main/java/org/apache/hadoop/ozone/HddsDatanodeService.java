@@ -75,9 +75,11 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.hdds.server.StartupProgress;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -142,6 +144,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
   private DNMXBeanImpl serviceRuntimeInfo;
   private ObjectName dnInfoBeanName;
+  private StartupProgress<DatanodeStartupPhase> startupProgress;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
   private ReconfigurationHandler reconfigurationHandler;
@@ -189,6 +192,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
   @Override
   public Void call() throws Exception {
+    TracingUtil.installMdcContextStorage();
     OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
       HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
@@ -231,6 +235,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
   @SuppressWarnings("methodlength")
   public void start() {
+    startupProgress = new StartupProgress<>(DatanodeStartupPhase.class);
+    startupProgress.beginPhase(DatanodeStartupPhase.INITIALIZING);
+    startupProgress.registerMXBean("HddsDatanode");
     serviceRuntimeInfo = new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
       @Override
       public String getNamespace() {
@@ -375,6 +382,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
       clientProtocolServer.start();
       startPlugins();
+      startupProgress.beginPhase(DatanodeStartupPhase.WAITING_FOR_SCM);
       // Starting HDDS Daemons
       datanodeStateMachine.startDaemon();
 
@@ -546,6 +554,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     return datanodeStateMachine;
   }
 
+  public StartupProgress<DatanodeStartupPhase> getStartupProgress() {
+    return startupProgress;
+  }
+
   public HddsDatanodeClientProtocolServer getClientProtocolServer() {
     return clientProtocolServer;
   }
@@ -602,6 +614,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         getClientProtocolServer().stop();
       }
       unregisterMXBean();
+      if (startupProgress != null) {
+        startupProgress.unregisterMXBean();
+      }
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
       if (secretKeyClient != null) {

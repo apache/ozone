@@ -212,7 +212,7 @@ describe('Namespace Usage page (Disk Usage)', () => {
     });
   });
 
-  test('notifies when namespace summary is still initializing', async () => {
+  test('shows only one notice when usage, summary and quota are initializing', async () => {
     namespaceUsageServer.use(
       http.get('/api/v1/namespace/usage', () =>
         HttpResponse.json(mockResponses.InitializingUsage)),
@@ -222,7 +222,7 @@ describe('Namespace Usage page (Disk Usage)', () => {
         HttpResponse.json(mockResponses.InitializingQuotaResponse))
     );
 
-    render(<NamespaceUsage />);
+    const { container } = render(<NamespaceUsage />);
     await confirmRootLoad();
 
     await waitFor(() =>
@@ -231,5 +231,8 @@ describe('Namespace Usage page (Disk Usage)', () => {
         expect.stringContaining('Namespace Summary is being initialized')
       )
     );
+    await waitFor(() => expect(container.querySelector('.ant-spin-spinning')).not.toBeInTheDocument());
+    expect(commonUtils.showInfoNotification).toHaveBeenCalledTimes(1);
+    expect(commonUtils.showDataFetchError).not.toHaveBeenCalled();
   });
 });

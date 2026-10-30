@@ -84,6 +84,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final KeyArgs keyArgs = super.preExecute(ozoneManager)
         .getAbortMultiPartUploadRequest().getKeyArgs();
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -92,8 +93,16 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath).build();
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,
-        ozoneManager, ACLType.WRITE);
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs, ozoneManager, ACLType.WRITE);
+    } catch (IOException ex) {
+      Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
+      auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
+          OMAction.ABORT_MULTIPART_UPLOAD, auditMap, ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
     return getOmRequest().toBuilder().setAbortMultiPartUploadRequest(
         getOmRequest().getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(
             resolvedArgs)).setUserInfo(getUserInfo()).build();

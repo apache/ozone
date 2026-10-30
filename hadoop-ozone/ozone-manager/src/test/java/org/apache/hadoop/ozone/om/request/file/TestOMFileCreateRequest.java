@@ -42,6 +42,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.protobuf.ByteString;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -143,6 +144,38 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
     assertNotNull(keyArgs);
     assertEquals(0, keyArgs.getModificationTime());
     assertEquals(0, keyArgs.getKeyLocationsList().size());
+  }
+
+  @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
+        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS, false, false);
+    KeyArgs keyArgs = omRequest.getCreateFileRequest().getKeyArgs().toBuilder()
+        .setIsMultipartKey(true).setMultipartNumber(1).setMultipartUploadID("invalid/" + UUID.randomUUID()).build();
+    OMRequest invalidRequest = omRequest.toBuilder()
+        .setCreateFileRequest(omRequest.getCreateFileRequest().toBuilder().setKeyArgs(keyArgs)).build();
+
+    OMException e = assertThrows(OMException.class,
+        () -> getOMFileCreateRequest(invalidRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPreExecuteClearsPartIv(boolean isMultipartKey) throws Exception {
+    OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
+        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS, false, false);
+    // A part IV sent by the client is not used.
+    KeyArgs.Builder keyArgs = omRequest.getCreateFileRequest().getKeyArgs().toBuilder()
+        .setPartIv(ByteString.copyFrom(new byte[16]));
+    if (isMultipartKey) {
+      keyArgs.setIsMultipartKey(true).setMultipartNumber(1).setMultipartUploadID(UUID.randomUUID().toString());
+    }
+    OMRequest requestWithPartIv = omRequest.toBuilder()
+        .setCreateFileRequest(omRequest.getCreateFileRequest().toBuilder().setKeyArgs(keyArgs)).build();
+
+    OMRequest modifiedOmRequest = getOMFileCreateRequest(requestWithPartIv).preExecute(ozoneManager);
+    assertFalse(modifiedOmRequest.getCreateFileRequest().getKeyArgs().hasPartIv());
   }
 
   @Test
