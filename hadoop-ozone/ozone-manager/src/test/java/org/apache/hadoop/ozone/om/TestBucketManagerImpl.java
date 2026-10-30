@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -70,6 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -407,7 +407,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
         .setIsVersionEnabled(true)
         .addAllMetadata(singletonMap("CustomKey", "CustomValue"))
         .build();
-    writeClient.createBucket(bucketInfo);
+    createBucket(omTestManagers.getMetadataManager(), bucketInfo);
 
     OmBucketInfo bucketLinkInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volume)

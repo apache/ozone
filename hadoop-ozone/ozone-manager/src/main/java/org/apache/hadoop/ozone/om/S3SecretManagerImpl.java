@@ -76,16 +76,11 @@ public class S3SecretManagerImpl implements S3SecretManager {
         "awsAccessKeyId cannot be null or empty.");
     LOG.trace("Get secret for awsAccessKey:{}", awsAccessKey);
 
-    S3SecretValue cacheValue = s3SecretCache.get(awsAccessKey);
-    if (cacheValue != null) {
-      return cacheValue.getAwsSecret();
-    }
-    S3SecretValue s3Secret = s3SecretStore.getSecret(awsAccessKey);
+    S3SecretValue s3Secret = getSecret(awsAccessKey);
     if (s3Secret == null) {
       throw new OzoneSecurityException("S3 secret not found for " +
           "awsAccessKeyId " + awsAccessKey, S3_SECRET_NOT_FOUND);
     }
-    updateCache(awsAccessKey, s3Secret);
     return s3Secret.getAwsSecret();
   }
 

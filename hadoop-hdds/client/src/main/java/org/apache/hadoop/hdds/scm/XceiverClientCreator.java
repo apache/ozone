@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED_DEFAULT;
+
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -55,7 +58,11 @@ public class XceiverClientCreator implements XceiverClientFactory {
     if (securityEnabled) {
       Objects.requireNonNull(trustManager, "trustManager == null");
     }
-    shortCircuitEnabled = conf.getObject(OzoneClientConfig.class).isShortCircuitEnabled();
+    final OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    if (clientConfig.isNettyWarmUpEnabled()) {
+      NettyWarmUp.start(securityEnabled && conf.getBoolean(HDDS_GRPC_TLS_ENABLED, HDDS_GRPC_TLS_ENABLED_DEFAULT));
+    }
+    shortCircuitEnabled = clientConfig.isShortCircuitEnabled();
     if (shortCircuitEnabled) {
       domainSocketFactory = DomainSocketFactory.getInstance(conf);
     }
