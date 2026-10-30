@@ -23,6 +23,21 @@ package org.apache.hadoop.ozone.om;
  */
 public final class OmTracingAttributes {
 
+  /** Status or result code of a failed request, for example KEY_NOT_FOUND. */
+  public static final String STATUS = "ozone.status";
+
+  /** {@code OMRequest.Type} of an OM request, for example {@code CreateKey}. */
+  public static final String OM_CMD_TYPE = "om.cmd_type";
+
+  /** Client ID sent with an OM request. */
+  public static final String OM_CLIENT_ID = "om.client_id";
+
+  /** Hadoop RPC call ID of an OM request. */
+  public static final String OM_CALL_ID = "om.call_id";
+
+  /** {@code false} when OM returned status OK without success, for example a no-op ACL or owner change. */
+  public static final String OM_SUCCESS = "om.success";
+
   /** Raft role of the OM applying a transaction: leader or follower. */
   public static final String OM_ROLE = "om.role";
 

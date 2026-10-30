@@ -397,6 +397,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         getGroupId()));
     Span span = TracingUtil.importAndCreateSpan("OM.startTransaction", omRequest.getTraceID());
     try (Scope ignored = span.makeCurrent()) {
+      span.setAttribute(OmTracingAttributes.OM_CMD_TYPE, omRequest.getCmdType().name());
       handler.validateRequest(omRequest);
     } catch (IOException ioe) {
       TracingUtil.recordException(span, ioe);
@@ -465,6 +466,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           // Runs on the executor thread, so the parent comes from the request's trace ID.
           Span span = TracingUtil.importAndCreateSpan("OM.applyTransaction", request.getTraceID());
           try (Scope ignored = span.makeCurrent()) {
+            span.setAttribute(OmTracingAttributes.OM_CMD_TYPE, request.getCmdType().name());
             span.setAttribute(OmTracingAttributes.OM_ROLE, context != null ? "leader" : "follower");
             return runCommand(request, termIndex);
           } finally {
