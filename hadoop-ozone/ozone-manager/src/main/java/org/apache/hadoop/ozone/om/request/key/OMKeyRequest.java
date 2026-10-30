@@ -1103,7 +1103,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Blocks will be appended as version 0.
     return createFileInfo(keyArgs, locations, replicationConfig,
             keyArgs.getDataSize(), encInfo, prefixManager,
-            omBucketInfo, omPathInfo, transactionLogIndex, objectID, config);
+            omBucketInfo, omPathInfo, transactionLogIndex, objectID, config,
+            keyArgs.hasStoragePolicy() ? OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()) : null);
   }
 
   /**
@@ -1121,7 +1122,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfo omPathInfo,
       long transactionLogIndex, long objectID,
-      OmConfig config) throws OMException {
+      OmConfig config, @Nullable StoragePolicy storagePolicy) throws OMException {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
@@ -1141,12 +1142,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
                     keyArgs.getTagsList()))
             .setUpdateID(transactionLogIndex)
             .setOwnerName(keyArgs.getOwnerName())
+            .setStoragePolicy(storagePolicy)
             .setFile(true);
     if (keyArgs.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
-    }
-    if (keyArgs.hasStoragePolicy()) {
-      builder.setStoragePolicy(OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()));
     }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
@@ -1210,9 +1209,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
+    // The part takes the storage policy of the multipart key, not the one in args: the client
+    // does not send it when opening a part, and allocateBlock later sends the policy of this part.
     return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
-            transactionLogIndex, objectID, configuration);
+            transactionLogIndex, objectID, configuration, partKeyInfo.getStoragePolicy());
   }
 
   /**

@@ -733,7 +733,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setStoragePolicy(StoragePolicy storagePolicy) {
+    public Builder setStoragePolicy(@Nullable StoragePolicy storagePolicy) {
       this.storagePolicy = storagePolicy;
       return this;
     }

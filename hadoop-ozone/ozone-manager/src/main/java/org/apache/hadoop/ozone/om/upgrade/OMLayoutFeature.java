@@ -47,7 +47,7 @@ public enum OMLayoutFeature implements LayoutFeature {
   SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot"),
   S3_LIFECYCLE_SUPPORT(10, "S3 bucket lifecycle configuration support"),
   MPU_PARTS_TABLE_SPLIT(11, "Split multipart table into separate table for parts and key"),
-  BUCKET_STORAGE_POLICY_SUPPORT(12, "Bucket storage policy and fallback storage policy support");
+  STORAGE_POLICY_SUPPORT(12, "Storage policy and fallback storage policy support");
 
   ///////////////////////////////  /////////////////////////////
 
