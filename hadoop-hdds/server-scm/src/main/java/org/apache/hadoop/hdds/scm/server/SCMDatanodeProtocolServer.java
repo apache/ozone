@@ -688,7 +688,7 @@ public class SCMDatanodeProtocolServer implements
     private final long[] containerIDs;
 
     public NodeRegistrationContainerReport(DatanodeDetails datanodeDetails) {
-      this(datanodeDetails, ContainerReportsProto.getDefaultInstance());
+      this(datanodeDetails, null);
     }
 
     public NodeRegistrationContainerReport(DatanodeDetails datanodeDetails,
