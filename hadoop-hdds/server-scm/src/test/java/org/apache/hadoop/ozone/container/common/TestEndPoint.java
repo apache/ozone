@@ -80,7 +80,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
-import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -431,16 +430,8 @@ public class TestEndPoint {
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getPipelineReport()).thenReturn(
         HddsTestUtils.getRandomPipelineReports());
-    DatanodeVersionManager versionManager =
-        mock(DatanodeVersionManager.class);
-    when(versionManager.getApparentVersion())
-        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getSoftwareVersion())
-        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getVersionForClient())
-        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
     DatanodeStateMachine dn = mock(DatanodeStateMachine.class);
-    when(dn.getVersionManager()).thenReturn(versionManager);
+    when(dn.getVersionManager()).thenReturn(ContainerTestUtils.mockDnVersionManager());
     if (!clearDatanodeDetails) {
       when(dn.getDatanodeDetails()).thenReturn(randomDatanodeDetails());
     }
