@@ -126,7 +126,7 @@ public class TestS3LifecycleConfigurationDelete {
       assertThat(response.getStatus()).isEqualTo(HTTP_NO_CONTENT);
     }
 
-    verify(proxy).getS3BucketDetails("bucket1");
+    verify(proxy).getBucketDetails(null, "bucket1");
     verify(proxy).deleteLifecycleConfiguration("volume1", "bucket1");
   }
 
@@ -192,7 +192,7 @@ public class TestS3LifecycleConfigurationDelete {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
     BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers);
-    when(proxy.getS3BucketDetails("bucket1")).thenThrow(new OMException("Lookup failed", code));
+    when(proxy.getBucketDetails(null, "bucket1")).thenThrow(new OMException("Lookup failed", code));
     assertErrorResponse(expected, () -> endpoint.delete("bucket1"));
     verify(proxy, never()).deleteLifecycleConfiguration("volume1", "bucket1");
   }
@@ -201,7 +201,7 @@ public class TestS3LifecycleConfigurationDelete {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
-    when(proxy.getS3BucketDetails("bucket1")).thenReturn(bucket);
+    when(proxy.getBucketDetails(null, "bucket1")).thenReturn(bucket);
     ObjectStore store = mock(ObjectStore.class);
     // The bucket lookup resolves the volume, so no separate S3 volume lookup is expected.
     when(store.getS3Volume()).thenThrow(new AssertionError("Unexpected S3 volume lookup"));

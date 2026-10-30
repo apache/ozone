@@ -59,7 +59,7 @@ class S3RequestContext {
 
   OzoneBucket getBucket(String name) throws IOException {
     if (bucket == null) {
-      bucket = endpoint.getClientProtocol().getS3BucketDetails(name);
+      bucket = endpoint.getClientProtocol().getBucketDetails(null, name);
     } else {
       Preconditions.assertEquals(bucket.getName(), name, "Multiple buckets in one request are not supported");
     }

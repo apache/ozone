@@ -334,22 +334,12 @@ public interface ClientProtocol {
 
   /**
    * Returns {@link OzoneBucket}.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume; S3 clients may pass null to resolve it from their S3 context.
    * @param bucketName Name of the Bucket
    * @return {@link OzoneBucket}
    * @throws IOException
    */
   OzoneBucket getBucketDetails(String volumeName, String bucketName)
-      throws IOException;
-
-  /**
-   * Returns Bucket Information for a bucket in the S3 volume resolved from the current S3 context
-   * (the thread-local S3Auth), and updates the S3Auth user principal with the one returned by OM.
-   * @param bucketName Name of the Bucket.
-   * @return OzoneBucket
-   * @throws IOException
-   */
-  OzoneBucket getS3BucketDetails(String bucketName)
       throws IOException;
 
   /**

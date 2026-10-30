@@ -267,9 +267,9 @@ public class TestBucketAclHandler {
     when(endpoint.getVolume()).thenReturn(volume);
     ClientProtocol clientProtocol = mock(ClientProtocol.class);
     when(endpoint.getClientProtocol()).thenReturn(clientProtocol);
-    when(clientProtocol.getS3BucketDetails(BUCKET_NAME))
+    when(clientProtocol.getBucketDetails(null, BUCKET_NAME))
         .thenAnswer(any -> client.getObjectStore().getS3Bucket(BUCKET_NAME));
-    when(clientProtocol.getS3BucketDetails("nonexistent-bucket"))
+    when(clientProtocol.getBucketDetails(null, "nonexistent-bucket"))
         .thenThrow(new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND));
     return new S3RequestContext(endpoint, null);
   }

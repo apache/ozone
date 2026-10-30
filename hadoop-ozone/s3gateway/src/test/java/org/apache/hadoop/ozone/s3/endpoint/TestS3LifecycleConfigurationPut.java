@@ -289,7 +289,7 @@ public class TestS3LifecycleConfigurationPut {
     when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
     when(mockClient.getProxy()).thenReturn(clientProtocol);
     when(mockObjectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(clientProtocol.getS3BucketDetails("bucket1")).thenReturn(mockBucket);
+    when(clientProtocol.getBucketDetails(null, "bucket1")).thenReturn(mockBucket);
 
     BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(mockClient)
@@ -876,7 +876,7 @@ public class TestS3LifecycleConfigurationPut {
       assertThat(response.getStatus()).isEqualTo(HTTP_OK);
     }
 
-    verify(proxy).getS3BucketDetails("bucket1");
+    verify(proxy).getBucketDetails(null, "bucket1");
     ArgumentCaptor<OmLifecycleConfiguration> config = ArgumentCaptor.forClass(OmLifecycleConfiguration.class);
     verify(proxy).setLifecycleConfiguration(config.capture());
     assertThat(config.getValue().getVolume()).isEqualTo("volume1");
@@ -906,7 +906,7 @@ public class TestS3LifecycleConfigurationPut {
     HttpHeaders requestHeaders = mock(HttpHeaders.class);
     when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
     BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
-    when(proxy.getS3BucketDetails("bucket1")).thenThrow(new OMException("Lookup failed", code));
+    when(proxy.getBucketDetails(null, "bucket1")).thenThrow(new OMException("Lookup failed", code));
     assertErrorResponse(expected, () -> endpoint.put("bucket1", null));
     verify(proxy, never()).setLifecycleConfiguration(any());
   }
@@ -1174,7 +1174,7 @@ public class TestS3LifecycleConfigurationPut {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").setBucketLayout(layout).build();
-    when(proxy.getS3BucketDetails("bucket1")).thenReturn(bucket);
+    when(proxy.getBucketDetails(null, "bucket1")).thenReturn(bucket);
     ObjectStore store = mock(ObjectStore.class);
     // The bucket lookup resolves the volume, so no separate S3 volume lookup is expected.
     when(store.getS3Volume()).thenThrow(new AssertionError("Unexpected S3 volume lookup"));

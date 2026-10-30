@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -278,7 +279,7 @@ public class TestObjectMultiDelete {
     when(client.getConfiguration()).thenReturn(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(clientProtocol.getS3BucketDetails(anyString())).thenReturn(bucket);
+    when(clientProtocol.getBucketDetails(isNull(), anyString())).thenReturn(bucket);
 
     return EndpointBuilder.newBucketEndpointBuilder()
         .setBase(new BucketEndpoint() {

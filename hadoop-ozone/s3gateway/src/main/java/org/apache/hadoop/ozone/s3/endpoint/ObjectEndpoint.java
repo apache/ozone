@@ -965,7 +965,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         String sourceKey = result.getRight();
         if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
           final String sourceBucketOwner = runWithS3ActionString(
-              "GetObject", () -> getClientProtocol().getS3BucketDetails(sourceBucket).getOwner());
+              "GetObject", () -> getClientProtocol().getBucketDetails(null, sourceBucket).getOwner());
           S3Owner.verifyBucketOwnerConditionOnCopyOperation(getHeaders(), sourceBucket, sourceBucketOwner, bucketName,
               ozoneBucket.getOwner());
         }
@@ -1206,7 +1206,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
       final String sourceBucketOwner = runWithS3ActionString(
-          "GetObject", () -> getClientProtocol().getS3BucketDetails(sourceBucket).getOwner());
+          "GetObject", () -> getClientProtocol().getBucketDetails(null, sourceBucket).getOwner());
       // The destBucket owner has already been checked in the caller method
       S3Owner.verifyBucketOwnerConditionOnCopyOperation(getHeaders(), sourceBucket, sourceBucketOwner, null, null);
     }

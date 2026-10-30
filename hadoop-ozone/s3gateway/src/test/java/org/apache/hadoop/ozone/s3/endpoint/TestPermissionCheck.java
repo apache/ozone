@@ -103,7 +103,7 @@ public class TestPermissionCheck {
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(clientProtocol.getS3BucketDetails(anyString())).thenReturn(bucket);
+    when(clientProtocol.getBucketDetails(isNull(), anyString())).thenReturn(bucket);
     when(bucket.getVolumeName()).thenReturn("s3Volume");
   }
 
@@ -125,7 +125,7 @@ public class TestPermissionCheck {
    */
   @Test
   public void testGetBucket() throws IOException {
-    doThrow(exception).when(clientProtocol).getS3BucketDetails(anyString());
+    doThrow(exception).when(clientProtocol).getBucketDetails(isNull(), anyString());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();

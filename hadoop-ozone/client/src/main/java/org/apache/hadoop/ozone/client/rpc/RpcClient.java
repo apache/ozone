@@ -235,6 +235,7 @@ public class RpcClient implements ClientProtocol {
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
+  private final boolean resolveS3VolumeOnOm;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -283,6 +284,8 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
+    resolveS3VolumeOnOm = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false)
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion);
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -1335,28 +1338,20 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(
       String volumeName, String bucketName) throws IOException {
+    if (volumeName == null && resolveS3VolumeOnOm) {
+      verifyBucketName(bucketName);
+      // Volume name is not important, as we call InfoBucket with
+      // assumeS3Context = true, OM will infer the correct s3 volume.
+      BucketInfoWithS3Context bucketInfo =
+          ozoneManagerClient.getBucketInfo(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT, bucketName, true);
+      bucketInfo.getUserPrincipal().ifPresent(this::updateS3Principal);
+      return buildOzoneBucket(bucketInfo.getBucketInfo());
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
     return buildOzoneBucket(bucketInfo);
-  }
-
-  @Override
-  public OzoneBucket getS3BucketDetails(String bucketName) throws IOException {
-    verifyBucketName(bucketName);
-    if (!OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion)) {
-      // Older OM ignores assumeS3Context and would look up the bucket in the default S3 volume,
-      // so resolve the S3 volume with a separate call.
-      String volumeName = getS3VolumeContext().getOmVolumeArgs().getVolume();
-      return getBucketDetails(volumeName, bucketName);
-    }
-    // Volume name is not important, as we call InfoBucket with
-    // assumeS3Context = true, OM will infer the correct s3 volume.
-    BucketInfoWithS3Context bucketInfo =
-        ozoneManagerClient.getBucketInfo(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT, bucketName, true);
-    bucketInfo.getUserPrincipal().ifPresent(this::updateS3Principal);
-    return buildOzoneBucket(bucketInfo.getBucketInfo());
   }
 
   private OzoneBucket buildOzoneBucket(OmBucketInfo bucketInfo) {

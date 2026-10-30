@@ -867,7 +867,7 @@ class TestObjectPut {
     }
     assertKeyContent(destBucket, DEST_KEY, CONTENT);
     assertThat(destBucket.getKey(DEST_KEY).getMetadata().get(OzoneConsts.ETAG)).isEqualTo(contentMd5Hex());
-    verify(protocol).getS3BucketDetails(DEST_BUCKET_NAME);
+    verify(protocol).getBucketDetails(null, DEST_BUCKET_NAME);
   }
 
   @Test

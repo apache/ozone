@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import jakarta.annotation.Nonnull;
@@ -30,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -43,14 +46,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
- * Verifies that {@link RpcClient#getS3BucketDetails} resolves the S3 volume on OM in the InfoBucket call
- * (HDDS-16681), and falls back to a separate GetS3VolumeContext call for an older OM.
+ * Verifies that an S3 client resolves the S3 volume of {@code getBucketDetails(null, bucket)} on OM in the InfoBucket
+ * call (HDDS-16681), and falls back to a separate GetS3VolumeContext call for an older OM.
  */
-public class TestRpcClientGetS3BucketDetails {
+public class TestS3ClientGetBucketDetails {
 
   private static final String TENANT_VOLUME = "tenantvol";
   private static final String BUCKET = "bucket1";
@@ -60,13 +64,14 @@ public class TestRpcClientGetS3BucketDetails {
   private final List<OMRequest> requests = new ArrayList<>();
 
   /**
-   * Creates a client against a mock OM reporting {@code omVersion}. The mock OM maps every S3 request to
-   * {@link #TENANT_VOLUME}, like OM does for a tenant user, but only honors assumeS3Context in InfoBucket when
-   * {@code omVersion} supports it.
+   * Creates a client against a mock OM reporting {@code omVersion}, wrapped in {@link S3ClientProtocol} like S3 Gateway
+   * clients if {@code s3Client}. The mock OM maps every S3 request to {@link #TENANT_VOLUME}, like OM does for a tenant
+   * user, but only honors assumeS3Context in InfoBucket when {@code omVersion} supports it.
    */
-  private OzoneClient newClient(OzoneManagerVersion omVersion) throws IOException {
+  private OzoneClient newClient(OzoneManagerVersion omVersion, boolean s3Client) throws IOException {
     InMemoryConfigurationForTesting conf = new InMemoryConfigurationForTesting();
     conf.setFromObject(conf.getObject(OzoneClientConfig.class));
+    conf.setBoolean(S3Auth.S3_AUTH_CHECK, s3Client);
     boolean resolvesS3Context = OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion);
     RpcClient rpcClient = new RpcClient(conf, null) {
       @Override
@@ -120,19 +125,20 @@ public class TestRpcClientGetS3BucketDetails {
         return new MockXceiverClientFactory();
       }
     };
-    OzoneClient client = new OzoneClient(conf, rpcClient);
+    ClientProtocol proxy = s3Client ? new S3ClientProtocol(rpcClient) : rpcClient;
+    OzoneClient client = new OzoneClient(conf, proxy);
     client.getObjectStore().createVolume(TENANT_VOLUME);
     client.getObjectStore().getVolume(TENANT_VOLUME).createBucket(BUCKET);
     requests.clear();
-    rpcClient.setThreadLocalS3Auth(new S3Auth("unused1", "unused2", ACCESS_ID, ACCESS_ID));
+    proxy.setThreadLocalS3Auth(new S3Auth("unused1", "unused2", ACCESS_ID, ACCESS_ID));
     return client;
   }
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class, names = {"S3_VOLUME_CONTEXT_RESOLUTION", "GET_KEY_INFO_REJECTS_OBS"})
   public void resolvesS3VolumeInInfoBucket(OzoneManagerVersion omVersion) throws IOException {
-    try (OzoneClient client = newClient(omVersion)) {
-      OzoneBucket bucket = client.getProxy().getS3BucketDetails(BUCKET);
+    try (OzoneClient client = newClient(omVersion, true)) {
+      OzoneBucket bucket = client.getProxy().getBucketDetails(null, BUCKET);
 
       assertEquals(TENANT_VOLUME, bucket.getVolumeName());
       assertEquals(BUCKET, bucket.getName());
@@ -146,8 +152,8 @@ public class TestRpcClientGetS3BucketDetails {
   @EnumSource(value = OzoneManagerVersion.class,
       names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "LIST_STATUS_REJECTS_OBS"})
   public void fallsBackToS3VolumeContextForOlderOm(OzoneManagerVersion omVersion) throws IOException {
-    try (OzoneClient client = newClient(omVersion)) {
-      OzoneBucket bucket = client.getProxy().getS3BucketDetails(BUCKET);
+    try (OzoneClient client = newClient(omVersion, true)) {
+      OzoneBucket bucket = client.getProxy().getBucketDetails(null, BUCKET);
 
       assertEquals(TENANT_VOLUME, bucket.getVolumeName());
       assertEquals(BUCKET, bucket.getName());
@@ -156,6 +162,27 @@ public class TestRpcClientGetS3BucketDetails {
       // An older OM ignores assumeS3Context, so the resolved volume must be sent instead.
       assertEquals(TENANT_VOLUME, requests.get(1).getInfoBucketRequest().getVolumeName());
       assertEquals(USER_PRINCIPAL, client.getProxy().getThreadLocalS3Auth().getUserPrincipal());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {"ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
+  public void preservesExplicitVolume(OzoneManagerVersion omVersion) throws IOException {
+    try (OzoneClient client = newClient(omVersion, true)) {
+      OzoneBucket bucket = client.getProxy().getBucketDetails(TENANT_VOLUME, BUCKET);
+
+      assertEquals(TENANT_VOLUME, bucket.getVolumeName());
+      assertThat(requests).extracting(OMRequest::getCmdType).containsExactly(Type.InfoBucket);
+      assertFalse(requests.get(0).getAssumeS3Context());
+      assertEquals(TENANT_VOLUME, requests.get(0).getInfoBucketRequest().getVolumeName());
+    }
+  }
+
+  @Test
+  public void rejectsMissingVolumeForNonS3Client() throws IOException {
+    try (OzoneClient client = newClient(OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION, false)) {
+      assertThrows(NullPointerException.class, () -> client.getProxy().getBucketDetails(null, BUCKET));
+      assertThat(requests).isEmpty();
     }
   }
 }

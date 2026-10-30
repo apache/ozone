@@ -200,12 +200,14 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public OzoneBucket getBucketDetails(String volumeName, String bucketName) throws IOException {
-    return delegate.getBucketDetails(volumeName, bucketName);
+    return delegate.getBucketDetails(resolveVolumeName(volumeName), bucketName);
   }
 
-  @Override
-  public OzoneBucket getS3BucketDetails(String bucketName) throws IOException {
-    return delegate.getS3BucketDetails(bucketName);
+  private String resolveVolumeName(String volumeName) throws IOException {
+    if (volumeName != null || OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(delegate.getOmVersion())) {
+      return volumeName;
+    }
+    return delegate.getS3VolumeContext().getOmVolumeArgs().getVolume();
   }
 
   @Override

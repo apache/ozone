@@ -348,7 +348,7 @@ public abstract class EndpointBase {
    */
   protected OS3Exception newDuplicateBucketError(String bucketName, OMException cause) {
     try {
-      OzoneBucket existingBucket = getClientProtocol().getS3BucketDetails(bucketName);
+      OzoneBucket existingBucket = getClientProtocol().getBucketDetails(null, bucketName);
       if (isSameBucketOwner(existingBucket.getOwner())) {
         return newError(BUCKET_ALREADY_OWNED_BY_YOU, bucketName, cause);
       }

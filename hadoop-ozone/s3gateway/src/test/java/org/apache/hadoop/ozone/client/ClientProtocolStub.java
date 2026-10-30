@@ -233,6 +233,9 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(String volumeName, String bucketName)
       throws IOException {
+    if (volumeName == null) {
+      return objectStoreStub.getS3Volume().getBucket(bucketName);
+    }
     return null;
   }
 
@@ -345,11 +348,6 @@ public class ClientProtocolStub implements ClientProtocol {
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
     return getBucket(volumeName, bucketName).rewriteKeyIfMatch(keyName, size, expectedETag, replicationConfig,
         metadata, tags, derivedKeyPiggyBacking);
-  }
-
-  @Override
-  public OzoneBucket getS3BucketDetails(String bucketName) throws IOException {
-    return objectStoreStub.getS3Volume().getBucket(bucketName);
   }
 
   @Override
