@@ -23,10 +23,16 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DE
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.ozone.recon.schema.generated.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
@@ -41,8 +47,11 @@ import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
+import org.apache.ozone.test.GenericTestUtils;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
+import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +63,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
   private ContainerCountBySizeDao containerCountBySizeDao;
   private ContainerSizeCountTask task;
   private DSLContext dslContext;
+  private ContainerManager containerManager;
 
   public TestContainerSizeCountTask() {
     super();
@@ -63,13 +73,13 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
   public void setUp() {
     UtilizationSchemaDefinition utilizationSchemaDefinition = getSchemaDefinition(UtilizationSchemaDefinition.class);
     dslContext = utilizationSchemaDefinition.getDSLContext();
-    containerCountBySizeDao = getDao(ContainerCountBySizeDao.class);
+    containerCountBySizeDao = spy(getDao(ContainerCountBySizeDao.class));
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setContainerSizeCountTaskInterval(Duration.ofSeconds(1));
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
     when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
         getDao(ReconTaskStatusDao.class), "mockedTask-" + System.currentTimeMillis()));
-    ContainerManager containerManager = mock(ContainerManager.class);
+    containerManager = mock(ContainerManager.class);
     task = new ContainerSizeCountTask(
         containerManager,
         reconTaskConfig,
@@ -222,4 +232,47 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     assertEquals(3, containerCountBySizeDao.count());
   }
 
+  @Test
+  public void testTaskKeepsRunningAfterFailedRun() throws Exception {
+    ContainerInfo container = mock(ContainerInfo.class);
+    given(container.containerID()).willReturn(ContainerID.valueOf(1));
+    given(container.getUsedBytes()).willReturn(1500000000L);
+    given(container.getState()).willReturn(CLOSED);
+    when(containerManager.getContainers()).thenReturn(List.of(container));
+    doThrow(new DataAccessException("Recon DB unavailable")).doCallRealMethod()
+        .when(containerCountBySizeDao).insert(anyList());
+
+    task.start();
+    try {
+      GenericTestUtils.waitFor(() -> containerCountBySizeDao.count() == 1, 100, 10_000);
+      assertEquals(1L, containerCountBySizeDao.findById(2147483648L).getCount());
+    } finally {
+      task.stop();
+      GenericTestUtils.waitFor(() -> !task.isRunning(), 100, 10_000);
+    }
+  }
+
+  @Test
+  public void testCountsRecoverAfterFailedWrite() throws Exception {
+    ContainerInfo container = mock(ContainerInfo.class);
+    given(container.containerID()).willReturn(ContainerID.valueOf(1));
+    given(container.getUsedBytes()).willReturn(1500000000L);
+    given(container.getState()).willReturn(CLOSED);
+    when(containerManager.getContainers()).thenReturn(List.of(container));
+    task.runTask();
+
+    // Insert the new 4GB bin, then fail to decrement the old 2GB bin.
+    given(container.getUsedBytes()).willReturn(2500000000L);
+    doThrow(new DataAccessException("Recon DB unavailable")).doCallRealMethod()
+        .when(containerCountBySizeDao).update(anyList());
+    assertThrows(DataAccessException.class, task::runTask);
+    assertEquals(1L, containerCountBySizeDao.findById(2147483648L).getCount());
+    assertEquals(1L, containerCountBySizeDao.findById(4294967296L).getCount());
+
+    task.runTask();
+    assertThat(containerCountBySizeDao.findAll())
+        .filteredOn(record -> record.getCount() > 0)
+        .extracting(ContainerCountBySize::getContainerSize, ContainerCountBySize::getCount)
+        .containsExactly(tuple(4294967296L, 1L));
+  }
 }

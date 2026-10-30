@@ -348,7 +348,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             }
             prevSnapshotLocalData = loadedLocalData.get();
           } else {
-            prevSnapshotLocalData = snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+            prevSnapshotLocalData = OmSnapshotLocalDataYaml.loadWithoutSstFiles(previousSnapshotLocalDataFile);
           }
           if (!prevSnapId.equals(prevSnapshotLocalData.getSnapshotId())) {
             String mismatch = "Expected SnapshotId " + prevSnapId +
@@ -370,13 +370,16 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return true;
   }
 
+  /**
+   * Loads the snapshot ids and versions of a local data YAML, without its SST file lists.
+   */
   private Optional<OmSnapshotLocalData> tryLoadSnapshotLocalData(File localDataFile, Set<String> failedFilePaths) {
     String path = localDataFile.getAbsolutePath();
     if (failedFilePaths.contains(path)) {
       return Optional.empty();
     }
     try {
-      return Optional.of(snapshotLocalDataSerializer.load(localDataFile));
+      return Optional.of(OmSnapshotLocalDataYaml.loadWithoutSstFiles(localDataFile));
     } catch (IOException e) {
       failedFilePaths.add(path);
       LOG.error("Skipping snapshot local data file {} because it could not be loaded. " +
@@ -514,12 +517,18 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return Pair.of(snapshotLocalData.getSnapshotId(), new SnapshotVersionsMeta(snapshotLocalData));
   }
 
-  private void checkOrphanSnapshotVersions(OMMetadataManager metadataManager, SnapshotChainManager chainManager)
-      throws IOException {
+  @VisibleForTesting
+  void checkOrphanSnapshotVersions(OMMetadataManager metadataManager, SnapshotChainManager chainManager) {
     for (Map.Entry<UUID, Integer> entry : snapshotToBeCheckedForOrphans.entrySet()) {
       UUID snapshotId = entry.getKey();
       int countBeforeCheck = entry.getValue();
-      checkOrphanSnapshotVersions(metadataManager, chainManager, snapshotId);
+      try {
+        checkOrphanSnapshotVersions(metadataManager, chainManager, snapshotId);
+      } catch (IOException e) {
+        // Keep the count so the snapshot is retried in the next run.
+        LOG.error("Failed to check orphan versions for snapshot {}, will retry in the next run", snapshotId, e);
+        continue;
+      }
       decrementOrphanCheckCount(snapshotId, countBeforeCheck);
     }
   }
