@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,11 +66,18 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -90,6 +98,7 @@ import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithOBS;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1030,6 +1039,137 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         deletedKeysSummary.get("totalUnreplicatedDataSize"));
     assertEquals(3L,
         deletedKeysSummary.get("totalDeletedKeys"));
+  }
+
+  @Test
+  public void testOpenKeySummaryIncludesMultipartUploads() throws IOException {
+    ReconGlobalStatsManager statsManager = omdbInsightEndpoint.getReconGlobalStatsManager();
+    insertGlobalStatsRecords(statsManager, "openKeyTableCount", 2L);
+    insertGlobalStatsRecords(statsManager, "openFileTableCount", 1L);
+    insertGlobalStatsRecords(statsManager, "openKeyTableReplicatedDataSize", 30L);
+    insertGlobalStatsRecords(statsManager, "openFileTableReplicatedDataSize", 30L);
+    insertGlobalStatsRecords(statsManager, "openKeyTableUnReplicatedDataSize", 10L);
+    insertGlobalStatsRecords(statsManager, "openFileTableUnReplicatedDataSize", 10L);
+    insertGlobalStatsRecords(statsManager, "multipartInfoTableCount", 2L);
+    insertGlobalStatsRecords(statsManager, "multipartInfoTableReplicatedDataSize", 600L);
+    insertGlobalStatsRecords(statsManager, "multipartInfoTableUnReplicatedDataSize", 200L);
+
+    Map<String, Long> openKeysSummary =
+        (Map<String, Long>) omdbInsightEndpoint.getOpenKeySummary().getEntity();
+
+    assertEquals(3L, openKeysSummary.get("totalOpenKeys"));
+    assertEquals(660L, openKeysSummary.get("totalReplicatedDataSize"));
+    assertEquals(220L, openKeysSummary.get("totalUnreplicatedDataSize"));
+  }
+
+  @Test
+  public void testGetOpenKeyInfoForMultipartOpenKeys() throws Exception {
+    ReplicationConfig ratisThree = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+
+    // Split-schema upload in an OBS bucket with two committed parts of 100 bytes.
+    String splitUploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    String splitMultipartKey = reconOMMetadataManager.getMultipartKey("vol1", "obs1", "mpu-split", splitUploadId);
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.OBJECT_STORE)
+        .put(splitMultipartKey, getMultipartOpenKeyInfo("vol1", "obs1", "mpu-split", ratisThree));
+    reconOMMetadataManager.getMultipartInfoTable().put(splitMultipartKey, new OmMultipartKeyInfo.Builder()
+        .setUploadID(splitUploadId)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(ratisThree)
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build());
+    for (int partNumber = 1; partNumber <= 2; partNumber++) {
+      reconOMMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(splitUploadId, partNumber),
+          getSplitSchemaPartInfo(splitMultipartKey, partNumber, 100L, ratisThree));
+    }
+
+    // Legacy-schema upload in an FSO bucket with two embedded parts of 50 bytes.
+    String legacyUploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    String legacyMultipartKey = reconOMMetadataManager.getMultipartKey("vol1", "fso1", "dir/mpu-legacy",
+        legacyUploadId);
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/1/2/3/mpu-legacy/" + legacyUploadId,
+            getMultipartOpenKeyInfo("vol1", "fso1", "dir/mpu-legacy", ratisThree));
+    OmMultipartKeyInfo legacyInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(legacyUploadId)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(ratisThree)
+        .build();
+    legacyInfo.addPartKeyInfo(getLegacyPartKeyInfo(legacyMultipartKey, 1, 50L));
+    legacyInfo.addPartKeyInfo(getLegacyPartKeyInfo(legacyMultipartKey, 2, 50L));
+    reconOMMetadataManager.getMultipartInfoTable().put(legacyMultipartKey, legacyInfo);
+
+    // Upload whose multipartInfoTable entry is already gone.
+    String orphanMultipartKey = reconOMMetadataManager.getMultipartKey("vol1", "obs1", "mpu-orphan",
+        OMMultipartUploadUtils.getMultipartUploadId());
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.OBJECT_STORE)
+        .put(orphanMultipartKey, getMultipartOpenKeyInfo("vol1", "obs1", "mpu-orphan", ratisThree));
+
+    KeyInsightInfoResponse response = (KeyInsightInfoResponse)
+        omdbInsightEndpoint.getOpenKeyInfo(-1, "", "", true, true).getEntity();
+
+    Map<String, KeyEntityInfo> nonFsoRows = response.getNonFSOKeyInfoList().stream()
+        .collect(Collectors.toMap(KeyEntityInfo::getKey, row -> row));
+    assertEquals(2, nonFsoRows.size());
+    assertEquals(200L, nonFsoRows.get(splitMultipartKey).getSize());
+    assertEquals(600L, nonFsoRows.get(splitMultipartKey).getReplicatedSize());
+    assertEquals(0L, nonFsoRows.get(orphanMultipartKey).getSize());
+    assertEquals(0L, nonFsoRows.get(orphanMultipartKey).getReplicatedSize());
+
+    assertEquals(1, response.getFsoKeyInfoList().size());
+    assertEquals(100L, response.getFsoKeyInfoList().get(0).getSize());
+    assertEquals(300L, response.getFsoKeyInfoList().get(0).getReplicatedSize());
+
+    assertEquals(300L, response.getUnreplicatedDataSize());
+    assertEquals(900L, response.getReplicatedDataSize());
+  }
+
+  private OmKeyInfo getMultipartOpenKeyInfo(String volumeName, String bucketName, String keyName,
+      ReplicationConfig replicationConfig) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFile(true)
+        .setObjectID(generateUniqueRandomLong())
+        .setReplicationConfig(replicationConfig)
+        .setDataSize(0L)
+        .setOmKeyLocationInfos(Collections.singletonList(new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+        .build();
+  }
+
+  private OmMultipartPartInfo getSplitSchemaPartInfo(String partName, int partNumber, long dataSize,
+      ReplicationConfig replicationConfig) {
+    OmKeyInfo partKeyInfo = new OmKeyInfo.Builder()
+        .setVolumeName("vol1")
+        .setBucketName("obs1")
+        .setKeyName("mpu-split")
+        .setReplicationConfig(replicationConfig)
+        .setDataSize(dataSize)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setObjectID(generateUniqueRandomLong())
+        .setOmKeyLocationInfos(Collections.singletonList(new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+        .addMetadata(OzoneConsts.ETAG, "etag-" + partNumber)
+        .build();
+    return OmMultipartPartInfo.from(partName, partNumber, partKeyInfo);
+  }
+
+  private PartKeyInfo getLegacyPartKeyInfo(String partName, int partNumber, long dataSize) {
+    return PartKeyInfo.newBuilder()
+        .setPartNumber(partNumber)
+        .setPartName(partName)
+        .setPartKeyInfo(KeyInfo.newBuilder()
+            .setVolumeName("vol1")
+            .setBucketName("fso1")
+            .setKeyName("dir/mpu-legacy")
+            .setDataSize(dataSize)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setObjectID(generateUniqueRandomLong())
+            .setType(HddsProtos.ReplicationType.RATIS)
+            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .build())
+        .build();
   }
 
   private void insertGlobalStatsRecords(ReconGlobalStatsManager statsManager,

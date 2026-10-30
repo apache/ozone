@@ -506,6 +506,8 @@ If neither `includeFso` nor `includeNonFso` is `true`, the response will be empt
 **Returns**
 
 Returns set of keys/files which are open. FSO and non-FSO keys are reported in separate arrays.
+Each incomplete multipart upload is listed once, with `size` and `replicatedSize` set to the total of its
+committed parts.
 
 ```json
 {
@@ -554,7 +556,8 @@ Returns set of keys/files which are open. FSO and non-FSO keys are reported in s
 
 **Returns**
 
-Returns a flat summary of all currently-open keys across the cluster.
+Returns a flat summary of all currently-open keys across the cluster. Each incomplete multipart upload is
+counted once, and the sizes include its committed parts (also reported by `/keys/open/mpu/summary`).
 
 ```json
 {
