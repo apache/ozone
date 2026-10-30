@@ -22,7 +22,9 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorR
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getObjectAttributes;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.listParts;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.endpoint.ServerSideEncryption.AES256;
 import static org.apache.hadoop.ozone.s3.endpoint.ServerSideEncryption.AWS_KMS;
 import static org.apache.hadoop.ozone.s3.endpoint.ServerSideEncryption.AWS_KMS_DSSE;
@@ -44,6 +46,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -214,6 +217,30 @@ public class TestServerSideEncryption {
     assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> objectEndpoint.head(ENCRYPTED, KEY_NAME));
     assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
         () -> getObjectAttributes(objectEndpoint, ENCRYPTED, KEY_NAME, "ETag"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("customerKeyHeaders")
+  public void completeMultipartUploadWithCustomerKeyIsNotImplemented(String header) throws IOException {
+    final String uploadId = initiateMultipartUpload(objectEndpoint, PLAIN, KEY_NAME);
+    CompleteMultipartUploadRequest request = new CompleteMultipartUploadRequest();
+    request.setPartList(Collections.singletonList(uploadPart(objectEndpoint, PLAIN, KEY_NAME, 1, uploadId, CONTENT)));
+    setHeader(header, "value");
+
+    assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
+        () -> objectEndpoint.completeMultipartUpload(PLAIN, KEY_NAME, request));
+    assertKeyAbsent(plainBucket);
+  }
+
+  @ParameterizedTest
+  @MethodSource("customerKeyHeaders")
+  public void listPartsWithCustomerKeyIsNotImplemented(String header) throws IOException {
+    final String uploadId = initiateMultipartUpload(objectEndpoint, PLAIN, KEY_NAME);
+    uploadPart(objectEndpoint, PLAIN, KEY_NAME, 1, uploadId, CONTENT);
+    setHeader(header, "value");
+
+    assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
+        () -> listParts(objectEndpoint, PLAIN, KEY_NAME, uploadId, 10, 0));
   }
 
   @Test

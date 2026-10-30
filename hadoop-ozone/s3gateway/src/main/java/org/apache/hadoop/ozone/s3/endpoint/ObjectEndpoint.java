@@ -864,6 +864,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      ServerSideEncryption.rejectCustomerKey(getHeaders(), key);
       // Reject an empty part list before contacting OM.
       if (partList == null || partList.isEmpty()) {
         throw newError(MALFORMED_XML, key);

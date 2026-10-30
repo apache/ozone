@@ -339,6 +339,7 @@ Put object with wrong Content-MD5 header
 
 
 Put object with server-side encryption
+    [tags]    aws-skip
                                 Execute                    echo "sse" > /tmp/ssetestfile
     IF    '${BUCKET}' == 'encrypted'
         ${result} =             Execute AWSS3APICli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/sse/key1 --body /tmp/ssetestfile --server-side-encryption AES256
@@ -351,6 +352,7 @@ Put object with server-side encryption
     END
 
 Put object with customer-provided encryption key
+    [tags]    aws-skip
                                 Execute                    echo "ssec" > /tmp/ssectestfile
     ${result} =                 Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/ssec/key1 --body /tmp/ssectestfile --sse-customer-algorithm AES256 --sse-customer-key 0123456789abcdef0123456789abcdef    255
                                 Should contain             ${result}    NotImplemented
