@@ -26,18 +26,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -192,13 +195,17 @@ public class TestOMMultiTenantManagerImpl {
   public void testIsTenantAdminSkipsMissingAccessId() throws IOException {
     final String missingAccessId = "tenant1$bob";
     final String adminAccessId = "tenant2$bob";
-    omMetadataManager.getPrincipalToAccessIdsTable().put("bob",
-        new OmDBUserPrincipalInfo(new HashSet<>(Arrays.asList(missingAccessId, adminAccessId))));
-    assignUserToTenantInDB("tenant2", adminAccessId, "bob", true, false);
     // An unlocked reader can still see an accessId in the principal row after its accessId row is removed.
-    // Ensure the missing entry is checked before the valid admin entry to exercise the regression.
-    assertThat(omMetadataManager.getPrincipalToAccessIdsTable().get("bob").getAccessIds())
-        .first().isEqualTo(missingAccessId);
+    // Stub the read to preserve missing-first order across HashSet reconstruction during deserialization.
+    OmDBUserPrincipalInfo principalInfo = mock(OmDBUserPrincipalInfo.class);
+    when(principalInfo.getAccessIds()).thenReturn(new LinkedHashSet<>(Arrays.asList(missingAccessId, adminAccessId)));
+    Table<String, OmDBUserPrincipalInfo> principalTable = spy(omMetadataManager.getPrincipalToAccessIdsTable());
+    doReturn(principalInfo).when(principalTable).get("bob");
+    OMMetadataManager metadataManager = spy(omMetadataManager);
+    doReturn(principalTable).when(metadataManager).getPrincipalToAccessIdsTable();
+    when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    tenantManager = new OMMultiTenantManagerImpl(ozoneManager, conf);
+    assignUserToTenantInDB("tenant2", adminAccessId, "bob", true, false);
 
     final UserGroupInformation bob = UserGroupInformation.createRemoteUser("bob");
     assertThat(tenantManager.isTenantAdmin(bob, "tenant2", false)).isTrue();
