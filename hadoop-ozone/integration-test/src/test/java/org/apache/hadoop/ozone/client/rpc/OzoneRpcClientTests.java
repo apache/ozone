@@ -716,6 +716,19 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
+  public void testGetBucketDetailsResolvesDefaultS3Volume() throws IOException {
+    String bucketName = UUID.randomUUID().toString();
+    store.createS3Bucket(bucketName);
+
+    // A client not using multi-tenancy may pass null volume without S3 authentication: OM resolves the default
+    // S3 volume.
+    OzoneBucket bucket = store.getClientProxy().getBucketDetails(null, bucketName);
+
+    assertEquals(store.getS3Volume().getName(), bucket.getVolumeName());
+    assertEquals(bucketName, bucket.getName());
+  }
+
+  @Test
   public void testDeleteS3Bucket()
       throws Exception {
     Instant testStartTime = getTestStartTime();

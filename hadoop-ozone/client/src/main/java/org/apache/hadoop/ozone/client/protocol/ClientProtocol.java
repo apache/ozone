@@ -334,7 +334,7 @@ public interface ClientProtocol {
 
   /**
    * Returns {@link OzoneBucket}.
-   * @param volumeName Name of the Volume; S3 clients may pass null to resolve it from their S3 context.
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
    * @param bucketName Name of the Bucket
    * @return {@link OzoneBucket}
    * @throws IOException
