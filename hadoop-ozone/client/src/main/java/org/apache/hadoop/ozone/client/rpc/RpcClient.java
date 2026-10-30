@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -234,6 +235,7 @@ public class RpcClient implements ClientProtocol {
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
+  private final boolean resolveS3VolumeOnOm;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -282,6 +284,9 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
+    resolveS3VolumeOnOm = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false)
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION
+            .isSupportedBy(omVersion);
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -1788,6 +1793,7 @@ public class RpcClient implements ClientProtocol {
             .setOffset(locationInfo.getOffset())
             .setToken(locationInfo.getToken())
             .setPartNumber(locationInfo.getPartNumber())
+            .setPartIv(locationInfo.getPartIv())
             .setCreateVersion(locationInfo.getCreateVersion())
             .setPipeline(pipeline)
             .build();
@@ -2817,19 +2823,26 @@ public class RpcClient implements ClientProtocol {
       return new OzoneInputStream(cryptoIn);
     } else {
       // Multipart Key with FileEncryptionInfo
-      List<LengthInputStream> lengthInputStreams = KeyInputStream
+      SortedMap<Integer, LengthInputStream> lengthInputStreams = KeyInputStream
           .getStreamsFromKeyInfo(keyInfo, xceiverClientManager, retryFunction,
               blockInputStreamFactory, clientConfig);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
+      // Parts that have their own IV carry it in each of their blocks.
+      Map<Integer, byte[]> partIvs = new HashMap<>();
+      for (OmKeyLocationInfo location : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
+        if (location.getPartIv() != null) {
+          partIvs.put(location.getPartNumber(), location.getPartIv());
+        }
+      }
+
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
-      for (int i = 0; i < lengthInputStreams.size(); i++) {
-        LengthInputStream lengthInputStream = lengthInputStreams.get(i);
+      for (Map.Entry<Integer, LengthInputStream> part : lengthInputStreams.entrySet()) {
         final OzoneCryptoInputStream ozoneCryptoInputStream =
-            new OzoneCryptoInputStream(lengthInputStream,
+            new OzoneCryptoInputStream(part.getValue(),
                 OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-                decrypted.getMaterial(), feInfo.getIV(),
-                keyInfo.getKeyName(), i);
+                decrypted.getMaterial(), partIvs.getOrDefault(part.getKey(), feInfo.getIV()),
+                keyInfo.getKeyName(), cryptoInputStreams.size());
         cryptoInputStreams.add(ozoneCryptoInputStream);
       }
       return new OzoneInputStream(
@@ -2902,10 +2915,12 @@ public class RpcClient implements ClientProtocol {
         openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
       KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+      // A multipart upload part may have its own IV.
+      final byte[] partIv = openKey.getKeyInfo().getPartIv();
       final CryptoOutputStream cryptoOut =
           new CryptoOutputStream(keyOutputStream,
               OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-              decrypted.getMaterial(), feInfo.getIV());
+              decrypted.getMaterial(), partIv != null ? partIv : feInfo.getIV());
       return new OzoneOutputStream(cryptoOut, enableHsync);
     } else {
       try {
@@ -3141,12 +3156,16 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
-      throws IOException {
+  public Map<String, String> getObjectTagging(
+      String volumeName, String bucketName, String keyName) throws IOException {
     if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(omVersion)) {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
+    boolean assumeS3Context = volumeName == null && resolveS3VolumeOnOm;
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
@@ -3154,6 +3173,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setAssumeS3Context(assumeS3Context)
         .build();
     return ozoneManagerClient.getObjectTagging(keyArgs);
   }

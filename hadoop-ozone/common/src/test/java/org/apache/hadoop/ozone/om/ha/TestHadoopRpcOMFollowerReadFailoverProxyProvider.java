@@ -45,6 +45,7 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -54,7 +55,6 @@ import java.util.StringJoiner;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io_.retry.RetryInvocationHandler;
 import org.apache.hadoop.ipc_.Client.ConnectionId;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RemoteException;
@@ -498,6 +498,25 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     assertHandledBy(1);
   }
 
+  @Test
+  void testReadAfterAddressRefreshDropsCachedProxy() throws Exception {
+    setupProxyProvider(3);
+    doRead();
+    assertHandledBy(0);
+
+    // Stand in for the node having been rescheduled to a new IP: the cached address has to differ
+    // from what re-resolving localhost returns, so refreshAddressIfChanged() swaps it and drops the
+    // cached proxy. The port stays the node's own, since createOMProxy maps it back to its mock.
+    OMProxyInfo<OzoneManagerProtocolPB> current = proxyProvider.getCurrentProxy();
+    current.setCachedAddressForTest(new InetSocketAddress(InetAddress.getByName("127.0.0.99"), 0));
+    assertTrue(current.refreshAddressIfChanged());
+    assertNull(current.getProxy());
+
+    // The read has to recreate the dropped proxy rather than dial the null one.
+    doRead();
+    assertHandledBy(0);
+  }
+
   private void setupProxyProvider(int omNodeCount) throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
     config.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
@@ -587,9 +606,6 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
     // Wrap the follower read proxy provider in retry proxy to allow automatic failover
     retryProxy = OzoneManagerProtocolPB.newProxy(proxyProvider, 2 * omNodeCount);
-    // This is currently added to prevent IllegalStateException in
-    // Client#setCallIdAndRetryCount since it seems that callId is set but not unset properly
-    RetryInvocationHandler.SET_CALL_ID_FOR_TEST.set(false);
   }
 
   private void doRead() throws Exception {

@@ -190,10 +190,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       // set the data size and location info list
       omKeyInfo.setDataSize(keyArgs.getDataSize());
-      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
-          keyArgs.getKeyLocationsList().stream()
+      List<OmKeyLocationInfo> locations = keyArgs.getKeyLocationsList().stream()
           .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()), true);
+          .collect(Collectors.toList());
+      // Blocks carry the part's IV, which is set by OM on the open key.
+      final byte[] partIv = omKeyInfo.getPartIv();
+      locations.forEach(location -> location.setPartIv(partIv));
+      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(locations, true);
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
