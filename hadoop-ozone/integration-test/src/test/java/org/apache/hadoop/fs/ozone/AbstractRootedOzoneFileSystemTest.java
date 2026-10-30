@@ -125,7 +125,6 @@ import org.apache.hadoop.tools.DistCpOptions;
 import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LocalJobRunnerMetricsCleanup;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -2403,7 +2402,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
         new DistCpOptions.Builder(Collections.singletonList(insideSrcBucket),
             dstBucketPath).build();
     options.appendToConf(conf);
-    Job distcpJob = runDistCp(options);
+    Job distcpJob = new DistCp(conf, options).execute();
     verifyCopy(dstBucketPath, distcpJob, 2, 2);
     FileStatus sourceFileStatus = fs.listStatus(srcBucketPath)[0];
     FileStatus dstFileStatus = fs.listStatus(dstBucketPath)[0];
@@ -2420,7 +2419,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
             dstBucketPath).preserve(DistCpOptions.FileAttribute.REPLICATION)
             .build();
     options.appendToConf(conf);
-    distcpJob = runDistCp(options);
+    distcpJob = new DistCp(conf, options).execute();
     verifyCopy(dstBucketPath, distcpJob, 2, 2);
     dstFileStatus = fs.listStatus(dstBucketPath)[0];
     // src and dst should have same replication
@@ -2428,14 +2427,8 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
 
     // test if copy is skipped due to matching checksums
     assertFalse(options.shouldSkipCRC());
-    distcpJob = runDistCp(options);
+    distcpJob = new DistCp(conf, options).execute();
     verifyCopy(dstBucketPath, distcpJob, 0, 2);
-  }
-
-  private Job runDistCp(DistCpOptions options) throws Exception {
-    try (LocalJobRunnerMetricsCleanup ignored = new LocalJobRunnerMetricsCleanup()) {
-      return new DistCp(conf, options).execute();
-    }
   }
 
   private void verifyCopy(Path dstBucketPath, Job distcpJob,

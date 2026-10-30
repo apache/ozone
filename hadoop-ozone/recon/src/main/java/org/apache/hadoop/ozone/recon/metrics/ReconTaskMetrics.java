@@ -64,7 +64,6 @@ public final class ReconTaskMetrics implements MetricsSource {
       new ConcurrentHashMap<>();
 
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered;
 
   private ReconTaskMetrics() {
   }
@@ -75,18 +74,12 @@ public final class ReconTaskMetrics implements MetricsSource {
     return metrics;
   }
 
-  public synchronized void register() {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName, "Recon Task Metrics", this);
-      registered = true;
-    }
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName, "Recon Task Metrics", this);
   }
 
-  public synchronized void unRegister() {
-    if (registered) {
-      DefaultMetricsSystem.instance().unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unRegister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   // Task Delta Processing Operations

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -37,7 +36,6 @@ public final class BlockDeletingServiceMetrics {
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private final AtomicBoolean registered = new AtomicBoolean();
 
   @Metric(about = "The number of successful delete blocks")
   private MutableCounterLong successCount;
@@ -94,7 +92,6 @@ public final class BlockDeletingServiceMetrics {
     BlockDeletingServiceMetrics metrics = new BlockDeletingServiceMetrics();
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.register(metrics.sourceName, "BlockDeletingService", metrics);
-    metrics.registered.set(true);
     return metrics;
   }
 
@@ -102,9 +99,7 @@ public final class BlockDeletingServiceMetrics {
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    if (registered.compareAndSet(true, false)) {
-      DefaultMetricsSystem.instance().unregisterSource(sourceName);
-    }
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void incrSuccessCount(long count) {

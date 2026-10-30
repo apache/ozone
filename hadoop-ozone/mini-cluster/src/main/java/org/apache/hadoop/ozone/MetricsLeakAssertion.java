@@ -42,10 +42,9 @@ public final class MetricsLeakAssertion {
   private static final String ALL_SOURCES_FIELD = "allSources";
 
   /**
-   * Metrics sources that are registered once per JVM (or once per service)
-   * and intentionally never unregistered, so they are expected to still be
-   * present after a mini cluster shuts down.  These are JVM-level singletons
-   * with no per-service owner; do not add per-service metrics here.
+   * Metrics sources expected to remain after a mini cluster shuts down:
+   * JVM-level singletons and sources whose cleanup is controlled by Hadoop.
+   * Do not add per-service sources whose lifecycle is controlled by Ozone.
    *
    * <p>For the matching rules see {@link #isExpectedLeftover(String)}.
    */
@@ -53,6 +52,7 @@ public final class MetricsLeakAssertion {
       "JvmMetrics*", // per service, via HddsServerUtil.initializeMetrics
       "UgiMetrics", // Hadoop security UGI metrics
       "DelegationTokenSecretManagerMetrics", // Hadoop static final JVM-wide singleton
+      "LocalJobRunnerMetrics-*", // Hadoop LocalClientProtocolProvider.close() does not clean up local runners
       "ManagedRocksObjectMetrics",
       "ContainerCacheMetrics" // ContainerCache singleton, created once per JVM
   );

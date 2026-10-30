@@ -45,7 +45,6 @@ public class OMPerformanceMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       OMPerformanceMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered;
 
   // TODO: https://issues.apache.org/jira/browse/HDDS-13555
   @SuppressWarnings("PMD.SingularField")
@@ -214,22 +213,14 @@ public class OMPerformanceMetrics implements MetricsSource {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     OMPerformanceMetrics metrics = new OMPerformanceMetrics();
     ms.register(metrics.sourceName, "OzoneManager Request Performance", metrics);
-    metrics.registered = true;
     return metrics;
   }
 
-  public synchronized void registerMetrics() {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName, "OzoneManager Request Performance", this);
-      registered = true;
-    }
+  public void registerMetrics() {
+    DefaultMetricsSystem.instance().register(sourceName, "OzoneManager Request Performance", this);
   }
 
-  public synchronized void unregister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }

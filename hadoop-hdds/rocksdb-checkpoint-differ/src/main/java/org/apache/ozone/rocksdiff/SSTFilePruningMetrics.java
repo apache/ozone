@@ -39,7 +39,6 @@ public final class SSTFilePruningMetrics implements MetricsSource {
   private final String metricSourceName;
   private final MetricsRegistry registry;
   private final String sourceName;
-  private boolean registered;
 
   /*
    * Pruning Throughput Metrics.
@@ -76,19 +75,13 @@ public final class SSTFilePruningMetrics implements MetricsSource {
     String sourceName = METRICS_SOURCE_NAME_PREFIX +
         (dbLocation == null || dbLocation.isEmpty() ? "" : "-" + dbLocation.replaceAll("[/\\:\\s]", "_"));
     SSTFilePruningMetrics metrics = new SSTFilePruningMetrics(sourceName);
-    DefaultMetricsSystem.instance().register(metrics.sourceName, "SST File Pruning Metrics", metrics);
-    metrics.registered = true;
-    return metrics;
+    return DefaultMetricsSystem.instance().register(metrics.sourceName, "SST File Pruning Metrics", metrics);
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public synchronized void unRegister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 

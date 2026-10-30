@@ -34,7 +34,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -118,12 +117,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
 
   private final NettyMetrics nettyMetrics;
-  private final AtomicBoolean stopped = new AtomicBoolean();
+  private final Runnable closeCallback;
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
     this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = ratisServer.getOzoneManager();
+    this.closeCallback = ratisServer::closeStateMachine;
 
     loadSnapshotInfoFromDB();
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
@@ -151,6 +151,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       NettyMetrics nettyMetrics) {
     this.isTracingEnabled = false;
     this.ozoneManager = ozoneManager;
+    this.closeCallback = this::stop;
     this.threadPrefix = "";
     this.ozoneManagerDoubleBuffer = doubleBuffer;
     this.handler = handler;
@@ -697,7 +698,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManager.shutDown("OM state machine is shutdown by Ratis server");
     } else {
       LOG.info("Stopping {}.", this);
-      stop();
+      closeCallback.run();
     }
   }
 
@@ -792,9 +793,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   public void stop() {
-    if (!stopped.compareAndSet(false, true)) {
-      return;
-    }
     resumeApplyTransaction();
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);

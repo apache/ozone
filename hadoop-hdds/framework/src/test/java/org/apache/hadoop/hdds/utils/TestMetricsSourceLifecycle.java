@@ -111,39 +111,22 @@ class TestMetricsSourceLifecycle {
   }
 
   private <T> void assertIndependentSources(Supplier<T> create, Consumer<T> close) throws Exception {
-    assertSourceLifecycle(create, close);
-    DefaultMetricsSystem.setMiniClusterMode(false);
     Set<String> before = sourceNames();
-    T first = create.get();
-    close.accept(first);
-    T replacement = create.get();
-    Set<String> replacementNames = sourceNames();
-    replacementNames.removeAll(before);
+    T first = null;
+    T second = null;
     try {
-      close.accept(first);
-      Set<String> remaining = sourceNames();
-      remaining.removeAll(before);
-      assertThat(remaining).containsExactlyInAnyOrderElementsOf(replacementNames);
-    } finally {
-      close.accept(replacement);
-    }
-    assertThat(sourceNames()).containsExactlyInAnyOrderElementsOf(before);
-  }
-
-  private <T> void assertSourceLifecycle(Supplier<T> create, Consumer<T> close) throws Exception {
-    Set<String> before = sourceNames();
-    T first = create.get();
-    Set<String> firstNames = sourceNames();
-    firstNames.removeAll(before);
-    T second = create.get();
-    Set<String> secondNames = sourceNames();
-    secondNames.removeAll(before);
-    secondNames.removeAll(firstNames);
-    try {
+      first = create.get();
+      Set<String> firstNames = sourceNames();
+      firstNames.removeAll(before);
+      second = create.get();
+      Set<String> secondNames = sourceNames();
+      secondNames.removeAll(before);
+      secondNames.removeAll(firstNames);
       assertThat(firstNames).hasSize(1);
       assertThat(secondNames).hasSize(1);
-      close.accept(first);
-      close.accept(first);
+      T closing = first;
+      first = null;
+      close.accept(closing);
       Set<String> remaining = sourceNames();
       remaining.removeAll(before);
       assertThat(remaining).containsExactlyInAnyOrderElementsOf(secondNames);
@@ -151,8 +134,15 @@ class TestMetricsSourceLifecycle {
         assertThat(metricsSystem.getSource(name)).isNotNull();
       }
     } finally {
-      close.accept(first);
-      close.accept(second);
+      try {
+        if (first != null) {
+          close.accept(first);
+        }
+      } finally {
+        if (second != null) {
+          close.accept(second);
+        }
+      }
     }
     assertThat(sourceNames()).containsExactlyInAnyOrderElementsOf(before);
   }

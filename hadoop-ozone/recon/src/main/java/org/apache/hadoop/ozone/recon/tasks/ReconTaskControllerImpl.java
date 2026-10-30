@@ -375,8 +375,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void start() {
     LOG.info("Starting Recon Task Controller.");
-    controllerMetrics.register();
-    taskMetrics.register();
+    if (executorService != null) {
+      controllerMetrics.register();
+      taskMetrics.register();
+    }
     
     // Clean up any pre-existing checkpoint directories from previous runs
     cleanupPreExistingCheckpoints();

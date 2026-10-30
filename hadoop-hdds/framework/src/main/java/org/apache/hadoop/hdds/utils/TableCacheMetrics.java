@@ -37,7 +37,6 @@ public final class TableCacheMetrics implements MetricsSource {
   private final TableCache<?, ?> cache;
   private final String tableName;
   private final String sourceName;
-  private boolean registered;
 
   private TableCacheMetrics(TableCache<?, ?> cache, String name) {
     this.cache = cache;
@@ -49,9 +48,7 @@ public final class TableCacheMetrics implements MetricsSource {
                                          String tableName) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     TableCacheMetrics tableMetrics = new TableCacheMetrics(cache, tableName);
-    ms.register(tableMetrics.getSourceName(), "Table cache metrics", tableMetrics);
-    tableMetrics.registered = true;
-    return tableMetrics;
+    return ms.register(tableMetrics.getSourceName(), "Table cache metrics", tableMetrics);
   }
 
   private String getSourceName() {
@@ -71,11 +68,7 @@ public final class TableCacheMetrics implements MetricsSource {
         .addGauge(MetricsInfos.IterationCount, stats.getIterationTimes());
   }
 
-  public synchronized void unregister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(getSourceName());
   }

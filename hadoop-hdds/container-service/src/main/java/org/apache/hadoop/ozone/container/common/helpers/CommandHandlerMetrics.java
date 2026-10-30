@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common.helpers;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -39,7 +38,6 @@ import org.apache.hadoop.ozone.util.MetricUtil;
 public final class CommandHandlerMetrics implements MetricsSource {
   public static final String SOURCE_NAME = CommandHandlerMetrics.class.getSimpleName();
 
-  private final AtomicBoolean registered = new AtomicBoolean(false);
   private final String metricsSourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
   private final Map<Type, CommandHandler> handlerMap;
   private final Map<Type, AtomicInteger> commandCount;
@@ -63,7 +61,6 @@ public final class CommandHandlerMetrics implements MetricsSource {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     CommandHandlerMetrics metrics = new CommandHandlerMetrics(handlerMap);
     ms.register(metrics.metricsSourceName, "CommandHandlerMetrics Metrics", metrics);
-    metrics.registered.set(true);
     return metrics;
   }
 
@@ -103,10 +100,8 @@ public final class CommandHandlerMetrics implements MetricsSource {
   }
 
   public void unRegister() {
-    if (registered.compareAndSet(true, false)) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(metricsSourceName);
-    }
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(metricsSourceName);
   }
 
   enum CommandMetricsMetricsInfo implements MetricsInfo {

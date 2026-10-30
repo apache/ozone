@@ -110,7 +110,7 @@ public class ECReconstructionCoordinator implements Closeable {
   private final MemoizedSupplier<ExecutorService> ecReconstructWriteExecutor;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
-  private final ContainerClientMetrics.Handle clientMetrics;
+  private final ContainerClientMetrics clientMetrics;
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
@@ -137,7 +137,7 @@ public class ECReconstructionCoordinator implements Closeable {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructReadExecutor);
     tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
-    this.clientMetrics = ContainerClientMetrics.acquireHandle();
+    this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;
   }
 
@@ -231,7 +231,7 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
         BufferPool.empty(), ozoneClientConfig,
-        blockLocationInfo.getToken(), clientMetrics.metrics(), streamBufferArgs, ecReconstructWriteExecutor,
+        blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor,
         false);
   }
 
@@ -459,7 +459,7 @@ public class ECReconstructionCoordinator implements Closeable {
         ecReconstructWriteExecutor.get().shutdownNow();
       }
       ecReconstructReadExecutor.shutdownNow();
-      clientMetrics.close();
+      ContainerClientMetrics.release();
     }
   }
 

@@ -21,7 +21,6 @@ import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -53,7 +52,6 @@ import org.apache.hadoop.ozone.util.MetricUtil;
 public class ContainerMetrics implements Closeable {
   public static final String STORAGE_CONTAINER_METRICS =
       "StorageContainerMetrics";
-  private final AtomicBoolean registered = new AtomicBoolean(false);
   private final String metricsSourceName = MetricUtil.getMetricsSourceName(STORAGE_CONTAINER_METRICS);
   @Metric private MutableCounterLong numOps;
   @Metric private MutableCounterLong containerDeleteFailedNonEmpty;
@@ -134,15 +132,12 @@ public class ContainerMetrics implements Closeable {
         conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
     ContainerMetrics metrics = new ContainerMetrics(intervals);
     ms.register(metrics.metricsSourceName, "Storage Container Node Metrics", metrics);
-    metrics.registered.set(true);
     return metrics;
   }
 
   @Override
   public void close() {
-    if (registered.compareAndSet(true, false)) {
-      DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
-    }
+    DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
     opsLatQuantiles.values().forEach(MetricUtil::stop);
   }
 

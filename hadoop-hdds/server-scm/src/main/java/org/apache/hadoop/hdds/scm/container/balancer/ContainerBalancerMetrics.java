@@ -35,7 +35,6 @@ public final class ContainerBalancerMetrics {
 
   private final MetricsSystem ms;
   private final String sourceName = MetricUtil.getMetricsSourceName(NAME);
-  private boolean registered = true;
 
   @Metric(about = "Amount of Gigabytes that Container Balancer moved" +
       " in the latest iteration.")
@@ -109,11 +108,8 @@ public final class ContainerBalancerMetrics {
     this.ms = ms;
   }
 
-  public synchronized void unregister() {
-    if (registered) {
-      ms.unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unregister() {
+    ms.unregisterSource(sourceName);
   }
 
   /**

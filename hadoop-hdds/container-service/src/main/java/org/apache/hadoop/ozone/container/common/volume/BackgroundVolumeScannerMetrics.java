@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -51,7 +50,6 @@ public class BackgroundVolumeScannerMetrics {
       "since the last iteration had not elapsed")
   private MutableCounterLong numIterationsSkipped;
 
-  private final AtomicBoolean registered = new AtomicBoolean(false);
   private final String metricsSourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
 
   public BackgroundVolumeScannerMetrics() {
@@ -61,7 +59,6 @@ public class BackgroundVolumeScannerMetrics {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     BackgroundVolumeScannerMetrics metrics = new BackgroundVolumeScannerMetrics();
     ms.register(metrics.metricsSourceName, "Background Volume Scanner Metrics", metrics);
-    metrics.registered.set(true);
     return metrics;
   }
 
@@ -122,8 +119,6 @@ public class BackgroundVolumeScannerMetrics {
   }
 
   public void unregister() {
-    if (registered.compareAndSet(true, false)) {
-      DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
-    }
+    DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
   }
 }

@@ -37,7 +37,6 @@ public final class OMLockMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       OMLockMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered;
 
   private final ConcurrentMutableStat readLockWaitingTimeMsStat;
   private final ConcurrentMutableStat readLockHeldTimeMsStat;
@@ -67,27 +66,14 @@ public final class OMLockMetrics implements MetricsSource {
   public static OMLockMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     OMLockMetrics metrics = new OMLockMetrics();
-    ms.register(metrics.sourceName, "Ozone Manager Lock Metrics",
-        metrics);
-    metrics.registered = true;
+    ms.register(metrics.sourceName, "Ozone Manager Lock Metrics", metrics);
     return metrics;
   }
 
   /**
    * Unregisters OMLockMetrics source.
    */
-  public synchronized void register() {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName, "Ozone Manager Lock Metrics", this);
-      registered = true;
-    }
-  }
-
-  public synchronized void unRegister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }

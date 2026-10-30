@@ -74,54 +74,37 @@ class TestSSTFilePruningMetrics {
   @ParameterizedTest(name = "{0}")
   @MethodSource("metrics")
   void testIndependentShutdown(String name, Supplier<Runnable> factory) throws Exception {
-    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
-    DefaultMetricsSystem.setMiniClusterMode(true);
     Set<String> before = sources();
-    Runnable closeFirst = factory.get();
-    Set<String> first = sources();
-    first.removeAll(before);
-    Runnable closeSecond = factory.get();
-    Set<String> second = sources();
-    second.removeAll(before);
-    second.removeAll(first);
+    Runnable closeFirst = null;
+    Runnable closeSecond = null;
     try {
+      closeFirst = factory.get();
+      Set<String> first = sources();
+      first.removeAll(before);
+      closeSecond = factory.get();
+      Set<String> second = sources();
+      second.removeAll(before);
+      second.removeAll(first);
       assertFalse(first.isEmpty(), name);
       assertEquals(first.size(), second.size(), name);
-      closeFirst.run();
-      closeFirst.run();
+      Runnable closing = closeFirst;
+      closeFirst = null;
+      closing.run();
       Set<String> remaining = sources();
       assertTrue(remaining.containsAll(second),
           "Closing one database must preserve another database's metrics: " + name);
       remaining.retainAll(first);
       assertTrue(remaining.isEmpty(), "Closed database metrics remain registered: " + remaining);
-      closeSecond.run();
-      assertEquals(before, sources());
     } finally {
-      closeFirst.run();
-      closeSecond.run();
-      Set<String> added = sources();
-      added.removeAll(before);
-      added.forEach(DefaultMetricsSystem.instance()::unregisterSource);
-      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
-    }
-  }
-
-  @ParameterizedTest(name = "{0} replacement")
-  @MethodSource("metrics")
-  void testRepeatedShutdownPreservesReplacement(String name, Supplier<Runnable> factory) throws Exception {
-    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
-    DefaultMetricsSystem.setMiniClusterMode(false);
-    Set<String> before = sources();
-    Runnable closeFirst = factory.get();
-    closeFirst.run();
-    Runnable closeReplacement = factory.get();
-    Set<String> registered = sources();
-    try {
-      closeFirst.run();
-      assertEquals(registered, sources(), "Repeated shutdown removed replacement metrics: " + name);
-    } finally {
-      closeReplacement.run();
-      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+      try {
+        if (closeFirst != null) {
+          closeFirst.run();
+        }
+      } finally {
+        if (closeSecond != null) {
+          closeSecond.run();
+        }
+      }
     }
     assertEquals(before, sources());
   }

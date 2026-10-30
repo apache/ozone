@@ -83,6 +83,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private MockClock testClock;
+  private boolean controllerStopped;
 
   public TestReconTaskControllerImpl() {
     super();
@@ -106,6 +107,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconGlobalStatsManager reconGlobalStatsManager = mock(ReconGlobalStatsManager.class);
     ReconFileMetadataManager reconFileMetadataManager = mock(ReconFileMetadataManager.class);
     testClock = MockClock.newInstance();
+    controllerStopped = false;
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
         reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager,
         reconGlobalStatsManager, reconFileMetadataManager, testClock);
@@ -114,9 +116,14 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   @AfterEach
   public void tearDown() {
-    if (reconTaskController != null) {
-      reconTaskController.stop();
+    if (reconTaskController != null && !controllerStopped) {
+      stopController();
     }
+  }
+
+  private void stopController() {
+    controllerStopped = true;
+    reconTaskController.stop();
   }
 
   @SuppressWarnings("unchecked")
@@ -136,14 +143,14 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertThat(sources).containsKeys(controllerSource, taskSource);
     controllerMetrics.incrTotalEventCount(3);
 
-    reconTaskController.stop();
-    reconTaskController.stop();
+    stopController();
     assertThat(sources).doesNotContainKeys(controllerSource, taskSource);
 
     reconTaskController.start();
+    controllerStopped = false;
     assertThat(sources).containsKeys(controllerSource, taskSource);
     assertEquals(3, controllerMetrics.getTotalEventCount());
-    reconTaskController.stop();
+    stopController();
     assertThat(sources).doesNotContainKeys(controllerSource, taskSource);
   }
 
@@ -153,7 +160,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // processing loop only exits on interrupt, so a plain shutdown() can never
     // drain it and awaitTermination would otherwise burn the full 30s timeout.
     long start = Time.monotonicNow();
-    reconTaskController.stop();
+    stopController();
     long elapsed = Time.monotonicNow() - start;
     assertThat(elapsed)
         .as("stop() should return promptly, not wait out the shutdown timeout")
@@ -411,7 +418,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
     
     reconTaskController.updateOMMetadataManager(mockOMMetadataManager);
-    reconTaskController.stop();
+    stopController();
     
     // Test successful queueing - the checkpoint creation should work with proper mocks
     ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
@@ -439,7 +446,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
     
     reconTaskController.updateOMMetadataManager(mockOMMetadataManager);
-    reconTaskController.stop();
+    stopController();
     
     // Create a spy of the controller to mock checkpoint creation failure
     ReconTaskControllerImpl controllerSpy = spy((ReconTaskControllerImpl) reconTaskController);
@@ -457,7 +464,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   @Test
   public void testDrainEventBufferAndCleanExistingCheckpoints() throws Exception {
     // Stop the async processing first to prevent events from being consumed
-    reconTaskController.stop();
+    stopController();
     
     // Recreate controller without starting async processing
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -477,6 +484,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl testController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
         reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager,
         reconGlobalStatsManager, reconFileMetadataManager);
+    reconTaskController = testController;
+    controllerStopped = false;
     // Don't start async processing
     
     // Add some events to buffer first
@@ -534,7 +543,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     
     // Update with first manager
     reconTaskController.updateOMMetadataManager(mockManager1);
-    reconTaskController.stop();
+    stopController();
     
     // Test that the manager was updated correctly by attempting to queue a reinitialization event
     ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
@@ -550,7 +559,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // up (not leaked) and the call must return RETRY_LATER.
 
     // Stop the async processor from setUp so it can't consume buffered events.
-    reconTaskController.stop();
+    stopController();
 
     // Build a controller with a capacity-1 event buffer so a single pre-filled event
     // makes the internal eventBuffer.offer(...) return false (buffer full).
@@ -569,6 +578,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         reconTaskStatusUpdaterManagerMock, reconDbProvider, mock(ReconContainerMetadataManager.class),
         mock(ReconNamespaceSummaryManager.class), mock(ReconGlobalStatsManager.class),
         mock(ReconFileMetadataManager.class));
+    reconTaskController = controller;
+    controllerStopped = false;
     // Do not start async processing.
 
     // Checkpointed manager whose cleanup (stop()) we verify.
@@ -607,7 +618,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // directory (a full copy of the OM DB) is still deleted and not leaked.
 
     // Halt the async processor so the buffered event isn't consumed before we drain.
-    reconTaskController.stop();
+    stopController();
     ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
 
     // Real on-disk checkpoint directory (with content) that cleanup must delete.
@@ -640,7 +651,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // checkpoint, then verify the real cleanup path deletes it from disk.
 
     // Halt the async processor so our explicit drain owns the enqueued event.
-    reconTaskController.stop();
+    stopController();
     ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
 
     // Real source OM DB + real RocksDB-backed Recon OM metadata manager.

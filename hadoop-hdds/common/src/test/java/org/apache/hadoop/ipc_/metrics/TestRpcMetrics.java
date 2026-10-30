@@ -86,18 +86,20 @@ public class TestRpcMetrics {
     Configuration conf = new Configuration(false);
     conf.set("rpc.metrics.percentiles.intervals", "60");
     conf.setBoolean("rpc.metrics.quantile.enable", true);
-    RpcMetrics quantileMetrics = new RpcMetrics(server, conf);
-    Field taskField = MutableQuantiles.class.getDeclaredField("scheduledTask");
-    taskField.setAccessible(true);
-    MutableQuantiles[] quantiles = {quantileMetrics.rpcQueueTimeQuantiles[0],
-        quantileMetrics.rpcLockWaitTimeQuantiles[0], quantileMetrics.rpcProcessingTimeQuantiles[0]};
-    ScheduledFuture<?>[] tasks = new ScheduledFuture<?>[quantiles.length];
-    for (int i = 0; i < quantiles.length; i++) {
-      tasks[i] = (ScheduledFuture<?>) taskField.get(quantiles[i]);
-      assertNotNull(tasks[i]);
+    RpcMetrics quantileMetrics = RpcMetrics.create(server, conf);
+    ScheduledFuture<?>[] tasks = new ScheduledFuture<?>[3];
+    try {
+      Field taskField = MutableQuantiles.class.getDeclaredField("scheduledTask");
+      taskField.setAccessible(true);
+      MutableQuantiles[] quantiles = {quantileMetrics.rpcQueueTimeQuantiles[0],
+          quantileMetrics.rpcLockWaitTimeQuantiles[0], quantileMetrics.rpcProcessingTimeQuantiles[0]};
+      for (int i = 0; i < quantiles.length; i++) {
+        tasks[i] = (ScheduledFuture<?>) taskField.get(quantiles[i]);
+        assertNotNull(tasks[i]);
+      }
+    } finally {
+      quantileMetrics.shutdown();
     }
-    quantileMetrics.shutdown();
-    quantileMetrics.shutdown();
     for (ScheduledFuture<?> task : tasks) {
       assertTrue(task.isCancelled());
     }

@@ -148,16 +148,16 @@ public abstract class AbstractBackgroundContainerScanner implements Runnable {
   public void shutdown() {
     if (stopping.compareAndSet(false, true)) {
       scannerThread.interrupt();
+      // A scanner stopped before start never reaches run() and its finally block.
+      if (scannerThread.getState() == Thread.State.NEW) {
+        getMetrics().unregister();
+      }
     }
     if (Thread.currentThread() == scannerThread) {
       return;
     }
     try {
       scannerThread.join();
-      // A scanner stopped before start never reaches run() and its finally block.
-      if (scannerThread.getState() == Thread.State.NEW) {
-        getMetrics().unregister();
-      }
     } catch (InterruptedException ex) {
       LOG.warn("Unexpected exception while stopping data scanner.", ex);
       Thread.currentThread().interrupt();

@@ -40,7 +40,6 @@ public final class DeletingServiceMetrics implements MetricsSource {
   public static final String METRICS_SOURCE_NAME =
       DeletingServiceMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME);
-  private boolean registered;
   private MetricsRegistry registry;
 
   /*
@@ -157,26 +156,18 @@ public final class DeletingServiceMetrics implements MetricsSource {
     DefaultMetricsSystem.instance().register(metrics.sourceName,
         "Metrics tracking the progress of deletion of directories and keys in the OM",
         metrics);
-    metrics.registered = true;
     return metrics;
+  }
+
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName,
+        "Metrics tracking the progress of deletion of directories and keys in the OM", this);
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public synchronized void register() {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName,
-          "Metrics tracking the progress of deletion of directories and keys in the OM", this);
-      registered = true;
-    }
-  }
-
-  public synchronized void unregister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 

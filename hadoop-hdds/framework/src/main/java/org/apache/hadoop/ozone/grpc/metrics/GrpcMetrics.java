@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.grpc.metrics;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -60,7 +59,6 @@ public class GrpcMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       GrpcMetrics.class.getSimpleName();
 
-  private final AtomicBoolean registered = new AtomicBoolean();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
   private final MetricsRegistry registry;
   private final boolean grpcQuantileEnable;
@@ -131,18 +129,14 @@ public class GrpcMetrics implements MetricsSource {
    */
   public static synchronized GrpcMetrics create(Configuration conf) {
     GrpcMetrics metrics = new GrpcMetrics(conf);
-    DefaultMetricsSystem.instance().register(metrics.sourceName, "Metrics for using gRPC", metrics);
-    metrics.registered.set(true);
-    return metrics;
+    return DefaultMetricsSystem.instance().register(metrics.sourceName, "Metrics for using gRPC", metrics);
   }
 
   /**
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    if (registered.compareAndSet(true, false)) {
-      DefaultMetricsSystem.instance().unregisterSource(sourceName);
-    }
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
     MetricUtil.stop(grpcProcessingTimeNanosQuantiles);
     MetricUtil.stop(grpcQueueTimeNanosQuantiles);
   }

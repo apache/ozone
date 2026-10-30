@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -49,7 +48,6 @@ public final class VolumeHealthMetrics implements MetricsSource {
       Interns.info("NumFailedVolumes", "Number of failed volumes");
 
   private final MetricsRegistry registry;
-  private final AtomicBoolean closed = new AtomicBoolean(false);
   private final String metricsSourceName;
   private final AtomicInteger healthyVolumes;
   private final AtomicInteger failedVolumes;
@@ -80,10 +78,8 @@ public final class VolumeHealthMetrics implements MetricsSource {
   }
 
   public void unregister() {
-    if (closed.compareAndSet(false, true)) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(metricsSourceName);
-    }
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(metricsSourceName);
   }
 
   public void incrementHealthyVolumes() {

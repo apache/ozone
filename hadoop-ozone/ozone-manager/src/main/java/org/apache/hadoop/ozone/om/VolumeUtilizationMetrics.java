@@ -51,7 +51,6 @@ public class VolumeUtilizationMetrics implements MetricsSource {
 
   private final OMMetadataManager metadataManager;
   private final String sourceName;
-  private boolean registered;
 
   public VolumeUtilizationMetrics(OMMetadataManager metadataManager,
       String omServiceId, String omNodeId) {
@@ -65,7 +64,6 @@ public class VolumeUtilizationMetrics implements MetricsSource {
     VolumeUtilizationMetrics metrics = new VolumeUtilizationMetrics(
         metadataManager, omServiceId, omNodeId);
     ms.register(metrics.sourceName, "Volume Utilization Metrics", metrics);
-    metrics.registered = true;
     return metrics;
   }
 
@@ -90,18 +88,7 @@ public class VolumeUtilizationMetrics implements MetricsSource {
     }
   }
 
-  public synchronized void register() {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName, "Volume Utilization Metrics", this);
-      registered = true;
-    }
-  }
-
-  public synchronized void unRegister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }

@@ -65,7 +65,6 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
   private static final String SOURCE_NAME =
       OMSnapshotDirectoryMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered;
 
   // Aggregate metrics
   private @Metric MutableGaugeLong dbSnapshotsDirSize;
@@ -105,9 +104,7 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
       String parent, OMMetadataManager metadataManager) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     OMSnapshotDirectoryMetrics metrics = new OMSnapshotDirectoryMetrics(conf, metadataManager);
-    ms.register(metrics.sourceName, parent,
-        metrics);
-    metrics.registered = true;
+    ms.register(metrics.sourceName, parent, metrics);
     return metrics;
   }
 
@@ -302,11 +299,7 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
     return sstBackupSstFilesCount.value();
   }
 
-  public synchronized void unRegister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unRegister() {
     stop();
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);

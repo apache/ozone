@@ -38,7 +38,6 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics, Metrics
       OmSnapshotMetrics.class.getSimpleName();
 
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered;
   private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
   private @Metric MutableCounterLong numKeyLookup;
@@ -70,19 +69,12 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics, Metrics
     return metrics;
   }
 
-  public synchronized void register() {
+  public void register() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    if (!registered) {
-      ms.register(sourceName, "Snapshot Manager Metrics", this);
-      registered = true;
-    }
+    ms.register(sourceName, "Snapshot Manager Metrics", this);
   }
 
-  public synchronized void unregister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 

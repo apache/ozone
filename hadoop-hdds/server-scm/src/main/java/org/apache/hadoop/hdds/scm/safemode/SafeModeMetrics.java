@@ -38,7 +38,6 @@ public class SafeModeMetrics {
 
   // These all values will be set to some values when safemode is enabled.
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered = true;
 
   private @Metric MutableGaugeLong
       numContainerWithOneReplicaReportedThreshold;
@@ -194,11 +193,8 @@ public class SafeModeMetrics {
     return scmInSafeMode;
   }
 
-  public synchronized void unRegister() {
-    if (registered) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(sourceName);
   }
 }

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import java.util.EnumMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -41,7 +40,6 @@ public class CSMMetrics {
   public static final String SOURCE_NAME =
       CSMMetrics.class.getSimpleName();
   private RaftGroupId gid;
-  private final AtomicBoolean registered = new AtomicBoolean(false);
   private final String metricsSourceName;
 
   // ratis op metrics metrics
@@ -96,7 +94,6 @@ public class CSMMetrics {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     CSMMetrics metrics = new CSMMetrics(gid);
     ms.register(metrics.metricsSourceName, "Container State Machine", metrics);
-    metrics.registered.set(true);
     return metrics;
   }
 
@@ -265,9 +262,7 @@ public class CSMMetrics {
   }
 
   public void unRegister() {
-    if (registered.compareAndSet(true, false)) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(metricsSourceName);
-    }
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(metricsSourceName);
   }
 }

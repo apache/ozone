@@ -133,7 +133,9 @@ public class TestHddsDispatcher {
 
   @AfterEach
   void cleanupMetrics() {
-    IOUtils.closeQuietly(metrics);
+    ContainerMetrics closing = metrics;
+    metrics = null;
+    IOUtils.closeQuietly(closing);
   }
 
   /**
@@ -225,7 +227,7 @@ public class TestHddsDispatcher {
       verify(stateMachine, times(2)).triggerHeartbeat(); // was called twice before
     } finally {
       volumeSet.shutdown();
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -248,7 +250,7 @@ public class TestHddsDispatcher {
 
       assertEquals(ContainerProtos.Result.SUCCESS, smallFileResponse.getResult());
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -291,7 +293,7 @@ public class TestHddsDispatcher {
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest0), context);
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -380,7 +382,7 @@ public class TestHddsDispatcher {
           scException.getMessage());
     } finally {
       volumeSet.shutdown();
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -433,7 +435,7 @@ public class TestHddsDispatcher {
         assertEquals(1, blockData.getChunksCount());
       }
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -467,7 +469,7 @@ public class TestHddsDispatcher {
           "ContainerID " + writeChunkRequest.getContainerID()
               + " does not exist");
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -501,7 +503,7 @@ public class TestHddsDispatcher {
           .contains("ContainerID " + writeChunkRequest.getContainerID()
               + " creation failed , Result: DISK_OUT_OF_SPACE");
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -543,7 +545,7 @@ public class TestHddsDispatcher {
       assertTrue(container.getContainerData().isOpen());
       assertFalse(container.getContainerData().isUnhealthy());
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -585,7 +587,7 @@ public class TestHddsDispatcher {
       assertTrue(container.getContainerData().isOpen());
       assertFalse(container.getContainerData().isUnhealthy());
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -643,7 +645,7 @@ public class TestHddsDispatcher {
         assertEquals(1, blockData.getChunksCount());
       }
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -942,7 +944,7 @@ public class TestHddsDispatcher {
         assertTrue(verified.getAndSet(false));
       }
     } finally {
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 
@@ -1051,7 +1053,7 @@ public class TestHddsDispatcher {
           hddsVolume.getVolumeInfoStats().getNumWriteRequestsRejectedHardMinFreeSpace());
     } finally {
       volumeSet.shutdown();
-      IOUtils.closeQuietly(metrics);
+      cleanupMetrics();
     }
   }
 

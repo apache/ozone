@@ -37,7 +37,6 @@ public class EventExecutorMetrics implements MetricsSource {
   private final String sourceName;
   private final String description;
   private final MetricsRegistry registry;
-  private boolean registered;
 
   @Metric("Number of tasks queued")
   private MutableCounterLong queued;
@@ -69,20 +68,14 @@ public class EventExecutorMetrics implements MetricsSource {
     init();
   }
 
-  public synchronized void init() {
-    if (!registered) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.register(sourceName, description, this);
-      registered = true;
-    }
+  public void init() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.register(sourceName, description, this);
   }
 
-  public synchronized void unregister() {
-    if (registered) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(sourceName);
   }
 
   @Override

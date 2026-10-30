@@ -46,7 +46,6 @@ public final class SCMNodeMetrics implements MetricsSource {
       SCMNodeMetrics.class.getSimpleName();
 
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered = true;
 
   private @Metric MutableCounterLong numHBProcessed;
   private @Metric MutableCounterLong numHBProcessingFailed;
@@ -87,12 +86,9 @@ public final class SCMNodeMetrics implements MetricsSource {
   /**
    * Unregister the metrics instance.
    */
-  public synchronized void unRegister() {
-    if (registered) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(sourceName);
   }
 
   /**

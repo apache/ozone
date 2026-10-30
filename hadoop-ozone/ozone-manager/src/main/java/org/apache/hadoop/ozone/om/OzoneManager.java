@@ -532,8 +532,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
-  private final VolumeUtilizationMetrics volumeUtilizationMetrics;
-  private final BucketUtilizationMetrics bucketUtilizationMetrics;
+  private VolumeUtilizationMetrics volumeUtilizationMetrics;
+  private BucketUtilizationMetrics bucketUtilizationMetrics;
 
   private boolean fsSnapshotEnabled;
 
@@ -833,9 +833,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omState = State.INITIALIZED;
     }
 
-    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager,
-        getOMServiceId(), getOMNodeId());
-    bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
     omHostName = HddsUtils.getHostName(conf);
   }
 
@@ -1161,6 +1158,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (withNewSnapshot) {
       versionManager.finalizeFromSnapshotIfRequired(metadataManager.getMetaTable());
     }
+    if (volumeUtilizationMetrics != null) {
+      volumeUtilizationMetrics.unRegister();
+      volumeUtilizationMetrics = null;
+    }
+    if (bucketUtilizationMetrics != null) {
+      bucketUtilizationMetrics.unRegister();
+      bucketUtilizationMetrics = null;
+    }
+    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager, getOMServiceId(), getOMNodeId());
+    bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
   }
 
   /**
@@ -2140,8 +2147,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.register();
     perfMetrics.registerMetrics();
     omDeletionMetrics.register();
-    volumeUtilizationMetrics.register();
-    bucketUtilizationMetrics.register();
     omSnapshotIntMetrics.register();
 
     instantiateServices(false);
@@ -2660,15 +2665,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       if (omhaMetrics != null) {
         omhaMetrics.unRegister();
+        omhaMetrics = null;
       }
       omRatisServer = null;
 
       if (volumeUtilizationMetrics != null) {
         volumeUtilizationMetrics.unRegister();
+        volumeUtilizationMetrics = null;
       }
 
       if (bucketUtilizationMetrics != null) {
         bucketUtilizationMetrics.unRegister();
+        bucketUtilizationMetrics = null;
       }
 
       if (omUpgradeFinalizeService != null) {

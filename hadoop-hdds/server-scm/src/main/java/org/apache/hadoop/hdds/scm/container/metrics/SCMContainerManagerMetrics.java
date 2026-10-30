@@ -39,7 +39,6 @@ public final class SCMContainerManagerMetrics {
   // of create/delete containers in SCM.
 
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered = true;
 
   private @Metric MutableCounterLong numSuccessfulCreateContainers;
   private @Metric MutableCounterLong numFailureCreateContainers;
@@ -68,12 +67,9 @@ public final class SCMContainerManagerMetrics {
   /**
    * Unregister metrics.
    */
-  public synchronized void unRegister() {
-    if (registered) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(sourceName);
   }
 
   public void incNumSuccessfulCreateContainers() {

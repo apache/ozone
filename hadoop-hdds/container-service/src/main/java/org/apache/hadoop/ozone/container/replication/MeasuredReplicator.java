@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -61,7 +60,6 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   @Metric(about = "Bytes transferred for successful replication tasks")
   private MutableGaugeLong transferredBytes;
 
-  private final AtomicBoolean closed = new AtomicBoolean(false);
   private final String metricsSourceName;
 
   public MeasuredReplicator(ContainerReplicator delegate, String name) {
@@ -98,9 +96,7 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    if (closed.compareAndSet(false, true)) {
-      DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
-    }
+    DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
   }
 
   MutableCounterLong getSuccess() {

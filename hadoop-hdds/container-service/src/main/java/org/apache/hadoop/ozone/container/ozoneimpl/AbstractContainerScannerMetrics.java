@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -32,7 +31,6 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 @Metrics(about = "Datanode container scanner metrics", context = "dfs")
 public abstract class AbstractContainerScannerMetrics {
 
-  private final AtomicBoolean closed = new AtomicBoolean(false);
   private final String name;
   private final MetricsSystem ms;
 
@@ -81,9 +79,7 @@ public abstract class AbstractContainerScannerMetrics {
   }
 
   public void unregister() {
-    if (closed.compareAndSet(false, true)) {
-      ms.unregisterSource(name);
-    }
+    ms.unregisterSource(name);
   }
 
   public String getName() {

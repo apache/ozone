@@ -46,7 +46,6 @@ public class OMMetrics implements OmMetadataReaderMetrics, MetricsSource {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered;
   private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
   private final LinkedList<String> ratisEvents = new LinkedList<>();
@@ -286,7 +285,6 @@ public class OMMetrics implements OmMetadataReaderMetrics, MetricsSource {
         OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
     OMMetrics metrics = new OMMetrics(maxRatisEvents);
     ms.register(metrics.sourceName, "Ozone Manager Metrics", metrics);
-    metrics.registered = true;
     return metrics;
   }
 
@@ -1631,16 +1629,13 @@ public class OMMetrics implements OmMetadataReaderMetrics, MetricsSource {
     }
   }
 
-  public synchronized void register() {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName, "Ozone Manager Metrics", this);
-      registered = true;
-    }
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName, "Ozone Manager Metrics", this);
     dbCheckpointMetrics.register("OM Metrics");
     snapshotMetrics.register();
   }
 
-  public synchronized void unRegister() {
+  public void unRegister() {
     snapshotMetrics.unregister();
     if (dbCheckpointMetrics != null) {
       dbCheckpointMetrics.unRegister();
@@ -1649,10 +1644,6 @@ public class OMMetrics implements OmMetadataReaderMetrics, MetricsSource {
       snapshotDirectoryMetrics.unRegister();
       snapshotDirectoryMetrics = null;
     }
-    if (!registered) {
-      return;
-    }
-    registered = false;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }

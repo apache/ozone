@@ -744,7 +744,6 @@ public class OzoneContainer {
     }
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
-    metrics.close();
     checksumTreeManager.stop();
     if (this.witnessedContainerMetadataStore != null) {
       try {

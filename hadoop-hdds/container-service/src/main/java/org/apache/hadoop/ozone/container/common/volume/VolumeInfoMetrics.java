@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -74,7 +73,6 @@ public class VolumeInfoMetrics implements MetricsSource {
           "(FilesystemUsed - OzoneUsed)");
 
   private final MetricsRegistry registry;
-  private final AtomicBoolean closed = new AtomicBoolean(false);
   private final String metricsSourceName;
   private final HddsVolume volume;
   @Metric("Returns the RocksDB compact times of the Volume")
@@ -116,16 +114,13 @@ public class VolumeInfoMetrics implements MetricsSource {
   }
 
   public void init() {
-    closed.set(false);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.register(metricsSourceName, "Volume Info Statistics", this);
   }
 
   public void unregister() {
-    if (closed.compareAndSet(false, true)) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(metricsSourceName);
-    }
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(metricsSourceName);
   }
 
   @Metric("Metric to return the Storage Type")

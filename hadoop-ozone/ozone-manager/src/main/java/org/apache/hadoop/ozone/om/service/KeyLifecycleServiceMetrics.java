@@ -38,7 +38,6 @@ public final class KeyLifecycleServiceMetrics implements MetricsSource {
   public static final String METRICS_SOURCE_NAME =
       KeyLifecycleServiceMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME);
-  private boolean registered;
   private MetricsRegistry registry;
 
   @Metric("Total no. of tasks skipped due to previous round task of this bucket has not finished")
@@ -112,18 +111,13 @@ public final class KeyLifecycleServiceMetrics implements MetricsSource {
     DefaultMetricsSystem.instance().register(metrics.sourceName,
         "Metrics tracking the lifecycle service in the OM",
         metrics);
-    metrics.registered = true;
     return metrics;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public synchronized void unregister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 

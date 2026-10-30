@@ -157,9 +157,11 @@ public class TestBlockDeletingService {
 
   @AfterEach
   public void cleanup() throws IOException {
-    if (blockDeletingService != null) {
+    BlockDeletingServiceTestImpl service = blockDeletingService;
+    blockDeletingService = null;
+    if (service != null) {
       // Wait for deletion tasks to release container DB references before cleanup.
-      blockDeletingService.close();
+      service.close();
     }
     BlockUtils.shutdownCache(conf);
     CodecBuffer.assertNoLeaks();
@@ -698,7 +700,7 @@ public class TestBlockDeletingService {
       assertEquals(BLOCK_CHUNK_SIZE,
           deletingServiceMetrics.getTotalPendingBlockBytes());
     }
-    blockDeletingService.close();
+    blockDeletingService.shutdown();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -901,7 +903,7 @@ public class TestBlockDeletingService {
       assertFalse(f.exists());
     }
 
-    blockDeletingService.close();
+    blockDeletingService.shutdown();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -926,7 +928,7 @@ public class TestBlockDeletingService {
     GenericTestUtils.waitFor(() -> blockDeletingService.getThreadCount() > 0, 100, 1000);
 
     // Shutdown service and verify all threads are stopped
-    blockDeletingService.close();
+    blockDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> blockDeletingService.getThreadCount() == 0, 100, 1000);
   }
 
@@ -1112,7 +1114,7 @@ public class TestBlockDeletingService {
                   0 && containerData.get(1).getBytesUsed() == 0),
           100, 3000);
     } finally {
-      blockDeletingService.close();
+      blockDeletingService.shutdown();
     }
   }
 
@@ -1158,7 +1160,7 @@ public class TestBlockDeletingService {
             StringUtils.countMatches(log.getOutput(), "Max lock hold time"));
       }
     } finally {
-      blockDeletingService.close();
+      blockDeletingService.shutdown();
     }
   }
 
@@ -1240,7 +1242,7 @@ public class TestBlockDeletingService {
               100, 3000);
 
     } finally {
-      blockDeletingService.close();
+      blockDeletingService.shutdown();
     }
   }
 

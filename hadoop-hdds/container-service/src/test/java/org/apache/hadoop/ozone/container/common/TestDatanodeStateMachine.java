@@ -62,6 +62,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -160,10 +161,21 @@ public class TestDatanodeStateMachine {
     Set<String> before = clientCacheMetricsSources();
     try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
       assertThat(clientCacheMetricsSources().size()).isGreaterThan(before.size());
-      stateMachine.close();
-      stateMachine.close();
-      assertThat(clientCacheMetricsSources()).containsExactlyInAnyOrderElementsOf(before);
     }
+    assertThat(clientCacheMetricsSources()).containsExactlyInAnyOrderElementsOf(before);
+  }
+
+  @Test
+  void testCloseReleasesContainerMetricsOnce() throws Exception {
+    ContainerMetrics metrics;
+    try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
+      OzoneContainer container = stateMachine.getContainer();
+      metrics = spy(container.getMetrics());
+      Field field = OzoneContainer.class.getDeclaredField("metrics");
+      field.setAccessible(true);
+      field.set(container, metrics);
+    }
+    verify(metrics).close();
   }
 
   private Set<String> clientCacheMetricsSources() throws ReflectiveOperationException {
@@ -182,8 +194,8 @@ public class TestDatanodeStateMachine {
   @Test
   public void testStartStopDatanodeStateMachine() throws IOException,
       InterruptedException, TimeoutException {
-    try (DatanodeStateMachine stateMachine =
-        new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
+    DatanodeStateMachine stateMachine = new DatanodeStateMachine(getNewDatanodeDetails(), conf);
+    try {
       stateMachine.startDaemon();
       SCMConnectionManager connectionManager =
           stateMachine.getConnectionManager();
@@ -193,10 +205,10 @@ public class TestDatanodeStateMachine {
             LOG.info("connectionManager.getValues().size() is {}", size);
             return size == 1;
           }, 1000, 30000);
-
+    } finally {
       stateMachine.stopDaemon();
-      assertTrue(stateMachine.isDaemonStopped());
     }
+    assertTrue(stateMachine.isDaemonStopped());
   }
 
   @Test

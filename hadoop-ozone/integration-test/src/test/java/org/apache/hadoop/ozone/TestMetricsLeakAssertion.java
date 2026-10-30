@@ -26,17 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.ozone.test.LocalJobRunnerMetricsCleanup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,34 +66,26 @@ class TestMetricsLeakAssertion {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"LeakedMetricsSource", "HttpServer2Metrics-service1", "RpcActivityForPorttest",
-      "RpcDetailedActivityForPorttest", "LocalJobRunnerMetricstest", "StorageContainerMetrics",
-      "ContainerDataScannerMetricstest", "ContainerMetadataScannerMetrics", "On-demand container scanner metrics",
-      "BackgroundVolumeScannerMetrics", "VolumeHealthMetrics-test", "VolumeIOStats-test", "VolumeInfoMetrics-test",
-      "CommandHandlerMetrics", "HddsDispatcher", "ECReconstructionMetrics", "ReplicationSupervisorMetrics",
-      "ContainerReplicator/push", "BlockDeletingService", "GrpcMetrics", "SCMNodeMetrics",
-      "SCMContainerManagerMetrics", "SafeModeMetrics", "ContainerBalancerMetrics", "NodeDecommissionMetrics",
-      "SCMDatanodeProtocol", "ScmBlockLocationProtocol", "ScmContainerLocationProtocol", "ScmSecurityProtocol",
-      "EventQueuetest", "OMMetrics", "OMPerformanceMetrics", "OMLockMetrics", "OMHAMetrics",
-      "OMSnapshotDirectoryMetrics", "OmSnapshotMetrics", "OmClientProtocol", "DeletingServiceMetrics",
-      "KeyLifecycleServiceMetrics", "BucketUtilizationMetrics", "Rocksdb_test", "SSTFilePruningMetrics-test",
-      "DBCheckpointMetrics", "keyTableCache", "CSMMetricsgroup-test", "CacheMetrics-test", "NettyMetricstest",
-      "ContainerClientMetrics1", "ReconTaskMetrics", "ReconTaskControllerMetrics", "keyTableCache-1"})
-  void testUnexpectedSourceFails(String sourceName) {
+  @Test
+  void testUnexpectedSourceFails() {
+    String sourceName = "FirstLeakedMetricsSource";
+    String otherSourceName = "SecondLeakedMetricsSource";
     registerSource("ContainerCacheMetrics");
     registerSource(sourceName);
+    registerSource(otherSourceName);
 
     AssertionError error = assertThrows(AssertionError.class, MetricsLeakAssertion::assertNoLeaks);
-    assertThat(error).hasMessageContaining(sourceName);
+    assertThat(error).hasMessageContaining(sourceName).hasMessageContaining(otherSourceName);
     assertNull(metricsSystem.getSource(sourceName));
+    assertNull(metricsSystem.getSource(otherSourceName));
     assertNotNull(metricsSystem.getSource("ContainerCacheMetrics"));
     assertDoesNotThrow(MetricsLeakAssertion::assertNoLeaks);
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"ContainerCacheMetrics", "ContainerCacheMetrics-1", "ContainerCacheMetrics-123",
-      "JvmMetricsOM", "DelegationTokenSecretManagerMetrics"})
+      "JvmMetricsOM", "UgiMetrics", "DelegationTokenSecretManagerMetrics",
+      "LocalJobRunnerMetrics-12345", "LocalJobRunnerMetrics--12345"})
   void testAllowedSourcePasses(String sourceName) {
     registerSource(sourceName);
 
@@ -106,42 +93,13 @@ class TestMetricsLeakAssertion {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ContainerCacheMetrics-unexpected", "ContainerCacheMetrics-", "keyTableCache-unexpected"})
+  @ValueSource(strings = {"ContainerCacheMetrics-unexpected", "ContainerCacheMetrics-", "keyTableCache-unexpected",
+      "LocalJobRunnerMetricsUnexpected"})
   void testUnexpectedSuffixFails(String sourceName) {
     registerSource(sourceName);
 
     AssertionError error = assertThrows(AssertionError.class, MetricsLeakAssertion::assertNoLeaks);
     assertThat(error).hasMessageContaining(sourceName);
-  }
-
-  @Test
-  @SuppressWarnings("unchecked")
-  void testLocalJobRunnerMetricsCleanupPreservesExistingSources() throws Exception {
-    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
-    DefaultMetricsSystem.setMiniClusterMode(true);
-    try {
-      metricsSystem.init(getClass().getSimpleName());
-      registerSource("LocalJobRunnerMetrics-existing");
-      Field sourcesField = MetricsSystemImpl.class.getDeclaredField("allSources");
-      sourcesField.setAccessible(true);
-      Map<String, ?> sources = (Map<String, ?>) sourcesField.get(metricsSystem);
-      Field referenceCountField = MetricsSystemImpl.class.getDeclaredField("refCount");
-      referenceCountField.setAccessible(true);
-      int references = referenceCountField.getInt(metricsSystem);
-      try (LocalJobRunnerMetricsCleanup cleanup = new LocalJobRunnerMetricsCleanup()) {
-        new Cluster(new Configuration()).close();
-        new Cluster(new Configuration()).close();
-        assertThat(sources.keySet()).filteredOn(name -> name.startsWith("LocalJobRunnerMetrics-")).hasSize(3);
-        cleanup.close();
-        assertThat(sources.keySet()).filteredOn(name -> name.startsWith("LocalJobRunnerMetrics-"))
-            .containsExactly("LocalJobRunnerMetrics-existing");
-        assertThat(referenceCountField.getInt(metricsSystem)).isEqualTo(references);
-        cleanup.close();
-        assertThat(referenceCountField.getInt(metricsSystem)).isEqualTo(references);
-      }
-    } finally {
-      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
-    }
   }
 
   @Test

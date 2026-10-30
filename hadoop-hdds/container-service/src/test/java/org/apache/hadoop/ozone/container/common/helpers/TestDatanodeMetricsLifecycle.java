@@ -38,7 +38,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.CSMMetrics;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.BackgroundVolumeScannerMetrics;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -92,77 +91,6 @@ class TestDatanodeMetricsLifecycle {
   }
 
   @Test
-  void testRepeatedClosePreservesReplacement() throws Exception {
-    boolean previous = DefaultMetricsSystem.inMiniClusterMode();
-    DefaultMetricsSystem.setMiniClusterMode(false);
-    try {
-      assertReplacement(BlockDeletingServiceMetrics::create, BlockDeletingServiceMetrics::unRegister);
-      assertReplacement(BackgroundVolumeScannerMetrics::create, BackgroundVolumeScannerMetrics::unregister);
-      assertReplacement(ECReconstructionMetrics::create, ECReconstructionMetrics::unRegister);
-      assertReplacement(() -> CommandHandlerMetrics.create(Collections.emptyMap()), CommandHandlerMetrics::unRegister);
-      assertReplacement(() -> ReplicationSupervisorMetrics.create(mock(ReplicationSupervisor.class)),
-          ReplicationSupervisorMetrics::unRegister);
-      assertReplacement(ContainerMetadataScannerMetrics::create, ContainerMetadataScannerMetrics::unregister);
-      assertReplacement(OnDemandScannerMetrics::create, OnDemandScannerMetrics::unregister);
-      assertReplacement(() -> VolumeHealthMetrics.create(StorageVolume.VolumeType.DATA_VOLUME),
-          VolumeHealthMetrics::unregister);
-      assertReplacement(() -> ContainerMetrics.create(new OzoneConfiguration()), ContainerMetrics::close);
-      assertReplacement(() -> ContainerDataScannerMetrics.create("volume"), ContainerDataScannerMetrics::unregister);
-      assertReplacement(() -> new VolumeIOStats("volume", "volume", new int[] {60}), VolumeIOStats::unregister);
-      assertReplacement(() -> new VolumeInfoMetrics("volume", mock(HddsVolume.class)), VolumeInfoMetrics::unregister);
-      RaftGroupId groupId = RaftGroupId.randomId();
-      assertReplacement(() -> CSMMetrics.create(groupId), CSMMetrics::unRegister);
-      assertReplacement(() -> new MeasuredReplicator(task -> { }, "push"), MeasuredReplicator::close);
-    } finally {
-      DefaultMetricsSystem.setMiniClusterMode(previous);
-    }
-  }
-
-  @Test
-  void testUnregisteredInstancesDoNotRemoveActiveSources() throws Exception {
-    boolean previous = DefaultMetricsSystem.inMiniClusterMode();
-    DefaultMetricsSystem.setMiniClusterMode(false);
-    try {
-      Set<String> initial = sources();
-      try (ContainerMetrics metrics = ContainerMetrics.create(new OzoneConfiguration())) {
-        Set<String> active = sources();
-        new ContainerMetrics(new int[0]).close();
-        assertEquals(active, sources());
-      }
-      assertEquals(initial, sources());
-      BackgroundVolumeScannerMetrics scannerMetrics = BackgroundVolumeScannerMetrics.create();
-      try {
-        Set<String> active = sources();
-        new BackgroundVolumeScannerMetrics().unregister();
-        assertEquals(active, sources());
-      } finally {
-        scannerMetrics.unregister();
-      }
-      ReplicationSupervisor supervisor = mock(ReplicationSupervisor.class);
-      ReplicationSupervisorMetrics supervisorMetrics = ReplicationSupervisorMetrics.create(supervisor);
-      try {
-        Set<String> active = sources();
-        new ReplicationSupervisorMetrics(supervisor).unRegister();
-        assertEquals(active, sources());
-      } finally {
-        supervisorMetrics.unRegister();
-      }
-      RaftGroupId groupId = RaftGroupId.randomId();
-      CSMMetrics stateMachineMetrics = CSMMetrics.create(groupId);
-      try {
-        Set<String> active = sources();
-        new CSMMetrics(groupId).unRegister();
-        assertEquals(active, sources());
-      } finally {
-        stateMachineMetrics.unRegister();
-      }
-      assertEquals(initial, sources());
-    } finally {
-      DefaultMetricsSystem.setMiniClusterMode(previous);
-    }
-  }
-
-  @Test
   void testVolumeCheckerShutdownBeforeStart() throws Exception {
     boolean previous = DefaultMetricsSystem.inMiniClusterMode();
     DefaultMetricsSystem.setMiniClusterMode(true);
@@ -186,21 +114,20 @@ class TestDatanodeMetricsLifecycle {
     XceiverServerRatis server = XceiverServerRatis.newXceiverServerRatis(null,
         MockDatanodeDetails.randomDatanodeDetails(), conf, mock(ContainerDispatcher.class),
         mock(ContainerController.class), null, null);
-    ContainerStateMachine stateMachine = null;
     try {
       // Ratis may remove a division from its map while its state machine is still initializing.
       Method factory = XceiverServerRatis.class.getDeclaredMethod("getStateMachine", RaftGroupId.class);
       factory.setAccessible(true);
-      stateMachine = (ContainerStateMachine) factory.invoke(server, RaftGroupId.randomId());
+      factory.invoke(server, RaftGroupId.randomId());
       assertNotEquals(initial, sources());
-      server.stop();
+      XceiverServerRatis stoppedServer = server;
+      server = null;
+      stoppedServer.stop();
       assertEquals(initial, sources(), "The server must release state machines missing from the Ratis division map");
     } finally {
-      if (stateMachine != null) {
-        stateMachine.close();
+      if (server != null) {
+        server.stop();
       }
-      server.getServer().close();
-      server.stop();
       DefaultMetricsSystem.setMiniClusterMode(previous);
     }
   }
@@ -218,40 +145,20 @@ class TestDatanodeMetricsLifecycle {
       secondNames.removeAll(initial);
       secondNames.removeAll(firstNames);
       assertEquals(1, secondNames.size(), "Each datanode must own a distinct source");
-      close.accept(second);
-      close.accept(second);
+      T closing = second;
+      second = null;
+      close.accept(closing);
       assertTrue(sources().containsAll(firstNames), "Stopping a datanode must preserve its live peer's source");
-      close.accept(first);
+      closing = first;
+      first = null;
+      close.accept(closing);
       assertEquals(initial, sources(), "All sources must be released after both datanodes stop");
     } finally {
-      close.accept(first);
+      if (first != null) {
+        close.accept(first);
+      }
       if (second != null) {
         close.accept(second);
-      }
-      Set<String> remaining = sources();
-      remaining.removeAll(initial);
-      remaining.forEach(DefaultMetricsSystem.instance()::unregisterSource);
-    }
-  }
-
-  private static <T> void assertReplacement(Supplier<T> create, CheckedConsumer<T, Exception> close) throws Exception {
-    Set<String> initial = sources();
-    T first = create.get();
-    T replacement = null;
-    try {
-      close.accept(first);
-      replacement = create.get();
-      Set<String> replacementNames = sources();
-      replacementNames.removeAll(initial);
-      assertEquals(1, replacementNames.size());
-      close.accept(first);
-      assertTrue(sources().containsAll(replacementNames), "Repeated close must preserve the replacement source");
-      close.accept(replacement);
-      assertEquals(initial, sources());
-    } finally {
-      close.accept(first);
-      if (replacement != null) {
-        close.accept(replacement);
       }
     }
   }

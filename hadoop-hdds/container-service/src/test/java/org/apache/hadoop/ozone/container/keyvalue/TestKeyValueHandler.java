@@ -215,6 +215,7 @@ public class TestKeyValueHandler {
   @AfterEach
   void cleanupMetrics() {
     IOUtils.closeQuietly(containerMetricsList);
+    containerMetricsList.clear();
   }
 
   private ContainerMetrics createContainerMetrics() {
@@ -1138,7 +1139,7 @@ public class TestKeyValueHandler {
     // Clean up metrics for next tests.
     hddsVolume.getVolumeInfoStats().unregister();
     hddsVolume.getVolumeIOStats().unregister();
-    IOUtils.closeQuietly(containerMetricsList);
+    cleanupMetrics();
 
     // Register the on-demand container scanner with the container set used by the KeyValueHandler.
     ContainerController controller = new ContainerController(containerSet,
@@ -1270,7 +1271,7 @@ public class TestKeyValueHandler {
 
   private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path, OzoneContainer ozoneContainer)
       throws IOException {
-    IOUtils.closeQuietly(containerMetricsList);
+    cleanupMetrics();
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     final ContainerMetrics containerMetrics = createContainerMetrics();
@@ -1386,7 +1387,6 @@ public class TestKeyValueHandler {
       assertCounter("localBytesGetBlock", blockMetadataBytes, containerMetrics);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      IOUtils.closeQuietly(containerMetricsList);
     }
   }
 
@@ -1434,7 +1434,6 @@ public class TestKeyValueHandler {
       }
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      IOUtils.closeQuietly(containerMetricsList);
     }
   }
 
@@ -1519,7 +1518,6 @@ public class TestKeyValueHandler {
         blockFile.close();
       }
       FileUtils.deleteDirectory(testDir.toFile());
-      IOUtils.closeQuietly(containerMetricsList);
     }
   }
 
@@ -1791,7 +1789,6 @@ public class TestKeyValueHandler {
     public void close() throws IOException {
       blockFile.close();
       FileUtils.deleteDirectory(testDir.toFile());
-      IOUtils.closeQuietly(containerMetricsList);
     }
   }
 
@@ -1914,7 +1911,6 @@ public class TestKeyValueHandler {
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2, 2, 2, 2);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      IOUtils.closeQuietly(containerMetricsList);
     }
   }
 
@@ -1942,7 +1938,6 @@ public class TestKeyValueHandler {
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2048, 2048, 1044, 3072);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      IOUtils.closeQuietly(containerMetricsList);
     }
   }
 
@@ -1974,7 +1969,6 @@ public class TestKeyValueHandler {
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 20, (1 << 20) + 20, 0, (1 << 20) + 30 + 1024);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      IOUtils.closeQuietly(containerMetricsList);
     }
 
   }

@@ -39,7 +39,6 @@ public class DBCheckpointMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       DBCheckpointMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered;
   private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
   // Metrics to track checkpoint statistics from last run.
@@ -57,23 +56,14 @@ public class DBCheckpointMetrics implements MetricsSource {
   public static DBCheckpointMetrics create(String parent) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     DBCheckpointMetrics metrics = new DBCheckpointMetrics();
-    ms.register(metrics.sourceName, parent, metrics);
-    metrics.registered = true;
-    return metrics;
+    return ms.register(metrics.sourceName, parent, metrics);
   }
 
-  public synchronized void register(String parent) {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName, parent, this);
-      registered = true;
-    }
+  public void register(String parent) {
+    DefaultMetricsSystem.instance().register(sourceName, parent, this);
   }
 
-  public synchronized void unRegister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }

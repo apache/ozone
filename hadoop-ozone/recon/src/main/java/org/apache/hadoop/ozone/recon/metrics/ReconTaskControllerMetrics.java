@@ -71,7 +71,6 @@ public final class ReconTaskControllerMetrics {
   private MutableCounterLong totalReprocessSubmittedToQueue;
 
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private boolean registered;
   private MetricsSource source;
 
   private ReconTaskControllerMetrics() {
@@ -83,21 +82,15 @@ public final class ReconTaskControllerMetrics {
     return metrics;
   }
 
-  public synchronized void register() {
-    if (!registered) {
-      if (source == null) {
-        source = MetricsAnnotations.makeSource(this);
-      }
-      DefaultMetricsSystem.instance().register(sourceName, "Recon Task Controller Metrics", source);
-      registered = true;
+  public void register() {
+    if (source == null) {
+      source = MetricsAnnotations.makeSource(this);
     }
+    DefaultMetricsSystem.instance().register(sourceName, "Recon Task Controller Metrics", source);
   }
 
-  public synchronized void unRegister() {
-    if (registered) {
-      DefaultMetricsSystem.instance().unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unRegister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   // Queue Management Operations

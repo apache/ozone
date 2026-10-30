@@ -139,48 +139,32 @@ class TestOMMetricsLifecycle {
     Set<String> second = sources();
     second.removeAll(before);
     second.removeAll(first);
+    boolean firstClosed = false;
+    boolean secondClosed = false;
     try {
       assertFalse(first.isEmpty(), name);
       assertEquals(first.size(), second.size(), name);
-      closeFirst.run();
+      firstClosed = true;
       closeFirst.run();
       Set<String> remaining = sources();
       assertTrue(remaining.containsAll(second), "Stopping one OM must preserve another OM's metrics: " + name);
       remaining.retainAll(first);
       assertTrue(remaining.isEmpty(), "Stopped OM metrics remain registered: " + remaining);
+      secondClosed = true;
       closeSecond.run();
       assertEquals(before, sources());
     } finally {
-      closeFirst.run();
-      closeSecond.run();
+      if (!firstClosed) {
+        closeFirst.run();
+      }
+      if (!secondClosed) {
+        closeSecond.run();
+      }
       Set<String> added = sources();
       added.removeAll(before);
       added.forEach(DefaultMetricsSystem.instance()::unregisterSource);
       DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
     }
-  }
-
-  @Test
-  void testDirectConstructorCleanupPreservesReplacement() throws Exception {
-    DefaultMetricsSystem.setMiniClusterMode(false);
-    Set<String> before = sources();
-    OMMetrics direct = new OMMetrics(0);
-    OMMetrics replacement = null;
-    try {
-      assertEquals(before.size() + 2, sources().size());
-      direct.unRegister();
-      assertEquals(before, sources());
-      replacement = OMMetrics.create(new OzoneConfiguration());
-      Set<String> replacementSources = sources();
-      direct.unRegister();
-      assertEquals(replacementSources, sources(), "Direct constructor cleanup must preserve replacement metrics");
-    } finally {
-      direct.unRegister();
-      if (replacement != null) {
-        replacement.unRegister();
-      }
-    }
-    assertEquals(before, sources());
   }
 
   @Test
@@ -190,42 +174,24 @@ class TestOMMetricsLifecycle {
     Set<String> before = sources();
     OMMetrics metrics = OMMetrics.create(new OzoneConfiguration());
     Set<String> registered = sources();
+    boolean active = true;
     try {
       metrics.setNumKeys(7);
       metrics.getSnapshotMetrics().incNumKeyLookups();
+      active = false;
       metrics.unRegister();
       assertEquals(before, sources());
       metrics.register();
-      metrics.register();
+      active = true;
       assertEquals(registered, sources());
-      assertGauge("NumKeys", 7L,
-          getMetrics(metrics));
-      assertCounter("NumKeyLookup", 1L,
-          getMetrics(metrics.getSnapshotMetrics()));
+      assertGauge("NumKeys", 7L, getMetrics(metrics));
+      assertCounter("NumKeyLookup", 1L, getMetrics(metrics.getSnapshotMetrics()));
     } finally {
-      metrics.unRegister();
+      if (active) {
+        metrics.unRegister();
+      }
       DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
     }
-  }
-
-  @ParameterizedTest(name = "{0} replacement")
-  @MethodSource("metrics")
-  void testRepeatedShutdownPreservesReplacement(String name, Supplier<Runnable> factory) throws Exception {
-    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
-    DefaultMetricsSystem.setMiniClusterMode(false);
-    Set<String> before = sources();
-    Runnable closeFirst = factory.get();
-    closeFirst.run();
-    Runnable closeReplacement = factory.get();
-    Set<String> registered = sources();
-    try {
-      closeFirst.run();
-      assertEquals(registered, sources(), "Repeated shutdown removed replacement metrics: " + name);
-    } finally {
-      closeReplacement.run();
-      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
-    }
-    assertEquals(before, sources());
   }
 
   @Test

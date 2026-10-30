@@ -39,7 +39,6 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
 
   private final String name;
   private final String sourceName;
-  private boolean registered;
 
   private final String description;
 
@@ -83,18 +82,12 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
     };
   }
 
-  public synchronized void register() {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName, description, this);
-      registered = true;
-    }
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName, description, this);
   }
 
-  public synchronized void unregister() {
-    if (registered) {
-      DefaultMetricsSystem.instance().unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unregister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   @Override

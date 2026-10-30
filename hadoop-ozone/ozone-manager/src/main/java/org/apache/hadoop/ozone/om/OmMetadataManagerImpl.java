@@ -441,9 +441,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   @Override
   public void start(OzoneConfiguration configuration) throws IOException {
-    if (lock.getOMLockMetrics() != null) {
-      lock.getOMLockMetrics().register();
-    }
     // We need to create the DB here, as when during restart, stop closes the
     // db, so we need to create the store object and initialize DB.
     if (store == null) {

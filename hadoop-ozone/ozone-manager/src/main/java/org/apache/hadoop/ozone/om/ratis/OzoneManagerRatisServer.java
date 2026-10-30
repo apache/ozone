@@ -45,6 +45,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -127,6 +128,7 @@ public final class OzoneManagerRatisServer {
 
   private final OzoneManager ozoneManager;
   private final OzoneManagerStateMachine omStateMachine;
+  private final AtomicReference<OzoneManagerStateMachine> stateMachineToClose = new AtomicReference<>();
   private final String ratisStorageDir;
   private final OMPerformanceMetrics perfMetrics;
 
@@ -179,6 +181,7 @@ public final class OzoneManagerRatisServer {
           raftGroupIdStr, raftPeersStr.substring(2));
     }
     this.omStateMachine = getStateMachine(conf);
+    stateMachineToClose.set(omStateMachine);
 
     this.readOption = RaftServerConfigKeys.Read.option(serverProperties);
 
@@ -699,13 +702,20 @@ public final class OzoneManagerRatisServer {
   public void stop() {
     LOG.info("Stopping {} at port {}", this, port);
     try {
-      // Ratis will also close the state machine
+      // Ratis will also close the state machine after the server has started.
       server.close();
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
-      // Ratis skips its state machine close callback when the server has not started.
-      omStateMachine.stop();
+      closeStateMachine();
+    }
+  }
+
+  void closeStateMachine() {
+    // The Ratis callback consumes ownership when it runs; failed startup can skip that callback.
+    OzoneManagerStateMachine stateMachine = stateMachineToClose.getAndSet(null);
+    if (stateMachine != null) {
+      stateMachine.stop();
     }
   }
 

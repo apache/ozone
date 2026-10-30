@@ -69,26 +69,36 @@ public class TestEventQueue {
     field.setAccessible(true);
     Map<?, ?> sources = (Map<?, ?>) field.get(DefaultMetricsSystem.instance());
     Set<?> original = new HashSet<>(sources.keySet());
-    SingleThreadExecutor<Long> first = new SingleThreadExecutor<>("testCleanup", "");
-    Set<?> firstSources = new HashSet<>(sources.keySet());
-    SingleThreadExecutor<Long> second = new SingleThreadExecutor<>("testCleanup", "");
+    SingleThreadExecutor<Long> first = null;
+    SingleThreadExecutor<Long> second = null;
     try {
+      first = new SingleThreadExecutor<>("testCleanup", "");
+      Set<?> firstSources = new HashSet<>(sources.keySet());
+      second = new SingleThreadExecutor<>("testCleanup", "");
       assertEquals(original.size() + 2, sources.size());
       Set<Object> expected = new HashSet<>(sources.keySet());
       expected.removeAll(firstSources);
       expected.addAll(original);
-      first.close();
-      Set<?> surviving = new HashSet<>(sources.keySet());
-      assertEquals(expected, surviving);
-      first.close();
-      assertEquals(surviving, sources.keySet());
-      second.close();
-      assertEquals(original, sources.keySet());
+      SingleThreadExecutor<Long> closing = first;
+      first = null;
+      closing.close();
+      assertEquals(expected, sources.keySet());
     } finally {
-      first.close();
-      second.close();
-      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+      try {
+        if (first != null) {
+          first.close();
+        }
+      } finally {
+        try {
+          if (second != null) {
+            second.close();
+          }
+        } finally {
+          DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+        }
+      }
     }
+    assertEquals(original, sources.keySet());
   }
 
   @Test

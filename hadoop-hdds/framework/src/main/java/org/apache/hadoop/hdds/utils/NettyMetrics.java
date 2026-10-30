@@ -43,15 +43,12 @@ public final class NettyMetrics implements MetricsSource {
   // direct memory once instead of on every getMetrics() call.
   private static final long MAX_DIRECT_MEMORY = maxDirectMemory();
 
-  private boolean registered;
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
 
   public static NettyMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     NettyMetrics metrics = new NettyMetrics();
-    ms.register(metrics.sourceName, "Netty metrics", metrics);
-    metrics.registered = true;
-    return metrics;
+    return ms.register(metrics.sourceName, "Netty metrics", metrics);
   }
 
   @Override
@@ -63,11 +60,9 @@ public final class NettyMetrics implements MetricsSource {
         .addGauge(MetricsInfos.MAX_DIRECT_MEM, MAX_DIRECT_MEMORY);
   }
 
-  public synchronized void unregister() {
-    if (registered) {
-      DefaultMetricsSystem.instance().unregisterSource(sourceName);
-      registered = false;
-    }
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(sourceName);
   }
 
   /**

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -31,7 +30,6 @@ import org.apache.hadoop.ozone.util.MetricUtil;
  * This class is used to track Volume IO stats for each HDDS Volume.
  */
 public class VolumeIOStats {
-  private final AtomicBoolean closed = new AtomicBoolean(false);
   private String metricsSourceName = VolumeIOStats.class.getSimpleName();
   private String storageDirectory;
   private final MetricsRegistry registry = new MetricsRegistry("VolumeIOStats");
@@ -83,18 +81,15 @@ public class VolumeIOStats {
   }
 
   public void init() {
-    closed.set(false);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.register(metricsSourceName, "Volume I/O Statistics", this);
   }
 
   public void unregister() {
-    if (closed.compareAndSet(false, true)) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(metricsSourceName);
-      MetricUtil.stop(readLatencyQuantiles);
-      MetricUtil.stop(writeLatencyQuantiles);
-    }
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(metricsSourceName);
+    MetricUtil.stop(readLatencyQuantiles);
+    MetricUtil.stop(writeLatencyQuantiles);
   }
 
   public String getMetricsSourceName() {

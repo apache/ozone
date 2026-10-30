@@ -23,13 +23,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
@@ -139,10 +142,12 @@ public class TestOzoneManagerRatisServer {
   }
 
   @AfterEach
-  public void shutdown() throws IOException {
+  public void shutdown() throws Exception {
     if (omRatisServer != null) {
+      when(ozoneManager.isStopped()).thenReturn(true);
       omRatisServer.stop();
     }
+    omMetadataManager.stop();
     certClient.close();
   }
 
@@ -166,21 +171,70 @@ public class TestOzoneManagerRatisServer {
           Collections.emptyMap(), secConfig, certClient, true);
       Field metricsField = OzoneManagerStateMachine.class.getDeclaredField("nettyMetrics");
       metricsField.setAccessible(true);
-      NettyMetrics metrics = (NettyMetrics) metricsField.get(unstarted.getOmStateMachine());
+      NettyMetrics metrics = spy((NettyMetrics) metricsField.get(unstarted.getOmStateMachine()));
+      metricsField.set(unstarted.getOmStateMachine(), metrics);
       Field nameField = NettyMetrics.class.getDeclaredField("sourceName");
       nameField.setAccessible(true);
       String sourceName = (String) nameField.get(metrics);
       assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
-      unstarted.stop();
+      OzoneManagerRatisServer closing = unstarted;
+      unstarted = null;
+      closing.stop();
       assertNull(DefaultMetricsSystem.instance().getSource(sourceName));
-      unstarted.stop();
-      assertNull(DefaultMetricsSystem.instance().getSource(sourceName));
+      verify(metrics).unregister();
     } finally {
       if (unstarted != null) {
-        unstarted.getOmStateMachine().stop();
+        unstarted.stop();
       }
       DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
     }
+  }
+
+  @Test
+  public void testFailedStartupReleasesMetrics(@TempDir Path directory) throws Exception {
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    OzoneManagerRatisServer failedServer = null;
+    try {
+      OzoneConfiguration failedConf = new OzoneConfiguration(conf);
+      Path storage = Files.createFile(directory.resolve("ratis"));
+      failedConf.set(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR, storage.toString());
+      failedServer = OzoneManagerRatisServer.newOMRatisServer(failedConf, ozoneManager,
+          omNodeDetails, Collections.emptyMap(), secConfig, certClient, true);
+      Field metricsField = OzoneManagerStateMachine.class.getDeclaredField("nettyMetrics");
+      metricsField.setAccessible(true);
+      NettyMetrics metrics = spy((NettyMetrics) metricsField.get(failedServer.getOmStateMachine()));
+      metricsField.set(failedServer.getOmStateMachine(), metrics);
+      Field nameField = NettyMetrics.class.getDeclaredField("sourceName");
+      nameField.setAccessible(true);
+      String sourceName = (String) nameField.get(metrics);
+      assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
+      assertThrows(Exception.class, failedServer::start);
+      assertEquals(LifeCycle.State.EXCEPTION, failedServer.getServerState());
+      OzoneManagerRatisServer closing = failedServer;
+      failedServer = null;
+      closing.stop();
+      assertNull(DefaultMetricsSystem.instance().getSource(sourceName));
+      verify(metrics).unregister();
+    } finally {
+      if (failedServer != null) {
+        failedServer.stop();
+      }
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+    }
+  }
+
+  @Test
+  public void testStopStartedServerReleasesMetricsOnce() throws Exception {
+    Field metricsField = OzoneManagerStateMachine.class.getDeclaredField("nettyMetrics");
+    metricsField.setAccessible(true);
+    NettyMetrics metrics = spy((NettyMetrics) metricsField.get(omRatisServer.getOmStateMachine()));
+    metricsField.set(omRatisServer.getOmStateMachine(), metrics);
+    when(ozoneManager.isStopped()).thenReturn(true);
+    OzoneManagerRatisServer closing = omRatisServer;
+    omRatisServer = null;
+    closing.stop();
+    verify(metrics).unregister();
   }
 
   /**
@@ -227,10 +281,12 @@ public class TestOzoneManagerRatisServer {
   public void testLoadSnapshotInfoOnStart() throws Exception {
     // Stop the Ratis server and manually update the snapshotInfo.
     omRatisServer.getOmStateMachine().loadSnapshotInfoFromDB();
-    omRatisServer.stop();
+    when(ozoneManager.isStopped()).thenReturn(true);
+    OzoneManagerRatisServer closing = omRatisServer;
+    omRatisServer = null;
+    closing.stop();
 
-    SnapshotInfo snapshotInfo =
-        omRatisServer.getOmStateMachine().getLatestSnapshot();
+    SnapshotInfo snapshotInfo = closing.getOmStateMachine().getLatestSnapshot();
 
     TermIndex newSnapshotIndex = TermIndex.valueOf(
         snapshotInfo.getTerm(), snapshotInfo.getIndex() + 100);
@@ -301,17 +357,19 @@ public class TestOzoneManagerRatisServer {
         .setOMServiceId(customOmServiceId)
         .build();
     // Starts a single node Ratis server
+    when(ozoneManager.isStopped()).thenReturn(true);
     omRatisServer.stop();
+    omRatisServer = null;
     OzoneManagerRatisServer newOmRatisServer = OzoneManagerRatisServer
         .newOMRatisServer(newConf, ozoneManager, nodeDetails,
             Collections.emptyMap(), secConfig, certClient, false);
+    omRatisServer = newOmRatisServer;
     newOmRatisServer.start();
 
     UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(UTF_8));
     RaftGroupId raftGroupId = newOmRatisServer.getRaftGroup().getGroupId();
     assertEquals(uuid, raftGroupId.getUuid());
     assertEquals(raftGroupId.toByteString().size(), 16);
-    newOmRatisServer.stop();
   }
 
   @Test

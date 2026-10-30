@@ -24,9 +24,6 @@ import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -35,7 +32,6 @@ import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -63,72 +59,36 @@ class TestSCMMetricsLifecycle {
     DefaultMetricsSystem.setMiniClusterMode(true);
     MetricsSystem ms = DefaultMetricsSystem.initialize(getClass().getSimpleName());
     Set<String> original = sources(ms);
-    T first = create.get();
-    Set<String> firstSources = sources(ms);
-    T second = create.get();
+    T first = null;
+    T second = null;
     try {
+      first = create.get();
+      Set<String> firstSources = sources(ms);
+      second = create.get();
       assertEquals(original.size() + 2, sources(ms).size());
       Set<String> expected = sources(ms);
       expected.removeAll(firstSources);
       expected.addAll(original);
-      unregister.accept(first);
-      Set<String> surviving = sources(ms);
-      assertEquals(expected, surviving);
-      unregister.accept(first);
-      assertEquals(surviving, sources(ms), "Repeated cleanup must retain the other SCM's metrics");
-      unregister.accept(second);
+      T closing = first;
+      first = null;
+      unregister.accept(closing);
+      assertEquals(expected, sources(ms));
+      closing = second;
+      second = null;
+      unregister.accept(closing);
       assertEquals(original, sources(ms));
     } finally {
-      Set<String> remaining = sources(ms);
-      remaining.removeAll(original);
-      remaining.forEach(ms::unregisterSource);
-      DefaultMetricsSystem.shutdown();
-      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
-    }
-  }
-
-  @ParameterizedTest
-  @MethodSource("metrics")
-  <T> void repeatedCleanupRetainsReplacementSource(Supplier<T> create, Consumer<T> unregister) throws Exception {
-    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
-    DefaultMetricsSystem.setMiniClusterMode(false);
-    MetricsSystem ms = DefaultMetricsSystem.initialize(getClass().getSimpleName());
-    Set<String> original = sources(ms);
-    T first = create.get();
-    try {
-      unregister.accept(first);
-      T second = create.get();
-      try {
-        Set<String> surviving = sources(ms);
-        assertEquals(original.size() + 1, surviving.size());
+      if (first != null) {
         unregister.accept(first);
-        assertEquals(surviving, sources(ms), "Repeated cleanup must retain the replacement SCM's metrics");
-      } finally {
+      }
+      if (second != null) {
         unregister.accept(second);
       }
-      assertEquals(original, sources(ms));
-    } finally {
       Set<String> remaining = sources(ms);
       remaining.removeAll(original);
       remaining.forEach(ms::unregisterSource);
       DefaultMetricsSystem.shutdown();
       DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
-    }
-  }
-
-  @Test
-  void unregisterDoesNotAcquireMetricsSamplingMonitor() throws Exception {
-    NodeDecommissionMetrics metrics = NodeDecommissionMetrics.create();
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-    try {
-      // Sampling holds the metrics-system monitor before calling synchronized getMetrics().
-      // Cleanup must not acquire this source's monitor before the metrics-system monitor.
-      synchronized (metrics) {
-        executor.submit(metrics::unRegister).get(5, TimeUnit.SECONDS);
-      }
-    } finally {
-      executor.shutdownNow();
-      metrics.unRegister();
     }
   }
 

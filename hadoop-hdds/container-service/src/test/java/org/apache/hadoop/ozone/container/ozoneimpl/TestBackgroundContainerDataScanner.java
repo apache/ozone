@@ -144,7 +144,6 @@ public class TestBackgroundContainerDataScanner extends
     assertNotNull(DefaultMetricsSystem.instance().getSource(name));
 
     scanner.shutdown();
-    scanner.run();
     
     assertNull(DefaultMetricsSystem.instance().getSource(name));
   }

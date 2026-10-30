@@ -54,7 +54,6 @@ public class RocksDBStoreMetrics implements MetricsSource {
 
   private String contextName;
   private final String sourceName;
-  private boolean registered;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBStoreMetrics.class);
@@ -136,17 +135,11 @@ public class RocksDBStoreMetrics implements MetricsSource {
     if (metricsSource != null) {
       return (RocksDBStoreMetrics) metricsSource;
     } else {
-      ms.register(metrics.sourceName, "RocksDB Metrics", metrics);
-      metrics.registered = true;
-      return metrics;
+      return ms.register(metrics.sourceName, "RocksDB Metrics", metrics);
     }
   }
 
-  public synchronized void unregister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }

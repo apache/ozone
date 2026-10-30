@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -35,7 +34,6 @@ public class OzoneManagerDoubleBufferMetrics {
   private static final String SOURCE_NAME =
       OzoneManagerDoubleBufferMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private final AtomicBoolean registered = new AtomicBoolean();
 
   @Metric(about = "Total Number of flush operations happened in " +
       "OzoneManagerDoubleBuffer.")
@@ -65,7 +63,6 @@ public class OzoneManagerDoubleBufferMetrics {
     OzoneManagerDoubleBufferMetrics metrics = new OzoneManagerDoubleBufferMetrics();
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.register(metrics.sourceName, "OzoneManager DoubleBuffer Metrics", metrics);
-    metrics.registered.set(true);
     return metrics;
   }
 
@@ -139,8 +136,6 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   public void unRegister() {
-    if (registered.compareAndSet(true, false)) {
-      DefaultMetricsSystem.instance().unregisterSource(sourceName);
-    }
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 }

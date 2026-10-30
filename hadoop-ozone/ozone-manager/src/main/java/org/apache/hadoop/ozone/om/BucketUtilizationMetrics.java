@@ -52,7 +52,6 @@ public class BucketUtilizationMetrics implements MetricsSource {
 
   private static final String SOURCE = BucketUtilizationMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE);
-  private boolean registered;
 
   private final OMMetadataManager metadataManager;
 
@@ -64,7 +63,6 @@ public class BucketUtilizationMetrics implements MetricsSource {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     BucketUtilizationMetrics metrics = new BucketUtilizationMetrics(metadataManager);
     ms.register(metrics.sourceName, "Bucket Utilization Metrics", metrics);
-    metrics.registered = true;
     return metrics;
   }
 
@@ -100,18 +98,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
     }
   }
 
-  public synchronized void register() {
-    if (!registered) {
-      DefaultMetricsSystem.instance().register(sourceName, "Bucket Utilization Metrics", this);
-      registered = true;
-    }
-  }
-
-  public synchronized void unRegister() {
-    if (!registered) {
-      return;
-    }
-    registered = false;
+  public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }

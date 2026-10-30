@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -38,7 +37,6 @@ public final class OMHAMetrics implements MetricsSource {
 
   public static final String SOURCE_NAME = OMHAMetrics.class.getSimpleName();
   private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
-  private final AtomicBoolean registered = new AtomicBoolean();
   private final OMHAMetricsInfo omhaMetricsInfo = new OMHAMetricsInfo();
   private MetricsRegistry metricsRegistry;
 
@@ -98,7 +96,6 @@ public final class OMHAMetrics implements MetricsSource {
     OMHAMetrics metrics = new OMHAMetrics(nodeId, leaderId);
     DefaultMetricsSystem.instance()
         .register(metrics.sourceName, "Metrics for OM HA", metrics);
-    metrics.registered.set(true);
     return metrics;
   }
 
@@ -106,9 +103,6 @@ public final class OMHAMetrics implements MetricsSource {
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    if (!registered.compareAndSet(true, false)) {
-      return;
-    }
     DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 

@@ -100,8 +100,6 @@ public class StorageVolumeChecker {
   private final List<VolumeSet> registeredVolumeSets;
 
   private final AtomicBoolean started;
-  private final AtomicBoolean closed = new AtomicBoolean(false);
-  private final Object startStopLock = new Object();
 
   /**
    * @param conf  Configuration object.
@@ -152,12 +150,13 @@ public class StorageVolumeChecker {
   }
 
   public void start() {
-    synchronized (startStopLock) {
-      if (!closed.get() && started.compareAndSet(false, true)) {
-        long periodicDiskCheckIntervalMinutes = dnConf.getPeriodicDiskCheckIntervalMinutes();
-        periodicDiskChecker = diskCheckerservice.scheduleWithFixedDelay(this::checkAllVolumeSets,
-            periodicDiskCheckIntervalMinutes, periodicDiskCheckIntervalMinutes, TimeUnit.MINUTES);
-      }
+    if (started.compareAndSet(false, true)) {
+      long periodicDiskCheckIntervalMinutes =
+          dnConf.getPeriodicDiskCheckIntervalMinutes();
+      periodicDiskChecker =
+          diskCheckerservice.scheduleWithFixedDelay(this::checkAllVolumeSets,
+              periodicDiskCheckIntervalMinutes,
+              periodicDiskCheckIntervalMinutes, TimeUnit.MINUTES);
     }
   }
 
@@ -485,23 +484,18 @@ public class StorageVolumeChecker {
    * of the parameters.
    */
   public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
-    if (closed.compareAndSet(false, true)) {
-      synchronized (startStopLock) {
-        started.set(false);
-        if (periodicDiskChecker != null) {
-          periodicDiskChecker.cancel(true);
-        }
-      }
-      diskCheckerservice.shutdownNow();
-      checkVolumeResultHandlerExecutorService.shutdownNow();
-      metrics.unregister();
-      try {
-        delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
-      } catch (InterruptedException e) {
-        LOG.warn("{} interrupted during shutdown.",
-            this.getClass().getSimpleName());
-        Thread.currentThread().interrupt();
-      }
+    if (started.compareAndSet(true, false)) {
+      periodicDiskChecker.cancel(true);
+    }
+    diskCheckerservice.shutdownNow();
+    checkVolumeResultHandlerExecutorService.shutdownNow();
+    metrics.unregister();
+    try {
+      delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
+    } catch (InterruptedException e) {
+      LOG.warn("{} interrupted during shutdown.",
+          this.getClass().getSimpleName());
+      Thread.currentThread().interrupt();
     }
   }
 
