@@ -17,6 +17,7 @@
 Documentation       S3 gateway test with aws cli
 Library             OperatingSystem
 Library             String
+Library             ./presigned_url_helper.py
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
@@ -87,3 +88,16 @@ Check Bucket Ownership Verification
     ${delete_file} =    Set Variable                                    /tmp/delete_objects.json
     Execute                                                             echo '${delete_json}' > ${delete_file}
     Execute AWSS3APICli with bucket owner check                         delete-objects --bucket ${BUCKET} --delete file://${delete_file}  ${correct_owner}
+
+Delete with an empty uploadId keeps the object
+    [Documentation]    DELETE with an empty uploadId names an abort of no upload. It must fail with
+    ...                NoSuchUpload and leave the committed object in place, not delete it.
+                        Execute                    date > /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/emptyuploadid/f1 --body /tmp/testfile
+    ${access_key} =     Execute                    aws configure get aws_access_key_id
+    ${secret_key} =     Execute                    aws configure get aws_secret_access_key
+    ${url} =            Generate Presigned Abort Multipart Upload Url    ${access_key}    ${secret_key}    ${BUCKET}    ${PREFIX}/emptyuploadid/f1    ${EMPTY}    us-east-1    3600    ${ENDPOINT_URL}
+                        Should Match Regexp        ${url}            [?&]uploadId=(&|$)
+    ${result} =         Execute                    curl -sS -i -X DELETE "${url}"
+                        Should Contain             ${result}         NoSuchUpload
+    ${result} =         Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/emptyuploadid/f1
