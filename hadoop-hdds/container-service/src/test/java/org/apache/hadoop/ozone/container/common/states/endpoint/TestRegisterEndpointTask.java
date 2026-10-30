@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
@@ -105,7 +106,8 @@ public class TestRegisterEndpointTask {
   private static StateContext newStateContext(DatanodeDetails dn) {
     DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
     when(datanodeStateMachine.getDatanodeDetails()).thenReturn(dn);
-    when(datanodeStateMachine.getVersionManager()).thenReturn(ContainerTestUtils.mockDnVersionManager());
+    DatanodeVersionManager versionManager = ContainerTestUtils.mockDnVersionManager();
+    when(datanodeStateMachine.getVersionManager()).thenReturn(versionManager);
     return new StateContext(new OzoneConfiguration(), DatanodeStates.RUNNING, datanodeStateMachine, "");
   }
 

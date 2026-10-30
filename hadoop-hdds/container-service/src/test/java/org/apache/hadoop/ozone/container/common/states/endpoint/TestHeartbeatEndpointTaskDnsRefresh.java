@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
@@ -117,7 +118,8 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
         .build();
     when(dsm.getDatanodeDetails()).thenReturn(dn);
 
-    when(dsm.getVersionManager()).thenReturn(ContainerTestUtils.mockDnVersionManager());
+    DatanodeVersionManager versionManager = ContainerTestUtils.mockDnVersionManager();
+    when(dsm.getVersionManager()).thenReturn(versionManager);
 
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING, dsm, "");
 

@@ -518,7 +518,8 @@ public class TestHeartbeatEndpointTask {
         .build();
     DatanodeStateMachine mockDSM = mock(DatanodeStateMachine.class);
     when(mockDSM.getDatanodeDetails()).thenReturn(datanodeDetails);
-    when(mockDSM.getVersionManager()).thenReturn(ContainerTestUtils.mockDnVersionManager());
+    DatanodeVersionManager versionManager = ContainerTestUtils.mockDnVersionManager();
+    when(mockDSM.getVersionManager()).thenReturn(versionManager);
     return mockDSM;
   }
 
