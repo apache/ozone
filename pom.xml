@@ -2987,6 +2987,21 @@
         <skip.pnpm>true</skip.pnpm>
       </properties>
     </profile>
+    <profile>
+      <!-- same excludedGroups as test-... profiles below -->
+      <id>module-test</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <excludedGroups>${unstable-test-groups}</excludedGroups>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!-- The following profiles define test splits for CI -->
     <profile>
       <id>test-client</id>
@@ -3124,23 +3139,6 @@
                 <!-- default excludes -->
                 <exclude>**/*$*</exclude>
               </excludes>
-              <excludedGroups>${unstable-test-groups}</excludedGroups>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>test-recon</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <includes>
-                <include>org.apache.hadoop.ozone.recon.**</include>
-              </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>

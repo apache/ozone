@@ -91,10 +91,13 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.rocksdb.WriteBatch;
@@ -608,8 +611,9 @@ public class TestOzoneManagerServiceProviderImpl {
     reconTaskControllerMock.stop();
   }
 
-  @Test
-  public void testSyncDataFromOMDeltaUpdates(
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testSyncDataFromOMDeltaUpdates(boolean taskStatusWriteFails,
       @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
       throws Exception {
 
@@ -622,6 +626,13 @@ public class TestOzoneManagerServiceProviderImpl {
         .consumeOMEvents(any(OMUpdateEventBatch.class),
             any(OMMetadataManager.class));
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = getMockTaskStatusUpdaterManager();
+    if (taskStatusWriteFails) {
+      // A task status write failure should not fail the delta sync and fall back to a full snapshot.
+      ReconTaskStatusDao failingDao = mock(ReconTaskStatusDao.class);
+      when(failingDao.existsById(anyString())).thenThrow(new DataAccessException("Injected failure"));
+      when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenAnswer(inv ->
+          new ReconTaskStatusUpdater(failingDao, (String) inv.getArgument(0)));
+    }
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration, omMetadataManager, reconTaskControllerMock,

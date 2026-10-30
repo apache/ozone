@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm;
+package org.apache.ozone.test;
 
 import java.lang.reflect.Field;
 
