@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3;
 
 import static org.apache.hadoop.hdds.cli.GenericCli.EXECUTION_ERROR_EXIT_CODE;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY;
@@ -39,8 +40,12 @@ import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.ozone.s3.util.S3StorageClassResolver;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
@@ -121,18 +126,22 @@ public class TestGateway {
   @Test
   void keepsResolverForTheInitialConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY, true);
     conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "HOT");
     conf.set(OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY, "WARM");
     conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY, "HOT");
     OzoneConfigurationHolder.setConfiguration(conf);
     S3StorageClassResolver resolver = OzoneConfigurationHolder.storageClassResolver();
 
+    conf.setBoolean(OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY, false);
     OzoneConfiguration ignored = new OzoneConfiguration();
     ignored.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "COLD");
     OzoneConfigurationHolder.setConfiguration(ignored);
 
     assertSame(conf, OzoneConfigurationHolder.configuration());
     assertSame(resolver, OzoneConfigurationHolder.storageClassResolver());
+    ReplicationConfig clientConfig = new ECReplicationConfig("rs-6-3-512k");
+    assertEquals(clientConfig, resolver.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null));
     assertEquals(OzoneStoragePolicy.HOT, resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.HOT, resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
@@ -141,6 +150,7 @@ public class TestGateway {
   @Test
   void resetsResolverWithConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY, true);
     conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "HOT");
     conf.set(OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY, "HOT");
     OzoneConfigurationHolder.setConfiguration(conf);
@@ -157,6 +167,10 @@ public class TestGateway {
     S3StorageClassResolver resolver = OzoneConfigurationHolder.storageClassResolver();
     assertSame(next, OzoneConfigurationHolder.configuration());
     assertNotSame(previous, resolver);
+    ReplicationConfig clientConfig = new ECReplicationConfig("rs-6-3-512k");
+    assertEquals(clientConfig, previous.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null));
+    assertEquals(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        resolver.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null));
     assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.HOT, previous.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
