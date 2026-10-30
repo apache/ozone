@@ -127,12 +127,13 @@ import org.slf4j.LoggerFactory;
  * <p>The SCM FCR lease flow is:
  * <ol>
  * <li>Registration supplies an actual FCR or records that it is deferred. Successful node registration is notified
- * independently of whether container inventory is ready.</li>
- * <li>A heartbeat requests a grant from {@link SCMFullContainerReportLeaseManager}, subject to SCM eligibility.</li>
+ * independently of whether its registration FCR has been processed.</li>
+ * <li>A heartbeat requests a grant from {@link SCMFullContainerReportLeaseManager}, when allowed by SCM leadership
+ * and upgrade state.</li>
  * <li>An incoming leased FCR is validated and claimed before dispatch; unleased reports retain legacy behavior.
  * Invalid leased FCRs are rejected without suppressing other heartbeat reports.</li>
  * <li>The dispatcher transfers an accepted report to the queue. Processing or discard completes its claim and releases
- * capacity; container SafeMode rules receive registration inventory only after successful FCR processing.</li>
+ * capacity; container SafeMode rules receive container IDs only after successful registration FCR processing.</li>
  * </ol>
  */
 public class SCMDatanodeProtocolServer implements
@@ -286,7 +287,7 @@ public class SCMDatanodeProtocolServer implements
     }
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
-      // A deferred report is not an empty inventory: record it for a later leased heartbeat instead of dispatching it.
+      // A deferred FCR does not describe an empty datanode; record it for a later leased heartbeat.
       if (containerReportsProto.getFullContainerReportDeferred()) {
         fcrLeaseManager.markFullContainerReportDeferred(datanodeDetails);
       } else {
@@ -444,7 +445,7 @@ public class SCMDatanodeProtocolServer implements
   /**
    * Validates and claims the lease attached to an incoming FCR, retaining capacity until the report completes.
    *
-   * @return the admitted report's claim, or empty if leasing is unavailable or the grant is invalid
+   * @return the report's lease claim, or empty if leasing is unavailable or the grant is invalid
    */
   private Optional<LeaseClaim> validateAndClaimFullContainerReportLease(
       DatanodeDetails datanodeDetails, FullContainerReportLeaseProto lease) {
@@ -483,8 +484,8 @@ public class SCMDatanodeProtocolServer implements
   }
 
   /**
-   * Selects the lease term when this SCM can grant or admit leased FCRs. Capacity-limit bypass does not affect this
-   * policy, and the returned term is distinct from the leader term attached to SCM commands.
+   * Selects the term used to grant leases and validate incoming FCR leases. Capacity-limit bypass does not affect
+   * these SCM leadership and upgrade checks. This is not necessarily the leader term attached to SCM commands.
    *
    * <ul>
    * <li>Recon (no SCM context) or an unfinalized feature: no lease term.</li>
@@ -706,7 +707,7 @@ public class SCMDatanodeProtocolServer implements
   }
 
   /**
-   * Datanode details and container IDs for two distinct registration milestones.
+   * Datanode details and container IDs for node registration and registration FCR processing events.
    * {@link SCMEvents#NODE_REGISTRATION_CONT_REPORT} needs only datanode identity after successful registration.
    * {@link SCMEvents#CONTAINER_REGISTRATION_REPORT} carries container IDs after successful registration FCR processing.
    */

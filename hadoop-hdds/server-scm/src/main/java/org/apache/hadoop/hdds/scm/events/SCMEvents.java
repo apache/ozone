@@ -56,7 +56,7 @@ public final class SCMEvents {
 
   /**
    * A datanode successfully registered. Node-count SafeMode rules consume only its identity; its FCR may be deferred.
-   * This event does not indicate that container inventory has been received or processed.
+   * This event does not indicate that the registration FCR has been received or processed.
    */
   public static final TypedEvent<NodeRegistrationContainerReport>
       NODE_REGISTRATION_CONT_REPORT = new TypedEvent<>(

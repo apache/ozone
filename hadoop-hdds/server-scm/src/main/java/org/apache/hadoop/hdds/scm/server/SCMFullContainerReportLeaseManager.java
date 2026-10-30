@@ -34,8 +34,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
  * GRANTED -> CLAIMED -> PROCESSING -> removed
  *                \---- discarded -> removed
  * </pre>
- * A GRANTED lease expires if the datanode does not send its report in time. Claiming validates the grant and admits
- * the report, retaining capacity while it is dispatched, queued and processed. CLAIMED and PROCESSING leases do not
+ * A GRANTED lease expires if the datanode does not send its report in time. Claiming validates the grant and marks it
+ * CLAIMED, retaining capacity while the report is dispatched, queued or processed. CLAIMED and PROCESSING leases do not
  * expire and survive local leadership changes and datanode removal until the report completes or is discarded.
  * Disabling rate limiting bypasses only the capacity check; validation and duplicate-report checks still apply.
  *
@@ -92,7 +92,7 @@ public class SCMFullContainerReportLeaseManager {
    *
    * @param datanode datanode requesting permission to send an FCR
    * @param term term selected by the caller's SCM eligibility policy
-   * @return the new grant, or empty if capacity is unavailable or this datanode already has an admitted report
+   * @return the new grant, or empty if capacity is unavailable or this datanode already has a claimed lease
    */
   public synchronized OptionalLong requestLease(
       DatanodeDetails datanode, long term) {
@@ -132,7 +132,7 @@ public class SCMFullContainerReportLeaseManager {
    * @param currentTerm currently allowed lease term, or empty when leasing is unavailable
    * @param leaseTerm term attached to the incoming report
    * @param leaseId lease ID attached to the incoming report
-   * @return the admitted report's claim, or empty if the grant is invalid, expired or already claimed
+   * @return the report's lease claim, or empty if the grant is invalid, expired or already claimed
    */
   public synchronized Optional<LeaseClaim> claimLease(
       DatanodeDetails datanode, OptionalLong currentTerm, long leaseTerm,
@@ -211,7 +211,7 @@ public class SCMFullContainerReportLeaseManager {
 
   /**
    * Records a new registration that still needs an FCR and invalidates any earlier unclaimed grant.
-   * An admitted report retains capacity, but its completion cannot clear this newer registration's ID.
+   * A claimed lease retains capacity, but its completion cannot clear this newer registration's ID.
    */
   public synchronized void markFullContainerReportDeferred(
       DatanodeDetails datanode) {
@@ -237,7 +237,7 @@ public class SCMFullContainerReportLeaseManager {
   }
 
   /**
-   * Removes registration tracking and any unclaimed grant. Admitted reports must release their own capacity.
+   * Removes registration tracking and any unclaimed grant. Claimed leases must be completed by their reports.
    */
   public synchronized void removeDatanode(DatanodeDetails datanode) {
     String datanodeId = datanode.getUuidString();
@@ -359,8 +359,8 @@ public class SCMFullContainerReportLeaseManager {
   }
 
   /**
-   * Holds an admitted FCR's lease until the report completes.
-   * The report owns this claim after admission; it remains valid while queued even after grant expiry or term changes.
+   * Holds a claimed FCR lease until the report completes.
+   * The claim remains valid while its report is queued, even after grant expiry or term changes.
    */
   public static final class LeaseClaim {
     private final SCMFullContainerReportLeaseManager leaseManager;
@@ -384,7 +384,7 @@ public class SCMFullContainerReportLeaseManager {
     }
 
     /**
-     * Moves an admitted report from CLAIMED to PROCESSING once, without rechecking grant expiry or SCM eligibility.
+     * Moves the lease from CLAIMED to PROCESSING once, without rechecking grant expiry or SCM eligibility.
      *
      * @return false if the claim was already completed or processing has already started
      */

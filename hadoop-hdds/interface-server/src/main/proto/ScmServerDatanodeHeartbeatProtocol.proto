@@ -229,7 +229,7 @@ message MetadataStorageReportProto {
 message ContainerReportsProto {
   repeated ContainerReplicaProto reports = 1;
   optional FullContainerReportLeaseProto fullContainerReportLease = 2;
-  // Registration omits its inventory and will send an FCR after acquiring a lease. This is not an empty inventory.
+  // Registration defers the FCR until a lease is granted. It does not indicate that the datanode has no containers.
   optional bool fullContainerReportDeferred = 3 [default = false];
 }
 

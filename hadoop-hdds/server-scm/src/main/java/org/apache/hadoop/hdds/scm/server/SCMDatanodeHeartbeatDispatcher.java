@@ -320,7 +320,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
-   * FCR event payload with origin and an optional admitted lease claim.
+   * FCR event payload with origin and an optional lease claim.
    * A deferred registration's FCR can arrive in a heartbeat; its claim identifies it as a registration report.
    * Completion is idempotent and releases the claim on either successful processing or discard.
    */
@@ -383,7 +383,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
     }
 
     /**
-     * Starts a leased report once. Unleased reports are unrestricted; admitted leases do not expire while queued.
+     * Starts a leased report once. Unleased reports are unrestricted; claimed leases do not expire while queued.
      */
     public boolean startProcessing() {
       return leaseClaim == null || leaseClaim.startProcessing();
