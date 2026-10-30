@@ -113,7 +113,7 @@ public class TestSendContainerRequestHandler {
     // import the incoming container by having the volume chooser throw.
     DiskOutOfSpaceException noSpace =
         new DiskOutOfSpaceException("No volumes have enough space for a new container");
-    doThrow(noSpace).when(importer).chooseNextVolume(anyLong());
+    doThrow(noSpace).when(importer).chooseNextVolume(anyLong(), any());
 
     doAnswer(invocation -> {
       Object arg = invocation.getArgument(0);

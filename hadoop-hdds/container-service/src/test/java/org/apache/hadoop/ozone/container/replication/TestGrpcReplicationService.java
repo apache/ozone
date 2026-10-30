@@ -146,7 +146,7 @@ class TestGrpcReplicationService {
     }).when(importer).importContainer(anyLong(), any(), any(), any());
     doReturn(true).when(importer).isAllowedContainerImport(eq(
         CONTAINER_ID));
-    when(importer.chooseNextVolume(anyLong())).thenReturn(new HddsVolume.Builder(
+    when(importer.chooseNextVolume(anyLong(), any())).thenReturn(new HddsVolume.Builder(
         Files.createDirectory(tempDir.resolve("ImporterDir")).toString()).conf(
         conf).build());
 
@@ -196,7 +196,7 @@ class TestGrpcReplicationService {
 
     OutputStream uploadStream = mock(OutputStream.class);
     ContainerUploader uploader = mock(ContainerUploader.class);
-    when(uploader.startUpload(anyLong(), any(), any(), any()))
+    when(uploader.startUpload(anyLong(), any(), any(), any(), any()))
         .thenReturn(uploadStream);
 
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);

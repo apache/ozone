@@ -21,6 +21,7 @@ import jakarta.annotation.Nonnull;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -59,6 +60,9 @@ public interface FindTargetStrategy {
    */
   void reInitialize(List<DatanodeUsageInfo> potentialDataNodes,
                     ContainerBalancerConfiguration config, Double upperLimit);
+
+  /** Selects the storage type and utilization bound without resetting iteration traffic. */
+  void setStorageType(StorageType storageType, double upperLimit);
 
   /**
    * Resets the collection of target {@link DatanodeUsageInfo} that can be

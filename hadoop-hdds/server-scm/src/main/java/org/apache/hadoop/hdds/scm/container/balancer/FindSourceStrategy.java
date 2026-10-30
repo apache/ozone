@@ -21,6 +21,7 @@ import jakarta.annotation.Nonnull;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 
@@ -75,6 +76,9 @@ public interface FindSourceStrategy {
    */
   void reInitialize(List<DatanodeUsageInfo> potentialDataNodes,
                     ContainerBalancerConfiguration config, Double lowerLimit);
+
+  /** Selects the storage type and utilization bound without resetting iteration traffic. */
+  void setStorageType(StorageType storageType, double lowerLimit);
 
   /**
    * Resets the collection of source {@link DatanodeUsageInfo} that can be

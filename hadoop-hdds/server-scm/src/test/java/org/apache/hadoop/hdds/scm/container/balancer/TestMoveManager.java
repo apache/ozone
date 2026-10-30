@@ -61,6 +61,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -317,7 +318,7 @@ public class TestMoveManager {
   public void testReplicationCommandFails() throws Exception {
     doThrow(new RuntimeException("test")).when(replicationManager)
             .sendLowPriorityReplicateContainerCommand(
-        any(), anyInt(), any(), any(), anyLong());
+        any(), anyInt(), any(), any(), anyLong(), any());
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
     assertEquals(FAIL_UNEXPECTED_ERROR, res.get());
   }
@@ -356,6 +357,37 @@ public class TestMoveManager {
     assertEquals(COMPLETED, finalResult);
   }
 
+  /**
+   * A move must ask the target to place the new replica on the same storage type
+   * the source replica lives on, otherwise balancing silently moves data between
+   * tiers.
+   */
+  @Test
+  public void testMoveKeepsSourceStorageType() throws Exception {
+    setupMocks();
+
+    ContainerReplica srcReplica = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED);
+    ContainerReplica withSsd = srcReplica.toBuilder()
+        .setVolumeStorageType(StorageType.SSD)
+        .build();
+    replicas.add(withSsd);
+    replicas.addAll(ReplicationTestUtil.createReplicas(
+        containerInfo.containerID(), 0, 0));
+
+    src = withSsd.getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+
+    moveManager.move(containerInfo.containerID(), src, tgt);
+
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong(),
+        eq(StorageType.SSD));
+  }
+
   @Test
   public void testSuccessfulMoveNonZeroRepIndex() throws Exception {
     containerInfo = ReplicationTestUtil.createContainer(
@@ -376,7 +408,7 @@ public class TestMoveManager {
 
     verify(replicationManager).sendLowPriorityReplicateContainerCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src), eq(tgt),
-        anyLong());
+        anyLong(), any());
 
     ContainerReplicaOp op = new ContainerReplicaOp(
         ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
@@ -525,7 +557,7 @@ public class TestMoveManager {
     ArgumentCaptor<Long> longCaptorReplicate = ArgumentCaptor.forClass(Long.class);
     verify(replicationManager).sendLowPriorityReplicateContainerCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
-        eq(tgt), longCaptorReplicate.capture());
+        eq(tgt), longCaptorReplicate.capture(), any());
 
     ContainerReplicaOp op = new ContainerReplicaOp(
         ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
@@ -564,7 +596,7 @@ public class TestMoveManager {
         moveManager.move(containerInfo.containerID(), src, tgt);
 
     verify(replicationManager).sendLowPriorityReplicateContainerCommand(
-        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong());
+        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong(), any());
 
     return res;
   }
@@ -603,7 +635,7 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> successRes =
         moveManager.move(containerInfo.containerID(), src, tgt);
     verify(replicationManager).sendLowPriorityReplicateContainerCommand(
-        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong());
+        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong(), any());
     completeMove(containerInfo, src, tgt, successRes);
   }
 
@@ -637,7 +669,7 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> successRes =
         moveManager.move(qcContainer.containerID(), src, tgt);
     verify(replicationManager).sendLowPriorityReplicateContainerCommand(
-        eq(qcContainer), eq(0), eq(src), eq(tgt), anyLong());
+        eq(qcContainer), eq(0), eq(src), eq(tgt), anyLong(), any());
     completeMove(qcContainer, src, tgt, successRes);
   }
 
@@ -660,7 +692,7 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> successRes =
         moveManager.move(qcContainer.containerID(), src, tgt);
     verify(replicationManager).sendLowPriorityReplicateContainerCommand(
-        eq(qcContainer), eq(0), eq(src), eq(tgt), anyLong());
+        eq(qcContainer), eq(0), eq(src), eq(tgt), anyLong(), any());
     completeMove(qcContainer, src, tgt, successRes);
   }
 

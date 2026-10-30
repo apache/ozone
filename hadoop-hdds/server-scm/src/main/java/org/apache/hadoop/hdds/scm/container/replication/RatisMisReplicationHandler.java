@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -63,10 +65,18 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
       throws CommandTargetOverloadedException, NotLeaderException {
     ReplicationManager replicationManager = getReplicationManager();
 
+    // All Ratis replicas are interchangeable, so any of the ones being replicated
+    // tells us which tier the copies belong on.
+    StorageType targetStorageType = replicasToBeReplicated.stream()
+        .map(ContainerReplica::getTargetStorageTypeForCopy)
+        .filter(Objects::nonNull)
+        .findFirst()
+        .orElse(null);
+
     int commandsSent = 0;
     for (DatanodeDetails target : targetDns) {
       replicationManager.sendThrottledReplicationCommand(containerInfo,
-          sources, target, 0);
+          sources, target, 0, targetStorageType);
       commandsSent++;
     }
 

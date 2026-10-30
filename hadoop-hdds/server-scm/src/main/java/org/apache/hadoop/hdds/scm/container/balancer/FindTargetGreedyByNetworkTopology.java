@@ -44,7 +44,6 @@ public class FindTargetGreedyByNetworkTopology
       LoggerFactory.getLogger(FindTargetGreedyByNetworkTopology.class);
 
   private NetworkTopology networkTopology;
-  private List potentialTargets;
 
   public FindTargetGreedyByNetworkTopology(
       ContainerManager containerManager,
@@ -53,8 +52,7 @@ public class FindTargetGreedyByNetworkTopology
       NetworkTopology networkTopology) {
     super(containerManager, placementPolicyValidateProxy, nodeManager);
     setLogger(LOG);
-    potentialTargets = new LinkedList<>();
-    setPotentialTargets(potentialTargets);
+    setPotentialTargets(new LinkedList<>());
     this.networkTopology = networkTopology;
   }
 
@@ -66,7 +64,8 @@ public class FindTargetGreedyByNetworkTopology
   @Override
   @VisibleForTesting
   public void sortTargetForSource(DatanodeDetails source) {
-    Collections.sort(potentialTargets,
+    List<DatanodeUsageInfo> targets = (List<DatanodeUsageInfo>) getPotentialTargets();
+    Collections.sort(targets,
         (DatanodeUsageInfo da, DatanodeUsageInfo db) -> {
         DatanodeDetails a = da.getDatanodeDetails();
         DatanodeDetails b = db.getDatanodeDetails();

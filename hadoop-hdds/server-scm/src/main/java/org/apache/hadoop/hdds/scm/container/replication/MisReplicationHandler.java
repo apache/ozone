@@ -21,10 +21,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -154,20 +154,34 @@ public abstract class MisReplicationHandler implements
 
     int requiredNodes = replicasToBeReplicated.size();
 
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
-    List<DatanodeDetails> targetDatanodes = ReplicationManagerUtil
-        .getTargetDatanodes(containerPlacement, requiredNodes,
+    Map<ContainerReplica, DatanodeDetails> targets = ReplicationManagerUtil
+        .getTargetDatanodesForReplicas(containerPlacement, replicasToBeReplicated,
             excludedAndUsedNodes.getUsedNodes(),
             excludedAndUsedNodes.getExcludedNodes(), currentContainerSize,
-            container, StorageType.DEFAULT);
+            container);
     List<DatanodeDetails> availableSources = sources.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
 
-    int count = sendReplicateCommands(container, replicasToBeReplicated,
-        availableSources, targetDatanodes);
+    int count = 0;
+    CommandTargetOverloadedException overloadedException = null;
+    for (Map.Entry<ContainerReplica, DatanodeDetails> entry : targets.entrySet()) {
+      try {
+        count += sendReplicateCommands(container, Collections.singleton(entry.getKey()),
+            availableSources, Collections.singletonList(entry.getValue()));
+      } catch (CommandTargetOverloadedException e) {
+        // EC indexes have independent sources; an overloaded source must not block the other indexes.
+        if (container.getReplicationType() != HddsProtos.ReplicationType.EC) {
+          throw e;
+        }
+        overloadedException = e;
+      }
+    }
+    if (overloadedException != null) {
+      throw overloadedException;
+    }
 
-    int found = targetDatanodes.size();
+    int found = targets.size();
     if (found < requiredNodes) {
       if (container.getReplicationType() == HddsProtos.ReplicationType.EC) {
         metrics.incrEcPartialReplicationForMisReplicationTotal();

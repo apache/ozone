@@ -17,12 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto;
 
 /**
  * Information about balancer task iteration.
@@ -32,14 +35,25 @@ public class ContainerBalancerTaskIterationStatusInfo {
   private final IterationInfo iterationInfo;
   private final ContainerMoveInfo containerMoveInfo;
   private final DataMoveInfo dataMoveInfo;
+  private final List<ContainerBalancerStorageTypeStatusInfoProto> storageTypeStatusInfo;
 
   public ContainerBalancerTaskIterationStatusInfo(
       IterationInfo iterationInfo,
       ContainerMoveInfo containerMoveInfo,
       DataMoveInfo dataMoveInfo) {
+    this(iterationInfo, containerMoveInfo, dataMoveInfo, Collections.emptyList());
+  }
+
+  public ContainerBalancerTaskIterationStatusInfo(IterationInfo iterationInfo, ContainerMoveInfo containerMoveInfo,
+      DataMoveInfo dataMoveInfo, List<ContainerBalancerStorageTypeStatusInfoProto> storageTypeStatusInfo) {
     this.iterationInfo = iterationInfo;
     this.containerMoveInfo = containerMoveInfo;
     this.dataMoveInfo = dataMoveInfo;
+    this.storageTypeStatusInfo = Collections.unmodifiableList(new ArrayList<>(storageTypeStatusInfo));
+  }
+
+  public List<ContainerBalancerStorageTypeStatusInfoProto> getStorageTypeStatusInfo() {
+    return storageTypeStatusInfo;
   }
 
   /**
@@ -160,6 +174,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
             mapToProtoNodeTransferInfo(getSizeLeavingNodes())
         )
         .addAllContainerMoveFailures(mapToProtoFailures(getFailures()))
+        .addAllStorageTypeStatusInfo(storageTypeStatusInfo)
         .build();
   }
 

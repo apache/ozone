@@ -110,6 +110,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -1198,18 +1199,37 @@ public class TestReplicationManager {
    * target has the correct deadline and that ContainerReplicaOp for
    * replica ADD is created correctly.
    */
-  @Test
-  public void testReplicateContainerCommandToTarget()
-      throws NotLeaderException {
-    // create a closed EC container
-    ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+  @ParameterizedTest
+  @CsvSource({
+      "0, SSD, ARCHIVE, ARCHIVE",
+      "1, SSD, ARCHIVE, ARCHIVE",
+      "0, ARCHIVE, SSD, SSD",
+      "1, ARCHIVE, SSD, SSD",
+      "0, SSD, DISK, DISK",
+      "1, SSD, DISK, DISK",
+      "0, SSD, , SSD",
+      "1, SSD, , SSD",
+      "0, , ARCHIVE, ARCHIVE",
+      "1, , ARCHIVE, ARCHIVE",
+      "0, EMPTY, SSD, SSD",
+      "1, EMPTY, SSD, SSD",
+      "0, , , ",
+      "1, , , ",
+      "0, EMPTY, , ",
+      "1, EMPTY, , "
+  })
+  public void testReplicateContainerCommandToTarget(int replicaIndex, StorageTier storageTier,
+      StorageType commandStorageType, StorageType expectedStorageType) throws NotLeaderException {
+    // Create a closed RATIS or EC container.
+    ReplicationConfig replicationConfig = replicaIndex == 0
+        ? RatisReplicationConfig.getInstance(THREE) : new ECReplicationConfig(3, 2);
     ContainerInfo containerInfo = TestContainerInfo.newBuilderForTest()
         .setContainerID(1)
-        .setReplicationConfig(ecRepConfig)
+        .setReplicationConfig(replicationConfig)
         .setState(HddsProtos.LifeCycleState.CLOSED)
         .setNumberOfKeys(10)
         .setUsedBytes(20)
-        .setStorageTier(StorageTier.SSD)
+        .setStorageTier(storageTier)
         .build();
 
     // command will be pushed from source to target
@@ -1217,7 +1237,8 @@ public class TestReplicationManager {
     DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
     ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
         containerInfo.getContainerID(), target);
-    command.setReplicaIndex(1);
+    command.setReplicaIndex(replicaIndex);
+    command.setTargetVolumeStorageType(commandStorageType);
     replicationManager.sendDatanodeCommand(command, containerInfo, source);
 
     // check the command's deadline
@@ -1232,11 +1253,12 @@ public class TestReplicationManager {
     assertEquals(ContainerReplicaOp.PendingOpType.ADD,
         ops.get(0).getOpType());
     assertEquals(target, ops.get(0).getTarget());
-    assertEquals(1, ops.get(0).getReplicaIndex());
-    assertEquals(StorageType.SSD, ops.get(0).getStorageType());
-    assertEquals(1, replicationManager.getMetrics()
+    assertEquals(replicaIndex, ops.get(0).getReplicaIndex());
+    assertEquals(expectedStorageType, ops.get(0).getStorageType());
+    assertEquals(commandStorageType, command.getTargetVolumeStorageType());
+    assertEquals(replicaIndex > 0 ? 1 : 0, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
-    assertEquals(0, replicationManager.getMetrics()
+    assertEquals(replicaIndex == 0 ? 1 : 0, replicationManager.getMetrics()
         .getReplicationCmdsSentTotal());
   }
 

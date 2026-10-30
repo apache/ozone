@@ -571,6 +571,9 @@ message SendContainerRequest {
   optional int64 checksum = 4;
   optional CopyContainerCompressProto compression = 5;
   optional int64 size = 6;
+  // StorageType the importing datanode should place the container on. Sent on
+  // the first request only, alongside size. Absent from older senders.
+  optional int32 storageTypeID = 7;
 }
 
 message SendContainerResponse {

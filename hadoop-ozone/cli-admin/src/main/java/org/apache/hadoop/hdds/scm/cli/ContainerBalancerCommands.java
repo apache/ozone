@@ -95,10 +95,10 @@ import picocli.CommandLine.Command;
  * estimate subcommand produces upper-bound estimates.
  * <p>The threshold parameter is a fraction in the range of (1%, 100%) with a
  * default value of 10%. The threshold sets a target for whether the cluster
- * is balanced. A cluster is balanced if for each datanode, the utilization
- * of the node (ratio of used space at the node to total capacity of the node)
- * differs from the utilization of the (ratio of used space in the cluster
- * to total capacity of the cluster) by no more than the threshold value.
+ * is balanced. Utilization is compared separately for each storage type against
+ * the cluster average for that storage type. Datanode involvement and traffic
+ * limits remain shared across all storage types in an iteration. If SCM reports
+ * only whole-node usage, assessment and estimate use the legacy whole-node analysis.
  * The smaller the threshold, the more balanced a cluster will become.
  * It takes more time to run the balancer for small threshold values.
  * Also for a very small threshold the cluster may not be able to reach the

@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,12 +29,18 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.apache.commons.math3.util.ArithmeticUtils;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -43,6 +52,129 @@ import org.junit.jupiter.api.Test;
  * Tests for {@link ContainerBalancerStatusInfo}.
  */
 class TestContainerBalancerStatusInfo {
+
+  @Test
+  void testStorageTypeMetricsExportWithoutChangingAggregateMetrics() {
+    ContainerBalancerMetrics metrics = ContainerBalancerMetrics.create();
+    metrics.resetStorageTypeMetrics();
+    ContainerBalancerMetrics.StorageTypeMetrics ssd = metrics.forStorageType(StorageType.SSD);
+    ContainerBalancerMetrics.StorageTypeMetrics disk = metrics.forStorageType(StorageType.DISK);
+    long aggregate = metrics.getDataSizeMovedInLatestIteration();
+    long priorSsdBytes = getLongCounter("DataSizeMovedBytesSSD", getMetrics(ContainerBalancerMetrics.NAME));
+    DatanodeID first = DatanodeID.randomID();
+    DatanodeID second = DatanodeID.randomID();
+
+    ssd.initialize(ContainerBalancerClusterSnapshot.newBuilder()
+        .setSourceDatanodes(Collections.singleton(first.toString()))
+        .setTargetDatanodes(Collections.singleton(second.toString()))
+        .setTotalOverUtilizedBytes(40).setTotalUnderUtilizedBytes(30).build());
+    ssd.recordScheduled();
+    ssd.recordResult(MoveManager.MoveResult.COMPLETED, 30, ssd.getGeneration());
+    ssd.recordTraffic(first, second, 30);
+    ssd.recordTraffic(second, first, 10);
+    disk.recordScheduled();
+    disk.recordResult(MoveManager.MoveResult.COMPLETED, 20, disk.getGeneration());
+    disk.recordTraffic(second, first, 20);
+
+    assertGauge("DataSizeMovedBytesInLatestIterationSSD", 30L, getMetrics(ContainerBalancerMetrics.NAME));
+    assertGauge("DataSizeMovedBytesInLatestIterationDISK", 20L, getMetrics(ContainerBalancerMetrics.NAME));
+    assertGauge("NumDatanodesInvolvedInLatestIterationSSD", 2L, getMetrics(ContainerBalancerMetrics.NAME));
+    assertGauge("NumDatanodesUnbalancedSSD", 2L, getMetrics(ContainerBalancerMetrics.NAME));
+    assertGauge("DataSizeUnbalancedBytesSSD", 40L, getMetrics(ContainerBalancerMetrics.NAME));
+    assertEquals(priorSsdBytes, getLongCounter("DataSizeMovedBytesSSD", getMetrics(ContainerBalancerMetrics.NAME)));
+    metrics.finishStorageTypeIteration();
+    metrics.finishStorageTypeIteration();
+    assertEquals(priorSsdBytes + 30,
+        getLongCounter("DataSizeMovedBytesSSD", getMetrics(ContainerBalancerMetrics.NAME)));
+    assertEquals(aggregate, metrics.getDataSizeMovedInLatestIteration());
+    assertEquals(aggregate, getLongCounter("DataSizeMovedBytesInLatestIteration",
+        getMetrics(ContainerBalancerMetrics.NAME)));
+  }
+
+  @Test
+  void testStorageTypeStatusRoundTripAndHistoryAreImmutableAcrossReset() throws Exception {
+    ContainerBalancerMetrics metrics = ContainerBalancerMetrics.create();
+    metrics.resetStorageTypeMetrics();
+    ContainerBalancerMetrics.StorageTypeMetrics ssd = metrics.forStorageType(StorageType.SSD);
+    ssd.recordScheduled();
+    ssd.recordResult(MoveManager.MoveResult.COMPLETED, 30, ssd.getGeneration());
+    ssd.recordTraffic(DatanodeID.randomID(), DatanodeID.randomID(), 30);
+    ContainerBalancerTaskIterationStatusInfo history = new ContainerBalancerTaskIterationStatusInfo(
+        new IterationInfo(1, "ITERATION_COMPLETED", 1L),
+        new ContainerMoveInfo(1, 1, 0, 0, Collections.emptyList()),
+        new DataMoveInfo(30, 30, Collections.emptyMap(), Collections.emptyMap()), metrics.getStorageTypeStatusInfo());
+    long generation = ssd.getGeneration();
+
+    metrics.resetStorageTypeMetrics();
+    // A late completion from the old iteration must not change the current gauges or frozen history.
+    ssd.recordResult(MoveManager.MoveResult.COMPLETED, 100, generation);
+    assertTrue(metrics.getStorageTypeStatusInfo().isEmpty());
+    assertGauge("DataSizeMovedBytesInLatestIterationSSD", 0L, getMetrics(ContainerBalancerMetrics.NAME));
+    ContainerBalancerTaskIterationStatusInfoProto proto =
+        ContainerBalancerTaskIterationStatusInfoProto.parseFrom(history.toProto().toByteArray());
+    ContainerBalancerStorageTypeStatusInfoProto type = proto.getStorageTypeStatusInfo(0);
+    assertEquals(StorageTypeProto.SSD, type.getStorageType());
+    assertEquals(30, type.getDataSizeMoved());
+    assertEquals(30, type.getSizeScheduledForMove());
+    assertEquals(1, type.getContainerMovesCompleted());
+    assertEquals(2, type.getNumDatanodesInvolved());
+    assertEquals(30, type.getSizeEnteringNodes(0).getDataVolume());
+    assertEquals(30, type.getSizeLeavingNodes(0).getDataVolume());
+  }
+
+  @Test
+  void testUnknownStorageTypeFailureTimeoutAndCounterReset() {
+    ContainerBalancerMetrics metrics = ContainerBalancerMetrics.create();
+    metrics.resetStorageTypeMetrics();
+    ContainerBalancerMetrics.StorageTypeMetrics unknown = metrics.forStorageType(null);
+    long priorFailures = getLongCounter("NumContainerMovesFailedUNKNOWN", getMetrics(ContainerBalancerMetrics.NAME));
+    unknown.recordScheduled();
+    unknown.recordResult(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR, 0, unknown.getGeneration());
+    unknown.recordScheduled();
+    unknown.recordResult(MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT, 0, unknown.getGeneration());
+    unknown.recordScheduled();
+    unknown.recordResult(MoveManager.MoveResult.DELETION_FAIL_TIME_OUT, 0, unknown.getGeneration());
+
+    ContainerBalancerStorageTypeStatusInfoProto type = metrics.getStorageTypeStatusInfo().get(0);
+    assertFalse(type.hasStorageType());
+    assertEquals(3, type.getContainerMovesScheduled());
+    assertEquals(1, type.getContainerMovesFailed());
+    assertEquals(2, type.getContainerMovesTimeout());
+    assertGauge("NumContainerMovesTimeoutInLatestIterationUNKNOWN", 2L, getMetrics(ContainerBalancerMetrics.NAME));
+    metrics.finishStorageTypeIteration();
+    metrics.resetStorageTypeMetrics();
+    assertGauge("NumContainerMovesTimeoutInLatestIterationUNKNOWN", 0L, getMetrics(ContainerBalancerMetrics.NAME));
+    assertEquals(priorFailures + 1,
+        getLongCounter("NumContainerMovesFailedUNKNOWN", getMetrics(ContainerBalancerMetrics.NAME)));
+  }
+
+  @Test
+  void testConcurrentStorageTypeResultsAccumulateWithoutMixingTypes() {
+    ContainerBalancerMetrics metrics = ContainerBalancerMetrics.create();
+    metrics.resetStorageTypeMetrics();
+    ContainerBalancerMetrics.StorageTypeMetrics ssd = metrics.forStorageType(StorageType.SSD);
+    ContainerBalancerMetrics.StorageTypeMetrics disk = metrics.forStorageType(StorageType.DISK);
+    long ssdGeneration = ssd.getGeneration();
+    long diskGeneration = disk.getGeneration();
+    IntStream.range(0, 100).parallel().forEach(index -> {
+      ssd.recordResult(MoveManager.MoveResult.COMPLETED, 3, ssdGeneration);
+      disk.recordResult(MoveManager.MoveResult.COMPLETED, 7, diskGeneration);
+    });
+    assertGauge("DataSizeMovedBytesInLatestIterationSSD", 300L, getMetrics(ContainerBalancerMetrics.NAME));
+    assertGauge("DataSizeMovedBytesInLatestIterationDISK", 700L, getMetrics(ContainerBalancerMetrics.NAME));
+    assertGauge("NumContainerMovesCompletedInLatestIterationSSD", 100L, getMetrics(ContainerBalancerMetrics.NAME));
+  }
+
+  @Test
+  void testLegacyIterationStatusDoesNotRequireStorageTypeBreakdown() {
+    ContainerBalancerTaskIterationStatusInfo legacy = new ContainerBalancerTaskIterationStatusInfo(
+        new IterationInfo(1, "ITERATION_COMPLETED", 1L),
+        new ContainerMoveInfo(1, 1, 0, 0, Collections.emptyList()),
+        new DataMoveInfo(30, 30, Collections.emptyMap(), Collections.emptyMap()));
+    assertTrue(legacy.getStorageTypeStatusInfo().isEmpty());
+    assertEquals(0, legacy.toProto().getStorageTypeStatusInfoCount());
+    assertEquals(30, legacy.toProto().getDataSizeMoved());
+  }
 
   @Test
   void testGetIterationStatistics() {

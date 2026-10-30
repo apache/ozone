@@ -82,6 +82,23 @@ With `-v`/`--verbose`, when failures occur, a **Failed container moves** section
 (e.g. `REPLICATION_FAIL_TIME_OUT`, `ITERATION_MOVE_TIMEOUT`, `PRE_MOVE_CONTAINER_NOT_FOUND` and more)
 with the total count and a per-datanode breakdown of which source and target nodes were involved.
 
+Verbose status also includes a section for each balancing storage type, with scheduled and moved bytes,
+scheduled/completed/failed/timed-out move counts, unique involved and unbalanced datanodes,
+imbalance bytes, and per-datanode entering/leaving traffic. History retains the breakdown for each iteration.
+Entering/leaving traffic describes data selected for transfer; moved bytes count completed moves.
+Type-agnostic balancing is reported as `UNKNOWN`; it is not assumed to be `DISK`.
+Older SCM responses without this breakdown continue to display the existing aggregate status.
+
+### Per-storage-type metrics
+
+The existing aggregate metrics remain unchanged. Additional metrics use a storage-type suffix, for example
+`DataSizeMovedBytesInLatestIterationSSD`, `NumContainerMovesCompletedInLatestIterationDISK`,
+`NumDatanodesUnbalancedSSD`, and `DataSizeUnbalancedBytesSSD`.
+Latest-iteration gauges reset at the next iteration. Cumulative counters such as `DataSizeMovedBytesSSD`
+and `NumContainerMovesFailedSSD` are finalized with the aggregate iteration totals and retained across iterations.
+Datanode and traffic limits are shared across all types. A datanode participating in multiple storage types
+is counted once in the aggregate involved-datanode metric, so per-type datanode counts must not be summed.
+
 ### Stop
 
 To stop the Container Balancer:

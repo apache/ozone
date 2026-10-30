@@ -50,6 +50,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.nullable;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -429,7 +430,7 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_SERVICE, 5));
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(
-            any(), anyList(), any(), anyInt());
+            any(), anyList(), any(), anyInt(), any());
 
     assertThrows(CommandTargetOverloadedException.class, () ->
         testUnderReplicationWithMissingIndexes(
@@ -1026,6 +1027,46 @@ public class TestECUnderReplicationHandler {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testCopiesSelectTargetsForEachReplicaStorageType(boolean maintenance) throws Exception {
+    HddsProtos.NodeOperationalState state = maintenance ? IN_MAINTENANCE : DECOMMISSIONING;
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (ContainerReplica replica : ReplicationTestUtil.createReplicas(
+        Pair.of(state, 1), Pair.of(state, 2), Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5))) {
+      StorageType type = replica.getReplicaIndex() == 1 ? StorageType.SSD : StorageType.ARCHIVE;
+      replicas.add(ContainerReplica.newBuilder().setContainerID(container.containerID())
+          .setContainerState(CLOSED).setDatanodeDetails(replica.getDatanodeDetails())
+          .setReplicaIndex(replica.getReplicaIndex()).setSequenceId(replica.getSequenceId())
+          .setVolumeStorageType(type).build());
+    }
+    PlacementPolicy placement = mock(PlacementPolicy.class);
+    DatanodeDetails ssdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails archiveTarget = MockDatanodeDetails.randomDatanodeDetails();
+    when(placement.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
+        .thenAnswer(invocation -> {
+          assertEquals(1, invocation.getArgument(3, Integer.class).intValue());
+          StorageType type = invocation.getArgument(6);
+          assertThat(type).isIn(StorageType.SSD, StorageType.ARCHIVE);
+          return singletonList(type == StorageType.SSD ? ssdTarget : archiveTarget);
+        });
+    ContainerPlacementStatus status = mock(ContainerPlacementStatus.class);
+    when(status.isPolicySatisfied()).thenReturn(true);
+    when(placement.validateContainerPlacement(anyList(), anyInt())).thenReturn(status);
+    UnderReplicatedHealthResult result = mock(UnderReplicatedHealthResult.class);
+    when(result.getContainerInfo()).thenReturn(container);
+    ECUnderReplicationHandler handler = new ECUnderReplicationHandler(placement, conf, replicationManager);
+
+    assertEquals(2, handler.processAndSendCommands(replicas, emptyList(), result, 2));
+    assertEquals(2, commandsSent.size());
+    for (Pair<DatanodeDetails, SCMCommand<?>> sent : commandsSent) {
+      ReplicateContainerCommand command = (ReplicateContainerCommand) sent.getRight();
+      StorageType type = command.getReplicaIndex() == 1 ? StorageType.SSD : StorageType.ARCHIVE;
+      assertEquals(type, command.getTargetVolumeStorageType());
+      assertEquals(type == StorageType.SSD ? ssdTarget : archiveTarget, command.getTargetDatanode());
+    }
+  }
+
   /**
    * HDDS-7683 was a case where the maintenance logic was calling the placement
    * policy requesting zero nodes. This test asserts that it is never called
@@ -1038,7 +1079,7 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
     when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(),
-            isNull(), anyInt(), anyLong(), anyLong(), any(StorageType.class)))
+            isNull(), anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
         .thenAnswer(invocationOnMock -> {
           int numNodes = invocationOnMock.getArgument(3);
           List<DatanodeDetails> targets = new ArrayList<>();
@@ -1059,7 +1100,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(1, commandsSent.size());
     verify(ecPlacementPolicy, times(0))
         .chooseDatanodes(anyList(), isNull(), eq(0), anyLong(),
-            anyLong(), any(StorageType.class));
+            anyLong(), nullable(StorageType.class));
   }
 
   /**
@@ -1082,7 +1123,7 @@ public class TestECUnderReplicationHandler {
     contain the DN pending ADD.
      */
     when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(),
-            isNull(), anyInt(), anyLong(), anyLong(), any(StorageType.class)))
+            isNull(), anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
         .thenAnswer(invocationOnMock -> {
           List<DatanodeDetails> usedList = invocationOnMock.getArgument(0);
           List<DatanodeDetails> excludeList = invocationOnMock.getArgument(1);
@@ -1215,7 +1256,7 @@ public class TestECUnderReplicationHandler {
     PlacementPolicySpy(PlacementPolicy placementPolicy, int totalNodes)
         throws IOException {
       when(placementPolicy.chooseDatanodes(any(), any(),
-          any(), anyInt(), anyLong(), anyLong(), any(StorageType.class))
+          any(), anyInt(), anyLong(), anyLong(), nullable(StorageType.class))
       ).thenAnswer(invocation -> {
         final Collection<DatanodeDetails> used = invocation.getArgument(0);
         final Collection<DatanodeDetails> excluded = invocation.getArgument(1);

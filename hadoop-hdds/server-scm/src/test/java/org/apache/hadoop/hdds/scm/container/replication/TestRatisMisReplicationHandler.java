@@ -27,6 +27,9 @@ import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.nullable;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -102,7 +105,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
                     anyInt())).thenReturn(mockedContainerPlacementStatus);
     when(placementPolicy.chooseDatanodes(
                     any(), any(), any(),
-                    anyInt(), anyLong(), anyLong(), any(StorageType.class)))
+                    anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
             .thenThrow(new SCMException("No nodes found", SCMException.ResultCodes.NO_SUCH_DATANODE));
     assertThrows(SCMException.class, () -> testMisReplication(
             availableReplicas, placementPolicy, Collections.emptyList(),
@@ -174,19 +177,22 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
             pendingOp, 0, 1, 0);
   }
 
-  @Test
-  public void testAllSourcesOverloaded() throws IOException {
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2, 3})
+  public void testAllSourcesOverloaded(int misreplicationCount) throws IOException {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
-            anyList(), any(), anyInt());
+            anyList(), any(), anyInt(), any());
 
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
             Pair.of(IN_SERVICE, 0));
     assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
-            Collections.emptyList(), 0, 1, 1, 0));
+            Collections.emptyList(), 0, misreplicationCount, misreplicationCount, 0));
+    verify(replicationManager, times(1))
+        .sendThrottledReplicationCommand(any(), anyList(), any(), anyInt(), any());
   }
 
   @Override

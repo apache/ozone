@@ -72,9 +72,10 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
       DatanodeDetails source = replica.getDatanodeDetails();
       DatanodeDetails target = targetDns.get(datanodeIdx);
       try {
+        // Place the new replica on the same storage type as the one it replaces.
         replicationManager.sendThrottledReplicationCommand(containerInfo,
             Collections.singletonList(source), target,
-            replica.getReplicaIndex());
+            replica.getReplicaIndex(), replica.getTargetStorageTypeForCopy());
         commandsSent++;
       } catch (CommandTargetOverloadedException e) {
         LOG.debug("Unable to replicate container {} and index {} from {} to {}"

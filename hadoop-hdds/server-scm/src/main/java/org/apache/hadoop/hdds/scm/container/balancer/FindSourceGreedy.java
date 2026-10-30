@@ -20,10 +20,13 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import jakarta.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -38,7 +41,11 @@ public class FindSourceGreedy implements FindSourceStrategy {
   private static final Logger LOG =
       LoggerFactory.getLogger(FindSourceGreedy.class);
   private Map<DatanodeDetails, Long> sizeLeavingNode;
+  private final Map<StorageType, Map<DatanodeDetails, Long>> sizeLeavingByStorageType =
+      new EnumMap<>(StorageType.class);
+  private StorageType storageType;
   private PriorityQueue<DatanodeUsageInfo> potentialSources;
+  private final Map<StorageType, PriorityQueue<DatanodeUsageInfo>> sourcesByStorageType = new HashMap<>();
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double lowerLimit;
@@ -47,9 +54,9 @@ public class FindSourceGreedy implements FindSourceStrategy {
     sizeLeavingNode = new ConcurrentHashMap<>();
     potentialSources = new PriorityQueue<>((a, b) -> {
       double currentUsageOfA = a.calculateUtilization(
-          -sizeLeavingNode.get(a.getDatanodeDetails()));
+          -sizeLeavingOnStorageType(a.getDatanodeDetails()), storageType);
       double currentUsageOfB = b.calculateUtilization(
-          -sizeLeavingNode.get(b.getDatanodeDetails()));
+          -sizeLeavingOnStorageType(b.getDatanodeDetails()), storageType);
       //in descending order
       int ret = Double.compare(currentUsageOfB, currentUsageOfA);
       if (ret != 0) {
@@ -103,6 +110,10 @@ public class FindSourceGreedy implements FindSourceStrategy {
     Long currentSize = sizeLeavingNode.get(dui);
     if (currentSize != null) {
       sizeLeavingNode.put(dui, currentSize + size);
+      if (storageType != null) {
+        sizeLeavingByStorageType.computeIfAbsent(storageType, ignored -> new ConcurrentHashMap<>())
+            .merge(dui, size, Long::sum);
+      }
       //reorder according to the latest sizeLeavingNode
       addBackSourceDataNode(dui);
       return;
@@ -172,7 +183,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
         return false;
       }
       if (Double.compare(nodeManager.getUsageInfo(source)
-          .calculateUtilization(-sizeLeavingAfterMove), lowerLimit) < 0) {
+          .calculateUtilization(-sizeLeavingOnStorageType(source) - size, storageType), lowerLimit) < 0) {
         LOG.debug("{} bytes cannot leave datanode {} because its utilization " +
                 "will drop below the lower limit of {}.", size, source, lowerLimit);
         return false;
@@ -193,8 +204,26 @@ public class FindSourceGreedy implements FindSourceStrategy {
                            Double lowLimit) {
     setConfiguration(conf);
     setLowerLimit(lowLimit);
-    sizeLeavingNode.clear();
+    storageType = null;
+    clearSizeLeavingNodes();
     resetSources(potentialDataNodes);
+  }
+
+  @Override
+  public void setStorageType(StorageType type, double lowLimit) {
+    sourcesByStorageType.put(storageType, potentialSources);
+    storageType = type;
+    potentialSources = sourcesByStorageType.computeIfAbsent(type,
+        ignored -> new PriorityQueue<>(potentialSources.comparator()));
+    setLowerLimit(lowLimit);
+  }
+
+  private long sizeLeavingOnStorageType(DatanodeDetails source) {
+    if (storageType == null) {
+      return sizeLeavingNode.getOrDefault(source, 0L);
+    }
+    Map<DatanodeDetails, Long> sizes = sizeLeavingByStorageType.get(storageType);
+    return sizes == null ? 0L : sizes.getOrDefault(source, 0L);
   }
 
   @Override
@@ -205,5 +234,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
   @Override
   public void clearSizeLeavingNodes() {
     sizeLeavingNode.clear();
+    sizeLeavingByStorageType.clear();
+    sourcesByStorageType.clear();
   }
 }
