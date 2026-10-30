@@ -359,6 +359,10 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       int index = entry.getKey();
       BlockExtendedInputStream stream;
       synchronized (streamLock) {
+        // close() sets closed before it closes the streams under streamLock, so a read racing with close() either
+        // fails here, outside the try so that the locations are not reported as bad, or opens a stream that close()
+        // then closes, instead of leaving one open after close().
+        checkOpen();
         locations.put(index, dataLocations[index]);
         try {
           stream = getOrOpenStream(index);

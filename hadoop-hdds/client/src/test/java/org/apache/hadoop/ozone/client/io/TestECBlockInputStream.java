@@ -43,9 +43,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -919,6 +922,31 @@ public class TestECBlockInputStream {
     } finally {
       reader.shutdownNow();
     }
+  }
+
+  @Test
+  public void testPositionedReadRacingCloseOpensNoStreamAfterClose() throws IOException {
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
+    AtomicReference<ECBlockInputStream> stream = new AtomicReference<>();
+    AtomicBoolean closeOnOpen = new AtomicBoolean(true);
+    // close() runs while the positioned read opens its first index stream, that is between two indexes of the read
+    BlockInputStreamFactory closingFactory = (rc, info, pipeline, token, clients, refresh, config) -> {
+      BlockExtendedInputStream opened = streamFactory.create(rc, info, pipeline, token, clients, refresh, config);
+      if (closeOnOpen.getAndSet(false)) {
+        stream.get().close();
+      }
+      return opened;
+    };
+    stream.set(createStream(keyInfo, closingFactory, conf.getObject(OzoneClientConfig.class)));
+
+    // the read covers the cells of two indexes
+    ByteBuffer buf = ByteBuffer.allocate(repConfig.getEcChunkSize() + 100);
+    IOException e = assertThrows(IOException.class, () -> stream.get().read(0, buf));
+    // the location is not bad, so it must not be reported as failed
+    assertThat(e).isNotInstanceOf(BadDataLocationException.class)
+        .hasMessageContaining(FSExceptionMessages.STREAM_IS_CLOSED);
+    // the second index stream is not opened after close(), where nothing would close it
+    assertEquals(1, streamFactory.getBlockStreams().size());
   }
 
   /** Creates the stream under test, reading the cells in parallel if the class runs with parallelRead. */
