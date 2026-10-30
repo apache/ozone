@@ -720,19 +720,35 @@ import_keys() {
   rm -f "$keys"
 }
 
+verify_apache_release() {
+  # paths of the file to verify
+  local remote_path="$1"
+  local local_path="$2"
+
+  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" == "true" ]]; then
+    return
+  fi
+
+  local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
+
+  if download_if_not_exists "${checksum_base_url}${remote_path}.asc" "${local_path}.asc" \
+    && gpg --verify "${local_path}.asc" "${local_path}"; then
+    return 0
+  fi
+
+  rm -fv "${local_path}.asc" "${local_path}"
+  return 1
+}
+
 download_and_verify_apache_release() {
   local remote_path="$1"
 
-  local f="$(basename "${remote_path}")"
+  local local_path="${DOWNLOAD_DIR}/$(basename "${remote_path}")"
   local base_url="${APACHE_MIRROR_URL:-https://www.apache.org/dyn/closer.lua?action=download&filename=}"
-  local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
 
-  download_if_not_exists "${base_url}${remote_path}" "${DOWNLOAD_DIR}/${f}" >&2 || return 1
-  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
-    download_if_not_exists "${checksum_base_url}${remote_path}.asc" "${DOWNLOAD_DIR}/${f}.asc" >&2
-    gpg --verify "${DOWNLOAD_DIR}/${f}.asc" "${DOWNLOAD_DIR}/${f}" >&2 || return 1
-  fi
-  echo "${DOWNLOAD_DIR}/${f}"
+  download_if_not_exists "${base_url}${remote_path}" "${local_path}" >&2 \
+    && verify_apache_release "${remote_path}" "${local_path}" >&2 \
+    && echo "${local_path}"
 }
 
 # retry at two levels:
