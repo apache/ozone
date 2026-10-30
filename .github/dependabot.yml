@@ -42,10 +42,6 @@ updates:
           - "4.7.7" # bug https://github.com/remkop/picocli/issues/2407
       - dependency-name: "io.netty:*"
         update-types: ["version-update:semver-minor"]
-      - dependency-name: "org.apache.derby:derby"
-        versions:
-          - "<10.17.1.0" # CVE-2022-46337 https://issues.apache.org/jira/browse/DERBY-7147
-          - ">=10.17.1.0" # requires Java 21
       - dependency-name: "org.apache.hadoop:*" # using multiple versions
       - dependency-name: "org.apache.iceberg:*" # update manually due to signature changes (1.11 -> 1.12)
         update-types: ["version-update:semver-minor"]

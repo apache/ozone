@@ -91,8 +91,7 @@ public class ReconService implements MiniOzoneCluster.Service {
     conf.set(OZONE_RECON_SCM_DB_DIR, dir.getAbsolutePath());
 
     ReconSqlDbConfig dbConfig = conf.getObject(ReconSqlDbConfig.class);
-    dbConfig.setJdbcUrl("jdbc:derby:" + dir.getAbsolutePath()
-        + "/ozone_recon_derby.db");
+    dbConfig.setJdbcUrl("jdbc:sqlite:" + dir.getAbsolutePath() + "/ozone_recon_sqlite.db");
     conf.setFromObject(dbConfig);
 
     conf.set(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD, "10s");

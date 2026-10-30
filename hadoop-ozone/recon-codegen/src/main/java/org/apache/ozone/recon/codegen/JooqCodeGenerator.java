@@ -28,7 +28,6 @@ import java.sql.SQLException;
 import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.io.FileUtils;
-import org.apache.derby.jdbc.EmbeddedDataSource;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.ReconSchemaDefinition;
 import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
@@ -44,6 +43,7 @@ import org.jooq.meta.jaxb.Strategy;
 import org.jooq.meta.jaxb.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.sqlite.SQLiteDataSource;
 
 /**
  * Utility class that generates the Dao and Pojos for Recon schema. The
@@ -59,9 +59,8 @@ public class JooqCodeGenerator {
 
   private static final String DB = Paths.get(
       System.getProperty("java.io.tmpdir"),
-      "recon-generated-schema-" + Time.monotonicNow()).toString();
-  public static final String RECON_SCHEMA_NAME = "RECON";
-  private static final String JDBC_URL = "jdbc:derby:" + DB;
+      "recon-generated-schema-" + Time.monotonicNow() + ".db").toString();
+  private static final String JDBC_URL = "jdbc:sqlite:" + DB;
   private final Set<ReconSchemaDefinition> allDefinitions;
 
   @Inject
@@ -85,15 +84,14 @@ public class JooqCodeGenerator {
     Configuration configuration =
         new Configuration()
             .withJdbc(new Jdbc()
-                .withDriver(SqlDbUtils.DERBY_DRIVER_CLASS)
+                .withDriver(SqlDbUtils.SQLITE_DRIVER_CLASS)
                 .withUrl(JDBC_URL))
             .withGenerator(new Generator()
                 .withDatabase(new Database()
-                    .withName("org.jooq.meta.derby.DerbyDatabase")
+                    .withName("org.jooq.meta.sqlite.SQLiteDatabase")
                     .withOutputSchemaToDefault(true)
                     .withIncludeTables(true)
-                    .withIncludePrimaryKeys(true)
-                    .withInputSchema(RECON_SCHEMA_NAME))
+                    .withIncludePrimaryKeys(true))
                 .withGenerate(new Generate()
                     .withDaos(true)
                     .withEmptyCatalogs(true))
@@ -111,22 +109,15 @@ public class JooqCodeGenerator {
    * Provider for embedded datasource.
    */
   static class LocalDataSourceProvider implements Provider<DataSource> {
-    private static EmbeddedDataSource dataSource;
+    private static final SQLiteDataSource DATA_SOURCE = new SQLiteDataSource();
 
     static {
-      try {
-        SqlDbUtils.createNewDerbyDatabase(JDBC_URL, RECON_SCHEMA_NAME);
-      } catch (Exception e) {
-        LOG.error("Error creating Recon Derby DB.", e);
-      }
-      dataSource = new EmbeddedDataSource();
-      dataSource.setDatabaseName(DB);
-      dataSource.setUser(RECON_SCHEMA_NAME);
+      DATA_SOURCE.setUrl(JDBC_URL);
     }
 
     @Override
     public DataSource get() {
-      return dataSource;
+      return DATA_SOURCE;
     }
 
     static void cleanup() {

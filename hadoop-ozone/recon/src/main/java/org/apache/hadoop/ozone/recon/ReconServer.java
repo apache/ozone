@@ -23,12 +23,14 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.Callable;
@@ -60,6 +62,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.upgrade.ReconVersion;
 import org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
@@ -138,6 +141,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       ReconGuiceServletContextListener.setInjector(injector);
 
       reconStorage = injector.getInstance(ReconStorageConfig.class);
+      boolean existingInstall = reconStorage.getState() == INITIALIZED;
 
 
       loginReconUserIfSecurityEnabled(configuration);
@@ -167,7 +171,15 @@ public class ReconServer extends GenericCli implements Callable<Void> {
           injector.getInstance(ReconSchemaManager.class);
 
       LOG.info("Creating Recon Schema.");
-      reconSchemaManager.createReconSchema();
+      // A new SQL DB on an existing Recon (for example after the move from Derby to SQLite) cannot tell which upgrade
+      // actions the derived data already has, so start from the initial version to run all of them.
+      ReconVersion newSqlDbVersion = existingInstall ? ReconVersion.INITIAL_VERSION : ReconVersion.SOFTWARE_VERSION;
+      reconSchemaManager.createReconSchema(newSqlDbVersion);
+      File legacyDerbyDb = new File(injector.getInstance(ReconUtils.class).getReconDbDir(configuration,
+          OZONE_RECON_DB_DIR), ReconSqlDbConfig.LEGACY_DERBY_DB_NAME);
+      if (legacyDerbyDb.exists()) {
+        LOG.info("Recon now uses SQLite. {} is no longer used and can be deleted.", legacyDerbyDb);
+      }
       LOG.debug("Recon schema creation done.");
 
       ReconSafeModeManager reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
