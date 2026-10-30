@@ -39,7 +39,7 @@ services:
       - ../_keytabs:/etc/security/keytabs
     command: ["/opt/hadoop/compose/common/init-kdc.sh"]
   kms:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_IMAGE_VERSION}
     hostname: kms
     dns_search: .
     ports:
