@@ -21,12 +21,11 @@
 # If you have Hadoop sources locally, set HADOOP_AWS_DIR to the directory containing `hadoop-aws`.
 # Otherwise it will try to download Hadoop ${HADOOP_VERSION}, defaults to ${hadoop.version}.
 
-if [[ -z "${HADOOP_AWS_DIR:-}" ]]; then
-  export HADOOP_AWS_DIR="${TEMP_DIR:-"/tmp/hadoop-aws-${HADOOP_VERSION}"}"
-fi
-
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
+
+: "${HADOOP_AWS_DIR:=${TEMP_DIR:-/tmp}/hadoop-aws-${HADOOP_VERSION}}"
+export HADOOP_AWS_DIR
 
 download_hadoop_aws() {
   if [[ ! -e "${HADOOP_AWS_DIR}" ]] || [[ ! -d "${HADOOP_AWS_DIR}"/src/test/resources ]]; then
