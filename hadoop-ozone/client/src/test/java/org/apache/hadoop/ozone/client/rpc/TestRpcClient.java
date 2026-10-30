@@ -686,7 +686,7 @@ public class TestRpcClient {
           "key", 1L, "excluded-etag", replication, Collections.emptyMap(), Collections.emptyMap(), false));
       IOException completeError = assertThrows(IOException.class, () -> client.completeMultipartUpload("vol", "bucket",
           "key", "upload-id", Collections.singletonMap(1, "part-etag"), null, null, "excluded-etag"));
-      if (version == OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) {
+      if (OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.isSupportedBy(version)) {
         assertEquals("captured", putError.getMessage());
         assertEquals("captured", streamError.getMessage());
         assertEquals("captured", completeError.getMessage());

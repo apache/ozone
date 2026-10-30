@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -161,6 +163,56 @@ public class TestOzoneManagerRequestHandler {
     default:
       break;
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testDisallowKeyWithMultipartPartIv(boolean hasPartIv) {
+    OzoneManagerProtocolProtos.KeyLocation.Builder location = OzoneManagerProtocolProtos.KeyLocation.newBuilder()
+        .setBlockID(HddsProtos.BlockID.newBuilder().setContainerBlockID(
+            HddsProtos.ContainerBlockID.newBuilder().setContainerID(1).setLocalID(1)))
+        .setOffset(0).setLength(10).setPartNumber(1);
+    if (hasPartIv) {
+      location.setPartIv(ByteString.copyFrom(new byte[16]));
+    }
+    OzoneManagerProtocolProtos.KeyInfo keyInfo = OzoneManagerProtocolProtos.KeyInfo.newBuilder()
+        .setVolumeName("volume").setBucketName("bucket").setKeyName("key").setDataSize(10)
+        .setType(HddsProtos.ReplicationType.RATIS).setCreationTime(0).setModificationTime(0)
+        .addKeyLocationList(OzoneManagerProtocolProtos.KeyLocationList.newBuilder()
+            .setVersion(0).addKeyLocations(location))
+        .build();
+    OzoneManagerProtocolProtos.OMRequest request = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.LookupKey).setClientId("client").build();
+
+    List<OzoneManagerProtocolProtos.OMResponse> responses = Arrays.asList(
+        OzoneManagerRequestHandler.disallowLookupKeyWithMultipartPartIv(request, okResponse()
+            .setLookupKeyResponse(OzoneManagerProtocolProtos.LookupKeyResponse.newBuilder().setKeyInfo(keyInfo))
+            .build(), null),
+        OzoneManagerRequestHandler.disallowGetKeyInfoWithMultipartPartIv(request, okResponse()
+            .setGetKeyInfoResponse(OzoneManagerProtocolProtos.GetKeyInfoResponse.newBuilder().setKeyInfo(keyInfo))
+            .build(), null),
+        OzoneManagerRequestHandler.disallowLookupFileWithMultipartPartIv(request, okResponse()
+            .setLookupFileResponse(OzoneManagerProtocolProtos.LookupFileResponse.newBuilder().setKeyInfo(keyInfo))
+            .build(), null));
+
+    for (OzoneManagerProtocolProtos.OMResponse response : responses) {
+      boolean hasKeyInfo = response.hasLookupKeyResponse() || response.hasGetKeyInfoResponse()
+          || response.hasLookupFileResponse();
+      if (hasPartIv) {
+        Assertions.assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION, response.getStatus());
+        assertThat(response.getMessage()).contains("volume/bucket/key");
+        Assertions.assertFalse(hasKeyInfo);
+      } else {
+        Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getStatus());
+        Assertions.assertTrue(hasKeyInfo);
+      }
+    }
+  }
+
+  private static OzoneManagerProtocolProtos.OMResponse.Builder okResponse() {
+    return OzoneManagerProtocolProtos.OMResponse.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.LookupKey)
+        .setStatus(OzoneManagerProtocolProtos.Status.OK);
   }
 
   /**
