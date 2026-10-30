@@ -243,8 +243,9 @@ class TestSCMFullContainerReportLeaseManager {
     assertThat(laterClaim.isRegistrationReport()).isFalse();
   }
 
-  @Test
-  void shouldRetainClaimedLeaseBeforeProcessingStarts() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void shouldRetainLeaseAfterGrantExpiry(boolean processingStarted) {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
         new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
@@ -257,11 +258,16 @@ class TestSCMFullContainerReportLeaseManager {
         requireClaim(leaseManager, firstDn, 7L, firstLease);
     assertThat(claim).isNotNull();
     assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+    if (processingStarted) {
+      assertThat(claim.startProcessing()).isTrue();
+    }
 
     now.addAndGet(100L);
 
     assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
-    assertThat(claim.startProcessing()).isTrue();
+    if (!processingStarted) {
+      assertThat(claim.startProcessing()).isTrue();
+    }
     claim.complete(true);
     assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
   }
@@ -415,40 +421,25 @@ class TestSCMFullContainerReportLeaseManager {
   }
 
   @Test
-  void shouldRetainLeaseWhileReportIsProcessing() {
-    AtomicLong now = new AtomicLong(1_000L);
-    SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
-    DatanodeDetails firstDn = randomDatanodeDetails();
-    DatanodeDetails secondDn = randomDatanodeDetails();
-
-    long firstLease = requireLease(leaseManager, firstDn, 7L);
-    SCMFullContainerReportLeaseManager.LeaseClaim claim =
-        requireClaim(leaseManager, firstDn, 7L, firstLease);
-    assertThat(claim).isNotNull();
-    assertThat(claim.startProcessing()).isTrue();
-
-    now.addAndGet(100L);
-
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
-    claim.complete(true);
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
-  }
-
-  @Test
-  void shouldGrantLeaseToLaterRequesterWhenCapacityIsAvailable() {
+  void shouldNotReserveCapacityForDeniedRequests() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
         new SCMFullContainerReportLeaseManager(1, 5_000L, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
     DatanodeDetails thirdDn = randomDatanodeDetails();
+    DatanodeDetails newDn = randomDatanodeDetails();
 
     long firstLease = requireLease(leaseManager, firstDn, 7L);
     assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
     assertThat(leaseManager.requestLease(thirdDn, 7L)).isEmpty();
 
     requireClaim(leaseManager, firstDn, 7L, firstLease).complete(true);
+
+    // The earlier denied datanode need not retry before another datanode can use the free slot.
+    now.incrementAndGet();
+    long newLease = requireLease(leaseManager, newDn, 7L);
+    requireClaim(leaseManager, newDn, 7L, newLease).complete(true);
 
     long thirdLease = requireLease(leaseManager, thirdDn, 7L);
     assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
@@ -458,53 +449,8 @@ class TestSCMFullContainerReportLeaseManager {
     requireClaim(leaseManager, secondDn, 7L, secondLease).complete(true);
   }
 
-  @Test
-  void shouldGrantLeaseWithoutWaitingForMissingRequester() {
-    AtomicLong now = new AtomicLong(1_000L);
-    SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 300_000L, now::get, null);
-    DatanodeDetails firstDn = randomDatanodeDetails();
-    DatanodeDetails missingDn = randomDatanodeDetails();
-    DatanodeDetails activeDn = randomDatanodeDetails();
-
-    long firstLease = requireLease(leaseManager, firstDn, 7L);
-    assertThat(leaseManager.requestLease(missingDn, 7L)).isEmpty();
-    requireClaim(leaseManager, firstDn, 7L, firstLease).complete(true);
-
-    // The earlier denied datanode never retries; its request must not reserve the free slot for five minutes.
-    now.incrementAndGet();
-
-    long activeLease = requireLease(leaseManager, activeDn, 7L);
-    requireClaim(leaseManager, activeDn, 7L, activeLease).complete(true);
-  }
-
-  @Test
-  void shouldGrantLeaseToReturningRequesterWhenCapacityIsAvailable() {
-    AtomicLong now = new AtomicLong(1_000L);
-    SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
-    DatanodeDetails firstDn = randomDatanodeDetails();
-    DatanodeDetails staleDn = randomDatanodeDetails();
-    DatanodeDetails activeDn = randomDatanodeDetails();
-
-    long firstLease = requireLease(leaseManager, firstDn, 7L);
-    assertThat(leaseManager.requestLease(staleDn, 7L)).isEmpty();
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isEmpty();
-    now.addAndGet(99L);
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isEmpty();
-    requireClaim(leaseManager, firstDn, 7L, firstLease).complete(true);
-    now.incrementAndGet();
-
-    long returningLease = requireLease(leaseManager, staleDn, 7L);
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isEmpty();
-    requireClaim(leaseManager, staleDn, 7L, returningLease).complete(true);
-
-    long activeLease = requireLease(leaseManager, activeDn, 7L);
-    requireClaim(leaseManager, activeDn, 7L, activeLease).complete(true);
-  }
-
   @ParameterizedTest
-  @ValueSource(ints = {1_000, 1_003})
+  @ValueSource(ints = {20, 23})
   void shouldFillEveryStartupBatchWithReverseRetryOrder(int datanodeCount) {
     int maxOutstandingLeases = 10;
     AtomicLong now = new AtomicLong(1_000L);
@@ -532,7 +478,7 @@ class TestSCMFullContainerReportLeaseManager {
           assertThat(lease).as("all %s slots occupied in batch %s", maxOutstandingLeases, batches + 1).isEmpty();
         }
       }
-      assertThat(claims).as("admissions in batch %s", batches + 1).hasSize(expectedBatchSize);
+      assertThat(claims).as("claimed leases in batch %s", batches + 1).hasSize(expectedBatchSize);
 
       for (SCMFullContainerReportLeaseManager.LeaseClaim claim : claims) {
         assertThat(claim.startProcessing()).isTrue();

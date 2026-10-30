@@ -160,28 +160,12 @@ class TestSCMDatanodeProtocolServer {
     assertTrue(server.sendHeartbeat(request).hasFullContainerReportLease());
   }
 
-  @Test
-  void testBypassStillWaitsForLeaderReadiness() throws Exception {
-    server.stop();
-    serverConf.setBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, false);
-    SCMContext context = mock(SCMContext.class);
-    when(context.isLeader()).thenReturn(true);
-    when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.empty());
-    server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, context);
-    versionManager.finalizeUpgrade();
-    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
-        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
-
-    assertFalse(server.sendHeartbeat(request).hasFullContainerReportLease());
-    when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.of(7L));
-    when(context.getTermOfLeader()).thenReturn(7L);
-    assertEquals(7L, server.sendHeartbeat(request).getFullContainerReportLease().getTerm());
-  }
-
   @ParameterizedTest
-  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
-  void testHaLeaseEligibility(boolean leader, boolean ready) throws Exception {
+  @CsvSource({"true, false, false", "true, false, true", "true, true, false", "true, true, true",
+      "false, false, false", "false, false, true", "false, true, false", "false, true, true"})
+  void testHaLeaseEligibility(boolean rateLimitEnabled, boolean leader, boolean ready) throws Exception {
     server.stop();
+    serverConf.setBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, rateLimitEnabled);
     SCMContext context = mock(SCMContext.class);
     when(context.isLeader()).thenReturn(leader);
     when(context.getTermOfLeaderIfReady()).thenReturn(leader && ready ? OptionalLong.of(7L) : OptionalLong.empty());
@@ -196,6 +180,9 @@ class TestSCMDatanodeProtocolServer {
     assertEquals(!leader || ready, response.hasFullContainerReportLease());
     if (response.hasFullContainerReportLease()) {
       assertEquals(leader ? 7L : SCMContext.INVALID_TERM, response.getFullContainerReportLease().getTerm());
+    } else {
+      when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.of(7L));
+      assertEquals(7L, server.sendHeartbeat(request).getFullContainerReportLease().getTerm());
     }
   }
 

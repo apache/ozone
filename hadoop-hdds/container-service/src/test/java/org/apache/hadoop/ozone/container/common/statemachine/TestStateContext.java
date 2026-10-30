@@ -240,8 +240,7 @@ public class TestStateContext {
   }
 
   @Test
-  public void testPutBackFullContainerReportForOneEndpoint()
-      throws IOException {
+  public void testMarkFullContainerReportPendingForOneEndpoint() throws IOException {
     StateContext context = createSubject();
     HostAndPort scm1 = new HostAndPort("scm1", 9001);
     HostAndPort scm2 = new HostAndPort("scm2", 9002);

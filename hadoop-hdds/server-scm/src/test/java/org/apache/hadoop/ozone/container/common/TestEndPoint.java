@@ -99,7 +99,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -496,8 +496,10 @@ public class TestEndPoint {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  public void testRegisterTaskDefersFCRWhenSCMSupportsFCRLease(boolean finalized) throws Exception {
+  @CsvSource({"false, true, false", "true, true, false", "true, false, false", "true, true, true"})
+  public void testRegisterTaskDefersFCROnlyWhenLeaseEnabled(boolean finalized, boolean scmSupportsLease, boolean recon)
+      throws Exception {
+    boolean deferred = finalized && scmSupportsLease && !recon;
     OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
@@ -517,7 +519,7 @@ public class TestEndPoint {
         .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
             Arrays.asList(getMetadataStorageReports(datanodeID))));
     ContainerController controller = mock(ContainerController.class);
-    if (finalized) {
+    if (deferred) {
       when(controller.getContainerReport()).thenThrow(new IOException("snapshot unavailable"));
     } else {
       when(controller.getContainerReport()).thenReturn(HddsTestUtils.getRandomContainerReports(1));
@@ -548,10 +550,11 @@ public class TestEndPoint {
       assertFalse(context.isFullContainerReportReady(rpcEndpoint.getAddress()));
       assertFalse(context.isFullContainerReportReady(otherScm));
       rpcEndpoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
+      rpcEndpoint.setPassive(recon);
       rpcEndpoint.setVersion(VersionResponse.newBuilder()
           .setVersion(1)
           .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED,
-              Boolean.TRUE.toString())
+              Boolean.toString(scmSupportsLease))
           .build());
       RegisterEndpointTask endpointTask = new RegisterEndpointTask(
           rpcEndpoint, ozoneContainer, context,
@@ -560,9 +563,9 @@ public class TestEndPoint {
 
       endpointTask.call();
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
-      assertEquals(finalized, context.isFullContainerReportReady(rpcEndpoint.getAddress()));
+      assertEquals(deferred, context.isFullContainerReportReady(rpcEndpoint.getAddress()));
       assertFalse(context.isFullContainerReportReady(otherScm));
-      if (finalized) {
+      if (deferred) {
         verify(controller, never()).getContainerReport();
       } else {
         verify(controller).getContainerReport();
@@ -570,8 +573,8 @@ public class TestEndPoint {
       verify(scm, never()).sendHeartbeat(any());
     }
 
-    assertEquals(finalized, containerReport.getValue().getFullContainerReportDeferred());
-    assertEquals(finalized ? 0 : 1, containerReport.getValue().getReportsCount());
+    assertEquals(deferred, containerReport.getValue().getFullContainerReportDeferred());
+    assertEquals(deferred ? 0 : 1, containerReport.getValue().getReportsCount());
   }
 
   @Test
