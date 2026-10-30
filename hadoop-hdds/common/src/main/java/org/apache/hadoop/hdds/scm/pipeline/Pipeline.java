@@ -424,8 +424,9 @@ public final class Pipeline {
 
     for (DatanodeDetails dn : nodeStatus.keySet()) {
       HddsProtos.DatanodeDetailsProto.Builder memberBuilder = dn.toProtoBuilder(clientVersion, filterPorts);
-      if (versionOverride != null) {
-        memberBuilder.setCurrentVersion(versionOverride.apply(dn.getID()).serialize());
+      ComponentVersion override = versionOverride == null ? null : versionOverride.apply(dn.getID());
+      if (override != null) {
+        memberBuilder.setCurrentVersion(override.serialize());
       }
       members.add(memberBuilder.build());
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
