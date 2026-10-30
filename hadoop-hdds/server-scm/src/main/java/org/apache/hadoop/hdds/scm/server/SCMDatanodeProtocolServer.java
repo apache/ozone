@@ -174,7 +174,8 @@ public class SCMDatanodeProtocolServer implements
     this.scm = scm;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
-    boolean rateLimitEnabled = parseFCRRateLimitEnabled(conf.get(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED));
+    boolean rateLimitEnabled = conf.getBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED,
+        OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT);
     this.fcrLeaseMetrics = scmContext == null
         ? null : SCMFullContainerReportLeaseMetrics.create();
     this.fcrLeaseManager = createFCRLeaseManager(conf);

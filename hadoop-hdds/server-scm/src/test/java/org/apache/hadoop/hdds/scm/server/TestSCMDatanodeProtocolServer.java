@@ -211,12 +211,13 @@ class TestSCMDatanodeProtocolServer {
 
   @ParameterizedTest
   @ValueSource(strings = {"", "flase", "0", "truefalse"})
-  void testMalformedRateLimitSettingRejectedAtStartup(String value) {
+  void testMalformedRateLimitSettingUsesDefaultAtStartup(String value) throws Exception {
     server.stop();
     serverConf.set(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, value);
 
-    assertThrows(IllegalArgumentException.class,
-        () -> new SCMDatanodeProtocolServer(serverConf, scm, publisher, SCMContext.emptyContext()));
+    server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, SCMContext.emptyContext());
+
+    assertGauge("FCRRateLimitEnabled", 1, getMetrics(SCMFullContainerReportLeaseMetrics.class.getSimpleName()));
   }
 
   @ParameterizedTest
