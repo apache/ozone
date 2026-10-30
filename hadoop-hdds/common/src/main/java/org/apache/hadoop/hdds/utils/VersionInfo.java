@@ -67,10 +67,6 @@ public class VersionInfo {
     return info.getProperty("url", "Unknown");
   }
 
-  public String getSrcChecksum() {
-    return info.getProperty("srcChecksum", "Unknown");
-  }
-
   public String getProtoVersions() {
     return info.getProperty("protoVersions", "Unknown");
   }
@@ -80,8 +76,6 @@ public class VersionInfo {
   }
 
   public String getBuildVersion() {
-    return getVersion() +
-        " from " + getRevision() +
-        " source checksum " + getSrcChecksum();
+    return getVersion() + " from " + getRevision();
   }
 }

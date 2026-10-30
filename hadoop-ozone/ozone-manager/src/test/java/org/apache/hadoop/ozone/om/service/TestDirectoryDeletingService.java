@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
@@ -91,6 +92,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePa
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -132,6 +134,9 @@ public class TestDirectoryDeletingService {
     conf.setInt(OZONE_THREAD_NUMBER_DIR_DELETION, threadCount);
     conf.set(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, "4MB");
     conf.setQuietMode(false);
+    // A single-node OM does not need to wait for the default election timeout before electing itself.
+    conf.set(OZONE_OM_HA_PREFIX + "." + RaftServerConfigKeys.Rpc.FIRST_ELECTION_TIMEOUT_MIN_KEY, "100ms");
+    conf.set(OZONE_OM_HA_PREFIX + "." + RaftServerConfigKeys.Rpc.FIRST_ELECTION_TIMEOUT_MAX_KEY, "200ms");
 
     volumeName = String.format("volume01");
     bucketName = String.format("bucket01");
@@ -451,11 +456,9 @@ public class TestDirectoryDeletingService {
   void testPurgeDirectoriesBatching() throws Exception {
     final int ratisLimitBytes = 2304;
 
-    OzoneConfiguration conf = new OzoneConfiguration();
-    ServerUtils.setOzoneMetaDirPath(conf, folder.toFile().toString());
+    OzoneConfiguration conf = createConfAndInitValues(10);
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, ratisLimitBytes, StorageUnit.BYTES);
-    conf.setQuietMode(false);
 
     OmTestManagers managers = new OmTestManagers(conf);
     om = managers.getOzoneManager();
@@ -519,10 +522,8 @@ public class TestDirectoryDeletingService {
   @Test
   @DisplayName("DirectoryDeletingService submits one bucket per PurgeDirectories transaction")
   void testPurgeDirectoriesGroupedByBucketPerTransaction() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    ServerUtils.setOzoneMetaDirPath(conf, folder.toFile().toString());
+    OzoneConfiguration conf = createConfAndInitValues(10);
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
-    conf.setQuietMode(false);
 
     OmTestManagers managers = new OmTestManagers(conf);
     om = managers.getOzoneManager();
