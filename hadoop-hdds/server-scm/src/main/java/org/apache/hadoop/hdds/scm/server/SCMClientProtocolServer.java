@@ -421,6 +421,27 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public List<ContainerInfo> getExistingContainersInBatch(List<Long> containerIDs) throws IOException {
+    Map<String, String> auditMap = Collections.singletonMap("containerIDs", containerIDs.toString());
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), true);
+      List<ContainerInfo> containers = new ArrayList<>();
+      for (Long containerID : containerIDs) {
+        try {
+          containers.add(scm.getContainerManager().getContainer(ContainerID.valueOf(containerID)));
+        } catch (ContainerNotFoundException ex) {
+          LOG.debug("Container {} no longer exists in SCM.", containerID);
+        }
+      }
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.GET_CONTAINER_BATCH, auditMap));
+      return containers;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_CONTAINER_BATCH, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
   public List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
       List<Long> containerIDs) {
     List<ContainerWithPipeline> cpList = new ArrayList<>();

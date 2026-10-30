@@ -24,9 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -37,6 +40,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.hadoop.hdds.HDDSVersion;
@@ -48,12 +52,15 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
@@ -162,6 +169,43 @@ public class TestSCMClientProtocolServer {
       // Test call from a legacy client, which uses a different method of listContainer
       assertEquals(10, scmServer.listContainer(1, 10, null,
           HddsProtos.ReplicationFactor.THREE).getContainerInfoList().size());
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testGetExistingContainersInBatchWithoutPipelines() throws Exception {
+    StorageContainerManager mockScm = mockStorageContainerManager();
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(mockScm.getPipelineManager()).thenReturn(pipelineManager);
+    ContainerInfo info = newContainerInfoForTest();
+    info.setSuppressed(true);
+    when(mockScm.getContainerManager().getContainer(ContainerID.valueOf(1))).thenReturn(info);
+    when(mockScm.getContainerManager().getContainer(ContainerID.valueOf(2)))
+        .thenThrow(new ContainerNotFoundException(ContainerID.valueOf(2)));
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockScm, mock(ReconfigurationHandler.class));
+    try {
+      assertEquals(Collections.singletonList(info), scmServer.getExistingContainersInBatch(Arrays.asList(2L, 1L)));
+      verify(mockScm).checkAdminAccess(any(), eq(true));
+      assertTrue(scmServer.getExistingContainersInBatch(Collections.emptyList()).isEmpty());
+      verifyNoInteractions(pipelineManager);
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testGetExistingContainersInBatchChecksAdminAccess() throws Exception {
+    StorageContainerManager mockScm = mockStorageContainerManager();
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockScm, mock(ReconfigurationHandler.class));
+    doThrow(new AccessControlException("Access denied")).when(mockScm).checkAdminAccess(any(), eq(true));
+    try {
+      assertThrows(AccessControlException.class,
+          () -> scmServer.getExistingContainersInBatch(Arrays.asList(1L, 2L)));
+      verify(mockScm.getContainerManager(), never()).getContainer(any());
     } finally {
       scmServer.stop();
     }

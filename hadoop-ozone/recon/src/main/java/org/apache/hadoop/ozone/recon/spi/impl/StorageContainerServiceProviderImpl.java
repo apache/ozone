@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -115,6 +116,12 @@ public class StorageContainerServiceProviderImpl
     } catch (RemoteException e) {
       throw e.unwrapRemoteException(ContainerNotFoundException.class);
     }
+  }
+
+  @Override
+  public List<ContainerInfo> getExistingContainersInBatch(List<ContainerID> containerIDs) throws IOException {
+    return scmClient.getExistingContainersInBatch(containerIDs.stream().map(ContainerID::getId)
+        .collect(Collectors.toList()));
   }
 
   @Override

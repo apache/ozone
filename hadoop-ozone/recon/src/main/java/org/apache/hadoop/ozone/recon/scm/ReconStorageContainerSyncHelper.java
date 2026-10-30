@@ -31,10 +31,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SC
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -440,37 +438,24 @@ class ReconStorageContainerSyncHelper {
       ContainerID start = ContainerID.valueOf(1);
       int updated = 0;
       while (true) {
-        List<ContainerInfo> containers = containerManager.getContainers(start, batchSize);
-        if (containers.isEmpty()) {
+        List<ContainerID> ids = containerManager.getContainerIDs(start, batchSize, null, null);
+        if (ids.isEmpty()) {
           break;
         }
-        List<Long> ids = new ArrayList<>(containers.size());
-        for (ContainerInfo container : containers) {
-          ids.add(container.getContainerID());
-        }
-        Map<ContainerID, ContainerInfo> scmContainers = new HashMap<>();
-        for (ContainerWithPipeline container : scmServiceProvider.getExistContainerWithPipelinesInBatch(ids)) {
-          ContainerInfo info = container.getContainerInfo();
-          scmContainers.put(info.containerID(), info);
-        }
-        for (ContainerInfo container : containers) {
-          ContainerID id = container.containerID();
+        for (ContainerInfo scmContainer : scmServiceProvider.getExistingContainersInBatch(ids)) {
+          ContainerID id = scmContainer.containerID();
           try {
-            ContainerInfo scmContainer = scmContainers.get(id);
-            if (scmContainer == null) {
-              // The batch RPC omits containers whose pipeline cannot be resolved.
-              scmContainer = scmServiceProvider.getContainerInfo(id.getId());
-            }
+            ContainerInfo container = containerManager.getContainer(id);
             if (container.isSuppressed() != scmContainer.isSuppressed()) {
               containerManager.updateContainerInfo(id,
                   container.getProtobuf().toBuilder().setSuppressed(scmContainer.isSuppressed()).build());
               updated++;
             }
           } catch (ContainerNotFoundException e) {
-            LOG.debug("Container {} vanished from SCM or Recon during suppressed flag sync.", id);
+            LOG.debug("Container {} vanished from Recon during suppressed flag sync.", id);
           }
         }
-        start = ContainerID.valueOf(containers.get(containers.size() - 1).getContainerID() + 1);
+        start = ContainerID.valueOf(ids.get(ids.size() - 1).getId() + 1);
       }
       LOG.info("Suppressed flag sync complete, updated {}.", updated);
       return true;

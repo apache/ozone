@@ -62,6 +62,12 @@ public interface StorageContainerServiceProvider {
   ContainerInfo getContainerInfo(long containerId) throws IOException;
 
   /**
+   * Returns metadata for existing containers without resolving their pipelines.
+   * @throws IOException if the SCM RPC call fails
+   */
+  List<ContainerInfo> getExistingContainersInBatch(List<ContainerID> containerIDs) throws IOException;
+
+  /**
    * Requests SCM for which containers in given ID list.
    * @param containerIDs containerId list
    * @return list of ContainerInfo + Pipeline info exists in SCM
