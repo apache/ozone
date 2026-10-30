@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.protocol;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -30,11 +31,17 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * The protocol spoken between datanodes and SCM. For specifics please the
  * Protoc file that defines this protocol.
+ * Service authorization reads {@link KerberosInfo} here, since this is the {@code ProtocolInfo} name of the PB protocol.
  */
+@KerberosInfo(
+    serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
+    clientPrincipal = HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public interface StorageContainerDatanodeProtocol {
 
