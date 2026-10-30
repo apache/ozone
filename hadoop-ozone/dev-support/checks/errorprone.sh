@@ -29,7 +29,7 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 DIAGNOSTIC_FILE="$REPORT_DIR/diagnostics.txt"
 OUTPUT_LOG=$(mktemp)
 
-MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon -DskipShade -DskipTests'
+MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipRecon -DskipShade -DskipTests'
 MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 MAVEN_DIAGNOSTIC_PATTERN='^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
 JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'

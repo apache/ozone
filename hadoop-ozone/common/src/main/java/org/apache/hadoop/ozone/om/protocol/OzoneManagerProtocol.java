@@ -922,6 +922,7 @@ public interface OzoneManagerProtocol
    * @param toSnapshot The name of the ending snapshot
    * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @param orderedReport when true, FSO diff reports apply dependency ordering
    * @return the result of submitting snapshot diff job.
    * @throws IOException in case of any exception while generating snapshot diff
    */
@@ -930,7 +931,8 @@ public interface OzoneManagerProtocol
                                                 String fromSnapshot,
                                                 String toSnapshot,
                                                 boolean forceFullDiff,
-                                                boolean disableNativeDiff)
+                                                boolean disableNativeDiff,
+                                                boolean orderedReport)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

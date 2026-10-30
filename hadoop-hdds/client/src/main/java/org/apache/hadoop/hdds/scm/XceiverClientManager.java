@@ -32,10 +32,17 @@ import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
@@ -51,6 +58,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.ConcurrentUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +84,9 @@ public class XceiverClientManager extends XceiverClientCreator {
   private final CacheMetrics cacheMetrics;
   private static XceiverClientMetrics metrics;
   private final ConcurrentHashMap<String, DatanodeDetails> localDNCache;
+  /** Unreferenced clients evicted by {@link #close()}, to be closed by it; guarded by {@link #clientCache}. */
+  private List<XceiverClientSpi> clientsToClose;
+  private final ExecutorService closeExecutor;
 
   /**
    * Creates a new XceiverClientManager for non secured ozone cluster.
@@ -96,6 +107,9 @@ public class XceiverClientManager extends XceiverClientCreator {
     Objects.requireNonNull(conf, "conf == null");
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
 
+    // at most one thread, which exits when idle
+    this.closeExecutor = new ThreadPoolExecutor(0, 1, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
+        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("XceiverClientManager-close-%d").build());
     this.clientCache = CacheBuilder.newBuilder()
         .recordStats()
         .expireAfterAccess(staleThresholdMs, MILLISECONDS)
@@ -109,7 +123,13 @@ public class XceiverClientManager extends XceiverClientCreator {
               synchronized (clientCache) {
                 // Mark the entry as evicted
                 XceiverClientSpi info = removalNotification.getValue();
-                info.setEvicted();
+                if (info.setEvicted()) {
+                  if (clientsToClose == null) {
+                    closeAsync(info);
+                  } else {
+                    clientsToClose.add(info);
+                  }
+                }
               }
             }
           }).build();
@@ -190,7 +210,9 @@ public class XceiverClientManager extends XceiverClientCreator {
       boolean topologyAware) {
     Objects.requireNonNull(client, "client == null");
     synchronized (clientCache) {
-      client.decrementReference();
+      if (client.decrementReference()) {
+        closeAsync(client);
+      }
       if (invalidateClient) {
         Pipeline pipeline = client.getPipeline();
         String key = getPipelineCacheKey(pipeline, topologyAware, client instanceof XceiverClientShortCircuit);
@@ -199,6 +221,27 @@ public class XceiverClientManager extends XceiverClientCreator {
           clientCache.invalidate(key);
         }
       }
+    }
+  }
+
+  /**
+   * Closes the client on a background thread. Closing can wait several seconds for channel termination,
+   * so it should not run on the caller thread, which holds the clientCache lock.
+   */
+  private void closeAsync(XceiverClientSpi client) {
+    try {
+      closeExecutor.execute(() -> closeAndLog(client));
+    } catch (RejectedExecutionException e) {
+      // this manager is already closed
+      closeAndLog(client);
+    }
+  }
+
+  private static void closeAndLog(XceiverClientSpi client) {
+    try {
+      client.close();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to close client for pipeline {}", client.getPipeline(), e);
     }
   }
 
@@ -296,9 +339,19 @@ public class XceiverClientManager extends XceiverClientCreator {
   public void close() {
     super.close();
     cleanupExecutor.shutdown();
-    //closing is done through RemovalListener
-    clientCache.invalidateAll();
-    clientCache.cleanUp();
+    final List<XceiverClientSpi> unreferenced = new ArrayList<>();
+    synchronized (clientCache) {
+      // the RemovalListener collects the unreferenced clients instead of closing them one by one
+      clientsToClose = unreferenced;
+      try {
+        clientCache.invalidateAll();
+        clientCache.cleanUp();
+      } finally {
+        clientsToClose = null;
+      }
+    }
+    closeInParallel(unreferenced);
+    ConcurrentUtils.shutdownAndWait(closeExecutor);
     if (LOG.isDebugEnabled()) {
       LOG.debug("XceiverClient cache stats: {}", clientCache.stats());
     }
@@ -307,6 +360,27 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     if (metrics != null) {
       metrics.unRegister();
+    }
+  }
+
+  /**
+   * Close the clients concurrently. Closing a Ratis client can wait seconds for its gRPC channels to shut down
+   * gracefully, and closing the clients one after another adds those waits up (HDDS-15255).
+   */
+  private static void closeInParallel(List<XceiverClientSpi> clients) {
+    if (clients.size() <= 1) {
+      clients.forEach(XceiverClientManager::closeAndLog);
+      return;
+    }
+    // one thread per client, so all the waits overlap; the cache size bounds the number of clients
+    final ExecutorService executor = Executors.newFixedThreadPool(clients.size(),
+        new ThreadFactoryBuilder().setNameFormat("XceiverClientManager-close-%d").setDaemon(true).build());
+    try {
+      CompletableFuture.allOf(clients.stream()
+          .map(client -> CompletableFuture.runAsync(() -> closeAndLog(client), executor))
+          .toArray(CompletableFuture[]::new)).join();
+    } finally {
+      executor.shutdown();
     }
   }
 

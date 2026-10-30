@@ -71,7 +71,8 @@ class TestXceiverClientManagerIdleEviction {
       Thread.sleep(2 * IDLE_THRESHOLD_MS);
 
       manager.getClientCache().cleanUp();
-      assertTrue(client.isClosed());
+      // evicted clients are closed in the background (HDDS-16812)
+      GenericTestUtils.waitFor(client::isClosed, 10, WAIT_MS);
     }
   }
 
@@ -85,7 +86,7 @@ class TestXceiverClientManagerIdleEviction {
       // expired, but still referenced, so it must stay open until it is released
       assertFalse(client.isClosed());
       manager.releaseClient(client, false);
-      assertTrue(client.isClosed());
+      GenericTestUtils.waitFor(client::isClosed, 10, WAIT_MS);
     }
   }
 
