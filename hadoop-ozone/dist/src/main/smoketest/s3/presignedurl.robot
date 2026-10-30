@@ -47,8 +47,21 @@ Presigned URL PUT Object using wrong x-amz-content-sha256
     ${ACCESS_KEY} =          Execute    aws configure get aws_access_key_id
     ${SECRET_ACCESS_KEY} =   Execute    aws configure get aws_secret_access_key
     ${presigned_url}=        Generate Presigned Put Object Url    ${ACCESS_KEY}    ${SECRET_ACCESS_KEY}    ${BUCKET}    test-presigned-put-wrong-sha    us-east-1    3600    ${EMPTY}    ${ENDPOINT_URL}
-    ${result} =              Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: wronghash" "${presigned_url}"
+    ${result} =              Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: 0000000000000000000000000000000000000000000000000000000000000000" "${presigned_url}"
+    Should Contain           ${result}    <Code>XAmzContentSHA256Mismatch</Code>
     Should Contain           ${result}    The provided 'x-amz-content-sha256' header does not match the computed hash.
     ${head_result} =         Execute AWSS3APICli and ignore error    head-object --bucket ${BUCKET} --key test-presigned-put-wrong-sha
+    Should contain           ${head_result}    404
+    Should contain           ${head_result}    Not Found
+
+Presigned URL PUT Object using malformed x-amz-content-sha256
+    [Documentation]    Test presigned URL PUT object with malformed x-amz-content-sha256
+    Execute                  echo "Randomtext" > /tmp/testfile
+    ${ACCESS_KEY} =          Execute    aws configure get aws_access_key_id
+    ${SECRET_ACCESS_KEY} =   Execute    aws configure get aws_secret_access_key
+    ${presigned_url}=        Generate Presigned Put Object Url    ${ACCESS_KEY}    ${SECRET_ACCESS_KEY}    ${BUCKET}    test-presigned-put-malformed-sha    us-east-1    3600    ${EMPTY}    ${ENDPOINT_URL}
+    ${result} =              Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: wronghash" "${presigned_url}"
+    Should Contain           ${result}    <Code>InvalidArgument</Code>
+    ${head_result} =         Execute AWSS3APICli and ignore error    head-object --bucket ${BUCKET} --key test-presigned-put-malformed-sha
     Should contain           ${head_result}    404
     Should contain           ${head_result}    Not Found
