@@ -35,7 +35,6 @@
     <module>container-service</module>
     <module>crypto-api</module>
     <module>crypto-default</module>
-    <module>docs</module>
     <module>erasurecode</module>
     <module>framework</module>
     <module>hadoop-dependency-client</module>

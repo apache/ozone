@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.function.DoubleConsumer;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -57,6 +58,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
  */
 public class FullDiffSequentialReader {
 
+  private static final double TO_TABLE_PROGRESS_END = 0.5;
+
   private final SnapDiffJobStore store;
   private final long updateIdGate;
   private final boolean gatingEnabled;
@@ -87,9 +90,10 @@ public class FullDiffSequentialReader {
    * @param keyPrefix optional bucket prefix as stored in RocksDB; {@code null} scans the full table
    */
   public void scanFileTables(Table<byte[], byte[]> fromTable,
-      Table<byte[], byte[]> toTable, byte[] keyPrefix) throws IOException {
-    scanToTable(toTable, keyPrefix, false);
-    scanFromTable(fromTable, keyPrefix, false);
+      Table<byte[], byte[]> toTable, byte[] keyPrefix, DoubleConsumer progress,
+      long estimatedToTableKeys, long estimatedFromTableKeys) throws IOException {
+    scanToTable(toTable, keyPrefix, false, progress, estimatedToTableKeys);
+    scanFromTable(fromTable, keyPrefix, false, progress, estimatedFromTableKeys);
   }
 
   /**
@@ -100,39 +104,58 @@ public class FullDiffSequentialReader {
    * @param keyPrefix optional bucket prefix as stored in RocksDB; {@code null} scans the full table
    */
   public void scanDirectoryTables(Table<byte[], byte[]> fromTable,
-      Table<byte[], byte[]> toTable, byte[] keyPrefix) throws IOException {
-    scanToTable(toTable, keyPrefix, true);
-    scanFromTable(fromTable, keyPrefix, true);
+      Table<byte[], byte[]> toTable, byte[] keyPrefix, DoubleConsumer progress,
+      long estimatedToTableKeys, long estimatedFromTableKeys) throws IOException {
+    scanToTable(toTable, keyPrefix, true, progress, estimatedToTableKeys);
+    scanFromTable(fromTable, keyPrefix, true, progress, estimatedFromTableKeys);
   }
 
-  private void scanToTable(Table<byte[], byte[]> table, byte[] keyPrefix, boolean isDir)
-      throws IOException {
+  private void scanToTable(Table<byte[], byte[]> table, byte[] keyPrefix, boolean isDir,
+      DoubleConsumer progress, long estimatedTableKeys) throws IOException {
+    long processedRows = 0L;
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     try (Table.KeyValueIterator<byte[], byte[]> iter =
         table.iterator(keyPrefix, IteratorType.VALUE_ONLY)) {
       while (iter.hasNext()) {
         byte[] value = iter.next().getValue();
         processToSideEntry(value, isDir);
+        processedRows++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(progress, 0.0, TO_TABLE_PROGRESS_END,
+            processedRows, estimatedTableKeys, checkpoint);
       }
     } catch (RocksDatabaseException | CodecException e) {
       throw new IOException(e);
     }
     store.flushWrites();
+    if (progress != null) {
+      progress.accept(TO_TABLE_PROGRESS_END);
+    }
   }
 
-  private void scanFromTable(Table<byte[], byte[]> table, byte[] keyPrefix, boolean isDir)
-      throws IOException {
+  private void scanFromTable(Table<byte[], byte[]> table, byte[] keyPrefix, boolean isDir,
+      DoubleConsumer progress, long estimatedTableKeys) throws IOException {
     store.flushWrites();
+    long processedRows = 0L;
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     try (Table.KeyValueIterator<byte[], byte[]> iter =
         table.iterator(keyPrefix, IteratorType.VALUE_ONLY)) {
       while (iter.hasNext()) {
         byte[] value = iter.next().getValue();
         processFromSideEntry(value, isDir);
+        processedRows++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(progress, TO_TABLE_PROGRESS_END, 1.0,
+            processedRows, estimatedTableKeys, checkpoint);
       }
     } catch (RocksDatabaseException | CodecException e) {
       throw new IOException(e);
     }
     store.clearDiffCandidates();
     store.flushWrites();
+    if (progress != null) {
+      progress.accept(1.0);
+    }
   }
 
   private void processToSideEntry(byte[] value, boolean isDir) throws IOException {
