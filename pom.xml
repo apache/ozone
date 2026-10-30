@@ -1214,11 +1214,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-docs</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-erasurecode</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -2971,7 +2966,6 @@
         <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodepnpm>true</skip.installnodepnpm>
         <skip.pnpm>true</skip.pnpm>
-        <skipDocs>true</skipDocs>
         <test>void</test>
       </properties>
     </profile>
