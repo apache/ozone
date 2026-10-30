@@ -23,6 +23,7 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Set;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -89,12 +90,14 @@ public class OMExecutionFlow {
           OMAuditLogger.log(omClientRequest.getAuditBuilder());
           omClientRequest.handleRequestFailure(ozoneManager);
         }
+        TracingUtil.recordExceptionInCurrentSpan(ex);
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
     } else {
       try {
         requestToSubmit = captureReadContext(request);
       } catch (IOException ex) {
+        TracingUtil.recordExceptionInCurrentSpan(ex);
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
     }

@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -473,6 +474,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       }
       responseBuilder.setSuccess(true);
     } catch (IOException ex) {
+      TracingUtil.recordExceptionInCurrentSpan(ex);
       responseBuilder.setSuccess(false);
       responseBuilder.setStatus(exceptionToResponseStatus(ex));
       if (ex.getMessage() != null) {
