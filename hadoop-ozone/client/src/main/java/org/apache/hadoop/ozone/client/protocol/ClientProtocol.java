@@ -1734,7 +1734,7 @@ public interface ClientProtocol {
 
   /**
    * Gets the tags for an existing key.
-   * @param volumeName Volume name.
+   * @param volumeName Volume name, or null to resolve it from the S3 request context.
    * @param bucketName Bucket name.
    * @param keyName Key name.
    * @return tags for the specified key.

@@ -378,13 +378,6 @@ final class S3ClientProtocol implements ClientProtocol {
     delegate.deleteKey(resolveVolumeName(volumeName), bucketName, keyName, recursive, expectedETag);
   }
 
-  private String resolveVolumeName(String volumeName) throws IOException {
-    if (volumeName != null || OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(delegate.getOmVersion())) {
-      return volumeName;
-    }
-    return delegate.getS3VolumeContext().getOmVolumeArgs().getVolume();
-  }
-
   @Override
   public void deleteKeys(String volumeName, String bucketName, List<String> keyNameList) throws IOException {
     delegate.deleteKeys(volumeName, bucketName, keyNameList);
@@ -895,8 +888,18 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    return delegate.getObjectTagging(volumeName, bucketName, keyName);
+  public Map<String, String> getObjectTagging(
+      String volumeName, String bucketName, String keyName) throws IOException {
+    return delegate.getObjectTagging(
+        resolveVolumeName(volumeName), bucketName, keyName);
+  }
+
+  private String resolveVolumeName(String volumeName) throws IOException {
+    if (volumeName != null || OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION
+        .isSupportedBy(delegate.getOmVersion())) {
+      return volumeName;
+    }
+    return delegate.getS3VolumeContext().getOmVolumeArgs().getVolume();
   }
 
   @Override

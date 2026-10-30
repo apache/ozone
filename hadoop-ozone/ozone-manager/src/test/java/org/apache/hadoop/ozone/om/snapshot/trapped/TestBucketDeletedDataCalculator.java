@@ -135,6 +135,8 @@ public class TestBucketDeletedDataCalculator extends SnapshotRequestAndResponseT
     assertTrue(stats.getPurgeableBytes() > 0L);
     assertEquals(1L, stats.getPurgeableKeys());
     assertEquals(0L, stats.getPurgeableDirs());
+    assertEquals(stats.getPurgeableBytes(), stats.getPurgeableKeyBytes());
+    assertEquals(0L, stats.getPurgeableDirBytes());
   }
 
   @Test
@@ -238,6 +240,8 @@ public class TestBucketDeletedDataCalculator extends SnapshotRequestAndResponseT
     assertEquals(1L, stats.getPurgeableKeys());
     assertEquals(0L, stats.getSnapshotTrappedDirs());
     assertEquals(1L, stats.getPurgeableDirs());
+    assertEquals(0L, stats.getPurgeableKeyBytes());
+    assertEquals(subFileInfo.getReplicatedSize(), stats.getPurgeableDirBytes());
   }
 }
 

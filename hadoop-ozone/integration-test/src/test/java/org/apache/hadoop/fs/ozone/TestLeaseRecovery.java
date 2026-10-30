@@ -483,6 +483,8 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
       om.restart();
       cluster.waitForClusterToBeReady();
+      // the client retries only a few times, so wait until OM can serve requests
+      GenericTestUtils.waitFor(om::isLeaderReady, 100, 10000);
       assertTrue(fs.recoverLease(file));
     }
   }

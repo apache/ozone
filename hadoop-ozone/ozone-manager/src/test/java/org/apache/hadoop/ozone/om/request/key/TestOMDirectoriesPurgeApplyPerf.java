@@ -65,7 +65,7 @@ import org.slf4j.event.Level;
  * <p>The {@code benchmark} tag is excluded from {@code mvn test} and CI by default, so it must be re-enabled
  * explicitly to run on demand:
  * <pre>
- *   mvn -pl :ozone-manager test -DskipShade -DskipRecon -DskipDocs \
+ *   mvn -pl :ozone-manager test -DskipShade -DskipRecon \
  *     -Dtest=TestOMDirectoriesPurgeApplyPerf -Dgroups=benchmark -Dexcluded-test-groups= \
  *     -Dsurefire.failIfNoSpecifiedTests=false
  * </pre>
