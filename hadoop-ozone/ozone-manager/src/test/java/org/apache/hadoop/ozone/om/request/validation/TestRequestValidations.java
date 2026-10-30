@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -95,6 +96,18 @@ public class TestRequestValidations {
           .load()
           .validateRequest(aCreateKeyRequest(currentClientVersion()));
     });
+  }
+
+  @Test
+  public void testOlderClientConditionsByClientVersion() {
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
+    int bucketLayoutClient = ClientVersion.BUCKET_LAYOUT_SUPPORT.serialize();
+    assertTrue(ValidationCondition.OLDER_CLIENT_REQUESTS.shouldApply(aCreateKeyRequest(bucketLayoutClient - 1), ctx));
+    assertFalse(ValidationCondition.OLDER_CLIENT_REQUESTS.shouldApply(aCreateKeyRequest(bucketLayoutClient), ctx));
+    assertTrue(ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT.shouldApply(
+        aCreateKeyRequest(bucketLayoutClient), ctx));
+    assertFalse(ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT.shouldApply(
+        aCreateKeyRequest(currentClientVersion()), ctx));
   }
 
   @Test
@@ -284,7 +297,7 @@ public class TestRequestValidations {
   }
 
   private int olderClientVersion() {
-    return ClientVersion.CURRENT.serialize() - 1;
+    return ClientVersion.BUCKET_LAYOUT_SUPPORT.serialize() - 1;
   }
 
   private int currentClientVersion() {

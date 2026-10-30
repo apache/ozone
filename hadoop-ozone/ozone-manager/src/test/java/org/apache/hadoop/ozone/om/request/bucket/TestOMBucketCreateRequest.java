@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -96,6 +97,32 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     when(ozoneManager.isStrictS3()).thenReturn(false);
 
     doPreExecute("volume1", bucketName);
+  }
+
+  @Test
+  public void preExecuteAllowsCreateAfterDeleteAtBucketLimit() throws Exception {
+    ozoneManager.getConfiguration().setInt(OMConfigKeys.OZONE_OM_MAX_BUCKET, 1);
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName, bucketName);
+    doValidateAndUpdateCache(volumeName, bucketName, omBucketCreateRequest.getOmRequest());
+
+    OMRequest deleteRequest = OMRequest.newBuilder().setDeleteBucketRequest(
+        DeleteBucketRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName))
+        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
+        .setClientId(UUID.randomUUID().toString()).build();
+    new OMBucketDeleteRequest(deleteRequest).validateAndUpdateCache(ozoneManager, 2);
+
+    assertNull(omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName)));
+    assertEquals(1, omMetadataManager.getBucketTable().getEstimatedKeyCount());
+    assertEquals(0, omMetadataManager.countLiveBuckets());
+
+    String newVolumeName = UUID.randomUUID().toString();
+    String newBucketName = UUID.randomUUID().toString();
+    doPreExecute(newVolumeName, newBucketName);
   }
 
   @Test

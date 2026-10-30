@@ -129,16 +129,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     this.retryPolicy = getReadRetryPolicy(config);
   }
 
-  // only for unit tests
-  public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
-                          Token<OzoneBlockTokenIdentifier> token,
-                          XceiverClientFactory xceiverClientFactory,
-                          OzoneClientConfig config
-  ) throws IOException {
-    this(new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockId).setLength(blockLen)),
-        pipeline, token, xceiverClientFactory, null, config);
-  }
-
   /**
    * Initialize the BlockInputStream. Get the BlockData (list of chunks) from
    * the Container and create the ChunkInputStreams for each Chunk in the Block.

@@ -166,7 +166,6 @@ public class TestContainerStateMachineFailures {
     conf.setFromObject(raftClientConfig);
 
     conf.setLong(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
-    conf.setQuietMode(false);
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10)
             .build();

@@ -259,7 +259,7 @@ public class BucketDeletedDataCalculator {
         boolean fileReclaimable = currentDirReclaimable
             || reclaimableKeyFilter.apply(Table.newKeyValue("", subFile));
         if (fileReclaimable) {
-          totals.addPurgeableKey(subFile.getReplicatedSize());
+          totals.addPurgeableDirFile(subFile.getReplicatedSize());
         } else {
           totals.addSnapshotTrappedKey(subFile.getReplicatedSize());
         }
@@ -318,6 +318,8 @@ public class BucketDeletedDataCalculator {
     private long purgeableKeys;
     private long snapshotTrappedDirs;
     private long purgeableDirs;
+    private long purgeableKeyBytes;
+    private long purgeableDirBytes;
 
     public long getSnapshotTrappedBytes() {
       return snapshotTrappedBytes;
@@ -343,6 +345,16 @@ public class BucketDeletedDataCalculator {
       return purgeableDirs;
     }
 
+    /** Purgeable bytes of entries in the deleted table. */
+    public long getPurgeableKeyBytes() {
+      return purgeableKeyBytes;
+    }
+
+    /** Purgeable bytes of files found under deleted directories. */
+    public long getPurgeableDirBytes() {
+      return purgeableDirBytes;
+    }
+
     public void addSnapshotTrappedBytes(long value) {
       snapshotTrappedBytes += value;
     }
@@ -358,6 +370,13 @@ public class BucketDeletedDataCalculator {
 
     public void addPurgeableKey(long bytes) {
       addPurgeableBytes(bytes);
+      purgeableKeyBytes += bytes;
+      purgeableKeys++;
+    }
+
+    public void addPurgeableDirFile(long bytes) {
+      addPurgeableBytes(bytes);
+      purgeableDirBytes += bytes;
       purgeableKeys++;
     }
 
