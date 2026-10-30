@@ -52,6 +52,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   private final boolean latestVersionLocation;
   private final boolean recursive;
   private final boolean headOp;
+  private final boolean assumeS3Context;
   private final boolean forceUpdateContainerCacheFromSCM;
   private final ImmutableMap<String, String> tags;
   // expectedDataGeneration, when used in key creation indicates that a
@@ -64,10 +65,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // Original S3/list prefix when keyName is empty (root listing). Used for STS
   // auth to check LIST on this prefix instead of "*".
   private final String listPrefix;
-  // Set by file system clients so that OM rejects a listing on an
-  // OBJECT_STORE bucket.
+  // Set by file system clients so that OM rejects a listing or a key info
+  // read on an OBJECT_STORE bucket.
   private final boolean requireFileSystemLayout;
   private final String expectedETag;
+  private final String excludedETag;
   private final boolean derivedKeyPiggyBacking;
 
   private OmKeyArgs(Builder b) {
@@ -86,6 +88,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.latestVersionLocation = b.latestVersionLocation;
     this.recursive = b.recursive;
     this.headOp = b.headOp;
+    this.assumeS3Context = b.assumeS3Context;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
@@ -93,6 +96,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.listPrefix = b.listPrefix;
     this.requireFileSystemLayout = b.requireFileSystemLayout;
     this.expectedETag = b.expectedETag;
+    this.excludedETag = b.excludedETag;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
   }
 
@@ -164,6 +168,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return headOp;
   }
 
+  public boolean isAssumeS3Context() {
+    return assumeS3Context;
+  }
+
   public boolean isForceUpdateContainerCacheFromSCM() {
     return forceUpdateContainerCacheFromSCM;
   }
@@ -194,6 +202,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
   public String getExpectedETag() {
     return expectedETag;
+  }
+
+  public String getExcludedETag() {
+    return excludedETag;
   }
 
   public boolean isDerivedKeyPiggyBacking() {
@@ -248,6 +260,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     if (expectedETag != null) {
       builder.setExpectedETag(expectedETag);
     }
+    if (excludedETag != null) {
+      builder.setExcludedETag(excludedETag);
+    }
     return builder.build();
   }
 
@@ -270,12 +285,14 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private final AclListBuilder acls;
     private boolean recursive;
     private boolean headOp;
+    private boolean assumeS3Context;
     private boolean forceUpdateContainerCacheFromSCM;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
     private String listPrefix = null;
     private boolean requireFileSystemLayout;
     private String expectedETag;
+    private String excludedETag;
     private boolean derivedKeyPiggyBacking;
 
     public Builder() {
@@ -319,10 +336,12 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.latestVersionLocation = obj.latestVersionLocation;
       this.recursive = obj.recursive;
       this.headOp = obj.headOp;
+      this.assumeS3Context = obj.assumeS3Context;
       this.forceUpdateContainerCacheFromSCM =
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
+      this.excludedETag = obj.excludedETag;
       this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
@@ -451,6 +470,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    public Builder setAssumeS3Context(boolean assumeS3Context) {
+      this.assumeS3Context = assumeS3Context;
+      return this;
+    }
+
     public Builder setForceUpdateContainerCacheFromSCM(boolean value) {
       this.forceUpdateContainerCacheFromSCM = value;
       return this;
@@ -473,6 +497,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setExpectedETag(String eTag) {
       this.expectedETag = eTag;
+      return this;
+    }
+
+    public Builder setExcludedETag(String eTag) {
+      this.excludedETag = eTag;
       return this;
     }
 

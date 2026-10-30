@@ -78,7 +78,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
@@ -119,6 +118,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
@@ -252,6 +252,8 @@ class TestKeyDeletingService extends OzoneTestBase {
           () -> getDeletedKeyCount() >= initialDeletedCount + keyCount,
           100, 10000);
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
+      // deletedKeyCount is updated once the purge request is applied, before the double buffer flushes it to the DB.
+      om.awaitDoubleBufferFlush();
       try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
           keyManager, om.getMetadataManager().getLock())) {
@@ -432,6 +434,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 100000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
+      om.awaitDoubleBufferFlush();
       try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
           keyManager, om.getMetadataManager().getLock())) {

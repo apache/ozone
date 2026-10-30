@@ -1221,7 +1221,11 @@
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
-      The heartbeat interval from a Datanode to Recon.
+      The heartbeat interval from a Datanode to Recon. The Datanode sends
+      the heartbeat to Recon together with a heartbeat to SCM, so the
+      interval is at least hdds.heartbeat.interval. It is at most a third
+      of ozone.scm.stale.node.interval, so that Recon does not mark the
+      Datanode as stale.
     </description>
   </property>
   <property>
@@ -4351,7 +4355,8 @@
     <value>5s</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The minimum timeout duration for SCM ratis leader
-      election. Default is 1s.</description>
+      election. Default is 5s. It is used as raft.server.rpc.timeout.min of SCM's Ratis server,
+      and raft.server.rpc.timeout.max is set to this value plus 200ms.</description>
   </property>
   <property>
     <name>ozone.scm.ha.raft.server.rpc.first-election.timeout</name>

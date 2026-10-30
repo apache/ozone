@@ -312,6 +312,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
@@ -594,6 +595,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_BLACKLIST_GROUPS, this::reconfOzoneBlacklistGroups)
             .register(OZONE_READ_BLACKLIST_USERS, this::reconfOzoneReadBlacklistUsers)
             .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
+    KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES.forEach(property ->
+        reconfigurationHandler.register(property, newVal -> validateKeyLifecycleProperty(property, newVal)));
+    reconfigurationHandler.registerCompleteCallback(this::reconfKeyLifecycleService);
 
     // Allow dynamic SCM node/address reconfiguration without restarting OM.
     // Address keys use prefix matching to discover new nodes added after startup.
@@ -767,8 +771,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
 
     metrics = OMMetrics.create(conf);
-
-    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create(getOMServiceId(),
+        getOMNodeId());
     perfMetrics = OMPerformanceMetrics.register();
     omDeletionMetrics = DeletingServiceMetrics.create();
     // Get admin list
@@ -829,7 +833,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omState = State.INITIALIZED;
     }
 
-    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager);
+    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager,
+        getOMServiceId(), getOMNodeId());
     bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
     omHostName = HddsUtils.getHostName(conf);
   }
@@ -1957,13 +1962,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     checkAdminUserPrivilege("get bucket deleted bytes.");
     BucketDeletedDataCalculator.BucketDeletedBytesStats stats =
         calculateDeletedBytesForBucket(bucketPath);
-    return new BucketDeletedBytes(
-        stats.getSnapshotTrappedBytes(),
-        stats.getPurgeableBytes(),
-        stats.getSnapshotTrappedKeys(),
-        stats.getPurgeableKeys(),
-        stats.getSnapshotTrappedDirs(),
-        stats.getPurgeableDirs());
+    return BucketDeletedBytes.newBuilder()
+        .setSnapshotTrappedBytes(stats.getSnapshotTrappedBytes())
+        .setPurgeableBytes(stats.getPurgeableBytes())
+        .setSnapshotTrappedKeys(stats.getSnapshotTrappedKeys())
+        .setPurgeableKeys(stats.getPurgeableKeys())
+        .setSnapshotTrappedDirs(stats.getSnapshotTrappedDirs())
+        .setPurgeableDirs(stats.getPurgeableDirs())
+        .setPurgeableKeyBytes(stats.getPurgeableKeyBytes())
+        .setPurgeableDirBytes(stats.getPurgeableDirBytes())
+        .build();
   }
 
   /**
@@ -2129,6 +2137,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
+    omSnapshotIntMetrics.register();
 
     instantiateServices(false);
 
@@ -2638,6 +2647,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       serviceManager.stop();
       DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
+      omSnapshotIntMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
       if (certClient != null) {
@@ -4515,6 +4525,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
           Integer.toString(partNumberMarker));
       auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
+      OMMultipartUploadUtils.validateUploadId(uploadID);
 
       if (getAclsEnabled()) {
         omMetadataReader.checkAcls(
@@ -5796,8 +5807,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public Map<String, String> getObjectTagging(final OmKeyArgs args)
       throws IOException {
-    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader = getReader(args)) {
-      return rcReader.get().getObjectTagging(args);
+    OmKeyArgs keyArgs = args;
+    if (args.isAssumeS3Context()) {
+      keyArgs = args.toBuilder().setVolumeName(
+          getS3VolumeContext(true).getOmVolumeArgs().getVolume()).build();
+    }
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader = getReader(keyArgs)) {
+      return rcReader.get().getObjectTagging(keyArgs);
     }
   }
 
@@ -5945,8 +5961,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -5987,8 +6002,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -6029,8 +6043,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
       if (getAclsEnabled()) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+        checkSnapshotDiffAcls(resolvedBucket);
       }
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
@@ -6047,6 +6060,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             auditMap));
       }
     }
+  }
+
+  /**
+   * Snapshot diff reads snapshot info, as getSnapshotInfo does, and lists key names, as listKeys does.
+   */
+  private void checkSnapshotDiffAcls(ResolvedBucket resolvedBucket) throws IOException {
+    omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
   }
 
   @Override
@@ -6252,6 +6275,30 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
     return newVal;
+  }
+
+  private String validateKeyLifecycleProperty(String property, String newVal) {
+    OzoneConfiguration newConf = new OzoneConfiguration(getConfiguration());
+    if (newVal == null) {
+      newConf.unset(property);
+    } else {
+      newConf.set(property, newVal);
+    }
+    KeyLifecycleService.validate(newConf);
+    return newVal;
+  }
+
+  /**
+   * Apply all changed KeyLifecycleService properties at once, after each of them is validated and stored
+   * in the OM configuration.
+   */
+  private void reconfKeyLifecycleService(Map<String, Boolean> changedKeys, Configuration newConf) {
+    KeyLifecycleService keyLifecycleService = getKeyManager().getKeyLifecycleService();
+    // If the service is not running, the new values are picked up from the configuration when it is started.
+    if (keyLifecycleService != null
+        && changedKeys.keySet().stream().anyMatch(KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES::contains)) {
+      keyLifecycleService.reconfigure(getConfiguration());
+    }
   }
 
   private String reconfOzoneSnapshotSSTFilteringServiceInterval(String newVal) {

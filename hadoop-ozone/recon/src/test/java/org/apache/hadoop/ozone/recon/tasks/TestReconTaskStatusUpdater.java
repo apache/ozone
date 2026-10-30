@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -33,6 +35,7 @@ import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
+import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -82,6 +85,22 @@ public class TestReconTaskStatusUpdater extends AbstractReconSqlDBTest {
     updater.updateDetails();
 
     verify(reconTaskStatusDaoMock, times(1)).update(any(ReconTaskStatus.class));
+  }
+
+  @Test
+  void testDataAccessExceptionIsNotPropagated() {
+    ReconTaskStatusUpdater realUpdater = new ReconTaskStatusUpdater(reconTaskStatusDaoMock, "task1");
+    when(reconTaskStatusDaoMock.existsById(anyString())).thenReturn(false, true);
+    doThrow(new DataAccessException("Injected failure"))
+        .when(reconTaskStatusDaoMock).insert(any(ReconTaskStatus.class));
+    doThrow(new DataAccessException("Injected failure"))
+        .when(reconTaskStatusDaoMock).update(any(ReconTaskStatus.class));
+
+    assertThatNoException().isThrownBy(realUpdater::recordRunStart);
+    assertThatNoException().isThrownBy(realUpdater::updateDetails);
+    assertThatNoException().isThrownBy(realUpdater::recordRunCompletion);
+    verify(reconTaskStatusDaoMock, times(1)).insert(any(ReconTaskStatus.class));
+    verify(reconTaskStatusDaoMock, times(2)).update(any(ReconTaskStatus.class));
   }
 
   @Test
