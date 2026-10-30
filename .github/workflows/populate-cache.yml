@@ -89,6 +89,7 @@ jobs:
       - name: Get Hadoop
         if: steps.restore-hadoop.outputs.stash-hit != 'true'
         run: |
+          rm -fr ~/.cache/ozone
           source hadoop-ozone/dist/src/main/compose/testlib.sh
           import_keys https://downloads.apache.org/hadoop/common/KEYS
           download_hadoop
@@ -99,6 +100,7 @@ jobs:
         with:
           path: ~/.cache/ozone
           key: hadoop-${{ env.HADOOP_VERSION }}
+          retention-days: 90
 
       - name: Restore Ranger
         id: restore-ranger
@@ -111,6 +113,7 @@ jobs:
       - name: Get Ranger
         if: steps.restore-ranger.outputs.stash-hit != 'true'
         run: |
+          rm -fr ~/.cache/ozone
           source hadoop-ozone/dist/src/main/compose/testlib.sh
           import_keys https://downloads.apache.org/ranger/KEYS
           download_ranger
@@ -122,6 +125,7 @@ jobs:
         with:
           path: ~/.cache/ozone
           key: ranger-${{ env.RANGER_VERSION }}
+          retention-days: 90
 
       - name: Restore NodeJS tarballs
         id: restore-nodejs
