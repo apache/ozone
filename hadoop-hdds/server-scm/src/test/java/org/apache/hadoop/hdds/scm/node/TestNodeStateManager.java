@@ -193,7 +193,7 @@ public class TestNodeStateManager {
       nsm.run();
     }
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertThat(eventPublisher.getEvents()).isEmpty();
+    assertNull(eventPublisher.getLastEvent());
   }
 
   @Test

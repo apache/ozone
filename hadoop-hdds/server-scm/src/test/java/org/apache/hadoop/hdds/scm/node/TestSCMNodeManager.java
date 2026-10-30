@@ -708,10 +708,10 @@ public class TestSCMNodeManager {
    * @throws InterruptedException
    * @throws AuthenticationException
    */
-  @ParameterizedTest
   // Pauses just under and at the stale node interval.
+  @ParameterizedTest
   @ValueSource(ints = {1250, 1500})
-  void testScmHandleJvmPause(int pause) throws Exception {
+  void testScmHandleJvmPause(int pauseMs) throws Exception {
     final int healthCheckInterval = 100; // milliseconds
     final int heartbeatInterval = 500; // milliseconds
     final int heartbeatRpcTimeout = 100; // milliseconds
@@ -751,8 +751,7 @@ public class TestSCMNodeManager {
        * Step 1 : stop heartbeat check process for the pause
        * Step 2 : resume heartbeat check
        * Step 3 : wait for 1 iteration of heartbeat check thread
-       * Step 4 : wait for less than a heartbeat interval and retrieve the
-       * state of all nodes - assert all are HEALTHY
+       * Step 4 : wait for less than a heartbeat interval and retrieve the state of all nodes - assert all are HEALTHY
        * Step 5 : heartbeat for node1
        * [TODO : what if there is scheduling delay of test thread in Step 5?]
        * Step 6 : wait for some time to allow iterations of check process
@@ -765,7 +764,7 @@ public class TestSCMNodeManager {
 
       // Step 1 : stop health check process (simulate JVM pause)
       nodeManager.pauseHealthCheck();
-      Thread.sleep(pause);
+      Thread.sleep(pauseMs);
 
       // Step 2 : resume health check
       assertEquals(0, nodeManager.getSkippedHealthChecks(),
@@ -779,8 +778,8 @@ public class TestSCMNodeManager {
           .withFailMessage("We did not skip any heartbeat checks")
           .isGreaterThan(0);
 
-      // Step 4 : all nodes should still be HEALTHY half a heartbeat interval
-      // after the pause, before node1 is due to heartbeat again.
+      // Step 4 : all nodes should still be HEALTHY half a heartbeat interval after the pause, before node1 is due to
+      // heartbeat again.
       Thread.sleep(heartbeatInterval / 2);
       assertEquals(2, nodeManager.getAllNodes().size());
       assertEquals(2, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));

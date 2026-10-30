@@ -839,9 +839,8 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * if the time since last check can make a node that heartbeats on time look
-   * stale, skip until datanodes had a heartbeat interval and the heartbeat RPC
-   * timeout to heartbeat again, as heartbeats sent during the delay may be lost.
+   * if the time since last check can make a node that heartbeats on time look stale, skip until datanodes have had a
+   * heartbeat interval and the heartbeat RPC timeout to heartbeat again, as heartbeats sent in the delay may be lost.
    * such long delays might be caused by a JVM pause. SCM cannot make reliable
    * conclusions about datanode health in such situations.
    * @return : true indicates skip HB checks
