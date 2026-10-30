@@ -27,7 +27,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -78,7 +78,7 @@ public final class BucketForTesting {
 
   public void writeKey(String key, ReplicationConfig repConfig,
       byte[] inputData) throws IOException {
-    TestDataUtil.createKey(bucket, key, repConfig, inputData);
+    DataTestUtil.createKey(bucket, key, repConfig, inputData);
   }
 
   public byte[] writeRandomBytes(String keyName, int dataLength)

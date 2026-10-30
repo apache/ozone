@@ -21,9 +21,14 @@ import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.KERBEROS;
 import static org.apache.hadoop.security.UserGroupInformation.createRemoteUser;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.apache.hadoop.ipc_.ExternalCall;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterEach;
@@ -34,6 +39,7 @@ class TestS3SecretRequestHelper {
   private static final String TEST_ACCESS_ID = "access/server@EXAMPLE.COM";
   private UserGroupInformation testUgi;
   private UserGroupInformation expectedUgi;
+  private OzoneManager ozoneManager;
 
   @BeforeEach
   void setUp() {
@@ -43,6 +49,7 @@ class TestS3SecretRequestHelper {
                     "DEFAULT");
     testUgi = createRemoteUser(TEST_ACCESS_ID, KERBEROS);
     expectedUgi = createRemoteUser(TEST_ACCESS_ID, KERBEROS);
+    ozoneManager = mock(OzoneManager.class);
   }
 
   @AfterEach
@@ -51,21 +58,33 @@ class TestS3SecretRequestHelper {
   }
 
   @Test
-  void testGettingUgiFromCall() {
+  void testGettingUgiFromCall() throws Exception {
     Server.getCurCall().set(new StubCall(testUgi));
     compareUgi(expectedUgi,
-               S3SecretRequestHelper.getOrCreateUgi(TEST_ACCESS_ID));
+               S3SecretRequestHelper.getOrCreateUgi(ozoneManager, TEST_ACCESS_ID));
   }
 
   @Test
-  void testGettingUgiFromAccessId() {
+  void testGettingUgiFromAccessId() throws Exception {
     compareUgi(expectedUgi,
-               S3SecretRequestHelper.getOrCreateUgi(TEST_ACCESS_ID));
+               S3SecretRequestHelper.getOrCreateUgi(ozoneManager, TEST_ACCESS_ID));
   }
 
   @Test
-  void testGettingUgiWithNoAccessId() {
-    assertNull(S3SecretRequestHelper.getOrCreateUgi(null));
+  void testGettingUgiWithNoAccessId() throws Exception {
+    assertNull(S3SecretRequestHelper.getOrCreateUgi(ozoneManager, null));
+  }
+
+  @Test
+  void testGettingUgiWithSecurityEnabled() throws Exception {
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+
+    OMException e = assertThrows(OMException.class,
+        () -> S3SecretRequestHelper.getOrCreateUgi(ozoneManager, TEST_ACCESS_ID));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
+
+    Server.getCurCall().set(new StubCall(testUgi));
+    compareUgi(expectedUgi, S3SecretRequestHelper.getOrCreateUgi(ozoneManager, TEST_ACCESS_ID));
   }
 
   private static void compareUgi(UserGroupInformation expected,

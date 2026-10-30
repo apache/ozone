@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
@@ -81,12 +82,25 @@ public abstract class Handler {
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
       final ContainerMetrics metrics,
-      IncrementalReportSender<Container> icrSender, ContainerChecksumTreeManager checksumManager) {
+      IncrementalReportSender<Container> icrSender,
+      ContainerChecksumTreeManager checksumManager) {
+    return getHandlerForContainerType(containerType, config, datanodeId, contSet, volumeSet,
+        volumeChoosingPolicy, metrics, icrSender, checksumManager, null);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static Handler getHandlerForContainerType(
+      final ContainerType containerType, final ConfigurationSource config,
+      final String datanodeId, final ContainerSet contSet,
+      final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
+      final ContainerMetrics metrics,
+      IncrementalReportSender<Container> icrSender, ContainerChecksumTreeManager checksumManager,
+      OzoneContainer ozoneContainer) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
           datanodeId, contSet, volumeSet, volumeChoosingPolicy, metrics,
-          icrSender, Clock.systemUTC(), checksumManager);
+          icrSender, Clock.systemUTC(), checksumManager, ozoneContainer);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
           containerType + "doesn't exist.");
@@ -285,5 +299,4 @@ public abstract class Handler {
       ContainerCommandRequestProto msg, Container container,
       RandomAccessFileChannel blockFile,
       StreamObserver<ContainerCommandResponseProto> streamObserver);
-
 }

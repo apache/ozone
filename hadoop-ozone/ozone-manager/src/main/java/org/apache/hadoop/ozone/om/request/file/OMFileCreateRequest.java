@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -82,11 +84,14 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
+    final CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
         .getCreateFileRequest();
     Objects.requireNonNull(createFileRequest, "createFileRequest == null");
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
+    if (keyArgs.getIsMultipartKey()) {
+      OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
+    }
 
     OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
     if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
@@ -135,7 +140,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
         .setDataSize(requestedSize);
 
     newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
-        .map(info -> info.getProtobuf(getOmRequest().getVersion()))
+        .map(info -> info.getProtobuf(
+            ClientVersion.deserialize(getOmRequest().getVersion())))
         .collect(Collectors.toList()));
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
@@ -227,7 +233,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       // do open key
       omBucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
@@ -277,9 +283,13 @@ public class OMFileCreateRequest extends OMKeyRequest {
           bucketName, omBucketInfo.getBucketLayout(),
           null, missingParentInfos, trxnLogIndex);
 
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+          .setKeyInfo(omKeyInfo.getNetworkProtobuf(
+              ClientVersion.deserialize(getOmRequest().getVersion()),
               keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())

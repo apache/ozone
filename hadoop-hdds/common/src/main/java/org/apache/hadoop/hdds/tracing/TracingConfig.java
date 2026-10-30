@@ -50,6 +50,18 @@ public class TracingConfig extends ReconfigurableConfig {
   private boolean tracingEnabled;
 
   @Config(
+      key = "ozone.tracing.client.application-aware",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      reconfigurable = true,
+      tags = { ConfigTag.OZONE, ConfigTag.HDDS },
+      description = "Only effective when ozone.tracing.enabled=false. When true, Ozone will "
+          + "continue an application-supplied trace (via GlobalOpenTelemetry or a wire-propagated "
+          + "context) as child spans, but will NOT start a new root trace on its own."
+  )
+  private boolean applicationAware = true;
+
+  @Config(
       key = "ozone.tracing.endpoint",
       defaultValue = "",
       type = ConfigType.STRING,
@@ -81,6 +93,10 @@ public class TracingConfig extends ReconfigurableConfig {
 
   public boolean isTracingEnabled() {
     return tracingEnabled;
+  }
+
+  public boolean isApplicationAware() {
+    return applicationAware;
   }
 
   @PostConstruct

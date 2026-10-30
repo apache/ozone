@@ -43,6 +43,7 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - bats: [Checks](../hadoop-ozone/dev-support/checks/bats.sh) bash scripts, (using the [Bash Automated Testing System](https://github.com/bats-core/bats-core#bats-core-bash-automated-testing-system-2018))
 - checkstyle: [Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) 'mvn checkstyle' plugin to confirm Java source abides by Ozone coding conventions
 - docs: [Builds](../hadoop-ozone/dev-support/checks/docs.sh) website with [Hugo](https://gohugo.io/)
+- errorprone: [Runs](../hadoop-ozone/dev-support/checks/errorprone.sh) Error Prone static analysis during Java compilation. All diagnostics go to `diagnostics.txt`; `summary.txt` contains only errors or a fallback for a non-diagnostic Maven failure.
 - findbugs: [Runs](../hadoop-ozone/dev-support/checks/findbugs.sh) spotbugs static analysis on bytecode
 - pmd: [Runs](../hadoop-ozone/dev-support/checks/pmd.sh) PMD static analysis on project's source code
 - rat (release audit tool): [Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
@@ -59,7 +60,7 @@ Performs unit tests (if necessary) in two parts:
 If they don't match, it describes how to make the updates to include the changes, (if they are intentional).  Otherwise, the changes should be removed.
 
 #### acceptance job
-[Runs](../hadoop-ozone/dev-support/checks/acceptance.sh) smoketests using robot framework and a real docker compose cluster.  There are three iterations, "secure", "unsecure", and "misc", each running in parallel, as different matrix configs.
+[Runs](../hadoop-ozone/dev-support/checks/acceptance.sh) smoketests using robot framework and a real docker compose cluster.
 
 #### kubernetes job
 [Runs](../hadoop-ozone/dev-support/checks/kubernetes.sh) k8s tests

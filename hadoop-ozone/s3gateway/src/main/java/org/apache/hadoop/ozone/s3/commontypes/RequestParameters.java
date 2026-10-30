@@ -65,6 +65,20 @@ public interface RequestParameters {
     }
   }
 
+  default boolean getBoolean(String key, boolean defaultValue) {
+    final String value = get(key);
+    if (value == null) {
+      return defaultValue;
+    }
+    if ("true".equalsIgnoreCase(value)) {
+      return true;
+    }
+    if ("false".equalsIgnoreCase(value)) {
+      return false;
+    }
+    throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, key);
+  }
+
   /** Mutable implementation based on {@link MultivaluedMap}. */
   final class MultivaluedMapImpl implements Mutable {
     private final MultivaluedMap<String, String> params;

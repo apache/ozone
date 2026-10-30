@@ -17,21 +17,17 @@
 
 package org.apache.hadoop.ozone.om.response.s3.tagging;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for delete object tagging request for FSO bucket.
  */
-@CleanupTableInfo(cleanupTables = {FILE_TABLE})
 public class S3DeleteObjectTaggingResponseWithFSO extends S3DeleteObjectTaggingResponse {
 
   private long volumeId;

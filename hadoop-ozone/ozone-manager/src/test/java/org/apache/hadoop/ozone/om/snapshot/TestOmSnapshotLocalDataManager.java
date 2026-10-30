@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
@@ -45,6 +46,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -63,8 +65,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -92,8 +96,8 @@ import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.Hierarchi
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -140,8 +144,7 @@ public class TestOmSnapshotLocalDataManager {
   @TempDir
   private Path tempDir;
 
-  @Mock
-  private OMLayoutVersionManager layoutVersionManager;
+  private OMVersionManager omVersionManager;
 
   private OmSnapshotLocalDataManager localDataManager;
   private AutoCloseable mocks;
@@ -178,7 +181,8 @@ public class TestOmSnapshotLocalDataManager {
   @BeforeEach
   public void setUp() throws IOException {
     mocks = MockitoAnnotations.openMocks(this);
-    
+    omVersionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+
     // Setup mock behavior
     when(omMetadataManager.getStore()).thenReturn(rdbStore);
     when(omMetadataManager.getHierarchicalLockManager()).thenReturn(lockManager);
@@ -196,7 +200,6 @@ public class TestOmSnapshotLocalDataManager {
     purgedSnapshotIdMap.clear();
     snapshotUtilMock.when(() -> OmSnapshotManager.isSnapshotPurged(any(), any(), any(), any()))
         .thenAnswer(i -> purgedSnapshotIdMap.getOrDefault(i.getArgument(2), false));
-    when(layoutVersionManager.isAllowed(any(LayoutFeature.class))).thenReturn(true);
     conf.setInt(OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL, -1);
   }
 
@@ -265,7 +268,7 @@ public class TestOmSnapshotLocalDataManager {
 
   private OmSnapshotLocalDataManager getNewOmSnapshotLocalDataManager(
       CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> provider) throws IOException {
-    return new OmSnapshotLocalDataManager(omMetadataManager, null, layoutVersionManager, provider, conf);
+    return new OmSnapshotLocalDataManager(omMetadataManager, null, omVersionManager, provider, conf);
   }
 
   private OmSnapshotLocalDataManager getNewOmSnapshotLocalDataManager() throws IOException {
@@ -709,7 +712,8 @@ public class TestOmSnapshotLocalDataManager {
     }
     addVersionsToLocalData(localDataManager, snapshotIds.get(1), ImmutableMap.of(1, 3, 2, previousVersion));
     try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotIds.get(1))) {
-      assertEquals(previousVersion < snap.getPreviousSnapshotLocalData().orElse(null).getVersion(), snap.needsDefrag());
+      assertEquals(previousVersion < snap.getPreviousSnapshotLocalData().orElseThrow(AssertionError::new).getVersion(),
+          snap.needsDefrag());
     }
   }
 
@@ -979,7 +983,20 @@ public class TestOmSnapshotLocalDataManager {
     createSnapshotLocalDataFile(snapshotId, previousSnapshotId);
     
     // Initialize - should load existing files
-    localDataManager = getNewOmSnapshotLocalDataManager();
+    AtomicInteger yamlLoads = new AtomicInteger();
+    // Static mocks are thread-local, so run the loader tasks on this thread while counting actual parses.
+    try (MockedStatic<Executors> executors = mockStatic(Executors.class);
+         MockedStatic<OmSnapshotLocalDataYaml> yaml = mockStatic(OmSnapshotLocalDataYaml.class, CALLS_REAL_METHODS)) {
+      executors.when(() -> Executors.newFixedThreadPool(anyInt(), any()))
+          .thenReturn(MoreExecutors.newDirectExecutorService());
+      yaml.when(() -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(any(File.class))).thenAnswer(load -> {
+        yamlLoads.incrementAndGet();
+        return load.callRealMethod();
+      });
+      localDataManager = getNewOmSnapshotLocalDataManager();
+    }
+    // snapshotId sorts first and depends on previousSnapshotId, but each YAML must still be parsed only once.
+    assertEquals(2, yamlLoads.get());
 
     assertNotNull(localDataManager);
     Map<UUID, OmSnapshotLocalDataManager.SnapshotVersionsMeta> versionMap =
@@ -1046,7 +1063,7 @@ public class TestOmSnapshotLocalDataManager {
     table.put("snap3", createMockSnapshotInfo(snap3, null, SNAPSHOT_ACTIVE));
     table.put("snap2", createMockSnapshotInfo(snap2, snap3, SNAPSHOT_DELETED));
     table.put("snap1", createMockSnapshotInfo(snap1, snap2, SNAPSHOT_ACTIVE));
-    when(layoutVersionManager.isAllowed(eq(OMLayoutFeature.SNAPSHOT_DEFRAG))).thenReturn(!needsUpgrade);
+    when(omVersionManager.isAllowed(eq(OMLayoutFeature.SNAPSHOT_DEFRAG))).thenReturn(!needsUpgrade);
     localDataManager = getNewOmSnapshotLocalDataManager(mockedProvider);
     if (needsUpgrade) {
       assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMapUnmodifiable().keySet());
@@ -1116,6 +1133,26 @@ public class TestOmSnapshotLocalDataManager {
       assertNotNull(provider.getMeta(),
           "getMeta() returned null. Calling getVersion() on it throws NullPointerException");
     }
+  }
+
+  @Test
+  public void testCheckOrphanSnapshotVersionsContinuesAfterLoadFailure() throws IOException {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    Map<UUID, Integer> orphanCheckMap = localDataManager.getSnapshotToBeCheckedForOrphans();
+    orphanCheckMap.clear();
+    orphanCheckMap.put(firstSnapId, 1);
+    orphanCheckMap.put(secondSnapId, 1);
+    // Corrupt the second snapshot's YAML after it has been loaded into the version graph.
+    Files.write(Paths.get(localDataManager.getSnapshotLocalPropertyYamlPath(secondSnapId)),
+        "not: [valid".getBytes(StandardCharsets.UTF_8));
+
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null);
+
+    // The first snapshot is still processed and the failed one stays queued for the next run.
+    assertThat(orphanCheckMap).containsOnlyKeys(secondSnapId).containsEntry(secondSnapId, 1);
   }
 
   @Test

@@ -28,6 +28,8 @@
     <module>cli-admin</module>
     <module>cli-debug</module>
     <module>cli-interactive</module>
+    <module>cli-local</module>
+    <module>cli-other</module>
     <module>cli-repair</module>
     <module>cli-shell</module>
     <module>client</module>
@@ -37,10 +39,14 @@
     <module>fault-injection-test</module>
     <module>freon</module>
     <module>httpfsgateway</module>
+    <module>iceberg</module>
     <module>insight</module>
     <module>integration-test</module>
+    <module>integration-test-freon</module>
+    <module>integration-test-full-deps</module>
     <module>integration-test-recon</module>
     <module>integration-test-s3</module>
+    <module>integration-test-tools</module>
     <module>interface-client</module>
     <module>interface-storage</module>
     <module>mini-cluster</module>
@@ -52,7 +58,6 @@
     <module>recon-codegen</module>
     <module>s3-secret-store</module>
     <module>s3gateway</module>
-    <module>tools</module>
     <module>vapor</module>
   </modules>
 
@@ -107,15 +112,6 @@
 
   <profiles>
     <profile>
-      <id>jdk11-with-iceberg</id>
-      <activation>
-        <jdk>[11,)</jdk>
-      </activation>
-      <modules>
-        <module>iceberg</module>
-      </modules>
-    </profile>
-    <profile>
       <id>build-with-ozonefs</id>
       <activation>
         <property>
@@ -133,6 +129,14 @@
       <modules>
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-shaded</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>CI</id>
+      <modules>
+        <!-- assuming ozonefs-shaded is available from repo -->
+        <module>ozonefs-hadoop2</module>
+        <module>ozonefs-hadoop3</module>
       </modules>
     </profile>
     <profile>

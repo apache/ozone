@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
@@ -53,6 +52,11 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
  * A set of helper functions to create responses to container commands.
  */
 public final class ContainerCommandResponseBuilders {
+
+  /** Longest pause an Echo request is given, in milliseconds; a larger value is clamped. */
+  public static final int MAX_ECHO_SLEEP_MS = 3_000;
+  /** Largest Echo response payload, in bytes; a larger value is clamped. */
+  public static final int MAX_ECHO_PAYLOAD_SIZE = 2 * 1024 * 1024;
 
   /**
    * Returns a Container Command Response Builder with the specified result
@@ -65,11 +69,15 @@ public final class ContainerCommandResponseBuilders {
   public static Builder getContainerCommandResponse(
       ContainerCommandRequestProto request, Result result, String message) {
 
-    return ContainerCommandResponseProto.newBuilder()
+    ContainerCommandResponseProto.Builder builder = ContainerCommandResponseProto.newBuilder()
         .setCmdType(request.getCmdType())
         .setTraceID(request.getTraceID())
         .setResult(result)
         .setMessage(message);
+    if (request.hasClientId() && request.hasCallId()) {
+      builder.setClientId(request.getClientId()).setCallId(request.getCallId());
+    }
+    return builder;
   }
 
   /**
@@ -82,10 +90,14 @@ public final class ContainerCommandResponseBuilders {
   public static Builder getSuccessResponseBuilder(
       ContainerCommandRequestProto request) {
 
-    return ContainerCommandResponseProto.newBuilder()
+    ContainerCommandResponseProto.Builder builder =  ContainerCommandResponseProto.newBuilder()
         .setCmdType(request.getCmdType())
         .setTraceID(request.getTraceID())
         .setResult(Result.SUCCESS);
+    if (request.hasClientId() && request.hasCallId()) {
+      builder.setClientId(request.getClientId()).setCallId(request.getCallId());
+    }
+    return builder;
   }
 
   /**
@@ -149,10 +161,10 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getBlockDataResponse(
-      ContainerCommandRequestProto msg, BlockData data) {
+      ContainerCommandRequestProto msg, BlockData data, boolean shortCircuitGranted) {
 
     GetBlockResponseProto.Builder getBlock = GetBlockResponseProto.newBuilder()
-        .setBlockData(data);
+        .setBlockData(data).setShortCircuitAccessGranted(shortCircuitGranted);
 
     return getSuccessResponseBuilder(msg)
         .setGetBlock(getBlock)
@@ -336,13 +348,14 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getReadBlockResponse(
-      ContainerCommandRequestProto request, ChecksumData checksumData, ByteBuffer data, long offset) {
+      ContainerCommandRequestProto request, List<ChunkInfo> chunks, ByteBuffer data, long offset) {
 
-    ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
-        .setChecksumData(checksumData.getProtoBufMessage())
+    ContainerProtos.ReadBlockResponseProto.Builder response = ContainerProtos.ReadBlockResponseProto.newBuilder()
         .setData(ByteString.copyFrom(data))
-        .setOffset(offset)
-        .build();
+        .setOffset(offset);
+    if (request.getReadBlock().getIncludeChecksums()) {
+      response.addAllChunkInfoList(chunks);
+    }
 
     return getSuccessResponseBuilder(request)
         .setReadBlock(response)
@@ -365,9 +378,10 @@ public final class ContainerCommandResponseBuilders {
       ContainerCommandRequestProto msg) {
 
     ContainerProtos.EchoRequestProto echoRequest = msg.getEcho();
-    int responsePayload = echoRequest.getPayloadSizeResp();
+    int responsePayload = Math.max(0, Math.min(echoRequest.getPayloadSizeResp(), MAX_ECHO_PAYLOAD_SIZE));
 
-    int sleepTimeMs = echoRequest.getSleepTimeMs();
+    // Clamp rather than reject: every replica and a replayed log entry must get the same SUCCESS.
+    int sleepTimeMs = Math.min(echoRequest.getSleepTimeMs(), MAX_ECHO_SLEEP_MS);
     try {
       if (sleepTimeMs > 0) {
         Thread.sleep(sleepTimeMs);
@@ -381,9 +395,7 @@ public final class ContainerCommandResponseBuilders {
             .newBuilder()
             .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.secure().randomBytes(responsePayload)));
 
-    return getSuccessResponseBuilder(msg)
-        .setEcho(echo)
-        .build();
+    return getSuccessResponseBuilder(msg).setEcho(echo).build();
   }
 
   public static ContainerCommandResponseProto getGetContainerMerkleTreeResponse(

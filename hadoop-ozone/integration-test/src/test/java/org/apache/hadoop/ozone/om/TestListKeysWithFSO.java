@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,7 +36,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -83,7 +84,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
-    legacyOzoneBucket = TestDataUtil
+    legacyOzoneBucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.LEGACY);
     String volumeName = legacyOzoneBucket.getVolumeName();
 
@@ -156,11 +157,12 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
   @Test
   public void testListKeysWithValidStartKey() throws Exception {
-    // case-1: StartKey LeafNode is lexographically behind than prefixKey.
-    // So, will return EmptyList
-    // a1/b2 < a1/b2Invalid
-    List<String> expectedKeys =
-        getExpectedKeyList("a1/b2", "a1", legacyOzoneBucket);
+    // case-1: StartKey is lexographically behind prefixKey.
+    // So will return all the sub-paths of prefixKey
+    // a1 < a1/b2
+    List<String> expectedKeys = Arrays.asList("a1/b2/", "a1/b2/d1/", "a1/b2/d1/d11.tx", "a1/b2/d2/",
+        "a1/b2/d2/d21.tx", "a1/b2/d2/d22.tx", "a1/b2/d3/", "a1/b2/d3/d31.tx");
+    checkKeyList("a1/b2", "a1", expectedKeys, legacyOzoneBucket);
     checkKeyList("a1/b2", "a1", expectedKeys, fsoOzoneBucket);
 
     // case-2: Same prefixKey and startKey, but with an ending slash
@@ -297,10 +299,12 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     checkKeyList("a1/b1", "a1/b2/d0", expectedKeys, fsoOzoneBucket);
 
     // case-3:
-    // StartKey LeafNode's parent is not matching with than prefixKey's parent.
-    // So, will return EmptyList
-    expectedKeys =
-        getExpectedKeyList("a1/b2", "a0/b123Invalid", legacyOzoneBucket);
+    // StartKey LeafNode's parent is not matching with prefixKey's parent,
+    // but startKey is lexographically behind prefixKey.
+    // So will return all the sub-paths of prefixKey
+    expectedKeys = Arrays.asList("a1/b2/", "a1/b2/d1/", "a1/b2/d1/d11.tx", "a1/b2/d2/",
+        "a1/b2/d2/d21.tx", "a1/b2/d2/d22.tx", "a1/b2/d3/", "a1/b2/d3/d31.tx");
+    checkKeyList("a1/b2", "a0/b123Invalid", expectedKeys, legacyOzoneBucket);
     checkKeyList("a1/b2", "a0/b123Invalid", expectedKeys, fsoOzoneBucket);
 
     // case-4: StartKey LeafNode is lexographically behind prefixKey.
@@ -421,6 +425,26 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     expectedKeys =
         getExpectedKeyList("x/y/z/z1.tx", "", legacyOzoneBucket2);
     checkKeyList("x/y/z/z1.tx", "", expectedKeys, fsoOzoneBucket2);
+  }
+
+  /**
+   * StartKey sorts before keyPrefix and lies on a different branch, with keys between them
+   * that do not match keyPrefix. Every key matching keyPrefix sorts after startKey.
+   */
+  @Test
+  public void testListKeysWithStartKeyBeforePrefix() throws Exception {
+    String keyPrefix = "dir1bh";
+    List<String> expectedKeys = Arrays.asList("dir1bh/", "dir1bh/file1", "dir1bha/", "dir1bha/file1");
+    List<String> expectedShallowKeys = Arrays.asList("dir1bh/", "dir1bha/");
+    // A non-shallow FSO listing of a keyPrefix that is also a directory lists only that directory,
+    // so the FSO result is compared with the listing without startKey.
+    List<String> expectedFsoKeys = getExpectedKeyList(keyPrefix, "", fsoOzoneBucket2);
+    for (String startKey : Arrays.asList("dir1/dir2/dir3/d11.tx", "dir1/dir2/file1", "a0")) {
+      checkKeyList(keyPrefix, startKey, expectedKeys, legacyOzoneBucket2);
+      checkKeyList(keyPrefix, startKey, expectedFsoKeys, fsoOzoneBucket2);
+      checkKeyShallowList(keyPrefix, startKey, expectedShallowKeys, legacyOzoneBucket2);
+      checkKeyShallowList(keyPrefix, startKey, expectedShallowKeys, fsoOzoneBucket2);
+    }
   }
 
   @Test
@@ -593,6 +617,8 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     keys.add("/x/y/z/z1.txdir/z2.tx");
 
     keys.add("/dir1/dir2/dir3/d11.tx");
+    keys.add("/dir1bh/file1");
+    keys.add("/dir1bha/file1");
 
     createAndAssertKeys(ozoneBucket, keys);
   }
@@ -662,7 +688,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
   private static void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
     for (String key : keys) {
-      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
+      byte[] input = DataTestUtil.createStringKey(ozoneBucket, key, 10);
       // Read the key with given key name.
       readkey(ozoneBucket, key, 10, input);
     }

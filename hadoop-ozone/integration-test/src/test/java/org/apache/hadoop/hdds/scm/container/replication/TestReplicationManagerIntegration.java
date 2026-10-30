@@ -70,9 +70,9 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -157,7 +157,7 @@ class TestReplicationManagerIntegration {
 
     client = cluster.newClient();
     scmClient = new ContainerOperationClient(cluster.getConf());
-    bucket = TestDataUtil.createVolumeAndBucket(client);
+    bucket = DataTestUtil.createVolumeAndBucket(client);
   }
 
   @AfterEach
@@ -178,7 +178,7 @@ class TestReplicationManagerIntegration {
   public void testClosedContainerReplicationWhenNodeDies()
       throws Exception {
     String keyName = "key-" + UUID.randomUUID();
-    TestDataUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
+    DataTestUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
         "this is the content".getBytes(StandardCharsets.UTF_8));
 
     // Get the container ID for the key
@@ -226,7 +226,7 @@ class TestReplicationManagerIntegration {
       throws Exception {
 
     String keyName = "key-" + UUID.randomUUID();
-    TestDataUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
+    DataTestUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
         "this is the content".getBytes(StandardCharsets.UTF_8));
 
     OzoneKeyDetails key = bucket.getKey(keyName);
@@ -277,7 +277,7 @@ class TestReplicationManagerIntegration {
   @Test
   public void testDeadMaintenanceNodeAndDecommission() throws Exception {
     String keyName = "key-" + UUID.randomUUID();
-    TestDataUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
+    DataTestUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
         "this is the content".getBytes(StandardCharsets.UTF_8));
 
     OzoneKeyDetails key = bucket.getKey(keyName);
@@ -321,7 +321,7 @@ class TestReplicationManagerIntegration {
   @Test
   public void testOneDeadMaintenanceNodeAndOneLiveMaintenanceNodeAndOneDecommissionNode() throws Exception {
     String keyName = "key-" + UUID.randomUUID();
-    TestDataUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
+    DataTestUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
         "this is the content".getBytes(StandardCharsets.UTF_8));
 
     OzoneKeyDetails key = bucket.getKey(keyName);

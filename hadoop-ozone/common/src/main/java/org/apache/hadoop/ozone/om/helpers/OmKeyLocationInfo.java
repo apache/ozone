@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.security.token.Token;
@@ -31,14 +33,33 @@ import org.apache.hadoop.security.token.Token;
  */
 public final class OmKeyLocationInfo extends BlockLocationInfo {
 
+  // IV of the multipart upload part this block belongs to, null if not set.
+  private byte[] partIv;
+
   private OmKeyLocationInfo(Builder builder) {
     super(builder);
+    this.partIv = builder.partIv;
+  }
+
+  public byte[] getPartIv() {
+    return partIv;
+  }
+
+  public void setPartIv(byte[] partIv) {
+    this.partIv = partIv;
   }
 
   /**
    * Builder of OmKeyLocationInfo.
    */
   public static class Builder extends BlockLocationInfo.Builder {
+
+    private byte[] partIv;
+
+    public Builder setPartIv(byte[] iv) {
+      this.partIv = iv;
+      return this;
+    }
 
     @Override
     public Builder setBlockID(BlockID blockID) {
@@ -88,17 +109,20 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
     }
   }
 
-  public KeyLocation getProtobuf(int clientVersion) {
+  public KeyLocation getProtobuf(ClientVersion clientVersion) {
     return getProtobuf(false, clientVersion);
   }
 
-  public KeyLocation getProtobuf(boolean ignorePipeline, int clientVersion) {
+  public KeyLocation getProtobuf(boolean ignorePipeline, ClientVersion clientVersion) {
     KeyLocation.Builder builder = KeyLocation.newBuilder()
         .setBlockID(getBlockID().getProtobuf())
         .setLength(getLength())
         .setOffset(getOffset())
         .setCreateVersion(getCreateVersion())
         .setPartNumber(getPartNumber());
+    if (partIv != null) {
+      builder.setPartIv(ByteString.copyFrom(partIv));
+    }
     if (!ignorePipeline) {
       Token<OzoneBlockTokenIdentifier> token = getToken();
       if (token != null) {
@@ -137,6 +161,9 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
         .setPipeline(getPipeline(keyLocation))
         .setCreateVersion(keyLocation.getCreateVersion())
         .setPartNumber(keyLocation.getPartNumber());
+    if (keyLocation.hasPartIv()) {
+      builder.setPartIv(keyLocation.getPartIv().toByteArray());
+    }
     if (keyLocation.hasToken()) {
       Token<OzoneBlockTokenIdentifier> token =
           OMPBHelper.tokenFromProto(keyLocation.getToken());

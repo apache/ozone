@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -38,7 +36,6 @@ import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
@@ -220,17 +217,6 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return bytes of DB key.
    */
   String getOpenKey(String volume, String bucket, String key, String clientId);
-
-  /**
-   * Returns client ID in Long of an OpenKeyTable DB Key String.
-   * @param dbOpenKeyName An OpenKeyTable DB Key String.
-   * @return Client ID (Long)
-   */
-  static long getClientIDFromOpenKeyDBKey(String dbOpenKeyName) {
-    final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
-    final String clientIdString = dbOpenKeyName.substring(lastPrefix + 1);
-    return Long.parseLong(clientIdString);
-  }
 
   /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.
@@ -510,7 +496,7 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   /**
    * @return list all LifecycleConfigurations.
    */
-  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws OMException;
+  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws IOException;
 
   /**
    * Fetches the lifecycle configuration by bucketName.
@@ -527,6 +513,14 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return meta table reference.
    */
   Table<String, String> getMetaTable();
+
+  /**
+   * Gets the S3RevokedStsTokenTable.
+   *
+   * @return Table.
+   */
+  Table<String, Long> getS3RevokedStsTokenTable();
+
 
   /**
    * Returns number of rows in a table.  This should not be used for very
@@ -584,6 +578,9 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return table names in OM DB.
    */
   Set<String> listTableNames();
+
+  Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+      getVolumeIterator();
 
   Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
       getBucketIterator();

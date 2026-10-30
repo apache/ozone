@@ -40,18 +40,18 @@ run-name: Test Ozone ${{ inputs.ref }} with Ratis ${{ inputs.ratis-repo }} @ ${{
 permissions: { }
 jobs:
   ratis:
-    uses: ./.github/workflows/build-ratis.yml
+    uses: $/.github/workflows/build-ratis.yml
     with:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
   ozone:
     needs:
       - ratis
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml
     permissions:
       contents: read
     secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
     with:
       ratis_args: ${{ needs.ratis.outputs.build-args }}

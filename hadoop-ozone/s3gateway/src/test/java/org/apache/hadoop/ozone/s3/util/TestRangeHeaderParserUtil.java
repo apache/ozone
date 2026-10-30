@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test class to test RangeHeaderParserUtil.
@@ -61,6 +63,13 @@ public class TestRangeHeaderParserUtil {
     assertTrue(rangeHeader.isReadFull());
     assertFalse(rangeHeader.isInValidRange());
 
+    // inverted range, start is still inside the object
+    rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=8-3", 10);
+    assertEquals(0, rangeHeader.getStartOffset());
+    assertEquals(9, rangeHeader.getEndOffset());
+    assertTrue(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
+
     // bytes spec is wrong
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("mb=11-8", 10);
     assertEquals(0, rangeHeader.getStartOffset());
@@ -93,6 +102,65 @@ public class TestRangeHeaderParserUtil {
     assertEquals(4977248768L, rangeHeader.getEndOffset());
     assertFalse(rangeHeader.isInValidRange());
 
+  }
+
+  @Test
+  public void testUnsatisfiableRanges() {
+    // start is past the last byte and no end is given
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=10-", 10).isInValidRange());
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=11-", 10).isInValidRange());
+
+    // zero suffix length selects no bytes
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=-0", 10).isInValidRange());
+
+    // an empty object has no bytes to select
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=-5", 0).isInValidRange());
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=0-", 0).isInValidRange());
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=0-5", 0).isInValidRange());
+
+    // the last byte is still satisfiable
+    RangeHeader rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=9-", 10);
+    assertEquals(9, rangeHeader.getStartOffset());
+    assertEquals(9, rangeHeader.getEndOffset());
+    assertFalse(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
+  }
+
+  @Test
+  public void testRangeWithoutStartAndEndIsIgnored() {
+    RangeHeader rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=-", 10);
+    assertEquals(0, rangeHeader.getStartOffset());
+    assertEquals(9, rangeHeader.getEndOffset());
+    assertTrue(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
+  }
+
+  @Test
+  public void testRangeWithLongMaxValue() {
+    RangeHeader rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=0-" + Long.MAX_VALUE, 10);
+    assertEquals(0, rangeHeader.getStartOffset());
+    assertEquals(9, rangeHeader.getEndOffset());
+    assertFalse(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
+  }
+
+  // 9223372036854775808 is Long.MAX_VALUE + 1
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "bytes=0-9223372036854775808",
+      "bytes=0-99999999999999999999",
+      "bytes=9223372036854775808-",
+      "bytes=99999999999999999999-",
+      "bytes=-9223372036854775808",
+      "bytes=-99999999999999999999",
+      "bytes=99999999999999999999-99999999999999999999"
+  })
+  public void testRangeOverflowingLongIsIgnored(String range) {
+    RangeHeader rangeHeader = RangeHeaderParserUtil.parseRangeHeader(range, 10);
+    assertEquals(0, rangeHeader.getStartOffset());
+    assertEquals(9, rangeHeader.getEndOffset());
+    assertTrue(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
   }
 
 }

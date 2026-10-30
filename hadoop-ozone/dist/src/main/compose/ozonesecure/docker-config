@@ -85,6 +85,7 @@ OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
 OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
 OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.heartbeat.interval=5s
+OZONE-SITE.XML_hdds.heartbeat.recon.interval=5s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
@@ -96,6 +97,7 @@ OZONE-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keyta
 
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
 OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
+OZONE-SITE.XML_ozone.s3g.sts.http.enabled=true
 OZONE-SITE.XML_ozone.http.filter.initializers=org.apache.hadoop.security.AuthenticationFilterInitializer
 
 OZONE-SITE.XML_ozone.om.http.auth.type=kerberos
@@ -206,3 +208,6 @@ OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 # OZONE-SITE.XML_ozone.recon.chatbot.gateway.api.key=YOUR_GATEWAY_KEY_HERE
 # OZONE-SITE.XML_ozone.recon.chatbot.gateway.models=gpt-4.1,claude-sonnet,gemini-2.5-flash
 # OZONE-SITE.XML_ozone.recon.chatbot.default.model=claude-sonnet
+
+# Revert when HDDS-17350 is merged. (lazy client tracing init)
+OZONE-SITE.XML_ozone.tracing.client.application-aware=false

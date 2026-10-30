@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.DataTestUtil.readFully;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.TestDataUtil.readFully;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
@@ -78,6 +78,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -189,6 +190,12 @@ public class TestOMRatisSnapshotTransfer {
     }
   }
 
+  @AfterAll
+  public static void deleteAuditLogs() {
+    AuditLogTestUtils.deleteAuditLogFile();
+    AuditLogTestUtils.deleteSystemAuditLogFile();
+  }
+
   @Test
   public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
     // Get the leader OM
@@ -284,7 +291,7 @@ public class TestOMRatisSnapshotTransfer {
     String toMatch = String.format(
         "op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"%s\",\"term\":\"%d\",\"lastAppliedIndex\":\"%d\"}",
         leaderOMNodeId, leaderOMSnapshotTermIndex, followerOMLastAppliedIndex);
-    assertTrue(AuditLogTestUtils.auditLogContains(toMatch));
+    assertTrue(AuditLogTestUtils.systemAuditLogContains(toMatch));
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);

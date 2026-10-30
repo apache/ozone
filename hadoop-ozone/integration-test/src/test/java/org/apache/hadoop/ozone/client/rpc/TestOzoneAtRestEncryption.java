@@ -40,11 +40,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import com.google.common.cache.Cache;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -62,10 +64,11 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.crypto.CryptoInputStream;
+import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
-import org.apache.hadoop.crypto.key.kms.LoadBalancingKMSClientProvider;
-import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -78,15 +81,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
+import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -95,6 +100,9 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
+import org.apache.hadoop.ozone.client.io.KeyInputStream;
+import org.apache.hadoop.ozone.client.io.LengthInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -119,11 +127,28 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 
+/**
+ * End-to-end tests for Ozone encryption at rest.
+ *
+ * <p>This suite runs against a local jceks {@link JavaKeyStoreProvider}
+ * instead of {@code MiniKMS}. hadoop-kms embeds Jetty 9, which cannot coexist
+ * with the Jetty 12 runtime this build targets, so MiniKMS was removed from
+ * the integration-test classpath during the Jetty 12 migration (HDDS-8280).
+ * The jceks provider is a no-op for EDEK warm-up and exposes no KMS queue to
+ * observe, so warm-up on OM startup is covered in two ways that do not need a
+ * real KMS: {@link #testWarmupEDEKCacheOnStartup()} swaps a spy over the live
+ * provider and re-triggers the warm-up path directly to assert the exact key,
+ * and {@link #testWarmupEDEKCacheOnOmRestart()} restarts the OM to exercise the
+ * genuine startup trigger and asserts warm-up from the loader's log line.
+ * Restoring coverage against a real KMS is tracked as a follow-up JIRA
+ * (HDDS-16424).
+ * </p>
+ */
 class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
-  private static MiniKMS miniKMS;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
   private static OzoneManager ozoneManager;
@@ -147,14 +172,15 @@ class TestOzoneAtRestEncryption {
   static void init() throws Exception {
     File kmsDir = new File(testDir, UUID.randomUUID().toString());
     assertTrue(kmsDir.mkdirs());
-    MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
-    miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
-    miniKMS.start();
 
     OzoneManager.setTestSecureOmFlag(true);
     conf = new OzoneConfiguration();
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-        getKeyProviderURI(miniKMS));
+        getKeyProviderURI(kmsDir));
+    // Seed the encryption key into the jceks store before the OM starts, so
+    // it is present when the OM constructs its KeyProvider at startup.
+    createKey(TEST_KEY,
+        KeyProviderFactory.get(new URI(getKeyProviderURI(kmsDir)), conf), conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -180,8 +206,6 @@ class TestOzoneAtRestEncryption {
     ozoneManager = cluster.getOzoneManager();
     ozoneManager.setMinMultipartUploadPartSize(MPU_PART_MIN_SIZE);
 
-    // create test key
-    createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
     eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
 
     final String rootPath = String.format("%s://%s/",
@@ -203,10 +227,6 @@ class TestOzoneAtRestEncryption {
     if (cluster != null) {
       cluster.shutdown();
     }
-
-    if (miniKMS != null) {
-      miniKMS.stop();
-    }
   }
 
   static void reInitClient() throws IOException {
@@ -216,30 +236,66 @@ class TestOzoneAtRestEncryption {
 
   @Test
   public void testWarmupEDEKCacheOnStartup() throws Exception {
+    // A bucket with an encryption key so the OM has an EDEK to warm up.
+    createVolumeAndBucket(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), BucketLayout.OBJECT_STORE);
 
-    createVolumeAndBucket("vol", "buck", BucketLayout.OBJECT_STORE);
-
-    @SuppressWarnings("unchecked") KMSClientProvider spy = getKMSClientProvider();
-    assertTrue(spy.getEncKeyQueueSize(TEST_KEY) > 0);
-
-    conf.setInt(OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
-    cluster.restartOzoneManager();
-
-    GenericTestUtils.waitFor(new BooleanSupplier() {
-      @Override
-      public boolean getAsBoolean() {
-        final KMSClientProvider kspy = getKMSClientProvider();
-        return kspy.getEncKeyQueueSize(TEST_KEY) > 0;
-      }
-    }, 1000, 60000);
+    // The jceks provider cannot be restarted into a spy (the OM rebuilds it in
+    // its constructor), so swap in a spy over the live provider and re-trigger
+    // the startup warm-up path directly with a zero initial delay.
+    KeyProviderCryptoExtension original = ozoneManager.getKmsProvider();
+    KeyProviderCryptoExtension kmsSpy = spy(original);
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager, "kmsProvider", kmsSpy);
+    try {
+      OzoneConfiguration warmupConf = new OzoneConfiguration(conf);
+      warmupConf.setInt(OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
+      ozoneManager.initializeEdekCache(warmupConf);
+      // The OM must discover the configured encryption key from the bucket
+      // table and hand it to the warm-up loader on startup. warmUpEncryptedKeys
+      // is varargs, so Mockito captures the key names as individual elements.
+      ArgumentCaptor<String> keysCaptor = ArgumentCaptor.forClass(String.class);
+      verify(kmsSpy, timeout(60000)).warmUpEncryptedKeys(keysCaptor.capture());
+      assertThat(keysCaptor.getAllValues()).contains(TEST_KEY);
+    } finally {
+      HddsWhiteboxTestUtils.setInternalState(ozoneManager, "kmsProvider", original);
+    }
   }
 
-  private KMSClientProvider getKMSClientProvider() {
-    LoadBalancingKMSClientProvider lbkmscp =
-        (LoadBalancingKMSClientProvider) HddsWhiteboxTestUtils.getInternalState(
-            cluster.getOzoneManager().getKmsProvider(), "extension");
-    assert lbkmscp.getProviders().length == 1;
-    return lbkmscp.getProviders()[0];
+  @Test
+  public void testWarmupEDEKCacheOnOmRestart() throws Exception {
+    // A bucket with an encryption key so the OM has an EDEK to warm up. The
+    // encrypted bucket is persisted and survives the restart, so the genuine
+    // startup trigger (OzoneManagerStateMachine#notifyLeaderChanged ->
+    // initializeEdekCache) rediscovers it.
+    createVolumeAndBucket(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), BucketLayout.OBJECT_STORE);
+
+    // Unlike testWarmupEDEKCacheOnStartup, this restarts the OM to drive the real
+    // startup path rather than calling initializeEdekCache directly. The jceks
+    // provider cannot be spied across a restart, so warm-up is asserted from the
+    // EDEKCacheLoader's log line. Every encrypted bucket in this class uses the
+    // single key TEST_KEY, which warmUpEdekCache dedupes into a one-element set,
+    // so the count must be exactly 1. Asserting the count (rather than the bare
+    // "Successfully warmed up" prefix) fails the test if the restart path
+    // discovers no keys, since the no-op jceks provider logs success regardless.
+    GenericTestUtils.LogCapturer omLogs =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.class);
+    try {
+      cluster.restartOzoneManager();
+      GenericTestUtils.waitFor(
+          (BooleanSupplier) () -> omLogs.getOutput().contains("Successfully warmed up 1 EDEKs."),
+          500, 60000);
+      // Match the loader's own line, not a bare key name: TEST_KEY also appears in unrelated OM
+      // log output during the restart, so a plain substring check would pass without the key ever
+      // having been warmed up.
+      assertThat(omLogs.getOutput())
+          .as("the loader must report warming up exactly this key")
+          .contains("Warming up 1 EDEKs: [" + TEST_KEY + "]");
+    } finally {
+      omLogs.stopCapturing();
+      ozClient.close();
+      reInitClient();
+    }
   }
 
   @ParameterizedTest
@@ -259,6 +315,17 @@ class TestOzoneAtRestEncryption {
     createAndVerifyKeyData(bucket);
     createAndVerifyStreamKeyData(bucket);
     createAndVerifyFileSystemData(bucket);
+
+    String keyName = UUID.randomUUID().toString();
+    byte[] data = generateRandomData(PositionedReadTestHelper.SOURCE_SIZE);
+    DataTestUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, ONE), data);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      assertInstanceOf(CryptoInputStream.class, inputStream.getInputStream());
+      inputStream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, inputStream::readFully);
+      assertEquals(123, inputStream.getPos());
+      assertEquals(Byte.toUnsignedInt(data[123]), inputStream.read());
+    }
   }
 
   @ParameterizedTest
@@ -299,7 +366,7 @@ class TestOzoneAtRestEncryption {
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
 
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         value.getBytes(StandardCharsets.UTF_8));
 
@@ -307,7 +374,7 @@ class TestOzoneAtRestEncryption {
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     // Overwrite the key
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         value.getBytes(StandardCharsets.UTF_8));
 
@@ -491,7 +558,7 @@ class TestOzoneAtRestEncryption {
         HddsProtos.ReplicationFactor.valueOf(factor.getValue());
     OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
     for (OmKeyLocationInfo info:
-        keyInfo.getLatestVersionLocations().getLocationList()) {
+        keyInfo.getLatestVersionLocations().createLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
       if (!ReplicationConfig.getLegacyFactor(container.getReplicationConfig())
@@ -503,9 +570,9 @@ class TestOzoneAtRestEncryption {
     return true;
   }
 
-  private static String getKeyProviderURI(MiniKMS kms) {
-    return KMSClientProvider.SCHEME_NAME + "://" +
-        kms.getKMSUrl().toExternalForm().replace("://", "@");
+  private static String getKeyProviderURI(File dir) {
+    File jks = new File(dir, "kms.jks");
+    return JavaKeyStoreProvider.SCHEME_NAME + "://file" + jks.toURI().getPath();
   }
 
   private static void createKey(String keyName, KeyProvider
@@ -609,6 +676,46 @@ class TestOzoneAtRestEncryption {
     testMultipartUploadWithEncryption(linkBucket, 2);
   }
 
+  @ParameterizedTest
+  @EnumSource
+  void mpuPartsHaveOwnIv(BucketLayout bucketLayout) throws Exception {
+    OzoneBucket bucket = createVolumeAndBucket(UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        bucketLayout);
+    String keyName = "mpu_same_content";
+    byte[] data = generateRandomData(MPU_PART_MIN_SIZE);
+    String uploadID = initiateMultipartUpload(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
+    Map<Integer, String> partsMap = new TreeMap<>();
+    partsMap.put(1, uploadPart(bucket, keyName, uploadID, 1, data));
+    partsMap.put(2, uploadPart(bucket, keyName, uploadID, 2, data));
+    completeMultipartUpload(bucket, keyName, uploadID, partsMap);
+
+    byte[] expected = new byte[2 * data.length];
+    System.arraycopy(data, 0, expected, 0, data.length);
+    System.arraycopy(data, 0, expected, data.length, data.length);
+    try (OzoneInputStream in = bucket.readKey(keyName)) {
+      assertArrayEquals(expected, in.readAllBytes());
+    }
+
+    // Read the stored bytes of each part without decrypting them.
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(keyName)
+        .build();
+    OmKeyInfo keyInfo = ozoneManager.getKeyInfo(keyArgs, false).getKeyInfo();
+    List<byte[]> storedParts = new ArrayList<>();
+    for (LengthInputStream part : KeyInputStream.getStreamsFromKeyInfo(keyInfo,
+        ((RpcClient) ozClient.getProxy()).getXceiverClientManager(), null, new BlockInputStreamFactoryImpl(),
+        conf.getObject(OzoneClientConfig.class)).values()) {
+      try (InputStream in = part) {
+        storedParts.add(in.readAllBytes());
+      }
+    }
+    assertThat(storedParts).hasSize(2);
+    assertThat(storedParts.get(0)).hasSameSizeAs(data).isNotEqualTo(data);
+    assertThat(storedParts.get(1)).hasSameSizeAs(data).isNotEqualTo(data).isNotEqualTo(storedParts.get(0));
+  }
+
   private void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts) throws Exception {
     testMultipartUploadWithEncryption(bucket, numParts, false);
@@ -672,6 +779,19 @@ class TestOzoneAtRestEncryption {
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
       assertInstanceOf(MultipartInputStream.class, inputStream.getInputStream());
+      if (numParts == 2) {
+        inputStream.seek(123);
+        PositionedReadTestHelper.runConcurrentPositionedReads(inputData, inputStream::readFully);
+        int offset = partsData.get(0).length - 17;
+        ByteBuffer destination = ByteBuffer.allocateDirect(DEFAULT_CRYPTO_BUFFER_SIZE + 37);
+        inputStream.readFully(offset, destination);
+        destination.flip();
+        byte[] actual = new byte[destination.remaining()];
+        destination.get(actual);
+        assertArrayEquals(Arrays.copyOfRange(inputData, offset, offset + actual.length), actual);
+        assertEquals(123, inputStream.getPos());
+        inputStream.seek(0);
+      }
 
       // Test complete read
       byte[] completeRead = new byte[keySize];

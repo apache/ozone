@@ -93,9 +93,14 @@ Administrators can adjust the following properties in `ozone-site.xml` to contro
     *   **Details**: For decommissioning nodes, this limit is scaled by `hdds.datanode.replication.outofservice.limit.factor`.
 
 *   **`hdds.datanode.replication.streams.limit`**
-    *   **Purpose**: Sets the base number of threads for the replication thread pool on a DataNode.
+    *   **Purpose**: Sets the base size of both the global replication handler executor and the inbound replication server executor.
     *   **Default**: `10`.
-    *   **Details**: For decommissioning nodes, this limit is also scaled by `hdds.datanode.replication.outofservice.limit.factor`.
+    *   **Details**: On decommissioning nodes, the global executor is scaled by `hdds.datanode.replication.outofservice.limit.factor`. Per-volume pools replace normal source-side push scheduling, but target-side inbound push requests remain limited by the inbound replication server executor configured by this property.
+
+*   **`hdds.datanode.replication.per.volume.streams.limit`**
+    *   **Purpose**: When `hdds.datanode.replication.per.volume.enabled` is true, sets the base number of push replication handler threads **per data volume**.
+    *   **Default**: `2` (reconfigurable at runtime).
+    *   **Details**: Each volume has its own pool; total push capacity on the node scales with the number of volumes. On decommissioning or maintenance nodes, each per-volume pool is scaled by `hdds.datanode.replication.outofservice.limit.factor`, same as the global pool. Push replication is typically disk-bound, so one or two concurrent transfers per volume is often enough to keep a disk busy while isolating slow volumes.
 
 By tuning these properties, administrators can balance the decommissioning speed against the impact on the cluster's performance.
 

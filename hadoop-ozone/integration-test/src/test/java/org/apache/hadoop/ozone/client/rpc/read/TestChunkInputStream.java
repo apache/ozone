@@ -17,28 +17,78 @@
 
 package org.apache.hadoop.ozone.client.rpc.read;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
+import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
+import org.apache.hadoop.hdds.scm.storage.LocalChunkInputStream;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.BucketForTesting;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests {@link ChunkInputStream}.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@ParameterizedClass
+@ValueSource(booleans = {true, false})
 class TestChunkInputStream extends InputStreamTests {
+
+  @Parameter
+  private boolean useShortCircuitRead;
+
+  private LogCapturer localChunkInputStreamLog;
+  private LogCapturer shortCircuitClientLog;
+  private LogCapturer blockInputStreamLog;
+  private LogCapturer grpcClientLog;
+
+  @BeforeEach
+  void startCapturing() {
+    localChunkInputStreamLog = LogCapturer.captureLogs(LocalChunkInputStream.LOG);
+    shortCircuitClientLog = LogCapturer.captureLogs(XceiverClientShortCircuit.LOG);
+    blockInputStreamLog = LogCapturer.captureLogs(BlockInputStream.LOG);
+    grpcClientLog = LogCapturer.captureLogs(XceiverClientGrpc.LOG);
+  }
+
+  @AfterEach
+  void stopCapturing() {
+    org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(
+        blockInputStreamLog, grpcClientLog, localChunkInputStreamLog, shortCircuitClientLog);
+  }
+
+  @Override
+  int getDatanodeCount() {
+    return getRepConfig().getRequiredNodes();
+  }
+
+  @Override
+  ReplicationConfig getRepConfig() {
+    return RatisReplicationConfig.getInstance(ONE);
+  }
 
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster
@@ -46,25 +96,42 @@ class TestChunkInputStream extends InputStreamTests {
    */
   @ContainerLayoutTestInfo.ContainerTest
   void testAll(ContainerLayoutVersion layout) throws Exception {
-    try (OzoneClient client = getCluster().newClient()) {
-      updateConfig(layout);
+    if (useShortCircuitRead) {
+      assumeTrue(DomainSocketFactory.getInstance(getCluster().getConf()).isServiceReady());
+    }
 
+    updateConfig(layout);
+
+    OzoneConfiguration clientConfig = new OzoneConfiguration(getCluster().getConf());
+    useShortCircuitRead(clientConfig, useShortCircuitRead);
+    debugShortCircuitRead();
+
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(clientConfig)) {
       BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
 
       testChunkReadBuffers(bucket);
       testBufferRelease(bucket);
       testCloseReleasesBuffers(bucket);
     }
+
+    assertEquals(useShortCircuitRead, localChunkInputStreamLog.getOutput()
+        .contains("LocalChunkInputStream is created"));
+    assertEquals(useShortCircuitRead, shortCircuitClientLog.getOutput()
+        .contains("XceiverClientShortCircuit is created"));
+    assertEquals(useShortCircuitRead, blockInputStreamLog.getOutput()
+        .contains("Get the FileInputStream of block"));
+    assertEquals(!useShortCircuitRead, grpcClientLog.getOutput()
+        .contains("XceiverClientGrpc is created"));
   }
 
   /**
    * Test to verify that data read from chunks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  private void testChunkReadBuffers(BucketForTesting bucket) throws Exception {
+  protected void testChunkReadBuffers(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
-    byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
+    byte[] inputData = bucket.writeRandomBytes(keyName, getRepConfig(), dataLength);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
@@ -123,9 +190,9 @@ class TestChunkInputStream extends InputStreamTests {
     }
   }
 
-  private void testCloseReleasesBuffers(BucketForTesting bucket) throws Exception {
+  protected void testCloseReleasesBuffers(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
-    bucket.writeRandomBytes(keyName, CHUNK_SIZE);
+    bucket.writeRandomBytes(keyName, getRepConfig(), CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       BlockInputStream block0Stream =
@@ -146,9 +213,9 @@ class TestChunkInputStream extends InputStreamTests {
    * Test that ChunkInputStream buffers are released as soon as the last byte
    * of the buffer is read.
    */
-  private void testBufferRelease(BucketForTesting bucket) throws Exception {
+  protected void testBufferRelease(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
-    byte[] inputData = bucket.writeRandomBytes(keyName, CHUNK_SIZE);
+    byte[] inputData = bucket.writeRandomBytes(keyName, getRepConfig(), CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
@@ -204,7 +271,7 @@ class TestChunkInputStream extends InputStreamTests {
     }
   }
 
-  private byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
+  protected byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
       int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     chunkInputStream.seek(offset);
@@ -228,7 +295,7 @@ class TestChunkInputStream extends InputStreamTests {
    * @param expectedBufferCapacity expected buffer capacity of unreleased
    *                               buffers
    */
-  private void checkBufferSizeAndCapacity(ByteBuffer[] buffers,
+  protected void checkBufferSizeAndCapacity(ByteBuffer[] buffers,
       int expectedNumBuffers, int numReleasedBuffers,
       long expectedBufferCapacity) {
     assertEquals(expectedNumBuffers, buffers.length,

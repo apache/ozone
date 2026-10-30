@@ -36,7 +36,7 @@ import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -79,11 +79,11 @@ public abstract class TestListKeys implements NonHATests.TestCase {
     client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
-    legacyOzoneBucket = TestDataUtil
+    legacyOzoneBucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.LEGACY);
 
     // create a volume and a OBJECT_STORE bucket
-    obsOzoneBucket = TestDataUtil
+    obsOzoneBucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
 
     initFSNameSpace();
@@ -152,8 +152,13 @@ public abstract class TestListKeys implements NonHATests.TestCase {
   private static Stream<Arguments> shallowListDataWithTrailingSlash() {
     return Stream.of(
 
-        // Case-1: StartKey is less than prefixKey, return emptyList.
-        of("a1/b2/", "a1", newLinkedList(Collections.emptyList())),
+        // Case-1: StartKey is less than prefixKey, return all immediate node.
+        of("a1/b2/", "a1", newLinkedList(Arrays.asList(
+            "a1/b2/",
+            "a1/b2/d1/",
+            "a1/b2/d2/",
+            "a1/b2/d3/"
+        ))),
 
         // Case-2: StartKey is empty, return all immediate node.
         of("a1/b2/", "", newLinkedList(Arrays.asList(
@@ -201,8 +206,12 @@ public abstract class TestListKeys implements NonHATests.TestCase {
   private static Stream<Arguments> shallowListObsDataWithTrailingSlash() {
     return Stream.of(
 
-        // Case-1: StartKey is less than prefixKey, return emptyList.
-        of("a1/b2/", "a1", newLinkedList(Collections.emptyList())),
+        // Case-1: StartKey is less than prefixKey, return all immediate node.
+        of("a1/b2/", "a1", newLinkedList(Arrays.asList(
+            "a1/b2/d1/",
+            "a1/b2/d2/",
+            "a1/b2/d3/"
+        ))),
 
         // Case-2: StartKey is empty, return all immediate node.
         of("a1/b2/", "", newLinkedList(Arrays.asList(
@@ -248,8 +257,15 @@ public abstract class TestListKeys implements NonHATests.TestCase {
   private static Stream<Arguments> shallowListDataWithoutTrailingSlash() {
     return Stream.of(
 
-        // Case-1: StartKey is less than prefixKey, return emptyList.
-        of("a1/b2", "a1", newLinkedList(Collections.emptyList())),
+        // Case-1: StartKey is less than prefixKey, return all immediate node.
+        of("a1/b2", "a1", newLinkedList(Arrays.asList(
+            "a1/b2/"
+        ))),
+
+        // Case-1a: StartKey is an existing key on a branch before prefixKey.
+        of("a1/b2", "a1/b1/c1/c1.tx", newLinkedList(Arrays.asList(
+            "a1/b2/"
+        ))),
 
         // Case-2: StartKey is empty, return all immediate node.
         of("a1/b2", "", newLinkedList(Arrays.asList(
@@ -369,7 +385,7 @@ public abstract class TestListKeys implements NonHATests.TestCase {
   private static void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
     for (String key : keys) {
-      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
+      byte[] input = DataTestUtil.createStringKey(ozoneBucket, key, 10);
       // Read the key with given key name.
       readkey(ozoneBucket, key, 10, input);
     }

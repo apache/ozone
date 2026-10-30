@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -100,13 +101,40 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
     checkDeleteKeysResponse(omKeysDeleteRequest);
   }
 
+  @Test
+  public void testDuplicatePathsReleaseQuotaOnce() throws Exception {
+    createPreRequisites();
+    DeleteKeyArgs keys = getOmRequest().getDeleteKeysRequest().getDeleteKeys();
+    OMRequest request = getOmRequest().toBuilder()
+        .setDeleteKeysRequest(getOmRequest().getDeleteKeysRequest().toBuilder()
+            .setDeleteKeys(keys.toBuilder().clearKeys()
+                .addKeys("dir0/file0").addKeys("dir0//file0").addKeys("/dir0/file0")
+                .addKeys("dir1/").addKeys("/dir1"))).build();
+    checkDuplicateKeysReleaseQuotaOnce(request, 2);
+  }
+
   @Override
   protected void createPreRequisites() throws Exception {
     createPreRequisites(RequestSource.USER);
   }
 
   @Override
+  protected OMKeysDeleteRequest getOmKeysDeleteRequest(OMRequest request) {
+    return new OmKeysDeleteRequestWithFSO(request, getBucketLayout());
+  }
+
+  @Override
+  protected long expectedNamespaceReleasedOnPartialDelete() {
+    // Only the leaf files sit under the shared parent directory created by createPreRequisites.
+    return 3L;
+  }
+
+  @Override
   protected void createPreRequisites(RequestSource sourceType) throws Exception {
+    // Directories are read back through getOMKeyInfoIfExists, which stamps them with the OM
+    // default; without it they cannot be written to the deleted directory table.
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(ONE));
     setDeleteKeyList(new ArrayList<>());
     // Add volume, bucket and key entries to OM DB.
     OMRequestTestUtils

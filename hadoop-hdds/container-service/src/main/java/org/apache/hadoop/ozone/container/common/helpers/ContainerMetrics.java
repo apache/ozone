@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import java.io.Closeable;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -59,11 +61,18 @@ public class ContainerMetrics implements Closeable {
   @Metric private MutableCounterLong numContainerReconciledWithoutChanges;
   @Metric private MutableCounterLong numContainerReconciledWithChanges;
 
+  /** for remote requests. */
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsForClosedContainer;
   private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
   private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
+
+  /** for local short-circuit requests. */
+  private final EnumMap<ContainerProtos.Type, MutableCounterLong> numLocalOpsArray;
+  private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsLocalBytesArray;
+  private final EnumMap<ContainerProtos.Type, MutableRate> opsLocalLatencyNs;
+  private final EnumMap<ContainerProtos.Type, MutableRate> opsLocalInQueueLatencyNs;
 
   // TODO: https://issues.apache.org/jira/browse/HDDS-13555
   @SuppressWarnings("PMD.SingularField")
@@ -71,7 +80,6 @@ public class ContainerMetrics implements Closeable {
 
   public ContainerMetrics(int[] intervals) {
     final int len = intervals.length;
-    MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
     this.numOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsBytesArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsForClosedContainer = new EnumMap<>(ContainerProtos.Type.class);
@@ -88,6 +96,7 @@ public class ContainerMetrics implements Closeable {
           "bytes used by " + type + " for closed container op", (long) 0));
       opsLatency.put(type, registry.newRate("latencyNs" + type, type + " op"));
 
+      MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
       for (int j = 0; j < len; j++) {
         int interval = intervals[j];
         String quantileName = type + "Nanos" + interval + "s";
@@ -95,6 +104,23 @@ public class ContainerMetrics implements Closeable {
             "latency of Container ops", "ops", "latencyNs", interval);
       }
       opsLatQuantiles.put(type, latQuantiles);
+    }
+
+    this.numLocalOpsArray = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsLocalBytesArray = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsLocalLatencyNs = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsLocalInQueueLatencyNs = new EnumMap<>(ContainerProtos.Type.class);
+
+    List<ContainerProtos.Type> localTypeList = new ArrayList<>();
+    localTypeList.add(ContainerProtos.Type.GetBlock);
+    localTypeList.add(ContainerProtos.Type.Echo);
+    for (ContainerProtos.Type type : localTypeList) {
+      numLocalOpsArray.put(type, registry.newCounter(
+          "numLocal" + type, "number of " + type + " ops", (long) 0));
+      opsLocalBytesArray.put(type, registry.newCounter(
+          "localBytes" + type, "bytes used by " + type + "op", (long) 0));
+      opsLocalLatencyNs.put(type, registry.newRate("localLatencyNs" + type, type + " op"));
+      opsLocalInQueueLatencyNs.put(type, registry.newRate("localInQueueLatencyNs" + type, type + " op"));
     }
   }
 
@@ -132,6 +158,27 @@ public class ContainerMetrics implements Closeable {
 
   public void incContainerBytesStats(ContainerProtos.Type type, long bytes) {
     opsBytesArray.get(type).incr(bytes);
+  }
+
+  public void incContainerLocalOpsMetrics(ContainerProtos.Type type) {
+    numOps.incr();
+    numLocalOpsArray.get(type).incr();
+  }
+
+  public long getContainerLocalOpsMetrics(ContainerProtos.Type type) {
+    return numLocalOpsArray.get(type).value();
+  }
+
+  public void incContainerLocalOpsLatencies(ContainerProtos.Type type, long nanoSeconds) {
+    opsLocalLatencyNs.get(type).add(nanoSeconds);
+  }
+
+  public void incContainerLocalOpsInQueueLatencies(ContainerProtos.Type type, long nanoSeconds) {
+    opsLocalInQueueLatencyNs.get(type).add(nanoSeconds);
+  }
+
+  public void incContainerLocalBytesStats(ContainerProtos.Type type, long bytes) {
+    opsLocalBytesArray.get(type).incr(bytes);
   }
 
   public void incClosedContainerBytesStats(ContainerProtos.Type type, long bytes) {

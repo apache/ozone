@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.s3;
 
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_CREDENTIAL_DATE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PAYLOAD_TOO_LARGE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.REQUEST_TIME_TOO_SKEWED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.DATE_FORMATTER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
@@ -28,6 +30,7 @@ import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TY
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -35,12 +38,15 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.stream.Stream;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -63,48 +69,76 @@ public class TestAuthorizationFilter {
   private AuthorizationFilter authorizationFilter = new AuthorizationFilter();
 
   private static final String DATETIME = StringToSignProducer.TIME_FORMATTER.
-      format(LocalDateTime.now());
+      format(LocalDateTime.now(ZoneOffset.UTC));
 
-  private static final String CURDATE = DATE_FORMATTER.format(LocalDate.now());
+  private static final String CURDATE =
+      DATE_FORMATTER.format(LocalDate.now(ZoneOffset.UTC));
+  private static final String MISMATCHED_CREDENTIAL_DATE =
+      DATE_FORMATTER.format(LocalDate.now(ZoneOffset.UTC).minusDays(1));
 
   private static Stream<Arguments>testAuthFilterFailuresInput() {
+    String staleCredentialDate = "20190221";
+    String staleDateTime = staleCredentialDate + "T002037Z";
     return Stream.of(
         arguments(
             "GET",
-            "AWS4-HMAC-SHA256 Credential=testuser1/20190221/us-west-1/s3" +
-                "/aws4_request, SignedHeaders=content-md5;host;" +
-                "x-amz-content-sha256;x-amz-date, " +
-                "Signature" +
-                "=56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf47" +
-                "65f46a14cd745ad",
+            "AWS4-HMAC-SHA256 Credential=testuser1/" + staleCredentialDate
+                + "/us-west-1/s3/aws4_request, SignedHeaders=content-md5;host;"
+                + "x-amz-content-sha256;x-amz-date, "
+                + "Signature"
+                + "=56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf47"
+                + "65f46a14cd745ad",
             "Zi68x2nPDDXv5qfDC+ZWTg==",
             "s3g:9878",
-            "e2bd43f11c97cde3465e0e8d1aad77af7ec7aa2ed8e213cd0e24" +
-                "1e28375860c6",
-            "20190221T002037Z",
+            "e2bd43f11c97cde3465e0e8d1aad77af7ec7aa2ed8e213cd0e24"
+                + "1e28375860c6",
+            staleDateTime,
             "",
             "/",
-            MALFORMED_HEADER.getErrorMessage()
+            HTTP_FORBIDDEN,
+            REQUEST_TIME_TOO_SKEWED.getErrorMessage()
         ),
         arguments(
             "GET",
-            "AWS4-HMAC-SHA256 " +
-                "Credential=AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request," +
-                " SignedHeaders=content-type;host;x-amz-date, " +
-                "Signature=" +
-                "5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400" +
-                "e06b5924a6f2b5d7",
+            "AWS4-HMAC-SHA256 "
+                + "Credential=AKIDEXAMPLE/" + staleCredentialDate
+                + "/us-east-1/iam/aws4_request,"
+                + " SignedHeaders=content-type;host;x-amz-date, "
+                + "Signature="
+                + "5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400"
+                + "e06b5924a6f2b5d7",
             "",
             "iam.amazonaws.com",
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            "20150830T123600Z",
+            staleDateTime,
             "application/x-www-form-urlencoded; charset=utf-8",
             "",
-            MALFORMED_HEADER.getErrorMessage()
+            HTTP_FORBIDDEN,
+            REQUEST_TIME_TOO_SKEWED.getErrorMessage()
+        ),
+        arguments(
+            "GET",
+            "AWS4-HMAC-SHA256 Credential=testuser1/" + MISMATCHED_CREDENTIAL_DATE
+                + "/us-east-1/s3/aws4_request, SignedHeaders=content-md5;host;"
+                + "x-amz-content-sha256;x-amz-date, "
+                + "Signature"
+                + "=56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf47"
+                + "65f46a14cd745ad",
+            "Zi68x2nPDDXv5qfDC+ZWTg==",
+            "s3g:9878",
+            "e2bd43f11c97cde3465e0e8d1aad77af7ec7aa2ed8e213cd0e24"
+                + "1e28375860c6",
+            DATETIME,
+            "",
+            "/",
+            HTTP_BAD_REQUEST,
+            MALFORMED_CREDENTIAL_DATE.getErrorMessage()
         ),
         arguments(null, null, null, null, null, null, null, null,
+            HTTP_FORBIDDEN,
             S3_AUTHINFO_CREATION_ERROR.getErrorMessage()),
         arguments(null, "", null, null, null, null, null, null,
+            HTTP_FORBIDDEN,
             S3_AUTHINFO_CREATION_ERROR.getErrorMessage()),
         // AWS V2 signature
         arguments(
@@ -116,7 +150,27 @@ public class TestAuthorizationFilter {
             "Wed, 22 Mar 2023 17:00:06 +0000",
             "application/octet-stream",
             "/",
+            HTTP_FORBIDDEN,
             S3_AUTHINFO_CREATION_ERROR.getErrorMessage()
+        ),
+        // Too huge payload for signature V4 of STS request
+        arguments(
+            "POST",
+            "AWS4-HMAC-SHA256 Credential=testuser1/" + CURDATE +
+            "/us-east-1/sts/aws4_request, " +
+                "SignedHeaders=content-type;host;" +
+                "x-amz-date, " +
+                "Signature" +
+                "=56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf47" +
+                "65f46a14cd745ad",
+            "Content-SHA",
+            "s3g:9880",
+            "Content-SHA",
+            DATETIME,
+            "application/x-www-form-urlencoded; charset=utf-8",
+            "/",
+            HTTP_BAD_REQUEST,
+            PAYLOAD_TOO_LARGE.getErrorMessage()
         )
     );
   }
@@ -127,11 +181,15 @@ public class TestAuthorizationFilter {
   void testAuthFilterFailures(
       String method, String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType,
-      String path, String expectedErrorMsg
+      String path, int expectedStatus, String expectedErrorMsg
   ) throws Exception {
     try {
       ContainerRequestContext context = setupContext(method, authHeader,
           contentMd5, host, amzContentSha256, date, contentType, path);
+
+      byte[] payloadBytes = new byte[OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE + 1];
+      InputStream payLoadStream = new ByteArrayInputStream(payloadBytes);
+      when(context.getEntityStream()).thenReturn(payLoadStream);
 
       AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
       awsSignatureProcessor.setContext(context);
@@ -146,22 +204,8 @@ public class TestAuthorizationFilter {
         fail("Empty AuthHeader must fail");
       }
     } catch (WebApplicationException ex) {
-      if (authHeader == null || authHeader.isEmpty() ||
-              authHeader.startsWith("AWS ")) {
-        // Empty auth header and unsupported AWS signature
-        // should fail with Invalid Request.
-        assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
-        assertEquals(expectedErrorMsg,
-            ex.getMessage());
-      } else {
-        // Other requests have stale timestamp and
-        // should fail with Malformed Authorization Header.
-        assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
-        assertEquals(expectedErrorMsg,
-            ex.getMessage());
-
-      }
-
+      assertEquals(expectedStatus, ex.getResponse().getStatus());
+      assertEquals(expectedErrorMsg, ex.getMessage());
     }
   }
 

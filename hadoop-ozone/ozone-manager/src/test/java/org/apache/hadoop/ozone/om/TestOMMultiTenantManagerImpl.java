@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -55,6 +56,7 @@ public class TestOMMultiTenantManagerImpl {
   private OMMetadataManager omMetadataManager;
   private OzoneConfiguration conf;
   private OzoneManager ozoneManager;
+  private OMMetrics omMetrics;
 
   @TempDir
   private Path folder;
@@ -72,6 +74,8 @@ public class TestOMMultiTenantManagerImpl {
 
     ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    omMetrics = mock(OMMetrics.class);
+    when(ozoneManager.getMetrics()).thenReturn(omMetrics);
 
     OzoneConfiguration ozoneConfiguration = mock(OzoneConfiguration.class);
     when(ozoneConfiguration.getTimeDuration(
@@ -90,6 +94,8 @@ public class TestOMMultiTenantManagerImpl {
    */
   @Test
   public void testReloadCache() throws IOException {
+    verify(omMetrics).setNumTenants(1);
+
     // Create a tenant with multiple users.
     CachedTenantState expectedTenant2State = createTenant("tenant2");
     assignUserToTenant(expectedTenant2State, "access2", "user2", false, false);
@@ -102,6 +108,7 @@ public class TestOMMultiTenantManagerImpl {
     // Reload the cache as part of new object creation.
     OMMultiTenantManagerImpl tenantManager2 =
         new OMMultiTenantManagerImpl(ozoneManager, conf);
+    verify(omMetrics).setNumTenants(3);
     // Check that the cache was restored correctly.
     // Setup created a tenant in addition to the ones created for this test.
     assertEquals(3, tenantManager2.getTenantCache().size());
@@ -112,6 +119,16 @@ public class TestOMMultiTenantManagerImpl {
     assertEquals(expectedTenant3State, tenantManager.getTenantCache()
         .get("tenant3"));
 
+  }
+
+  @Test
+  public void testReloadCacheWithNoTenants() throws IOException {
+    omMetadataManager.getTenantAccessIdTable().delete("seed-accessId1");
+    omMetadataManager.getTenantStateTable().delete(TENANT_ID);
+
+    OMMultiTenantManagerImpl emptyTenantManager = new OMMultiTenantManagerImpl(ozoneManager, conf);
+    assertThat(emptyTenantManager.getTenantCache()).isEmpty();
+    verify(omMetrics).setNumTenants(0);
   }
 
   @Test

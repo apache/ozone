@@ -20,23 +20,26 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.EOFException;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -54,10 +57,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockInputStream extends BlockExtendedInputStream {
 
-  private static final Logger LOG = LoggerFactory.getLogger(BlockInputStream.class);
-
-  private static final List<Validator> VALIDATORS =
-      ContainerProtocolCalls.toValidatorList((request, response) -> validate(response));
+  public static final Logger LOG = LoggerFactory.getLogger(BlockInputStream.class);
 
   private final BlockID blockID;
   private long length;
@@ -68,8 +68,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
       new AtomicReference<>();
   private final boolean verifyChecksum;
   private XceiverClientFactory xceiverClientFactory;
-  private XceiverClientSpi xceiverClient;
-  private boolean initialized = false;
+  private XceiverClientSpi xceiverClientGrpc;
+  private XceiverClientShortCircuit xceiverClientShortCircuit;
+  private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
+  private volatile FileInputStream blockFileInputStream;
+  private volatile boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
 
@@ -126,16 +129,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     this.retryPolicy = getReadRetryPolicy(config);
   }
 
-  // only for unit tests
-  public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
-                          Token<OzoneBlockTokenIdentifier> token,
-                          XceiverClientFactory xceiverClientFactory,
-                          OzoneClientConfig config
-  ) throws IOException {
-    this(new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockId).setLength(blockLen)),
-        pipeline, token, xceiverClientFactory, null, config);
-  }
-
   /**
    * Initialize the BlockInputStream. Get the BlockData (list of chunks) from
    * the Container and create the ChunkInputStreams for each Chunk in the Block.
@@ -153,7 +146,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       try {
         blockData = getBlockData();
         chunks = blockData.getChunksList();
-        if (blockInfo != null && blockInfo.isUnderConstruction()) {
+        if (blockInfo.isUnderConstruction()) {
           // use the block length from DN if block is under construction.
           length = blockData.getSize();
           LOG.debug("Updated block length to {} for block {}", length, blockID);
@@ -208,7 +201,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private void refreshBlockInfo(IOException cause) throws IOException {
+  private synchronized void refreshBlockInfo(IOException cause) throws IOException {
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
 
@@ -230,49 +223,95 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * @return BlockData.
    */
   protected BlockData getBlockDataUsingClient() throws IOException {
-    Pipeline pipeline = pipelineRef.get();
+    if (xceiverClientShortCircuit != null) {
+      try {
+        return getBlockDataUsingSCClient();
+      } catch (IOException e) {
+        if (e instanceof StorageContainerException) {
+          // getBlock may return exceptions like
+          // "StorageContainerException: Unable to find the block with bcsID 3275. Container 1 bcsId is 3261."
+          // when local datanode is not the leader of pipeline and hasn't finished the putBlock execution
+          // with the expected bcsID
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Failed to get blockData using short-circuit client", e);
+          }
+        } else {
+          LOG.warn("Failed to get blockData using short-circuit client", e);
+        }
+        // acquire client again if xceiverClientGrpc is not acquired.
+        acquireClient();
+      }
+    }
+    return getBlockDataUsingGRPCClient(xceiverClientGrpc, pipelineRef.get(), tokenRef.get());
+  }
+
+  @VisibleForTesting
+  protected BlockData getBlockDataUsingSCClient() throws IOException {
+    final Pipeline pipeline = pipelineRef.get();
+
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Initializing BlockInputStream for get key to access block {}",
-          blockID);
+      LOG.debug("Initializing BlockInputStream for get key to access {}",
+          blockID.getContainerID());
     }
 
-    GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
-        xceiverClient, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
+    int replicaIndex = pipeline.getReplicaIndex(xceiverClientShortCircuit.getDn());
+    final GetBlockRequestProto.Builder getBlockRequest = GetBlockRequestProto.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicaIndex))
+        .setRequestShortCircuitAccess(true);
+    ContainerProtos.ContainerCommandRequestProto.Builder builder =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.GetBlock)
+            .setContainerID(blockID.getContainerID())
+            .setGetBlock(getBlockRequest)
+            .setClientId(xceiverClientShortCircuit.getClientId())
+            .setCallId(xceiverClientShortCircuit.getCallId());
+    if (tokenRef.get() != null) {
+      builder.setEncodedToken(tokenRef.get().encodeToUrlString());
+    }
+    GetBlockResponseProto response = ContainerProtocolCalls.getBlock(xceiverClientShortCircuit,
+        VALIDATORS, builder, xceiverClientShortCircuit.getDn());
+
+    blockFileInputStream = xceiverClientShortCircuit.getFileInputStream(builder.getCallId(), blockID.getLocalID());
+    if (blockFileInputStream == null) {
+      throw new IOException("Failed to get file InputStream for block " + blockID);
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Get the FileInputStream of block {}", blockID);
+      }
+    }
     return response.getBlockData();
   }
 
-  private static void validate(ContainerCommandResponseProto response)
-      throws IOException {
-    if (!response.hasGetBlock()) {
-      throw new IllegalArgumentException("Not GetBlock: response=" + response);
-    }
-    final GetBlockResponseProto b = response.getGetBlock();
-    final long blockLength = b.getBlockData().getSize();
-    final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
-    for (int i = 0; i < chunks.size(); i++) {
-      final ChunkInfo c = chunks.get(i);
-      // HDDS-10682 caused an empty chunk to get written to the end of some EC blocks. Due to this
-      // validation, these blocks will not be readable. In the EC case, the empty chunk is always
-      // the last chunk and the offset is the block length. We can safely ignore this case and not fail.
-      if (c.getLen() <= 0 && i == chunks.size() - 1 && c.getOffset() == blockLength) {
-        DatanodeBlockID blockID = b.getBlockData().getBlockID();
-        LOG.warn("The last chunk is empty for container/block {}/{} with an offset of the block length. " +
-            "Likely due to HDDS-10682. This is safe to ignore.", blockID.getContainerID(), blockID.getLocalID());
-      } else if (c.getLen() <= 0) {
-        throw new IOException("Failed to get chunkInfo["
-            + i + "]: len == " + c.getLen());
+  private void acquireClient() throws IOException {
+    final Pipeline pipeline = pipelineRef.get();
+    // xceiverClientGrpc not-null indicates there is fall back to GRPC reads
+    if (xceiverClientFactory != null && xceiverClientFactory.isShortCircuitEnabled() && !fallbackToGrpc.get()
+        && xceiverClientShortCircuit == null) {
+      try {
+        XceiverClientSpi newClient = xceiverClientFactory.acquireClientForReadData(pipeline, true);
+        if (newClient instanceof XceiverClientShortCircuit) {
+          xceiverClientShortCircuit = (XceiverClientShortCircuit) newClient;
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("acquired short-circuit client {} for block {}", xceiverClientShortCircuit.toString(), blockID);
+          }
+        } else {
+          xceiverClientGrpc = newClient;
+          fallbackToGrpc.set(true);
+        }
+        return;
+      } catch (Exception e) {
+        LOG.warn("Failed to acquire {} client for pipeline {}, block {}. Fallback to Grpc client.",
+            DomainSocketFactory.FEATURE, pipeline, blockID, e);
+        fallbackToGrpc.set(true);
       }
     }
-  }
 
-  private void acquireClient() throws IOException {
-    if (xceiverClientFactory != null && xceiverClient == null) {
-      final Pipeline pipeline = pipelineRef.get();
+    // fall back to acquire GRPC client
+    if (xceiverClientFactory != null && xceiverClientGrpc == null) {
       try {
-        xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+        xceiverClientGrpc = xceiverClientFactory.acquireClientForReadData(pipeline);
       } catch (IOException ioe) {
-        LOG.warn("Failed to acquire client for pipeline {}, block {}",
-            pipeline, blockID);
+        LOG.warn("Failed to acquire client for pipeline {}, block {}", pipeline, blockID);
         throw ioe;
       }
     }
@@ -288,8 +327,14 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-    return new ChunkInputStream(chunkInfo, blockID,
-        xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get);
+    if (blockFileInputStream != null) {
+      // a non-empty blockFileInputStream means we have a direct local block replica to read from
+      return new LocalChunkInputStream(chunkInfo, blockID, xceiverClientFactory, pipelineRef::get,
+          verifyChecksum, tokenRef::get, xceiverClientShortCircuit, blockFileInputStream.getChannel());
+    } else {
+      return new ChunkInputStream(chunkInfo, blockID,
+          xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get);
+    }
   }
 
   @Override
@@ -314,10 +359,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
       // Get the current chunkStream and read data from it
       ChunkInputStream current = chunkStreams.get(chunkIndex);
-      int numBytesToRead = Math.min(len, (int)current.getRemaining());
+      int readLength = Math.min(len, (int)current.getRemaining());
       int numBytesRead;
       try {
-        numBytesRead = strategy.readFromBlock(current, numBytesToRead);
+        numBytesRead = strategy.readFromBlock(current, readLength);
         retries = 0;
         // If we get a StorageContainerException or an IOException due to
         // datanodes are not reachable, refresh to get the latest pipeline
@@ -345,14 +390,14 @@ public class BlockInputStream extends BlockExtendedInputStream {
         }
       }
 
-      if (numBytesRead != numBytesToRead) {
+      if (numBytesRead != readLength) {
         // This implies that there is either data loss or corruption in the
         // chunk entries. Even EOF in the current stream would be covered in
         // this case.
         throw new IOException(String.format(
-            "Inconsistent read for chunkName=%s length=%d numBytesToRead= %d " +
+            "Inconsistent read for chunkName=%s length=%d readLength= %d " +
                 "numBytesRead=%d", current.getChunkName(), current.getLength(),
-            numBytesToRead, numBytesRead));
+            readLength, numBytesRead));
       }
       totalReadLen += numBytesRead;
       len -= numBytesRead;
@@ -362,6 +407,97 @@ public class BlockInputStream extends BlockExtendedInputStream {
       }
     }
     return totalReadLen;
+  }
+
+  /**
+   * Stateless positioned read across this block's chunks. Fills up to
+   * {@code dst.remaining()} bytes starting from {@code blockRelativePosition}
+   * without mutating this stream's cursor ({@code chunkIndex},
+   * {@code blockPosition}) or the sequential chunk streams' buffered state.
+   * Reuses each chunk's range reader, whose buffers and client references belong to the request.
+   *
+   * @return bytes copied into {@code dst}, or {@link #EOF} at EOF
+   */
+  @Override
+  public int readPositioned(long blockRelativePosition, ByteBuffer dst) throws IOException {
+    if (!dst.hasRemaining()) {
+      return 0;
+    }
+    if (blockRelativePosition < 0) {
+      return EOF;
+    }
+
+    if (!initialized) {
+      initialize();
+    }
+    final long[] offsets;
+    final List<ChunkInputStream> streams;
+    final long blockLength;
+    synchronized (this) {
+      checkOpen();
+      if (chunkOffsets == null || blockData == null || blockRelativePosition >= length) {
+        return EOF;
+      }
+
+      offsets = chunkOffsets;
+      streams = chunkStreams;
+      blockLength = length;
+    }
+
+    int index = MultipartInputStream.binarySearchOffsetIndex(offsets, blockRelativePosition);
+
+    long pos = blockRelativePosition;
+    int totalReadLen = 0;
+    while (dst.hasRemaining() && pos < blockLength && index < streams.size()) {
+      final ChunkInputStream chunk = streams.get(index);
+      final long chunkOffset = pos - offsets[index];
+      final long readLength = Math.min(Math.min(dst.remaining(), chunk.getLength() - chunkOffset), blockLength - pos);
+      if (readLength > 0) {
+        final int numBytesRead = readChunkAt(chunk, chunkOffset, (int) readLength, dst);
+        totalReadLen += numBytesRead;
+        pos += numBytesRead;
+      }
+      index++;
+    }
+    return totalReadLen == 0 ? EOF : totalReadLen;
+  }
+
+  /** Read a chunk range with a request-local retry counter and buffer position. */
+  private int readChunkAt(ChunkInputStream chunk, long chunkOffset, int readLength, ByteBuffer dst) throws IOException {
+    int preadRetries = 0;
+    while (true) {
+      checkOpen();
+      final ByteBuffer target = dst.duplicate();
+      target.limit(target.position() + readLength);
+      final int numBytesRead;
+      try {
+        numBytesRead = chunk.readPositioned(chunkOffset, target);
+      } catch (SCMSecurityException ex) {
+        throw ex;
+      } catch (StorageContainerException ex) {
+        if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
+          throw ex;
+        }
+        refreshBlockInfo(ex);
+        continue;
+      } catch (IOException ex) {
+        if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
+          throw ex;
+        }
+        if (isConnectivityIssue(ex)) {
+          refreshBlockInfo(ex);
+        }
+        continue;
+      }
+
+      if (numBytesRead != readLength) {
+        throw new IOException(String.format(
+            "Inconsistent read for chunkName=%s length=%d readLength=%d numBytesRead=%d",
+            chunk.getChunkName(), chunk.getLength(), readLength, numBytesRead));
+      }
+      dst.position(target.position());
+      return numBytesRead;
+    }
   }
 
   /**
@@ -461,12 +597,23 @@ public class BlockInputStream extends BlockExtendedInputStream {
         is.close();
       }
     }
+    if (blockFileInputStream != null) {
+      try {
+        blockFileInputStream.close();
+      } catch (IOException e) {
+        LOG.error("Failed to close file InputStream for block " + blockID, e);
+      }
+    }
   }
 
   private void releaseClient() {
-    if (xceiverClientFactory != null && xceiverClient != null) {
-      xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
-      xceiverClient = null;
+    if (xceiverClientFactory != null && xceiverClientGrpc != null) {
+      xceiverClientFactory.releaseClientForReadData(xceiverClientGrpc, false);
+      xceiverClientGrpc = null;
+    }
+    if (xceiverClientFactory != null && xceiverClientShortCircuit != null) {
+      xceiverClientFactory.releaseClientForReadData(xceiverClientShortCircuit, false);
+      xceiverClientShortCircuit = null;
     }
   }
 
@@ -500,6 +647,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return blockPosition;
   }
 
+  public FileInputStream getBlockFileInputStream() {
+    return blockFileInputStream;
+  }
+
   @Override
   public synchronized void unbuffer() {
     storePosition();
@@ -517,7 +668,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     blockPosition = getPos();
   }
 
-  private void handleReadError(IOException cause) throws IOException {
+  private synchronized void handleReadError(IOException cause) throws IOException {
     releaseClient();
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
     if (inputStreams != null) {

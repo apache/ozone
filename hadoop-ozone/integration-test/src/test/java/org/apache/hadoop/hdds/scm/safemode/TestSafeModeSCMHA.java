@@ -26,9 +26,9 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -118,7 +118,7 @@ public class TestSafeModeSCMHA {
 
     OzoneBucket bucket = volume.getBucket("testbucket");
 
-    TestDataUtil.createKey(bucket, "testkey123",
+    DataTestUtil.createKey(bucket, "testkey123",
         RatisReplicationConfig.getInstance(THREE), "Hello".getBytes(UTF_8));
   }
 }

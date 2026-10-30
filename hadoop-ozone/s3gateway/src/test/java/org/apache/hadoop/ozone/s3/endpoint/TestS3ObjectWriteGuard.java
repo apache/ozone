@@ -32,8 +32,13 @@ import org.apache.hadoop.ozone.client.OzoneBucketStub.KeyMetadataAwareByteBuffer
 import org.apache.hadoop.ozone.client.OzoneBucketStub.KeyMetadataAwareOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
+import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for close-time commit guards used by S3 object writes.
@@ -120,11 +125,60 @@ class TestS3ObjectWriteGuard {
     assertCommitBlockedBy(guard, failure);
   }
 
+  @Test
+  void keyOpenedFailureBlocksEmptyCommit() {
+    RuntimeException failure = new IllegalStateException("key-open callback failed");
+    S3ObjectWriteGuard guard = newGuard(0);
+
+    RuntimeException thrown = assertThrows(RuntimeException.class,
+        () -> guard.onKeyOpened(key -> {
+          throw failure;
+        }));
+
+    assertSame(failure, thrown);
+    assertCommitBlockedBy(guard, failure);
+  }
+
+  @Test
+  void datastreamKeyOpenedFailureBlocksEmptyCommit() {
+    RuntimeException failure = new IllegalStateException("key-open callback failed");
+    S3ObjectStreamingWriteGuard guard = new S3ObjectStreamingWriteGuard(
+        new OzoneDataStreamOutput(
+            new KeyMetadataAwareByteBufferStreamOutput(Collections.emptyMap()), null),
+        0, KEY_PATH);
+
+    RuntimeException thrown = assertThrows(RuntimeException.class,
+        () -> guard.onKeyOpened(key -> {
+          throw failure;
+        }));
+
+    assertSame(failure, thrown);
+    assertCommitBlockedBy(guard, failure);
+  }
+
   private static S3ObjectWriteGuard newGuard(long expectedLength) {
     KeyMetadataAwareOutputStream keyOutputStream =
         new KeyMetadataAwareOutputStream(Collections.emptyMap());
     return new S3ObjectWriteGuard(new OzoneOutputStream(keyOutputStream, null),
         expectedLength, KEY_PATH);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void unsignedTrailerFailureBlocksCommitAfterExactLengthRead(boolean datastream) throws ReflectiveOperationException {
+    S3ObjectWriteGuard guard = datastream ? new S3ObjectStreamingWriteGuard(
+        new OzoneDataStreamOutput(new KeyMetadataAwareByteBufferStreamOutput(Collections.emptyMap()), null),
+        CONTENT.length, KEY_PATH) : newGuard(CONTENT.length);
+    // All decoded bytes are present; the trailer is missing its final blank line.
+    byte[] body = "7\r\ncontent\r\n0\r\nx-amz-checksum-crc32:AAAAAA==\r\n".getBytes(UTF_8);
+    UnsignedChunksInputStream chunks = new UnsignedChunksInputStream(
+        new ByteArrayInputStream(body), KEY_PATH, TrailerHeader.CRC32);
+    MultiDigestInputStream input = new MultiDigestInputStream(chunks, Collections.emptyList());
+
+    OS3Exception failure = assertThrows(OS3Exception.class, () -> guard.copyFrom(input, CONTENT.length));
+
+    assertThat(writtenLength(guard)).isEqualTo(CONTENT.length);
+    assertCommitBlockedBy(guard, failure);
   }
 
   private static InputStream failingInputStream(Throwable failure) {

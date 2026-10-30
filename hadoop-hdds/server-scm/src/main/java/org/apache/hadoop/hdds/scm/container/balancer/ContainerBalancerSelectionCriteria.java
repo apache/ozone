@@ -21,10 +21,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -47,6 +50,7 @@ import org.slf4j.LoggerFactory;
 public class ContainerBalancerSelectionCriteria {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerSelectionCriteria.class);
+  private static final int MAX_EXCLUDED_CONTAINERS_TO_LOG = 50;
 
   private ContainerBalancerConfiguration balancerConfiguration;
   private NodeManager nodeManager;
@@ -55,9 +59,16 @@ public class ContainerBalancerSelectionCriteria {
   private Map<ContainerID, DatanodeDetails> containerToSourceMap;
   private Set<ContainerID> excludeContainers;
   private Set<ContainerID> includeContainers;
-  private Set<ContainerID> excludeContainersDueToFailure;
+  // excludeContainersDueToFailure: Containers excluded for current iteration only.
+  // excludeContainersNotFound: Container exclusions persist across iterations.
+  private final Set<ContainerID> excludeContainersDueToFailure;
+  private final Set<ContainerID> excludeContainersNotFound;
+  private final Map<ContainerID, ContainerHealthResult.HealthState> excludeContainersDueToHealth;
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
+
+  // Capped to avoid unbounded growth in long-running or unlimited-iteration runs.
+  private static final int MAX_NOT_FOUND_CONTAINERS = 10_000;
 
   public ContainerBalancerSelectionCriteria(
       ContainerBalancerConfiguration balancerConfiguration,
@@ -66,12 +77,26 @@ public class ContainerBalancerSelectionCriteria {
       ContainerManager containerManager,
       FindSourceStrategy findSourceStrategy,
       Map<ContainerID, DatanodeDetails> containerToSourceMap) {
+    this(balancerConfiguration, nodeManager, replicationManager, containerManager,
+        findSourceStrategy, containerToSourceMap, new HashSet<>());
+  }
+
+  public ContainerBalancerSelectionCriteria(
+      ContainerBalancerConfiguration balancerConfiguration,
+      NodeManager nodeManager,
+      ReplicationManager replicationManager,
+      ContainerManager containerManager,
+      FindSourceStrategy findSourceStrategy,
+      Map<ContainerID, DatanodeDetails> containerToSourceMap,
+      Set<ContainerID> excludeContainersNotFound) {
     this.balancerConfiguration = balancerConfiguration;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
     this.containerToSourceMap = containerToSourceMap;
-    excludeContainersDueToFailure = new HashSet<>();
+    this.excludeContainersDueToFailure = new HashSet<>();
+    this.excludeContainersNotFound = excludeContainersNotFound;
+    this.excludeContainersDueToHealth = new LinkedHashMap<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
     includeContainers = balancerConfiguration.getIncludeContainers();
     this.findSourceStrategy = findSourceStrategy;
@@ -175,11 +200,13 @@ public class ContainerBalancerSelectionCriteria {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} to check if it should be a " +
           "candidate container. Excluding it.", containerID);
+      addToExcludeNotFoundContainers(containerID);
       return true;
     }
 
     if (excludeContainers.contains(containerID) ||
         excludeContainersDueToFailure.contains(containerID) ||
+        excludeContainersNotFound.contains(containerID) ||
         containerToSourceMap.containsKey(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
         || breaksMaxSizeToMoveLimit(container.containerID(),
@@ -193,6 +220,7 @@ public class ContainerBalancerSelectionCriteria {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
           "this container.", container.getContainerID(), e);
+      addToExcludeNotFoundContainers(containerID);
       return true;
     }
 
@@ -247,6 +275,7 @@ public class ContainerBalancerSelectionCriteria {
     ContainerHealthResult.HealthState state =
         replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
     if (state != ContainerHealthResult.HealthState.HEALTHY) {
+      excludeContainersDueToHealth.put(container.containerID(), state);
       LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
       return false;
     }
@@ -339,8 +368,22 @@ public class ContainerBalancerSelectionCriteria {
       return true;
     }
 
+    excludeContainersDueToHealth.put(container.containerID(), state);
     LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
     return false;
+  }
+
+  void logExcludedContainersDueToHealth() {
+    if (excludeContainersDueToHealth.isEmpty()) {
+      return;
+    }
+
+    List<Map.Entry<ContainerID, ContainerHealthResult.HealthState>> containersToLog =
+        excludeContainersDueToHealth.entrySet().stream()
+            .limit(MAX_EXCLUDED_CONTAINERS_TO_LOG)
+            .collect(Collectors.toList());
+    LOG.info("Excluded {} containers because of their health state. Logging the first {}: {}.",
+        excludeContainersDueToHealth.size(), containersToLog.size(), containersToLog);
   }
 
   private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,
@@ -369,6 +412,20 @@ public class ContainerBalancerSelectionCriteria {
     return excludeContainersDueToFailure;
   }
 
+  public void addToExcludeNotFoundContainers(ContainerID container) {
+    if (excludeContainersNotFound.size() < MAX_NOT_FOUND_CONTAINERS) {
+      excludeContainersNotFound.add(container);
+    } else {
+      LOG.warn("ContainerBalancer not found exclude set has reached the cap of {}. " +
+              "Container {} will not be added, it may be retried in subsequent iterations.",
+          MAX_NOT_FOUND_CONTAINERS, container);
+    }
+  }
+
+  Set<ContainerID> getExcludeNotFoundContainers() {
+    return excludeContainersNotFound;
+  }
+
   private NavigableSet<ContainerID> getCandidateContainers(DatanodeDetails node) {
     NavigableSet<ContainerID> newSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
@@ -380,9 +437,9 @@ public class ContainerBalancerSelectionCriteria {
       if (excludeContainers != null) {
         idSet.removeAll(excludeContainers);
       }
-      if (excludeContainersDueToFailure != null) {
-        idSet.removeAll(excludeContainersDueToFailure);
-      }
+      idSet.removeAll(excludeContainersDueToFailure);
+      idSet.removeAll(excludeContainersNotFound);
+
       idSet.removeAll(containerToSourceMap.keySet());
       newSet.addAll(idSet);
       return newSet;

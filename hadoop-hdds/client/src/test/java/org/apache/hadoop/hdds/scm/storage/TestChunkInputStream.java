@@ -18,20 +18,34 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.BUFFER_SIZE;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.EOFException;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -49,6 +63,9 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -157,6 +174,105 @@ public class TestChunkInputStream {
   }
 
   @Test
+  public void testReadChunkRequestOmitsChecksums() {
+    ChunkReader reader = new ChunkReader(chunkInfo, true, chunkStream::readChunk);
+    ChunkInfo request = reader.getChunkInfo(30, 25);
+    assertThat(request.getChecksumData().getChecksumsList()).isEmpty();
+    assertThat(chunkInfo.getChecksumData().getChecksumsList()).isNotEmpty();
+    assertEquals(chunkInfo.getChecksumData().getBytesPerChecksum(), request.getChecksumData().getBytesPerChecksum());
+    assertEquals(20, request.getOffset());
+    assertEquals(40, request.getLen());
+  }
+
+  @Test
+  public void testPositionedReadIsStateless() throws Exception {
+    // Advance the stream's own cursor with a normal sequential read.
+    byte[] seq = new byte[10];
+    assertEquals(10, chunkStream.read(seq, 0, 10));
+    matchWithInputData(seq, 0, 10);
+    long posBeforePositionedRead = chunkStream.getPos();
+
+    // A positioned read at an unrelated offset returns the right bytes ...
+    ByteBuffer dst = ByteBuffer.allocate(15);
+    int read = chunkStream.readPositioned(50, dst);
+    assertEquals(15, read);
+    dst.flip();
+    byte[] positioned = new byte[15];
+    dst.get(positioned);
+    matchWithInputData(positioned, 50, 15);
+
+    // ... without disturbing the stream's own position ...
+    assertEquals(posBeforePositionedRead, chunkStream.getPos());
+
+    // ... so the sequential read continues where it left off.
+    byte[] seq2 = new byte[10];
+    assertEquals(10, chunkStream.read(seq2, 0, 10));
+    matchWithInputData(seq2, 10, 10);
+  }
+
+  @Test
+  public void testPositionedReadAtEof() throws Exception {
+    ByteBuffer dst = ByteBuffer.allocate(10);
+    assertEquals(-1, chunkStream.readPositioned(CHUNK_SIZE, dst));
+    assertEquals(-1, chunkStream.readPositioned(CHUNK_SIZE + 1, dst));
+    for (long position : new long[] {0, CHUNK_SIZE, CHUNK_SIZE + 1}) {
+      assertEquals(0, chunkStream.readPositioned(position, ByteBuffer.allocate(0)));
+    }
+  }
+
+  @Test
+  public void testPositionedReadTruncatedAtChunkEnd() throws Exception {
+    // Request more than remains in the chunk; only the remainder is returned.
+    ByteBuffer dst = ByteBuffer.allocate(50);
+    int read = chunkStream.readPositioned(CHUNK_SIZE - 20, dst);
+    assertEquals(20, read);
+    dst.flip();
+    byte[] tail = new byte[20];
+    dst.get(tail);
+    matchWithInputData(tail, CHUNK_SIZE - 20, 20);
+  }
+
+  @Test
+  public void testConcurrentPositionedRead() throws Exception {
+    Checksum checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
+    byte[] largeChunkData = generateRandomData(SOURCE_SIZE);
+    ChunkInfo largeChunkInfo = ChunkInfo.newBuilder()
+        .setChunkName("large-chunk")
+        .setOffset(0)
+        .setLen(SOURCE_SIZE)
+        .setChecksumData(checksum.computeChecksum(
+            largeChunkData, 0, SOURCE_SIZE).getProtoBufMessage())
+        .build();
+    try (DummyChunkInputStream largeStream = new DummyChunkInputStream(
+        largeChunkInfo, blockID, null, false, largeChunkData.clone(), null)) {
+      PositionedReadTestHelper.runConcurrentPositionedReads(largeChunkData,
+          (offset, buf) -> {
+            int read = largeStream.readPositioned(offset, buf);
+            if (read != BUFFER_SIZE) {
+              throw new AssertionError("expected " + BUFFER_SIZE + " bytes at " + offset
+                  + " but read " + read);
+            }
+          });
+    }
+  }
+
+  @Test
+  void concurrentLocalRangeReadsPreserveFileAndStreamPositions(@TempDir Path directory) throws Exception {
+    byte[] data = generateRandomData(SOURCE_SIZE);
+    Path path = Files.write(directory.resolve("block"), data);
+    ChunkInfo info = chunkInfo.toBuilder().setLen(data.length)
+        .setChecksumData(new Checksum(ChecksumType.CRC32, 4096).computeChecksum(data).getProtoBufMessage()).build();
+    try (FileChannel file = FileChannel.open(path);
+         LocalChunkInputStream stream = new LocalChunkInputStream(info, blockID, null, () -> null, true,
+             () -> null, null, file)) {
+      stream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, stream::readPositioned);
+      assertEquals(123, stream.getPos());
+      assertEquals(0, file.position());
+    }
+  }
+
+  @Test
   public void testSeek() throws Exception {
     seekAndVerify(0);
     EOFException eofException = assertThrows(EOFException.class, () ->  seekAndVerify(CHUNK_SIZE + 1));
@@ -235,6 +351,103 @@ public class TestChunkInputStream {
     int bytesRead2 = chunkStream.read(b2, 0, 20);
     assertEquals(20, bytesRead2, "Expected to read 20 bytes");
     matchWithInputData(b2, 20, 20);
+  }
+
+  @Test
+  void rangeReadsOverlapWithoutChangingSourceBufferPositions() throws Exception {
+    ByteBuffer source = ByteBuffer.wrap(chunkData, 0, BYTES_PER_CHECKSUM).slice().asReadOnlyBuffer();
+    CountDownLatch entered = new CountDownLatch(2);
+    ChunkReader reader = new ChunkReader(chunkInfo, true, range -> {
+      entered.countDown();
+      try {
+        if (!entered.await(5, TimeUnit.SECONDS)) {
+          throw new IOException("Range reads were serialized");
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(e);
+      }
+      return new ByteBuffer[] {source};
+    });
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> first = executor.submit(() -> {
+        ByteBuffer destination = ByteBuffer.allocate(7);
+        assertEquals(7, reader.read(3, destination));
+        assertArrayEquals(Arrays.copyOfRange(chunkData, 3, 10), destination.array());
+        return null;
+      });
+      Future<?> second = executor.submit(() -> {
+        ByteBuffer destination = ByteBuffer.allocate(7);
+        assertEquals(7, reader.read(12, destination));
+        assertArrayEquals(Arrays.copyOfRange(chunkData, 12, 19), destination.array());
+        return null;
+      });
+      first.get(10, TimeUnit.SECONDS);
+      second.get(10, TimeUnit.SECONDS);
+      assertEquals(0, source.position());
+      assertEquals(BYTES_PER_CHECKSUM, source.limit());
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "true, 0, 100, 0, 100",
+      "true, 1, 98, 0, 100",
+      "true, 19, 2, 0, 40",
+      "true, 91, 9, 80, 20",
+      "false, 0, 100, 0, 100",
+      "false, 7, 17, 7, 17"
+  })
+  void rangeReadsReuseFullChunkInfo(boolean verifyChecksum, int offset, int length,
+      int expectedOffset, int expectedLength) throws Exception {
+    ChunkInfo info = chunkInfo.toBuilder().setOffset(1024).setStripeChecksum(ByteString.copyFromUtf8("stripe")).build();
+    AtomicReference<ChunkInfo> request = new AtomicReference<>();
+    ChunkReader reader = new ChunkReader(info, verifyChecksum, range -> {
+      request.set(range);
+      assertEquals(1024 + expectedOffset, range.getOffset());
+      assertEquals(expectedLength, range.getLen());
+      assertEquals(info.getChecksumData().toBuilder().clearChecksums().build(), range.getChecksumData());
+      assertFalse(range.hasStripeChecksum());
+      return new ByteBuffer[] {ByteBuffer.wrap(chunkData, expectedOffset, expectedLength)};
+    });
+    ByteBuffer destination = ByteBuffer.allocate(length);
+    assertEquals(length, reader.read(offset, destination));
+    assertArrayEquals(Arrays.copyOfRange(chunkData, offset, offset + length), destination.array());
+    if (expectedLength == CHUNK_SIZE) {
+      assertSame(request.get(), reader.getChunkInfo(offset, length));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void rangeReadsSkipBuffersWithoutChangingTheirPositions(boolean directSource, boolean directDestination)
+      throws Exception {
+    ByteBuffer[] sources = new ByteBuffer[5];
+    for (int i = 0; i < sources.length; i++) {
+      ByteBuffer buffer = directSource ? ByteBuffer.allocateDirect(8) : ByteBuffer.allocate(8);
+      buffer.position(2);
+      buffer.put(chunkData, i * 4, 4);
+      buffer.limit(6).position(2);
+      sources[i] = buffer.asReadOnlyBuffer();
+    }
+    ChunkReader reader = new ChunkReader(chunkInfo, true, range -> sources);
+    ByteBuffer destination = directDestination ? ByteBuffer.allocateDirect(10) : ByteBuffer.allocate(10);
+    destination.position(2).limit(9);
+    assertEquals(7, reader.read(9, destination));
+    assertEquals(9, destination.position());
+    assertEquals(9, destination.limit());
+    destination.position(2);
+    byte[] actual = new byte[7];
+    destination.get(actual);
+    assertArrayEquals(Arrays.copyOfRange(chunkData, 9, 16), actual);
+    for (ByteBuffer source : sources) {
+      assertEquals(2, source.position());
+      assertEquals(6, source.limit());
+    }
   }
 
   @Test

@@ -69,13 +69,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -85,6 +83,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdat
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.OMDBReprocessResponse;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.metrics.ReconSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -293,7 +292,16 @@ public class OzoneManagerServiceProviderImpl
                   deltaTaskStatusUpdater.getLastUpdatedSeqNumber()) < 0; // Condition 3
         })
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));  // Collect into desired Map
-    if (!reconOmTaskMap.isEmpty()) {
+    if (!reconOmTaskMap.isEmpty() && omMetadataManager.getStore() == null) {
+      // Fresh start (or the local OM snapshot DB is missing) while stale task
+      // status rows still exist in the Recon SQL DB. There is no local OM DB to
+      // checkpoint/reprocess yet, so attempting reinitialization here would fail
+      // (checkpoint creation dereferences a null DB store). Skip it; the full
+      // snapshot sync scheduled below will download the OM DB and initialize tasks.
+      LOG.info("Skipping startup task reinitialization because the local OM DB store " +
+          "is not initialized yet (no OM snapshot present). The scheduled full snapshot " +
+          "sync will download the OM DB and initialize tasks.");
+    } else if (!reconOmTaskMap.isEmpty()) {
       LOG.info("Task name and last updated sequence number of tasks, that are not matching with " +
           "the last updated sequence number of OmDeltaRequest task:\n");
       LOG.info("{} -> {}", deltaTaskStatusUpdater.getTaskName(), deltaTaskStatusUpdater.getLastUpdatedSeqNumber());
@@ -497,11 +505,9 @@ public class OzoneManagerServiceProviderImpl
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(
           ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-      // Do not wipe the candidate dir here. The shared RDBSnapshotProvider's
-      // checkLeaderConsistency() manages it on the next attempt: kept for the
-      // same leader (so a future batched/chunked transfer can resume the parts
-      // already received), reset on a leader change. This matches how the OM
-      // follower handles a failed download.
+      // Clear the candidate dir, as the OM follower does after a failed download, so a partly extracted file
+      // is never reported to the leader as already received on the next attempt.
+      reconSnapshotProvider.init();
       return null;
     }
   }
@@ -559,6 +565,27 @@ public class OzoneManagerServiceProviderImpl
       LOG.error("Unable to refresh Recon OM DB Snapshot.", e);
       reconSyncMetrics.incrSnapshotDownloadFailures();
       return false;
+    }
+  }
+
+  @Override
+  public OMDBReprocessResponse triggerTaskRebuild() {
+    if (omMetadataManager == null || omMetadataManager.getStore() == null) {
+      return new OMDBReprocessResponse(OMDBReprocessResponse.Status.RETRY,
+          "Recon has not loaded an OM DB yet, so there is nothing to rebuild. Ensure an OM DB snapshot is "
+              + "present in the Recon OM DB directory and has been loaded, then retry.");
+    }
+
+    ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD);
+
+    if (result == ReconTaskController.ReInitializationResult.SUCCESS) {
+      return new OMDBReprocessResponse(OMDBReprocessResponse.Status.ACCEPTED,
+          "Manual OM DB rebuild queued successfully.");
+    } else {
+      return new OMDBReprocessResponse(OMDBReprocessResponse.Status.RETRY,
+          "Manual OM DB rebuild could not be queued. Buffer might be full or another rebuild is "
+              + "pending. Please retry.");
     }
   }
 
@@ -625,8 +652,7 @@ public class OzoneManagerServiceProviderImpl
       reconSyncMetrics.incrDeltaFetchSuccess();
 
       latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
-      RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
-      final RocksDatabase rocksDB = rocksDBStore.getDb();
+      DBStore omDbStore = omMetadataManager.getStore();
       numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
@@ -647,12 +673,10 @@ public class OzoneManagerServiceProviderImpl
           try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
             // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
             writeBatch.iterate(omdbUpdatesHandler);
-            // Commit the OM DB transactions in recon rocks DB and sync here.
+            // Commit the OM DB transactions using the store's configured write options.
             try (RDBBatchOperation rdbBatchOperation =
                      RDBBatchOperation.newAtomicOperation(writeBatch)) {
-              try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
-                rdbBatchOperation.commit(rocksDB, wOpts);
-              }
+              omDbStore.commitBatchOperation(rdbBatchOperation);
             }
           }
         }
@@ -707,6 +731,11 @@ public class OzoneManagerServiceProviderImpl
         boolean fullSnapshot = false;
 
         if (currentSequenceNumber <= 0) {
+          fullSnapshot = true;
+        } else if (!omMetadataManager.getStore().getDbLocation().exists()) {
+          // A failed full snapshot leaves Recon on its previous OM DB, whose directory was deleted before the fetch.
+          LOG.warn("Recon OM DB directory {} no longer exists, fetching a full snapshot.",
+              omMetadataManager.getStore().getDbLocation());
           fullSnapshot = true;
         } else {
           // Get updates from OM and apply to local Recon OM DB and update task status in table

@@ -219,6 +219,10 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       throw new OMException("Unable to acquire readlock on snapshot db with key " + key,
           OMException.ResultCodes.INTERNAL_ERROR);
     }
+    // The dbMap.compute lambda cannot throw a checked exception, so a typed load failure is parked here and
+    // rethrown below. Flattening it into an IllegalStateException loses the result code, and callers cannot
+    // map that back to a retriable condition such as TIMEOUT.
+    AtomicReference<OMException> loadFailure = new AtomicReference<>();
     try {
       // Atomic operation to initialize the OmSnapshot instance (once) if the key
       // does not exist, and increment the reference count on the instance.
@@ -227,10 +231,11 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
           LOG.info("Loading SnapshotId: '{}'", k);
           try {
             v = new ReferenceCounted<>(cacheLoader.load(key), false, this);
+            omMetrics.incNumSnapshotCacheSize();
           } catch (OMException omEx) {
             // Return null if the snapshot is no longer active
             if (!omEx.getResult().equals(OMException.ResultCodes.FILE_NOT_FOUND)) {
-              throw new IllegalStateException(omEx);
+              loadFailure.set(omEx);
             }
           } catch (IOException ioEx) {
             // Failed to load snapshot DB
@@ -239,7 +244,6 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
             // Unexpected and unknown exception thrown from CacheLoader#load
             throw new IllegalStateException(ex);
           }
-          omMetrics.incNumSnapshotCacheSize();
         }
         if (v != null) {
           // When RC OmSnapshot is successfully loaded
@@ -247,6 +251,10 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         }
         return v;
       });
+      OMException loadException = loadFailure.get();
+      if (loadException != null) {
+        throw loadException;
+      }
       if (rcOmSnapshot == null) {
         throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
             OMException.ResultCodes.FILE_NOT_FOUND);
@@ -397,9 +405,13 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       if (v == null) {
         LOG.info("SnapshotId '{}' does not exist in cache during cleanup; "
             + "it may have already been invalidated, closed, and removed.", k);
+        pendingEvictionQueue.remove(k);
       } else if (v.getTotalRefCount() > 0) {
         LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
         result = v;
+        // Deliberately leave the key queued. A concurrent release can drop the last reference and re-enqueue
+        // the key after the count above was read, and dequeuing it here would strand an unreferenced entry in
+        // dbMap that is no longer queued, so nothing would ever evict it.
       } else {
         LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
         // Close the instance, which also closes its DB handle.
@@ -409,8 +421,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
           throw new IllegalStateException("Error while closing snapshot DB for snapshotId " + k, ex);
         }
         omMetrics.decNumSnapshotCacheSize();
+        pendingEvictionQueue.remove(k);
       }
-      pendingEvictionQueue.remove(k);
       return result;
     });
     return null;

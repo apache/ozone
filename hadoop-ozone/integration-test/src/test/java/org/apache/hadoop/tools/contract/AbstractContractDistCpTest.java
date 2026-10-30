@@ -283,7 +283,7 @@ public abstract class AbstractContractDistCpTest
     Counter c = job.getCounters().findCounter(counter);
     long value = c.getValue();
     String description =
-        String.format("%s value %s", c.getDisplayName(), value, false);
+        String.format("%s value %s", c.getDisplayName(), value);
 
     if (min >= 0) {
       assertThat(value)

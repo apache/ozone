@@ -532,7 +532,7 @@ public class KeyOutputStream extends OutputStream
         throw new UnsupportedOperationException("The replication factor = "
             + replication.getRequiredNodes() + " <= 1");
       }
-      if (ozoneManagerVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      if (!OzoneManagerVersion.HBASE_SUPPORT.isSupportedBy(ozoneManagerVersion)) {
         throw new UnsupportedOperationException("Hsync API requires OM version "
             + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
             + ozoneManagerVersion);
@@ -662,6 +662,10 @@ public class KeyOutputStream extends OutputStream
   public synchronized OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
+  }
+
+  public long getModificationTime() {
+    return blockOutputStreamEntryPool.getModificationTime();
   }
 
   @VisibleForTesting

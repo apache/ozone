@@ -28,6 +28,7 @@ import picocli.CommandLine.Command;
     subcommands = {
         CreateSnapshotHandler.class,
         DeleteSnapshotHandler.class,
+        CountSnapshotHandler.class,
         ListSnapshotHandler.class,
         SnapshotDiffHandler.class,
         ListSnapshotDiffHandler.class,

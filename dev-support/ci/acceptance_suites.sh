@@ -19,8 +19,14 @@
 # shellcheck source=dev-support/ci/lib/_script_init.sh
 . dev-support/ci/lib/_script_init.sh
 
-SUITES=$(grep --no-filename -r '^#suite:' hadoop-ozone/dist/src/main/compose \
-  | sort -u | cut -f2 -d':' | grep -v 'failing')
+cd hadoop-ozone/dist/src/main/compose
+SUITES=$(find . -mindepth 2 -maxdepth 2 -name 'test*.sh' | cut -c3- \
+  | grep -Fv -e 'testlib.sh' -e 'test-failures' \
+  | sort)
+VERSIONS=$(grep '^old_versions=' xcompat/lib.sh \
+  | cut -f2 -d'"')
 
 initialization::ga_output suites \
     "$(initialization::parameters_to_json ${SUITES})"
+initialization::ga_output versions \
+    "$(initialization::parameters_to_json ${VERSIONS})"

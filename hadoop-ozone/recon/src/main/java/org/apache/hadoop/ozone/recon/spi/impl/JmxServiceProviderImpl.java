@@ -110,8 +110,7 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
     return SecurityUtil.doAsLoginUser(() -> {
       HttpURLConnection urlConnection =
           getMetricsResponse(api, queryString);
-      if (Response.Status.fromStatusCode(urlConnection.getResponseCode())
-          .getFamily() == Response.Status.Family.SUCCESSFUL) {
+      if (Response.Status.Family.familyOf(urlConnection.getResponseCode()) == Response.Status.Family.SUCCESSFUL) {
         try (InputStream inputStream = urlConnection.getInputStream()) {
           Map<String, Object> jsonMap = JsonUtils.getDefaultMapper().readValue(inputStream, Map.class);
           Object beansObj = jsonMap.get("beans");

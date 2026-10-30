@@ -319,37 +319,39 @@ public abstract class ContainerKeyMapperHelper {
     long containerCountToIncrement = 0;
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo.getKeyLocationVersions()) {
       long keyVersion = omKeyLocationInfoGroup.getVersion();
-      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup.getLocationList()) {
-        long containerId = omKeyLocationInfo.getContainerID();
-        ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
-        if (reconContainerMetadataManager.getCountForContainerKeyPrefix(containerKeyPrefix) == 0 &&
-            !containerKeyMap.containsKey(containerKeyPrefix)) {
-          // Save on writes. No need to save same container-key prefix
-          // mapping again.
-          containerKeyMap.put(containerKeyPrefix, 1);
-          // Remove the container-key prefix from the deleted list if we
-          // previously deleted it in this batch (and now we add it again)
-          deletedContainerKeyList.remove(containerKeyPrefix);
+      for (List<OmKeyLocationInfo> locationList : omKeyLocationInfoGroup.getLocationLists()) {
+        for (OmKeyLocationInfo omKeyLocationInfo : locationList) {
+          long containerId = omKeyLocationInfo.getContainerID();
+          ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
+          if (reconContainerMetadataManager.getCountForContainerKeyPrefix(containerKeyPrefix) == 0 &&
+              !containerKeyMap.containsKey(containerKeyPrefix)) {
+            // Save on writes. No need to save same container-key prefix
+            // mapping again.
+            containerKeyMap.put(containerKeyPrefix, 1);
+            // Remove the container-key prefix from the deleted list if we
+            // previously deleted it in this batch (and now we add it again)
+            deletedContainerKeyList.remove(containerKeyPrefix);
 
-          // check if container already exists and
-          // increment the count of containers if it does not exist
-          if (!reconContainerMetadataManager.doesContainerExists(containerId) &&
-              !containerKeyCountMap.containsKey(containerId)) {
-            containerCountToIncrement++;
+            // check if container already exists and
+            // increment the count of containers if it does not exist
+            if (!reconContainerMetadataManager.doesContainerExists(containerId) &&
+                !containerKeyCountMap.containsKey(containerId)) {
+              containerCountToIncrement++;
+            }
+
+            // update the count of keys for the given containerID
+            long keyCount;
+            if (containerKeyCountMap.containsKey(containerId)) {
+              keyCount = containerKeyCountMap.get(containerId);
+            } else {
+              keyCount = reconContainerMetadataManager.getKeyCountForContainer(containerId);
+            }
+
+            // increment the count and update containerKeyCount.
+            // keyCount will be 0 if containerID is not found. So, there is no
+            // need to initialize keyCount for the first time.
+            containerKeyCountMap.put(containerId, ++keyCount);
           }
-
-          // update the count of keys for the given containerID
-          long keyCount;
-          if (containerKeyCountMap.containsKey(containerId)) {
-            keyCount = containerKeyCountMap.get(containerId);
-          } else {
-            keyCount = reconContainerMetadataManager.getKeyCountForContainer(containerId);
-          }
-
-          // increment the count and update containerKeyCount.
-          // keyCount will be 0 if containerID is not found. So, there is no
-          // need to initialize keyCount for the first time.
-          containerKeyCountMap.put(containerId, ++keyCount);
         }
       }
     }
@@ -490,18 +492,20 @@ public abstract class ContainerKeyMapperHelper {
 
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo.getKeyLocationVersions()) {
       long keyVersion = omKeyLocationInfoGroup.getVersion();
-      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup.getLocationList()) {
-        long containerId = omKeyLocationInfo.getContainerID();
-        ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
+      for (List<OmKeyLocationInfo> locationList : omKeyLocationInfoGroup.getLocationLists()) {
+        for (OmKeyLocationInfo omKeyLocationInfo : locationList) {
+          long containerId = omKeyLocationInfo.getContainerID();
+          ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
 
-        // During reprocess, tables are empty so skip DB lookup - just check in-memory map
-        if (!localContainerKeyMap.containsKey(containerKeyPrefix)) {
-          // Save on writes. No need to save same container-key prefix mapping again.
-          localContainerKeyMap.put(containerKeyPrefix, 1);
+          // During reprocess, tables are empty so skip DB lookup - just check in-memory map
+          if (!localContainerKeyMap.containsKey(containerKeyPrefix)) {
+            // Save on writes. No need to save same container-key prefix mapping again.
+            localContainerKeyMap.put(containerKeyPrefix, 1);
 
-          // Thread-safe increment using computeIfAbsent (cross-task safe: FSO + OBS)
-          sharedContainerKeyCountMap.computeIfAbsent(containerId, k -> new AtomicLong(0))
-              .incrementAndGet();
+            // Thread-safe increment using computeIfAbsent (cross-task safe: FSO + OBS)
+            sharedContainerKeyCountMap.computeIfAbsent(containerId, k -> new AtomicLong(0))
+                .incrementAndGet();
+          }
         }
       }
     }

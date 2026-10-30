@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
  * A ContainerStateManager is responsible for keeping track of all the
@@ -169,6 +170,11 @@ public interface ContainerStateManager extends SCMHandler {
   void addContainer(ContainerInfoProto containerInfo)
       throws IOException;
 
+  @Deprecated
+  @Replicate
+  void updateContainerState(HddsProtos.ContainerID id,
+      HddsProtos.LifeCycleEvent event) throws IOException, InvalidStateTransitionException;
+
   /**
    * Updates container state with sequenceId synchronization for HA consistency.
    * This method ensures that all SCM nodes have the same sequenceId when 
@@ -191,6 +197,14 @@ public interface ContainerStateManager extends SCMHandler {
   @Replicate
   void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
       throws IOException;
+
+  /**
+   * Kept to apply Raft log entries written by SCM 2.0 and 2.1.
+   * Same as {@link #transitionDeletingOrDeletedToTargetState} with CLOSED.
+   */
+  @Deprecated
+  @Replicate
+  void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
 
   /**
    *

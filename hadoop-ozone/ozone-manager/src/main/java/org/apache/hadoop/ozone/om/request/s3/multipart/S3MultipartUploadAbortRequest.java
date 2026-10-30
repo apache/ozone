@@ -82,8 +82,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    KeyArgs keyArgs = super.preExecute(ozoneManager)
+    final KeyArgs keyArgs = super.preExecute(ozoneManager)
         .getAbortMultiPartUploadRequest().getKeyArgs();
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -92,8 +93,16 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath).build();
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,
-        ozoneManager, ACLType.WRITE);
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs, ozoneManager, ACLType.WRITE);
+    } catch (IOException ex) {
+      Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
+      auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
+          OMAction.ABORT_MULTIPART_UPLOAD, auditMap, ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
     return getOmRequest().toBuilder().setAbortMultiPartUploadRequest(
         getOmRequest().getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(
             resolvedArgs)).setUserInfo(getUserInfo()).build();
@@ -156,7 +165,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
           .get(multipartOpenKey);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       if (omKeyInfo == null) {
         // In old env, OpenKeycleanupservice may have deleted key from openKeyTable leaving behind
@@ -212,6 +221,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       omMetadataManager.getMultipartInfoTable()
           .addCacheEntry(new CacheKey<>(multipartKey),
               CacheValue.get(trxnLogIndex));
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
           multipartKey, multipartOpenKey, omResponse, omBucketInfo,

@@ -17,25 +17,42 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
+import javax.net.ssl.X509TrustManager;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 
@@ -103,4 +120,154 @@ public class TestSCMRatisServerImpl {
     }
   }
 
+  static Stream<Arguments> peerAddressEncodings() {
+    return Stream.of(
+        Arguments.of("10.0.0.1:9894", "10.0.0.1:9894:LEADER:peer1:10.0.0.1"),
+        Arguments.of("[2001:db8::1]:9894", "[2001:db8::1]:9894:LEADER:peer1:[2001:db8::1]"));
+  }
+
+  /**
+   * The encoding is a wire format shared with every consumer of
+   * {@code ozone admin scm roles}, so it is asserted verbatim rather than
+   * round-tripped through the parser that reads it back.
+   */
+  @ParameterizedTest
+  @MethodSource("peerAddressEncodings")
+  public void testGetRatisRolesEncoding(String peerAddress, String expectedRole) throws Exception {
+    try (
+        MockedConstruction<SecurityConfig> mockedSecurityConfigConstruction = mockConstruction(SecurityConfig.class);
+        MockedStatic<RaftServer> staticMockedRaftServer = mockStatic(RaftServer.class);
+        MockedStatic<RatisUtil> staticMockedRatisUtil = mockStatic(RatisUtil.class);
+    ) {
+      ConfigurationSource conf = mock(ConfigurationSource.class);
+      StorageContainerManager scm = mock(StorageContainerManager.class);
+      when(scm.getClusterId()).thenReturn("CID-" + UUID.randomUUID());
+      SCMHADBTransactionBuffer dbTransactionBuffer = mock(SCMHADBTransactionBuffer.class);
+
+      RaftServer.Builder raftServerBuilder = mock(RaftServer.Builder.class);
+      when(raftServerBuilder.setServerId(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setProperties(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setStateMachineRegistry(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setOption(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setGroup(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setParameters(any())).thenReturn(raftServerBuilder);
+
+      RaftServer raftServer = mock(RaftServer.class);
+      RaftServer.Division division = mock(RaftServer.Division.class);
+      when(raftServer.getDivision(any())).thenReturn(division);
+      when(raftServerBuilder.build()).thenReturn(raftServer);
+      staticMockedRaftServer.when(RaftServer::newBuilder).thenReturn(raftServerBuilder);
+
+      RaftProperties raftProperties = mock(RaftProperties.class);
+      staticMockedRatisUtil.when(() -> RatisUtil.newRaftProperties(conf)).thenReturn(raftProperties);
+
+      SecurityConfig sc = new SecurityConfig(conf);
+      when(sc.isSecurityEnabled()).thenReturn(false);
+
+      SCMRatisServerImpl scmRatisServer = spy(new SCMRatisServerImpl(conf, scm, dbTransactionBuffer));
+
+      RaftPeer peer = RaftPeer.newBuilder()
+          .setId(RaftPeerId.valueOf("peer1"))
+          .setAddress(peerAddress)
+          .build();
+
+      when(division.getGroup()).thenReturn(RaftGroup.valueOf(RaftGroupId.randomId(), peer));
+      doReturn(peer).when(scmRatisServer).getLeader();
+
+      List<String> roles = scmRatisServer.getRatisRoles();
+
+      assertEquals(Arrays.asList(expectedRole), roles);
+    }
+  }
+
+  @Test
+  public void testGetRatisRolesKeepsHostname() throws Exception {
+    try (
+        MockedConstruction<SecurityConfig> mockedSecurityConfigConstruction = mockConstruction(SecurityConfig.class);
+        MockedStatic<RaftServer> staticMockedRaftServer = mockStatic(RaftServer.class);
+        MockedStatic<RatisUtil> staticMockedRatisUtil = mockStatic(RatisUtil.class);
+    ) {
+      ConfigurationSource conf = mock(ConfigurationSource.class);
+      StorageContainerManager scm = mock(StorageContainerManager.class);
+      when(scm.getClusterId()).thenReturn("CID-" + UUID.randomUUID());
+      SCMHADBTransactionBuffer dbTransactionBuffer = mock(SCMHADBTransactionBuffer.class);
+
+      RaftServer.Builder raftServerBuilder = mock(RaftServer.Builder.class);
+      when(raftServerBuilder.setServerId(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setProperties(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setStateMachineRegistry(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setOption(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setGroup(any())).thenReturn(raftServerBuilder);
+      when(raftServerBuilder.setParameters(any())).thenReturn(raftServerBuilder);
+
+      RaftServer raftServer = mock(RaftServer.class);
+      RaftServer.Division division = mock(RaftServer.Division.class);
+      when(raftServer.getDivision(any())).thenReturn(division);
+      when(raftServerBuilder.build()).thenReturn(raftServer);
+      staticMockedRaftServer.when(RaftServer::newBuilder).thenReturn(raftServerBuilder);
+
+      RaftProperties raftProperties = mock(RaftProperties.class);
+      staticMockedRatisUtil.when(() -> RatisUtil.newRaftProperties(conf)).thenReturn(raftProperties);
+
+      SecurityConfig sc = new SecurityConfig(conf);
+      when(sc.isSecurityEnabled()).thenReturn(false);
+
+      SCMRatisServerImpl scmRatisServer = spy(new SCMRatisServerImpl(conf, scm, dbTransactionBuffer));
+
+      RaftPeer peer = RaftPeer.newBuilder()
+          .setId(RaftPeerId.valueOf("peer1"))
+          .setAddress("localhost:9894")
+          .build();
+
+      when(division.getGroup()).thenReturn(RaftGroup.valueOf(RaftGroupId.randomId(), peer));
+      doReturn(peer).when(scmRatisServer).getLeader();
+
+      List<String> roles = scmRatisServer.getRatisRoles();
+
+      // Which address a name resolves to is the resolver's business, so only
+      // the fields the encoding itself owns are pinned here.
+      assertEquals(1, roles.size());
+      assertThat(roles.get(0)).startsWith("localhost:9894:LEADER:peer1:");
+      assertThat(roles.get(0)).doesNotEndWith(":");
+    }
+  }
+
+  @Test
+  public void testTlsConfigAcceptsOnlyScmCertificates() throws Exception {
+    SecurityConfig securityConfig = mock(SecurityConfig.class);
+    when(securityConfig.isSecurityEnabled()).thenReturn(true);
+    when(securityConfig.isGrpcTlsEnabled()).thenReturn(true);
+    ReloadingX509TrustManager clusterTrustManager = mock(ReloadingX509TrustManager.class);
+    CertificateClient certificateClient = mock(CertificateClient.class);
+    when(certificateClient.getKeyManager()).thenReturn(mock(ReloadingX509KeyManager.class));
+    when(certificateClient.getTrustManager()).thenReturn(clusterTrustManager);
+
+    X509TrustManager trustManager = (X509TrustManager) HASecurityUtils
+        .createSCMRatisTLSConfig(securityConfig, certificateClient).getTrustManager().getTrustManager();
+
+    X509Certificate scmCert = mock(X509Certificate.class);
+    when(scmCert.getBasicConstraints()).thenReturn(Integer.MAX_VALUE);
+    X509Certificate[] scmChain = {scmCert};
+    trustManager.checkClientTrusted(scmChain, "RSA");
+    trustManager.checkServerTrusted(scmChain, "RSA");
+
+    X509Certificate leafCert = mock(X509Certificate.class);
+    when(leafCert.getBasicConstraints()).thenReturn(-1);
+    X509Certificate[] leafChain = {leafCert};
+    assertThatThrownBy(() -> trustManager.checkClientTrusted(leafChain, "RSA"))
+        .isInstanceOf(CertificateException.class)
+        .hasMessageStartingWith("Not an SCM certificate");
+    assertThatThrownBy(() -> trustManager.checkServerTrusted(leafChain, "RSA"))
+        .isInstanceOf(CertificateException.class)
+        .hasMessageStartingWith("Not an SCM certificate");
+    // Only the peer certificate counts, not the CA certificates that follow it in the chain.
+    X509Certificate[] leafWithIssuerChain = {leafCert, scmCert};
+    assertThatThrownBy(() -> trustManager.checkClientTrusted(leafWithIssuerChain, "RSA"))
+        .isInstanceOf(CertificateException.class)
+        .hasMessageStartingWith("Not an SCM certificate");
+
+    // A chain the cluster trust manager rejects stays rejected.
+    doThrow(new CertificateException("untrusted chain")).when(clusterTrustManager).checkClientTrusted(scmChain, "RSA");
+    assertThatThrownBy(() -> trustManager.checkClientTrusted(scmChain, "RSA")).hasMessage("untrusted chain");
+  }
 }

@@ -39,6 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.StringUtils;
@@ -59,6 +60,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.ByteBufferGetStatus;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
@@ -75,6 +77,8 @@ import org.slf4j.LoggerFactory;
  */
 public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
+
+  private static final Pattern VANISHED_WAL_FILE = Pattern.compile("/\\d+\\.log: No such file or directory");
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
@@ -238,34 +242,16 @@ public final class RocksDatabase implements Closeable {
     return isClosed.get();
   }
 
-  /**
-   * Represents a checkpoint of the db.
-   *
-   * @see ManagedCheckpoint
-   */
-  final class RocksCheckpoint implements Closeable {
-    private final ManagedCheckpoint checkpoint;
-
-    private RocksCheckpoint() {
-      this.checkpoint = ManagedCheckpoint.create(db);
-    }
-
-    public void createCheckpoint(Path path) throws RocksDatabaseException {
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        checkpoint.get().createCheckpoint(path.toString());
-      } catch (RocksDBException e) {
-        closeOnError(e);
-        throw toRocksDatabaseException(this, "createCheckpoint " + path, e);
-      }
-    }
-
-    public long getLatestSequenceNumber() throws RocksDatabaseException {
-      return RocksDatabase.this.getLatestSequenceNumber();
-    }
-
-    @Override
-    public void close() throws RocksDatabaseException {
-      checkpoint.close();
+  /** @return the latest sequence number after the checkpoint is created. */
+  long createCheckpoint(Path path) throws RocksDatabaseException {
+    final String checkpointPath = path.toString();
+    try (UncheckedAutoCloseable ignored = acquire();
+        ManagedCheckpoint checkpoint = ManagedCheckpoint.create(db)) {
+      checkpoint.get().createCheckpoint(checkpointPath);
+      return db.get().getLatestSequenceNumber();
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      throw toRocksDatabaseException(this, "createCheckpoint " + checkpointPath, e);
     }
   }
 
@@ -596,10 +582,6 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  RocksCheckpoint createCheckpoint() {
-    return new RocksCheckpoint();
-  }
-
   /**
    * - When the key definitely does not exist in the database,
    *   this method returns null.
@@ -681,6 +663,21 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  List<byte[]> multiGet(ColumnFamily family, List<byte[]> keys)
+      throws RocksDatabaseException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      return db.get().multiGetAsList(DEFAULT_READ_OPTION,
+          Collections.nCopies(keys.size(), family.getHandle()), keys);
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      final String message = "multiGet " + keys.size() + " keys from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
   /**
    * Get the value mapped to the given key.
    *
@@ -706,6 +703,32 @@ public final class RocksDatabase implements Closeable {
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "get " + bytes2String(key) + " from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
+  List<ByteBufferGetStatus> multiGet(ColumnFamily family, List<ByteBuffer> keys, List<ByteBuffer> values)
+      throws RocksDatabaseException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      final List<ByteBufferGetStatus> statuses = db.get().multiGetByteBuffers(DEFAULT_READ_OPTION,
+          Collections.nCopies(keys.size(), family.getHandle()), keys, values);
+      if (LOG.isTraceEnabled()) {
+        for (ByteBufferGetStatus status: statuses) {
+          if (status.value != null) {
+            LOG.trace("multiGet: requiredSize={}, remaining={}",
+                status.requiredSize, status.value.asReadOnlyBuffer().remaining());
+          } else {
+            LOG.trace("multiGet: status={}", status.status);
+          }
+        }
+      }
+      return statuses;
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      final String message = "multiGet " + keys.size() + " keys from " + family;
       throw toRocksDatabaseException(this, message, e);
     }
   }
@@ -760,10 +783,48 @@ public final class RocksDatabase implements Closeable {
   public ManagedTransactionLogIterator getUpdatesSince(long sequenceNumber)
       throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
-      return managed(db.get().getUpdatesSince(sequenceNumber));
+      return getUpdatesSinceRetryingWalRace(sequenceNumber);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      if (!isVanishedWalFile(e)) {
+        closeOnError(e);
+      }
       throw toRocksDatabaseException(this, "getUpdatesSince " + sequenceNumber, e);
+    }
+  }
+
+  private ManagedTransactionLogIterator getUpdatesSinceRetryingWalRace(long sequenceNumber)
+      throws RocksDBException {
+    try {
+      return getUpdatesSinceFromRocksDB(sequenceNumber);
+    } catch (RocksDBException e) {
+      if (!isVanishedWalFile(e)) {
+        throw e;
+      }
+      LOG.warn("getUpdatesSince {} raced with WAL archive/purge, retrying once", sequenceNumber, e);
+      return getUpdatesSinceFromRocksDB(sequenceNumber);
+    }
+  }
+
+  @VisibleForTesting
+  ManagedTransactionLogIterator getUpdatesSinceFromRocksDB(long sequenceNumber) throws RocksDBException {
+    return managed(db.get().getUpdatesSince(sequenceNumber));
+  }
+
+  /**
+   * A WAL file was archived or purged while RocksDB was listing or opening it; this does not affect recovery.
+   * The message is matched because rocksdbjni's Status.SubCode has no PathNotFound.
+   */
+  @VisibleForTesting
+  static boolean isVanishedWalFile(RocksDBException e) {
+    if (e.getStatus() == null) {
+      return false;
+    }
+    switch (e.getStatus().getCode()) {
+    case IOError:
+      final String state = e.getStatus().getState();
+      return state != null && VANISHED_WAL_FILE.matcher(state).find();
+    default:
+      return false;
     }
   }
 
@@ -813,7 +874,7 @@ public final class RocksDatabase implements Closeable {
 
   public void delete(ColumnFamily family, byte[] key) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
-      db.get().delete(family.getHandle(), key);
+      db.get().delete(family.getHandle(), writeOptions, key);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "delete " + bytes2String(key) + " from " + family;
@@ -834,7 +895,7 @@ public final class RocksDatabase implements Closeable {
   public void deleteRange(ColumnFamily family, byte[] beginKey, byte[] endKey)
       throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
-      db.get().deleteRange(family.getHandle(), beginKey, endKey);
+      db.get().deleteRange(family.getHandle(), writeOptions, beginKey, endKey);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "delete range " + bytes2String(beginKey) +

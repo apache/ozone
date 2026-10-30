@@ -62,7 +62,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
     SetTimesRequest setTimesRequest = request.getSetTimesRequest();
     String keyPath = setTimesRequest.getKeyArgs().getKeyName();
     String normalizedKeyPath =

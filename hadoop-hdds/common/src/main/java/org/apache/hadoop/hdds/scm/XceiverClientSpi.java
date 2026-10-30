@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -50,6 +52,14 @@ public abstract class XceiverClientSpi implements Closeable {
     // just a shortcut to avoid having to repeat long list of generic parameters
   }
 
+  /**
+   * Validator for container read chunk through short-circuit local reads.
+   */
+  public interface ShortCircuitValidator extends
+      CheckedBiConsumer<List<ByteBuffer>, ContainerProtos.ChunkInfo, IOException> {
+    // just a shortcut to avoid having to repeat long list of generic parameters
+  }
+
   public XceiverClientSpi() {
     this.referenceCount = new AtomicInteger(0);
     this.isEvicted = false;
@@ -59,23 +69,23 @@ public abstract class XceiverClientSpi implements Closeable {
     this.referenceCount.incrementAndGet();
   }
 
-  void decrementReference() {
+  /** @return true if the caller should now close this client. */
+  boolean decrementReference() {
     this.referenceCount.decrementAndGet();
-    cleanup();
+    return shouldClose();
   }
 
-  void setEvicted() {
+  /** @return true if the caller should now close this client. */
+  boolean setEvicted() {
     isEvicted = true;
-    cleanup();
+    return shouldClose();
   }
 
   // close the xceiverClient only if,
   // 1) there is no refcount on the client
   // 2) it has been evicted from the cache.
-  private void cleanup() {
-    if (referenceCount.get() == 0 && isEvicted) {
-      close();
-    }
+  private boolean shouldClose() {
+    return referenceCount.get() == 0 && isEvicted;
   }
 
   @VisibleForTesting
@@ -90,6 +100,10 @@ public abstract class XceiverClientSpi implements Closeable {
 
   @Override
   public abstract void close();
+
+  public boolean isClosed() {
+    return false;
+  }
 
   /**
    * Returns the pipeline of machines that host the container used by this

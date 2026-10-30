@@ -36,7 +36,35 @@ import org.slf4j.LoggerFactory;
 public class OzoneClientConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(OzoneClientConfig.class);
+  public static final String OZONE_READ_SHORT_CIRCUIT = "ozone.client.read.short-circuit";
+  public static final boolean OZONE_READ_SHORT_CIRCUIT_DEFAULT = false;
+  public static final String OZONE_DOMAIN_SOCKET_PATH = "ozone.domain.socket.path";
+  public static final String SHORT_CIRCUIT_PREFIX = OZONE_READ_SHORT_CIRCUIT + ".";
+  public static final short DATA_TRANSFER_VERSION = 28;
+  public static final byte DATA_TRANSFER_MAGIC_CODE = 99;
 
+  @Config(key = "ozone.client.read.short-circuit",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Whether read short-circuit is enabled or not",
+      tags = { ConfigTag.CLIENT, ConfigTag.DATANODE })
+  private boolean shortCircuitEnabled = OZONE_READ_SHORT_CIRCUIT_DEFAULT;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "buffer.size",
+      defaultValue = "128KB",
+      type = ConfigType.SIZE,
+      description = "Buffer size of reader/writer.",
+      tags = { ConfigTag.CLIENT, ConfigTag.DATANODE })
+  private int shortCircuitBufferSize = 128 * 1024;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "disable.interval",
+      defaultValue = "600",
+      type = ConfigType.LONG,
+      description = "If some unknown IO error happens on Domain socket read, short circuit read will be disabled " +
+          "temporarily for this period of time(seconds).",
+      tags = { ConfigTag.CLIENT })
+  private long shortCircuitReadDisableInterval = 60 * 10;
+  
   @Config(key = "ozone.client.stream.buffer.flush.size",
       defaultValue = "16MB",
       type = ConfigType.SIZE,
@@ -185,7 +213,7 @@ public class OzoneClientConfig {
       description = "Ozone client to verify checksum of the checksum "
           + "blocksize data.",
       tags = ConfigTag.CLIENT)
-  private boolean checksumVerify = true;
+  private volatile boolean checksumVerify = true;
 
   @Config(key = "ozone.client.max.ec.stripe.write.retries",
       defaultValue = "10",
@@ -229,6 +257,25 @@ public class OzoneClientConfig {
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
+
+  @Config(key = "ozone.client.ec.parallel.read.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, a read of an EC block that spans more than one cell reads the cells of different" +
+          " data indexes from their datanodes in parallel, instead of one cell at a time. Reads within a single" +
+          " cell, and reads that need reconstruction, are not affected.",
+      tags = ConfigTag.CLIENT)
+  private boolean ecParallelReadEnabled = false;
+
+  @Config(key = "ozone.client.ec.parallel.read.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for reading the cells of an EC block in parallel, when" +
+          " ozone.client.ec.parallel.read.enabled is true. When the pool is saturated, the reading thread reads" +
+          " the remaining cells itself.",
+      tags = ConfigTag.CLIENT)
+  // For the largest recommended EC policy rs-10-4-1024k, a read can span
+  // 10 data indexes, so this allows 3 such reads in parallel.
+  private int ecParallelReadPoolLimit = 10 * 3;
 
   @Config(key = "ozone.client.checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
@@ -289,6 +336,18 @@ public class OzoneClientConfig {
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
+  @Config(key = "ozone.client.datastream.putblock.without.raft.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, the PutBlock of a Ratis data stream is committed through the data stream " +
+          "instead of a separate WriteAsync PutBlock, so that it does not go through the Raft log: " +
+          "StreamInitWithPutBlock is used so that datanodes commit PutBlock when the data stream closes, " +
+          "and the PutBlock triggered by a flush in the middle of the stream is sent as a data stream command. " +
+          "It takes effect only for pipelines whose datanodes all support committing PutBlock through the data " +
+          "stream; otherwise PutBlock goes through the Raft log.",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamPutBlockWithoutRaftEnabled = false;
+
   @Config(key = "ozone.client.key.write.concurrency",
       defaultValue = "1",
       description = "Maximum concurrent writes allowed on each key. " +
@@ -302,14 +361,18 @@ public class OzoneClientConfig {
       defaultValue = "33554432",
       type = ConfigType.LONG,
       tags = {ConfigTag.CLIENT},
-      description = "Extra bytes to prefetch during streaming reads.")
+      description = "Size of the pre-read window for streaming reads: the number of bytes requested from the " +
+          "datanode ahead of the current read position. The window is refilled in bulk once the bytes requested " +
+          "ahead drop below half of this value. Set to 0 to disable pre-read.")
   private long streamReadPreReadSize = 32L << 20;
 
   @Config(key = "ozone.client.stream.read.response-data-size",
       defaultValue = "1048576",
       type = ConfigType.INT,
       tags = {ConfigTag.CLIENT},
-      description = "Chunk size of streaming read responses from datanodes.")
+      description = "Amount of block data the datanode sends in each streaming read response. "
+          + "A response must fit in the 32 MB gRPC message limit, and 1 MB of that is reserved for metadata "
+          + "such as checksums, so the datanode caps this value at 31 MB.")
   private int streamReadResponseDataSize = 1 << 20;
 
   @Config(key = "ozone.client.stream.read.timeout",
@@ -318,6 +381,16 @@ public class OzoneClientConfig {
       tags = {ConfigTag.CLIENT},
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
+
+  @Config(key = "ozone.client.netty.warmup.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.CLIENT},
+      description = "When the client is created, initialize Netty, and netty-tcnative (BoringSSL) if gRPC TLS is " +
+          "enabled, on a background thread, so the first datanode connection does not wait for them. This takes " +
+          "about 0.1 s in a new JVM, so it matters for short-lived clients such as YARN containers and CLI " +
+          "commands. It needs a spare CPU core to help.")
+  private boolean nettyWarmUpEnabled = true;
 
   @PostConstruct
   public void validate() {
@@ -343,6 +416,12 @@ public class OzoneClientConfig {
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE);
       bytesPerChecksum =
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
+    }
+
+    if (ecParallelReadPoolLimit < 1) {
+      LOG.warn("ozone.client.ec.parallel.read.pool.limit ({}) must be at least 1, resetting to 1.",
+          ecParallelReadPoolLimit);
+      ecParallelReadPoolLimit = 1;
     }
 
     // Verify client configs related to HBase enhancements
@@ -400,6 +479,38 @@ public class OzoneClientConfig {
           streamReadTimeout, defaultTimeout);
       streamReadTimeout = defaultTimeout;
     }
+  }
+
+  public boolean isShortCircuitEnabled() {
+    return shortCircuitEnabled;
+  }
+
+  public boolean isNettyWarmUpEnabled() {
+    return nettyWarmUpEnabled;
+  }
+
+  public void setNettyWarmUpEnabled(boolean nettyWarmUpEnabled) {
+    this.nettyWarmUpEnabled = nettyWarmUpEnabled;
+  }
+
+  public void setShortCircuit(boolean enabled) {
+    shortCircuitEnabled = enabled;
+  }
+
+  public int getShortCircuitBufferSize() {
+    return shortCircuitBufferSize;
+  }
+
+  public void setShortCircuitBufferSize(int size) {
+    this.shortCircuitBufferSize = size;
+  }
+
+  public long getShortCircuitReadDisableInterval() {
+    return shortCircuitReadDisableInterval;
+  }
+
+  public void setShortCircuitReadDisableInterval(long value) {
+    shortCircuitReadDisableInterval = value;
   }
 
   public long getStreamBufferFlushSize() {
@@ -560,6 +671,22 @@ public class OzoneClientConfig {
     return ecReconstructStripeWritePoolLimit;
   }
 
+  public boolean isEcParallelReadEnabled() {
+    return ecParallelReadEnabled;
+  }
+
+  public void setEcParallelReadEnabled(boolean ecParallelReadEnabled) {
+    this.ecParallelReadEnabled = ecParallelReadEnabled;
+  }
+
+  public int getEcParallelReadPoolLimit() {
+    return ecParallelReadPoolLimit;
+  }
+
+  public void setEcParallelReadPoolLimit(int poolLimit) {
+    this.ecParallelReadPoolLimit = poolLimit;
+  }
+
   public void setFsDefaultBucketLayout(String bucketLayout) {
     if (!bucketLayout.isEmpty()) {
       this.fsDefaultBucketLayout = bucketLayout;
@@ -644,6 +771,14 @@ public class OzoneClientConfig {
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {
     this.streamReadTimeout = streamReadTimeout;
+  }
+
+  public boolean isDatastreamPutBlockWithoutRaftEnabled() {
+    return datastreamPutBlockWithoutRaftEnabled;
+  }
+
+  public void setDatastreamPutBlockWithoutRaftEnabled(boolean datastreamPutBlockWithoutRaftEnabled) {
+    this.datastreamPutBlockWithoutRaftEnabled = datastreamPutBlockWithoutRaftEnabled;
   }
 
   /**

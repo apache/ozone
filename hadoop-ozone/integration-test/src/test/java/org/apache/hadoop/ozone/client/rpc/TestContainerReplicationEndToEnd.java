@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -105,7 +105,6 @@ public class TestContainerReplicationEndToEnd {
     conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 6);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
 
-    conf.setQuietMode(false);
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4)
             .build();
@@ -228,7 +227,7 @@ public class TestContainerReplicationEndToEnd {
     }
     // This will try to read the data from the dn to which the container got
     // replicated after the container got closed.
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, testData, objectStore, volumeName, bucketName);
   }
 }

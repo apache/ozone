@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -88,6 +89,9 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       XceiverClientSpi client1 = clientManager
           .acquireClient(container1.getPipeline());
       assertEquals(1, client1.getRefcount());
+      // although allowShortCircuit true when calling acquireClientForReadData,
+      // XceiverClientGrpc client will be allocated since short-circuit is by default disabled.
+      assertThat(client1).isInstanceOf(XceiverClientGrpc.class);
 
       ContainerWithPipeline container2 = storageContainerLocationClient
           .allocateContainer(
@@ -97,6 +101,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       XceiverClientSpi client2 = clientManager
           .acquireClient(container2.getPipeline());
       assertEquals(1, client2.getRefcount());
+      assertThat(client2).isInstanceOf(XceiverClientGrpc.class);
 
       XceiverClientSpi client3 = clientManager
           .acquireClient(container1.getPipeline());
@@ -111,7 +116,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
   }
 
   @Test
-  public void testFreeByReference(@TempDir Path metaDir) throws IOException {
+  public void testFreeByReference(@TempDir Path metaDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     ScmClientConfig clientConfig = conf.getObject(ScmClientConfig.class);
     clientConfig.setMaxSize(1);
@@ -156,6 +161,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       clientManager.releaseClient(client1, false);
 
       // Create container should throw exception on closed client
+      GenericTestUtils.waitFor(client1::isClosed, 100, 10000);
       Throwable t = assertThrows(IOException.class,
           () -> ContainerProtocolCalls.createContainer(client1,
               container1.getContainerInfo().getContainerID(), null));
@@ -166,7 +172,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
   }
 
   @Test
-  public void testFreeByEviction(@TempDir Path metaDir) throws IOException {
+  public void testFreeByEviction(@TempDir Path metaDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     ScmClientConfig clientConfig = conf.getObject(ScmClientConfig.class);
     clientConfig.setMaxSize(1);
@@ -205,6 +211,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       assertNull(nonExistent);
 
       // Any container operation should now fail
+      GenericTestUtils.waitFor(client1::isClosed, 100, 10000);
       Throwable t = assertThrows(IOException.class,
           () -> ContainerProtocolCalls.createContainer(client1,
               container1.getContainerInfo().getContainerID(), null));
@@ -253,7 +260,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       clientManager.releaseClient(client1, true);
       assertEquals(0, client1.getRefcount());
       assertNotNull(cache.getIfPresent(
-          container1.getContainerInfo().getPipelineID().getId().toString()
+          container1.getContainerInfo().getPipelineID().getId().toString() + "-"
               + container1.getContainerInfo().getReplicationType()));
 
       // cleanup

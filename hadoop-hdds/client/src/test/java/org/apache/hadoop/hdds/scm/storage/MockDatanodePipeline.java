@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetCommitt
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
+import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
@@ -56,6 +57,7 @@ import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.io.WriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.protocol.RoutingTable;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
  * A stateful test harness that simulates a datanode pipeline for {@link BlockDataStreamOutput} unit tests.
@@ -75,7 +77,11 @@ public class MockDatanodePipeline {
   // Recorded state
   private final List<byte[]> receivedChunks = Collections.synchronizedList(new ArrayList<>());
   private final List<ContainerCommandRequestProto> receivedPutBlocks = Collections.synchronizedList(new ArrayList<>());
+  private final List<ContainerCommandRequestProto> receivedCommands = Collections.synchronizedList(new ArrayList<>());
   private final AtomicInteger watchForCommitCount = new AtomicInteger(0);
+  private volatile Type streamInitType;
+  // When true, stream commands are replied without a payload, as a datanode which does not handle them does.
+  private volatile boolean commandUnsupported;
 
   // Commit tracking
   private final AtomicLong nextLogIndex = new AtomicLong(1);
@@ -120,8 +126,14 @@ public class MockDatanodePipeline {
     // Both overloads must be stubbed: stream(ByteBuffer) and stream(ByteBuffer, RoutingTable) — the pipeline-mode
     // default is true, so the 2-arg overload is what BlockDataStreamOutput.setupStream calls.
     DataStreamApi dataStreamApi = mock(DataStreamApi.class);
-    doReturn(mockDataStreamOutput).when(dataStreamApi).stream(any(ByteBuffer.class));
-    doReturn(mockDataStreamOutput).when(dataStreamApi).stream(any(ByteBuffer.class), any(RoutingTable.class));
+    doAnswer(invocation -> {
+      captureStreamInitType(invocation.getArgument(0));
+      return mockDataStreamOutput;
+    }).when(dataStreamApi).stream(any(ByteBuffer.class));
+    doAnswer(invocation -> {
+      captureStreamInitType(invocation.getArgument(0));
+      return mockDataStreamOutput;
+    }).when(dataStreamApi).stream(any(ByteBuffer.class), any(RoutingTable.class));
     doReturn(dataStreamApi).when(xceiverClient).getDataStreamApi();
 
     // Setup sendCommandAsync (putBlock) behavior
@@ -193,6 +205,26 @@ public class MockDatanodePipeline {
       return CompletableFuture.completedFuture(dataStreamReply(data.length));
     }).when(mockDataStreamOutput).writeAsync(any(ByteBuffer.class), any(Iterable.class));
 
+    // Setup commandAsync (mid-stream PutBlock) behavior
+    doAnswer(invocation -> {
+      ByteBuffer src = invocation.getArgument(0);
+      final ContainerCommandRequestProto request = toProto(src);
+      receivedCommands.add(request);
+      if (commandUnsupported) {
+        return CompletableFuture.completedFuture(dataStreamReply(0));
+      }
+      int count = putBlockCount.incrementAndGet();
+      if (count > putBlockFailAfter && putBlockFailure != null) {
+        CompletableFuture<DataStreamReply> failed = new CompletableFuture<>();
+        failed.completeExceptionally(putBlockFailure.get());
+        return failed;
+      }
+      final DataStreamReply reply = dataStreamReply(0);
+      when(reply.nioBuffer()).thenReturn(
+          buildPutBlockResponse(blockID).toByteString().asReadOnlyByteBuffer());
+      return CompletableFuture.completedFuture(reply);
+    }).when(mockDataStreamOutput).commandAsync(any(ByteBuffer.class));
+
     // Mock XceiverClientFactory
     this.clientFactory = mock(XceiverClientFactory.class);
     doReturn(xceiverClient).when(clientFactory).acquireClient(any(Pipeline.class), anyBoolean());
@@ -225,8 +257,17 @@ public class MockDatanodePipeline {
     return receivedPutBlocks;
   }
 
+  /** @return the requests received as data stream commands. */
+  public List<ContainerCommandRequestProto> getReceivedCommands() {
+    return receivedCommands;
+  }
+
   public int getWatchForCommitCount() {
     return watchForCommitCount.get();
+  }
+
+  public Type getStreamInitType() {
+    return streamInitType;
   }
 
   /** Concatenate all received chunks into a single byte array. */
@@ -261,7 +302,28 @@ public class MockDatanodePipeline {
     return this;
   }
 
+  /** Reply to stream commands without a payload, as a datanode which does not handle them does. */
+  public MockDatanodePipeline withUnsupportedCommand() {
+    this.commandUnsupported = true;
+    return this;
+  }
+
   // --- Helpers ---
+
+  private void captureStreamInitType(ByteBuffer buffer) {
+    streamInitType = toProto(buffer).getCmdType();
+  }
+
+  private static ContainerCommandRequestProto toProto(ByteBuffer buffer) {
+    ByteBuffer dup = buffer.duplicate();
+    byte[] bytes = new byte[dup.remaining()];
+    dup.get(bytes);
+    try {
+      return ContainerCommandRequestMessage.toProto(ByteString.copyFrom(bytes), null);
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to decode container command request", e);
+    }
+  }
 
   private static ContainerCommandResponseProto buildPutBlockResponse(BlockID blockID) {
     return ContainerCommandResponseProto.newBuilder()
@@ -283,6 +345,8 @@ public class MockDatanodePipeline {
     when(reply.getBytesWritten()).thenReturn(bytesWritten);
     when(reply.getDataLength()).thenReturn(bytesWritten);
     when(reply.getCommitInfos()).thenReturn(Collections.emptyList());
+    // Ratis replies with an empty buffer unless the state machine returns a command reply.
+    when(reply.nioBuffer()).thenReturn(ByteBuffer.allocate(0).asReadOnlyBuffer());
     return reply;
   }
 }

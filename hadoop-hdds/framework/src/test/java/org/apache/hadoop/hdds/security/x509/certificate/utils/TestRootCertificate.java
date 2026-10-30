@@ -25,8 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.math.BigInteger;
+import java.net.InetAddress;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
@@ -34,7 +37,11 @@ import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -149,6 +156,46 @@ public class TestRootCertificate {
     assertNotNull(loadedCert);
     assertEquals(certificate.getSerialNumber(),
         loadedCert.getSerialNumber());
+  }
+
+  @Test
+  public void testCACertWithMockedInetAddressAddsDnsName() throws Exception {
+    ZonedDateTime notBefore = ZonedDateTime.now();
+    ZonedDateTime notAfter = notBefore.plusYears(1);
+    String clusterID = UUID.randomUUID().toString();
+    String scmID = UUID.randomUUID().toString();
+    String subject = "testRootCert";
+    HDDSKeyGenerator keyGen =
+        new HDDSKeyGenerator(securityConfig);
+    KeyPair keyPair = keyGen.generateKey();
+
+    InetAddress address = mock(InetAddress.class);
+    when(address.getHostAddress()).thenReturn("192.0.2.20");
+    when(address.getCanonicalHostName()).thenReturn("scm1.lxd");
+
+    X509Certificate certificate =
+        SelfSignedCertificate.newBuilder()
+            .setBeginDate(notBefore)
+            .setEndDate(notAfter)
+            .setClusterID(clusterID)
+            .setScmID(scmID)
+            .setSubject(subject)
+            .setKey(keyPair)
+            .setConfiguration(securityConfig)
+            .makeCA()
+            .addInetAddresses(Collections.singletonList(address))
+            .build();
+
+    Collection<List<?>> subjectAlternativeNames = certificate.getSubjectAlternativeNames();
+    assertNotNull(subjectAlternativeNames);
+    List<String> dnsNames = new ArrayList<>();
+    for (List<?> san : subjectAlternativeNames) {
+      // GeneralName type 2 is dNSName, see RFC 5280 4.2.1.6.
+      if (((Number) san.get(0)).intValue() == 2) {
+        dnsNames.add((String) san.get(1));
+      }
+    }
+    assertTrue(dnsNames.contains("scm1.lxd"));
   }
 
   @Test

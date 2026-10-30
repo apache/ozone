@@ -122,6 +122,17 @@ public class OMQuotaRepairRequest extends OMClientRequest {
         // bucket might be deleted when running repair count parallel
         return;
       }
+      if (bucketCountInfo.hasBucketObjectID()
+          && bucketCountInfo.getBucketObjectID() != bucketInfo.getObjectID()) {
+        // The bucket was deleted and recreated under the same name after the
+        // repair scan captured its counts. Applying the stale delta would
+        // corrupt the counters of the unrelated recreated bucket, so drop it.
+        LOG.warn("Skipping quota repair delta for bucket {}/{}: scanned objectID {} does not match "
+                + "current objectID {} (bucket recreated during repair)",
+            bucketCountInfo.getVolName(), bucketCountInfo.getBucketName(),
+            bucketCountInfo.getBucketObjectID(), bucketInfo.getObjectID());
+        return;
+      }
       bucketInfo.incrUsedBytes(bucketCountInfo.getDiffUsedBytes());
       bucketInfo.incrUsedNamespace(bucketCountInfo.getDiffUsedNamespace());
       if (bucketCountInfo.hasDiffSnapshotUsedBytes()) {
@@ -143,7 +154,14 @@ public class OMQuotaRepairRequest extends OMClientRequest {
 
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey), CacheValue.get(transactionLogIndex, bucketInfo));
-      bucketMap.put(Pair.of(bucketCountInfo.getVolName(), bucketCountInfo.getBucketName()), bucketInfo);
+
+      // Store an immutable snapshot in the response map so the double buffer
+      // serializes the repair result, not a value later mutated in place by a
+      // concurrent key commit that reads the same live cached OmBucketInfo.
+      // Every other mutating request copies its response bucket for the same
+      // reason (see OMKeyCommitRequest#validateAndUpdateCache).
+      bucketMap.put(Pair.of(bucketCountInfo.getVolName(), bucketCountInfo.getBucketName()),
+          bucketInfo.copyObject());
     } finally {
       if (acquiredBucketLock) {
         mergeOmLockDetails(omMetadataManager.getLock()

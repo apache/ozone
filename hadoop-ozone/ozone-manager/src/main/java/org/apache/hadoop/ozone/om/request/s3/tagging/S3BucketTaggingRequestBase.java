@@ -60,7 +60,7 @@ public abstract class S3BucketTaggingRequestBase extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest baseRequest = super.preExecute(ozoneManager);
+    final OMRequest baseRequest = super.preExecute(ozoneManager);
     BucketArgs bucketArgs = getRequestBucketArgs(baseRequest);
 
     OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);

@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
@@ -134,7 +135,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
 
     hostInetAddress = InetAddress.getByName(hostname);
     InetAddress rpcAddressFromConfig = InetAddress.getByName(
-        rpcAddrStr.split(":")[0]);
+        HddsUtils.getHostName(rpcAddrStr).orElse(""));
 
     if (!hostInetAddress.equals(rpcAddressFromConfig)) {
       throw new IOException("OM " + decommNodeId + "'s host address in " +

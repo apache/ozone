@@ -28,6 +28,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Clock;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -95,6 +97,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -220,7 +223,14 @@ public final class ContainerTestUtils {
   public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
       String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
       ContainerChecksumTreeManager checksumTreeManager) {
-    return new KeyValueHandler(config, datanodeId, contSet, volSet, metrics, c -> { }, checksumTreeManager);
+    return getKeyValueHandler(config, datanodeId, contSet, volSet, metrics, checksumTreeManager, null);
+  }
+
+  public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
+      String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
+      ContainerChecksumTreeManager checksumTreeManager, OzoneContainer ozoneContainer) {
+    return new KeyValueHandler(config, datanodeId, contSet, volSet, null, metrics,
+        c -> { }, Clock.systemUTC(), checksumTreeManager, ozoneContainer);
   }
 
   /**
@@ -444,10 +454,10 @@ public final class ContainerTestUtils {
         null, null);
   }
 
-  /** Initialize {@link DatanodeLayoutStorage}.  Normally this is done during {@link HddsDatanodeService} start,
+  /** Initialize {@link DatanodeStorage}.  Normally this is done during {@link HddsDatanodeService} start,
    * have to do the same for tests that create {@link OzoneContainer} manually. */
   public static void initializeDatanodeLayout(ConfigurationSource conf, DatanodeDetails dn) throws IOException {
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf, dn.getUuidString());
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf, dn.getUuidString());
     if (layoutStorage.getState() != INITIALIZED) {
       layoutStorage.initialize();
     }
@@ -474,5 +484,16 @@ public final class ContainerTestUtils {
         metadata.getStore().getBlockDataTable().put(blockKey, kd);
       }
     }
+  }
+
+  /**
+   * Creates a replicate container command filled in with the latest apparent
+   * version, so callers that do not exercise mixed-version handling don't need
+   * to specify it.
+   */
+  public static ReplicateContainerCommand getReplicateContainerCommand(
+      long containerID, DatanodeDetails target) {
+    return ReplicateContainerCommand.toTarget(
+        containerID, target, HDDSVersion.SOFTWARE_VERSION);
   }
 }

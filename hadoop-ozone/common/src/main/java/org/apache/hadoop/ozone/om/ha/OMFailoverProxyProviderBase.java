@@ -179,6 +179,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         OMException omEx = (OMException) cause;
         // Do not failover if the operation was blocked because the OM was
         // prepared.
+        // Current OMs do not support prepare for upgrade, but the client may encounter an old OM server.
         return omEx.getResult() !=
            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED;
       }
@@ -389,13 +390,24 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   /**
    * Get the wait time based on
-   * 1. Is the same OM being retried based on response from OM.
-   * 2. Is this a new OM that is being used.
-   * 3. Were all the OMs visited once and retries need to be resumed after a
+   * 1. Were all the OMs visited once and retries need to be resumed after a
    * delay.
+   * 2. Is the same OM being retried based on response from OM.
+   * 3. Is this a new OM that is being used.
    * @return delay in milliseconds
    */
   public synchronized long getWaitTime() {
+    // OMs are being contacted in Round Robin way. If all the OMs have been
+    // contacted once in this attempt, clear the list. The OMs will be retried
+    // in a Round Robin fashion again after a fixed delay. This is checked first
+    // because with a single OM, Round Robin selects the same OM again, which is
+    // not a retry on the same OM based on response from OM.
+    if (attemptedOMs.containsAll(omProxies.getNodeIds())) {
+      attemptedOMs.clear();
+      numAttemptsOnSameOM = 0;
+      return waitBetweenRetries;
+    }
+
     if (omProxies.getNodeId(nextProxyIndex).equals(lastAttemptedOM)) {
       // Clear attemptedOMs list as the same OM has been selected again.
       attemptedOMs.clear();
@@ -406,19 +418,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     }
     // Reset numAttemptsOnSameOM as we failed over to a different OM.
     numAttemptsOnSameOM = 0;
-
-    // OMs are being contacted in Round Robin way. Check if all the OMs have
-    // been contacted in this attempt.
-    for (String omNodeID : omProxies.getNodeIds()) {
-      if (!attemptedOMs.contains(omNodeID)) {
-        return 0;
-      }
-    }
-    // This implies all the OMs have been contacted once. Return true and
-    // clear the list. The OMs will be retried in a Round Robin fashion again
-    // after a delay.
-    attemptedOMs.clear();
-    return waitBetweenRetries;
+    return 0;
   }
 
   public List<OMProxyInfo<T>> getOMProxies() {

@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.junit.jupiter.api.AfterEach;
@@ -109,7 +109,6 @@ public class TestFailureHandlingByClientFlushDelay {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
-    conf.setQuietMode(false);
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(
@@ -185,8 +184,8 @@ public class TestFailureHandlingByClientFlushDelay {
       key.write(data.getBytes(UTF_8));
       key.flush();
       assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
-      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
-      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+      // Datanodes are not asserted: watchForCommit can time out against the two shut down
+      // followers, which then get recorded as failed servers and added to the exclude list.
       key.write(data.getBytes(UTF_8));
       // The close will just write to the buffer
     }
@@ -210,12 +209,12 @@ public class TestFailureHandlingByClientFlushDelay {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return TestHelper
+    return OzoneTestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

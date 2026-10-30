@@ -37,10 +37,12 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -96,11 +98,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteKeysRequest deleteKeysRequest = super.preExecute(ozoneManager).getDeleteKeysRequest();
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+    DeleteKeysRequest deleteKeysRequest = omRequest.getDeleteKeysRequest();
     Objects.requireNonNull(deleteKeysRequest, "deleteKeysRequest == null");
 
     if (deleteKeysRequest.getSourceType() == RequestSource.LIFECYCLE && deleteKeysRequest.hasScanState()) {
-      if (ozoneManager.getAclsEnabled()) {
+      if (ozoneManager.isAdminAuthorizationEnabled()) {
         UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "
@@ -110,7 +113,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
     }
 
-    return getOmRequest();
+    return omRequest;
   }
 
   @Override @SuppressWarnings("methodlength")
@@ -183,6 +186,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
+      Set<String> resolvedKeys = new HashSet<>();
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
@@ -223,6 +227,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysAclCheckLatency);
           OzoneFileStatus fileStatus = getOzoneKeyStatus(
               ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
+          // Different FSO path spellings can resolve to the same entry. Release its quota only once.
+          if (!resolvedKeys.add(getBucketLayout().isFileSystemOptimized() ? omKeyInfo.getPath() : objectKey)) {
+            deleteKeys.remove(keyName);
+            continue;
+          }
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
               fileStatus);
           deleteKeysInfo.add(omKeyInfo);
@@ -236,7 +245,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       OmBucketInfo omBucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
@@ -259,6 +268,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
+
+      // A partial delete still persists the accepted keys and the bucket row, so publish here
+      // rather than only when every key was deleted.
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
       omClientResponse =
           getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
               unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
@@ -283,7 +298,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       omResponse.setDeleteKeysResponse(
           DeleteKeysResponse.newBuilder().setStatus(false)
-              .setUnDeletedKeys(unDeletedKeys).build()).build();
+              .setUnDeletedKeys(unDeletedKeys).build());
       omClientResponse =
           new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
       long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();

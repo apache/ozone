@@ -39,13 +39,13 @@ public class LifecycleStatusSubCommand implements Callable<Void> {
   private LifecycleSubCommand parent;
 
   @CommandLine.Option(
-      names = {"-id", "--service-id"},
+      names = {"--service-id"},
       description = "Ozone Manager Service ID"
   )
   private String omServiceId;
 
   @CommandLine.Option(
-      names = {"-host", "--service-host"},
+      names = {"--service-host"},
       description = "Ozone Manager Host"
   )
   private String omHost;
@@ -86,4 +86,3 @@ public class LifecycleStatusSubCommand implements Callable<Void> {
     return System.out;
   }
 }
-

@@ -30,11 +30,17 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
  *
  */
 public class MockCAStore implements CertificateStore {
+  private final List<X509Certificate> storedCertificates = new ArrayList<>();
+
   @Override
   public void storeValidCertificate(BigInteger serialID,
       X509Certificate certificate, NodeType role)
       throws IOException {
+    storedCertificates.add(certificate);
+  }
 
+  public List<X509Certificate> getStoredCertificates() {
+    return storedCertificates;
   }
 
   @Override
