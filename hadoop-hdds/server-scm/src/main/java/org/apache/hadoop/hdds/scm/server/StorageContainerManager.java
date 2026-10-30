@@ -19,7 +19,12 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -196,6 +201,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
@@ -227,6 +233,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMMetrics metrics;
   private SCMPerformanceMetrics perfMetrics;
   private SCMHAMetrics scmHAMetrics;
+  private final SCMFullContainerReportLeaseMetrics fcrLeaseMetrics;
   private final NettyMetrics nettyMetrics;
 
   /*
@@ -250,6 +257,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private FinalizationManager finalizationManager;
   private ScmVersionManager versionManager;
   private LeaseManager<Object> leaseManager;
+  private final SCMFullContainerReportLeaseManager fcrLeaseManager;
 
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore certificateStore;
@@ -463,11 +471,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmReadOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
 
-    datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
-        eventQueue, scmContext);
+    fcrLeaseMetrics = SCMFullContainerReportLeaseMetrics.create();
+    fcrLeaseManager = createFCRLeaseManager(conf);
+    scmNodeManager.setDatanodeRemovedCallback(fcrLeaseManager::removeDatanode);
+    datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this, eventQueue, scmContext, fcrLeaseManager);
     reconfigurationHandler.register(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED,
-        datanodeProtocolServer::reconfigureFCRRateLimit);
-    scmNodeManager.setDatanodeRemovedCallback(datanodeProtocolServer::removeDatanode);
+        this::reconfigureFCRRateLimit);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this,
         reconfigurationHandler);
@@ -489,6 +498,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     registerMXBean();
     registerMetricsSource(this);
     this.nettyMetrics = NettyMetrics.create();
+  }
+
+  private SCMFullContainerReportLeaseManager createFCRLeaseManager(OzoneConfiguration conf) {
+    int maxLeases = conf.getInt(OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES,
+        OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES_DEFAULT);
+    long leaseDurationMs = conf.getTimeDuration(OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION,
+        OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT.toLong(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+    SCMFullContainerReportLeaseManager manager =
+        new SCMFullContainerReportLeaseManager(maxLeases, leaseDurationMs, Time::monotonicNow, fcrLeaseMetrics);
+    manager.setRateLimitEnabled(conf.getBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED,
+        OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT));
+    return manager;
   }
 
   private void initializeEventHandlers() {
@@ -1741,7 +1762,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       LOG.error("SCM Event Queue stop failed", ex);
     }
-
+    fcrLeaseMetrics.unregister();
     try {
       LOG.info("Stopping SCM HA services.");
       scmHAManager.stop();
@@ -2280,6 +2301,23 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         OZONE_READONLY_ADMINISTRATORS,
         newVal, admins);
     return String.valueOf(newVal);
+  }
+
+  private String reconfigureFCRRateLimit(String newValue) {
+    boolean enabled = parseFCRRateLimitEnabled(newValue);
+    fcrLeaseManager.setRateLimitEnabled(enabled);
+    return Boolean.toString(enabled);
+  }
+
+  private static boolean parseFCRRateLimitEnabled(String value) {
+    if (value == null) {
+      return OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT;
+    }
+    String trimmed = value.trim();
+    if (!"true".equalsIgnoreCase(trimmed) && !"false".equalsIgnoreCase(trimmed)) {
+      throw new IllegalArgumentException(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED + " must be true or false");
+    }
+    return Boolean.parseBoolean(trimmed);
   }
 
   private String reconfigureSafeModeLogInterval(String newLogInterval) {

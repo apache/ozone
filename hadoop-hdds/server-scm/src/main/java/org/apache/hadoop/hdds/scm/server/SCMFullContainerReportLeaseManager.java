@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 /**
  * Reserves capacity for outstanding full container reports on one SCM.
+ * Created and owned by {@link StorageContainerManager}, and shared with its datanode protocol server.
  *
  * <p>Every outstanding lease counts toward the capacity limit, from grant until report completion or discard:
  * <pre>

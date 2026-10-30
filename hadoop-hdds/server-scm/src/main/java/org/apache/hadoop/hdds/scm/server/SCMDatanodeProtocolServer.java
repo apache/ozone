@@ -32,14 +32,8 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_READ_THREADPOOL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_READ_THREADPOOL_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES_DEFAULT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
@@ -58,7 +52,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HDDSVersion;
@@ -116,7 +109,6 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.authorize.PolicyProvider;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,7 +146,7 @@ public class SCMDatanodeProtocolServer implements
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
-  private final SCMFullContainerReportLeaseMetrics fcrLeaseMetrics;
+  // Owned by SCM; null for Recon, which does not participate in FCR leasing.
   private final SCMFullContainerReportLeaseManager fcrLeaseManager;
   private ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type> protocolMessageMetrics;
 
@@ -163,7 +155,8 @@ public class SCMDatanodeProtocolServer implements
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
                                    OzoneStorageContainerManager scm,
                                    EventPublisher eventPublisher,
-                                   SCMContext scmContext)
+                                   SCMContext scmContext,
+                                   SCMFullContainerReportLeaseManager fcrLeaseManager)
       throws IOException {
 
     // This constructor has broken down to smaller methods so that Recon's
@@ -174,12 +167,8 @@ public class SCMDatanodeProtocolServer implements
     this.scm = scm;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
-    boolean rateLimitEnabled = conf.getBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED,
-        OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT);
-    this.fcrLeaseMetrics = scmContext == null
-        ? null : SCMFullContainerReportLeaseMetrics.create();
-    this.fcrLeaseManager = createFCRLeaseManager(conf);
-    this.fcrLeaseManager.setRateLimitEnabled(rateLimitEnabled);
+    this.fcrLeaseManager = scmContext == null ? fcrLeaseManager
+        : Objects.requireNonNull(fcrLeaseManager, "FCR lease manager cannot be null for SCM");
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
@@ -278,10 +267,10 @@ public class SCMDatanodeProtocolServer implements
     // Reject unsupported deferral before register() can change node state. Prefer the structured version error for
     // incompatible datanodes, and preserve rejection even if finalization advances during version validation.
     if (containerReportsProto.getFullContainerReportDeferred()
-        && !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)) {
+        && (fcrLeaseManager == null || !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE))) {
       registeredCommand = scm.getScmNodeManager().getRegistrationVersionError(datanodeDetails, versionInfo)
           .orElseThrow(() -> new IOException(
-              "Full container report leases must be finalized before deferring registration reports."));
+              "Full container report leases must be supported and finalized before deferring registration reports."));
     } else {
       registeredCommand = scm.getScmNodeManager()
           .register(datanodeDetails, nodeReport, pipelineReportsProto, versionInfo);
@@ -292,7 +281,9 @@ public class SCMDatanodeProtocolServer implements
       if (containerReportsProto.getFullContainerReportDeferred()) {
         fcrLeaseManager.markFullContainerReportDeferred(datanodeDetails);
       } else {
-        fcrLeaseManager.clearFullContainerReportDeferred(datanodeDetails);
+        if (fcrLeaseManager != null) {
+          fcrLeaseManager.clearFullContainerReportDeferred(datanodeDetails);
+        }
         eventPublisher.fireEvent(CONTAINER_REPORT,
             new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
                 datanodeDetails, containerReportsProto, true));
@@ -410,39 +401,6 @@ public class SCMDatanodeProtocolServer implements
     }
   }
 
-  private SCMFullContainerReportLeaseManager createFCRLeaseManager(
-      OzoneConfiguration conf) {
-    int maxLeases = conf.getInt(OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES,
-        OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES_DEFAULT);
-    long leaseDurationMs = conf.getTimeDuration(
-        OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION,
-        OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT
-            .toLong(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
-    return new SCMFullContainerReportLeaseManager(maxLeases, leaseDurationMs,
-        Time::monotonicNow, fcrLeaseMetrics);
-  }
-
-  String reconfigureFCRRateLimit(String newValue) {
-    boolean enabled = parseFCRRateLimitEnabled(newValue);
-    fcrLeaseManager.setRateLimitEnabled(enabled);
-    return Boolean.toString(enabled);
-  }
-
-  private static boolean parseFCRRateLimitEnabled(String value) {
-    if (value == null) {
-      return OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT;
-    }
-    String trimmed = value.trim();
-    if (!"true".equalsIgnoreCase(trimmed) && !"false".equalsIgnoreCase(trimmed)) {
-      throw new IllegalArgumentException(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED + " must be true or false");
-    }
-    return Boolean.parseBoolean(trimmed);
-  }
-
-  void removeDatanode(DatanodeDetails datanode) {
-    fcrLeaseManager.removeDatanode(datanode);
-  }
-
   /**
    * Validates and claims the lease attached to an incoming FCR, retaining capacity until the report completes.
    *
@@ -451,9 +409,8 @@ public class SCMDatanodeProtocolServer implements
   private Optional<LeaseClaim> validateAndClaimFullContainerReportLease(
       DatanodeDetails datanodeDetails, FullContainerReportLeaseProto lease) {
     OptionalLong currentTerm = getFCRLeaseTermIfAllowed();
-    Optional<LeaseClaim> claim =
-        fcrLeaseManager.claimLease(datanodeDetails, currentTerm,
-            lease.getTerm(), lease.getId());
+    Optional<LeaseClaim> claim = fcrLeaseManager == null ? Optional.empty()
+        : fcrLeaseManager.claimLease(datanodeDetails, currentTerm, lease.getTerm(), lease.getId());
     if (claim.isEmpty()) {
       LOG.warn("Ignoring full container report from datanode {} with invalid "
               + "lease id {} and term {}.", datanodeDetails.getUuidString(), lease.getId(), lease.getTerm());
@@ -631,9 +588,6 @@ public class SCMDatanodeProtocolServer implements
     }
     IOUtils.cleanupWithLogger(LOG, scm.getScmNodeManager());
     protocolMessageMetrics.unregister();
-    if (fcrLeaseMetrics != null) {
-      fcrLeaseMetrics.unregister();
-    }
   }
 
   @Override
