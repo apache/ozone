@@ -44,6 +44,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.TextFormat;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -147,6 +148,7 @@ public class SCMDatanodeProtocolServer implements
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
   // Owned by SCM; null for Recon, which does not participate in FCR leasing.
+  @Nullable
   private final SCMFullContainerReportLeaseManager fcrLeaseManager;
   private ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type> protocolMessageMetrics;
 
@@ -409,8 +411,14 @@ public class SCMDatanodeProtocolServer implements
   private Optional<LeaseClaim> validateAndClaimFullContainerReportLease(
       DatanodeDetails datanodeDetails, FullContainerReportLeaseProto lease) {
     OptionalLong currentTerm = getFCRLeaseTermIfAllowed();
-    Optional<LeaseClaim> claim = fcrLeaseManager == null ? Optional.empty()
-        : fcrLeaseManager.claimLease(datanodeDetails, currentTerm, lease.getTerm(), lease.getId());
+    Optional<LeaseClaim> claim = Optional.empty();
+    if (fcrLeaseManager != null) {
+      if (currentTerm.isPresent()) {
+        claim = fcrLeaseManager.claimLease(datanodeDetails, currentTerm.getAsLong(), lease.getTerm(), lease.getId());
+      } else {
+        fcrLeaseManager.incrementInvalidLeaseReports();
+      }
+    }
     if (claim.isEmpty()) {
       LOG.warn("Ignoring full container report from datanode {} with invalid "
               + "lease id {} and term {}.", datanodeDetails.getUuidString(), lease.getId(), lease.getTerm());
@@ -420,7 +428,7 @@ public class SCMDatanodeProtocolServer implements
 
   private void addFCRLeaseIfRequested(SCMHeartbeatRequestProto heartbeat,
       SCMHeartbeatResponseProto.Builder builder) {
-    if (!heartbeat.getRequestFullContainerReportLease()) {
+    if (fcrLeaseManager == null || !heartbeat.getRequestFullContainerReportLease()) {
       return;
     }
 

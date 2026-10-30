@@ -48,7 +48,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -219,9 +218,9 @@ public class TestContainerReportHandler {
   }
 
   private static LeaseClaim claimLease(DatanodeDetails datanode) {
-    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
     long leaseId = leases.requestLease(datanode, 7L).getAsLong();
-    return leases.claimLease(datanode, OptionalLong.of(7L), 7L, leaseId).orElseThrow(AssertionError::new);
+    return leases.claimLease(datanode, 7L, 7L, leaseId).orElseThrow(AssertionError::new);
   }
 
   static Stream<Arguments> containerAndReplicaStates() {

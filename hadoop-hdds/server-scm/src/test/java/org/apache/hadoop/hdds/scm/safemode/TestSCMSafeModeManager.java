@@ -197,7 +197,7 @@ public class TestSCMSafeModeManager {
     List<DatanodeDetails> datanodes = new ArrayList<>(nodeManager.getAllNodes());
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(2, 100L, now::get, null);
+        new SCMFullContainerReportLeaseManager(2, 100L, true, now::get, null);
     doAnswer(invocation -> {
       ContainerReplica replica = invocation.getArgument(1);
       assertThat(leaseManager.requestLease(replica.getDatanodeDetails(), 7L))
@@ -232,7 +232,7 @@ public class TestSCMSafeModeManager {
           OptionalLong lease = leaseManager.requestLease(datanode, 7L);
           assertThat(lease).isPresent();
           LeaseClaim claim =
-              leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease.getAsLong())
+              leaseManager.claimLease(datanode, 7L, 7L, lease.getAsLong())
                   .orElseThrow(AssertionError::new);
           ContainerReportsProto report = HddsTestUtils.getContainerReports(ContainerReplicaProto.newBuilder()
               .setContainerID(container.getContainerID())

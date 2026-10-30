@@ -2184,5 +2184,4 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     //  finalize command if needed.
     return false;
   }
-
 }

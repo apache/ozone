@@ -44,17 +44,17 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldRejectInvalidConfiguration() {
     assertThatIllegalArgumentException()
         .isThrownBy(() -> new SCMFullContainerReportLeaseManager(
-            0, 5_000L, () -> 0L, null));
+            0, 5_000L, true, () -> 0L, null));
     assertThatIllegalArgumentException()
         .isThrownBy(() -> new SCMFullContainerReportLeaseManager(
-            1, 0L, () -> 0L, null));
+            1, 0L, true, () -> 0L, null));
   }
 
   @Test
   void shouldLimitOutstandingLeasesAndReleaseAfterReport() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
 
@@ -66,8 +66,7 @@ class TestSCMFullContainerReportLeaseManager {
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
         requireClaim(leaseManager, firstDn, 7L, firstLease);
     assertThat(claim).isNotNull();
-    assertThat(leaseManager.claimLease(firstDn, OptionalLong.of(7L), 7L,
-        firstLease)).isEmpty();
+    assertThat(leaseManager.claimLease(firstDn, 7L, 7L, firstLease)).isEmpty();
     assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
 
     claim.complete(true);
@@ -79,7 +78,7 @@ class TestSCMFullContainerReportLeaseManager {
   @Test
   void shouldPreserveOutstandingReportsWhenRateLimitingChanges() {
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
     DatanodeDetails thirdDn = randomDatanodeDetails();
@@ -108,14 +107,13 @@ class TestSCMFullContainerReportLeaseManager {
   @Test
   void shouldRejectDuplicateReportsWhenRateLimitingIsDisabled() {
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
-    leaseManager.setRateLimitEnabled(false);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, false, () -> 0L, null);
     DatanodeDetails datanode = randomDatanodeDetails();
     long lease = requireLease(leaseManager, datanode, 7L);
     SCMFullContainerReportLeaseManager.LeaseClaim claim = requireClaim(leaseManager, datanode, 7L, lease);
 
     assertThat(leaseManager.requestLease(datanode, 7L)).isEmpty();
-    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, 7L, 7L, lease)).isEmpty();
     assertThat(claim.startProcessing()).isTrue();
     assertThat(leaseManager.requestLease(datanode, 7L)).isEmpty();
     claim.complete(true);
@@ -126,30 +124,29 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldValidateLeasesWhenRateLimitingIsDisabled() {
     AtomicLong now = new AtomicLong();
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
-    leaseManager.setRateLimitEnabled(false);
+        new SCMFullContainerReportLeaseManager(1, 100L, false, now::get, null);
     DatanodeDetails datanode = randomDatanodeDetails();
     long lease = requireLease(leaseManager, datanode, 7L);
 
-    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, 0L)).isEmpty();
-    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease == 1L ? 2L : 1L)).isEmpty();
-    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(8L), 7L, lease)).isEmpty();
-    assertThat(leaseManager.claimLease(datanode, OptionalLong.empty(), 7L, lease)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, 7L, 7L, 0L)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, 7L, 7L, lease == 1L ? 2L : 1L)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, 8L, 7L, lease)).isEmpty();
     now.set(100L);
-    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, 7L, 7L, lease)).isEmpty();
 
     long newLease = requireLease(leaseManager, datanode, 8L);
-    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(8L), 8L, newLease)).isPresent();
+    assertThat(leaseManager.claimLease(datanode, 8L, 8L, newLease)).isPresent();
   }
 
-  @Test
-  void shouldReportRateLimitModeAndOutstandingLeases() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void shouldReportRateLimitModeAndOutstandingLeases(boolean rateLimitEnabled) {
     SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create();
     String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
     try {
       SCMFullContainerReportLeaseManager leaseManager =
-          new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, metrics);
-      assertGauge("FCRRateLimitEnabled", 1, getMetrics(source));
+          new SCMFullContainerReportLeaseManager(1, 5_000L, rateLimitEnabled, () -> 0L, metrics);
+      assertGauge("FCRRateLimitEnabled", rateLimitEnabled ? 1 : 0, getMetrics(source));
       DatanodeDetails firstDn = randomDatanodeDetails();
       DatanodeDetails secondDn = randomDatanodeDetails();
       long firstLease = requireLease(leaseManager, firstDn, 7L);
@@ -176,19 +173,17 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldRejectExpiredAndWrongTermLeases() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(2, 100L, now::get, null);
+        new SCMFullContainerReportLeaseManager(2, 100L, true, now::get, null);
     DatanodeDetails wrongTermDatanode = randomDatanodeDetails();
     DatanodeDetails expiredDatanode = randomDatanodeDetails();
 
     long wrongTermLease = requireLease(leaseManager, wrongTermDatanode, 3L);
     long expiredLease = requireLease(leaseManager, expiredDatanode, 3L);
 
-    assertThat(leaseManager.claimLease(wrongTermDatanode,
-        OptionalLong.of(4L), 3L, wrongTermLease)).isEmpty();
+    assertThat(leaseManager.claimLease(wrongTermDatanode, 4L, 3L, wrongTermLease)).isEmpty();
 
     now.addAndGet(101L);
-    assertThat(leaseManager.claimLease(expiredDatanode,
-        OptionalLong.of(3L), 3L, expiredLease)).isEmpty();
+    assertThat(leaseManager.claimLease(expiredDatanode, 3L, 3L, expiredLease)).isEmpty();
     assertThat(leaseManager.requestLease(wrongTermDatanode, 3L)).isPresent();
   }
 
@@ -196,7 +191,7 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldInvalidateOldTermLeasesWhenGrantingNewTerm() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
 
@@ -205,17 +200,15 @@ class TestSCMFullContainerReportLeaseManager {
 
     assertThat(oldTermLease).isNotZero();
     assertThat(newTermLease).isNotZero();
-    assertThat(leaseManager.claimLease(firstDn, OptionalLong.of(3L), 3L,
-        oldTermLease)).isEmpty();
-    assertThat(leaseManager.claimLease(secondDn, OptionalLong.of(4L), 4L,
-        newTermLease)).isPresent();
+    assertThat(leaseManager.claimLease(firstDn, 3L, 3L, oldTermLease)).isEmpty();
+    assertThat(leaseManager.claimLease(secondDn, 4L, 4L, newTermLease)).isPresent();
   }
 
   @Test
   void shouldPreserveDeferredRegistrationUntilReportIsProcessed() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, now::get, null);
     DatanodeDetails datanode = randomDatanodeDetails();
 
     leaseManager.markFullContainerReportDeferred(datanode);
@@ -248,7 +241,7 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldRetainLeaseAfterGrantExpiry(boolean processingStarted) {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 100L, true, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
 
@@ -276,7 +269,7 @@ class TestSCMFullContainerReportLeaseManager {
   @ValueSource(booleans = {false, true})
   void shouldKeepNewRegistrationPendingWhenOlderReportCompletes(boolean processingStarted) {
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
     DatanodeDetails datanode = randomDatanodeDetails();
     leaseManager.markFullContainerReportDeferred(datanode);
     long oldLease = requireLease(leaseManager, datanode, 7L);
@@ -305,14 +298,14 @@ class TestSCMFullContainerReportLeaseManager {
   @Test
   void shouldInvalidateUnclaimedGrantOnReregistration() {
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
     DatanodeDetails datanode = randomDatanodeDetails();
     leaseManager.markFullContainerReportDeferred(datanode);
     long oldLease = requireLease(leaseManager, datanode, 7L);
 
     leaseManager.markFullContainerReportDeferred(datanode);
 
-    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, oldLease)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, 7L, 7L, oldLease)).isEmpty();
     long newLease = requireLease(leaseManager, datanode, 7L);
     assertThat(requireClaim(leaseManager, datanode, 7L, newLease).isRegistrationReport()).isTrue();
   }
@@ -320,7 +313,7 @@ class TestSCMFullContainerReportLeaseManager {
   @Test
   void shouldStartProcessingClaimOnlyOnce() {
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
     DatanodeDetails datanode = randomDatanodeDetails();
     long lease = requireLease(leaseManager, datanode, 7L);
     SCMFullContainerReportLeaseManager.LeaseClaim claim = requireClaim(leaseManager, datanode, 7L, lease);
@@ -336,7 +329,7 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldRetainQueuedRegistrationReportAfterGrantExpiry() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 100L, true, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
     ContainerReportQueue queue = new ContainerReportQueue();
@@ -368,7 +361,7 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldNotReleaseProcessingLeaseForRepeatedExpiredReport() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 100L, true, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
     long lease = requireLease(leaseManager, firstDn, 7L);
@@ -377,7 +370,7 @@ class TestSCMFullContainerReportLeaseManager {
 
     now.addAndGet(1_000L);
 
-    assertThat(leaseManager.claimLease(firstDn, OptionalLong.of(7L), 7L, lease)).isEmpty();
+    assertThat(leaseManager.claimLease(firstDn, 7L, 7L, lease)).isEmpty();
     assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
     claim.complete(true);
     assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
@@ -387,7 +380,7 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldRetainClaimedLeaseUntilRemovedReportIsReleased() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 100L, true, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
     long lease = requireLease(leaseManager, firstDn, 7L);
@@ -406,7 +399,7 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldRetainClaimedLeaseAcrossTermChange() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 100L, true, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
     long lease = requireLease(leaseManager, firstDn, 7L);
@@ -424,7 +417,7 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldNotReserveCapacityForDeniedRequests() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, now::get, null);
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
     DatanodeDetails thirdDn = randomDatanodeDetails();
@@ -455,7 +448,7 @@ class TestSCMFullContainerReportLeaseManager {
     int maxOutstandingLeases = 10;
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(maxOutstandingLeases, 5_000L, now::get, null);
+        new SCMFullContainerReportLeaseManager(maxOutstandingLeases, 5_000L, true, now::get, null);
     List<DatanodeDetails> pendingDatanodes = new ArrayList<>(datanodeCount);
     for (int i = 0; i < datanodeCount; i++) {
       pendingDatanodes.add(randomDatanodeDetails());
@@ -503,7 +496,7 @@ class TestSCMFullContainerReportLeaseManager {
   void shouldRemoveGrantAndDeferredRegistration() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
-        new SCMFullContainerReportLeaseManager(1, 5_000L, now::get, null);
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, now::get, null);
     DatanodeDetails removedDn = randomDatanodeDetails();
     DatanodeDetails nextDn = randomDatanodeDetails();
 
@@ -535,7 +528,7 @@ class TestSCMFullContainerReportLeaseManager {
       SCMFullContainerReportLeaseManager leaseManager,
       DatanodeDetails datanode, long term, long leaseId) {
     Optional<SCMFullContainerReportLeaseManager.LeaseClaim> claim =
-        leaseManager.claimLease(datanode, OptionalLong.of(term), term, leaseId);
+        leaseManager.claimLease(datanode, term, term, leaseId);
     assertThat(claim).isPresent();
     return claim.get();
   }

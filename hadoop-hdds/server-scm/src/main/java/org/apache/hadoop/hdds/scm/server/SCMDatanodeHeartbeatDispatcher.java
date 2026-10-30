@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 
 import com.google.protobuf.Message;
+import jakarta.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -330,6 +331,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
     private long createTime = Time.monotonicNow();
     private final boolean registrationReport;
     // Null for reports that do not use an FCR lease.
+    @Nullable
     private final LeaseClaim leaseClaim;
     private final AtomicBoolean completed = new AtomicBoolean();
 

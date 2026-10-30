@@ -505,11 +505,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES_DEFAULT);
     long leaseDurationMs = conf.getTimeDuration(OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION,
         OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT.toLong(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
-    SCMFullContainerReportLeaseManager manager =
-        new SCMFullContainerReportLeaseManager(maxLeases, leaseDurationMs, Time::monotonicNow, fcrLeaseMetrics);
-    manager.setRateLimitEnabled(conf.getBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED,
-        OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT));
-    return manager;
+    boolean rateLimitEnabled = conf.getBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED,
+        OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT);
+    return new SCMFullContainerReportLeaseManager(maxLeases, leaseDurationMs, rateLimitEnabled,
+        Time::monotonicNow, fcrLeaseMetrics);
   }
 
   private void initializeEventHandlers() {

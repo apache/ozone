@@ -56,11 +56,10 @@ public class SCMFullContainerReportLeaseManager {
   private final Map<String, Lease> outstandingLeases = new HashMap<>();
   private final Map<String, Long> deferredRegistrationIds = new HashMap<>();
   private long nextDeferredRegistrationId;
-  private boolean rateLimitEnabled = true;
+  private boolean rateLimitEnabled;
 
-  public SCMFullContainerReportLeaseManager(int maxOutstandingLeases,
-      long leaseExpiryMs, LongSupplier clock,
-      SCMFullContainerReportLeaseMetrics metrics) {
+  public SCMFullContainerReportLeaseManager(int maxOutstandingLeases, long leaseExpiryMs, boolean rateLimitEnabled,
+      LongSupplier clock, SCMFullContainerReportLeaseMetrics metrics) {
     if (maxOutstandingLeases < 1) {
       throw new IllegalArgumentException(
           "Maximum outstanding full container report leases must be at least 1");
@@ -71,6 +70,7 @@ public class SCMFullContainerReportLeaseManager {
     }
     this.maxOutstandingLeases = maxOutstandingLeases;
     this.leaseExpiryMs = leaseExpiryMs;
+    this.rateLimitEnabled = rateLimitEnabled;
     this.clock = clock;
     this.metrics = metrics;
     if (metrics != null) {
@@ -130,16 +130,14 @@ public class SCMFullContainerReportLeaseManager {
    * Validates an incoming report's grant and moves it from GRANTED to CLAIMED without releasing capacity.
    *
    * @param datanode datanode sending the FCR
-   * @param currentTerm currently allowed lease term, or empty when leasing is unavailable
+   * @param currentTerm term selected by the caller's SCM eligibility policy
    * @param leaseTerm term attached to the incoming report
    * @param leaseId lease ID attached to the incoming report
    * @return the report's lease claim, or empty if the grant is invalid, expired or already claimed
    */
   public synchronized Optional<LeaseClaim> claimLease(
-      DatanodeDetails datanode, OptionalLong currentTerm, long leaseTerm,
-      long leaseId) {
-    if (!currentTerm.isPresent() || currentTerm.getAsLong() != leaseTerm
-        || leaseId == 0) {
+      DatanodeDetails datanode, long currentTerm, long leaseTerm, long leaseId) {
+    if (currentTerm != leaseTerm || leaseId == 0) {
       incrementInvalidLeaseReports();
       return Optional.empty();
     }
@@ -164,8 +162,8 @@ public class SCMFullContainerReportLeaseManager {
       return Optional.empty();
     }
 
-    if (lease.term != currentTerm.getAsLong()) {
-      if (currentTerm.getAsLong() > lease.term) {
+    if (lease.term != currentTerm) {
+      if (currentTerm > lease.term) {
         outstandingLeases.remove(datanodeId);
         updateOutstandingLeaseMetric();
       }
@@ -319,7 +317,10 @@ public class SCMFullContainerReportLeaseManager {
     }
   }
 
-  private void incrementInvalidLeaseReports() {
+  /**
+   * Counts rejected leased reports, including those rejected by the protocol server's SCM eligibility checks.
+   */
+  void incrementInvalidLeaseReports() {
     if (metrics != null) {
       metrics.incNumFCRReportsRejectedInvalidLease();
     }

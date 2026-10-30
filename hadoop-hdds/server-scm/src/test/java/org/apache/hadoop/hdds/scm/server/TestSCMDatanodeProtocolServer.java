@@ -28,9 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -113,7 +115,7 @@ class TestSCMDatanodeProtocolServer {
     when(nodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
     when(nodeManager.register(any(), any(), any(), any())).thenReturn(
         new RegisteredCommand(SCMRegisteredResponseProto.ErrorCode.success, datanode, "cluster"));
-    leases = new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+    leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
     server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, SCMContext.emptyContext(), leases);
   }
 
@@ -326,26 +328,50 @@ class TestSCMDatanodeProtocolServer {
     report.getValue().complete(true);
   }
 
-  @Test
-  void testLeasedReportRejectedWithoutDroppingHeartbeat() throws Exception {
-    long leaseId = leases.requestLease(datanode, SCMContext.INVALID_TERM).getAsLong();
-    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
-        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true)
-        .setContainerReport(ContainerReportsProto.newBuilder()
-            .setFullContainerReportLease(
-                FullContainerReportLeaseProto.newBuilder().setId(leaseId).setTerm(SCMContext.INVALID_TERM)))
-        .setNodeReport(NodeReportProto.getDefaultInstance())
-        .addIncrementalContainerReport(IncrementalContainerReportProto.getDefaultInstance()).build();
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void testUnavailableLeaseTermRejectsReportWithoutDroppingHeartbeat(boolean finalized, boolean rateLimitEnabled)
+      throws Exception {
+    server.stop();
+    SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create();
+    try {
+      leases = spy(new SCMFullContainerReportLeaseManager(1, 5_000L, rateLimitEnabled, () -> 0L, metrics));
+      SCMContext context = mock(SCMContext.class);
+      when(context.isLeader()).thenReturn(true);
+      when(context.getTermOfLeader()).thenReturn(7L);
+      when(context.getTermOfLeaderIfReady()).thenReturn(finalized ? OptionalLong.empty() : OptionalLong.of(7L));
+      if (finalized) {
+        versionManager.finalizeUpgrade();
+      }
+      server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, context, leases);
+      long leaseId = leases.requestLease(datanode, 7L).getAsLong();
+      SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+          .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true)
+          .setContainerReport(ContainerReportsProto.newBuilder()
+              .setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(leaseId).setTerm(7L)))
+          .setNodeReport(NodeReportProto.getDefaultInstance())
+          .addIncrementalContainerReport(IncrementalContainerReportProto.getDefaultInstance()).build();
 
-    assertTrue(server.sendHeartbeat(request).getFullContainerReportLeaseRejected());
-    verify(publisher).fireEvent(eq(NODE_REPORT), any());
-    verify(publisher).fireEvent(eq(INCREMENTAL_CONTAINER_REPORT), any());
-    verify(publisher, never()).fireEvent(eq(CONTAINER_REPORT), any());
+      assertTrue(server.sendHeartbeat(request).getFullContainerReportLeaseRejected());
+      assertEquals(1L, metrics.getNumFCRReportsRejectedInvalidLease());
+      verify(leases, never()).claimLease(any(), anyLong(), anyLong(), anyLong());
+      verify(publisher).fireEvent(eq(NODE_REPORT), any());
+      verify(publisher).fireEvent(eq(INCREMENTAL_CONTAINER_REPORT), any());
+      verify(publisher, never()).fireEvent(eq(CONTAINER_REPORT), any());
 
-    versionManager.finalizeUpgrade();
+      if (!finalized) {
+        versionManager.finalizeUpgrade();
+      }
+      when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.of(7L));
 
-    assertFalse(server.sendHeartbeat(request).getFullContainerReportLeaseRejected());
-    verify(publisher).fireEvent(eq(CONTAINER_REPORT), any());
+      assertFalse(server.sendHeartbeat(request).getFullContainerReportLeaseRejected());
+      assertEquals(1L, metrics.getNumFCRReportsRejectedInvalidLease());
+      ArgumentCaptor<ContainerReportFromDatanode> report = ArgumentCaptor.forClass(ContainerReportFromDatanode.class);
+      verify(publisher).fireEvent(eq(CONTAINER_REPORT), report.capture());
+      report.getValue().complete(true);
+    } finally {
+      metrics.unregister();
+    }
   }
 
   private SCMRegisteredResponseProto register(ContainerReportsProto report) throws IOException {

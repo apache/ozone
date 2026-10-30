@@ -475,26 +475,6 @@ public class TestEndPoint {
     }
   }
 
-  @Test
-  public void testRegisterAssignsCurrentVersionFromVersionManager()
-      throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
-    try (EndpointStateMachine rpcEndPoint =
-        createEndpoint(conf, serverAddress, 1000)) {
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
-      RegisterEndpointTask endpointTask =
-          getRegisterEndpointTask(false, conf, rpcEndPoint);
-      // Simulate stale version on the persisted datanode details. The task
-      // should overwrite it with the version manager's current value, matching
-      // the heartbeat behavior.
-      endpointTask.getDatanodeDetails()
-          .setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
-      endpointTask.call();
-      assertEquals(HDDSVersion.SOFTWARE_VERSION,
-          endpointTask.getDatanodeDetails().getCurrentVersion());
-    }
-  }
-
   @ParameterizedTest
   @CsvSource({"false, true, false", "true, true, false", "true, false, false", "true, true, true"})
   public void testRegisterTaskDefersFCROnlyWhenLeaseEnabled(boolean finalized, boolean scmSupportsLease, boolean recon)
@@ -557,9 +537,7 @@ public class TestEndPoint {
               Boolean.toString(scmSupportsLease))
           .build());
       RegisterEndpointTask endpointTask = new RegisterEndpointTask(
-          rpcEndpoint, ozoneContainer, context,
-          versionManager);
-      endpointTask.setDatanodeDetails(datanodeDetails);
+          rpcEndpoint, ozoneContainer, context);
 
       endpointTask.call();
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
@@ -575,6 +553,26 @@ public class TestEndPoint {
 
     assertEquals(deferred, containerReport.getValue().getFullContainerReportDeferred());
     assertEquals(deferred ? 0 : 1, containerReport.getValue().getReportsCount());
+  }
+
+  @Test
+  public void testRegisterAssignsCurrentVersionFromVersionManager()
+      throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    try (EndpointStateMachine rpcEndPoint =
+        createEndpoint(conf, serverAddress, 1000)) {
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
+      RegisterEndpointTask endpointTask =
+          getRegisterEndpointTask(false, conf, rpcEndPoint);
+      // Simulate stale version on the persisted datanode details. The task
+      // should overwrite it with the version manager's current value, matching
+      // the heartbeat behavior.
+      endpointTask.getDatanodeDetails()
+          .setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
+      endpointTask.call();
+      assertEquals(HDDSVersion.SOFTWARE_VERSION,
+          endpointTask.getDatanodeDetails().getCurrentVersion());
+    }
   }
 
   @Test
