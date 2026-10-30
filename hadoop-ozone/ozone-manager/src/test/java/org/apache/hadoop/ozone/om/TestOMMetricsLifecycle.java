@@ -42,6 +42,7 @@ import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBufferMetrics;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleServiceMetrics;
 import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
 import org.junit.jupiter.api.AfterEach;
@@ -100,6 +101,10 @@ class TestOMMetricsLifecycle {
         }),
         Arguments.of("OMHAMetrics", (Supplier<Runnable>) () -> {
           OMHAMetrics metrics = OMHAMetrics.create("om", "leader");
+          return metrics::unRegister;
+        }),
+        Arguments.of("OzoneManagerDoubleBufferMetrics", (Supplier<Runnable>) () -> {
+          OzoneManagerDoubleBufferMetrics metrics = OzoneManagerDoubleBufferMetrics.create();
           return metrics::unRegister;
         }),
         Arguments.of("OMSnapshotDirectoryMetrics", (Supplier<Runnable>) () -> {

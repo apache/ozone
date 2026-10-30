@@ -19,9 +19,6 @@ package org.apache.hadoop.ozone.container.common.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -72,6 +69,7 @@ class TestDatanodeMetricsLifecycle {
     boolean previous = DefaultMetricsSystem.inMiniClusterMode();
     DefaultMetricsSystem.setMiniClusterMode(true);
     try {
+      assertIndependent(BlockDeletingServiceMetrics::create, BlockDeletingServiceMetrics::unRegister);
       assertIndependent(BackgroundVolumeScannerMetrics::create, BackgroundVolumeScannerMetrics::unregister);
       assertIndependent(ECReconstructionMetrics::create, ECReconstructionMetrics::unRegister);
       assertIndependent(() -> CommandHandlerMetrics.create(Collections.emptyMap()), CommandHandlerMetrics::unRegister);
@@ -98,6 +96,7 @@ class TestDatanodeMetricsLifecycle {
     boolean previous = DefaultMetricsSystem.inMiniClusterMode();
     DefaultMetricsSystem.setMiniClusterMode(false);
     try {
+      assertReplacement(BlockDeletingServiceMetrics::create, BlockDeletingServiceMetrics::unRegister);
       assertReplacement(BackgroundVolumeScannerMetrics::create, BackgroundVolumeScannerMetrics::unregister);
       assertReplacement(ECReconstructionMetrics::create, ECReconstructionMetrics::unRegister);
       assertReplacement(() -> CommandHandlerMetrics.create(Collections.emptyMap()), CommandHandlerMetrics::unRegister);
@@ -204,18 +203,6 @@ class TestDatanodeMetricsLifecycle {
       server.stop();
       DefaultMetricsSystem.setMiniClusterMode(previous);
     }
-  }
-
-  @Test
-  void testBlockDeletingMetricsSharedUntilFinalOwnerStops() {
-    try (BlockDeletingServiceMetrics.Handle first = BlockDeletingServiceMetrics.acquireHandle();
-         BlockDeletingServiceMetrics.Handle second = BlockDeletingServiceMetrics.acquireHandle()) {
-      assertSame(first.metrics(), second.metrics());
-      first.close();
-      first.close();
-      assertNotNull(DefaultMetricsSystem.instance().getSource(BlockDeletingServiceMetrics.SOURCE_NAME));
-    }
-    assertNull(DefaultMetricsSystem.instance().getSource(BlockDeletingServiceMetrics.SOURCE_NAME));
   }
 
   private static <T> void assertIndependent(Supplier<T> create, CheckedConsumer<T, Exception> close) throws Exception {

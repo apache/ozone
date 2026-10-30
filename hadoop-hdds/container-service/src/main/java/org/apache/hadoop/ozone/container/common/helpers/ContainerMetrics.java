@@ -138,11 +138,6 @@ public class ContainerMetrics implements Closeable {
     return metrics;
   }
 
-  public static void remove() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(STORAGE_CONTAINER_METRICS);
-  }
-
   @Override
   public void close() {
     if (registered.compareAndSet(true, false)) {

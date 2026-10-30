@@ -25,6 +25,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics related to Block Deleting Service running on Datanode.
@@ -33,10 +34,10 @@ import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
     + "background block deleting service on Datanode", context = "dfs")
 public final class BlockDeletingServiceMetrics {
 
-  private static BlockDeletingServiceMetrics instance;
-  private static int referenceCount;
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private final AtomicBoolean registered = new AtomicBoolean();
 
   @Metric(about = "The number of successful delete blocks")
   private MutableCounterLong successCount;
@@ -89,56 +90,21 @@ public final class BlockDeletingServiceMetrics {
   private BlockDeletingServiceMetrics() {
   }
 
-  public static synchronized BlockDeletingServiceMetrics create() {
-    if (instance == null) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      instance = ms.register(SOURCE_NAME, "BlockDeletingService",
-          new BlockDeletingServiceMetrics());
-    }
-
-    return instance;
-  }
-
-  /** Acquires the shared metrics for one block deleting service. */
-  public static synchronized Handle acquireHandle() {
-    BlockDeletingServiceMetrics metrics = create();
-    referenceCount++;
-    return new Handle(metrics);
-  }
-
-  /** Keeps the shared source registered until the final service stops. */
-  public static final class Handle implements AutoCloseable {
-    private final BlockDeletingServiceMetrics metrics;
-    private final AtomicBoolean closed = new AtomicBoolean(false);
-
-    private Handle(BlockDeletingServiceMetrics metrics) {
-      this.metrics = metrics;
-    }
-
-    public BlockDeletingServiceMetrics metrics() {
-      return metrics;
-    }
-
-    @Override
-    public void close() {
-      if (closed.compareAndSet(false, true)) {
-        synchronized (BlockDeletingServiceMetrics.class) {
-          if (instance == metrics && --referenceCount == 0) {
-            unRegister();
-          }
-        }
-      }
-    }
+  public static BlockDeletingServiceMetrics create() {
+    BlockDeletingServiceMetrics metrics = new BlockDeletingServiceMetrics();
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.register(metrics.sourceName, "BlockDeletingService", metrics);
+    metrics.registered.set(true);
+    return metrics;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static synchronized void unRegister() {
-    instance = null;
-    referenceCount = 0;
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+  public void unRegister() {
+    if (registered.compareAndSet(true, false)) {
+      DefaultMetricsSystem.instance().unregisterSource(sourceName);
+    }
   }
 
   public void incrSuccessCount(long count) {
