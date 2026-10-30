@@ -46,8 +46,6 @@ public final class HddsVersionInfo {
     System.out.println(
         "Compiled with protoc " + HDDS_VERSION_INFO.getProtoVersions());
     System.out.println(
-        "From source with checksum " + HDDS_VERSION_INFO.getSrcChecksum());
-    System.out.println(
         "Compiled on platform " + HDDS_VERSION_INFO.getCompilePlatform());
     if (LOG.isDebugEnabled()) {
       LOG.debug("This command was run using " +

@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -1788,6 +1789,7 @@ public class RpcClient implements ClientProtocol {
             .setOffset(locationInfo.getOffset())
             .setToken(locationInfo.getToken())
             .setPartNumber(locationInfo.getPartNumber())
+            .setPartIv(locationInfo.getPartIv())
             .setCreateVersion(locationInfo.getCreateVersion())
             .setPipeline(pipeline)
             .build();
@@ -2817,19 +2819,26 @@ public class RpcClient implements ClientProtocol {
       return new OzoneInputStream(cryptoIn);
     } else {
       // Multipart Key with FileEncryptionInfo
-      List<LengthInputStream> lengthInputStreams = KeyInputStream
+      SortedMap<Integer, LengthInputStream> lengthInputStreams = KeyInputStream
           .getStreamsFromKeyInfo(keyInfo, xceiverClientManager, retryFunction,
               blockInputStreamFactory, clientConfig);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
+      // Parts that have their own IV carry it in each of their blocks.
+      Map<Integer, byte[]> partIvs = new HashMap<>();
+      for (OmKeyLocationInfo location : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
+        if (location.getPartIv() != null) {
+          partIvs.put(location.getPartNumber(), location.getPartIv());
+        }
+      }
+
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
-      for (int i = 0; i < lengthInputStreams.size(); i++) {
-        LengthInputStream lengthInputStream = lengthInputStreams.get(i);
+      for (Map.Entry<Integer, LengthInputStream> part : lengthInputStreams.entrySet()) {
         final OzoneCryptoInputStream ozoneCryptoInputStream =
-            new OzoneCryptoInputStream(lengthInputStream,
+            new OzoneCryptoInputStream(part.getValue(),
                 OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-                decrypted.getMaterial(), feInfo.getIV(),
-                keyInfo.getKeyName(), i);
+                decrypted.getMaterial(), partIvs.getOrDefault(part.getKey(), feInfo.getIV()),
+                keyInfo.getKeyName(), cryptoInputStreams.size());
         cryptoInputStreams.add(ozoneCryptoInputStream);
       }
       return new OzoneInputStream(
@@ -2902,10 +2911,12 @@ public class RpcClient implements ClientProtocol {
         openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
       KeyProvider.KeyVersion decrypted = getDEK(feInfo);
+      // A multipart upload part may have its own IV.
+      final byte[] partIv = openKey.getKeyInfo().getPartIv();
       final CryptoOutputStream cryptoOut =
           new CryptoOutputStream(keyOutputStream,
               OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-              decrypted.getMaterial(), feInfo.getIV());
+              decrypted.getMaterial(), partIv != null ? partIv : feInfo.getIV());
       return new OzoneOutputStream(cryptoOut, enableHsync);
     } else {
       try {
