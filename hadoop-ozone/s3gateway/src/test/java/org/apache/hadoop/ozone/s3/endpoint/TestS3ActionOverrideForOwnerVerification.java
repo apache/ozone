@@ -53,7 +53,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -193,7 +192,6 @@ public class TestS3ActionOverrideForOwnerVerification {
     final OzoneClient client = mock(OzoneClient.class);
     final ObjectStore objectStore = mock(ObjectStore.class);
     final ClientProtocol clientProtocol = mock(ClientProtocol.class);
-    final OzoneVolume volume = mock(OzoneVolume.class);
     final OzoneBucket destBucket = mock(OzoneBucket.class);
     final OzoneBucket sourceBucket = mock(OzoneBucket.class);
 
@@ -206,13 +204,11 @@ public class TestS3ActionOverrideForOwnerVerification {
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-
-    when(volume.getName()).thenReturn("s3Volume");
 
     when(destBucket.getName()).thenReturn(DEST_BUCKET);
+    when(destBucket.getVolumeName()).thenReturn("s3Volume");
     when(destBucket.getOwner()).thenReturn(DEST_OWNER);
-    when(volume.getBucket(DEST_BUCKET)).thenReturn(destBucket);
+    when(clientProtocol.getBucketDetails(null, DEST_BUCKET)).thenReturn(destBucket);
 
     when(sourceBucket.getOwner()).thenAnswer(invocationOnMock -> {
       final S3Auth s3Auth = s3AuthRef.get();
@@ -220,7 +216,7 @@ public class TestS3ActionOverrideForOwnerVerification {
       actionAtSourceBucketOwnerLookup.set(s3Auth.getS3Action());
       return SOURCE_OWNER;
     });
-    when(volume.getBucket(SOURCE_BUCKET)).thenReturn(sourceBucket);
+    when(clientProtocol.getBucketDetails(null, SOURCE_BUCKET)).thenReturn(sourceBucket);
 
     // Stop the request after the source-bucket owner check, without needing to set up full copy behavior.
     when(clientProtocol.getKeyDetails(anyString(), eq(SOURCE_BUCKET), eq(SOURCE_KEY)))
@@ -303,7 +299,6 @@ public class TestS3ActionOverrideForOwnerVerification {
     final OzoneClient client = mock(OzoneClient.class);
     final ObjectStore objectStore = mock(ObjectStore.class);
     final ClientProtocol clientProtocol = mock(ClientProtocol.class);
-    final OzoneVolume volume = mock(OzoneVolume.class);
     final OzoneBucket bucket = mock(OzoneBucket.class);
     final AtomicReference<S3Auth> s3AuthRef = new AtomicReference<>();
 
@@ -315,8 +310,7 @@ public class TestS3ActionOverrideForOwnerVerification {
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket("bucket")).thenAnswer(invocationOnMock -> {
+    when(clientProtocol.getBucketDetails(null, "bucket")).thenAnswer(invocationOnMock -> {
       final S3Auth s3Auth = s3AuthRef.get();
       actionAtBucketLookup.set(s3Auth == null ? null : s3Auth.getS3Action());
       return bucket;

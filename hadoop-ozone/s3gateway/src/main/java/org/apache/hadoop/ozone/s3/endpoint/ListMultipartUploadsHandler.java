@@ -64,11 +64,11 @@ class ListMultipartUploadsHandler extends BucketOperationHandler {
 
     try {
       if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
-        OzoneBucket bucket = context.getVolume().getBucket(bucketName);
+        OzoneBucket bucket = context.getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
       OzoneMultipartUploadList ozoneMultipartUploadList =
-          getClientProtocol().listMultipartUploads(context.getVolume().getName(), bucketName, prefix,
+          getClientProtocol().listMultipartUploads(context.getVolumeName(), bucketName, prefix,
               keyMarker, uploadIdMarker, maxUploads);
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
