@@ -23,16 +23,60 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeUsageInfoProto;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link ContainerBalancerAdvisor} estimation. */
 public final class TestContainerBalancerAdvisor {
+
+  @Test
+  void testStorageTypesSharePerIterationLimitsDespiteBalancedWholeNodeTotals() {
+    ContainerBalancerEstimation estimate = ContainerBalancerAdvisor.estimate(new OzoneConfiguration(),
+        new ContainerBalancerAdvisor.AdvisorRequest()
+            .setNodes(Arrays.asList(typedProto("first", 5, 95), typedProto("second", 95, 5)))
+            .setMaxDatanodesPercentageToInvolvePerIteration(100)).get(0);
+
+    assertThat(estimate.succeeded()).isTrue();
+    assertEquals(70L * OzoneConsts.GB, estimate.getBytesToMove());
+    // MEDIUM grants 26 GB to each datanode, not a fresh 26 GB for each storage type.
+    assertEquals(26L * OzoneConsts.GB, estimate.getPerIterationBytes());
+    assertEquals(3, estimate.getEstimatedIterations());
+  }
+
+  @Test
+  void testEstimateRejectsPartialStorageTypeUsage() {
+    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ContainerBalancerAdvisor.estimate(new OzoneConfiguration(), new ContainerBalancerAdvisor.AdvisorRequest()
+            .setNodes(Arrays.asList(typedProto("new", 5, 95), proto("legacy", 200, 100)))));
+    assertThat(ex).hasMessageContaining("missing or incomplete storage-type usage");
+  }
+
+  @Test
+  void testEstimateDoesNotCountIncompatibleSourcesAndTargetsAsExtraThroughput() {
+    List<DatanodeUsageInfoProto> nodes = new ArrayList<>(Arrays.asList(
+        typedProto("first", 0, 100), typedProto("second", 40, 60), typedProto("third", 40, 60)));
+    // Only ARCHIVE has a compatible source/target pair at the 20% threshold.
+    for (long remaining : new long[]{50, 950}) {
+      nodes.add(proto("archive-" + remaining, 1000L * OzoneConsts.GB, remaining * OzoneConsts.GB).toBuilder()
+          .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.ARCHIVE)
+              .setCapacity(1000L * OzoneConsts.GB).setRemaining(remaining * OzoneConsts.GB)).build());
+    }
+    ContainerBalancerEstimation estimate = ContainerBalancerAdvisor.estimate(new OzoneConfiguration(),
+        new ContainerBalancerAdvisor.AdvisorRequest().setNodes(nodes).setThresholdPercent(20.0)
+            .setMaxDatanodesPercentageToInvolvePerIteration(100)).get(0);
+
+    assertThat(estimate.succeeded()).isTrue();
+    assertEquals(250L * OzoneConsts.GB, estimate.getBytesToMove());
+    assertEquals(26L * OzoneConsts.GB, estimate.getPerIterationBytes());
+  }
 
   @Test
   void testComputePerIterationBytesNeverExceedsBytesToMove() {
@@ -278,6 +322,14 @@ public final class TestContainerBalancerAdvisor {
       nodes.add(proto("over-" + i, capacity, (long) (capacity * 0.35)));
     }
     return nodes;
+  }
+
+  private static DatanodeUsageInfoProto typedProto(String hostname, long ssdRemaining, long diskRemaining) {
+    return proto(hostname, 200L * OzoneConsts.GB, (ssdRemaining + diskRemaining) * OzoneConsts.GB).toBuilder()
+        .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.SSD)
+            .setCapacity(100L * OzoneConsts.GB).setRemaining(ssdRemaining * OzoneConsts.GB))
+        .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+            .setCapacity(100L * OzoneConsts.GB).setRemaining(diskRemaining * OzoneConsts.GB)).build();
   }
 
   private static DatanodeUsageInfoProto proto(String hostname, long capacity, long remaining) {

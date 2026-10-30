@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -53,6 +55,39 @@ class TestContainerBalancerAssessmentSubcommand {
   @AfterEach
   void tearDown() {
     IOUtils.closeQuietly(out);
+  }
+
+  @Test
+  void testAssessmentReportsImbalanceSeparatelyForEachStorageType() {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("first", 5, 95), typedProto("second", 95, 5)));
+
+    runAssessment(scmClient);
+
+    assertThat(out.get()).contains("Storage type: SSD", "Storage type: DISK", "35 B", "70 B",
+        "All storage types (shared iteration limits):").doesNotContain("WARNING");
+  }
+
+  @Test
+  void testJsonAssessmentIncludesStorageTypesAndUniqueDatanodeCounts() {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("first", 5, 95), typedProto("second", 95, 5)));
+
+    runAssessment(scmClient, "--json");
+
+    assertThat(out.get()).contains("\"storageTypes\"", "\"SSD\"", "\"DISK\"",
+        "\"bytesToMove\" : 70", "\"count\" : 2", "\"incompleteStorageTypeUsage\" : false");
+  }
+
+  @Test
+  void testAssessmentWarnsWhenStorageTypeReportsAreIncomplete() {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("new", 5, 95), proto("legacy", 200, 100)));
+
+    runAssessment(scmClient);
+
+    assertThat(out.get()).contains("WARNING: Missing or incomplete storage-type usage",
+        "storage-type assessment is partial");
   }
 
   @Test
@@ -157,6 +192,14 @@ class TestContainerBalancerAssessmentSubcommand {
     return Arrays.asList(
         proto("source-1", 100, 10),
         proto("target-1", 100, 50));
+  }
+
+  private static DatanodeUsageInfoProto typedProto(String hostname, long ssdRemaining, long diskRemaining) {
+    return proto(hostname, 200, ssdRemaining + diskRemaining).toBuilder()
+        .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.SSD)
+            .setCapacity(100).setRemaining(ssdRemaining))
+        .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+            .setCapacity(100).setRemaining(diskRemaining)).build();
   }
 
   private static DatanodeUsageInfoProto proto(String hostname, long capacity, long remaining) {
