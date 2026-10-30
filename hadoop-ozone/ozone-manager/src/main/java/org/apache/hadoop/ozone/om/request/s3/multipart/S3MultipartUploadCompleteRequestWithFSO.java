@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -71,7 +72,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
   }
 
   @Override
-  protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
+  protected List<String> addMissingParentsToCache(OmBucketInfo omBucketInfo,
       List<OmDirectoryInfo> missingParentInfos,
       OMMetadataManager omMetadataManager, long volumeId, long bucketId,
       long transactionLogIndex) throws IOException {
@@ -84,6 +85,22 @@ public class S3MultipartUploadCompleteRequestWithFSO
     OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
         volumeId, bucketId, transactionLogIndex,
         missingParentInfos, null);
+    return missingParentInfos.stream()
+        .map(dirInfo -> omMetadataManager.getOzonePathKey(volumeId, bucketId, dirInfo))
+        .collect(Collectors.toList());
+  }
+
+  @Override
+  protected void removeMissingEntriesFromCache(OMMetadataManager omMetadataManager, List<String> missingParentKeys,
+      String multipartOpenKey, long transactionLogIndex) {
+    // None of these keys existed before this request, so an entry without a value restores that state. It is
+    // evicted together with the other cache entries of this transaction.
+    for (String missingParentKey : missingParentKeys) {
+      omMetadataManager.getDirectoryTable().addCacheEntry(missingParentKey, transactionLogIndex);
+    }
+    if (multipartOpenKey != null) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(multipartOpenKey, transactionLogIndex);
+    }
   }
 
   @Override

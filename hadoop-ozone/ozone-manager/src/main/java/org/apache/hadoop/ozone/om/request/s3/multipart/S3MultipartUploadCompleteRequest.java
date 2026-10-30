@@ -182,6 +182,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Exception exception = null;
     Result result = null;
+    List<String> missingParentKeys = Collections.emptyList();
+    String missingMultipartOpenKey = null;
     try {
       multipartKey = omMetadataManager.getMultipartKey(volumeName,
           bucketName, keyName, uploadID);
@@ -209,7 +211,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             bucketName);
 
         // add all missing parents to directory table
-        addMissingParentsToCache(omBucketInfo, missingParentInfos,
+        missingParentKeys = addMissingParentsToCache(omBucketInfo, missingParentInfos,
             omMetadataManager, volumeId, bucketId, trxnLogIndex);
 
         String multipartOpenKey = omMetadataManager
@@ -259,6 +261,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           // Add missing multi part info to open key table
           addMultiPartToCache(omMetadataManager, multipartOpenKey,
               pathInfoFSO, keyInfoFromArgs, keyName, trxnLogIndex);
+          missingMultipartOpenKey = multipartOpenKey;
         }
       }
 
@@ -411,6 +414,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = getOmClientResponse(omResponse, exception);
+      // The missing parent directories and open key were added to the cache before the request was validated.
+      // A failed complete writes none of them to DB, so withdraw them while the bucket lock is still held.
+      // Otherwise a request applied before this one is flushed could create children under them.
+      removeMissingEntriesFromCache(omMetadataManager, missingParentKeys, missingMultipartOpenKey, trxnLogIndex);
     } finally {
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
@@ -573,11 +580,23 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
   }
 
-  protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
+  /**
+   * @return the directory table keys of the cache entries that were added
+   */
+  protected List<String> addMissingParentsToCache(OmBucketInfo omBucketInfo,
       List<OmDirectoryInfo> missingParentInfos,
       OMMetadataManager omMetadataManager,
       long volumeId, long bucketId, long transactionLogIndex
   ) throws IOException {
+    // FSO is disabled. Do nothing.
+    return Collections.emptyList();
+  }
+
+  /**
+   * Withdraws the cache entries added by {@link #addMissingParentsToCache} and {@link #addMultiPartToCache}.
+   */
+  protected void removeMissingEntriesFromCache(OMMetadataManager omMetadataManager, List<String> missingParentKeys,
+      String multipartOpenKey, long transactionLogIndex) {
     // FSO is disabled. Do nothing.
   }
 
