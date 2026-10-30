@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY;
@@ -54,9 +56,10 @@ public final class S3StorageClassResolver {
   private final S3StorageClassSpec standardSpec;
   private final S3StorageClassSpec reducedRedundancySpec;
   private final S3StorageClassSpec standardIaSpec;
+  private final boolean standardUsesClientDefault;
 
   /**
-   * Resolves gateway storage policy settings once, before the gateway accepts requests.
+   * Resolves gateway storage class settings once, before the gateway accepts requests.
    *
    * @param conf gateway configuration
    * @throws IllegalArgumentException if any configured storage policy is not valid
@@ -68,6 +71,8 @@ public final class S3StorageClassResolver {
         getConfiguredStoragePolicy(conf, OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY));
     standardIaSpec = S3StorageClass.STANDARD_IA.getSpec().withStoragePolicy(
         getConfiguredStoragePolicy(conf, OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY));
+    standardUsesClientDefault = conf.getBoolean(OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY,
+        OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT);
   }
 
   /**
@@ -76,6 +81,8 @@ public final class S3StorageClassResolver {
    * <p>For {@code STANDARD}, {@code REDUCED_REDUNDANCY}, and {@code STANDARD_IA}, the storage policy comes from the
    * class's gateway setting resolved at startup. When the setting is empty, the spec has no storage policy and the
    * write path uses the bucket's policy or the cluster default. Configuration is not read during request lookup.
+   * The spec retains the class's replication defaults. Use {@link #resolveReplicationConfig} to also apply the
+   * STANDARD client-default replication setting.
    *
    * @param s3StorageClass the {@code x-amz-storage-class} header value
    * @throws IllegalArgumentException if the storage class is null or unknown
@@ -96,7 +103,40 @@ public final class S3StorageClassResolver {
   }
 
   /**
+   * Resolves replication for a request, including the STANDARD client-default setting.
+   *
+   * <p>When the setting is enabled and the request specifies STANDARD, a non-null client replication config is used
+   * unchanged, including its EC layout. The storage-config header and bucket replication do not override it.
+   * Otherwise, explicit classes use their spec's replication rules. A missing or empty class header uses client
+   * replication, then bucket replication, or null so the server can apply its default.
+   * For explicit classes, storage policy is resolved separately through {@link #toSpec} and is unaffected.
+   *
+   * @param s3StorageClass the x-amz-storage-class header value, or null
+   * @param storageConfigHeader the storage-config header value, or null
+   * @param clientReplicationConfig replication from the gateway's ozone.replication settings, or null
+   * @param bucketReplicationConfig the bucket's default replication, or null
+   * @return the resolved replication, or null to use the server default
+   * @throws IllegalArgumentException if the class is unknown or its EC layout header is invalid
+   */
+  @Nullable
+  public ReplicationConfig resolveReplicationConfig(@Nullable String s3StorageClass,
+      @Nullable String storageConfigHeader, @Nullable ReplicationConfig clientReplicationConfig,
+      @Nullable ReplicationConfig bucketReplicationConfig) {
+    if (StringUtils.isEmpty(s3StorageClass)) {
+      return clientReplicationConfig != null ? clientReplicationConfig : bucketReplicationConfig;
+    }
+    S3StorageClass storageClass = S3StorageClass.fromS3StorageClass(s3StorageClass);
+    if (standardUsesClientDefault && storageClass == S3StorageClass.STANDARD && clientReplicationConfig != null) {
+      return clientReplicationConfig;
+    }
+    return toReplicationConfig(toSpec(s3StorageClass), storageConfigHeader, bucketReplicationConfig);
+  }
+
+  /**
    * The replication config for a write with the given spec.
+   *
+   * <p>This conversion does not apply client replication settings. Request handlers should use
+   * {@link #resolveReplicationConfig} to honor the STANDARD client-default setting.
    *
    * <p>The spec must supply a supported replication type (RATIS or EC). A missing type is rejected even when a bucket
    * replication config is supplied.
