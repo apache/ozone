@@ -24,6 +24,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -460,6 +462,26 @@ public final class ServerUtils {
     String componentName = getComponentName(nodeType);
     return Paths.get(metaDirPath.getPath(),
         componentName + ".ratis." + OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR).toString();
+  }
+
+  /**
+   * Shut down an owned executor, forcing cancellation if graceful termination times out.
+   *
+   * @param executor executor to stop
+   */
+  public static void executorServiceShutdownGraceful(ExecutorService executor) {
+    executor.shutdown();
+    try {
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+      }
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        LOG.error("Unable to shut down executor service.");
+      }
+    } catch (InterruptedException e) {
+      executor.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
   }
 
   /**

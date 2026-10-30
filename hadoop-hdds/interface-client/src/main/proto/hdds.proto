@@ -635,3 +635,32 @@ message DatanodeDiskBalancerInfoProto {
     repeated VolumeReportProto volumeInfo = 10;
     repeated StorageTypeDiskBalancerInfoProto storageTypeInfo = 11;
 }
+
+message ExtendedJobWorkDetailsProto {
+    required JobworkerDetailsProto jobworkerDetails = 1;
+    optional string version = 2;
+    optional int64 setupTime = 3;
+    optional string revision = 4;
+    optional string buildDate = 5;
+}
+
+message JobworkerDetailsProto {
+    required hadoop.hdds.UUID uuid128 = 1;
+    required string ipAddress = 2;
+    required string hostName = 3;
+    repeated hadoop.hdds.JobworkerPort ports = 4;
+    optional string networkName = 5;
+    optional string networkLocation = 6;
+    optional NodeOperationalState nodeOperationalState = 7;
+    required uint32 jobworkerVersion = 8;
+}
+
+message JobworkerPort {
+    required JobworkerPortType type = 1;
+    required uint32 value = 2;
+}
+
+enum JobworkerPortType {
+    UNKNOWN_PORT = 0;
+    HTTP = 1;
+}

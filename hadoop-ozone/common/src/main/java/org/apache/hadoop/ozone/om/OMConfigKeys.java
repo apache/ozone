@@ -28,6 +28,8 @@ import org.rocksdb.CompactRangeOptions.BottommostLevelCompaction;
  * Ozone Manager Constants.
  */
 public final class OMConfigKeys {
+  public static final String OZONE_OM_USE_JOBWORKER_HOSTNAME_KEY = "ozone.om.use.jobworker.hostname";
+  public static final boolean OZONE_OM_USE_JOBWORKER_HOSTNAME_DEFAULT = false;
   public static final String OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY =
       "ozone.filesystem.snapshot.enabled";
   public static final boolean OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT = true;

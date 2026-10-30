@@ -34,6 +34,7 @@ public enum ConfigTag {
   FREON,
   HA,
   HDDS,
+  JOBWORKER,
   KERBEROS,
   MANAGEMENT,
   OM,

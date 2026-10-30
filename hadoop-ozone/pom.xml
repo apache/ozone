@@ -44,6 +44,7 @@
     <module>integration-test-s3</module>
     <module>interface-client</module>
     <module>interface-storage</module>
+    <module>jobworker-server</module>
     <module>mini-cluster</module>
     <module>multitenancy-ranger</module>
     <module>ozone-manager</module>

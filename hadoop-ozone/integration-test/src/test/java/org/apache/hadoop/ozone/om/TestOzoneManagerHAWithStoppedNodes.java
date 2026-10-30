@@ -39,17 +39,26 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatus;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.OMJobworkerCommandProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.JobworkerService;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -60,12 +69,20 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.jobworker.JobworkerConnectionManager;
+import org.apache.hadoop.ozone.jobworker.JobworkerStateContext;
+import org.apache.hadoop.ozone.jobworker.commands.AbstractJobworkerCommandHandler;
+import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommand;
+import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandHandler;
+import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandStatus;
+import org.apache.hadoop.ozone.jobworker.commands.OMJobworkerCommand;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.jobworker.command.JobworkerCommandListener;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -92,6 +109,7 @@ import org.slf4j.LoggerFactory;
  * Ozone Manager HA tests that stop/restart one or more OM nodes.
  * @see TestOzoneManagerHAWithAllRunning
  */
+
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
@@ -108,6 +126,149 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
   @BeforeEach
   void setup() throws Exception {
     waitForLeaderToBeReady();
+  }
+
+  @Test
+  void testJobworkerTermFencingAcrossLeaderChange() throws Exception {
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch finish = new CountDownLatch(1);
+    AtomicInteger executions = new AtomicInteger();
+    JobworkerService worker = new JobworkerService(new String[0]) {
+      @Override
+      protected JobworkerCommandHandler[] createCommandHandlers() {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AbstractJobworkerCommandHandler handler =
+            new AbstractJobworkerCommandHandler(OMJobworkerCommandProto.Type.mockCommand, executor) {
+              @Override
+              protected boolean processCommand(JobworkerCommand<?> command, JobworkerStateContext context,
+                  JobworkerConnectionManager connections) throws Exception {
+                // The first command blocks until the test releases it, later commands complete at once.
+                if (executions.incrementAndGet() == 1) {
+                  started.countDown();
+                  return finish.await(120, TimeUnit.SECONDS);
+                }
+                return true;
+              }
+
+              @Override
+              public void stop() {
+                ServerUtils.executorServiceShutdownGraceful(executor);
+              }
+            };
+        return new JobworkerCommandHandler[]{handler};
+      }
+    };
+    try {
+      OzoneConfiguration workerConf = enableJobworkerFramework();
+      OzoneManager firstLeader = cluster.getOMLeader();
+      JobworkerCommandListener firstListener = registerJobworkerResultListener(firstLeader);
+      worker.start(workerConf);
+      UUID workerId = worker.getJobworkerDetails().getUuid();
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        GenericTestUtils.waitFor(() -> om.getJobworkerNodemanager().isJobworkerNodeRegistered(workerId), 100, 30_000);
+      }
+
+      // Command A runs on the worker in the term of the first leader.
+      OMJobworkerCommand<?> commandA = new MockOMJobworkerCommand(42L);
+      firstLeader.getOMJobworkerCommandManager().sendCommand(workerId, commandA);
+      long firstTerm = commandA.getTerm();
+      assertTrue(started.await(30, TimeUnit.SECONDS));
+
+      // After a leader change the old leader forgets command A and only the new leader dispatches.
+      OzoneManager secondLeader = cluster.getOzoneManagersList().stream()
+          .filter(om -> om != firstLeader).findFirst().get();
+      transferLeader(firstLeader, secondLeader);
+      waitForLeaderToBeReady();
+      OzoneManager newLeader = cluster.getOMLeader();
+      assertNotEquals(firstLeader.getOMNodeId(), newLeader.getOMNodeId());
+      long secondTerm = newLeader.getJobworkerLeaderTracker().getTermIfReady().getAsLong();
+      assertTrue(secondTerm > firstTerm);
+      GenericTestUtils.waitFor(() -> firstLeader.getOMJobworkerCommandManager()
+          .getInFlightCommandCount(OMJobworkerCommandProto.Type.mockCommand) == 0, 100, 30_000);
+      org.mockito.Mockito.verify(firstListener).onStatusUpdateTimeout(
+          org.mockito.ArgumentMatchers.argThat(info -> info.getCommandId() == 42L),
+          org.mockito.ArgumentMatchers.eq(workerId));
+      assertThrows(IOException.class, () -> firstLeader.getOMJobworkerCommandManager()
+          .sendCommand(workerId, new MockOMJobworkerCommand(43L)));
+
+      // The worker learns the new term, and a late command from the old term is dropped.
+      String serviceId = newLeader.getOMServiceId();
+      JobworkerStateContext context = worker.getJobworkerStateMachine().getContext();
+      GenericTestUtils.waitFor(() -> context.getCommandManager().getTermOfLeaderOMByServiceId(serviceId)
+          .orElse(-1) == secondTerm, 100, 30_000);
+      OMJobworkerCommandProto lateCommand = OMJobworkerCommandProto.newBuilder()
+          .setCommandType(OMJobworkerCommandProto.Type.mockCommand).setCmdId(44L).setTerm(firstTerm).build();
+      context.addCommand(JobworkerCommand.fromEnvelope(lateCommand, serviceId, firstTerm));
+      GenericTestUtils.waitFor(() -> {
+        JobworkerCommandStatus status = context.getCommandManager().getCmdStatus(serviceId, 44L);
+        return status == null || status.getStatus() == CommandStatus.Status.FAILED;
+      }, 100, 30_000);
+
+      // Command B from the new leader runs and is reported to the new leader.
+      JobworkerCommandListener newListener = registerJobworkerResultListener(newLeader);
+      newLeader.getOMJobworkerCommandManager().sendCommand(workerId, new MockOMJobworkerCommand(45L));
+      finish.countDown();
+      GenericTestUtils.waitFor(() -> executions.get() == 2, 100, 30_000);
+      GenericTestUtils.waitFor(() -> newLeader.getOMJobworkerCommandManager()
+          .getInFlightCommandCount(OMJobworkerCommandProto.Type.mockCommand) == 0, 100, 30_000);
+      org.mockito.Mockito.verify(newListener).onCommandSucceeded(
+          org.mockito.ArgumentMatchers.argThat(info -> info.getCommandId() == 45L),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      // The late result of command A from the old term never reaches the new leader's listener.
+      org.mockito.Mockito.verify(newListener, org.mockito.Mockito.never()).onCommandSucceeded(
+          org.mockito.ArgumentMatchers.argThat(info -> info.getCommandId() == 42L),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      assertEquals(2, executions.get(), "The late command from the old term must not run");
+    } finally {
+      finish.countDown();
+      worker.stop();
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        om.getConfiguration().setBoolean("ozone.om.jobworker.service.enabled", false);
+      }
+    }
+  }
+
+  private OzoneConfiguration enableJobworkerFramework() throws Exception {
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    cluster.restartOzoneManagersWithConfigCustomizer(conf -> {
+      conf.setBoolean("ozone.om.jobworker.service.enabled", true);
+      conf.setInt("ozone.om.jobworker.grpc.port", 0);
+    });
+    waitForLeaderToBeReady();
+    OzoneConfiguration workerConf = new OzoneConfiguration(getConf());
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      workerConf.setInt("ozone.om.jobworker.grpc.port." + om.getOMServiceId() + "." + om.getOMNodeId(),
+          om.getJobworkerGrpcPort());
+    }
+    workerConf.set("ozone.jobworker.om.service.ids", cluster.getOMLeader().getOMServiceId());
+    workerConf.set("ozone.jobworker.heartbeat.interval", "100ms");
+    workerConf.set("ozone.jobworker.command.status.report.interval", "100ms");
+    workerConf.set("ozone.jobworker.node.report.interval", "100ms");
+    return workerConf;
+  }
+
+  private static JobworkerCommandListener registerJobworkerResultListener(OzoneManager om) {
+    JobworkerCommandListener listener = org.mockito.Mockito.mock(JobworkerCommandListener.class);
+    om.getOMJobworkerCommandManager().registerHandler(OMJobworkerCommandProto.Type.mockCommand, listener);
+    return listener;
+  }
+
+  /** A mock command with a fixed ID. */
+  private static final class MockOMJobworkerCommand extends OMJobworkerCommand<OMJobworkerCommandProto> {
+    private MockOMJobworkerCommand(long id) {
+      super(id);
+    }
+
+    @Override
+    public OMJobworkerCommandProto.Type getType() {
+      return OMJobworkerCommandProto.Type.mockCommand;
+    }
+
+    @Override
+    public OMJobworkerCommandProto getProto() {
+      return OMJobworkerCommandProto.newBuilder().setCommandType(getType()).setCmdId(getId()).build();
+    }
   }
 
   /**

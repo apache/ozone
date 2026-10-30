@@ -63,6 +63,10 @@ public class VersionInfo {
     return info.getProperty("revision", "Unknown");
   }
 
+  public String getDate() {
+    return info.getProperty("date", "Unknown");
+  }
+
   public String getUrl() {
     return info.getProperty("url", "Unknown");
   }
