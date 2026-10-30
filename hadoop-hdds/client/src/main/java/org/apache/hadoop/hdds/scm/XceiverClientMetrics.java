@@ -22,7 +22,6 @@ import java.util.EnumMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -128,12 +127,6 @@ public class XceiverClientMetrics implements MetricsSource {
   @VisibleForTesting
   public void reset() {
     init();
-  }
-
-  public void unRegister() {
-    IOUtils.closeQuietly(containerOpsLatency.values());
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
   }
 
   @Override
