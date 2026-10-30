@@ -24,6 +24,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -108,7 +109,7 @@ public class TestRegisterEndpointTask {
     return new StateContext(new OzoneConfiguration(), DatanodeStates.RUNNING, datanodeStateMachine, "");
   }
 
-  private static OzoneContainer mockOzoneContainer() {
+  private static OzoneContainer mockOzoneContainer() throws IOException {
     ContainerController controller = mock(ContainerController.class);
     when(controller.getContainerReport()).thenReturn(ContainerReportsProto.getDefaultInstance());
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
