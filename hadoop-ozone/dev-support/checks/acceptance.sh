@@ -22,12 +22,12 @@ cd "$DIR/../../.." || exit 1
 OZONE_ROOT=$(pwd -P)
 
 : ${HADOOP_AWS_DIR:=""}
-: ${OZONE_ACCEPTANCE_SUITE:="${1:-}"}
-: ${OZONE_TEST_SELECTOR:=""}
+: ${OZONE_ACCEPTANCE_SUITE:=""}
+: ${OZONE_TEST_SELECTOR:="${1:-}"}
 : ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
 : ${OZONE_WITH_COVERAGE:="false"}
 
-if [[ "${OZONE_ACCEPTANCE_SUITE}" == "compat-old" ]]; then
+if [[ "${OZONE_TEST_SELECTOR}" == "xcompat/test-old.sh" ]]; then
   : ${OZONE_OLD_VERSIONS:="${2:-}"}
   export OZONE_OLD_VERSIONS
 fi
@@ -56,7 +56,7 @@ create_aws_dir
 
 mkdir -p "$REPORT_DIR"
 
-if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
+if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]] || [[ "${OZONE_TEST_SELECTOR}" =~ "test-s3a.sh" ]]; then
   OZONE_ACCEPTANCE_TEST_TYPE="maven"
 
   if [[ -z "${HADOOP_AWS_DIR}" ]]; then
@@ -89,7 +89,7 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
   fi
 fi
 
-export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE
+export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE OZONE_TEST_SELECTOR
 
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"

@@ -1567,7 +1567,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     final OzoneManagerProtocolProtos.SubmitSnapshotDiffRequest.Builder
         requestBuilder =
@@ -1577,7 +1578,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
             .setForceFullDiff(forceFullDiff)
-            .setDisableNativeDiff(disableNativeDiff);
+            .setDisableNativeDiff(disableNativeDiff)
+            .setOrdered(orderedReport);
 
     final OMRequest omRequest = createOMRequest(Type.SubmitSnapshotDiff)
         .setSubmitSnapshotDiffRequest(requestBuilder)
@@ -2110,13 +2112,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     GetBucketDeletedBytesResponse response = handleError(submitRequest(omRequest))
         .getGetBucketDeletedBytesResponse();
-    return new BucketDeletedBytes(
-        response.getSnapshotTrappedBytes(),
-        response.getPurgeableBytes(),
-        response.getSnapshotTrappedKeys(),
-        response.getPurgeableKeys(),
-        response.getSnapshotTrappedDirs(),
-        response.getPurgeableDirs());
+    BucketDeletedBytes.Builder builder = BucketDeletedBytes.newBuilder()
+        .setSnapshotTrappedBytes(response.getSnapshotTrappedBytes())
+        .setPurgeableBytes(response.getPurgeableBytes())
+        .setSnapshotTrappedKeys(response.getSnapshotTrappedKeys())
+        .setPurgeableKeys(response.getPurgeableKeys())
+        .setSnapshotTrappedDirs(response.getSnapshotTrappedDirs())
+        .setPurgeableDirs(response.getPurgeableDirs());
+    if (response.hasPurgeableKeyBytes()) {
+      builder.setPurgeableKeyBytes(response.getPurgeableKeyBytes());
+    }
+    if (response.hasPurgeableDirBytes()) {
+      builder.setPurgeableDirBytes(response.getPurgeableDirBytes());
+    }
+    return builder.build();
   }
 
   @Override
@@ -2928,7 +2937,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
+        .setVolumeName(Strings.nullToEmpty(args.getVolumeName()))
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .build();
@@ -2939,6 +2948,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .build();
 
     OMRequest omRequest = createOMRequest(Type.GetObjectTagging)
+        .setAssumeS3Context(args.isAssumeS3Context())
         .setGetObjectTaggingRequest(req)
         .build();
 

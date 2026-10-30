@@ -110,6 +110,7 @@ import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
+import org.apache.hadoop.ozone.s3.util.S3ContentSha256Type;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.util.Time;
@@ -249,10 +250,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       String amzDecodedLength =
           getHeaders().getHeaderString(S3Consts.DECODED_CONTENT_LENGTH_HEADER);
-      boolean hasAmzDecodedLengthZero = amzDecodedLength != null &&
-          Long.parseLong(amzDecodedLength) == 0;
+      String amzContentSha256 = getHeaders().getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256);
+      boolean useDecodedLength = amzDecodedLength != null && amzContentSha256 != null &&
+          S3ContentSha256Type.fromHeaderValue(amzContentSha256).isStreaming();
+      boolean isEmptyPayload = useDecodedLength ? Long.parseLong(amzDecodedLength) == 0 : length == 0;
       if (canCreateDirectory &&
-          (length == 0 || hasAmzDecodedLengthZero) &&
+          isEmptyPayload &&
           StringUtils.endsWith(keyPath, "/")
       ) {
         context.setAction(S3GAction.CREATE_DIRECTORY);

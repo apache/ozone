@@ -31,11 +31,13 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.DoubleConsumer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,38 +53,51 @@ public final class MergeJoinSnapDiffWriter {
   private static final DiffType[] FSO_RESOLVE_ORDER =
       {MODIFY, RENAME, CREATE};
 
+  private static final double FSO_CLASSIFY_END = 0.5;
+  private static final double FSO_RESOLVE_END_ORDERED = 0.9;
+  private static final double FSO_RESOLVE_END_UNORDERED = 1.0;
+  private static final double FSO_ORDER_END = 1.0;
+
   private MergeJoinSnapDiffWriter() {
   }
 
   /**
    * {@code dependencyOrderingEnabled} applies to FSO buckets only; OBS entries are always
    * resolved and written directly to the report table.
+   * Call {@link SnapDiffJobStore#isReportDependencyOrdered()} on {@code store} after this
+   * returns to read whether dependency ordering was applied.
    */
   public static Pair<Long, String> writeReport(SnapshotDiffManager manager,
       SnapDiffJobStore store, long bucketObjectId, boolean isFso,
-      boolean dependencyOrderingEnabled) throws IOException {
+      boolean dependencyOrderingEnabled, DoubleConsumer reportProgress) throws IOException {
     store.beginReportWrite();
+    boolean orderedReportOutcome;
     if (isFso) {
-      // Classified CFs hold only objectId + (parentId, name). Path resolution is deferred.
-      classifyMergeJoin(store, true);
+      long classifyStart = Time.monotonicNow();
+      classifyMergeJoin(store, true, reportProgress);
+      LOG.info("SnapDiff job {} classify stage elapsed: {}ms", store.getJobId(),
+          Time.monotonicNow() - classifyStart);
       store.dropListColumnFamilies();
 
-      // Deleted entries are filtered to include top-level deletes only and emitted straight to the report table,
-      // if dependency ordering is disabled.
-      // Otherwise, entries are emitted into {jobId}-dependency-nodes for ordering.
+      ResolveProgress resolveProgress = new ResolveProgress(store, reportProgress,
+          dependencyOrderingEnabled);
+
+      long deleteResolveStart = Time.monotonicNow();
       SnapDiffPathResolver fromResolver = store.newFromPathResolver(bucketObjectId);
       boolean[] dependencyOrderingEnabledRef = {dependencyOrderingEnabled};
       int nodeCount = filterAndResolveTopLevelDeletes(manager, store, bucketObjectId,
-          fromResolver, dependencyOrderingEnabledRef);
+          fromResolver, dependencyOrderingEnabledRef, resolveProgress);
+      LOG.info("SnapDiff job {} filter and resolve deletes stage elapsed: {}ms", store.getJobId(),
+          Time.monotonicNow() - deleteResolveStart);
       store.dropDirectoryIdColumnFamilies();
       store.dropClassifiedColumnFamily(DELETE);
 
-      // Remaining classified entries are resolved and emitted straight to the report table,
-      // if dependency ordering is disabled.
-      // Otherwise, entries are emitted into {jobId}-dependency-nodes for ordering.
+      long pathResolveStart = Time.monotonicNow();
       SnapDiffPathResolver toResolver = store.newToPathResolver(bucketObjectId);
       nodeCount = resolveDiffPaths(store, fromResolver, toResolver, dependencyOrderingEnabledRef,
-          nodeCount);
+          nodeCount, resolveProgress);
+      LOG.info("SnapDiff job {} resolve paths stage elapsed: {}ms", store.getJobId(),
+          Time.monotonicNow() - pathResolveStart);
       fromResolver.clearPathCache();
       toResolver.clearPathCache();
       for (DiffType diffType : FSO_RESOLVE_ORDER) {
@@ -90,24 +105,45 @@ public final class MergeJoinSnapDiffWriter {
       }
       store.dropEdgeColumnFamilies();
 
+      if (reportProgress != null && dependencyOrderingEnabledRef[0]) {
+        reportProgress.accept(FSO_RESOLVE_END_ORDERED);
+      }
       if (dependencyOrderingEnabledRef[0]) {
-        // Classified entries are ordered and emitted straight to the report table.
-        orderAndWriteReport(store, nodeCount);
+        long orderStart = Time.monotonicNow();
+        orderAndWriteReport(store, nodeCount, reportProgress);
+        LOG.info("SnapDiff job {} ordering stage elapsed: {}ms", store.getJobId(),
+            Time.monotonicNow() - orderStart);
+      } else if (reportProgress != null) {
+        reportProgress.accept(FSO_RESOLVE_END_UNORDERED);
       }
       store.dropDependencyGraphColumnFamilies();
+      orderedReportOutcome = dependencyOrderingEnabledRef[0];
 
     } else {
-      classifyMergeJoin(store, false);
+      long classifyStart = Time.monotonicNow();
+      classifyMergeJoin(store, false, reportProgress);
+      LOG.info("SnapDiff job {} classify stage elapsed: {}ms", store.getJobId(),
+          Time.monotonicNow() - classifyStart);
       store.dropListColumnFamilies();
+      if (reportProgress != null) {
+        reportProgress.accept(1.0);
+      }
+      orderedReportOutcome = true;
     }
-    return store.finishReportWrite();
+    return store.finishReportWrite(orderedReportOutcome);
   }
 
-  private static void classifyMergeJoin(SnapDiffJobStore store, boolean isFso) throws IOException {
+  private static void classifyMergeJoin(SnapDiffJobStore store, boolean isFso,
+      DoubleConsumer reportProgress) throws IOException {
     try (SnapDiffJobStore.ListIterator newHead = store.newListIterator();
          SnapDiffJobStore.ListIterator oldHead = store.oldListIterator()) {
       Map.Entry<Long, byte[]> newEntry = newHead.nextOrNull();
       Map.Entry<Long, byte[]> oldEntry = oldHead.nextOrNull();
+      long mergeSteps = 0L;
+      long mergeDenominator = store.mergeJoinStepDenominator();
+      double classifyEnd = isFso ? FSO_CLASSIFY_END : 1.0;
+      SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+          new SnapDiffProgressHelper.TenPercentCheckpoint();
 
       while (newEntry != null || oldEntry != null) {
         if (oldEntry == null || (newEntry != null && newEntry.getKey() < oldEntry.getKey())) {
@@ -121,11 +157,39 @@ public final class MergeJoinSnapDiffWriter {
           newEntry = newHead.nextOrNull();
           oldEntry = oldHead.nextOrNull();
         }
+        mergeSteps++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(reportProgress, 0.0, classifyEnd,
+            mergeSteps, mergeDenominator, checkpoint);
       }
     } catch (RocksDatabaseException e) {
       throw new IOException(e);
     }
     store.flushWrites();
+    if (reportProgress != null) {
+      reportProgress.accept(isFso ? FSO_CLASSIFY_END : 1.0);
+    }
+  }
+
+  private static final class ResolveProgress {
+    private final DoubleConsumer reportProgress;
+    private final long resolveDenominator;
+    private final double resolveEnd;
+    private long resolveSteps;
+    private final SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
+
+    ResolveProgress(SnapDiffJobStore store, DoubleConsumer reportProgress,
+        boolean dependencyOrderingEnabled) {
+      this.reportProgress = reportProgress;
+      this.resolveDenominator = store.classifiedEntryDenominator();
+      this.resolveEnd = dependencyOrderingEnabled ? FSO_RESOLVE_END_ORDERED : FSO_RESOLVE_END_UNORDERED;
+    }
+
+    void onClassifiedEntry(DiffType diffType) {
+      resolveSteps++;
+      SnapDiffProgressHelper.reportEveryTenPercentInSlice(reportProgress, FSO_CLASSIFY_END, resolveEnd,
+          resolveSteps, resolveDenominator, checkpoint);
+    }
   }
 
   private static void emitCreate(SnapDiffJobStore store, Map.Entry<Long, byte[]> newEntry,
@@ -202,7 +266,7 @@ public final class MergeJoinSnapDiffWriter {
 
   private static int filterAndResolveTopLevelDeletes(SnapshotDiffManager manager,
       SnapDiffJobStore store, long bucketObjectId, SnapDiffPathResolver fromResolver,
-      boolean[] dependencyOrderingEnabled) throws IOException {
+      boolean[] dependencyOrderingEnabled, ResolveProgress resolveProgress) throws IOException {
     Map<Long, Boolean> ancestorMemo = newAncestorMemo(store);
     int nodeIndex = 0;
     int writeBatchSize = store.getWriteBatchSize();
@@ -210,6 +274,9 @@ public final class MergeJoinSnapDiffWriter {
     try (SnapDiffJobStore.ClassifiedIterator deleteIter = store.classifiedIterator(DELETE)) {
       while (deleteIter.hasNext()) {
         deleteBatch.add(deleteIter.next());
+        if (resolveProgress != null) {
+          resolveProgress.onClassifiedEntry(DELETE);
+        }
         if (deleteBatch.size() == writeBatchSize) {
           nodeIndex = filterAndResolveTopLevelDeleteBatch(manager, store, bucketObjectId,
               fromResolver, dependencyOrderingEnabled, ancestorMemo, nodeIndex, deleteBatch);
@@ -277,13 +344,17 @@ public final class MergeJoinSnapDiffWriter {
 
   private static int resolveDiffPaths(SnapDiffJobStore store,
       SnapDiffPathResolver fromResolver, SnapDiffPathResolver toResolver,
-      boolean[] dependencyOrderingEnabled, int nodeIndex) throws IOException {
+      boolean[] dependencyOrderingEnabled, int nodeIndex, ResolveProgress resolveProgress)
+      throws IOException {
     int writeBatchSize = store.getWriteBatchSize();
     for (DiffType diffType : FSO_RESOLVE_ORDER) {
       List<Map.Entry<Long, byte[]>> batch = new ArrayList<>(writeBatchSize);
       try (SnapDiffJobStore.ClassifiedIterator iter = store.classifiedIterator(diffType)) {
         while (iter.hasNext()) {
           batch.add(iter.next());
+          if (resolveProgress != null) {
+            resolveProgress.onClassifiedEntry(diffType);
+          }
           if (batch.size() == writeBatchSize) {
             nodeIndex = resolveDiffPathBatch(store, diffType, fromResolver, toResolver,
                 dependencyOrderingEnabled, nodeIndex, batch);
@@ -450,13 +521,16 @@ public final class MergeJoinSnapDiffWriter {
     return new SnapDiffDependencyEntry(objectId, sourceParentId, targetParentId, reportEntry);
   }
 
-  private static void orderAndWriteReport(SnapDiffJobStore store, int nodeCount)
-      throws IOException {
+  private static void orderAndWriteReport(SnapDiffJobStore store, int nodeCount,
+      DoubleConsumer reportProgress) throws IOException {
     List<Integer> orderedNodeIds;
     try (SnapDiffJobStore.DependencyNodeIterator dependencyEntries = store.dependencyNodeIterator()) {
       orderedNodeIds = buildOrderedNodeIds(store.getJobId(), dependencyEntries);
     }
     int writeBatchSize = store.getWriteBatchSize();
+    long orderDenominator = Math.max(1, nodeCount);
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     for (int position = 0; position < nodeCount; position += writeBatchSize) {
       int end = Math.min(position + writeBatchSize, nodeCount);
       List<Integer> nodeBatch = new ArrayList<>(end - position);
@@ -465,6 +539,11 @@ public final class MergeJoinSnapDiffWriter {
       }
       List<DiffReportEntry> reportEntries = store.multiGetDependencyReportEntries(nodeBatch);
       store.putOrderedReportEntries(reportEntries);
+      SnapDiffProgressHelper.reportEveryTenPercentInSlice(reportProgress, FSO_RESOLVE_END_ORDERED,
+          FSO_ORDER_END, end, orderDenominator, checkpoint);
+    }
+    if (reportProgress != null) {
+      reportProgress.accept(FSO_ORDER_END);
     }
   }
 

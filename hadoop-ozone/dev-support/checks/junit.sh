@@ -36,7 +36,7 @@ if [[ ${ITERATIONS} -le 0 ]]; then
 fi
 
 export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
-MAVEN_OPTIONS="-B -V -DskipDocs -DskipRecon -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
+MAVEN_OPTIONS="-B -V -DskipRecon -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
 MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
@@ -97,9 +97,11 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 
   log=$(mktemp)
+  set -x
   mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" ${CLEAN} "${PHASE}" \
       | tee "${log}"
   irc=$?
+  set +x
 
   mkdir -p "${REPORT_DIR}"
   mv -f "${log}" "${REPORT_DIR}"/output.log
