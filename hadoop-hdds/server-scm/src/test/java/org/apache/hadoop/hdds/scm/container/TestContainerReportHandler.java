@@ -27,9 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,10 +48,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -71,8 +73,9 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.ContainerReportProcessingLifecycle;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -175,59 +178,50 @@ public class TestContainerReportHandler {
   public void testCompletesProcessedReport() {
     DatanodeDetails datanode =
         nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
-    AtomicReference<Boolean> processed = new AtomicReference<>();
+    LeaseClaim claim = spy(claimLease(datanode));
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
-        datanode, ContainerReportsProto.getDefaultInstance(), false,
-        lifecycle(() -> true, processed));
+        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
 
-    assertEquals(Boolean.TRUE, processed.get());
+    verify(claim).complete(true);
   }
 
   @Test
   public void testCompletesUnknownDatanodeReportAsUnprocessed() {
-    AtomicReference<Boolean> processed = new AtomicReference<>();
+    DatanodeDetails datanode = randomDatanodeDetails();
+    LeaseClaim claim = spy(claimLease(datanode));
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
-        randomDatanodeDetails(),
-        ContainerReportsProto.getDefaultInstance(), false,
-        lifecycle(() -> true, processed));
+        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
 
-    assertEquals(Boolean.FALSE, processed.get());
+    verify(claim).complete(false);
   }
 
   @Test
-  public void testCompletesReportWithoutProcessingWhenPermitIsRevoked() {
+  public void testCompletesReportWithoutProcessingWhenClaimIsAlreadyCompleted() {
     DatanodeDetails datanode =
         nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
-    AtomicReference<Boolean> processed = new AtomicReference<>();
+    LeaseClaim completedClaim = claimLease(datanode);
+    completedClaim.complete(false);
+    LeaseClaim claim = spy(completedClaim);
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
-        datanode, ContainerReportsProto.getDefaultInstance(), false,
-        lifecycle(() -> false, processed));
+        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
 
-    assertEquals(Boolean.FALSE, processed.get());
+    verify(claim).complete(false);
+    verify(containerManager, never()).notifyContainerReportProcessing(anyBoolean(), anyBoolean());
   }
 
-  private static ContainerReportProcessingLifecycle lifecycle(
-      BooleanSupplier processingPermit, AtomicReference<Boolean> processed) {
-    return new ContainerReportProcessingLifecycle() {
-      @Override
-      public boolean startProcessing() {
-        return processingPermit.getAsBoolean();
-      }
-
-      @Override
-      public void complete(boolean reportProcessed) {
-        processed.set(reportProcessed);
-      }
-    };
+  private static LeaseClaim claimLease(DatanodeDetails datanode) {
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+    long leaseId = leases.requestLease(datanode, 7L).getAsLong();
+    return leases.claimLease(datanode, OptionalLong.of(7L), 7L, leaseId).orElseThrow(AssertionError::new);
   }
 
   static Stream<Arguments> containerAndReplicaStates() {

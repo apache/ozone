@@ -75,11 +75,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.server.ContainerReportProcessingLifecycle;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -231,7 +231,7 @@ public class TestSCMSafeModeManager {
           ContainerInfo container = containers.get(batch * 2 + i);
           OptionalLong lease = leaseManager.requestLease(datanode, 7L);
           assertThat(lease).isPresent();
-          ContainerReportProcessingLifecycle claim =
+          LeaseClaim claim =
               leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease.getAsLong())
                   .orElseThrow(AssertionError::new);
           ContainerReportsProto report = HddsTestUtils.getContainerReports(ContainerReplicaProto.newBuilder()

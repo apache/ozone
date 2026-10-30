@@ -100,7 +100,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Returns a version-related registration rejection, if any, without changing node state.
    */
-  Optional<RegisteredCommand> getRegistrationVersionError(DatanodeDetails datanodeDetails, DatanodeVersionProto versionReport);
+  Optional<RegisteredCommand> getRegistrationVersionError(DatanodeDetails datanodeDetails,
+      DatanodeVersionProto versionReport);
 
   /**
    * Register a SendCommandNotify handler for a specific type of SCMCommand.
@@ -533,8 +534,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   }
 
-  default void setDatanodeRemovedHandler(
-      Consumer<DatanodeDetails> datanodeRemovedHandler) {
+  /**
+   * Sets the callback for datanode removal.
+   *
+   * <p>{@link SCMNodeManager} invokes it synchronously under the node-manager write lock, before removing node state.
+   *
+   * @param callback datanode removal callback
+   */
+  default void setDatanodeRemovedCallback(Consumer<DatanodeDetails> callback) {
   }
 
   int openContainerLimit(List<DatanodeDetails> datanodes);

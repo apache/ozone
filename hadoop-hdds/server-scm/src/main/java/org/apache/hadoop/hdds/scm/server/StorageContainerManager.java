@@ -467,7 +467,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         eventQueue, scmContext);
     reconfigurationHandler.register(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED,
         datanodeProtocolServer::reconfigureFCRRateLimit);
-    scmNodeManager.setDatanodeRemovedHandler(datanodeProtocolServer::removeDatanode);
+    scmNodeManager.setDatanodeRemovedCallback(datanodeProtocolServer::removeDatanode);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this,
         reconfigurationHandler);

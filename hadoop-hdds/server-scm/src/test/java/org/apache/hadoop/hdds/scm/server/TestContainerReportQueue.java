@@ -18,12 +18,14 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.OptionalLong;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.junit.jupiter.api.Test;
 
 class TestContainerReportQueue {
@@ -32,45 +34,35 @@ class TestContainerReportQueue {
   void shouldCompleteReplacedFullContainerReportAsUnprocessed() {
     ContainerReportQueue queue = new ContainerReportQueue();
     DatanodeDetails datanode = randomDatanodeDetails();
-    AtomicReference<Boolean> firstReportProcessed = new AtomicReference<>();
+    LeaseClaim claim = spy(claimLease(datanode));
     ContainerReportFromDatanode firstReport = new ContainerReportFromDatanode(
-        datanode, ContainerReportsProto.getDefaultInstance(), false,
-        lifecycle(firstReportProcessed));
+        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
     ContainerReportFromDatanode secondReport = new ContainerReportFromDatanode(
         datanode, ContainerReportsProto.getDefaultInstance());
 
     queue.add(firstReport);
     queue.add(secondReport);
 
-    assertThat(firstReportProcessed).hasValue(false);
+    verify(claim).complete(false);
   }
 
   @Test
   void shouldCompleteQueuedFullContainerReportWhenCleared() {
     ContainerReportQueue queue = new ContainerReportQueue();
-    AtomicReference<Boolean> reportProcessed = new AtomicReference<>();
+    DatanodeDetails datanode = randomDatanodeDetails();
+    LeaseClaim claim = spy(claimLease(datanode));
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
-        randomDatanodeDetails(), ContainerReportsProto.getDefaultInstance(),
-        false, lifecycle(reportProcessed));
+        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
     queue.add(report);
 
     queue.clear();
 
-    assertThat(reportProcessed).hasValue(false);
+    verify(claim).complete(false);
   }
 
-  private static ContainerReportProcessingLifecycle lifecycle(
-      AtomicReference<Boolean> processed) {
-    return new ContainerReportProcessingLifecycle() {
-      @Override
-      public boolean startProcessing() {
-        return true;
-      }
-
-      @Override
-      public void complete(boolean reportProcessed) {
-        processed.set(reportProcessed);
-      }
-    };
+  private static LeaseClaim claimLease(DatanodeDetails datanode) {
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+    long leaseId = leases.requestLease(datanode, 7L).getAsLong();
+    return leases.claimLease(datanode, OptionalLong.of(7L), 7L, leaseId).orElseThrow(AssertionError::new);
   }
 }

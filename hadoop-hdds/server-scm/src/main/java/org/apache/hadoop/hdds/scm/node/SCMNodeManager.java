@@ -147,7 +147,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
   private final NonWritableNodeFilter nonWritableNodeFilter;
   private final int numContainerPerVolume;
-  private Consumer<DatanodeDetails> datanodeRemovedHandler = ignored -> { };
+  private Consumer<DatanodeDetails> datanodeRemovedCallback = ignored -> { };
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -2115,7 +2115,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     try {
       NodeStatus nodeStatus = this.getNodeStatus(datanodeDetails);
       if (datanodeDetails.isDecommissioned() || nodeStatus.isDead()) {
-        datanodeRemovedHandler.accept(datanodeDetails);
+        datanodeRemovedCallback.accept(datanodeDetails);
         if (clusterMap.contains(datanodeDetails)) {
           clusterMap.remove(datanodeDetails);
         }
@@ -2132,8 +2132,8 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   }
 
   @Override
-  public void setDatanodeRemovedHandler(Consumer<DatanodeDetails> handler) {
-    datanodeRemovedHandler = Objects.requireNonNull(handler);
+  public void setDatanodeRemovedCallback(Consumer<DatanodeDetails> callback) {
+    datanodeRemovedCallback = Objects.requireNonNull(callback);
   }
 
   @Override

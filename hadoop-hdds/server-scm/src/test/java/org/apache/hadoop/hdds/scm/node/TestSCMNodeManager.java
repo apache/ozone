@@ -232,7 +232,7 @@ public class TestSCMNodeManager {
   }
 
   @Test
-  public void testRemoveNodeInvokesDatanodeRemovedHandler() throws Exception {
+  public void testRemoveNodeInvokesDatanodeRemovedCallback() throws Exception {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       DatanodeDetails datanode = randomDatanodeDetails();
       registerNode(nodeManager, datanode);
@@ -241,7 +241,7 @@ public class TestSCMNodeManager {
       datanode.setPersistedOpState(
           HddsProtos.NodeOperationalState.DECOMMISSIONED);
       AtomicReference<DatanodeDetails> removed = new AtomicReference<>();
-      nodeManager.setDatanodeRemovedHandler(removed::set);
+      nodeManager.setDatanodeRemovedCallback(removed::set);
 
       nodeManager.removeNode(datanode);
 

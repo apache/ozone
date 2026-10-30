@@ -311,7 +311,10 @@ public class SCMFullContainerReportLeaseManager {
     }
   }
 
-  static final class LeaseClaim implements ContainerReportProcessingLifecycle {
+  /**
+   * Holds an admitted FCR's lease until the report completes.
+   */
+  public static final class LeaseClaim {
     private final SCMFullContainerReportLeaseManager leaseManager;
     private final String datanodeId;
     private final long leaseId;
@@ -329,12 +332,10 @@ public class SCMFullContainerReportLeaseManager {
       return registrationReport;
     }
 
-    @Override
     public boolean startProcessing() {
       return leaseManager.startProcessing(datanodeId, leaseId);
     }
 
-    @Override
     public void complete(boolean processed) {
       leaseManager.completeLease(datanodeId, leaseId, processed);
     }

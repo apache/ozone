@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.IEventInfo;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
@@ -322,19 +323,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
     private long createTime = Time.monotonicNow();
     // Used to identify whether container reporting is from a registration.
     private boolean isRegister = false;
-    private final ContainerReportProcessingLifecycle processingLifecycle;
+    // Null for reports that do not use an FCR lease.
+    private final LeaseClaim leaseClaim;
     private final AtomicBoolean completed = new AtomicBoolean();
-    private static final ContainerReportProcessingLifecycle
-        UNRESTRICTED_PROCESSING = new ContainerReportProcessingLifecycle() {
-          @Override
-          public boolean startProcessing() {
-            return true;
-          }
-
-          @Override
-          public void complete(boolean processed) {
-          }
-        };
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
@@ -343,15 +334,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report, boolean isRegister) {
-      this(datanodeDetails, report, isRegister, UNRESTRICTED_PROCESSING);
+      this(datanodeDetails, report, isRegister, null);
     }
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report, boolean isRegister,
-        ContainerReportProcessingLifecycle processingLifecycle) {
+        LeaseClaim leaseClaim) {
       super(datanodeDetails, report);
       this.isRegister = isRegister;
-      this.processingLifecycle = Objects.requireNonNull(processingLifecycle);
+      this.leaseClaim = leaseClaim;
     }
 
     @Override
@@ -379,13 +370,13 @@ public final class SCMDatanodeHeartbeatDispatcher {
     }
 
     public boolean startProcessing() {
-      return processingLifecycle.startProcessing();
+      return leaseClaim == null || leaseClaim.startProcessing();
     }
 
     @Override
     public void complete(boolean processed) {
-      if (completed.compareAndSet(false, true)) {
-        processingLifecycle.complete(processed);
+      if (completed.compareAndSet(false, true) && leaseClaim != null) {
+        leaseClaim.complete(processed);
       }
     }
 
