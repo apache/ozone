@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.OzoneQuota;
@@ -182,6 +184,13 @@ public class TestMultiTenantVolume {
     OzoneBucket bucket = store.getS3Bucket(BUCKET_NAME);
     assertEquals(TENANT_ID, bucket.getVolumeName());
 
+    String tagKey = "tagged-key";
+    Map<String, String> tags = Collections.singletonMap("tag-key", "tag-value");
+    bucket.createKey(tagKey, 0).close();
+    bucket.putObjectTagging(tagKey, tags);
+    assertThat(store.getClientProxy().getObjectTagging(null, BUCKET_NAME,
+        tagKey)).containsExactlyInAnyOrderEntriesOf(tags);
+
     // A different user should not see bucket, since they will be directed to
     // the s3 volume.
     ObjectStore store2 = getStoreForAccessID(UUID.randomUUID().toString());
@@ -215,6 +224,7 @@ public class TestMultiTenantVolume {
     store.deleteVolume(sourceVolumeName);
 
     // Delete bucket.
+    bucket.deleteKey(tagKey);
     store.deleteS3Bucket(BUCKET_NAME);
     assertS3BucketNotFound(store, BUCKET_NAME);
 
@@ -250,6 +260,7 @@ public class TestMultiTenantVolume {
 
   private static ObjectStore getStoreForAccessID(String accessID)
       throws IOException {
+    cluster.getConf().setBoolean(S3Auth.S3_AUTH_CHECK, true);
     // Use a separate client so its S3 auth does not affect the shared client.
     ObjectStore store = cluster.newClient().getObjectStore();
     // userPrincipal is set to be the same as accessId for the test

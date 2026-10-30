@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +32,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OMKeyRenameResponse.
@@ -105,6 +108,57 @@ public class TestOMKeyRenameResponse extends OMKeyResponseTests {
     }
   }
 
+  /**
+   * Renames a key twice in a snapshotted bucket. snapshotRenamedTable must keep the name the key has in the
+   * snapshot, whether or not both renames are flushed in the same batch.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testSecondRenameKeepsSnapshotName(boolean sameBatch) throws Exception {
+    OMResponse omResponse = getOkRenameResponse();
+    OMRequestTestUtils.addSnapshotToTable(volumeName, bucketName, "snap", omMetadataManager);
+
+    OmKeyInfo midKeyInfo = getOmKeyInfo(getOmKeyInfo(keyName), UUID.randomUUID().toString(), random.nextLong());
+    OmKeyInfo fromKeyInfo = getOmKeyInfo(midKeyInfo, keyName, midKeyInfo.getObjectID());
+    OmKeyInfo toKeyInfo = getOmKeyInfo(midKeyInfo, UUID.randomUUID().toString(), midKeyInfo.getObjectID());
+    String dbFromKey = addKeyToTable(fromKeyInfo);
+
+    getOMKeyRenameResponse(omResponse, fromKeyInfo, midKeyInfo).addToDBBatch(omMetadataManager, batchOperation);
+    if (!sameBatch) {
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      batchOperation.close();
+      batchOperation = omMetadataManager.getStore().initBatchOperation();
+    }
+    getOMKeyRenameResponse(omResponse, midKeyInfo, toKeyInfo).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(getDBKeyName(toKeyInfo))).isNotNull();
+    String renameDbKey = omMetadataManager.getRenameKey(volumeName, bucketName, toKeyInfo.getObjectID());
+    assertThat(omMetadataManager.getSnapshotRenamedTable().get(renameDbKey)).isEqualTo(dbFromKey);
+  }
+
+  /**
+   * The source name holds a different object in the committed DB, so the renamed object got that name in the
+   * same batch and is not in the snapshot under it: no entry is recorded.
+   */
+  @Test
+  public void testRenameOfObjectNotCommittedAtSourceRecordsNothing() throws Exception {
+    OMRequestTestUtils.addSnapshotToTable(volumeName, bucketName, "snap", omMetadataManager);
+    OmKeyInfo committedKeyInfo = getOmKeyInfo(getOmKeyInfo(keyName), keyName, random.nextLong());
+    addKeyToTable(committedKeyInfo);
+    long otherObjectID = committedKeyInfo.getObjectID() + 1;
+    OmKeyInfo fromKeyInfo = getOmKeyInfo(committedKeyInfo, keyName, otherObjectID);
+    OmKeyInfo toKeyInfo = getOmKeyInfo(committedKeyInfo, UUID.randomUUID().toString(), otherObjectID);
+
+    getOMKeyRenameResponse(getOkRenameResponse(), fromKeyInfo, toKeyInfo)
+        .addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(getDBKeyName(toKeyInfo))).isNotNull();
+    assertThat(omMetadataManager.getSnapshotRenamedTable()
+        .get(omMetadataManager.getRenameKey(volumeName, bucketName, otherObjectID))).isNull();
+  }
+
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     OMResponse omResponse = OMResponse.newBuilder().setRenameKeyResponse(
@@ -157,6 +211,22 @@ public class TestOMKeyRenameResponse extends OMKeyResponseTests {
 
   protected OmKeyInfo getOmKeyInfo(OmKeyInfo toKeyInfo, String keyName) {
     return getOmKeyInfo(keyName);
+  }
+
+  /** Key info with the given object ID, under the same parent as {@code sibling}. */
+  private OmKeyInfo getOmKeyInfo(OmKeyInfo sibling, String keyName, long objectID) {
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig)
+        .setObjectID(objectID)
+        .setParentObjectID(sibling.getParentObjectID())
+        .build();
+  }
+
+  protected static OMResponse getOkRenameResponse() {
+    return OMResponse.newBuilder()
+        .setRenameKeyResponse(OzoneManagerProtocolProtos.RenameKeyResponse.getDefaultInstance())
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
+        .build();
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {
