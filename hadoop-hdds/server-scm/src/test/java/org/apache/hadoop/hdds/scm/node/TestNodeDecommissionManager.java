@@ -71,6 +71,7 @@ public class TestNodeDecommissionManager {
   private SCMNodeManager nodeManager;
   private ContainerManager containerManager;
   private OzoneConfiguration conf;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private static int id = 1;
 
   @BeforeEach
@@ -114,9 +115,14 @@ public class TestNodeDecommissionManager {
 
   private ReplicationManager mockReplicationManager(OzoneConfiguration config) {
     ReplicationManager rm = mock(ReplicationManager.class);
-    when(rm.getConfig()).thenReturn(
-        config.getObject(ReplicationManager.ReplicationManagerConfiguration.class));
+    rmConf = config.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    when(rm.getConfig()).thenReturn(rmConf);
     return rm;
+  }
+
+  private void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
+    rmConf.setMaintenanceReplicaMinimum(replicaMinimum);
+    rmConf.setMaintenanceRemainingRedundancy(remainingRedundancy);
   }
 
   @Test
@@ -682,7 +688,7 @@ public class TestNodeDecommissionManager {
       setContainers(dn, idsRatis);
     }
 
-    decom.setMaintenanceConfigs(2, 1); // default config
+    setMaintenanceConfigs(2, 1); // default config
     // putting 4 DNs into maintenance leave the cluster with 1 DN,
     // it should not be allowed as maintenance.replica.minimum is 2
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -718,7 +724,7 @@ public class TestNodeDecommissionManager {
     decom.getMonitor().run();
     assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
-    decom.setMaintenanceConfigs(3, 1); // non-default config
+    setMaintenanceConfigs(3, 1); // non-default config
     // putting 3 DNs into maintenance leave the cluster with 2 DN,
     // it should not be allowed as maintenance.replica.minimum is 3
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -782,7 +788,7 @@ public class TestNodeDecommissionManager {
       setContainers(dn, idsEC);
     }
 
-    decom.setMaintenanceConfigs(2, 1); // default config
+    setMaintenanceConfigs(2, 1); // default config
     // putting 2 DNs into maintenance leave the cluster with 3 DN,
     // it should not be allowed as maintenance.remaining.redundancy is 1 => 3+1=4 DNs are required
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()),
@@ -808,7 +814,7 @@ public class TestNodeDecommissionManager {
     decom.getMonitor().run();
     assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
-    decom.setMaintenanceConfigs(2, 2); // non-default config
+    setMaintenanceConfigs(2, 2); // non-default config
     // putting 1 DNs into maintenance leave the cluster with 4 DN,
     // it should not be allowed as maintenance.remaining.redundancy is 2 => 3+2=5 DNs are required
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
@@ -868,7 +874,7 @@ public class TestNodeDecommissionManager {
       setContainers(dn, idsEC);
     }
 
-    decom.setMaintenanceConfigs(2, 1); // default config
+    setMaintenanceConfigs(2, 1); // default config
     // putting 2 DNs into maintenance leave the cluster with 3 DN,
     // it should not be allowed as maintenance.remaining.redundancy is 1 => 3+1=4 DNs are required
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()),
@@ -889,7 +895,7 @@ public class TestNodeDecommissionManager {
     decom.getMonitor().run();
     assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
-    decom.setMaintenanceConfigs(3, 2); // non-default config
+    setMaintenanceConfigs(3, 2); // non-default config
     // putting 1 DNs into maintenance leave the cluster with 4 DN,
     // it should not be allowed as for EC, maintenance.remaining.redundancy is 2 => 3+2=5 DNs are required
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
@@ -1116,19 +1122,10 @@ public class TestNodeDecommissionManager {
     assertEquals(2, decom.getMaintenanceReplicaMinimum());
     assertEquals(1, decom.getMaintenanceRemainingRedundancy());
 
-    // Build a ReplicationManagerConfiguration with non-default maintenance values.
-    ReplicationManager.ReplicationManagerConfiguration rmConf =
-        new OzoneConfiguration().getObject(ReplicationManager.ReplicationManagerConfiguration.class);
-    rmConf.setMaintenanceReplicaMinimum(5);
-    rmConf.setMaintenanceRemainingRedundancy(3);
-    ReplicationManager rm = mock(ReplicationManager.class);
-    when(rm.getConfig()).thenReturn(rmConf);
+    rmConf.reconfigureProperty("hdds.scm.replication.maintenance.replica.minimum", "5");
+    rmConf.reconfigureProperty("hdds.scm.replication.maintenance.remaining.redundancy", "3");
 
-    NodeDecommissionManager manager = new NodeDecommissionManager(conf, nodeManager,
-        containerManager, SCMContext.emptyContext(), new EventQueue(), rm);
-
-    // Constructor must read these from ReplicationManagerConfiguration, not hardcoded defaults.
-    assertEquals(5, manager.getMaintenanceReplicaMinimum());
-    assertEquals(3, manager.getMaintenanceRemainingRedundancy());
+    assertEquals(5, decom.getMaintenanceReplicaMinimum());
+    assertEquals(3, decom.getMaintenanceRemainingRedundancy());
   }
 }
