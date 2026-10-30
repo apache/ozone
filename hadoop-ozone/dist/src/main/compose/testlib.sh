@@ -34,14 +34,6 @@ source "${_testlib_dir}/../smoketest/testlib.sh"
 : ${SCM:=scm}
 : ${SKIP_APACHE_VERIFY_DOWNLOAD:=${CI:-false}}
 
-if [[ -z ${HADOOP_VERSION:-} ]]; then
-  export HADOOP_VERSION="${hadoop.version}"
-fi
-
-if [[ -z "${RANGER_VERSION:-}" ]]; then
-  export RANGER_VERSION="${ranger.version}"
-fi
-
 # Check if running from output of Maven build or from source
 _is_build() {
   local file=""
@@ -55,6 +47,14 @@ if _is_build; then
   # version is used in bucket name, which does not allow uppercase
   # variable is replaced by Maven at build time
   OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+
+  if [[ -z ${HADOOP_VERSION:-} ]]; then
+    export HADOOP_VERSION="${hadoop.version}"
+  fi
+
+  if [[ -z "${RANGER_VERSION:-}" ]]; then
+    export RANGER_VERSION="${ranger.version}"
+  fi
 else
   OZONE_CURRENT_VERSION=src
 fi
