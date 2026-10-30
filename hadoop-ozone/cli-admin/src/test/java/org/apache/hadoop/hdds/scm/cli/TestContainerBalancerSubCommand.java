@@ -832,6 +832,30 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
+  void testContainerBalancerEstimateUsesPerStorageTypeUsage() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE)).thenReturn(Arrays.asList(
+        typedDatanodeUsageProto("first", 5, 95), typedDatanodeUsageProto("second", 95, 5)));
+
+    parseSubcommand(estimateCmd, "-d", "100");
+    estimateCmd.execute(scmClient);
+
+    assertThat(out.get()).contains("Bytes to move:", byteDesc(70L * GB),
+        "Per iteration (estimate): ~" + byteDesc(26L * GB)).doesNotContain("Estimation failed:");
+  }
+
+  @Test
+  void testContainerBalancerEstimateRejectsPartialStorageTypeUsage() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE)).thenReturn(Arrays.asList(
+        typedDatanodeUsageProto("new", 5, 95), datanodeUsageProto("legacy", 200L * GB, 100L * GB)));
+
+    parseSubcommand(estimateCmd, "-d", "100");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
+    assertThat(ex).hasMessageContaining("missing or incomplete storage-type usage");
+  }
+
+  @Test
   void testContainerBalancerEstimateSubcommandDefaultShowsMediumProfile() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
@@ -1052,6 +1076,16 @@ class TestContainerBalancerSubCommand {
       nodes.add(datanodeUsageProto("over-" + i, capacity, (long) (capacity * 0.35)));
     }
     return nodes;
+  }
+
+  private static HddsProtos.DatanodeUsageInfoProto typedDatanodeUsageProto(
+      String hostname, long ssdRemaining, long diskRemaining) {
+    return datanodeUsageProto(hostname, 200L * GB, (ssdRemaining + diskRemaining) * GB).toBuilder()
+        .addStorageTypeUsage(HddsProtos.StorageTypeUsageInfoProto.newBuilder()
+            .setStorageType(HddsProtos.StorageTypeProto.SSD).setCapacity(100L * GB).setRemaining(ssdRemaining * GB))
+        .addStorageTypeUsage(HddsProtos.StorageTypeUsageInfoProto.newBuilder()
+            .setStorageType(HddsProtos.StorageTypeProto.DISK).setCapacity(100L * GB).setRemaining(diskRemaining * GB))
+        .build();
   }
 
   private static HddsProtos.DatanodeUsageInfoProto datanodeUsageProto(

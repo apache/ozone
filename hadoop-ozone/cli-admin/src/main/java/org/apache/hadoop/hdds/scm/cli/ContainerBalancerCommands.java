@@ -93,6 +93,11 @@ import picocli.CommandLine.Command;
  * support {@code --profile}, compare estimate profiles to the config you plan
  * to pass on start, or wait until profile support is added to start.
  * estimate subcommand produces upper-bound estimates.
+ * <p>Assessment and estimate compare usage separately for each storage type when
+ * SCM reports that information. They use whole-node usage when no storage-type
+ * breakdown is available. Incomplete storage-type reports produce an assessment
+ * warning and prevent estimation. The running balancer still selects moves using
+ * whole-node usage; per-storage-type move selection is separate work.
  * <p>The threshold parameter is a fraction in the range of (1%, 100%) with a
  * default value of 10%. The threshold sets a target for whether the cluster
  * is balanced. A cluster is balanced if for each datanode, the utilization
