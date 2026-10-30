@@ -17,6 +17,7 @@
 Documentation       S3 gateway test with aws cli
 Library             OperatingSystem
 Library             String
+Library             ./presigned_url_helper.py
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
@@ -47,3 +48,18 @@ Delete file with multi delete
                         Should contain             ${result}         ${PREFIX}/multidelete/key=value/f3
                         Should contain             ${result}         STANDARD
                         Should not contain         ${result}         REDUCED_REDUNDANCY
+
+Multi delete rejects a key with mixed content
+    [Documentation]    A Key holding text, a child element and more text is malformed. It must be rejected,
+    ...                not read as only the text after the child element, which would delete another key.
+                        Execute                    date > /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}-mixed --body /tmp/testfile
+    ${access_key} =     Execute                    aws configure get aws_access_key_id
+    ${secret_key} =     Execute                    aws configure get aws_secret_access_key
+    ${url} =            Generate Presigned Delete Objects Url    ${access_key}    ${secret_key}    ${BUCKET}    us-east-1    3600    ${ENDPOINT_URL}
+                        Create File                /tmp/${PREFIX}-mixed.xml    <Delete><Object><Key>dir/<a/>${PREFIX}-mixed</Key></Object></Delete>
+    ${result} =         Execute                    curl -sS -i -X POST -H "Content-Type: application/xml" --data-binary @/tmp/${PREFIX}-mixed.xml "${url}"
+                        Should Contain             ${result}         InvalidRequest
+                        Should Contain             ${result}         Mixed content is not allowed
+    ${result} =         Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}-mixed
+    [Teardown]          Remove File                /tmp/${PREFIX}-mixed.xml

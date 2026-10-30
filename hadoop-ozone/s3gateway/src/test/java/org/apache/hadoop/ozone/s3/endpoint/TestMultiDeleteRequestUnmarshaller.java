@@ -19,9 +19,14 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import javax.ws.rs.WebApplicationException;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
@@ -64,6 +69,39 @@ public class TestMultiDeleteRequestUnmarshaller {
 
     //THEN
     assertEquals(3, multiDeleteRequest.getObjects().size());
+  }
+
+  @Test
+  public void keyWithEscapedMarkupIsOneKey() throws IOException {
+    MultiDeleteRequest request = unmarshall(body("<Delete><Object><Key>tmp/&lt;x&gt;</Key></Object></Delete>"));
+    assertEquals("tmp/<x>", request.getObjects().get(0).getKey());
+  }
+
+  @Test
+  public void indentedBodyIsAccepted() throws IOException {
+    MultiDeleteRequest request = unmarshall(body("<Delete>\n  <Object>\n    <Key>tmp/a</Key>\n  </Object>\n</Delete>"));
+    assertEquals("tmp/a", request.getObjects().get(0).getKey());
+  }
+
+  @Test
+  public void elementAfterTextInKeyIsRejected() {
+    assertRejected("<Delete><Object><Key>tmp/<a/>secret</Key></Object></Delete>");
+  }
+
+  @Test
+  public void textAfterElementInKeyIsRejected() {
+    assertRejected("<Delete><Object><Key><a>tmp/</a>secret</Key></Object></Delete>");
+  }
+
+  /** JAXB would read only the text after the child; the request must be refused, not read as another key. */
+  private void assertRejected(String xml) {
+    WebApplicationException ex = assertThrows(WebApplicationException.class, () -> unmarshall(body(xml)));
+    OS3Exception cause = assertInstanceOf(OS3Exception.class, ex.getCause());
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), cause.getCode());
+  }
+
+  private static ByteArrayInputStream body(String xml) {
+    return new ByteArrayInputStream(xml.getBytes(UTF_8));
   }
 
   private MultiDeleteRequest unmarshall(ByteArrayInputStream inputBody)
