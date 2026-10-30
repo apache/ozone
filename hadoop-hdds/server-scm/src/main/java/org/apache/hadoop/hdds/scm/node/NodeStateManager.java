@@ -130,6 +130,16 @@ public class NodeStateManager implements Runnable, Closeable {
   private final long containerRollIntervalMs;
 
   /**
+   * A gap between two health checks of at least this long is handled as an SCM pause.
+   */
+  private final long pauseThresholdMs;
+
+  /**
+   * How long health checks are skipped after a pause, so that datanodes can heartbeat again.
+   */
+  private final long pauseHoldOffMs;
+
+  /**
    * The future is used to pause/unpause the scheduled checks.
    */
   private ScheduledFuture<?> healthCheckFuture;
@@ -148,6 +158,11 @@ public class NodeStateManager implements Runnable, Closeable {
    * number of times the heart beat check was skipped.
    */
   private long skippedHealthChecks;
+
+  /**
+   * Health checks are skipped until this time after a pause.
+   */
+  private long skipHealthChecksUntil;
 
   /**
    * Constructs a NodeStateManager instance with the given configuration.
@@ -179,6 +194,10 @@ public class NodeStateManager implements Runnable, Closeable {
     Preconditions.checkState(staleNodeIntervalMs < deadNodeIntervalMs,
         OZONE_SCM_STALENODE_INTERVAL + " should be less than" +
             OZONE_SCM_DEADNODE_INTERVAL);
+    final long heartbeatIntervalMs = HddsServerUtil.getScmHeartbeatInterval(conf);
+    // A pause this long can make a node that heartbeats on time look stale.
+    pauseThresholdMs = staleNodeIntervalMs - heartbeatIntervalMs;
+    pauseHoldOffMs = heartbeatIntervalMs + HddsServerUtil.getScmRpcTimeOutInMilliseconds(conf);
     ScheduledThreadPoolExecutor executor = new HadoopScheduledThreadPoolExecutor(1,
         new ThreadFactoryBuilder()
             .setDaemon(true)
@@ -191,6 +210,8 @@ public class NodeStateManager implements Runnable, Closeable {
     executorService = executor;
 
     skippedHealthChecks = 0;
+    lastHealthCheck = Time.monotonicNow();
+    skipHealthChecksUntil = lastHealthCheck;
     checkPaused = false; // accessed only from test functions
 
     containerRollIntervalMs = conf.getTimeDuration(
@@ -671,13 +692,15 @@ public class NodeStateManager implements Runnable, Closeable {
   @Override
   public void run() {
 
-    if (shouldSkipCheck()) {
+    // One clock reading for the pause check and the health deadlines, so that a pause between them is not missed.
+    final long now = Time.monotonicNow();
+    if (shouldSkipCheck(now)) {
       skippedHealthChecks++;
-      LOG.info("Detected long delay in scheduling HB processing thread. "
-          + "Skipping heartbeat checks for one iteration.");
     } else {
-      checkNodesHealth();
+      checkNodesHealth(now);
     }
+    // A pause during this run is then part of the gap seen by the next run.
+    lastHealthCheck = now;
 
     // we purposefully make this non-deterministic. Instead of using a
     // scheduleAtFixedFrequency  we will just go to sleep
@@ -707,6 +730,10 @@ public class NodeStateManager implements Runnable, Closeable {
 
   @VisibleForTesting
   public void checkNodesHealth() {
+    checkNodesHealth(Time.monotonicNow());
+  }
+
+  private void checkNodesHealth(long processingStartTime) {
 
     /*
      *
@@ -734,7 +761,6 @@ public class NodeStateManager implements Runnable, Closeable {
      *
      * The Processing starts from current time and looks backwards in time.
      */
-    long processingStartTime = Time.monotonicNow();
     // After this time node is considered to be stale.
     long healthyNodeDeadline = processingStartTime - staleNodeIntervalMs;
     // After this time node is considered to be dead.
@@ -810,22 +836,23 @@ public class NodeStateManager implements Runnable, Closeable {
       LOG.warn("Current Thread is interrupted, shutting down HB processing " +
           "thread for Node Manager.");
     }
-
-    lastHealthCheck = Time.monotonicNow();
   }
 
   /**
-   * if the time since last check exceeds the stale|dead node interval, skip.
+   * if the time since last check can make a node that heartbeats on time look
+   * stale, skip until datanodes had a heartbeat interval and the heartbeat RPC
+   * timeout to heartbeat again, as heartbeats sent during the delay may be lost.
    * such long delays might be caused by a JVM pause. SCM cannot make reliable
    * conclusions about datanode health in such situations.
    * @return : true indicates skip HB checks
    */
-  private boolean shouldSkipCheck() {
-
-    long currentTime = Time.monotonicNow();
-    long minInterval = Math.min(staleNodeIntervalMs, deadNodeIntervalMs);
-
-    return ((currentTime - lastHealthCheck) >= minInterval);
+  private boolean shouldSkipCheck(long now) {
+    if (now - lastHealthCheck >= pauseThresholdMs) {
+      skipHealthChecksUntil = now + pauseHoldOffMs;
+      LOG.info("Detected long delay of {} ms in scheduling HB processing thread. Skipping heartbeat checks for {} ms.",
+          now - lastHealthCheck, pauseHoldOffMs);
+    }
+    return now - skipHealthChecksUntil < 0;
   }
 
   /**
@@ -946,10 +973,6 @@ public class NodeStateManager implements Runnable, Closeable {
           || healthCheckFuture.isDone()));
 
       checkPaused = false;
-      /**
-       * We do not call scheduleNextHealthCheck because we are
-       * not updating the lastHealthCheck timestamp.
-       */
       healthCheckFuture = executorService.schedule(this,
           heartbeatCheckerIntervalMs, TimeUnit.MILLISECONDS);
     }
