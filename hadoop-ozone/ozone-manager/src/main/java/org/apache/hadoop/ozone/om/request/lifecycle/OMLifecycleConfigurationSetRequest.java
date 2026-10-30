@@ -89,10 +89,6 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
 
     ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
         Pair.of(volumeName, bucketName), this);
-    // Read the bucket before the checks below, so that the recorded object ID is of a bucket they all see.
-    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
-    OmBucketInfo bucketInfo = metadataManager.getBucketTable().get(
-        metadataManager.getBucketKey(resolvedBucket.realVolume(), resolvedBucket.realBucket()));
 
     if (ozoneManager.getAclsEnabled()) {
       checkAclPermission(ozoneManager, resolvedBucket.realVolume(), resolvedBucket.realBucket());
@@ -107,6 +103,13 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
 
     validateAbortMpuDaysAgainstCleanupThreshold(ozoneManager, lifecycleConfiguration);
 
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    OmBucketInfo bucketInfo = metadataManager.getBucketTable().get(
+        metadataManager.getBucketKey(resolvedBucket.realVolume(), resolvedBucket.realBucket()));
+    if (bucketInfo == null) {
+      throw new OMException("Bucket doesn't exist", BUCKET_NOT_FOUND);
+    }
+
     SetLifecycleConfigurationRequest.Builder newCreateRequest =
         request.toBuilder();
 
@@ -115,9 +118,7 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
             .setVolume(resolvedBucket.realVolume())
             .setBucket(resolvedBucket.realBucket());
     // Bind the request to the bucket validated above, see validateAndUpdateCache.
-    if (bucketInfo != null) {
-      newLifecycleConfiguration.setBucketObjectID(bucketInfo.getObjectID());
-    }
+    newLifecycleConfiguration.setBucketObjectID(bucketInfo.getObjectID());
 
     newLifecycleConfiguration.setCreationTime(System.currentTimeMillis());
     newCreateRequest.setLifecycleConfiguration(newLifecycleConfiguration);
