@@ -551,8 +551,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           snapDiffJob.getReason());
     case DONE:
       SnapshotDiffReportOzone report = createPageResponse(snapDiffJob,
-          volumeName, bucketName, fromSnapshotName, toSnapshotName, index,
-          pageSize);
+          snapDiffJobKey, volumeName, bucketName, fromSnapshotName,
+          toSnapshotName, index, pageSize);
       return new SnapshotDiffResponse(report, DONE, 0L);
     case REJECTED:
       return new SnapshotDiffResponse(
@@ -624,8 +624,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           snapDiffJob.getReason());
     case DONE:
       SnapshotDiffReportOzone report = createPageResponse(snapDiffJob,
-          volumeName, bucketName, fromSnapshotName, toSnapshotName, index,
-          pageSize);
+          snapDiffJobKey, volumeName, bucketName, fromSnapshotName,
+          toSnapshotName, index, pageSize);
       return new SnapshotDiffResponse(report, DONE, 0L);
     case CANCELLED:
       return new SnapshotDiffResponse(
@@ -708,8 +708,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   }
 
   @VisibleForTesting
+  @SuppressWarnings("parameternumber")
   SnapshotDiffReportOzone createPageResponse(
       final SnapshotDiffJob snapDiffJob,
+      final String jobKey,
       final String volumeName,
       final String bucketName,
       final String fromSnapshotName,
@@ -748,7 +750,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     OFSPath path = getSnapshotRootPath(volumeName, bucketName);
 
     Pair<List<DiffReportEntry>, String> pageResponse =
-        createPageResponse(snapDiffJob, index, pageSize);
+        createPageResponse(snapDiffJob, jobKey, index, pageSize);
     List<DiffReportEntry> diffReportList = pageResponse.getLeft();
     String tokenString = pageResponse.getRight();
 
@@ -758,6 +760,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
   Pair<List<DiffReportEntry>, String> createPageResponse(
       final SnapshotDiffJob snapDiffJob,
+      final String jobKey,
       final String index,
       final int pageSize
   ) throws IOException {
@@ -784,7 +787,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       String nextTokenString = iterator.hasNext() ?
           getIndexFromReportKey(StringCodec.get().fromPersistedFormat(iterator.next().getKey())) : null;
 
-      checkReportsIntegrity(snapDiffJob, pageLastKey, nextTokenString == null);
+      checkReportsIntegrity(snapDiffJob, jobKey, pageLastKey, nextTokenString == null);
       return Pair.of(diffReportList, nextTokenString);
     }
 
@@ -798,14 +801,26 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
    * service and throws the exception to client.
    */
   @VisibleForTesting
-  void checkReportsIntegrity(final SnapshotDiffJob diffJob,
+  synchronized void checkReportsIntegrity(final SnapshotDiffJob diffJob,
+                             final String jobKey,
                              final String largestPageIndex,
                              boolean lastPage) throws IOException {
-    // For last page check last entry returned if the largest entry key equals the largest key stored in the job entry.
-    if (lastPage && (diffJob.getLargestEntryKey() == null || !diffJob.getLargestEntryKey().equals(largestPageIndex))) {
+    // A DONE job persisted before largestEntryKey was introduced deserializes with a
+    // null largestEntryKey. Such a legacy job carries no stored last-entry to compare,
+    // so skip the integrity assertion for it rather than treating it as a failure.
+    if (lastPage && diffJob.getLargestEntryKey() != null &&
+        !diffJob.getLargestEntryKey().equals(largestPageIndex)) {
       LOG.error("Expected last entry: {} but found " +
               "Largest Page entry: {}", diffJob.getLargestEntryKey(), largestPageIndex);
-      updateJobStatus(diffJob.getJobId(), DONE, FAILED);
+      // The job is stored under jobKey (fromSnapshotId + DELIMITER + toSnapshotId), not
+      // under its jobId; passing the jobId here would look up a missing row.
+      // Cleanup deletes job rows without the manager lock, so share the DB monitor with cleanup as well.
+      synchronized (db) {
+        SnapshotDiffJob currentJob = snapDiffJobTable.get(jobKey);
+        if (currentJob != null && currentJob.getJobId().equals(diffJob.getJobId()) && currentJob.getStatus() == DONE) {
+          updateJobStatus(jobKey, DONE, FAILED);
+        }
+      }
       throw new IOException("Report integrity check failed. Retry after: " +
           ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval());
     }
@@ -846,8 +861,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     if (snapDiffJob.getStatus() != QUEUED) {
       // Same request is submitted by another thread and already completed.
       if (snapDiffJob.getStatus() == DONE) {
-        SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, volume,
-            bucket, fromSnapshot, toSnapshot, index, pageSize);
+        SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, jobKey,
+            volume, bucket, fromSnapshot, toSnapshot, index, pageSize);
         return new SnapshotDiffResponse(report, DONE, 0L);
       } else {
         // Otherwise, return the same status as in DB with wait time.

@@ -124,7 +124,11 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     // assumption is that by the next cleanup run, there is no purged snapDiff
     // job reading from report table.
     long purgedReportJobs = removeOlderJobReport();
-    long movedJobsToPurgeTable = moveOldSnapDiffJobsToPurgeTable();
+    long movedJobsToPurgeTable;
+    // Serialize job deletion with SnapshotDiffManager's integrity-failure status transition.
+    synchronized (db) {
+      movedJobsToPurgeTable = moveOldSnapDiffJobsToPurgeTable();
+    }
     LOG.info("Snapshot diff cleanup run completed. Purged report jobs: {}, " +
             "moved jobs to purge table: {}.",
         purgedReportJobs, movedJobsToPurgeTable);
