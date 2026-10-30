@@ -28,6 +28,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Metrics for full container report lease management.
+ * Outstanding leases include grants awaiting a report and admitted reports awaiting completion or discard.
+ * Rejected lease requests (capacity unavailable or a report already admitted for that datanode) are distinct from
+ * incoming FCRs rejected for invalid leases. Disabling rate limiting bypasses capacity checks, not lease validation.
  */
 @Metrics(about = "SCM full container report lease metrics",
     context = OzoneConsts.OZONE)

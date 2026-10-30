@@ -194,7 +194,8 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         // list
         processMissingReplicas(datanodeDetails, expectedContainersInDatanode);
         getContainerManager().notifyContainerReportProcessing(true, true);
-        if (reportFromDatanode.isRegister()) {
+        // Container SafeMode rules advance only after the actual registration FCR has been processed.
+        if (reportFromDatanode.isRegistrationReport()) {
           publisher.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT,
               new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanodeDetails,
               reportFromDatanode.getReport()));

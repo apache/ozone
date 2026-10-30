@@ -85,6 +85,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -121,7 +122,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Protocol Handler for Datanode Protocol.
+ * Protocol handler for datanode registration and heartbeats.
+ *
+ * <p>The SCM FCR lease flow is:
+ * <ol>
+ * <li>Registration supplies an actual FCR or records that it is deferred. Successful node registration is notified
+ * independently of whether container inventory is ready.</li>
+ * <li>A heartbeat requests a grant from {@link SCMFullContainerReportLeaseManager}, subject to SCM eligibility.</li>
+ * <li>An incoming leased FCR is validated and claimed before dispatch; unleased reports retain legacy behavior.
+ * Invalid leased FCRs are rejected without suppressing other heartbeat reports.</li>
+ * <li>The dispatcher transfers an accepted report to the queue. Processing or discard completes its claim and releases
+ * capacity; container SafeMode rules receive registration inventory only after successful FCR processing.</li>
+ * </ol>
  */
 public class SCMDatanodeProtocolServer implements
     StorageContainerDatanodeProtocol, Auditor {
@@ -261,9 +273,10 @@ public class SCMDatanodeProtocolServer implements
     final boolean leaderReady = scmContext == null || scmContext.isLeaderReady();
     // TODO : Return the list of Nodes that forms the SCM HA.
     RegisteredCommand registeredCommand;
+    // Reject unsupported deferral before register() can change node state. Prefer the structured version error for
+    // incompatible datanodes, and preserve rejection even if finalization advances during version validation.
     if (containerReportsProto.getFullContainerReportDeferred()
         && !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)) {
-      // Preserve the rejection if finalization advances before the response is sent.
       registeredCommand = scm.getScmNodeManager().getRegistrationVersionError(datanodeDetails, versionInfo)
           .orElseThrow(() -> new IOException(
               "Full container report leases must be finalized before deferring registration reports."));
@@ -273,6 +286,7 @@ public class SCMDatanodeProtocolServer implements
     }
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
+      // A deferred report is not an empty inventory: record it for a later leased heartbeat instead of dispatching it.
       if (containerReportsProto.getFullContainerReportDeferred()) {
         fcrLeaseManager.markFullContainerReportDeferred(datanodeDetails);
       } else {
@@ -281,6 +295,7 @@ public class SCMDatanodeProtocolServer implements
             new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
                 datanodeDetails, containerReportsProto, true));
       }
+      // Count successful node registration independently of container SafeMode progress after actual FCR processing.
       eventPublisher.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
           new NodeRegistrationContainerReport(datanodeDetails));
       eventPublisher.fireEvent(PIPELINE_REPORT,
@@ -342,8 +357,23 @@ public class SCMDatanodeProtocolServer implements
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
-    ContainerReportFromDatanode containerReport = prepareFullContainerReport(heartbeat);
-    boolean leasedReportRejected = heartbeat.hasContainerReport() && containerReport == null;
+    ContainerReportFromDatanode containerReport = null;
+    boolean leasedReportRejected = false;
+    if (heartbeat.hasContainerReport()) {
+      DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
+      ContainerReportsProto report = heartbeat.getContainerReport();
+      if (report.hasFullContainerReportLease()) {
+        Optional<LeaseClaim> claim =
+            validateAndClaimFullContainerReportLease(datanodeDetails, report.getFullContainerReportLease());
+        if (claim.isPresent()) {
+          containerReport = new ContainerReportFromDatanode(datanodeDetails, report, claim.get());
+        } else {
+          leasedReportRejected = true;
+        }
+      } else {
+        containerReport = new ContainerReportFromDatanode(datanodeDetails, report);
+      }
+    }
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
     for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeat, containerReport)) {
       cmdResponses.add(getCommandResponse(cmd, scm));
@@ -412,47 +442,31 @@ public class SCMDatanodeProtocolServer implements
   }
 
   /**
-   * Prepares the FCR for dispatch, claiming its lease when present.
+   * Validates and claims the lease attached to an incoming FCR, retaining capacity until the report completes.
    *
-   * @return the accepted report, or null if no FCR was supplied or its lease was rejected
+   * @return the admitted report's claim, or empty if leasing is unavailable or the grant is invalid
    */
-  private ContainerReportFromDatanode prepareFullContainerReport(SCMHeartbeatRequestProto heartbeat) {
-    if (!heartbeat.hasContainerReport()) {
-      return null;
-    }
-    DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
-        heartbeat.getDatanodeDetails());
-    ContainerReportsProto containerReport = heartbeat.getContainerReport();
-    if (!containerReport.hasFullContainerReportLease()) {
-      return new ContainerReportFromDatanode(datanodeDetails, containerReport);
-    }
-    FullContainerReportLeaseProto lease =
-        containerReport.getFullContainerReportLease();
-    OptionalLong currentTerm = getFCRLeaseTerm();
-    Optional<SCMFullContainerReportLeaseManager.LeaseClaim> claim =
+  private Optional<LeaseClaim> validateAndClaimFullContainerReportLease(
+      DatanodeDetails datanodeDetails, FullContainerReportLeaseProto lease) {
+    OptionalLong currentTerm = getFCRLeaseTermIfAllowed();
+    Optional<LeaseClaim> claim =
         fcrLeaseManager.claimLease(datanodeDetails, currentTerm,
             lease.getTerm(), lease.getId());
-    if (claim.isPresent()) {
-      SCMFullContainerReportLeaseManager.LeaseClaim leaseClaim = claim.get();
-      return new ContainerReportFromDatanode(
-          datanodeDetails, containerReport, leaseClaim.isRegistrationReport(),
-          leaseClaim);
+    if (claim.isEmpty()) {
+      LOG.warn("Ignoring full container report from datanode {} with invalid "
+              + "lease id {} and term {}.", datanodeDetails.getUuidString(), lease.getId(), lease.getTerm());
     }
-
-    LOG.warn("Ignoring full container report from datanode {} with invalid "
-            + "lease id {} and term {}.", datanodeDetails.getUuidString(),
-        lease.getId(), lease.getTerm());
-    return null;
+    return claim;
   }
 
   private void addFCRLeaseIfRequested(SCMHeartbeatRequestProto heartbeat,
       SCMHeartbeatResponseProto.Builder builder) {
-    if (!heartbeat.getRequestFullContainerReportLease() || scmContext == null) {
+    if (!heartbeat.getRequestFullContainerReportLease()) {
       return;
     }
 
-    OptionalLong term = getFCRLeaseTerm();
-    if (!term.isPresent()) {
+    OptionalLong term = getFCRLeaseTermIfAllowed();
+    if (term.isEmpty()) {
       return;
     }
 
@@ -468,7 +482,18 @@ public class SCMDatanodeProtocolServer implements
     }
   }
 
-  private OptionalLong getFCRLeaseTerm() {
+  /**
+   * Selects the lease term when this SCM can grant or admit leased FCRs. Capacity-limit bypass does not affect this
+   * policy, and the returned term is distinct from the leader term attached to SCM commands.
+   *
+   * <ul>
+   * <li>Recon (no SCM context) or an unfinalized feature: no lease term.</li>
+   * <li>HA leader that is not ready: no lease term.</li>
+   * <li>Ready HA leader: its current term.</li>
+   * <li>HA follower or non-HA SCM: {@link SCMContext#INVALID_TERM}, identifying leases local to this SCM.</li>
+   * </ul>
+   */
+  private OptionalLong getFCRLeaseTermIfAllowed() {
     if (scmContext == null || !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)) {
       return OptionalLong.empty();
     }
@@ -681,7 +706,9 @@ public class SCMDatanodeProtocolServer implements
   }
 
   /**
-   * Datanode details and container IDs for registration events.
+   * Datanode details and container IDs for two distinct registration milestones.
+   * {@link SCMEvents#NODE_REGISTRATION_CONT_REPORT} needs only datanode identity after successful registration.
+   * {@link SCMEvents#CONTAINER_REGISTRATION_REPORT} carries container IDs after successful registration FCR processing.
    */
   public static class NodeRegistrationContainerReport {
     private final DatanodeDetails datanodeDetails;

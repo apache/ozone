@@ -240,7 +240,7 @@ public class TestSCMSafeModeManager {
               .setOriginNodeId(datanode.getUuidString())
               .setKeyCount(10)
               .build());
-          reports.add(new ContainerReportFromDatanode(datanode, report, true, claim));
+          reports.add(new ContainerReportFromDatanode(datanode, report, claim));
         }
         queue.processAll(5000);
 

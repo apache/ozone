@@ -177,6 +177,7 @@ message SCMHeartbeatResponseProto {
   // Same as term in SCMCommandProto
   optional int64 term = 3;
   optional FullContainerReportLeaseProto fullContainerReportLease = 4;
+  // Rejects an incoming leased FCR, not a request for a lease. Other heartbeat fields are still processed.
   optional bool fullContainerReportLeaseRejected = 5 [default = false];
 }
 
@@ -228,6 +229,7 @@ message MetadataStorageReportProto {
 message ContainerReportsProto {
   repeated ContainerReplicaProto reports = 1;
   optional FullContainerReportLeaseProto fullContainerReportLease = 2;
+  // Registration omits its inventory and will send an FCR after acquiring a lease. This is not an empty inventory.
   optional bool fullContainerReportDeferred = 3 [default = false];
 }
 

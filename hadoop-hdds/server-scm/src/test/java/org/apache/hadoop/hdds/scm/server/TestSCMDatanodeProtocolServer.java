@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
@@ -74,6 +75,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
@@ -174,6 +176,50 @@ class TestSCMDatanodeProtocolServer {
     when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.of(7L));
     when(context.getTermOfLeader()).thenReturn(7L);
     assertEquals(7L, server.sendHeartbeat(request).getFullContainerReportLease().getTerm());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void testHaLeaseEligibility(boolean leader, boolean ready) throws Exception {
+    server.stop();
+    SCMContext context = mock(SCMContext.class);
+    when(context.isLeader()).thenReturn(leader);
+    when(context.getTermOfLeaderIfReady()).thenReturn(leader && ready ? OptionalLong.of(7L) : OptionalLong.empty());
+    when(context.getTermOfLeader()).thenReturn(7L);
+    server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, context);
+    versionManager.finalizeUpgrade();
+    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+
+    SCMHeartbeatResponseProto response = server.sendHeartbeat(request);
+
+    assertEquals(!leader || ready, response.hasFullContainerReportLease());
+    if (response.hasFullContainerReportLease()) {
+      assertEquals(leader ? 7L : SCMContext.INVALID_TERM, response.getFullContainerReportLease().getTerm());
+    }
+  }
+
+  @Test
+  void testNonHaScmGrantsLeaseWithLocalTerm() throws Exception {
+    versionManager.finalizeUpgrade();
+    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+
+    SCMHeartbeatResponseProto response = server.sendHeartbeat(request);
+
+    assertTrue(response.hasFullContainerReportLease());
+    assertEquals(SCMContext.INVALID_TERM, response.getFullContainerReportLease().getTerm());
+  }
+
+  @Test
+  void testReconDoesNotGrantLease() throws Exception {
+    server.stop();
+    server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, null);
+    versionManager.finalizeUpgrade();
+    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+
+    assertFalse(server.sendHeartbeat(request).hasFullContainerReportLease());
   }
 
   @ParameterizedTest
@@ -317,7 +363,7 @@ class TestSCMDatanodeProtocolServer {
 
     ArgumentCaptor<ContainerReportFromDatanode> report = ArgumentCaptor.forClass(ContainerReportFromDatanode.class);
     verify(publisher).fireEvent(eq(CONTAINER_REPORT), report.capture());
-    assertTrue(report.getValue().isRegister());
+    assertTrue(report.getValue().isRegistrationReport());
     verify(publisher).fireEvent(eq(NODE_REGISTRATION_CONT_REPORT), any());
     report.getValue().complete(true);
   }
@@ -332,7 +378,7 @@ class TestSCMDatanodeProtocolServer {
     ArgumentCaptor<ContainerReportFromDatanode> report = ArgumentCaptor.forClass(ContainerReportFromDatanode.class);
     verify(publisher).fireEvent(eq(CONTAINER_REPORT), report.capture());
     assertEquals(request.getContainerReport(), report.getValue().getReport());
-    assertFalse(report.getValue().isRegister());
+    assertFalse(report.getValue().isRegistrationReport());
     assertTrue(report.getValue().startProcessing());
     report.getValue().complete(true);
   }

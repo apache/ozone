@@ -180,7 +180,7 @@ public class TestContainerReportHandler {
         nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
     LeaseClaim claim = spy(claimLease(datanode));
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
-        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
@@ -193,7 +193,7 @@ public class TestContainerReportHandler {
     DatanodeDetails datanode = randomDatanodeDetails();
     LeaseClaim claim = spy(claimLease(datanode));
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
-        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
@@ -209,7 +209,7 @@ public class TestContainerReportHandler {
     completedClaim.complete(false);
     LeaseClaim claim = spy(completedClaim);
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
-        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);

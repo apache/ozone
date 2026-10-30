@@ -36,7 +36,7 @@ class TestContainerReportQueue {
     DatanodeDetails datanode = randomDatanodeDetails();
     LeaseClaim claim = spy(claimLease(datanode));
     ContainerReportFromDatanode firstReport = new ContainerReportFromDatanode(
-        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
     ContainerReportFromDatanode secondReport = new ContainerReportFromDatanode(
         datanode, ContainerReportsProto.getDefaultInstance());
 
@@ -52,7 +52,7 @@ class TestContainerReportQueue {
     DatanodeDetails datanode = randomDatanodeDetails();
     LeaseClaim claim = spy(claimLease(datanode));
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
-        datanode, ContainerReportsProto.getDefaultInstance(), false, claim);
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
     queue.add(report);
 
     queue.clear();

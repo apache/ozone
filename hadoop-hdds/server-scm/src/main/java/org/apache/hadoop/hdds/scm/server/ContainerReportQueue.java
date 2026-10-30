@@ -38,6 +38,8 @@ import org.apache.hadoop.util.Time;
 /**
  * Customized queue to handle FCR and ICR from datanode optimally,
  * avoiding duplicate FCR reports.
+ * Superseding or clearing a queued FCR completes it as unprocessed, releasing any claimed lease capacity without
+ * clearing the datanode's pending registration FCR.
  */
 public class ContainerReportQueue
     implements BlockingQueue<ContainerReport>, IQueueMetrics {

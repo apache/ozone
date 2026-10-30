@@ -294,6 +294,11 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     void mergeReport(ContainerReport val);
 
+    /**
+     * Signals the end of processing or discard. Reports owning resources release them in either outcome.
+     *
+     * @param processed true if processing completed successfully; false on processing failure or discard
+     */
     default void complete(boolean processed) {
     }
   }
@@ -315,14 +320,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
-   * Container report event payload with origin.
+   * FCR event payload with origin and an optional admitted lease claim.
+   * A deferred registration's FCR can arrive in a heartbeat; its claim identifies it as a registration report.
+   * Completion is idempotent and releases the claim on either successful processing or discard.
    */
   public static class ContainerReportFromDatanode
       extends ReportFromDatanode<ContainerReportsProto>
       implements ContainerReport, IEventInfo {
     private long createTime = Time.monotonicNow();
-    // Used to identify whether container reporting is from a registration.
-    private boolean isRegister = false;
+    private final boolean registrationReport;
     // Null for reports that do not use an FCR lease.
     private final LeaseClaim leaseClaim;
     private final AtomicBoolean completed = new AtomicBoolean();
@@ -332,17 +338,24 @@ public final class SCMDatanodeHeartbeatDispatcher {
       this(datanodeDetails, report, false);
     }
 
+    /**
+     * Creates an unleased report, including an FCR supplied directly during registration.
+     */
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
-        ContainerReportsProto report, boolean isRegister) {
-      this(datanodeDetails, report, isRegister, null);
+        ContainerReportsProto report, boolean registrationReport) {
+      super(datanodeDetails, report);
+      this.registrationReport = registrationReport;
+      this.leaseClaim = null;
     }
 
+    /**
+     * Creates a leased report whose registration status is determined by its non-null claim.
+     */
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
-        ContainerReportsProto report, boolean isRegister,
-        LeaseClaim leaseClaim) {
+        ContainerReportsProto report, LeaseClaim leaseClaim) {
       super(datanodeDetails, report);
-      this.isRegister = isRegister;
-      this.leaseClaim = leaseClaim;
+      this.leaseClaim = Objects.requireNonNull(leaseClaim, "leaseClaim == null");
+      this.registrationReport = leaseClaim.isRegistrationReport();
     }
 
     @Override
@@ -365,14 +378,20 @@ public final class SCMDatanodeHeartbeatDispatcher {
       return createTime;
     }
 
-    public boolean isRegister() {
-      return isRegister;
+    public boolean isRegistrationReport() {
+      return registrationReport;
     }
 
+    /**
+     * Starts a leased report once. Unleased reports are unrestricted; admitted leases do not expire while queued.
+     */
     public boolean startProcessing() {
       return leaseClaim == null || leaseClaim.startProcessing();
     }
 
+    /**
+     * Releases this report's lease at most once. Only successful processing clears the matching pending registration.
+     */
     @Override
     public void complete(boolean processed) {
       if (completed.compareAndSet(false, true) && leaseClaim != null) {
