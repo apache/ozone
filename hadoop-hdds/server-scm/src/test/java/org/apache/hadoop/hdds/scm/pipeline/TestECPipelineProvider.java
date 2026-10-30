@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -235,7 +236,7 @@ public class TestECPipelineProvider {
 
   private DatanodeInfo createDatanodeInfo(DatanodeDetails dn) {
     DatanodeInfo datanodeInfo = new DatanodeInfo(dn,
-        NodeStatus.inServiceHealthy(), null,
+        NodeStatus.inServiceHealthy(), UpgradeUtils.defaultVersionProto(),
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     datanodeInfo.updateStorageReports(Collections.singletonList(
         HddsTestUtils.createStorageReport(dn.getID(),

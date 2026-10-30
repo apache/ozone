@@ -45,7 +45,7 @@ public enum ValidationCondition {
   public boolean shouldApply(OMRequest req, ValidationContext ctx) {
     return switch (this) {
     case CLUSTER_NEEDS_FINALIZATION -> ctx.versionManager().needsFinalization();
-    case OLDER_CLIENT_REQUESTS -> req.getVersion() < ClientVersion.CURRENT_VERSION;
+    case OLDER_CLIENT_REQUESTS -> !ClientVersion.CURRENT.isSupportedBy(req.getVersion());
     };
   }
 }

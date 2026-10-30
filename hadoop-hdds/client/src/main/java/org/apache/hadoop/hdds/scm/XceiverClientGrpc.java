@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.TimeDurationUtil;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -122,8 +123,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     super();
     Objects.requireNonNull(pipeline, "pipeline == null");
     Objects.requireNonNull(config, "config == null");
-    setTimeout(config.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
-        OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
+    setTimeout(getTimeoutMillis(config, OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
+        OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT));
     this.streamReadTimeoutNanos = config.getObject(OzoneClientConfig.class)
         .getStreamReadTimeout().toNanos();
     this.pipeline = pipeline;
@@ -327,7 +328,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
             futureHashMap = new HashMap<>();
     if (!request.hasVersion()) {
       ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto.newBuilder(request);
-      builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+      builder.setVersion(ClientVersion.CURRENT.serialize());
       request = builder.build();
     }
     for (DatanodeDetails dn : datanodeList) {
@@ -419,7 +420,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               ContainerCommandRequestProto.newBuilder(request)
                   .setTraceID(TracingUtil.exportCurrentSpan());
           if (!request.hasVersion()) {
-            builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+            builder.setVersion(ClientVersion.CURRENT.serialize());
           }
           return sendCommandWithRetry(builder.build(), validators);
         });
@@ -726,7 +727,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           ContainerCommandRequestProto.newBuilder(request)
               .setTraceID(TracingUtil.exportCurrentSpan());
       if (!request.hasVersion()) {
-        builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+        builder.setVersion(ClientVersion.CURRENT.serialize());
       }
       XceiverClientReply asyncReply =
           sendCommandAsync(builder.build(), pipeline.getFirstNode());
@@ -770,7 +771,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     // create a new grpc message stream pair for each call.
     final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        dnChannelInfoMap.get(dnId).getStub().withDeadlineAfter(timeout, TimeUnit.SECONDS)
+        dnChannelInfoMap.get(dnId).getStub().withDeadlineAfter(timeout, TimeUnit.MILLISECONDS)
             .send(new StreamObserver<ContainerCommandResponseProto>() {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
@@ -832,6 +833,20 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return config;
   }
 
+  /**
+   * Returns the timeout configured by {@code key} in milliseconds.
+   * A value without unit is in seconds, for compatibility.
+   */
+  static long getTimeoutMillis(ConfigurationSource config, String key, String defaultValue) {
+    return TimeDurationUtil.getDuration(key, config.get(key, defaultValue), TimeUnit.SECONDS).toMillis();
+  }
+
+  @VisibleForTesting
+  long getTimeout() {
+    return timeout;
+  }
+
+  /** Sets the deadline of each request in milliseconds. */
   public void setTimeout(long timeout) {
     this.timeout = timeout;
   }

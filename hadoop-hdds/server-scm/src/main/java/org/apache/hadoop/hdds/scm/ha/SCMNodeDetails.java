@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.NodeDetails;
-import org.apache.hadoop.net.NetUtils;
 
 /**
  * Construct SCM node details.
@@ -145,11 +144,6 @@ public final class SCMNodeDetails extends NodeDetails {
     public SCMNodeDetails build() {
       return new SCMNodeDetails(this);
     }
-  }
-
-  @Override
-  public String getRpcAddressString() {
-    return NetUtils.getHostPortString(getRpcAddress());
   }
 
   public InetSocketAddress getClientProtocolServerAddress() {

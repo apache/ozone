@@ -19,8 +19,9 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedInputStream;
@@ -38,21 +39,28 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -145,11 +153,106 @@ public class TestStreamRead {
     runTestReadKey(KEY_SIZE, bytesPerChecksum);
   }
 
-  void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
+  @Test
+  void testUnevenFlushedChunks() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster.getConf());
+    OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
+    config.setStreamReadBlock(true);
+    config.setChecksumVerify(true);
+    config.setBytesPerChecksum(16 * 1024);
+    config.setStreamReadResponseDataSize(32 * 1024);
+    config.setStreamBufferFlushDelay(false);
+    conf.setFromObject(config);
+    byte[] expected = new byte[8193 + 32771 + 65543];
+    new java.util.Random(16258).nextBytes(expected);
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
+      String key = "uneven-flushed-chunks";
+      try (OutputStream out = bucket.delegate().createKey(key, expected.length,
+          RatisReplicationConfig.getInstance(ONE), Collections.emptyMap())) {
+        int offset = 0;
+        for (int length : new int[] {8193, 32771, 65543}) {
+          out.write(expected, offset, length);
+          out.flush();
+          offset += length;
+        }
+      }
+      OmKeyInfo info = client.getProxy().getKeyInfo(bucket.delegate().getVolumeName(),
+          bucket.delegate().getName(), key, false);
+      List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
+      assertEquals(1, locations.size());
+      BlockID blockID = locations.get(0).getBlockID();
+      KeyValueContainerData container = (KeyValueContainerData) cluster.getHddsDatanodes().get(0)
+          .getDatanodeStateMachine().getContainer().getContainerSet()
+          .getContainer(blockID.getContainerID()).getContainerData();
+      List<ChunkInfo> chunks;
+      try (DBHandle db = BlockUtils.getDB(container, conf)) {
+        BlockData block = db.getStore().getBlockByID(blockID, container.getBlockKey(blockID.getLocalID()));
+        chunks = block.getChunks();
+      }
+      assertTrue(chunks.size() >= 3, "flush must persist separate chunks");
+      assertTrue(chunks.stream().map(ChunkInfo::getLen).distinct().count() > 1, "stored chunks must be nonuniform");
+      long shiftedOffset = chunks.get(1).getOffset();
+      assertTrue(shiftedOffset % config.getBytesPerChecksum() != 0, "second chunk must shift the checksum grid");
+      try (KeyInputStream in = bucket.getKeyInputStream(key)) {
+        in.getPartStreams().forEach(part -> assertInstanceOf(StreamBlockInputStream.class, part));
+        byte[] actual = new byte[expected.length];
+        org.apache.hadoop.io.IOUtils.readFully(in, actual, 0, actual.length);
+        assertArrayEquals(expected, actual);
+        for (long position : new long[] {shiftedOffset + 1, shiftedOffset + 16385, expected.length - 17, 0}) {
+          in.seek(position);
+          int length = Math.min(20000, expected.length - (int) position);
+          byte[] range = new byte[length];
+          org.apache.hadoop.io.IOUtils.readFully(in, range, 0, range.length);
+          assertArrayEquals(Arrays.copyOfRange(expected, (int) position, (int) position + length), range);
+        }
+      }
+    }
+  }
+
+  /**
+   * The client chooses the size of the ReadBlock responses. A response must fit in the client's gRPC inbound message
+   * limit, so the datanode caps the size instead of failing the read.
+   */
+  @Test
+  void testResponseDataSizeAboveGrpcMessageLimit() throws Exception {
+    final SizeInBytes keySize = SizeInBytes.valueOf("40M");
+    final SizeInBytes bufferSize = SizeInBytes.ONE_MB;
+
+    final OzoneConfiguration conf = new OzoneConfiguration(cluster.getConf());
+    final OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setStreamReadBlock(true);
+    clientConfig.setStreamReadResponseDataSize(2 * OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+    conf.setFromObject(clientConfig);
+
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      final BucketForTesting testBucket = BucketForTesting.newBuilder(client).build();
+      final String keyName = "keyResponseDataSize";
+      createKey(testBucket.delegate(), keyName, keySize, bufferSize);
+
+      final File blockFile = getBlockFile(client, testBucket.delegate(), keyName);
+      final String expectedMd5 = generateMd5(keySize, bufferSize, blockFile);
+      streamRead(keySize, bufferSize, expectedMd5, testBucket, keyName);
+    }
+  }
+
+  private File getBlockFile(OzoneClient client, OzoneBucket bucket, String keyName) throws Exception {
     final List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
     assertEquals(1, datanodes.size());
     final HddsDatanodeService datanode = datanodes.get(0);
 
+    final OmKeyInfo info = client.getProxy().getKeyInfo(bucket.getVolumeName(), bucket.getName(), keyName, false);
+    final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
+    assertEquals(1, locations.size());
+    final BlockID blockId = locations.get(0).getBlockID();
+    final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
+        .getContainer(blockId.getContainerID()).getContainerData();
+    final File blockFile = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(containerData, blockId, null);
+    assertTrue(blockFile.exists());
+    return blockFile;
+  }
+
+  void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
     OzoneConfiguration conf = cluster.getConf();
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setBytesPerChecksum(bytesPerChecksum.getSizeInt());
@@ -188,14 +291,7 @@ public class TestStreamRead {
         createKey(testBucket.delegate(), keyName, keySize, bufferSize);
 
         // get block file and generate md5
-        final OmKeyInfo info = nonStreamReadClient.getProxy().getKeyInfo(volume, bucket, keyName, false);
-        final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
-        assertEquals(1, locations.size());
-        final BlockID blockId = locations.get(0).getBlockID();
-        final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
-            .getContainer(blockId.getContainerID()).getContainerData();
-        final File blockFile = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(containerData, blockId, null);
-        assertTrue(blockFile.exists());
+        final File blockFile = getBlockFile(nonStreamReadClient, testBucket.delegate(), keyName);
         assertEquals(BLOCK_SIZE, blockFile.length());
         final String expectedMd5 = generateMd5(keySize, SizeInBytes.ONE_MB, blockFile);
 
@@ -233,7 +329,7 @@ public class TestStreamRead {
   static void streamRead(SizeInBytes keySize, SizeInBytes bufferSize, String expectedMD5,
       BucketForTesting bucket, String keyName) throws Exception {
     try (KeyInputStream in = bucket.getKeyInputStream(keyName)) {
-      assertTrue(in.isStreamBlockInputStream());
+      in.getPartStreams().forEach(part -> assertInstanceOf(StreamBlockInputStream.class, part));
       runTestReadKey(keySize, bufferSize, expectedMD5, in);
     }
   }
@@ -242,7 +338,7 @@ public class TestStreamRead {
       OzoneClient nonStreamReadClient, String volume, String bucket, String keyName) throws Exception {
     final ClientProtocol proxy = nonStreamReadClient.getProxy();
     try (KeyInputStream in = (KeyInputStream) proxy.getKey(volume, bucket, keyName).getInputStream()) {
-      assertFalse(in.isStreamBlockInputStream());
+      in.getPartStreams().forEach(part -> assertInstanceOf(BlockInputStream.class, part));
       runTestReadKey(keySize, bufferSize, expectedMD5, in);
     }
   }

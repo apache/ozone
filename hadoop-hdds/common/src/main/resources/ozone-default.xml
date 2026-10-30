@@ -513,6 +513,29 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.key.deleting.scm.follower.lag.throttle.threshold</name>
+    <value>100000</value>
+    <tag>OM, DELETION</tag>
+    <description>
+      When SCM reports that its Ratis followers lag the leader by at least this
+      many Raft log entries, OM throttles key block deletion to SCM by sending
+      fewer keys per task run (see
+      ozone.om.key.deleting.scm.lag.throttled.limit.per.task).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.key.deleting.scm.lag.throttled.limit.per.task</name>
+    <value>1000</value>
+    <tag>OM, DELETION</tag>
+    <description>
+      The reduced value of ozone.key.deleting.limit.per.task used by the key
+      deleting service while SCM follower replication lag is at or above
+      ozone.om.key.deleting.scm.follower.lag.throttle.threshold. Must be greater
+      than 0 so OM keeps sending smaller batches to SCM and keeps receiving
+      fresh lag readings, allowing it to stop throttling once the lag clears.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.key.deleting.limit.per.task</name>
     <value>20000</value>
     <tag>OM, PERFORMANCE, DELETION</tag>
@@ -1231,7 +1254,11 @@
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
-      The heartbeat interval from a Datanode to Recon.
+      The heartbeat interval from a Datanode to Recon. The Datanode sends
+      the heartbeat to Recon together with a heartbeat to SCM, so the
+      interval is at least hdds.heartbeat.interval. It is at most a third
+      of ozone.scm.stale.node.interval, so that Recon does not mark the
+      Datanode as stale.
     </description>
   </property>
   <property>
@@ -2112,6 +2139,17 @@
   </property>
 
   <property>
+    <name>ozone.s3g.standard.storage-class.use-client-default</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      When true, a request with x-amz-storage-class STANDARD uses ozone.replication and
+      ozone.replication.type, if ozone.replication is set, instead of RATIS/THREE.
+      The ozone local runtime sets it to true.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.storage-class.standard.storage-policy</name>
     <value></value>
     <tag>OZONE, S3GATEWAY</tag>
@@ -2609,7 +2647,10 @@
     <name>ozone.om.kerberos.principal</name>
     <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
-    <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
+    <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM
+      SCM issues an OM certificate only to this service user, and allocates and deletes blocks only for this service
+      user or an SCM admin, so the property must be set in the configuration of SCM as well.
+    </description>
   </property>
   <property>
     <name>ozone.om.kerberos.principal.pattern</name>
@@ -3556,6 +3597,8 @@
     <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
+      kerberos takes effect only when ozone.security.http.kerberos.enabled is true.
+      With simple, requests are not authenticated, so the admin check of the /dbCheckpoint and /v2/dbCheckpoint endpoints is not applied.
     </description>
   </property>
   <property>
@@ -3564,6 +3607,8 @@
     <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
+      kerberos takes effect only when ozone.security.http.kerberos.enabled is true.
+      With simple, requests are not authenticated, so the admin check of the /dbCheckpoint endpoint is not applied.
     </description>
   </property>
   <property>
@@ -4385,7 +4430,8 @@
     <value>5s</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The minimum timeout duration for SCM ratis leader
-      election. Default is 1s.</description>
+      election. Default is 5s. It is used as raft.server.rpc.timeout.min of SCM's Ratis server,
+      and raft.server.rpc.timeout.max is set to this value plus 200ms.</description>
   </property>
   <property>
     <name>ozone.scm.ha.raft.server.rpc.first-election.timeout</name>
@@ -5327,6 +5373,8 @@
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
       own fully qualified hostname at startup. The _HOST placeholder
       allows using the same configuration setting on all Datanodes.
+      SCM issues a Datanode certificate only to this service user, so the
+      property must be set in the configuration of SCM as well.
     </description>
   </property>
   <property>
@@ -5437,7 +5485,12 @@
     <tag>OZONE, RATIS, OM</tag>
     <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
-
+  <property>
+    <name>ozone.om.upgrade.finalization.check.interval</name>
+    <value>1m</value>
+    <tag>OM</tag>
+    <description>If OM is unfinalized, how frequently it should poll SCM to trigger finalization</description>
+  </property>
   <property>
     <name>ozone.lifecycle.service.enabled</name>
     <value>false</value>

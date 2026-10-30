@@ -182,14 +182,14 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED, storageTier);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(pipeline);
 
     Pipeline pipeline1 = provider.create(RatisReplicationConfig
         .getInstance(factor), storageTier);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED, storageTier);
     // New pipeline should not overlap with the previous created pipeline
@@ -298,7 +298,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED, storageTier);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto);
 
     factor = HddsProtos.ReplicationFactor.ONE;
@@ -307,7 +307,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED, storageTier);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto1);
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
@@ -462,7 +462,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED, storageTier);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
 
@@ -593,7 +593,7 @@ public class TestRatisPipelineProvider {
       Pipeline p = provider.create(
           RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
           new ArrayList<>(), new ArrayList<>(), StorageTier.getDefaultTier());
-      stateManager.addPipeline(p.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+      stateManager.addPipeline(p.getProtobufMessage(ClientVersion.CURRENT));
     }
 
     // Next pipeline creation should fail with default limit message.
@@ -619,7 +619,7 @@ public class TestRatisPipelineProvider {
       stateManager.addPipeline(
           provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
               new ArrayList<>(), new ArrayList<>(), StorageTier.getDefaultTier())
-              .getProtobufMessage(ClientVersion.CURRENT_VERSION)
+              .getProtobufMessage(ClientVersion.CURRENT)
       );
     }
 
@@ -663,7 +663,7 @@ public class TestRatisPipelineProvider {
         .setSupportedStorageTier(storageTier)
         .build();
     HddsProtos.Pipeline pipelineProto = openPipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
 
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);
@@ -699,7 +699,7 @@ public class TestRatisPipelineProvider {
 
   private static DatanodeInfo datanodeInfoWithDiskAndSsd(DatanodeDetails dn) {
     DatanodeInfo datanodeInfo = new DatanodeInfo(
-        dn, NodeStatus.inServiceHealthy(), UpgradeUtils.defaultLayoutVersionProto(),
+        dn, NodeStatus.inServiceHealthy(), UpgradeUtils.defaultVersionProto(),
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     List<StorageReportProto> storageReports = new ArrayList<>();
     long capacity = 10L * 1024 * 1024 * 1024;

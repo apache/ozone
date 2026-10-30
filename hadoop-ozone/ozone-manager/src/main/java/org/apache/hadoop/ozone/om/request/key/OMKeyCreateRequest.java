@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -54,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -94,6 +96,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     Objects.requireNonNull(createKeyRequest, "createKeyRequest == null");
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
+
+    if (keyArgs.hasExcludedETag()) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
+    }
 
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
@@ -170,7 +176,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
           .map(info -> info.getProtobuf(false,
-              getOmRequest().getVersion()))
+              ClientVersion.deserialize(getOmRequest().getVersion())))
           .collect(Collectors.toList()));
     } else {
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
@@ -179,6 +185,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     newKeyArgs.setKeyName(keyPath);
 
     if (keyArgs.getIsMultipartKey()) {
+      OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
       getFileEncryptionInfoForMpuKey(keyArgs, newKeyArgs, ozoneManager);
     } else {
       generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
@@ -247,7 +254,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
       validateAtomicRewrite(dbKeyInfo, keyArgs);
-      keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(keyArgs, dbKeyInfo);
+      keyArgs = validateAndRewriteETagConditionsAsExpectedGeneration(keyArgs, dbKeyInfo);
 
       OmBucketInfo bucketInfo =
           getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
@@ -348,7 +355,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           dbOpenKeyName, omKeyInfo, trxnLogIndex);
 
-      builder.setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+      builder.setKeyInfo(omKeyInfo.getNetworkProtobuf(
+              ClientVersion.deserialize(getOmRequest().getVersion()),
               keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion);

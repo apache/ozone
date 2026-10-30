@@ -30,11 +30,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StoragePolicy;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -42,15 +44,16 @@ import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 
@@ -163,6 +166,38 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
 
+  }
+
+  @Test
+  public void testRejectInvalidReplicationConfig() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    HddsProtos.DefaultReplicationConfig unknownCodec = HddsProtos.DefaultReplicationConfig.newBuilder()
+        .setType(HddsProtos.ReplicationType.EC).setEcReplicationConfig(OMRequestTestUtils.invalidEcReplicationConfig())
+        .build();
+    HddsProtos.DefaultReplicationConfig missingEcConfig = HddsProtos.DefaultReplicationConfig.newBuilder()
+        .setType(HddsProtos.ReplicationType.EC).build();
+
+    for (HddsProtos.DefaultReplicationConfig replicationConfig : Arrays.asList(unknownCodec, missingEcConfig)) {
+      BucketArgs bucketArgs = BucketArgs.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+          .setDefaultReplicationConfig(replicationConfig).build();
+      OMRequest setProperty = OMRequest.newBuilder()
+          .setSetBucketPropertyRequest(SetBucketPropertyRequest.newBuilder().setBucketArgs(bucketArgs))
+          .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
+          .setClientId(UUID.randomUUID().toString()).build();
+      OMRequest.Builder setOwner = setProperty.toBuilder();
+      setOwner.getSetBucketPropertyRequestBuilder().getBucketArgsBuilder().setOwnerName("owner1");
+
+      OMException e = assertThrows(OMException.class,
+          () -> new OMBucketSetPropertyRequest(setProperty).preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+
+      for (OMClientRequest request
+          : Arrays.asList(new OMBucketSetPropertyRequest(setProperty), new OMBucketSetOwnerRequest(setOwner.build()))) {
+        OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 1);
+        assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST, response.getOMResponse().getStatus());
+      }
+    }
   }
 
   private OMRequest createSetBucketPropertyRequest(String volumeName,
@@ -611,7 +646,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
   public void testAllowSetStoragePolicyAfterFinalization() throws Exception {
     OMRequest request = storagePolicyRequest(OzoneStoragePolicy.COLD, null, true);
 
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    OMVersionManager versionManager = mock(OMVersionManager.class);
     when(versionManager.isAllowed(
         OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(true);
 
@@ -652,7 +687,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
   }
 
   private ValidationContext preFinalizedContext() {
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    OMVersionManager versionManager = mock(OMVersionManager.class);
     when(versionManager.isAllowed(
         OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(false);
     return of(versionManager, omMetadataManager);

@@ -111,6 +111,12 @@ type SummaryResponse = {
   type: string;
 }
 
+type QuotaResponse = {
+  status: string;
+  allowed: number;
+  used: number;
+}
+
 type MetadataProps = {
   path: string;
 };
@@ -139,9 +145,9 @@ const NUMetadata: React.FC<MetadataProps> = ({
     }
   );
   
-  const quotaAPI = useApiData<any>(
+  const quotaAPI = useApiData<QuotaResponse>(
     `/api/v1/namespace/quota?path=${path}`,
-    {},
+    {} as QuotaResponse,
     {
       retryAttempts: 2,
       onError: (error) => showDataFetchError(error)
@@ -264,7 +270,7 @@ const NUMetadata: React.FC<MetadataProps> = ({
   }, [path]);
 
   // Process data when both APIs complete
-  const processMetadata = useCallback(async (summaryResponse: SummaryResponse, quotaResponse: any) => {
+  const processMetadata = useCallback(async (summaryResponse: SummaryResponse, quotaResponse: QuotaResponse) => {
     setIsProcessingData(true);
     try {
       let data: MetadataState = [];
@@ -274,7 +280,6 @@ const NUMetadata: React.FC<MetadataProps> = ({
       // Error checks for summary response
       if (summaryResponse.status === 'INITIALIZING') {
         summaryResponsePresent = false;
-        showDataFetchError(`The metadata is currently initializing. Please wait a moment and try again later`);
       }
 
       if (summaryResponse.status === 'PATH_NOT_FOUND' || quotaResponse.status === 'PATH_NOT_FOUND') {
@@ -346,9 +351,8 @@ const NUMetadata: React.FC<MetadataProps> = ({
       }
 
       // Error checks for quota response
-      if (quotaResponse.state === 'INITIALIZING') {
+      if (quotaResponse.status === 'INITIALIZING') {
         quotaResponsePresent = false;
-        showDataFetchError(`The quota is currently initializing. Please wait a moment and try again later`);
       }
 
       if (quotaResponse.status === 'TYPE_NOT_APPLICABLE') {

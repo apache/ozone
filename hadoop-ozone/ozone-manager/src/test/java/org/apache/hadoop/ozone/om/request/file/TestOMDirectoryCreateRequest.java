@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
@@ -64,7 +64,8 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -110,10 +111,8 @@ public class TestOMDirectoryCreateRequest {
         .thenReturn(new ResolvedBucket("", "",
             "", "", "",
             BucketLayout.DEFAULT));
-    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
-    when(lvm.getMetadataLayoutVersion()).thenReturn(0);
-    when(lvm.isAllowed(anyString())).thenReturn(true);
-    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
   }
 
   @AfterEach
@@ -494,6 +493,24 @@ public class TestOMDirectoryCreateRequest {
     // Verify sub dirs inherit parent DEFAULT acls.
     verifyDirectoriesInheritAcls(volumeName, bucketName, keyName, bucketAcls);
 
+  }
+
+  @Test
+  public void testRejectInvalidReplicationConfig() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+
+    OMRequest.Builder request = createDirectoryRequest(volumeName, bucketName, genRandomKeyName()).toBuilder();
+    request.getCreateDirectoryRequestBuilder().getKeyArgsBuilder().setType(EC)
+        .setEcReplicationConfig(OMRequestTestUtils.invalidEcReplicationConfig());
+    OMRequest modifiedRequest =
+        new OMDirectoryCreateRequest(request.build(), getBucketLayout()).preExecute(ozoneManager);
+    OMDirectoryCreateRequest omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedRequest, getBucketLayout());
+    omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
+    OMClientResponse response = omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST, response.getOMResponse().getStatus());
   }
 
   @ParameterizedTest

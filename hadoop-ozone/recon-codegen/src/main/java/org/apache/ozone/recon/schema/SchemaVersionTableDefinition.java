@@ -42,7 +42,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   public static final String SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DataSource dataSource;
-  private int latestSLV;
+  private int softwareVersion;
 
   @Inject
   public SchemaVersionTableDefinition(DataSource dataSource) {
@@ -61,8 +61,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
         createSchemaVersionTable(localDslContext);
 
         if (isFreshInstall) {
-          // Fresh install: Set the SLV to the latest version
-          insertInitialSLV(localDslContext, latestSLV);
+          insertApparentVersion(localDslContext, softwareVersion);
         }
       }
     }
@@ -80,27 +79,16 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
-  /**
-   * Inserts the initial SLV into the Schema Version table.
-   *
-   * @param dslContext The DSLContext to use for the operation.
-   * @param slv        The initial SLV value.
-   */
-  private void insertInitialSLV(DSLContext dslContext, int slv) {
+  private void insertApparentVersion(DSLContext dslContext, int apparentVersion) {
     dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
         .columns(DSL.field(name("version_number")),
             DSL.field(name("applied_on")))
-        .values(slv, DSL.currentTimestamp())
+        .values(apparentVersion, DSL.currentTimestamp())
         .execute();
-    LOG.info("Inserted initial SLV '{}' into SchemaVersion table.", slv);
+    LOG.info("Inserted initial apparent version '{}' into SchemaVersion table.", apparentVersion);
   }
 
-  /**
-   * Set the latest SLV.
-   *
-   * @param slv The latest Software Layout Version.
-   */
-  public void setLatestSLV(int slv) {
-    this.latestSLV = slv;
+  public void setSoftwareVersion(int version) {
+    this.softwareVersion = version;
   }
 }

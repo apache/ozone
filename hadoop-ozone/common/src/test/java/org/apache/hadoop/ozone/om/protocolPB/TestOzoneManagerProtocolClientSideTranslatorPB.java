@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
@@ -187,6 +188,24 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
     assertThat(transport.getLastRequest().getReadConsistencyHint()
         .getReadConsistency())
         .isEqualTo(ReadConsistency.LINEARIZABLE_LEADER_ONLY.toProto());
+  }
+
+  @Test
+  void abortMultipartUploadSetsS3Context() throws IOException {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("s3v")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setMultipartUploadID("upload-id")
+        .build();
+
+    client.abortMultipartUpload(keyArgs, true);
+
+    assertThat(transport.getLastRequest().getCmdType()).isEqualTo(Type.AbortMultiPartUpload);
+    assertThat(transport.getLastRequest().getAssumeS3Context()).isTrue();
   }
 
   @Test

@@ -69,13 +69,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -507,11 +505,9 @@ public class OzoneManagerServiceProviderImpl
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(
           ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-      // Do not wipe the candidate dir here. The shared RDBSnapshotProvider's
-      // checkLeaderConsistency() manages it on the next attempt: kept for the
-      // same leader (so a future batched/chunked transfer can resume the parts
-      // already received), reset on a leader change. This matches how the OM
-      // follower handles a failed download.
+      // Clear the candidate dir, as the OM follower does after a failed download, so a partly extracted file
+      // is never reported to the leader as already received on the next attempt.
+      reconSnapshotProvider.init();
       return null;
     }
   }
@@ -656,8 +652,7 @@ public class OzoneManagerServiceProviderImpl
       reconSyncMetrics.incrDeltaFetchSuccess();
 
       latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
-      RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
-      final RocksDatabase rocksDB = rocksDBStore.getDb();
+      DBStore omDbStore = omMetadataManager.getStore();
       numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
@@ -678,12 +673,10 @@ public class OzoneManagerServiceProviderImpl
           try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
             // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
             writeBatch.iterate(omdbUpdatesHandler);
-            // Commit the OM DB transactions in recon rocks DB and sync here.
+            // Commit the OM DB transactions using the store's configured write options.
             try (RDBBatchOperation rdbBatchOperation =
                      RDBBatchOperation.newAtomicOperation(writeBatch)) {
-              try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
-                rdbBatchOperation.commit(rocksDB, wOpts);
-              }
+              omDbStore.commitBatchOperation(rdbBatchOperation);
             }
           }
         }
@@ -738,6 +731,11 @@ public class OzoneManagerServiceProviderImpl
         boolean fullSnapshot = false;
 
         if (currentSequenceNumber <= 0) {
+          fullSnapshot = true;
+        } else if (!omMetadataManager.getStore().getDbLocation().exists()) {
+          // A failed full snapshot leaves Recon on its previous OM DB, whose directory was deleted before the fetch.
+          LOG.warn("Recon OM DB directory {} no longer exists, fetching a full snapshot.",
+              omMetadataManager.getStore().getDbLocation());
           fullSnapshot = true;
         } else {
           // Get updates from OM and apply to local Recon OM DB and update task status in table

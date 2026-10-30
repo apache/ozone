@@ -893,6 +893,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       throw new RuntimeException(
           "Error while building tenant user cache from DB.", ex);
     }
+    ozoneManager.getMetrics().setNumTenants(tenantCache.size());
   }
 
   @Override

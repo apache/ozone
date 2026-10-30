@@ -22,6 +22,13 @@ x-common-config:
     - ../../../common/security.conf
   image: ${OZONE_TEST_IMAGE}
   dns_search: .
+  extra_hosts:
+    - "om1:10.9.0.11"
+    - "om2:10.9.0.12"
+    - "om3:10.9.0.13"
+    - "scm1.org:10.9.0.14"
+    - "scm2.org:10.9.0.15"
+    - "scm3.org:10.9.0.16"
   depends_on:
     kdc:
       condition: service_healthy
@@ -66,6 +73,16 @@ x-volumes:
     - &krb5conf ./krb5.conf:/etc/krb5.conf
     - &ozone-dir ../../../..:${OZONE_DIR}
     - &transformation ../../../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+
+x-s3-worker:
+  &s3-worker
+  command: ["ozone","s3g"]
+  <<: *common-config
+  environment:
+    <<: *environment
+  ports:
+    - 9878
+    - 19878
 
 services:
   kdc:
@@ -259,23 +276,67 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
-  s3g:
-    command: ["ozone","s3g"]
-    <<: *common-config
-    environment:
-      <<: *environment
+  s3g-haproxy:
+    image: haproxy:lts-alpine
     hostname: s3g
     networks:
       net:
         ipv4_address: 10.9.0.23
     ports:
       - 9878:9878
+      - 19878:19878
     volumes:
-      - ${OZONE_VOLUME}/s3g:/data
+      - ../../../common/s3-haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    command: ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+  s3g1:
+    <<: *s3-worker
+    hostname: s3g1
+    networks:
+      net:
+        ipv4_address: 10.9.0.24
+    volumes:
+      - ${OZONE_VOLUME}/s3g1:/data
       - *keytabs
       - *krb5conf
       - *ozone-dir
       - *transformation
+  s3g2:
+    <<: *s3-worker
+    hostname: s3g2
+    networks:
+      net:
+        ipv4_address: 10.9.0.25
+    volumes:
+      - ${OZONE_VOLUME}/s3g2:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  s3g3:
+    <<: *s3-worker
+    hostname: s3g3
+    networks:
+      net:
+        ipv4_address: 10.9.0.26
+    volumes:
+      - ${OZONE_VOLUME}/s3g3:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  client:
+    command: ["sleep","1000000"]
+    <<: *common-config
+    environment:
+      <<: *environment
+    hostname: client
+    networks:
+      net:
+        ipv4_address: 10.9.0.27
+    volumes:
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
 
 networks:
   net:
