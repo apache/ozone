@@ -398,8 +398,7 @@ public class TestS3RevokeSTSTokenRequest {
       flush(omMetadataManager, 3L, revoke(ozoneManager, 3L, "c", olderCutoff));
       final OMClientResponse newerRevokeOfA = revoke(ozoneManager, 4L, "a", newerCutoff);
       final OMClientResponse purge = new S3DeleteRevokedSTSTokensRequest(
-          buildPurgeOmRequest(
-              Arrays.asList("a", "b", "c"), Arrays.asList(olderCutoff, olderCutoff, olderCutoff)))
+          buildPurgeOmRequest(Arrays.asList("a", "b", "c"), olderCutoff + 1))
           .validateAndUpdateCache(ozoneManager, 5L);
       final OMClientResponse newerRevokeOfB = revoke(ozoneManager, 6L, "b", newerCutoff);
       flush(omMetadataManager, 4L, newerRevokeOfA);
@@ -428,7 +427,7 @@ public class TestS3RevokeSTSTokenRequest {
       final OzoneManager ozoneManager = mockOzoneManager(omMetadataManager);
       flush(omMetadataManager, 1L, revoke(ozoneManager, 1L, originalAccessKeyId, cutoff));
       flush(omMetadataManager, 2L, new S3DeleteRevokedSTSTokensRequest(
-          buildPurgeOmRequest(Collections.singletonList(originalAccessKeyId), Collections.singletonList(cutoff)))
+          buildPurgeOmRequest(Collections.singletonList(originalAccessKeyId), cutoff + 1))
           .validateAndUpdateCache(ozoneManager, 2L));
 
       assertRevokedEntryFullyRemoved(omMetadataManager.getS3RevokedStsTokenTable(), originalAccessKeyId);
@@ -438,17 +437,41 @@ public class TestS3RevokeSTSTokenRequest {
   }
 
   @Test
-  public void testPurgeWithoutCutoffsDeletesListedEntries() throws Exception {
-    // A purge submitted without the cutoffs the scan read deletes the listed entries from the cache and the DB.
+  public void testPurgeWithoutPurgeBeforeMillisDeletesListedEntries() throws Exception {
+    // A purge submitted without purgeBeforeMillis deletes the listed entries from the cache and the DB.
     final String originalAccessKeyId = "original-access-key-id";
     final long cutoff = 1_700_000_000_000L;
     final OmMetadataManagerImpl omMetadataManager = createMetadataManager();
     try {
       final OzoneManager ozoneManager = mockOzoneManager(omMetadataManager);
       flush(omMetadataManager, 1L, revoke(ozoneManager, 1L, originalAccessKeyId, cutoff));
-      flush(omMetadataManager, 2L, new S3DeleteRevokedSTSTokensRequest(buildPurgeOmRequest(
-          Collections.singletonList(originalAccessKeyId), Collections.emptyList()))
+      flush(omMetadataManager, 2L, new S3DeleteRevokedSTSTokensRequest(
+          buildPurgeOmRequest(DeleteRevokedSTSTokensRequest.newBuilder().addOriginalAccessKeyId(originalAccessKeyId)))
           .validateAndUpdateCache(ozoneManager, 2L));
+
+      assertRevokedEntryFullyRemoved(omMetadataManager.getS3RevokedStsTokenTable(), originalAccessKeyId);
+    } finally {
+      omMetadataManager.stop();
+    }
+  }
+
+  @Test
+  public void testPurgeWithoutPurgeBeforeMillisDeletesNewerCutoff() throws Exception {
+    // A purge submitted without purgeBeforeMillis deletes a listed entry even if a newer
+    // cutoff was applied after the scan
+    final String originalAccessKeyId = "original-access-key-id";
+    final long olderCutoff = 1_700_000_000_000L;
+    final long newerCutoff = olderCutoff + TimeUnit.HOURS.toMillis(13);
+    final OmMetadataManagerImpl omMetadataManager = createMetadataManager();
+    try {
+      final OzoneManager ozoneManager = mockOzoneManager(omMetadataManager);
+      flush(omMetadataManager, 1L, revoke(ozoneManager, 1L, originalAccessKeyId, olderCutoff));
+      final OMClientResponse newerRevoke = revoke(ozoneManager, 2L, originalAccessKeyId, newerCutoff);
+      final OMClientResponse purge = new S3DeleteRevokedSTSTokensRequest(
+          buildPurgeOmRequest(DeleteRevokedSTSTokensRequest.newBuilder().addOriginalAccessKeyId(originalAccessKeyId)))
+          .validateAndUpdateCache(ozoneManager, 3L);
+      flush(omMetadataManager, 2L, newerRevoke);
+      flush(omMetadataManager, 3L, purge);
 
       assertRevokedEntryFullyRemoved(omMetadataManager.getS3RevokedStsTokenTable(), originalAccessKeyId);
     } finally {
@@ -465,8 +488,7 @@ public class TestS3RevokeSTSTokenRequest {
     try {
       final OzoneManager ozoneManager = mockOzoneManager(omMetadataManager);
       flush(omMetadataManager, 1L, revoke(ozoneManager, 1L, originalAccessKeyId, cutoff));
-      final OMRequest purgeOmRequest = buildPurgeOmRequest(
-          Collections.singletonList(originalAccessKeyId), Collections.singletonList(cutoff));
+      final OMRequest purgeOmRequest = buildPurgeOmRequest(Collections.singletonList(originalAccessKeyId), cutoff + 1);
       final OMClientResponse firstPurge = new S3DeleteRevokedSTSTokensRequest(purgeOmRequest)
           .validateAndUpdateCache(ozoneManager, 2L);
       final OMClientResponse secondPurge = new S3DeleteRevokedSTSTokensRequest(purgeOmRequest)
@@ -483,28 +505,48 @@ public class TestS3RevokeSTSTokenRequest {
   }
 
   @Test
-  public void testPurgeWithMismatchedCutoffsDeletesNothing() throws Exception {
-    // A cutoff list that does not match the key list is rejected with a status that does not terminate the OM,
-    // and no entry is deleted from the cache or the DB.
+  public void testPurgeDeletesReplacedCutoffThatIsAlsoExpired() throws Exception {
+    // A newer cutoff applied after the scan is still deleted when it is also older than purgeBeforeMillis, since no
+    // unexpired STS token can depend on it.
+    final String originalAccessKeyId = "original-access-key-id";
+    final long olderCutoff = 1_700_000_000_000L;
+    final long replacedCutoff = olderCutoff + TimeUnit.HOURS.toMillis(1);
+    final OmMetadataManagerImpl omMetadataManager = createMetadataManager();
+    try {
+      final OzoneManager ozoneManager = mockOzoneManager(omMetadataManager);
+      flush(omMetadataManager, 1L, revoke(ozoneManager, 1L, originalAccessKeyId, olderCutoff));
+      final OMClientResponse replacedRevoke = revoke(ozoneManager, 2L, originalAccessKeyId, replacedCutoff);
+      final OMClientResponse purge = new S3DeleteRevokedSTSTokensRequest(
+          buildPurgeOmRequest(Collections.singletonList(originalAccessKeyId), olderCutoff + TimeUnit.HOURS.toMillis(2)))
+          .validateAndUpdateCache(ozoneManager, 3L);
+
+      flush(omMetadataManager, 2L, replacedRevoke);
+      flush(omMetadataManager, 3L, purge);
+
+      assertRevokedEntryFullyRemoved(omMetadataManager.getS3RevokedStsTokenTable(), originalAccessKeyId);
+    } finally {
+      omMetadataManager.stop();
+    }
+  }
+
+  @Test
+  public void testPurgeKeepsCutoffEqualToPurgeBeforeMillis() throws Exception {
+    // Only cutoffs strictly older than purgeBeforeMillis are deleted, so a cutoff equal to it stays in the cache and
+    // the DB.
+    final String originalAccessKeyId = "original-access-key-id";
     final long cutoff = 1_700_000_000_000L;
     final OmMetadataManagerImpl omMetadataManager = createMetadataManager();
     try {
       final OzoneManager ozoneManager = mockOzoneManager(omMetadataManager);
-      flush(omMetadataManager, 1L, revoke(ozoneManager, 1L, "a", cutoff));
-      flush(omMetadataManager, 2L, revoke(ozoneManager, 2L, "b", cutoff));
-      // Note the size of the originalAccessKeyId list and the revocationCutoffTimeMillis list in the purge request
-      // below is not the same, i.e. mismatched therefore nothing gets deleted
+      flush(omMetadataManager, 1L, revoke(ozoneManager, 1L, originalAccessKeyId, cutoff));
       final OMClientResponse purge = new S3DeleteRevokedSTSTokensRequest(
-          buildPurgeOmRequest(Arrays.asList("a", "b"), Collections.singletonList(cutoff)))
-          .validateAndUpdateCache(ozoneManager, 3L);
-      flush(omMetadataManager, 3L, purge);
+          buildPurgeOmRequest(Collections.singletonList(originalAccessKeyId), cutoff))
+          .validateAndUpdateCache(ozoneManager, 2L);
+      flush(omMetadataManager, 2L, purge);
 
-      assertThat(purge.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.INVALID_REQUEST);
       final Table<String, Long> table = omMetadataManager.getS3RevokedStsTokenTable();
-      for (String originalAccessKeyId : Arrays.asList("a", "b")) {
-        assertThat(table.getIfExist(originalAccessKeyId)).as(originalAccessKeyId).isEqualTo(cutoff);
-        assertThat(table.getSkipCache(originalAccessKeyId)).as(originalAccessKeyId).isEqualTo(cutoff);
-      }
+      assertThat(table.getIfExist(originalAccessKeyId)).isEqualTo(cutoff);
+      assertThat(table.getSkipCache(originalAccessKeyId)).isEqualTo(cutoff);
     } finally {
       omMetadataManager.stop();
     }
@@ -545,13 +587,17 @@ public class TestS3RevokeSTSTokenRequest {
         .build();
   }
 
-  private static OMRequest buildPurgeOmRequest(List<String> originalAccessKeyIds, List<Long> revocationTimeMillis) {
+  private static OMRequest buildPurgeOmRequest(List<String> originalAccessKeyIds, long purgeBeforeMillis) {
+    return buildPurgeOmRequest(DeleteRevokedSTSTokensRequest.newBuilder()
+        .addAllOriginalAccessKeyId(originalAccessKeyIds)
+        .setPurgeBeforeMillis(purgeBeforeMillis));
+  }
+
+  private static OMRequest buildPurgeOmRequest(DeleteRevokedSTSTokensRequest.Builder purgeRequest) {
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
         .setCmdType(Type.DeleteRevokedSTSTokens)
-        .setDeleteRevokedSTSTokensRequest(DeleteRevokedSTSTokensRequest.newBuilder()
-            .addAllOriginalAccessKeyId(originalAccessKeyIds)
-            .addAllRevocationTimeMillis(revocationTimeMillis))
+        .setDeleteRevokedSTSTokensRequest(purgeRequest)
         .build();
   }
 

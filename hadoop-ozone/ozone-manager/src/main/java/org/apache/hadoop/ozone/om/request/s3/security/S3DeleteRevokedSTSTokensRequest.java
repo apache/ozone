@@ -17,12 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -44,8 +41,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles DeleteRevokedSTSTokens requests submitted by {@link RevokedSTSTokenCleanupService}.
- * Each request contains originalAccessKeyIds to remove from the revocation table, together with the cutoff the
- * cleanup scan read for each of them. An entry is removed only if its current cutoff still equals that value.
+ * Each request lists originalAccessKeyIds to remove from the revocation table. When {@code purgeBeforeMillis} is set,
+ * an entry is removed only if its current cutoff is older than that threshold. Requests without
+ * {@code purgeBeforeMillis} delete all listed ids.
  */
 public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
 
@@ -76,26 +74,21 @@ public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
     final OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
     final List<String> originalAccessKeyIds = request.getOriginalAccessKeyIdList();
-    final List<Long> revocationTimeMillisList = request.getRevocationTimeMillisList();
     final Table<String, Long> table = ozoneManager.getMetadataManager().getS3RevokedStsTokenTable();
     final List<String> deletedIds;
     try {
-      if (revocationTimeMillisList.isEmpty()) {
-        // Releases before cutoffs were added replicate requests with ids only.  Apply as they did, and add cache
-        // delete markers those releases omitted.
+      if (!request.hasPurgeBeforeMillis()) {
+        // Delete all listed ids if the request does not have purgeBeforeMillis
         deletedIds = originalAccessKeyIds;
-      } else if (revocationTimeMillisList.size() != originalAccessKeyIds.size()) {
-        // Validated at apply time, since this request is submitted to Ratis without preExecute.
-        // Uses INVALID_REQUEST rather than INTERNAL_ERROR, since the OM state machine terminates on INTERNAL_ERROR.
-        throw new OMException(
-            "Got " + revocationTimeMillisList.size() + " revocationTimeMillis for " + originalAccessKeyIds.size() +
-            " originalAccessKeyIds", INVALID_REQUEST);
       } else {
+        final long purgeBeforeMillis = request.getPurgeBeforeMillis();
         deletedIds = new ArrayList<>();
-        for (int i = 0; i < originalAccessKeyIds.size(); i++) {
-          // A cutoff written after the scan, such as a newer revocation of the same key, is kept
-          if (Objects.equals(revocationTimeMillisList.get(i), table.getIfExist(originalAccessKeyIds.get(i)))) {
-            deletedIds.add(originalAccessKeyIds.get(i));
+        for (String originalAccessKeyId : originalAccessKeyIds) {
+          final Long revocationTimeMillis = table.getIfExist(originalAccessKeyId);
+          // A cutoff written after the scan, such as a newer revocation of the same key, is kept unless it is also
+          // older than purgeBeforeMillis.
+          if (revocationTimeMillis != null && revocationTimeMillis < purgeBeforeMillis) {
+            deletedIds.add(originalAccessKeyId);
           }
         }
       }
@@ -103,10 +96,11 @@ public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
       return new S3DeleteRevokedSTSTokensResponse(null, createErrorOMResponse(omResponse, e));
     }
 
-    if (!revocationTimeMillisList.isEmpty() && deletedIds.size() < originalAccessKeyIds.size()) {
+    if (request.hasPurgeBeforeMillis() && deletedIds.size() < originalAccessKeyIds.size()) {
       LOG.info(
-          "Skipped {} of {} revoked STS token purge entries because the cutoff changed or the entry was " +
-          "already removed.", originalAccessKeyIds.size() - deletedIds.size(), originalAccessKeyIds.size());
+          "Skipped {} of {} revoked STS token purge entries because the cutoff is not older than the purge " +
+          "threshold or the entry was already removed.", originalAccessKeyIds.size() - deletedIds.size(),
+          originalAccessKeyIds.size());
     }
 
     // The full table cache only evicts delete markers, so without one a deleted key's old cutoff stays cached
