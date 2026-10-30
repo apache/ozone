@@ -60,7 +60,8 @@ public class OMQuotaRepairResponse extends OMClientResponse {
               omBucketInfo.getBucketName()), omBucketInfo);
     }
     for (OmVolumeArgs volArgs : volumeArgsMap.values()) {
-      metadataManager.getVolumeTable().putWithBatch(batchOp, volArgs.getVolume(), volArgs);
+      metadataManager.getVolumeTable().putWithBatch(batchOp,
+          metadataManager.getVolumeKey(volArgs.getVolume()), volArgs);
     }
   }
 }
