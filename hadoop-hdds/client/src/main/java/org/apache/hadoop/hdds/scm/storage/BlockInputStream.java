@@ -415,6 +415,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * without mutating this stream's cursor ({@code chunkIndex},
    * {@code blockPosition}) or the sequential chunk streams' buffered state.
    * Reuses each chunk's range reader, whose buffers and client references belong to the request.
+   * Takes this stream's lock only to initialize it or to refresh the block info after a read error,
+   * so it does not wait for a sequential read in progress.
+   * It does not check that this stream is open: {@link MultipartInputStream} checks that before it calls this method.
    *
    * @return bytes copied into {@code dst}, or {@link #EOF} at EOF
    */
@@ -430,19 +433,15 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (!initialized) {
       initialize();
     }
-    final long[] offsets;
-    final List<ChunkInputStream> streams;
-    final long blockLength;
-    synchronized (this) {
-      checkOpen();
-      if (chunkOffsets == null || blockData == null || blockRelativePosition >= length) {
-        return EOF;
-      }
-
-      offsets = chunkOffsets;
-      streams = chunkStreams;
-      blockLength = length;
+    // initialized stays false for a block with no chunks.
+    if (!initialized || blockRelativePosition >= length) {
+      return EOF;
     }
+
+    // initialize() sets these fields before it sets initialized, and nothing changes them after that.
+    final long[] offsets = chunkOffsets;
+    final List<ChunkInputStream> streams = chunkStreams;
+    final long blockLength = length;
 
     int index = MultipartInputStream.binarySearchOffsetIndex(offsets, blockRelativePosition);
 
@@ -466,7 +465,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private int readChunkAt(ChunkInputStream chunk, long chunkOffset, int readLength, ByteBuffer dst) throws IOException {
     int preadRetries = 0;
     while (true) {
-      checkOpen();
       final ByteBuffer target = dst.duplicate();
       target.limit(target.position() + readLength);
       final int numBytesRead;

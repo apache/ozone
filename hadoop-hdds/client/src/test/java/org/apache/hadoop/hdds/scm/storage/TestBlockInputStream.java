@@ -43,8 +43,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -549,6 +554,16 @@ public class TestBlockInputStream {
   }
 
   @Test
+  public void testPositionedReadOnBlockWithNoChunks() throws Exception {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    try (BlockInputStream subject = new DummyBlockInputStream(blockID, CHUNK_SIZE, pipeline, null, null,
+        refreshFunction, new ArrayList<>(), new HashMap<>(), clientConfig)) {
+      assertEquals(-1, subject.readPositioned(0, ByteBuffer.allocate(1)));
+    }
+  }
+
+  @Test
   public void testConcurrentPositionedRead() throws Exception {
     try (BlockInputStream largeBlockStream = createLargeBlockStream()) {
       largeBlockStream.initialize();
@@ -560,6 +575,54 @@ public class TestBlockInputStream {
                   + " but read " + read);
             }
           });
+    }
+  }
+
+  @Test
+  public void testPositionedReadDoesNotWaitForSequentialRead() throws Exception {
+    CountDownLatch sequentialReadStarted = new CountDownLatch(1);
+    CountDownLatch releaseSequentialRead = new CountDownLatch(1);
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    // The sequential read holds the BlockInputStream lock while the read of chunk-0 is blocked.
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    try (BlockInputStream subject = new DummyBlockInputStream(blockID, blockSize, pipeline, null, null,
+        refreshFunction, chunks, chunkDataMap, clientConfig) {
+      @Override
+      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+        if (!chunkInfo.getChunkName().equals("chunk-0")) {
+          return super.createChunkInputStream(chunkInfo);
+        }
+        return new DummyChunkInputStream(chunkInfo, null, null, false, chunkDataMap.get("chunk-0"), null) {
+          @Override
+          protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
+            sequentialReadStarted.countDown();
+            try {
+              releaseSequentialRead.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new IllegalStateException(e);
+            }
+            return super.readChunk(readChunkInfo);
+          }
+        };
+      }
+    }) {
+      try {
+        Future<Integer> sequentialRead = executor.submit(() -> subject.read(new byte[CHUNK_SIZE], 0, CHUNK_SIZE));
+        assertTrue(sequentialReadStarted.await(10, TimeUnit.SECONDS));
+
+        ByteBuffer buf = ByteBuffer.allocate(CHUNK_SIZE);
+        Future<Integer> positionedRead = executor.submit(() -> subject.readPositioned(2 * CHUNK_SIZE, buf));
+        assertEquals(CHUNK_SIZE, positionedRead.get(5, TimeUnit.SECONDS));
+        matchWithInputData(buf.array(), 2 * CHUNK_SIZE, CHUNK_SIZE);
+
+        releaseSequentialRead.countDown();
+        assertEquals(CHUNK_SIZE, sequentialRead.get(10, TimeUnit.SECONDS));
+      } finally {
+        releaseSequentialRead.countDown();
+        executor.shutdownNow();
+      }
     }
   }
 
