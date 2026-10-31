@@ -107,8 +107,8 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
       return null;
     }
     try {
-      Map<String, String> tagMap = getClientProtocol().getObjectTagging(
-          context.getVolume().getName(), context.getBucketName(), keyName);
+      Map<String, String> tagMap = getClientProtocol().getObjectTagging(null,
+          context.getBucketName(), keyName);
       getMetrics().updateGetObjectTaggingSuccessStats(context.getStartNanos());
       return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
     } catch (Exception e) {

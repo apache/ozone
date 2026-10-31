@@ -156,6 +156,26 @@ public class TestOMFailoverProxyProvider {
   }
 
   /**
+   * Tests waitTime with a single OM: Round Robin failover (e.g. on connection
+   * failure) selects the same OM again, and should not increase the wait time.
+   */
+  @Test
+  public void testWaitTimeWithSingleNode() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, DUMMY_NODE_ADDR);
+    provider = new HadoopRpcOMFailoverProxyProvider<>(conf, UserGroupInformation.getCurrentUser(), null,
+        OzoneManagerProtocolPB.class);
+
+    failoverToNextNode(3, waitBetweenRetries);
+    // Retry on the same OM based on response from OM, waitTime should increase.
+    failoverToSameNode(2);
+    // Round Robin failover again should reset waitTime.
+    failoverToNextNode(1, waitBetweenRetries);
+    // The next retry on the same OM should start from the base waitTime again.
+    failoverToSameNode(1);
+  }
+
+  /**
    * Ensure listener nodes are excluded from provider's proxy list.
    */
   @Test
