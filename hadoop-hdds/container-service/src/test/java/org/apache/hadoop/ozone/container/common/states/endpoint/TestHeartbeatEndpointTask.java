@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,10 +27,13 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.UnsafeByteOperations;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.OptionalLong;
@@ -56,6 +60,7 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
@@ -334,6 +339,84 @@ public class TestHeartbeatEndpointTask {
     assertFalse(heartbeat.hasContainerReport());
     assertEquals(0, heartbeat.getCommandStatusReportsCount());
     assertTrue(heartbeat.hasContainerActions());
+    // SCM processed the heartbeat, so the actions are not sent again
+    assertEquals(emptyList(), context.getPendingContainerAction(TEST_SCM_ENDPOINT, 10));
+  }
+
+  /** The container actions of a heartbeat that fails are sent again, like the CLOSE action for a full container. */
+  @Test
+  public void testContainerActionsPutBackOnHeartbeatFailure() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    StateContext context = newContextWithContainerAction(conf);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenThrow(new IOException("SCM is not reachable"))
+        .thenAnswer(invocation -> heartbeatResponse(invocation.getArgument(0)));
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(conf, context, scm);
+
+    endpointTask.call();
+    endpointTask.call();
+
+    assertContainerActionSentTwice(argument.getAllValues());
+    assertEquals(emptyList(), context.getPendingContainerAction(TEST_SCM_ENDPOINT, 10));
+  }
+
+  /** SCM does not process the heartbeat of a datanode it asks to re-register, so its container actions are resent. */
+  @Test
+  public void testContainerActionsPutBackOnReregisterCommand() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    StateContext context = newContextWithContainerAction(conf);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    final SCMCommandProto reregister = SCMCommandProto.newBuilder()
+        .setCommandType(SCMCommandProto.Type.reregisterCommand).build();
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation -> heartbeatResponse(invocation.getArgument(0), reregister))
+        .thenAnswer(invocation -> heartbeatResponse(invocation.getArgument(0)));
+    EndpointStateMachine endpointStateMachine = mock(EndpointStateMachine.class);
+    when(endpointStateMachine.getEndPoint()).thenReturn(scm);
+    when(endpointStateMachine.getAddress()).thenReturn(TEST_SCM_ENDPOINT);
+    when(endpointStateMachine.getState()).thenReturn(EndPointStates.HEARTBEAT);
+    HeartbeatEndpointTask endpointTask = HeartbeatEndpointTask.newBuilder()
+        .setConfig(conf)
+        .setContext(context)
+        .setEndpointStateMachine(endpointStateMachine)
+        .build();
+
+    endpointTask.call();
+    verify(endpointStateMachine).setState(EndPointStates.GETVERSION);
+    endpointTask.call();
+
+    assertContainerActionSentTwice(argument.getAllValues());
+    assertEquals(emptyList(), context.getPendingContainerAction(TEST_SCM_ENDPOINT, 10));
+  }
+
+  private StateContext newContextWithContainerAction(OzoneConfiguration conf) {
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanodeStateMachine, "");
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    context.addContainerAction(getContainerAction());
+    return context;
+  }
+
+  private static SCMHeartbeatResponseProto heartbeatResponse(SCMHeartbeatRequestProto request,
+      SCMCommandProto... commands) {
+    return SCMHeartbeatResponseProto.newBuilder()
+        .setDatanodeUUID(request.getDatanodeDetails().getUuid())
+        .addAllCommands(Arrays.asList(commands))
+        .build();
+  }
+
+  private void assertContainerActionSentTwice(List<SCMHeartbeatRequestProto> heartbeats) {
+    assertEquals(2, heartbeats.size());
+    for (SCMHeartbeatRequestProto heartbeat : heartbeats) {
+      assertEquals(singletonList(getContainerAction()), heartbeat.getContainerActions().getContainerActionsList());
+    }
   }
 
   @Test

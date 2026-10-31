@@ -30,6 +30,7 @@ import com.google.protobuf.Message;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -119,7 +120,7 @@ public class StateContext {
   private final AtomicReference<Message> pipelineReports;
   // Incremental reports are queued in the map below
   private final Map<HostAndPort, List<Message>> incrementalReportsQueue;
-  private final Map<HostAndPort, Queue<ContainerAction>> containerActions;
+  private final Map<HostAndPort, Deque<ContainerAction>> containerActions;
   private final Map<HostAndPort, PipelineActionMap> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
@@ -524,6 +525,28 @@ public class StateContext {
         }
       }
       return containerActionList;
+    }
+  }
+
+  /**
+   * Adds the ContainerActions that SCM did not process back to the front of the endpoint's queue, in their original
+   * order, so that the next heartbeat sends them again. Actions that are queued again already are skipped.
+   *
+   * @param actionsToPutBack actions taken from the queue by {@link #getPendingContainerAction}
+   * @param endpoint the SCM the actions were sent to
+   */
+  public void putBackContainerActions(List<ContainerAction> actionsToPutBack, HostAndPort endpoint) {
+    synchronized (containerActions) {
+      final Deque<ContainerAction> actions = containerActions.get(endpoint);
+      if (actions == null) {
+        return;
+      }
+      for (int i = actionsToPutBack.size() - 1; i >= 0; i--) {
+        final ContainerAction action = actionsToPutBack.get(i);
+        if (!actions.contains(action)) {
+          actions.addFirst(action);
+        }
+      }
     }
   }
 

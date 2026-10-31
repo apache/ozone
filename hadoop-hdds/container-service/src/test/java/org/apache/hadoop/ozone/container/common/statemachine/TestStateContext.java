@@ -503,6 +503,36 @@ public class TestStateContext {
     assertEquals(1, containerActions.size());
   }
 
+  @Test
+  public void testPutBackContainerActions() {
+    StateContext stateContext = new StateContext(new OzoneConfiguration(),
+        DatanodeStates.getInitState(), mock(DatanodeStateMachine.class), "");
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9001);
+    stateContext.addEndpoint(scm1);
+    stateContext.addEndpoint(scm2);
+    final ContainerAction close1 = ContainerAction.newBuilder().setAction(CLOSE).setContainerID(1L).build();
+    final ContainerAction close2 = ContainerAction.newBuilder().setAction(CLOSE).setContainerID(2L).build();
+    final ContainerAction close3 = ContainerAction.newBuilder().setAction(CLOSE).setContainerID(3L).build();
+    stateContext.addContainerAction(close1);
+    stateContext.addContainerAction(close2);
+
+    final List<ContainerAction> sent = stateContext.getPendingContainerAction(scm1, 10);
+    assertEquals(Arrays.asList(close1, close2), sent);
+    // while the heartbeat is in flight, writes queue a new action and the same action again
+    stateContext.addContainerActionIfAbsent(close3);
+    stateContext.addContainerActionIfAbsent(close2);
+
+    stateContext.putBackContainerActions(sent, scm1);
+    // the put-back actions go first, in their original order, and are not queued twice
+    assertEquals(Arrays.asList(close1, close3, close2), stateContext.getPendingContainerAction(scm1, 10));
+    // other SCMs are not affected
+    assertEquals(Arrays.asList(close1, close2, close3), stateContext.getPendingContainerAction(scm2, 10));
+
+    // an endpoint that is not (or no longer) added is ignored
+    stateContext.putBackContainerActions(sent, new HostAndPort("scm3", 9001));
+  }
+
   /**
    * Verifies that {@code StateContext} does not allow going back to running
    * state after shutdown.  It creates a task that just waits until the state
