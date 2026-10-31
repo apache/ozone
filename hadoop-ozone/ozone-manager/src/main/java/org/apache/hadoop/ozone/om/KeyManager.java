@@ -378,6 +378,11 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   SstFilteringService getSnapshotSstFilteringService();
 
   /**
+   * Restart the snapshot SST filtering service with the interval in {@code conf}; it stays stopped if disabled.
+   */
+  void restartSnapshotSstFilteringService(OzoneConfiguration conf);
+
+  /**
    * Returns the instance of Snapshot Defrag service.
    * @return Background service.
    */
