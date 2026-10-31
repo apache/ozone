@@ -292,6 +292,11 @@ public class TestContainerBalancer {
     stopBalancer();
     assertThat(logCapturer.getOutput()).contains("Container Balancer was interrupted during the delayed start.");
     assertThat(logCapturer.getOutput()).doesNotContain("Container Balancer is stopped abnormally");
+
+    ContainerBalancerStatusInfo statusInfo = containerBalancer.getBalancerStatusInfo();
+    assertNotNull(statusInfo);
+    assertEquals(ContainerBalancerStopReason.USER_REQUESTED.name(), statusInfo.getStopReason());
+    assertEquals(ContainerBalancerStopReason.USER_REQUESTED.getMessage(), statusInfo.getStopMessage());
   }
 
   @Test
