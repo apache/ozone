@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerBlocksInfoWrapper;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -52,7 +53,10 @@ import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -70,11 +74,16 @@ public class TestBlocksEndPoint {
   private BlocksEndPoint blocksEndPoint;
   private boolean isSetupDone = false;
   private  DBStore scmDBStore;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconStorageContainerManagerFacade reconStorageContainerManager;
+  private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider reconReplicaHistoryDBProvider;
 
   private void initializeInjector() throws Exception {
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    omMetadataManager = initializeNewOmMetadataManager(
+        Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
 
     ReconTestInjector reconTestInjector =
@@ -93,8 +102,10 @@ public class TestBlocksEndPoint {
             .addBinding(BlocksEndPoint.class)
             .build();
 
-    ReconStorageContainerManagerFacade reconStorageContainerManager =
-        reconTestInjector.getInstance(ReconStorageContainerManagerFacade.class);
+    reconStorageContainerManager = reconTestInjector.getInstance(ReconStorageContainerManagerFacade.class);
+    // Already provisioned as dependencies of the facade.
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+    reconReplicaHistoryDBProvider = reconTestInjector.getInstance(ReconReplicaHistoryDBProvider.class);
     reconContainerManager = (ReconContainerManager)
         reconStorageContainerManager.getContainerManager();
     reconPipelineManager = (ReconPipelineManager)
@@ -127,6 +138,25 @@ public class TestBlocksEndPoint {
         getTestContainer(HddsProtos.LifeCycleState.OPEN, 106L));
     reconContainerManager.addNewContainer(
         getTestContainer(HddsProtos.LifeCycleState.OPEN, 107L));
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconStorageContainerManager != null) {
+      reconStorageContainerManager.stop();
+    }
+    if (reconReplicaHistoryDBProvider != null) {
+      reconReplicaHistoryDBProvider.close();
+    }
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   @Test

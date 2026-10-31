@@ -46,6 +46,8 @@ import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -61,20 +63,40 @@ class TestReconStorageContainerManagerFacade {
 
   private final List<ReconScmContainerSyncMetrics> metricsToUnregister =
       new ArrayList<>();
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconStorageContainerManagerFacade reconScmFacade;
+  private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
 
   @AfterEach
-  void tearDown() {
+  void tearDown() throws Exception {
     metricsToUnregister.forEach(ReconScmContainerSyncMetrics::unRegister);
     metricsToUnregister.clear();
+    if (reconScmFacade != null) {
+      reconScmFacade.stop();
+    }
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (replicaHistoryDBProvider != null) {
+      replicaHistoryDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   @Test
   void testScmSnapshotDbIsOpenedAtCanonicalReconPath() throws Exception {
     StorageContainerServiceProvider scmServiceProvider =
         mock(StorageContainerServiceProviderImpl.class);
-    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
+    omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("OmMetadata")).toFile());
-    ReconOMMetadataManager reconOMMetadataManager =
+    reconOMMetadataManager =
         getTestReconOmMetadataManager(omMetadataManager,
             Files.createDirectory(temporaryFolder.resolve("ReconOmMetadata"))
                 .toFile());
@@ -92,6 +114,9 @@ class TestReconStorageContainerManagerFacade {
 
     ReconStorageContainerManagerFacade reconScm =
         injector.getInstance(ReconStorageContainerManagerFacade.class);
+    reconScmFacade = reconScm;
+    reconDBProvider = injector.getInstance(ReconDBProvider.class);
+    replicaHistoryDBProvider = injector.getInstance(ReconReplicaHistoryDBProvider.class);
     ReconContainerManager containerManager = (ReconContainerManager) reconScm.getContainerManager();
     DatanodeID historyDatanode = DatanodeID.randomID();
     containerManager.upsertContainerHistory(1L, historyDatanode, 10L, 20L,
@@ -184,9 +209,9 @@ class TestReconStorageContainerManagerFacade {
       throws Exception {
     StorageContainerServiceProvider scmServiceProvider =
         mock(StorageContainerServiceProviderImpl.class);
-    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
+    omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("OmMetadata")).toFile());
-    ReconOMMetadataManager reconOMMetadataManager =
+    reconOMMetadataManager =
         getTestReconOmMetadataManager(omMetadataManager,
             Files.createDirectory(temporaryFolder.resolve("ReconOmMetadata"))
                 .toFile());
@@ -203,6 +228,9 @@ class TestReconStorageContainerManagerFacade {
             .build();
     ReconStorageContainerManagerFacade reconScm =
         injector.getInstance(ReconStorageContainerManagerFacade.class);
+    reconScmFacade = reconScm;
+    reconDBProvider = injector.getInstance(ReconDBProvider.class);
+    replicaHistoryDBProvider = injector.getInstance(ReconReplicaHistoryDBProvider.class);
     metricsToUnregister.add(getContainerSyncMetrics(reconScm));
     return reconScm;
   }

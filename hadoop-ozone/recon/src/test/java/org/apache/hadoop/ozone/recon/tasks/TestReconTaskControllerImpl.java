@@ -77,6 +77,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private MockClock testClock;
+  private OMMetadataManager realOmMetadataManager;
+  private ReconOMMetadataManager realReconOMMetadataManager;
 
   public TestReconTaskControllerImpl() {
     super();
@@ -107,9 +109,15 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws Exception {
     if (reconTaskController != null) {
       reconTaskController.stop();
+    }
+    if (realReconOMMetadataManager != null) {
+      realReconOMMetadataManager.stop();
+    }
+    if (realOmMetadataManager != null) {
+      realOmMetadataManager.stop();
     }
   }
 
@@ -610,13 +618,12 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
 
     // Real source OM DB + real RocksDB-backed Recon OM metadata manager.
-    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(dirOmMetadata);
-    ReconOMMetadataManager reconOMMetadataManager =
-        getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
-    controllerImpl.updateOMMetadataManager(reconOMMetadataManager);
+    realOmMetadataManager = initializeNewOmMetadataManager(dirOmMetadata);
+    realReconOMMetadataManager = getTestReconOmMetadataManager(realOmMetadataManager, dirReconMetadata);
+    controllerImpl.updateOMMetadataManager(realReconOMMetadataManager);
 
     // Real checkpoint creation -> temp-recon-reinit-checkpoint_<UUID>/ on disk.
-    ReconOMMetadataManager checkpointed = controllerImpl.createOMCheckpoint(reconOMMetadataManager);
+    ReconOMMetadataManager checkpointed = controllerImpl.createOMCheckpoint(realReconOMMetadataManager);
     File checkpointDir = checkpointed.getStore().getDbLocation().getParentFile();
     assertTrue(checkpointDir.exists(), "checkpoint dir should exist after creation");
     assertTrue(checkpointDir.getName().startsWith("temp-recon-reinit-checkpoint"),
