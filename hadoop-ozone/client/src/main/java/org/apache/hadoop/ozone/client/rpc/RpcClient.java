@@ -1834,6 +1834,9 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive,
       String expectedETag) throws IOException {
+    if (expectedETag != null && !OzoneManagerVersion.CONDITIONAL_DELETE.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support conditional key deletion.");
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
@@ -2373,6 +2376,11 @@ public class RpcClient implements ClientProtocol {
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
       String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
       String excludedETag) throws IOException {
+    // Conditional MPU completion and atomic create-if-absent first shipped in 2.2.0.
+    if ((expectedDataGeneration != null || expectedETag != null)
+        && !OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support conditional multipart upload completion.");
+    }
     if (excludedETag != null) {
       checkIfNoneMatchETagSupport();
     }

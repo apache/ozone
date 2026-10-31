@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -80,6 +81,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     Objects.requireNonNull(deleteKeyRequest, "deleteKeyRequest == null");
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
+    if (keyArgs.hasExpectedETag()) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.CONDITIONAL_DELETE);
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    }
     String keyPath = keyArgs.getKeyName();
 
     OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyPath);

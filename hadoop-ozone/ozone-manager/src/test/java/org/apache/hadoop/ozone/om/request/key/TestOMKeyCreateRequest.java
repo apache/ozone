@@ -48,6 +48,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -124,6 +125,35 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         new Object[]{true, false},
         new Object[]{false, true},
         new Object[]{false, false});
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {"etag,NULL,NULL,ATOMIC_REWRITE_KEY", "*,NULL,NULL,ATOMIC_REWRITE_KEY",
+      "NULL,1,NULL,ATOMIC_REWRITE_KEY", "NULL,0,NULL,ATOMIC_CREATE_IF_NOT_EXISTS",
+      "etag,0,NULL,ATOMIC_REWRITE_KEY", "etag,0,NULL,ATOMIC_CREATE_IF_NOT_EXISTS",
+      "NULL,NULL,etag,S3_IF_NONE_MATCH_ETAG"}, nullValues = "NULL")
+  public void testPreExecuteRefusesDisabledConditionalCreate(String etag, Long generation, String excludedETag,
+      OzoneManagerVersion feature) throws Exception {
+    doThrow(new OMException("disabled", OMException.ResultCodes.NOT_SUPPORTED_OPERATION))
+        .when(ozoneManager).checkFeatureEnabled(feature);
+    OMRequest request = createKeyRequest(false, 0, 0L, replicationConfig, null);
+    KeyArgs.Builder args = request.getCreateKeyRequest().getKeyArgs().toBuilder();
+    if (etag != null) {
+      args.setExpectedETag(etag);
+    }
+    if (generation != null) {
+      args.setExpectedDataGeneration(generation);
+    }
+    if (excludedETag != null) {
+      args.setExcludedETag(excludedETag);
+    }
+    OMRequest conditional = request.toBuilder()
+        .setCreateKeyRequest(request.getCreateKeyRequest().toBuilder().setKeyArgs(args)).build();
+
+    OMException error = assertThrows(OMException.class,
+        () -> getOMKeyCreateRequest(conditional).preExecute(ozoneManager));
+    assertThat(error.getResult()).isEqualTo(OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    assertThat(getOMKeyCreateRequest(request).preExecute(ozoneManager).hasCreateKeyRequest()).isTrue();
   }
 
   @Test

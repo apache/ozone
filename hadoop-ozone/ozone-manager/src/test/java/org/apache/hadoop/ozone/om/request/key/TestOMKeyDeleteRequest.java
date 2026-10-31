@@ -17,15 +17,18 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -68,6 +71,23 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
         () -> deleteKeyRequest.preExecute(ozoneManager));
     assertEquals(expectedExceptionMessage, omException.getMessage());
     assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, omException.getResult());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"etag,CONDITIONAL_DELETE", "*,CONDITIONAL_DELETE", "etag,ATOMIC_REWRITE_KEY", "*,ATOMIC_REWRITE_KEY"})
+  public void testPreExecuteRefusesDisabledConditionalDelete(String etag, OzoneManagerVersion feature)
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    addKeyToTable();
+    doThrow(new OMException("disabled", OMException.ResultCodes.NOT_SUPPORTED_OPERATION))
+        .when(ozoneManager).checkFeatureEnabled(feature);
+
+    OMException error = assertThrows(OMException.class,
+        () -> getOmKeyDeleteRequest(createDeleteKeyRequestWithExpectedETag(etag)).preExecute(ozoneManager));
+    assertThat(error.getResult()).isEqualTo(OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+
+    OMRequest unconditional = getOmKeyDeleteRequest(createDeleteKeyRequest()).preExecute(ozoneManager);
+    assertThat(unconditional.getDeleteKeyRequest().getKeyArgs().hasExpectedETag()).isFalse();
   }
 
   @Test
