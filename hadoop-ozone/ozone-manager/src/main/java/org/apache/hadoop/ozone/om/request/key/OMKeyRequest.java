@@ -1392,6 +1392,20 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
+  protected void checkConditionalWriteEnabled(OzoneManager ozoneManager, KeyArgs keyArgs) throws OMException {
+    if (keyArgs.hasExcludedETag()) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
+    }
+    if (keyArgs.hasExpectedDataGeneration()
+        && keyArgs.getExpectedDataGeneration() == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
+    }
+    if (keyArgs.hasExpectedETag() || (keyArgs.hasExpectedDataGeneration()
+        && keyArgs.getExpectedDataGeneration() != OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT)) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    }
+  }
+
   /**
    * Validates atomic rewrite conditions for conditional writes.
    * <p>
