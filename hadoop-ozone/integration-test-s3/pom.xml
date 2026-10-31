@@ -73,6 +73,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-client</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
       <scope>test</scope>
     </dependency>
@@ -110,6 +115,11 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-integration-test</artifactId>
       <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-interface-client</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
