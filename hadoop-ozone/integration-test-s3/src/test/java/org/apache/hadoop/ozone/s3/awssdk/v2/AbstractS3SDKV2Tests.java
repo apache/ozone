@@ -756,6 +756,23 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testAbortMultipartUploadWithEmptyUploadIdKeepsObject() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    PutObjectResponse putResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("bar"));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.abortMultipartUpload(b -> b.bucket(bucketName).key(keyName).uploadId("")));
+
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchUpload", exception.awsErrorDetails().errorCode());
+    HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals(putResponse.eTag(), headObjectResponse.eTag());
+  }
+
+  @Test
   public void testGetObjectIfMatch() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
