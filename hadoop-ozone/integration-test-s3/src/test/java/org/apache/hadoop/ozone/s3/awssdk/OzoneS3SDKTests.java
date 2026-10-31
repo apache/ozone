@@ -26,9 +26,23 @@ import org.apache.hadoop.ozone.s3.S3GatewayService;
 import org.apache.hadoop.ozone.s3.awssdk.v1.AbstractS3SDKV1Tests;
 import org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests;
 import org.apache.ozone.test.ClusterForTests;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.TestInstance;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class OzoneS3SDKTests extends ClusterForTests<MiniOzoneCluster> {
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
 
   @Override
   protected OzoneConfiguration createOzoneConfig() {

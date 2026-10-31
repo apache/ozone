@@ -102,8 +102,8 @@ import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -241,7 +241,7 @@ import software.amazon.awssdk.utils.IoUtils;
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonHATests.TestCase {
+public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements ClusterForTests.TestCase {
 
   /**
    * Test-only key for the {@code host:port} http address of a gateway, outside the proxy, that has

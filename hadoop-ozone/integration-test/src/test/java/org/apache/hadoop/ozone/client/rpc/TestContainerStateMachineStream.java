@@ -40,7 +40,7 @@ import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Tests the containerStateMachine stream handling.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestContainerStateMachineStream implements NonHATests.TestCase {
+public abstract class TestContainerStateMachineStream implements ClusterForTests.TestCase {
   private OzoneClient client;
   private String volumeName;
   private String bucketName;
