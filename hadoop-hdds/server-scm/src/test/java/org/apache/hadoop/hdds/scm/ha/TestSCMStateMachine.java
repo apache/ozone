@@ -265,6 +265,16 @@ public class TestSCMStateMachine {
   }
 
   @Test
+  void testBootstrapStateMachineSkipsApplyTransaction() throws Exception {
+    try (SCMStateMachine bootstrap = new SCMStateMachine()) {
+      CompletableFuture<Message> future = bootstrap.applyTransaction(newTransaction(RequestType.CONTAINER, 1));
+
+      assertTrue(future.isDone());
+      assertThat(future.get()).isSameAs(Message.EMPTY);
+    }
+  }
+
+  @Test
   void testAlreadyCaughtUpStartsDNServerExactlyOnce() throws Exception {
     commitIndexAvailable.set(true);
 
