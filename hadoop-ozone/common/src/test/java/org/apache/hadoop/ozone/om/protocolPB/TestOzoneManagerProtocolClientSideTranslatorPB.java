@@ -52,6 +52,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQu
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 class TestOzoneManagerProtocolClientSideTranslatorPB {
@@ -230,6 +232,29 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
 
     assertThat(transport.getLastRequest().getCmdType()).isEqualTo(Type.AbortMultiPartUpload);
     assertThat(transport.getLastRequest().getAssumeS3Context()).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void deleteKeySetsS3Context(boolean assumeS3Context) throws IOException {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("s3v")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setAssumeS3Context(assumeS3Context)
+        .setExpectedETag("etag")
+        .build();
+
+    client.deleteKey(keyArgs);
+
+    OMRequest request = transport.getLastRequest();
+    assertThat(request.getCmdType()).isEqualTo(Type.DeleteKey);
+    assertThat(request.getAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.hasAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.getDeleteKeyRequest().getKeyArgs().getExpectedETag()).isEqualTo("etag");
   }
 
   @Test
