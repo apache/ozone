@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 
-import java.util.Objects;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
@@ -165,8 +164,9 @@ public interface ReplicationConfig {
       type = ReplicationType.valueOf(
           config.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
     }
-    replication = Objects.toString(replication,
-        config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
+    if (replication == null) {
+      replication = config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
+    }
 
     return parseWithoutFallback(type, replication, config);
   }
