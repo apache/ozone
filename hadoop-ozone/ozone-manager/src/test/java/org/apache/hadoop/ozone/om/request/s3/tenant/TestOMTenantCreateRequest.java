@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,6 +34,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -52,12 +54,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateT
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests create tenant request.
@@ -131,6 +136,55 @@ public class TestOMTenantCreateRequest {
     assertEquals(Status.OK, omResponse.getStatus());
     assertNotNull(omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(tenantId)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"username", "username@EXAMPLE.COM"})
+  public void testValidateAndUpdateCacheAddsVolumeToOwnerVolumeList(String userName) throws Exception {
+    final String ownerName = "username";
+    final String existingVolume = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeToDB(existingVolume, ownerName, omMetadataManager);
+    OMRequestTestUtils.addUserToDB(existingVolume, ownerName, omMetadataManager);
+
+    final String tenantId = UUID.randomUUID().toString();
+    OMClientResponse omClientResponse = createTenant(tenantId, userName, ownerName);
+    assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
+
+    final String ownerKey = omMetadataManager.getUserKey(ownerName);
+    assertThat(omMetadataManager.getUserTable().get(ownerKey).getVolumeNamesList())
+        .containsExactlyInAnyOrder(existingVolume, tenantId);
+
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      omClientResponse.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+    assertThat(omMetadataManager.getUserTable().getSkipCache(ownerKey).getVolumeNamesList())
+        .containsExactlyInAnyOrder(existingVolume, tenantId);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"username", "username@EXAMPLE.COM"})
+  public void testValidateAndUpdateCacheEnforcesOwnerVolumeLimit(String userName) throws Exception {
+    when(ozoneManager.getMaxUserVolumeCount()).thenReturn(1L);
+    final String ownerName = "username";
+    final String existingVolume = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeToDB(existingVolume, ownerName, omMetadataManager);
+    OMRequestTestUtils.addUserToDB(existingVolume, ownerName, omMetadataManager);
+
+    OMClientResponse omClientResponse = createTenant(UUID.randomUUID().toString(), userName, ownerName);
+    assertEquals(Status.USER_TOO_MANY_VOLUMES, omClientResponse.getOMResponse().getStatus());
+    assertThat(omMetadataManager.getUserTable().get(omMetadataManager.getUserKey(ownerName)).getVolumeNamesList())
+        .containsExactly(existingVolume);
+  }
+
+  private OMClientResponse createTenant(String tenantId, String userName, String ownerName) throws IOException {
+    OMRequest originalRequest = OMRequestTestUtils.createTenantRequest(tenantId, false).toBuilder()
+        .setUserInfo(UserInfo.newBuilder().setUserName(userName))
+        .build();
+    OMTenantCreateRequest omTenantCreateRequest = spy(new OMTenantCreateRequest(originalRequest));
+    doReturn(ownerName).when(omTenantCreateRequest).getUserName();
+    OMRequest modifiedRequest = omTenantCreateRequest.preExecute(ozoneManager);
+    return new OMTenantCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 1L);
   }
 
   @Test
