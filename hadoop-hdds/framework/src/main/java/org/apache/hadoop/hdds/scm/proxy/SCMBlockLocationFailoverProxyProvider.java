@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.proxy;
 
+import javax.net.SocketFactory;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
@@ -32,7 +33,12 @@ public class SCMBlockLocationFailoverProxyProvider extends
       LoggerFactory.getLogger(SCMBlockLocationFailoverProxyProvider.class);
 
   public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {
-    super(ScmBlockLocationProtocolPB.class, conf, null);
+    this(conf, null);
+  }
+
+  public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf,
+      SocketFactory socketFactory) {
+    super(ScmBlockLocationProtocolPB.class, conf, null, socketFactory);
   }
 
   @Override
@@ -45,4 +51,3 @@ public class SCMBlockLocationFailoverProxyProvider extends
     return scmNodeInfo.getBlockClientAddress();
   }
 }
-
