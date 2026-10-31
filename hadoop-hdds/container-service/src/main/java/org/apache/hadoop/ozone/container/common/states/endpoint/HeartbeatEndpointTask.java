@@ -152,12 +152,17 @@ public class HeartbeatEndpointTask
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
           .sendHeartbeat(request);
       processResponse(response, datanodeDetailsProto);
+      if (hasReregisterCommand(response)) {
+        // SCM does not process heartbeats from a datanode it asks to re-register
+        putBackContainerActions(requestBuilder);
+      }
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
     } catch (IOException ex) {
       Preconditions.checkState(requestBuilder != null);
-      // put back the reports which failed to be sent
+      // put back the reports and actions which failed to be sent
       putBackIncrementalReports(requestBuilder);
+      putBackContainerActions(requestBuilder);
       rpcEndpoint.logIfNeeded(ex);
       maybeRefreshScmAddress(ex);
     } finally {
@@ -200,6 +205,26 @@ public class HeartbeatEndpointTask
       reports.addAll(requestBuilder.getIncrementalContainerReportList());
     }
     context.putBackReports(reports, rpcEndpoint.getAddress());
+  }
+
+  /**
+   * Container actions are only created again by a later write, for example the CLOSE action for a full container,
+   * so the ones SCM did not process must be sent again.
+   */
+  private void putBackContainerActions(SCMHeartbeatRequestProto.Builder requestBuilder) {
+    if (requestBuilder.hasContainerActions()) {
+      context.putBackContainerActions(requestBuilder.getContainerActions().getContainerActionsList(),
+          rpcEndpoint.getAddress());
+    }
+  }
+
+  private static boolean hasReregisterCommand(SCMHeartbeatResponseProto response) {
+    for (SCMCommandProto command : response.getCommandsList()) {
+      if (command.getCommandType() == SCMCommandProto.Type.reregisterCommand) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
