@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ORIGIN_NODE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ORIGIN_PIPELINE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STATE;
 
+import com.facebook.infer.annotation.ThreadSafe;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
@@ -56,6 +57,7 @@ import org.yaml.snakeyaml.Yaml;
  * ContainerData is the in-memory representation of container metadata and is
  * represented on disk by the .container file.
  */
+@ThreadSafe
 public abstract class ContainerData {
 
   //Type of the container.

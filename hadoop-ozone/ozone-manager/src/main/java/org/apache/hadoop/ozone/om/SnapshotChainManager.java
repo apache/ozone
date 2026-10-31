@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.facebook.infer.annotation.ThreadSafe;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -47,6 +48,7 @@ import org.slf4j.LoggerFactory;
  * On start, the snapshot chains are initialized from the on disk
  * SnapshotInfoTable from the OM RocksDB.
  */
+@ThreadSafe
 public class SnapshotChainManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotChainManager.class);

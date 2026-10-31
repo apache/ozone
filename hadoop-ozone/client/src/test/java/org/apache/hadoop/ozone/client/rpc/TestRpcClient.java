@@ -38,13 +38,16 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import javax.crypto.Cipher;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -360,6 +363,16 @@ public class TestRpcClient {
         getOmVersion(serviceInfoEx(
             om(OzoneManagerVersion.UNKNOWN_VERSION),
             om(OzoneManagerVersion.UNKNOWN_VERSION))));
+  }
+
+  @Test
+  public void testGetGDPRSymmetricKeyRejectsIncompleteMetadata() {
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put(OzoneConsts.GDPR_FLAG, Boolean.TRUE.toString());
+
+    IOException ex = assertThrows(IOException.class,
+        () -> RpcClient.getGDPRSymmetricKey(metadata, Cipher.DECRYPT_MODE));
+    assertThat(ex).hasMessage("GDPR metadata is missing secret or algorithm");
   }
 
   @Test

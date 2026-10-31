@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
+import com.facebook.infer.annotation.ThreadSafe;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -119,6 +120,7 @@ import org.slf4j.LoggerFactory;
  * get functions in this file as a snap-shot of information that is inconsistent
  * as soon as you read it.
  */
+@ThreadSafe
 public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSubscriber {
 
   private static final Logger LOG =
