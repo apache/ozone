@@ -651,12 +651,8 @@ public class PipelineManagerImpl implements PipelineManager {
     }
   }
 
-  /**
-   * @param pipeline The pipeline to check
-   * @return True if the pipeline is open and contains unregistered nodes. False
-   *         otherwise.
-   */
-  private boolean isOpenWithUnregisteredNodes(Pipeline pipeline) {
+  @Override
+  public boolean isOpenWithUnregisteredNodes(Pipeline pipeline) {
     if (!pipeline.isOpen()) {
       return false;
     }

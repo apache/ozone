@@ -462,6 +462,29 @@ public class TestWritableECContainerProvider {
     }
   }
 
+  /**
+   * A pipeline reloaded from the SCM DB can list a datanode that has not registered since SCM started. It must not
+   * be handed out for writes, and a different pipeline must be used instead.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testPipelineWithUnregisteredNodeIsNotReturned(PipelineChoosePolicy policy) throws IOException {
+    provider = createSubject(policy);
+    Set<ContainerInfo> allocatedContainers = new HashSet<>();
+    for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
+      allocatedContainers.add(provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
+    }
+    ContainerInfo unregistered = allocatedContainers.iterator().next();
+    Pipeline unregisteredPipeline = pipelineManager.getPipeline(unregistered.getPipelineID());
+    ((MockPipelineManager) pipelineManager).setNodeUnregistered(unregisteredPipeline.getNodes().get(0));
+
+    for (int i = 0; i < 20; i++) {
+      ContainerInfo container = provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      assertNotEquals(unregistered.getPipelineID(), container.getPipelineID(),
+          "Returned a pipeline with an unregistered node");
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("policies")
   public void testPipelineOpenButContainerRemovedFromIt(

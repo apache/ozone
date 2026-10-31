@@ -85,6 +85,41 @@ class TestWritableRatisContainerProvider {
   }
 
   @RepeatedTest(100)
+  void skipsPipelineWithUnregisteredNodes() throws Exception {
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    ContainerInfo existingContainer = pipelineHasContainer(pipeline);
+
+    Pipeline pipelineWithUnregisteredNode = MockPipeline.createPipeline(3);
+    pipelineHasContainer(pipelineWithUnregisteredNode);
+    existingPipelines(pipelineWithUnregisteredNode, pipeline);
+    when(pipelineManager.isOpenWithUnregisteredNodes(pipelineWithUnregisteredNode)).thenReturn(true);
+
+    ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
+
+    assertSame(existingContainer, container);
+    verifyPipelineNotCreated();
+  }
+
+  @Test
+  void createsNewContainerIfOnlyPipelineHasUnregisteredNodes() throws Exception {
+    Pipeline pipelineWithUnregisteredNode = MockPipeline.createPipeline(3);
+    pipelineHasContainer(pipelineWithUnregisteredNode);
+    Pipeline newPipeline = MockPipeline.createPipeline(3);
+    ContainerInfo newContainer = pipelineHasContainer(newPipeline);
+    when(pipelineManager.createPipeline(REPLICATION_CONFIG)).thenReturn(newPipeline);
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
+        .thenReturn(new ArrayList<>(singletonList(pipelineWithUnregisteredNode)))
+        .thenReturn(new ArrayList<>(singletonList(newPipeline)));
+    when(pipelineManager.isOpenWithUnregisteredNodes(pipelineWithUnregisteredNode)).thenReturn(true);
+    pipelineHasAllNodesRegistered(newPipeline);
+
+    ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
+
+    assertSame(newContainer, container);
+    verifyPipelineCreated();
+  }
+
+  @RepeatedTest(100)
   void skipsPipelineWithoutContainer() throws Exception {
     Pipeline pipeline = MockPipeline.createPipeline(3);
     ContainerInfo existingContainer = pipelineHasContainer(pipeline);
@@ -125,6 +160,11 @@ class TestWritableRatisContainerProvider {
   private void existingPipelines(List<Pipeline> pipelines) {
     when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(pipelines);
+    pipelines.forEach(this::pipelineHasAllNodesRegistered);
+  }
+
+  private void pipelineHasAllNodesRegistered(Pipeline pipeline) {
+    when(pipelineManager.isOpenWithUnregisteredNodes(pipeline)).thenReturn(false);
   }
 
   private ContainerInfo pipelineHasContainer(Pipeline pipeline) {
@@ -147,6 +187,7 @@ class TestWritableRatisContainerProvider {
     when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(emptyList())
         .thenReturn(new ArrayList<>(singletonList(newPipeline)));
+    pipelineHasAllNodesRegistered(newPipeline);
 
     return pipelineHasContainer(newPipeline);
   }

@@ -596,6 +596,26 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testIsOpenWithUnregisteredNodes() throws Exception {
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    Pipeline pipeline = pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    pipelineManager.openPipeline(pipeline.getId());
+    pipeline = pipelineManager.getPipeline(pipeline.getId());
+    assertFalse(pipelineManager.isOpenWithUnregisteredNodes(pipeline));
+
+    // A node that never registered makes an open pipeline unusable.
+    DatanodeDetails unregistered = nodeManager.getNode(pipeline.getNodes().get(1).getID());
+    nodeManager.getClusterNetworkTopologyMap().remove(unregistered);
+    assertTrue(pipelineManager.isOpenWithUnregisteredNodes(pipeline));
+
+    // Closed pipelines are never reported, whatever their nodes.
+    pipelineManager.closePipeline(pipeline.getId());
+    assertFalse(pipelineManager.isOpenWithUnregisteredNodes(pipelineManager.getPipeline(pipeline.getId())));
+
+    pipelineManager.close();
+  }
+
+  @Test
   public void testScrubPipelinesShouldFailOnFollower() throws Exception {
     conf.setTimeDuration(
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10, TimeUnit.SECONDS);

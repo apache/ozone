@@ -328,6 +328,12 @@ public class SCMClientProtocolServer implements
       pipeline = null;
     }
 
+    // An OPEN pipeline reloaded from the SCM DB can list datanodes that have not registered since SCM started.
+    // Build the pipeline from the replicas instead, which only include datanodes that have reported.
+    if (pipeline != null && scm.getPipelineManager().isOpenWithUnregisteredNodes(pipeline)) {
+      pipeline = null;
+    }
+
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipelineForRead(
           container.getReplicationConfig(),

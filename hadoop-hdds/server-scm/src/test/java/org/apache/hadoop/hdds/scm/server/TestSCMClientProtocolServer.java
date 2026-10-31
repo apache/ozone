@@ -37,6 +37,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.hadoop.hdds.HDDSVersion;
@@ -53,7 +54,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
@@ -232,6 +236,44 @@ public class TestSCMClientProtocolServer {
     when(scmNodeDetails.getClientProtocolServerAddressKey()).thenReturn("test");
     when(storageContainerManager.getScmNodeDetails()).thenReturn(scmNodeDetails);
     return storageContainerManager;
+  }
+
+  /**
+   * An OPEN container whose pipeline lists a datanode that is not registered must be served from the live replicas
+   * instead of the stored pipeline, and a pipeline with all nodes registered is still returned as is.
+   */
+  @Test
+  public void testGetContainerWithPipelineSkipsStoredPipelineWithUnregisteredNode() throws Exception {
+    Pipeline storedPipeline = MockPipeline.createPipeline(3);
+    Pipeline replicaPipeline = MockPipeline.createPipeline(2);
+    ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(1)
+        .setState(LifeCycleState.OPEN)
+        .setPipelineID(storedPipeline.getId())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .build();
+
+    ContainerManagerImpl containerManager = mock(ContainerManagerImpl.class);
+    when(containerManager.getContainer(container.containerID())).thenReturn(container);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(pipelineManager.getPipeline(storedPipeline.getId())).thenReturn(storedPipeline);
+    when(pipelineManager.createPipelineForRead(any(), any())).thenReturn(replicaPipeline);
+    StorageContainerManager storageContainerManager = mockStorageContainerManager(Collections.emptyList());
+    when(storageContainerManager.getContainerManager()).thenReturn(containerManager);
+    when(storageContainerManager.getPipelineManager()).thenReturn(pipelineManager);
+    when(storageContainerManager.getScmContext()).thenReturn(SCMContext.emptyContext());
+
+    SCMClientProtocolServer testServer = new SCMClientProtocolServer(
+        new OzoneConfiguration(), storageContainerManager, mock(ReconfigurationHandler.class));
+    try {
+      when(pipelineManager.isOpenWithUnregisteredNodes(storedPipeline)).thenReturn(false);
+      assertEquals(storedPipeline, testServer.getContainerWithPipeline(container.getContainerID()).getPipeline());
+
+      when(pipelineManager.isOpenWithUnregisteredNodes(storedPipeline)).thenReturn(true);
+      assertEquals(replicaPipeline, testServer.getContainerWithPipeline(container.getContainerID()).getPipeline());
+    } finally {
+      testServer.stop();
+    }
   }
 
   @Test
