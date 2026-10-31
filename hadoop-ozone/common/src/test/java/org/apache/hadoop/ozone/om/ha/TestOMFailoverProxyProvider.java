@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,7 +38,9 @@ import java.util.List;
 import java.util.StringJoiner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.BeforeEach;
@@ -127,6 +130,19 @@ public class TestOMFailoverProxyProvider {
         "This test needs at least 2 OMs");
     provider.setNextOmProxy(allNodeIds.iterator().next());
     assertEquals(0, provider.getWaitTime());
+  }
+
+  @Test
+  public void testNotLeaderFailsOverToSuggestedLeader() throws Exception {
+    final List<String> nodeIds = new ArrayList<>(provider.getOMProxyMap().getNodeIds());
+    // Not the next node, which a failover without the suggested leader would try.
+    final String suggestedLeader = nodeIds.get((nodeIds.indexOf(provider.getCurrentProxyOMNodeId()) + 2) % numNodes);
+
+    final RetryPolicy.RetryAction action = provider.getRetryPolicy(10).shouldRetry(
+        new ServiceException(new OMNotLeaderException("not the leader", suggestedLeader)), 0, 0, true);
+
+    assertEquals(RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY, action.action);
+    assertEquals(suggestedLeader, provider.getNextProxyOMNodeId());
   }
 
   /**

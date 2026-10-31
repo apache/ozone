@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
@@ -117,11 +118,7 @@ public class TestS3GrpcOmTransport {
                       responseObserver.onCompleted();
                     }
                   } catch (Throwable e) {
-                    IOException ex = new IOException(e.getCause());
-                    responseObserver.onError(io.grpc.Status
-                        .INTERNAL
-                        .withDescription(ex.getMessage())
-                        .asRuntimeException());
+                    responseObserver.onError(OMGrpcError.toStatusRuntimeException(e.getCause()));
                   }
                 }
               }));
@@ -131,8 +128,6 @@ public class TestS3GrpcOmTransport {
   private ServiceException createNotLeaderException() {
     RaftPeerId raftPeerId = RaftPeerId.getRaftPeerId("testNodeId");
 
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
     OMNotLeaderException notLeaderException =
         new OMNotLeaderException(raftPeerId);
     LOG.debug(notLeaderException.getMessage());
@@ -284,6 +279,27 @@ public class TestS3GrpcOmTransport {
     // This exception should cause failover to NOT retry,
     // rather to fail.
     assertThrows(Exception.class, () -> client.submitRequest(omRequest));
+  }
+
+  @Test
+  public void testNotLeaderExceptionGoesToSuggestedLeader() throws Exception {
+    configureHaOmService("om0", "om1", "om2");
+
+    AtomicInteger notLeaderCount = new AtomicInteger();
+    AtomicInteger leaderRequestCount = new AtomicInteger();
+    OMNotLeaderException notLeaderException =
+        new OMNotLeaderException(RaftPeerId.valueOf("om0"), RaftPeerId.valueOf("om2"), null);
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNotLeaderNodeChannel(notLeaderCount, notLeaderException));
+    client.startClient("om1", createNotLeaderNodeChannel(notLeaderCount, notLeaderException));
+    client.startClient("om2", createNodeChannel("om2", leaderRequestCount, new AtomicReference<>()));
+    client.changeLeaderProxyForTest("om0");
+
+    client.submitRequest(arbitraryOmRequest());
+
+    assertEquals(1, notLeaderCount.get());
+    assertEquals(1, leaderRequestCount.get());
   }
 
   @Test
@@ -506,7 +522,8 @@ public class TestS3GrpcOmTransport {
     client = new GrpcOmTransport(conf, ugi, omServiceId);
     client.startClient("om0", createNodeChannel("om0",
         leaderRequestCount, leaderRequest));
-    client.startClient("om1", createNotLeaderNodeChannel(followerRequestCount));
+    client.startClient("om1", createNotLeaderNodeChannel(followerRequestCount,
+        new OMNotLeaderException(RaftPeerId.valueOf("om1"))));
     client.changeLeaderProxyForTest("om0");
     client.changeFollowerReadInitialProxy("om1");
 
@@ -640,8 +657,8 @@ public class TestS3GrpcOmTransport {
           public void submitRequest(OMRequest request, StreamObserver<OMResponse> responseObserver) {
             requests.add(request);
             if (requests.size() <= notReadyCount) {
-              IOException ex = new IOException(new OMLeaderNotReadyException(nodeId + " is not ready"));
-              responseObserver.onError(io.grpc.Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
+              responseObserver.onError(OMGrpcError.toStatusRuntimeException(
+                  new OMLeaderNotReadyException(nodeId + " is not ready")));
               return;
             }
             responseObserver.onNext(newSuccessResponse(nodeId, request));
@@ -663,8 +680,8 @@ public class TestS3GrpcOmTransport {
         .build();
   }
 
-  private ManagedChannel createNotLeaderNodeChannel(AtomicInteger requestCount)
-      throws IOException {
+  private ManagedChannel createNotLeaderNodeChannel(AtomicInteger requestCount,
+      OMNotLeaderException notLeaderException) throws IOException {
     String nodeServerName = InProcessServerBuilder.generateName();
     grpcCleanup.register(InProcessServerBuilder
         .forName(nodeServerName)
@@ -674,15 +691,7 @@ public class TestS3GrpcOmTransport {
           public void submitRequest(OMRequest request,
               StreamObserver<OMResponse> responseObserver) {
             requestCount.incrementAndGet();
-            try {
-              throw createNotLeaderException();
-            } catch (Throwable e) {
-              IOException ex = new IOException(e.getCause());
-              responseObserver.onError(io.grpc.Status
-                  .INTERNAL
-                  .withDescription(ex.getMessage())
-                  .asRuntimeException());
-            }
+            responseObserver.onError(OMGrpcError.toStatusRuntimeException(notLeaderException));
           }
         })
         .build()

@@ -52,8 +52,12 @@ public class OMNotLeaderException extends IOException {
   }
 
   public OMNotLeaderException(String msg) {
+    this(msg, null);
+  }
+
+  public OMNotLeaderException(String msg, String suggestedLeaderNodeId) {
     super(msg);
-    this.leaderPeerId = null;
+    this.leaderPeerId = suggestedLeaderNodeId;
     this.leaderAddress = null;
   }
 
