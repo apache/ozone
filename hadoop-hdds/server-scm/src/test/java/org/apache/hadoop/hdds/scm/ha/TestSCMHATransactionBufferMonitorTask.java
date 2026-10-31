@@ -231,6 +231,36 @@ public class TestSCMHATransactionBufferMonitorTask {
   }
 
   @Test
+  public void testSaveConfigurationDoesNotFlushUnderStaleIndexDuringApply() throws Exception {
+    StatefulServiceStateManager stateManager = StatefulServiceStateManagerImpl.newBuilder()
+        .setStatefulServiceConfig(statefulServiceConfigTable)
+        .setSCMDBTransactionBuffer(transactionBuffer)
+        .setRatisServer(SCMHAManagerStub.getInstance(true, transactionBuffer).getRatisServer())
+        .build();
+    ByteString config = ByteString.copyFromUtf8("value");
+
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
+    transactionBuffer.flush();
+    // Ensure the zero-wait flush is deferred by the apply guard, not by timeDiff == 0.
+    advanceClockPastFlushInterval();
+
+    transactionBuffer.beginApplyingTransaction();
+    try {
+      stateManager.saveConfiguration("svc", config);
+      assertEquals(TRX_INFO_T4, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+      assertNull(statefulServiceConfigTable.get("svc"),
+          "saveConfiguration must not commit config under the stale transaction index");
+      transactionBuffer.updateLatestTrxInfo(TRX_INFO_T5);
+    } finally {
+      transactionBuffer.endApplyingTransaction();
+    }
+
+    transactionBuffer.flushIfNeeded(0);
+    assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+    assertEquals(config, statefulServiceConfigTable.get("svc"));
+  }
+
+  @Test
   public void testMonitorTaskDoesNotPartialFlushDuringTransactionApply()
       throws Exception {
     transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
