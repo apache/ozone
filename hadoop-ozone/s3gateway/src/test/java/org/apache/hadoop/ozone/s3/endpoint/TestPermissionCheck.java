@@ -98,7 +98,7 @@ public class TestPermissionCheck {
     when(client.getConfiguration()).thenReturn(conf);
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
@@ -329,7 +329,7 @@ public class TestPermissionCheck {
   public void testObjectTagging() throws Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(clientProtocol.getObjectTagging(anyString(), anyString(), anyString())).thenThrow(exception);
+    when(clientProtocol.getObjectTagging(isNull(), anyString(), anyString())).thenThrow(exception);
     doThrow(exception).when(clientProtocol).putObjectTagging(anyString(), anyString(), anyString(), anyMap());
     doThrow(exception).when(clientProtocol).deleteObjectTagging(anyString(), anyString(), anyString());
 

@@ -650,6 +650,37 @@ class TestSnapshotCache {
   }
 
   @Test
+  @DisplayName("cleanup() leaves a still-referenced key queued so a concurrent release is not erased")
+  void testCleanupKeepsQueuedKeyWhenStillReferenced() throws IOException {
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 0, true, newAcquiringLock());
+    final UUID snapshotId = UUID.randomUUID();
+
+    // Drop the last reference so the key is enqueued for eviction, then take a fresh reference. This is the
+    // state a release racing the eviction pass leaves behind: queued, but referenced again. Reproducing the
+    // race itself needs the release to land inside cleanup()'s dbMap.compute window, which no production hook
+    // exposes; this pins the dequeue decision that makes the race harmful.
+    snapshotCache.get(snapshotId).close();
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+
+    final UncheckedAutoCloseableSupplier<OmSnapshot> handle = snapshotCache.get(snapshotId);
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+
+    // The cleanup pass sees a non-zero refcount and must leave the key queued. Dequeuing it here is what
+    // strands an unreferenced entry in dbMap with nothing left to evict it, after which lock() never drains.
+    assertThrows(IllegalStateException.class, () -> snapshotCache.lock());
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+    assertTrue(snapshotCache.getDbMap().containsKey(snapshotId));
+
+    // Once the last reference goes away, the next pass evicts it.
+    handle.close();
+    try (UncheckedAutoCloseableSupplier<OMLockDetails> lockDetails = snapshotCache.lock()) {
+      assertTrue(lockDetails.get().isLockAcquired());
+    }
+    assertFalse(snapshotCache.getDbMap().containsKey(snapshotId));
+    assertFalse(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+  }
+
+  @Test
   @DisplayName("get() surfaces a retriable load TIMEOUT as OMException, not IllegalStateException")
   void testGetPropagatesLoadTimeout() throws Exception {
     clearInvocations(lock);

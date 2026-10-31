@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -515,12 +516,9 @@ public class TestHeartbeatEndpointTask {
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .build();
-    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
-    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getVersionForClient()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
     DatanodeStateMachine mockDSM = mock(DatanodeStateMachine.class);
     when(mockDSM.getDatanodeDetails()).thenReturn(datanodeDetails);
+    DatanodeVersionManager versionManager = ContainerTestUtils.mockDnVersionManager();
     when(mockDSM.getVersionManager()).thenReturn(versionManager);
     return mockDSM;
   }

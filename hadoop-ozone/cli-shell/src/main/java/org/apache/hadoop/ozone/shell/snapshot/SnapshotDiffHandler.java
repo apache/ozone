@@ -96,6 +96,11 @@ public class SnapshotDiffHandler extends Handler {
       hidden = true)
   private boolean diffDisableNativeLibs;
 
+  @CommandLine.Option(names = {"--ordered"},
+      description = "emit FSO snapshot diff report entries in dependency order",
+      defaultValue = "false")
+  private boolean orderedReport;
+
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
       description = "Format output as JSON")
@@ -129,7 +134,7 @@ public class SnapshotDiffHandler extends Handler {
     SubmitSnapshotDiffResponse response;
     try {
       response = store.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-          forceFullDiff, diffDisableNativeLibs);
+          forceFullDiff, diffDisableNativeLibs, orderedReport);
     } catch (OMException ex) {
       // submit snapshot diff falls back to legacy snapshotDiff is server does not support it.
       if (ex.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {

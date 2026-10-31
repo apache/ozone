@@ -40,6 +40,7 @@ OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
+OZONE-SITE.XML_hdds.heartbeat.recon.interval=30s
 OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
 OZONE-SITE.XML_ozone.scm.container.placement.impl=org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware
 OZONE-SITE.XML_net.topology.node.switch.mapping.impl=org.apache.hadoop.net.TableMapping
@@ -64,3 +65,6 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
+
+# Revert when HDDS-17350 is merged. (lazy client tracing init)
+OZONE-SITE.XML_ozone.tracing.client.application-aware=false
