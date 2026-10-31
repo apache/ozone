@@ -486,16 +486,16 @@ public class StorageVolumeChecker {
   public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
     if (started.compareAndSet(true, false)) {
       periodicDiskChecker.cancel(true);
-      diskCheckerservice.shutdownNow();
-      checkVolumeResultHandlerExecutorService.shutdownNow();
-      metrics.unregister();
-      try {
-        delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
-      } catch (InterruptedException e) {
-        LOG.warn("{} interrupted during shutdown.",
-            this.getClass().getSimpleName());
-        Thread.currentThread().interrupt();
-      }
+    }
+    diskCheckerservice.shutdownNow();
+    checkVolumeResultHandlerExecutorService.shutdownNow();
+    metrics.unregister();
+    try {
+      delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
+    } catch (InterruptedException e) {
+      LOG.warn("{} interrupted during shutdown.",
+          this.getClass().getSimpleName());
+      Thread.currentThread().interrupt();
     }
   }
 

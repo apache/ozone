@@ -117,11 +117,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
 
   private final NettyMetrics nettyMetrics;
+  private final Runnable closeCallback;
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
     this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = ratisServer.getOzoneManager();
+    this.closeCallback = ratisServer::closeStateMachine;
 
     loadSnapshotInfoFromDB();
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
@@ -149,6 +151,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       NettyMetrics nettyMetrics) {
     this.isTracingEnabled = false;
     this.ozoneManager = ozoneManager;
+    this.closeCallback = this::stop;
     this.threadPrefix = "";
     this.ozoneManagerDoubleBuffer = doubleBuffer;
     this.handler = handler;
@@ -695,7 +698,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManager.shutDown("OM state machine is shutdown by Ratis server");
     } else {
       LOG.info("Stopping {}.", this);
-      stop();
+      closeCallback.run();
     }
   }
 

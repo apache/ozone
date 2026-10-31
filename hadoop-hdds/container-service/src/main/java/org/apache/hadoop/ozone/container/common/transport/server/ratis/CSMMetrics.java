@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ratis.protocol.RaftGroupId;
 
 /**
@@ -39,6 +40,7 @@ public class CSMMetrics {
   public static final String SOURCE_NAME =
       CSMMetrics.class.getSimpleName();
   private RaftGroupId gid;
+  private final String metricsSourceName;
 
   // ratis op metrics metrics
   private @Metric MutableCounterLong numWriteStateMachineOps;
@@ -78,6 +80,7 @@ public class CSMMetrics {
 
   public CSMMetrics(RaftGroupId gid) {
     this.gid = gid;
+    this.metricsSourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME + gid);
     this.opsLatencyMs = new EnumMap<>(ContainerProtos.Type.class);
     this.opsQueueingDelay = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
@@ -89,9 +92,9 @@ public class CSMMetrics {
 
   public static CSMMetrics create(RaftGroupId gid) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME + gid.toString(),
-        "Container State Machine",
-        new CSMMetrics(gid));
+    CSMMetrics metrics = new CSMMetrics(gid);
+    ms.register(metrics.metricsSourceName, "Container State Machine", metrics);
+    return metrics;
   }
 
   @Metric
@@ -260,6 +263,6 @@ public class CSMMetrics {
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME + gid.toString());
+    ms.unregisterSource(metricsSourceName);
   }
 }

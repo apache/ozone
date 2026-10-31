@@ -66,22 +66,26 @@ class TestMetricsLeakAssertion {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"LeakedMetricsSource", "HttpServer2Metrics-service1"})
-  void testUnexpectedSourceFails(String sourceName) {
+  @Test
+  void testUnexpectedSourceFails() {
+    String sourceName = "FirstLeakedMetricsSource";
+    String otherSourceName = "SecondLeakedMetricsSource";
     registerSource("ContainerCacheMetrics");
     registerSource(sourceName);
+    registerSource(otherSourceName);
 
     AssertionError error = assertThrows(AssertionError.class, MetricsLeakAssertion::assertNoLeaks);
-    assertThat(error).hasMessageContaining(sourceName);
+    assertThat(error).hasMessageContaining(sourceName).hasMessageContaining(otherSourceName);
     assertNull(metricsSystem.getSource(sourceName));
+    assertNull(metricsSystem.getSource(otherSourceName));
     assertNotNull(metricsSystem.getSource("ContainerCacheMetrics"));
     assertDoesNotThrow(MetricsLeakAssertion::assertNoLeaks);
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"ContainerCacheMetrics", "ContainerCacheMetrics-1", "ContainerCacheMetrics-123",
-      "JvmMetricsOM", "RpcActivityForPort15000", "VolumeIOStats-/data/volume", "keyTableCache", "keyTableCache-1"})
+      "JvmMetricsOM", "UgiMetrics", "DelegationTokenSecretManagerMetrics",
+      "LocalJobRunnerMetrics-12345", "LocalJobRunnerMetrics--12345"})
   void testAllowedSourcePasses(String sourceName) {
     registerSource(sourceName);
 
@@ -89,7 +93,8 @@ class TestMetricsLeakAssertion {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ContainerCacheMetrics-unexpected", "ContainerCacheMetrics-", "keyTableCache-unexpected"})
+  @ValueSource(strings = {"ContainerCacheMetrics-unexpected", "ContainerCacheMetrics-", "keyTableCache-unexpected",
+      "LocalJobRunnerMetricsUnexpected"})
   void testUnexpectedSuffixFails(String sourceName) {
     registerSource(sourceName);
 

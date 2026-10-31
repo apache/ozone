@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -71,6 +72,7 @@ public class TestContainerBalancerOperations {
 
   @AfterAll
   public static void cleanup() throws Exception {
+    IOUtils.closeQuietly(containerBalancerClient);
     if (cluster != null) {
       cluster.shutdown();
     }

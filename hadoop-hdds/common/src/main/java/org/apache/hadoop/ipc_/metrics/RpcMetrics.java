@@ -33,6 +33,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +60,7 @@ public class RpcMetrics implements MetricsSource {
   
   RpcMetrics(Server server, Configuration conf) {
     String port = String.valueOf(server.getListenerAddress().getPort());
-    name = "RpcActivityForPort" + port;
+    name = MetricUtil.getMetricsSourceName("RpcActivityForPort" + port);
     this.server = server;
     registry = new MetricsRegistry("rpc")
         .tag("port", "RPC port", port)
@@ -187,6 +188,9 @@ public class RpcMetrics implements MetricsSource {
   //@Override
   public void shutdown() {
     DefaultMetricsSystem.instance().unregisterSource(name);
+    MetricUtil.stop(rpcQueueTimeQuantiles);
+    MetricUtil.stop(rpcLockWaitTimeQuantiles);
+    MetricUtil.stop(rpcProcessingTimeQuantiles);
   }
 
   /**

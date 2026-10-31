@@ -677,6 +677,7 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
+    IOUtils.cleanupWithLogger(LOG, containerManager);
     containerSyncMetrics.unRegister();
     scmSnapshotExecutor.shutdownNow();
     IOUtils.close(LOG, dbStore);

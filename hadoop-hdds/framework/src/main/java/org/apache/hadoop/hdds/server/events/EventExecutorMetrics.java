@@ -26,6 +26,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics source for EventExecutor implementations.
@@ -33,6 +34,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 @Metrics(about = "Executor Metrics", context = "EventQueue")
 public class EventExecutorMetrics implements MetricsSource {
   private final String name;
+  private final String sourceName;
   private final String description;
   private final MetricsRegistry registry;
 
@@ -59,6 +61,7 @@ public class EventExecutorMetrics implements MetricsSource {
 
   public EventExecutorMetrics(String name, String description) {
     this.name = name;
+    this.sourceName = MetricUtil.getMetricsSourceName(name);
     this.description = description;
 
     registry = new MetricsRegistry(name);
@@ -67,12 +70,12 @@ public class EventExecutorMetrics implements MetricsSource {
 
   public void init() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.register(name, description, this);
+    ms.register(sourceName, description, this);
   }
 
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(name);
+    ms.unregisterSource(sourceName);
   }
 
   @Override

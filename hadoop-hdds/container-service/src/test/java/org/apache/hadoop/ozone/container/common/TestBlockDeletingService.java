@@ -157,9 +157,11 @@ public class TestBlockDeletingService {
 
   @AfterEach
   public void cleanup() throws IOException {
-    if (blockDeletingService != null) {
+    BlockDeletingServiceTestImpl service = blockDeletingService;
+    blockDeletingService = null;
+    if (service != null) {
       // Wait for deletion tasks to release container DB references before cleanup.
-      blockDeletingService.shutdown();
+      service.close();
     }
     BlockUtils.shutdownCache(conf);
     CodecBuffer.assertNoLeaks();
@@ -715,10 +717,10 @@ public class TestBlockDeletingService {
     createToDeleteBlocks(containerSet, 1, 3, 1);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
-    BlockDeletingServiceMetrics blockDeletingServiceMetrics = BlockDeletingServiceMetrics.create();
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     createBlockDeletingService(containerSet, conf, keyValueHandler);
+    BlockDeletingServiceMetrics blockDeletingServiceMetrics = blockDeletingService.getMetrics();
     blockDeletingService.start();
     GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 
@@ -959,7 +961,7 @@ public class TestBlockDeletingService {
       svc.updateAndRestart(updatedConf);
       assertEquals(newInterval.toMillis(), svc.getIntervalMillis());
     } finally {
-      svc.shutdown();
+      svc.close();
     }
   }
 
@@ -997,7 +999,7 @@ public class TestBlockDeletingService {
     }, 100, 1000);
 
     log.stopCapturing();
-    svc.shutdown();
+    svc.close();
 
     // test for normal case that doesn't have timeout limitation
 
@@ -1028,7 +1030,7 @@ public class TestBlockDeletingService {
       assertThat(newLog.getOutput())
           .doesNotContain("Background task executes timed out, retrying in next interval");
     }
-    svc.shutdown();
+    svc.close();
   }
 
   private void createBlockDeletingService(

@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRatesWithAggregation;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +40,7 @@ public class RpcDetailedMetrics {
   final String name;
 
   RpcDetailedMetrics(int port) {
-    name = "RpcDetailedActivityForPort"+ port;
+    name = MetricUtil.getMetricsSourceName("RpcDetailedActivityForPort" + port);
     registry = new MetricsRegistry("rpcdetailed")
         .tag("port", "RPC port", String.valueOf(port));
     LOG.debug(registry.info().toString());

@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  * A per-datanode container block deleting service takes in charge
  * of deleting staled ozone blocks.
  */
-public class BlockDeletingService extends BackgroundService {
+public class BlockDeletingService extends BackgroundService implements AutoCloseable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockDeletingService.class);
@@ -309,6 +309,15 @@ public class BlockDeletingService extends BackgroundService {
 
   public ConfigurationSource getConf() {
     return conf;
+  }
+
+  @Override
+  public void close() {
+    try {
+      shutdown();
+    } finally {
+      metrics.unRegister();
+    }
   }
 
   public BlockDeletingServiceMetrics getMetrics() {

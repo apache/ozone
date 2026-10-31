@@ -81,7 +81,7 @@ public class TestS3PutBucketTaggingRequest extends BucketRequestTests {
 
   @AfterEach
   public void teardown() {
-    OMPerformanceMetrics.unregister();
+    ozoneManager.getPerfMetrics().unregister();
   }
 
   @Test

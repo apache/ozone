@@ -194,6 +194,7 @@ public final class SCMMetrics {
   }
 
   public void unRegister() {
+    dbCheckpointMetrics.unRegister();
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }

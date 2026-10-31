@@ -27,6 +27,7 @@ import static org.apache.ozone.test.MetricsAsserts.mockMetricsRecordBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import com.google.common.collect.Iterators;
 import java.io.IOException;
@@ -155,10 +156,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertCounter("QueueSizeNumOps", flushIterations, recordBuilder);
     assertCounter("FlushTimeNumOps", flushIterations, recordBuilder);
 
-    // Assert there is only instance of OM Double Metrics.
-    OzoneManagerDoubleBufferMetrics metricsCopy =
-        OzoneManagerDoubleBufferMetrics.create();
-    assertEquals(metrics, metricsCopy);
+    assertSame(metrics, doubleBuffer.getMetrics());
 
     TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);

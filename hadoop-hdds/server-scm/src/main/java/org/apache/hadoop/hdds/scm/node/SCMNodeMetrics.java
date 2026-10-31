@@ -32,6 +32,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -43,6 +44,8 @@ public final class SCMNodeMetrics implements MetricsSource {
 
   public static final String SOURCE_NAME =
       SCMNodeMetrics.class.getSimpleName();
+
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
 
   private @Metric MutableCounterLong numHBProcessed;
   private @Metric MutableCounterLong numHBProcessingFailed;
@@ -76,8 +79,8 @@ public final class SCMNodeMetrics implements MetricsSource {
    */
   public static SCMNodeMetrics create(NodeManagerMXBean managerMXBean) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "SCM NodeManager Metrics",
-        new SCMNodeMetrics(managerMXBean));
+    SCMNodeMetrics metrics = new SCMNodeMetrics(managerMXBean);
+    return ms.register(metrics.sourceName, "SCM NodeManager Metrics", metrics);
   }
 
   /**
@@ -85,7 +88,7 @@ public final class SCMNodeMetrics implements MetricsSource {
    */
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   /**

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.server.events;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +59,46 @@ public class TestEventQueue {
   public void stopEventQueue() {
     DefaultMetricsSystem.shutdown();
     queue.close();
+  }
+
+  @Test
+  public void testExecutorMetricsCleanupWithMultipleQueues() throws Exception {
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    Field field = DefaultMetricsSystem.instance().getClass().getDeclaredField("allSources");
+    field.setAccessible(true);
+    Map<?, ?> sources = (Map<?, ?>) field.get(DefaultMetricsSystem.instance());
+    Set<?> original = new HashSet<>(sources.keySet());
+    SingleThreadExecutor<Long> first = null;
+    SingleThreadExecutor<Long> second = null;
+    try {
+      first = new SingleThreadExecutor<>("testCleanup", "");
+      Set<?> firstSources = new HashSet<>(sources.keySet());
+      second = new SingleThreadExecutor<>("testCleanup", "");
+      assertEquals(original.size() + 2, sources.size());
+      Set<Object> expected = new HashSet<>(sources.keySet());
+      expected.removeAll(firstSources);
+      expected.addAll(original);
+      SingleThreadExecutor<Long> closing = first;
+      first = null;
+      closing.close();
+      assertEquals(expected, sources.keySet());
+    } finally {
+      try {
+        if (first != null) {
+          first.close();
+        }
+      } finally {
+        try {
+          if (second != null) {
+            second.close();
+          }
+        } finally {
+          DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+        }
+      }
+    }
+    assertEquals(original, sources.keySet());
   }
 
   @Test

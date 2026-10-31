@@ -21,21 +21,25 @@ import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Class contains metrics related to the OM Deletion services.
  */
 @Metrics(about = "Deletion Service Metrics", context = OzoneConsts.OZONE)
-public final class DeletingServiceMetrics {
+public final class DeletingServiceMetrics implements MetricsSource {
 
   public static final String METRICS_SOURCE_NAME =
       DeletingServiceMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME);
   private MetricsRegistry registry;
 
   /*
@@ -148,16 +152,23 @@ public final class DeletingServiceMetrics {
    * @return DeletingServiceMetrics
    */
   public static DeletingServiceMetrics create() {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+    DeletingServiceMetrics metrics = new DeletingServiceMetrics();
+    DefaultMetricsSystem.instance().register(metrics.sourceName,
         "Metrics tracking the progress of deletion of directories and keys in the OM",
-        new DeletingServiceMetrics());
+        metrics);
+    return metrics;
+  }
+
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName,
+        "Metrics tracking the progress of deletion of directories and keys in the OM", this);
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+  public void unregister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void incrNumDirsSentForPurge(long dirDel) {
@@ -356,6 +367,11 @@ public final class DeletingServiceMetrics {
     numDirsSentForPurge.set(0);
     numSubDirsSentForPurge.set(0);
     numSubFilesSentForPurge.set(0);
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    registry.snapshot(collector.addRecord(registry.info()), all);
   }
 
 }

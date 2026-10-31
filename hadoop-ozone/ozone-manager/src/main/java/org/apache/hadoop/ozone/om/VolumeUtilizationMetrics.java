@@ -63,7 +63,8 @@ public class VolumeUtilizationMetrics implements MetricsSource {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     VolumeUtilizationMetrics metrics = new VolumeUtilizationMetrics(
         metadataManager, omServiceId, omNodeId);
-    return ms.register(metrics.sourceName, "Volume Utilization Metrics", metrics);
+    ms.register(metrics.sourceName, "Volume Utilization Metrics", metrics);
+    return metrics;
   }
 
   @Override

@@ -103,6 +103,11 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
+  public void close() {
+    scmContainerManagerMetrics.unRegister();
+  }
+
+  @Override
   public void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException {
     lock.lock();

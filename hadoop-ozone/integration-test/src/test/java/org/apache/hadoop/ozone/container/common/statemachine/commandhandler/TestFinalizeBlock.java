@@ -82,6 +82,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestFinalizeBlock {
 
   private OzoneClient client;
+  private XceiverClientManager xceiverClientManager;
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
   private ObjectStore objectStore;
@@ -139,7 +140,7 @@ public class TestFinalizeBlock {
 
   @AfterEach
   public void shutdown() {
-    IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(client, xceiverClientManager);
     if (cluster != null) {
       try {
         cluster.shutdown();
@@ -171,7 +172,7 @@ public class TestFinalizeBlock {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
 
-    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
+    xceiverClientManager = new XceiverClientManager(conf);
     XceiverClientSpi xceiverClient =
         xceiverClientManager.acquireClient(pipeline);
 

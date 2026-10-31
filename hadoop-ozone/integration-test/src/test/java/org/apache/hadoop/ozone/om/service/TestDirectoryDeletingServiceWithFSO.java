@@ -152,10 +152,10 @@ public class TestDirectoryDeletingServiceWithFSO {
   @AfterAll
   public static void teardown() {
     IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(fs);
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @AfterEach

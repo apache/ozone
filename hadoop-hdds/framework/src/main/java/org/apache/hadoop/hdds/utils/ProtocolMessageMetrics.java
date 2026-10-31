@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
@@ -37,6 +38,7 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSource {
 
   private final String name;
+  private final String sourceName;
 
   private final String description;
 
@@ -58,6 +60,7 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
   public ProtocolMessageMetrics(String name, String description,
       Class<KEY> enumClass) {
     this.name = name;
+    this.sourceName = MetricUtil.getMetricsSourceName(name);
     this.description = description;
     final EnumMap<KEY, Stats> map = new EnumMap<>(enumClass);
     for (KEY value : enumClass.getEnumConstants()) {
@@ -80,12 +83,11 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
   }
 
   public void register() {
-    DefaultMetricsSystem.instance()
-        .register(name, description, this);
+    DefaultMetricsSystem.instance().register(sourceName, description, this);
   }
 
   public void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(name);
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   @Override

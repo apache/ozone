@@ -42,92 +42,19 @@ public final class MetricsLeakAssertion {
   private static final String ALL_SOURCES_FIELD = "allSources";
 
   /**
-   * Metrics sources that are registered once per JVM (or once per service)
-   * and intentionally never unregistered, so they are expected to still be
-   * present after a mini cluster shuts down.  These are JVM-level singletons
-   * with no per-service owner; do not add per-service metrics here.
+   * Metrics sources expected to remain after a mini cluster shuts down:
+   * JVM-level singletons and sources whose cleanup is controlled by Hadoop.
+   * Do not add per-service sources whose lifecycle is controlled by Ozone.
    *
    * <p>For the matching rules see {@link #isExpectedLeftover(String)}.
    */
   private static final List<String> EXPECTED_LEFTOVER_SOURCES = Arrays.asList(
       "JvmMetrics*", // per service, via HddsServerUtil.initializeMetrics
       "UgiMetrics", // Hadoop security UGI metrics
+      "DelegationTokenSecretManagerMetrics", // Hadoop static final JVM-wide singleton
+      "LocalJobRunnerMetrics-*", // Hadoop LocalClientProtocolProvider.close() does not clean up local runners
       "ManagedRocksObjectMetrics",
       "ContainerCacheMetrics" // ContainerCache singleton, created once per JVM
-  );
-
-  /**
-   * Metrics sources that leak: they should be unregistered when the mini
-   * cluster shuts down but currently are not.  This is a transitional list to
-   * keep the integration suite green while the leaks are being fixed.  Each
-   * entry should be removed once the corresponding source unregisters
-   * properly; do not add new entries, fix the leak instead.
-   *
-   * <p>For the matching rules see {@link #isExpectedLeftover(String)}.
-   */
-  private static final List<String> TODO_LEFTOVER_SOURCES = Arrays.asList(
-      // RPC / HTTP server metrics (name embeds the listening port).
-      "RpcActivityForPort*",
-      "RpcDetailedActivityForPort*",
-      "LocalJobRunnerMetrics*",
-
-      // Datanode per-instance metrics.
-      "StorageContainerMetrics",
-      "ContainerDataScannerMetrics*", // name embeds the volume path
-      "ContainerMetadataScannerMetrics",
-      "On-demand container scanner metrics",
-      "BackgroundVolumeScannerMetrics",
-      "VolumeHealthMetrics-*",
-      "VolumeIOStats-*", // name embeds the volume path
-      // Name embeds the volume path.  Also intentionally kept registered for
-      // failed volumes (HDDS-7086), so only the healthy-volume case is a leak.
-      "VolumeInfoMetrics-*",
-      "CommandHandlerMetrics",
-      "HddsDispatcher",
-      "ECReconstructionMetrics",
-      "ReplicationSupervisorMetrics",
-      "ContainerReplicator/push",
-      "BlockDeletingService",
-      "GrpcMetrics",
-
-      // SCM metrics.
-      "SCMNodeMetrics",
-      "SCMContainerManagerMetrics",
-      "SafeModeMetrics",
-      "ContainerBalancerMetrics",
-      "NodeDecommissionMetrics",
-      "SCMDatanodeProtocol",
-      "ScmBlockLocationProtocol",
-      "ScmContainerLocationProtocol",
-      "ScmSecurityProtocol",
-      "EventQueue*", // per event/handler pair, registered by SCM EventQueue
-
-      // OM metrics.
-      "OMMetrics",
-      "OMPerformanceMetrics",
-      "OMLockMetrics",
-      "OMHAMetrics",
-      "OMSnapshotDirectoryMetrics",
-      "OmSnapshotMetrics",
-      "OmClientProtocol",
-      "DeletingServiceMetrics",
-      "KeyLifecycleServiceMetrics",
-      "BucketUtilizationMetrics",
-      "DelegationTokenSecretManagerMetrics",
-
-      // OM / SCM RocksDB table cache and DB metrics (name embeds path/uuid).
-      "Rocksdb_*",
-      "SSTFilePruningMetrics-*",
-      "DBCheckpointMetrics",
-      "*TableCache",
-
-      // Ratis / third-party infrastructure metrics.
-      "CSMMetricsgroup-*", // Ratis container state machine, embeds a random id
-      "CacheMetrics-*", // Hadoop cache metrics (XceiverClientManager, etc.)
-      "NettyMetrics*",
-      "ContainerClientMetrics1",
-      "ReconTaskMetrics",
-      "ReconTaskControllerMetrics"
   );
 
   private MetricsLeakAssertion() {
@@ -171,8 +98,7 @@ public final class MetricsLeakAssertion {
   }
 
   /**
-   * Matching rules for {@link #EXPECTED_LEFTOVER_SOURCES} and
-   * {@link #TODO_LEFTOVER_SOURCES}:
+   * Matching rules for {@link #EXPECTED_LEFTOVER_SOURCES}:
    * <ul>
    *   <li>An entry ending in {@code *} is a prefix match, used for sources
    *   whose registered name embeds a random id, an absolute path, or a port
@@ -186,7 +112,7 @@ public final class MetricsLeakAssertion {
    * </ul>
    */
   private static boolean isExpectedLeftover(String name) {
-    return matches(EXPECTED_LEFTOVER_SOURCES, name) || matches(TODO_LEFTOVER_SOURCES, name);
+    return matches(EXPECTED_LEFTOVER_SOURCES, name);
   }
 
   private static boolean matches(List<String> entries, String name) {

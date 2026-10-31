@@ -144,7 +144,9 @@ public class TestOzoneManagerStateMachine {
 
   @AfterEach
   public void tearDown() {
-    sm.stop();
+    if (sm != null) {
+      sm.stop();
+    }
     Server.getCurCall().remove();
     OzoneManager.setS3Auth(null);
     OzoneManager.setStsTokenIdentifier(null);
@@ -1559,7 +1561,9 @@ public class TestOzoneManagerStateMachine {
 
   @Test
   public void testStopShutdownsResources() {
-    sm.stop();
+    OzoneManagerStateMachine closing = sm;
+    sm = null;
+    closing.stop();
 
     verify(doubleBuffer).stop();
     assertTrue(executor.isShutdown());
@@ -1578,7 +1582,9 @@ public class TestOzoneManagerStateMachine {
   public void testCloseWhenOmAlreadyStopped() {
     when(om.isStopped()).thenReturn(true);
 
-    sm.close();
+    OzoneManagerStateMachine closing = sm;
+    sm = null;
+    closing.close();
 
     // stop() calls doubleBuffer.stop()
     verify(doubleBuffer).stop();

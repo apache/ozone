@@ -1972,17 +1972,18 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       throws IOException, InterruptedException, TimeoutException {
     String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
     cluster.getConf().set(FS_DEFAULT_NAME_KEY, rootPath);
-    FileSystem fs = FileSystem.get(cluster.getConf());
+    try (FileSystem fs = FileSystem.get(cluster.getConf())) {
 
-    org.apache.hadoop.fs.Path dir1Path = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, dir1);
-    org.apache.hadoop.fs.Path dir2Path = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, dir2);
+      org.apache.hadoop.fs.Path dir1Path = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, dir1);
+      org.apache.hadoop.fs.Path dir2Path = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, dir2);
 
-    fs.delete(dir1Path, false);
-    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
-        bucketName), 1000, 30000);
-    fs.delete(dir2Path, false);
-    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == getBucketUsedNamespace(volumeName,
-        bucketName), 1000, 30000);
+      fs.delete(dir1Path, false);
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+          bucketName), 1000, 30000);
+      fs.delete(dir2Path, false);
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == getBucketUsedNamespace(volumeName,
+          bucketName), 1000, 30000);
+    }
   }
 
   private void handleNonLegacyBucketDelete(RpcClient client, String volumeName, String bucketName, String dir1,

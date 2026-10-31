@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.util.MetricUtil;
 public class ContainerMetrics implements Closeable {
   public static final String STORAGE_CONTAINER_METRICS =
       "StorageContainerMetrics";
+  private final String metricsSourceName = MetricUtil.getMetricsSourceName(STORAGE_CONTAINER_METRICS);
   @Metric private MutableCounterLong numOps;
   @Metric private MutableCounterLong containerDeleteFailedNonEmpty;
   @Metric private MutableCounterLong containerDeleteFailedBlockCountNotZero;
@@ -129,18 +130,14 @@ public class ContainerMetrics implements Closeable {
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
         conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
-    return ms.register(STORAGE_CONTAINER_METRICS,
-                       "Storage Container Node Metrics",
-                       new ContainerMetrics(intervals));
-  }
-
-  public static void remove() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(STORAGE_CONTAINER_METRICS);
+    ContainerMetrics metrics = new ContainerMetrics(intervals);
+    ms.register(metrics.metricsSourceName, "Storage Container Node Metrics", metrics);
+    return metrics;
   }
 
   @Override
   public void close() {
+    DefaultMetricsSystem.instance().unregisterSource(metricsSourceName);
     opsLatQuantiles.values().forEach(MetricUtil::stop);
   }
 

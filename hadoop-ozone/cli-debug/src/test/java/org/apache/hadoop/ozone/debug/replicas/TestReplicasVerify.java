@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.debug.replicas;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,22 +43,53 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedConstruction;
 import picocli.CommandLine;
 
 /**
  * Unit tests for replicas verify command.
  */
 class TestReplicasVerify {
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testClosesVerifierClients(boolean fail) throws Exception {
+    ReplicasVerify command = new ReplicasVerify();
+    new CommandLine(command).parseArgs("--checksums", "--block-existence", "--container-state", "/");
+    OzoneClient client = mock(OzoneClient.class);
+    ObjectStore store = mock(ObjectStore.class);
+    when(client.getObjectStore()).thenReturn(store);
+    when(store.listVolumes(null)).thenReturn(Collections.emptyIterator());
+    if (fail) {
+      when(client.getObjectStore()).thenThrow(new IllegalStateException("Verification failed"));
+    }
+    try (MockedConstruction<ContainerOperationClient> clients = mockConstruction(ContainerOperationClient.class)) {
+      if (fail) {
+        assertThrows(IllegalStateException.class, () -> command.execute(client, new OzoneAddress("/")));
+      } else {
+        command.execute(client, new OzoneAddress("/"));
+      }
+      assertEquals(3, clients.constructed().size());
+      for (ContainerOperationClient containerClient : clients.constructed()) {
+        verify(containerClient).close();
+      }
+    }
+  }
 
   @Test
   void testRefreshContainerLocationsFromScmOption() throws Exception {
