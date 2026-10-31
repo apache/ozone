@@ -46,14 +46,25 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
     }
   }
 
-  public void finalizeFromSnapshotIfRequired(Table<String, String> finalizationStore) throws IOException {
+  public void finalizeIfRequired(Table<String, String> finalizationStore, boolean fromSnapshot)
+      throws IOException {
     ComponentVersion apparentVersionInNewDB = getApparentVersionInDB(finalizationStore);
     if (apparentVersionInNewDB != null && !isAllowed(apparentVersionInNewDB)) {
-      LOG.info("New snapshot received with higher apparent version {}. Attempting to finalize to that version.",
-          apparentVersionInNewDB);
+      if (fromSnapshot) {
+        LOG.info("New snapshot received with higher apparent version {}. Attempting to finalize to that version.",
+            apparentVersionInNewDB);
+      } else {
+        LOG.warn("Version file has lower apparent version ({}) than DB ({}). Finalizing to the DB version.",
+            getApparentVersion(), apparentVersionInNewDB);
+      }
       finalizeUpgrade();
-      // Update the apparent version in the DB to match the VERSION file.
-      // When finalization is not done with a snapshot, this DB value is updated by OMCompleteFinalizeUpgradeRequest.
+    } else if (apparentVersionInNewDB != null && !apparentVersionInNewDB.equals(getApparentVersion())) {
+      // The DB is behind the VERSION file. This should not happen: finalization writes the VERSION file inside
+      // applyTransaction, so the Ratis log entry was committed and should be replayed on restart, which would
+      // update the DB via the unconditional transactionBuffer.addToBuffer call in FinalizationStateManagerImpl.
+      // This branch is a safety net for cases where Ratis replay did not run.
+      LOG.warn("DB has lower apparent version ({}) than VERSION file ({}). Updating DB to match VERSION file.",
+          apparentVersionInNewDB, getApparentVersion());
       finalizationStore.put(APPARENT_VERSION_KEY, String.valueOf(getApparentVersion().serialize()));
     }
   }
