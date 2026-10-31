@@ -3327,12 +3327,13 @@
     <name>ozone.client.failover.max.attempts</name>
     <value>500</value>
     <description>
-      Expert only. Ozone RpcClient attempts talking to each OzoneManager
-      ipc.client.connect.max.retries (default = 10) number of times before
-      failing over to another OzoneManager, if available. This parameter
-      represents the number of times per request the client will failover
-      before giving up. This value is kept high so that client does not
-      give up trying to connect to OMs easily.
+      Expert only. The number of times per request the Ozone client will
+      failover between OzoneManagers before giving up. A failed connection
+      attempt fails over to the next OzoneManager, if available, without
+      retrying on the same one (for connect timeouts, unless
+      ipc.client.connect.max.retries.on.timeouts is set explicitly). This
+      value is kept high so that client does not give up trying to connect
+      to OMs easily.
     </description>
   </property>
   <property>

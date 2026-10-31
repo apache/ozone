@@ -33,7 +33,9 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
+import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -94,6 +96,15 @@ public class TestSCMFailoverProxyProviderRefreshWired {
       refreshCalls++;
       return false;
     }
+  }
+
+  /**
+   * SCM proxies should not retry connect timeouts on the same SCM, since the provider fails over to the next SCM.
+   */
+  @Test
+  public void testNoConnectRetriesOnTimeouts() {
+    ScmBlockLocationProtocolPB proxy = new SCMBlockLocationFailoverProxyProvider(conf).getProxy().proxy;
+    assertEquals(0, RPC.getConnectionIdForProxy(proxy).getMaxRetriesOnSocketTimeouts());
   }
 
   @Test
