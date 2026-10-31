@@ -132,7 +132,7 @@ public final class OMNodeDetails extends NodeDetails {
     }
 
     public Builder setRatisAddress(InetSocketAddress ratisAddr) {
-      this.hostAddress = ratisAddr.getHostName();
+      this.hostAddress = ratisAddr.getHostString();
       this.ratisPort = ratisAddr.getPort();
       return this;
     }
@@ -248,9 +248,9 @@ public final class OMNodeDetails extends NodeDetails {
     int ratisPort = conf.getInt(ratisPortKey, OZONE_OM_RATIS_PORT_DEFAULT);
 
     String httpAddr = OmUtils.getHttpAddressForOMPeerNode(conf,
-        omServiceId, omNodeId, omRpcAddress.getHostName());
+        omServiceId, omNodeId, omRpcAddress.getHostString());
     String httpsAddr = OmUtils.getHttpsAddressForOMPeerNode(conf,
-        omServiceId, omNodeId, omRpcAddress.getHostName());
+        omServiceId, omNodeId, omRpcAddress.getHostString());
 
     Collection<String> listenerOmNodeIds = OmUtils.getListenerOMNodeIds(conf, omServiceId);
     boolean isListener = listenerOmNodeIds.contains(omNodeId);
