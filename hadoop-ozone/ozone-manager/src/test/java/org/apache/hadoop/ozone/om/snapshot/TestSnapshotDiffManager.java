@@ -39,6 +39,7 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMI
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_JOB_TABLE_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_PURGED_JOB_TABLE_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_REPORT_TABLE_NAME;
@@ -140,6 +141,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
@@ -151,6 +153,7 @@ import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ExitUtil;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.AfterEach;
@@ -167,6 +170,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -353,6 +357,7 @@ public class TestSnapshotDiffManager {
     when(omBucketInfo.getBucketLayout()).thenReturn(LEGACY);
     when(bucketInfoTable.get(bucketTableKey)).thenReturn(omBucketInfo);
     when(omMetadataManager.getStore()).thenReturn(dbStore);
+    when(omMetadataManager.getLock()).thenReturn(new OmReadOnlyLock());
     when(omMetadataManager.getSnapshotInfoTable())
         .thenReturn(snapshotInfoTable);
     when(omMetadataManager.getBucketTable()).thenReturn(bucketInfoTable);
@@ -368,17 +373,116 @@ public class TestSnapshotDiffManager {
     SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0, true,
         new OmReadOnlyLock());
 
-    when(omSnapshotManager.getActiveSnapshot(anyString(), anyString(), anyString()))
-        .thenAnswer(invocationOnMock -> {
-          SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, invocationOnMock.getArgument(0),
-              invocationOnMock.getArgument(1), invocationOnMock.getArgument(2));
-          return snapshotCache.get(snapInfo.getSnapshotId());
-        });
+    HddsWhiteboxTestUtils.setInternalState(omSnapshotManager, "ozoneManager", ozoneManager);
+    HddsWhiteboxTestUtils.setInternalState(omSnapshotManager, "snapshotCache", snapshotCache);
+    Mockito.doCallRealMethod().when(omSnapshotManager)
+        .getActiveSnapshot(anyString(), anyString(), anyString(), any(UUID.class));
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     snapshotDiffManager = new SnapshotDiffManager(db, ozoneManager,
         snapDiffJobTable, snapDiffReportTable, snapDiffPurgedJobTable,
         columnFamilyOptions, codecRegistry);
     when(omSnapshotManager.getDiffCleanupServiceInterval()).thenReturn(0L);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"0, false, false", "1, false, false", "2, false, false", "3, false, false",
+      "3, true, false", "0, false, true", "1, false, true", "2, false, true", "3, false, true", "3, true, true"})
+  public void testSnapshotDiffLocks(int failOnOpen, boolean sameSnapshot, boolean optimized) throws Exception {
+    SnapshotInfo from = snapshotInfo;
+    SnapshotInfo to = sameSnapshot ? from : snapshotInfoList.get(0);
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    when(omMetadataManager.getLock()).thenReturn(lock);
+    try (SnapshotCache cache = new SnapshotCache(mockCacheLoader(), 10, ozoneManager.getMetrics(), 0, true, lock)) {
+      SnapshotDiffManager manager = spy(newSnapshotDiffManagerWithOptimizedEnabled(optimized));
+      doReturn(failOnOpen != 0, false).when(manager).areDiffJobAndSnapshotsActive(
+          VOLUME_NAME, BUCKET_NAME, from.getName(), to.getName());
+      AtomicInteger opens = new AtomicInteger();
+      OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
+      doAnswer(invocation -> {
+        // Both stripes must be held before even the first snapshot is opened.
+        assertTrue(lock.getReadHoldCount(SNAPSHOT_DB_LOCK, from.getSnapshotId().toString()) > 0);
+        assertTrue(lock.getReadHoldCount(SNAPSHOT_DB_LOCK, to.getSnapshotId().toString()) > 0);
+        if (opens.incrementAndGet() == failOnOpen) {
+          throw new IOException("Snapshot load failed");
+        }
+        String name = invocation.getArgument(2);
+        return cache.get(name.equals(from.getName()) ? from.getSnapshotId() : to.getSnapshotId());
+      }).when(omSnapshotManager).getActiveSnapshot(anyString(), anyString(), anyString(), any(UUID.class));
+      String jobKey = generateSnapDiffJobKey.apply(from, to);
+      String jobId = UUID.randomUUID().toString();
+      manager.getSnapDiffJobTable().put(jobKey, new SnapshotDiffJob(System.currentTimeMillis(), jobId,
+          IN_PROGRESS, VOLUME_NAME, BUCKET_NAME, from.getName(), to.getName(), false, false, 0, null, 0.0, ""));
+      if (failOnOpen == 1 || failOnOpen == 2) {
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> manager.generateSnapshotDiffReport(
+            jobKey, jobId, VOLUME_NAME, BUCKET_NAME, from.getName(), to.getName(), true, false, false));
+        assertEquals("Snapshot load failed", failure.getCause().getMessage());
+        assertEquals(FAILED, manager.getSnapDiffJobTable().get(jobKey).getStatus());
+      } else {
+        manager.generateSnapshotDiffReport(jobKey, jobId, VOLUME_NAME, BUCKET_NAME,
+            from.getName(), to.getName(), true, false, false);
+      }
+      assertEquals(failOnOpen == 0 ? 0 : Math.min(failOnOpen, 2), opens.get());
+      assertEquals(0, lock.getReadHoldCount(SNAPSHOT_DB_LOCK, from.getSnapshotId().toString()));
+      assertEquals(0, lock.getReadHoldCount(SNAPSHOT_DB_LOCK, to.getSnapshotId().toString()));
+      assertEquals(0, cache.totalRefCount(from.getSnapshotId()));
+      assertEquals(0, cache.totalRefCount(to.getSnapshotId()));
+    }
+  }
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(ints = {1, 2})
+  public void testSnapshotDiffLocksAfterSnapshotNameReuse(int replaceOnOpen) throws Exception {
+    SnapshotInfo from = snapshotInfo;
+    SnapshotInfo to = snapshotInfoList.get(0);
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    when(omMetadataManager.getLock()).thenReturn(lock);
+    try (SnapshotCache cache = new SnapshotCache(mockCacheLoader(), 10, ozoneManager.getMetrics(), 0, true, lock)) {
+      SnapshotDiffManager manager = spy(snapshotDiffManager);
+      doReturn(true, false).when(manager).areDiffJobAndSnapshotsActive(
+          VOLUME_NAME, BUCKET_NAME, from.getName(), to.getName());
+      Set<UUID> openedIds = new LinkedHashSet<>();
+      Set<UUID> replacementIds = new LinkedHashSet<>();
+      AtomicInteger opens = new AtomicInteger();
+      OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
+      HddsWhiteboxTestUtils.setInternalState(omSnapshotManager, "snapshotCache", cache);
+      doAnswer(invocation -> {
+        if (opens.incrementAndGet() == replaceOnOpen) {
+          assertTrue(lock.getReadHoldCount(SNAPSHOT_DB_LOCK, from.getSnapshotId().toString()) > 0);
+          assertTrue(lock.getReadHoldCount(SNAPSHOT_DB_LOCK, to.getSnapshotId().toString()) > 0);
+          UUID replacementId = LongStream.range(0, 1024).mapToObj(id -> new UUID(0, id))
+              .filter(id -> lock.getReadHoldCount(SNAPSHOT_DB_LOCK, id.toString()) == 0)
+              .findFirst().orElseThrow(() -> new AssertionError("No unheld snapshot DB stripe found"));
+          // Simulate A being renamed away and C taking A's old name after A and B were prelocked.
+          SnapshotInfo original = replaceOnOpen == 1 ? from : to;
+          SnapshotInfo replacement = original.toBuilder().setSnapshotId(replacementId).build();
+          replacementIds.add(replacementId);
+          when(snapshotInfoTable.get(original.getTableKey())).thenReturn(replacement);
+        }
+        UUID id = invocation.getArgument(3);
+        assertTrue(lock.getReadHoldCount(SNAPSHOT_DB_LOCK, id.toString()) > 0);
+        Object handle = invocation.callRealMethod();
+        openedIds.add(id);
+        return handle;
+      }).when(omSnapshotManager).getActiveSnapshot(anyString(), anyString(), anyString(), any(UUID.class));
+      String jobKey = generateSnapDiffJobKey.apply(from, to);
+      String jobId = UUID.randomUUID().toString();
+      manager.getSnapDiffJobTable().put(jobKey, new SnapshotDiffJob(System.currentTimeMillis(), jobId,
+          IN_PROGRESS, VOLUME_NAME, BUCKET_NAME, from.getName(), to.getName(), false, false, 0, null, 0.0, ""));
+
+      RuntimeException failure = assertThrows(RuntimeException.class, () -> manager.generateSnapshotDiffReport(
+          jobKey, jobId, VOLUME_NAME, BUCKET_NAME, from.getName(), to.getName(), true, false, false));
+      assertTrue(failure.getCause().getMessage().contains("Snapshot name mapping changed"));
+      assertEquals(FAILED, manager.getSnapDiffJobTable().get(jobKey).getStatus());
+      assertEquals(replaceOnOpen, opens.get());
+      assertEquals(replaceOnOpen - 1, openedIds.size());
+      Set<UUID> snapshotIds = new LinkedHashSet<>(replacementIds);
+      snapshotIds.add(from.getSnapshotId());
+      snapshotIds.add(to.getSnapshotId());
+      for (UUID id : snapshotIds) {
+        assertEquals(0, lock.getReadHoldCount(SNAPSHOT_DB_LOCK, id.toString()));
+        assertEquals(0, cache.totalRefCount(id));
+      }
+    }
   }
 
   private SnapshotDiffManager newSnapshotDiffManagerWithOptimizedEnabled(boolean enabled)

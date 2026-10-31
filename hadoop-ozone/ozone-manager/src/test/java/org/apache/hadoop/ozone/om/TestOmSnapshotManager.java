@@ -81,10 +81,12 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.HddsWhiteboxTestUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -93,8 +95,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.slf4j.event.Level;
 
 /**
@@ -165,6 +169,59 @@ class TestOmSnapshotManager {
       Files.deleteIfExists(snapshotYaml);
     }
     omSnapshotManager.invalidateCache();
+  }
+
+  private enum SnapshotScenario {
+    ACTIVE,
+    MISSING,
+    UUID_MISMATCH,
+    DELETED,
+    NAME_REUSED_AFTER_VALIDATION
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(SnapshotScenario.class)
+  public void testGetActiveSnapshotWithExpectedId(SnapshotScenario scenario) throws Exception {
+    OzoneManager manager = mock(OzoneManager.class);
+    OMMetadataManager metadata = mock(OMMetadataManager.class);
+    @SuppressWarnings("unchecked")
+    Table<String, SnapshotInfo> table = mock(Table.class);
+    SnapshotCache cache = mock(SnapshotCache.class);
+    OmSnapshotManager snapshots = mock(OmSnapshotManager.class);
+    when(manager.getMetadataManager()).thenReturn(metadata);
+    when(metadata.getSnapshotInfoTable()).thenReturn(table);
+    HddsWhiteboxTestUtils.setInternalState(snapshots, "ozoneManager", manager);
+    HddsWhiteboxTestUtils.setInternalState(snapshots, "snapshotCache", cache);
+    UUID expected = UUID.randomUUID();
+    SnapshotInfo info = SnapshotInfo.newInstance("vol", "bucket", "snap", expected, 1);
+    if (scenario == SnapshotScenario.DELETED) {
+      info.setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+    }
+    SnapshotInfo replacement = info.toBuilder().setSnapshotId(UUID.randomUUID()).build();
+    when(table.get(info.getTableKey())).thenReturn(
+        scenario == SnapshotScenario.MISSING ? null : scenario == SnapshotScenario.UUID_MISMATCH ? replacement : info);
+    Mockito.doCallRealMethod().when(snapshots).getActiveSnapshot("vol", "bucket", "snap", expected);
+    if (scenario == SnapshotScenario.MISSING || scenario == SnapshotScenario.UUID_MISMATCH ||
+        scenario == SnapshotScenario.DELETED) {
+      OMException failure = assertThrows(OMException.class,
+          () -> snapshots.getActiveSnapshot("vol", "bucket", "snap", expected));
+      assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, failure.getResult());
+      Mockito.verifyNoInteractions(cache);
+    } else {
+      @SuppressWarnings("unchecked")
+      UncheckedAutoCloseableSupplier<OmSnapshot> handle =
+          mock(UncheckedAutoCloseableSupplier.class);
+      when(cache.get(expected)).thenAnswer(invocation -> {
+        if (scenario == SnapshotScenario.NAME_REUSED_AFTER_VALIDATION) {
+          // Rename/name reuse after validation must not change the UUID passed to the cache.
+          when(table.get(info.getTableKey())).thenReturn(replacement);
+        }
+        return handle;
+      });
+      assertEquals(handle, snapshots.getActiveSnapshot("vol", "bucket", "snap", expected));
+      verify(cache).get(expected);
+      verify(table).get(info.getTableKey());
+    }
   }
 
   @Test

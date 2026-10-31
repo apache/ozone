@@ -658,6 +658,16 @@ public final class OmSnapshotManager implements AutoCloseable {
     return getSnapshot(volumeName, bucketName, snapshotName, false);
   }
 
+  /** Opens an active snapshot only if its name still identifies the expected UUID. */
+  public UncheckedAutoCloseableSupplier<OmSnapshot> getActiveSnapshot(
+      String volumeName, String bucketName, String snapshotName, UUID expectedSnapshotId) throws IOException {
+    Objects.requireNonNull(expectedSnapshotId, "expectedSnapshotId");
+    if (snapshotName == null || snapshotName.isEmpty()) {
+      throw new OMException(INVALID_KEY_NAME);
+    }
+    return getSnapshot(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName), false, expectedSnapshotId);
+  }
+
   public UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(
       String volumeName,
       String bucketName,
@@ -687,14 +697,24 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   private UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(String snapshotTableKey, boolean skipActiveCheck)
       throws IOException {
+    return getSnapshot(snapshotTableKey, skipActiveCheck, null);
+  }
+
+  private UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(
+      String snapshotTableKey, boolean skipActiveCheck, UUID expectedSnapshotId) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotTableKey);
+    UUID snapshotId = snapshotInfo.getSnapshotId();
+    if (expectedSnapshotId != null && !expectedSnapshotId.equals(snapshotId)) {
+      throw new OMException("Snapshot name mapping changed for '" + snapshotTableKey + "': expected UUID "
+          + expectedSnapshotId + ", actual UUID " + snapshotId, FILE_NOT_FOUND);
+    }
     // Block FS API reads when snapshot is not active.
     if (!skipActiveCheck) {
       checkSnapshotActive(snapshotInfo, false);
     }
 
     // retrieve the snapshot from the cache
-    return snapshotCache.get(snapshotInfo.getSnapshotId());
+    return snapshotCache.get(snapshotId);
   }
 
   /**

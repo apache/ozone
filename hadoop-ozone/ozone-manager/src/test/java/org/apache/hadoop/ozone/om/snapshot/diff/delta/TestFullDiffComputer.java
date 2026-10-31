@@ -236,8 +236,10 @@ public class TestFullDiffComputer {
 
     when(fromHandle.get()).thenReturn(fromSnap);
     when(toHandle.get()).thenReturn(toSnap);
-    when(omSnapshotManager.getActiveSnapshot("vol1", "bucket1", "snap1")).thenReturn(fromHandle);
-    when(omSnapshotManager.getActiveSnapshot("vol1", "bucket1", "snap2")).thenReturn(toHandle);
+    when(omSnapshotManager.getActiveSnapshot("vol1", "bucket1", "snap1", fromSnapshot.getSnapshotId()))
+        .thenReturn(fromHandle);
+    when(omSnapshotManager.getActiveSnapshot("vol1", "bucket1", "snap2", toSnapshot.getSnapshotId()))
+        .thenReturn(toHandle);
 
     TablePrefixInfo tablePrefixInfo = new TablePrefixInfo(tablePrefixMap);
 
