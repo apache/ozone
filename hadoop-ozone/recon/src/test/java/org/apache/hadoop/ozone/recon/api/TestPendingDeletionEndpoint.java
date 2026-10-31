@@ -23,11 +23,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
+import org.apache.hadoop.ozone.recon.api.types.BucketDeletedBytesCompleteResponse;
+import org.apache.hadoop.ozone.recon.api.types.BucketDeletedBytesProgressResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsProgressResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
@@ -50,17 +50,17 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 public class TestPendingDeletionEndpoint {
   private PendingDeletionEndpoint pendingDeletionEndpoint;
-  private ReconGlobalMetricsService reconGlobalMetricsService;
+  private BucketDeletedBytesMetricsService bucketDeletedBytesMetricsService;
   private DataNodeMetricsService dataNodeMetricsService;
   private StorageContainerLocationInternalInterface scmClient;
 
   @BeforeEach
   public void setup() {
-    reconGlobalMetricsService = mock(ReconGlobalMetricsService.class);
+    bucketDeletedBytesMetricsService = mock(BucketDeletedBytesMetricsService.class);
     dataNodeMetricsService = mock(DataNodeMetricsService.class);
     scmClient = mock(StorageContainerLocationInternalInterface.class);
     pendingDeletionEndpoint = new PendingDeletionEndpoint(
-        reconGlobalMetricsService, dataNodeMetricsService, scmClient);
+        bucketDeletedBytesMetricsService, dataNodeMetricsService, scmClient);
   }
 
   @Test
@@ -193,16 +193,35 @@ public class TestPendingDeletionEndpoint {
   }
 
   @Test
-  public void testOmComponentReturnsPendingDeletionSizes() {
-    Map<String, Long> pendingSizes = new HashMap<>();
-    pendingSizes.put("pendingDirectorySize", 200L);
-    pendingSizes.put("pendingKeySize", 400L);
-    pendingSizes.put("totalSize", 600L);
-    when(reconGlobalMetricsService.calculatePendingSizes()).thenReturn(pendingSizes);
+  public void testOmComponentReturnsOkWhenFinished() {
+    BucketDeletedBytesCompleteResponse metricsResponse = new BucketDeletedBytesCompleteResponse(
+        BucketDeletedBytesMetricsService.MetricCollectionStatus.FINISHED,
+        1,
+        0,
+        400L,
+        200L,
+        30L,
+        5L,
+        150L,
+        250L);
+    when(bucketDeletedBytesMetricsService.getCollectedMetrics()).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("om", 1);
 
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    assertEquals(pendingSizes, response.getEntity());
+    assertEquals(metricsResponse, response.getEntity());
+  }
+
+  @Test
+  public void testOmComponentReturnsAcceptedWhenInProgress() {
+    BucketDeletedBytesProgressResponse metricsResponse = new BucketDeletedBytesProgressResponse(
+        BucketDeletedBytesMetricsService.MetricCollectionStatus.IN_PROGRESS,
+        "Bucket deleted bytes collection task is currently running. Please wait for task to finish.");
+    when(bucketDeletedBytesMetricsService.getCollectedMetrics()).thenReturn(metricsResponse);
+
+    Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("om", 1);
+
+    assertEquals(Response.Status.ACCEPTED.getStatusCode(), response.getStatus());
+    assertEquals(metricsResponse, response.getEntity());
   }
 }

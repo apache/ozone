@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -35,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.recon.api.types.BucketDeletedBytesMetrics;
 import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -47,10 +49,14 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 public class BucketEndpoint {
 
   private ReconOMMetadataManager omMetadataManager;
+  private final BucketDeletedBytesMetricsService bucketDeletedBytesMetricsService;
 
   @Inject
-  public BucketEndpoint(ReconOMMetadataManager omMetadataManager) {
+  public BucketEndpoint(
+      ReconOMMetadataManager omMetadataManager,
+      BucketDeletedBytesMetricsService bucketDeletedBytesMetricsService) {
     this.omMetadataManager = omMetadataManager;
+    this.bucketDeletedBytesMetricsService = bucketDeletedBytesMetricsService;
   }
 
   @GET
@@ -63,10 +69,21 @@ public class BucketEndpoint {
   ) throws IOException {
     List<OmBucketInfo> buckets = omMetadataManager.listBucketsUnderVolume(
         volume, prevKey, limit);
+    Map<String, BucketDeletedBytesMetrics> trappedBytesMetrics =
+        bucketDeletedBytesMetricsService.getPerBucketMetrics();
     List<BucketObjectDBInfo> bucketMetadata = buckets
-        .stream().map(BucketObjectDBInfo::new).collect(Collectors.toList());
-    BucketsResponse bucketsResponse =
-        new BucketsResponse(buckets.size(), bucketMetadata);
+        .stream().map(bucket -> {
+          BucketObjectDBInfo bucketInfo = new BucketObjectDBInfo(bucket);
+          BucketDeletedBytesMetrics trappedBytes =
+              trappedBytesMetrics.get(bucket.getVolumeName() + "/" + bucket.getBucketName());
+          if (trappedBytes != null) {
+            bucketInfo.setTrappedBytes(trappedBytes.getSnapshotTrappedBytes());
+            bucketInfo.setTrappedKeys(trappedBytes.getSnapshotTrappedKeys());
+          }
+          return bucketInfo;
+        }).collect(Collectors.toList());
+    BucketsResponse bucketsResponse = new BucketsResponse(
+        buckets.size(), bucketMetadata, bucketDeletedBytesMetricsService.getCurrentStatus());
     return Response.ok(bucketsResponse).build();
   }
 }
