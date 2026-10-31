@@ -20,9 +20,8 @@ package org.apache.hadoop.hdds.client;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT_TYPE;
 
-import java.util.Objects;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
@@ -44,6 +43,8 @@ public interface ReplicationConfig {
     switch (type) {
     case RATIS:
       return RatisReplicationConfig.getInstance(factor);
+    case CHAINED:
+      return ChainedReplicationConfig.getInstance(factor);
     case STAND_ALONE:
       return StandaloneReplicationConfig.getInstance(factor);
     default:
@@ -62,15 +63,11 @@ public interface ReplicationConfig {
       org.apache.hadoop.hdds.client.ReplicationType type,
       org.apache.hadoop.hdds.client.ReplicationFactor factor
   ) {
-    return fromProtoTypeAndFactor(
-        HddsProtos.ReplicationType.valueOf(type.name()),
-        HddsProtos.ReplicationFactor.valueOf(factor.name()));
+    return fromProtoTypeAndFactor(type.toProto(), factor.toProto());
   }
 
   static ReplicationConfig getDefault(ConfigurationSource config) {
-    String replication =
-        config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
-    return parse(null, replication, config);
+    return parse(null, null, config);
   }
 
   static ReplicationConfig resolve(ReplicationConfig replicationConfig,
@@ -98,6 +95,7 @@ public interface ReplicationConfig {
     case EC:
       return new ECReplicationConfig(ecConfig);
     case RATIS:
+    case CHAINED:
     case STAND_ALONE:
       return fromProtoTypeAndFactor(type, factor);
     default:
@@ -149,26 +147,23 @@ public interface ReplicationConfig {
    * @param type the ReplicationType to parse from the replication string
    * @param replication the replication String that for example contains the
    *                    replication factor for RATIS replication.
-   * @param config the current Ozone configuration to apply validation on the
-   *               parsed object.
+   * @param conf the current Ozone configuration to apply validation on the parsed object.
    * @return a validated ReplicationConfig object that is allowed based on the
    *         system's configuration.
    * @throws IllegalArgumentException if the parsed ReplicationConfig is not
    *         allowed by the ozone.replication.allowed-configs property, or
    *         if the give replication type or replication can not be parsed.
-   * @throws NullPointerException if the ReplicationConfig was not created
-   *         for the type.
    */
-  static ReplicationConfig parse(ReplicationType type, String replication,
-      ConfigurationSource config) {
+  static ReplicationConfig parse(ReplicationType type, String replication, ConfigurationSource conf) {
     if (type == null) {
-      type = ReplicationType.valueOf(
-          config.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
+      final String confValue = conf.get(OZONE_REPLICATION_TYPE);
+      type = confValue != null ? ReplicationType.valueOf(confValue) : OZONE_REPLICATION_TYPE_DEFAULT_TYPE;
     }
-    replication = Objects.toString(replication,
-        config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
+    if (replication == null) {
+      replication = conf.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
+    }
 
-    return parseWithoutFallback(type, replication, config);
+    return parseWithoutFallback(type, replication, conf);
   }
 
   static ReplicationConfig parseWithoutFallback(ReplicationType type,
@@ -186,6 +181,7 @@ public interface ReplicationConfig {
     ReplicationConfig replicationConfig;
     switch (type) {
     case RATIS:
+    case CHAINED:
     case STAND_ALONE:
       ReplicationFactor factor;
       try {
