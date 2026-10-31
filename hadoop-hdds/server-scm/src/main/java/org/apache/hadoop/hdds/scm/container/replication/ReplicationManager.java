@@ -42,7 +42,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -575,8 +574,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
       throws CommandTargetOverloadedException, NotLeaderException {
     long containerID = containerInfo.getContainerID();
-    List<Pair<Integer, DatanodeDetails>> sourceWithCmds =
-        getAvailableDatanodesForReplication(sources);
+    List<DatanodeCommandCount> sourceWithCmds = getAvailableDatanodesForReplication(sources);
     if (sourceWithCmds.isEmpty()) {
       metrics.incrReplicateContainerCmdsDeferredTotal();
       throw new CommandTargetOverloadedException("No sources with capacity " +
@@ -618,8 +616,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         () -> {
           // Pick the least-loaded target datanode that can accept the command.
           List<DatanodeDetails> targets = command.getTargetDatanodes();
-          List<Pair<Integer, DatanodeDetails>> targetWithCmds =
-              getAvailableDatanodesForReplication(targets);
+          List<DatanodeCommandCount> targetWithCmds = getAvailableDatanodesForReplication(targets);
           if (targetWithCmds.isEmpty()) {
             metrics.incrECReconstructionCmdsDeferredTotal();
             throw new CommandTargetOverloadedException("No target with capacity " +
@@ -662,14 +659,14 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   }
 
   private DatanodeDetails selectAndOptionallyExcludeDatanode(
-      int additionalCmdCount, List<Pair<Integer, DatanodeDetails>> datanodes) {
+      int additionalCmdCount, List<DatanodeCommandCount> datanodes) {
     if (datanodes.isEmpty()) {
       return null;
     }
     // Put the least loaded datanode first
-    datanodes.sort(Comparator.comparingInt(Pair::getLeft));
-    DatanodeDetails datanode = datanodes.get(0).getRight();
-    int currentCount = datanodes.get(0).getLeft();
+    datanodes.sort(Comparator.comparingInt(DatanodeCommandCount::commandCount));
+    DatanodeDetails datanode = datanodes.get(0).datanode();
+    int currentCount = datanodes.get(0).commandCount();
     if (currentCount + additionalCmdCount >= getReplicationLimit(datanode)) {
       addExcludedNode(datanode);
     }
@@ -686,10 +683,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * @return List of datanodes with the current command count that are not over
    *         the limit.
    */
-  private List<Pair<Integer, DatanodeDetails>>
-      getAvailableDatanodesForReplication(List<DatanodeDetails> datanodes) {
-    List<Pair<Integer, DatanodeDetails>> datanodeWithCommandCount
-        = new ArrayList<>();
+  private List<DatanodeCommandCount> getAvailableDatanodesForReplication(List<DatanodeDetails> datanodes) {
+    List<DatanodeCommandCount> datanodeWithCommandCount = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
       try {
         int totalCount = getQueuedReplicationCount(dn);
@@ -701,7 +696,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           addExcludedNode(dn);
           continue;
         }
-        datanodeWithCommandCount.add(Pair.of(totalCount, dn));
+        datanodeWithCommandCount.add(new DatanodeCommandCount(totalCount, dn));
       } catch (NodeNotFoundException e) {
         LOG.error("Node {} not found in NodeManager. Should not happen",
             dn, e);
@@ -1893,5 +1888,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private interface ReconstructionSendAction {
     void run() throws CommandTargetOverloadedException, NotLeaderException;
   }
+
+  /**
+   * A datanode paired with its current queued replication command count,
+   * used to pick the least loaded datanode for a new command.
+   */
+  private record DatanodeCommandCount(int commandCount, DatanodeDetails datanode) { }
 }
 

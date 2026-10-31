@@ -71,7 +71,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -94,6 +93,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeIdCommand;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.NodeOperationalStateAndIndex;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -145,7 +146,7 @@ public class TestReplicationManager {
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
   private ReplicationQueue repQueue;
-  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
+  private Set<DatanodeIdCommand> commandsSent;
 
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException {
@@ -167,7 +168,7 @@ public class TestReplicationManager {
     commandsSent = new HashSet<>();
     eventPublisher = mock(EventPublisher.class);
     doAnswer(invocation -> {
-      commandsSent.add(Pair.of(invocation.getArgument(0),
+      commandsSent.add(new DatanodeIdCommand(invocation.getArgument(0),
           invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
@@ -419,10 +420,8 @@ public class TestReplicationManager {
     handler.processAndSendCommands(replicas, Collections.emptyList(),
             repQueue.dequeueOverReplicatedContainer(), 2);
     assertTrue(commandsSent.iterator().hasNext());
-    assertEquals(unhealthy.getDatanodeDetails().getID(),
-        commandsSent.iterator().next().getKey());
-    assertEquals(SCMCommandProto.Type.deleteContainerCommand,
-        commandsSent.iterator().next().getValue().getType());
+    assertEquals(unhealthy.getDatanodeDetails().getID(), commandsSent.iterator().next().datanodeId());
+    assertEquals(SCMCommandProto.Type.deleteContainerCommand, commandsSent.iterator().next().command().getType());
 
   }
 
@@ -893,17 +892,12 @@ public class TestReplicationManager {
     // a delete command should also have been sent for UNHEALTHY replica of
     // index 1
     assertEquals(1, commandsSent.size());
-    Pair<DatanodeID, SCMCommand<?>> command = commandsSent.iterator().next();
-    assertEquals(SCMCommandProto.Type.deleteContainerCommand,
-        command.getValue().getType());
-    DeleteContainerCommand deleteCommand =
-        (DeleteContainerCommand) command.getValue();
-    assertEquals(unhealthyReplica1.getDatanodeDetails().getID(),
-        command.getKey());
-    assertEquals(container.containerID(),
-        ContainerID.valueOf(deleteCommand.getContainerID()));
-    assertEquals(unhealthyReplica1.getReplicaIndex(),
-        deleteCommand.getReplicaIndex());
+    DatanodeIdCommand command = commandsSent.iterator().next();
+    assertEquals(SCMCommandProto.Type.deleteContainerCommand, command.command().getType());
+    DeleteContainerCommand deleteCommand = (DeleteContainerCommand) command.command();
+    assertEquals(unhealthyReplica1.getDatanodeDetails().getID(), command.datanodeId());
+    assertEquals(container.containerID(), ContainerID.valueOf(deleteCommand.getContainerID()));
+    assertEquals(unhealthyReplica1.getReplicaIndex(), deleteCommand.getReplicaIndex());
   }
 
   @Test
@@ -1046,9 +1040,9 @@ public class TestReplicationManager {
     ContainerInfo decomContainer = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(decomContainer, ContainerReplicaProto.State.CLOSED,
-        Pair.of(DECOMMISSIONING, 1),
-        Pair.of(DECOMMISSIONING, 2), Pair.of(DECOMMISSIONING, 3),
-        Pair.of(DECOMMISSIONING, 4), Pair.of(DECOMMISSIONING, 5));
+        new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+        new NodeOperationalStateAndIndex(DECOMMISSIONING, 2), new NodeOperationalStateAndIndex(DECOMMISSIONING, 3),
+        new NodeOperationalStateAndIndex(DECOMMISSIONING, 4), new NodeOperationalStateAndIndex(DECOMMISSIONING, 5));
 
     ContainerInfo underRep1 = createContainerInfo(repConfig, 2,
         HddsProtos.LifeCycleState.CLOSED);
@@ -1331,12 +1325,10 @@ public class TestReplicationManager {
         container, new ArrayList<>(sourceNodes), destination, replicaIndex);
 
     assertEquals(1, commandsSent.size());
-    Pair<DatanodeID, SCMCommand<?>> cmdWithTarget = commandsSent.iterator().next();
-    assertEquals(expectedTarget.getID(), cmdWithTarget.getLeft());
-    assertEquals(ReplicateContainerCommand.class,
-        cmdWithTarget.getRight().getClass());
-    ReplicateContainerCommand cmd =
-        (ReplicateContainerCommand) cmdWithTarget.getRight();
+    DatanodeIdCommand cmdWithTarget = commandsSent.iterator().next();
+    assertEquals(expectedTarget.getID(), cmdWithTarget.datanodeId());
+    assertEquals(ReplicateContainerCommand.class, cmdWithTarget.command().getClass());
+    ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmdWithTarget.command();
     assertEquals(destination, cmd.getTargetDatanode());
     assertEquals(replicaIndex, cmd.getReplicaIndex());
   }
@@ -1393,10 +1385,9 @@ public class TestReplicationManager {
     replicationManager.sendThrottledReconstructionCommand(container, command);
 
     assertEquals(1, commandsSent.size());
-    Pair<DatanodeID, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    assertEquals(cmdTarget.getID(), cmd.getLeft());
-    assertEquals(0, replicationManager.getMetrics()
-        .getEcReconstructionCmdsDeferredTotal());
+    DatanodeIdCommand cmd = commandsSent.iterator().next();
+    assertEquals(cmdTarget.getID(), cmd.datanodeId());
+    assertEquals(0, replicationManager.getMetrics().getEcReconstructionCmdsDeferredTotal());
   }
 
   @Test
@@ -1476,9 +1467,8 @@ public class TestReplicationManager {
     replicationManager.sendThrottledReconstructionCommand(container, command);
 
     assertEquals(1, commandsSent.size());
-    Pair<DatanodeID, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    ReconstructECContainersCommand sent =
-        (ReconstructECContainersCommand) cmd.getValue();
+    DatanodeIdCommand cmd = commandsSent.iterator().next();
+    ReconstructECContainersCommand sent = (ReconstructECContainersCommand) cmd.command();
     assertEquals(lower, sent.getApparentVersion());
   }
 
@@ -1675,10 +1665,10 @@ public class TestReplicationManager {
 
     replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), true);
     assertEquals(1, commandsSent.size());
-    Pair<DatanodeID, SCMCommand<?>> sentCommand = commandsSent.iterator().next();
+    DatanodeIdCommand sentCommand = commandsSent.iterator().next();
     // The target should be DN2 and the deadline should have been updated from the value set in commandDeadline above
-    assertEquals(dn2.getID(), sentCommand.getLeft());
-    assertNotEquals(commandDeadline, sentCommand.getRight().getDeadline());
+    assertEquals(dn2.getID(), sentCommand.datanodeId());
+    assertNotEquals(commandDeadline, sentCommand.command().getDeadline());
   }
 
   @ParameterizedTest
@@ -1796,7 +1786,7 @@ public class TestReplicationManager {
   @SafeVarargs
   private final Set<ContainerReplica>  addReplicas(ContainerInfo container,
       ContainerReplicaProto.State replicaState,
-      Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
+      NodeOperationalStateAndIndex... nodes) {
     final Set<ContainerReplica> replicas =
         createReplicas(container.containerID(), replicaState, nodes);
     storeContainerAndReplicas(container, replicas);
