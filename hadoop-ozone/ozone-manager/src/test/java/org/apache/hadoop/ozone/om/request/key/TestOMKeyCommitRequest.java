@@ -883,7 +883,9 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     OMKeyCommitRequest omKeyCommitRequest = getOmKeyCommitRequest(modifiedOmRequest);
 
-    addKeyToOpenKeyTable(allocatedBlockList);
+    // A non-zero object ID, to tell whether the pseudo key of the uncommitted blocks keeps it
+    addKeyToOpenKeyTable(allocatedBlockList, OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), false)).setObjectID(100L));
 
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 102L);
@@ -925,6 +927,8 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertEquals(DEFAULT_COMMIT_BLOCK_SIZE, overwrittenKey.getLatestVersionLocations().createLocationList().size());
     assertEquals(allocatedKeyLocationList.size() - committedKeyLocationList.size(),
         uncommittedPseudoKey.getLatestVersionLocations().createLocationList().size());
+    // A snapshot's version of the key is matched by object ID
+    assertThat(uncommittedPseudoKey.getObjectID()).isNotZero().isEqualTo(omKeyInfo.getObjectID());
 
     // flush response content to db
     BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
