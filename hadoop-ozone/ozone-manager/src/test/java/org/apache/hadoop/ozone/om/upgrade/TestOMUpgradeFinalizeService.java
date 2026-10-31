@@ -32,7 +32,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -63,7 +63,7 @@ public class TestOMUpgradeFinalizeService {
   private OMVersionManager versionManager;
   private TypedTable<String, String> metaTable;
   private ScmClient scmClient;
-  private ScmBlockLocationProtocol blockClient;
+  private ScmBlockLocationInternalInterface blockClient;
   private OzoneManagerRatisServer omRatisServer;
   private OMUpgradeFinalizeService service;
 
@@ -88,7 +88,7 @@ public class TestOMUpgradeFinalizeService {
     // OzoneManagerRatisUtils.submitRequest() calls ozoneManager.getOmRatisServer().submitRequest(...)
     when(ozoneManager.getOmRatisServer()).thenReturn(omRatisServer);
 
-    blockClient = mock(ScmBlockLocationProtocol.class);
+    blockClient = mock(ScmBlockLocationInternalInterface.class);
     scmClient = mock(ScmClient.class);
     when(scmClient.getBlockClient()).thenReturn(blockClient);
 

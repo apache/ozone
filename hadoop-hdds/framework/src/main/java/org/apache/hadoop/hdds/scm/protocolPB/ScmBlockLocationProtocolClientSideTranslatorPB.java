@@ -65,7 +65,7 @@ import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io_.retry.RetryProxy;
@@ -79,12 +79,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class is the client-side translator to translate the requests made on
- * the {@link ScmBlockLocationProtocol} interface to the RPC server
+ * the {@link ScmBlockLocationInternalInterface} interface to the RPC server
  * implementing {@link ScmBlockLocationProtocolPB}.
  */
 @InterfaceAudience.Private
 public final class ScmBlockLocationProtocolClientSideTranslatorPB
-    implements ScmBlockLocationProtocol, ProtocolTranslator, Closeable {
+    implements ScmBlockLocationInternalInterface, ProtocolTranslator, Closeable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ScmBlockLocationProtocolClientSideTranslatorPB.class);

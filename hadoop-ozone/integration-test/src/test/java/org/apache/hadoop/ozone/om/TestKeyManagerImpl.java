@@ -100,7 +100,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -157,7 +157,7 @@ public class TestKeyManagerImpl {
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;
   private static StorageContainerManager scm;
-  private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
+  private static ScmBlockLocationInternalInterface mockScmBlockLocationProtocol;
   private static StorageContainerLocationInternalInterface mockScmContainerClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
@@ -182,7 +182,7 @@ public class TestKeyManagerImpl {
     final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME,
         conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
+    mockScmBlockLocationProtocol = mock(ScmBlockLocationInternalInterface.class);
     MockNodeManager nodeManager = new MockNodeManager(true, 10);
     NodeSchema[] schemas = new NodeSchema[]
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
