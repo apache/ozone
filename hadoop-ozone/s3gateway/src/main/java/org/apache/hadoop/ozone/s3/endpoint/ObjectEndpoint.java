@@ -395,6 +395,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       context.setAction(S3GAction.GET_KEY);
 
+      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
+      validatePartNumberAndRange(partNumber, rangeHeaderVal, keyPath);
+
       OzoneKeyDetails keyDetails = (partNumber != 0) ?
           getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
           getClientProtocol().getS3KeyDetails(bucketName, keyPath);
@@ -416,7 +419,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       LOG.debug("Data length of the key {} is {}", keyPath, length);
 
-      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
       RangeHeader rangeHeader = null;
 
       LOG.debug("range Header provided value: {}", rangeHeaderVal);
@@ -502,6 +504,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     } catch (IOException | RuntimeException ex) {
       getMetrics().updateGetKeyFailureStats(startNanos);
       throw ex;
+    }
+  }
+
+  private static void validatePartNumberAndRange(int partNumber, String rangeHeaderVal, String keyPath) {
+    if (partNumber != 0 && rangeHeaderVal != null) {
+      throw newError(INVALID_REQUEST, keyPath)
+          .withMessage("Cannot specify both Range header and partNumber query parameter");
     }
   }
 
@@ -645,6 +654,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         OzoneBucket bucket = getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
+      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
+      validatePartNumberAndRange(partNumber, rangeHeaderVal, keyPath);
+
       // A partNumber is validated against the object's parts and yields the
       // metadata of that part; an out-of-range part throws InvalidPart.
       key = (partNumber != 0) ?
@@ -660,7 +672,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         return conditionalResponse;
       }
 
-      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
       if (rangeHeaderVal != null) {
         rangeHeader = RangeHeaderParserUtil.parseRangeHeader(rangeHeaderVal, key.getDataSize());
         if (rangeHeader.isInValidRange()) {

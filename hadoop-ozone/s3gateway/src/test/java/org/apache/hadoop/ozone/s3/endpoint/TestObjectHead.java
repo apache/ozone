@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CACHE_CONTROL_CUSTOM;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_DISPOSITION_CUSTOM;
@@ -28,10 +29,14 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.EXPIRES_CUSTOM;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.endpoint.TestObjectGet.EXPIRES1;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_RANGE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
@@ -44,6 +49,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UN
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -76,6 +82,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test head object.
@@ -129,12 +137,48 @@ public class TestObjectHead {
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, "badKeyName"));
   }
 
-  @Test
-  public void testHeadWithNegativePartNumber() throws Exception {
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = "bytes=0-4")
+  public void testHeadWithNegativePartNumber(String range) throws Exception {
     keyEndpoint.queryParamsForTest()
         .setInt(S3Consts.QueryParams.PART_NUMBER, -1);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
     assertErrorResponse(INVALID_ARGUMENT,
         () -> keyEndpoint.head(bucketName, "key1"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"bytes=0-4", "bytes=100-200", "bytes=abc", ""})
+  public void testHeadWithPartNumberAndRange(String range) throws Exception {
+    String uploadId = initiateMultipartUpload(keyEndpoint, bucketName, RANGE_KEY);
+    CompleteMultipartUploadRequest.Part part =
+        uploadPart(keyEndpoint, bucketName, RANGE_KEY, 2, uploadId, RANGE_CONTENT);
+    completeMultipartUpload(keyEndpoint, bucketName, RANGE_KEY, uploadId, singletonList(part));
+    keyEndpoint.queryParamsForTest().unset(S3Consts.QueryParams.UPLOAD_ID);
+    keyEndpoint.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 2);
+    assertSucceeds(() -> keyEndpoint.head(bucketName, RANGE_KEY));
+
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+    long failureBefore = keyEndpoint.getMetrics().getHeadKeyFailure();
+
+    OS3Exception exception = assertErrorResponse(INVALID_REQUEST, () -> keyEndpoint.head(bucketName, RANGE_KEY));
+
+    assertThat(exception.getErrorMessage())
+        .isEqualTo("Cannot specify both Range header and partNumber query parameter");
+    assertThat(keyEndpoint.getMetrics().getHeadKeyFailure() - failureBefore).isEqualTo(1);
+  }
+
+  @Test
+  public void testHeadWithZeroPartNumberAndRange() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    keyEndpoint.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 0);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-4");
+
+    try (Response response = keyEndpoint.head(bucketName, RANGE_KEY)) {
+      assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_PARTIAL_CONTENT);
+      assertThat(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)).isEqualTo("5");
+    }
   }
 
   @ParameterizedTest
