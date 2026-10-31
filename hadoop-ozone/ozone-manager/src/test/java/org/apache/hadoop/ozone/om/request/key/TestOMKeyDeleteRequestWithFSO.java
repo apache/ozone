@@ -24,13 +24,20 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -46,6 +53,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -289,9 +297,12 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
    * Creates child directory and file, deletes them, then tries to delete parent.
    * This test exposes a Ratis transaction visibility issue where deleted
    * entries are in cache but not yet flushed to DB via double buffer.
+   * With flushDuringEmptinessCheck, the double buffer flushes them right after
+   * the emptiness check of the parent delete has opened its DB iterator.
    */
-  @Test
-  public void testDeleteParentAfterChildDeleted() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testDeleteParentAfterChildDeleted(boolean flushDuringEmptinessCheck) throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
 
     String parentDir = "parent";
@@ -299,6 +310,8 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Create a child directory (tests checkSubDirectoryExists path)
     OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, parentDir + "/childDir", omMetadataManager);
+    String childDirKey = omMetadataManager.getOzonePathKey(omMetadataManager.getVolumeId(volumeName),
+        omMetadataManager.getBucketId(volumeName, bucketName), parentId, "childDir");
 
     // Create a child file (tests checkSubFileExists path)
     String fileName = "childFile";
@@ -309,7 +322,8 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         .setUpdateID(50L)
         .build();
     fileInfo.setKeyName(fileName);
-    OMRequestTestUtils.addFileToKeyTable(false, false, fileName, fileInfo, -1, 50, omMetadataManager);
+    String childFileKey =
+        OMRequestTestUtils.addFileToKeyTable(false, false, fileName, fileInfo, -1, 50, omMetadataManager);
 
     // Delete the child directory
     long txnId = 1000L;
@@ -328,12 +342,38 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Try to delete parent (should succeed but fails without fix)
     OMRequest deleteParentRequest = doPreExecute(createDeleteKeyRequest(parentDir, false));
+    if (flushDuringEmptinessCheck) {
+      // txnId - 2 and txnId - 1 are the deletes of the child directory and the child file
+      Table<String, OmDirectoryInfo> dirTable =
+          flushDeleteWhenIteratorIsOpened(omMetadataManager.getDirectoryTable(), childDirKey, txnId - 2);
+      Table<String, OmKeyInfo> fileTable =
+          flushDeleteWhenIteratorIsOpened(omMetadataManager.getKeyTable(getBucketLayout()), childFileKey, txnId - 1);
+      doReturn(dirTable).when(omMetadataManager).getDirectoryTable();
+      doReturn(fileTable).when(omMetadataManager).getKeyTable(getBucketLayout());
+    }
     OMKeyDeleteRequest deleteParentKeyRequest = getOmKeyDeleteRequest(deleteParentRequest);
     OMClientResponse response = deleteParentKeyRequest.validateAndUpdateCache(ozoneManager, txnId);
 
     // This should succeed after the fix
     assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus(),
         "Parent delete should succeed after children deleted");
+  }
+
+  /**
+   * Returns a view of the table that behaves as if the double buffer flushed the delete of the given key right
+   * after an iterator was opened: the row is removed from DB first, then its cache entry is evicted.
+   */
+  private static <V> Table<String, V> flushDeleteWhenIteratorIsOpened(Table<String, V> table, String key,
+      long epoch) throws Exception {
+    Table<String, V> tableSpy = spy(table);
+    doAnswer(invocation -> {
+      Object iterator = invocation.callRealMethod();
+      table.delete(key);
+      table.cleanupCache(Collections.singletonList(epoch));
+      GenericTestUtils.waitFor(() -> table.getCacheValue(new CacheKey<>(key)) == null, 10, 10_000);
+      return iterator;
+    }).when(tableSpy).iterator(anyString());
+    return tableSpy;
   }
 
   @Test
