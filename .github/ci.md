@@ -48,11 +48,6 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - rat (release audit tool): [Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
 
 
-#### unit job
-Performs unit tests (if necessary) in two parts:
-- unit: [Runs](../hadoop-ozone/dev-support/checks/unit.sh) 'mvn test' for all non integration tests
-- native: [Runs](../hadoop-ozone/dev-support/checks/native.sh) 'mvn test' for all tests that require RocksDB native library to be built (few tests but longer build process)
-
 #### dependency job
 [Confirms](../hadoop-ozone/dev-support/checks/dependency.sh) that the list of jars included in the current build matches the expected ones defined [here](../hadoop-ozone/dist/src/main/license/jar-report.txt)
 
@@ -65,12 +60,11 @@ If they don't match, it describes how to make the updates to include the changes
 [Runs](../hadoop-ozone/dev-support/checks/kubernetes.sh) k8s tests
 
 #### integration job
-[Runs](../hadoop-ozone/dev-support/checks/integration.sh) 'mvn test' for all integration/minicluster tests, split into multiple subjobs, by a matrix config.
+[Runs](../hadoop-ozone/dev-support/checks/integration.sh) 'mvn test' for all junit tests, split into multiple subjobs, by a matrix config.
 
 #### coverage job
 [Merges](../hadoop-ozone/dev-support/checks/coverage.sh) the coverage data from the following jobs that were run earlier:
 - acceptance
-- basic
 - integration
 
 ### close-stale-prs Workflow

@@ -184,8 +184,7 @@ The [`hadoop-ozone/dev-support/checks` directory](https://github.com/apache/ozon
     * `findbugs.sh`: SpotBugs
     * `kubernetes.sh`: very limited set of tests run in Kubernetes environment
  4. slow (around 1 hour or more)
-    * `unit.sh`: pure unit tests
-    * `integration.sh`: Java-based tests using single JVM "mini cluster"
+    * `junit.sh`: Java-based tests
     * `acceptance.sh`: rather complete set of tests in Docker Compose-based environment
 
 The set of tests run by `integration` and `acceptance` may be limited via arguments, please see the scripts for details.  This is used by CI to run them in multiple splits to avoid taking too much time.
