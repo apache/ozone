@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -32,29 +35,57 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientReply;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.MockDatanodeStorage;
+import org.apache.hadoop.ozone.client.MockOmTransport;
+import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.client.MockXceiverClientSpi;
+import org.apache.hadoop.ozone.client.MultiNodePipelineBlockAllocator;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.event.Level;
 
 /**
@@ -197,5 +228,236 @@ public class TestKeyOutputStream {
     // Reader must see the allocated entry, not the intermediate null (fails without the fix).
     assertSame(allocation.get(5, TimeUnit.SECONDS), read.get(5, TimeUnit.SECONDS),
         "Reader must not observe the intermediate index before the new entry is added");
+  }
+
+  /**
+   * A call fails for good and the stream is closed while a second call is in progress. The buffered data is dropped
+   * with the stream, so the second call must fail as well.
+   * @param call the second call
+   * @param pauseInFlush whether the second call starts when the first call is sending its data to the datanodes, or
+   *                     when it is handling the failure
+   * @param maxRetries how often the client retries a failed write
+   */
+  @ParameterizedTest
+  @CsvSource({"hsync, true, 5", "hsync, false, 5", "hsync, false, 0", "flush, false, 5", "write, false, 0"})
+  @Timeout(120)
+  void testCallInProgressFailsWhenStreamFails(String call, boolean pauseInFlush, int maxRetries) throws Exception {
+    final byte[] synced = "synced".getBytes(UTF_8);
+    final byte[] notSynced = "not synced".getBytes(UTF_8);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.setInt("ozone.client.key.write.concurrency", -1);
+    conf.setInt("ozone.client.max.retries", maxRetries);
+
+    AtomicBoolean failWrites = new AtomicBoolean();
+    AtomicBoolean paused = new AtomicBoolean();
+    CountDownLatch firstCallPaused = new CountDownLatch(1);
+    CountDownLatch secondCallBlocked = new CountDownLatch(1);
+    MockXceiverClientFactory factory = new MockXceiverClientFactory() {
+      private void pauseFirstCall(boolean inFlush) {
+        if (failWrites.get() && inFlush == pauseInFlush && paused.compareAndSet(false, true)) {
+          pause(firstCallPaused, secondCallBlocked);
+        }
+      }
+
+      @Override
+      public XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit)
+          throws IOException {
+        return new MockXceiverClientSpi(pipeline,
+            getStorages().computeIfAbsent(pipeline.getFirstNode(), dn -> new MockDatanodeStorage())) {
+          @Override
+          public XceiverClientReply sendCommandAsync(ContainerCommandRequestProto request) {
+            if (!failWrites.get()) {
+              return super.sendCommandAsync(request);
+            }
+            // The caller holds the monitor of the block stream.
+            pauseFirstCall(true);
+            return new XceiverClientReply(CompletableFuture.completedFuture(ContainerCommandResponseProto.newBuilder()
+                .setCmdType(request.getCmdType()).setResult(Result.CLOSED_CONTAINER_IO).build()));
+          }
+        };
+      }
+
+      @Override
+      public void releaseClient(XceiverClientSpi client, boolean invalidateClient) {
+        // The failure handling releases the client of the failed block with the write lock of the key stream held.
+        pauseFirstCall(false);
+      }
+    };
+
+    Thread first = null;
+    Thread second = null;
+    try (OzoneClient client = newClient(conf, factory)) {
+      OzoneBucket bucket = createBucket(client);
+      OzoneOutputStream out = bucket.createKey("key", 0, RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+          new HashMap<>());
+      out.write(synced);
+      out.hsync();
+      out.write(notSynced);
+      failWrites.set(true);
+
+      FutureTask<Void> firstCall = new FutureTask<>(() -> {
+        out.hsync();
+        return null;
+      });
+      FutureTask<Void> secondCall = new FutureTask<>(() -> {
+        if ("hsync".equals(call)) {
+          out.hsync();
+        } else if ("flush".equals(call)) {
+          out.flush();
+        } else {
+          out.write(notSynced);
+        }
+        return null;
+      });
+      first = new Thread(firstCall, "first-call");
+      second = new Thread(secondCall, "second-call");
+      first.start();
+      assertThat(firstCallPaused.await(30, TimeUnit.SECONDS)).isTrue();
+      second.start();
+      // The second call is in progress when it waits for a lock that the first call holds.
+      waitUntilBlockedBy(second, first);
+      secondCallBlocked.countDown();
+
+      // Either call can be the one that handles the failure and gives up after its retries.
+      assertThatThrownBy(() -> firstCall.get(30, TimeUnit.SECONDS)).hasCauseInstanceOf(IOException.class);
+      assertThatThrownBy(() -> secondCall.get(30, TimeUnit.SECONDS)).hasCauseInstanceOf(IOException.class);
+      assertThatThrownBy(out::hsync).isInstanceOf(IOException.class).hasMessageContaining("Stream is closed");
+      // The data synced before the failure is not affected.
+      try (OzoneInputStream in = bucket.readKey("key")) {
+        byte[] read = new byte[synced.length + notSynced.length];
+        assertThat(in.read(read)).isEqualTo(synced.length);
+        assertThat(read).startsWith(synced);
+      }
+    } finally {
+      secondCallBlocked.countDown();
+      joinThreads(first, second);
+    }
+  }
+
+  /**
+   * With the default configuration, a flush is in progress when another thread closes the stream. Nothing has
+   * failed and close() commits the data, so the flush must return normally.
+   */
+  @Test
+  @Timeout(120)
+  void testFlushInProgressSucceedsWhenStreamIsClosed() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // One full buffer, so that the flush has something to send with the default flush delay.
+    final byte[] data = new byte[conf.getObject(OzoneClientConfig.class).getStreamBufferSize()];
+    Arrays.fill(data, (byte) 'a');
+
+    AtomicBoolean pauseNextRequest = new AtomicBoolean();
+    CountDownLatch flushPaused = new CountDownLatch(1);
+    CountDownLatch closeBlocked = new CountDownLatch(1);
+    MockXceiverClientFactory factory = new MockXceiverClientFactory() {
+      @Override
+      public XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit)
+          throws IOException {
+        return new MockXceiverClientSpi(pipeline,
+            getStorages().computeIfAbsent(pipeline.getFirstNode(), dn -> new MockDatanodeStorage())) {
+          @Override
+          public XceiverClientReply sendCommandAsync(ContainerCommandRequestProto request) {
+            if (pauseNextRequest.compareAndSet(true, false)) {
+              // The caller holds the monitor of the block stream.
+              pause(flushPaused, closeBlocked);
+            }
+            return super.sendCommandAsync(request);
+          }
+        };
+      }
+    };
+
+    Thread flusher = null;
+    Thread closer = null;
+    try (OzoneClient client = newClient(conf, factory)) {
+      OzoneBucket bucket = createBucket(client);
+      OzoneOutputStream out = bucket.createKey("key", 0, RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+          new HashMap<>());
+      out.write(data);
+      pauseNextRequest.set(true);
+
+      // OzoneOutputStream runs hflush() as flush() of the key stream unless hsync is enabled, and does not
+      // synchronize it with close().
+      FutureTask<Void> flush = new FutureTask<>(() -> {
+        out.hflush();
+        return null;
+      });
+      FutureTask<Void> close = new FutureTask<>(() -> {
+        out.close();
+        return null;
+      });
+      flusher = new Thread(flush, "flusher");
+      closer = new Thread(close, "closer");
+      flusher.start();
+      assertThat(flushPaused.await(30, TimeUnit.SECONDS)).isTrue();
+      closer.start();
+      // close() holds the write lock of the key stream and waits for the block stream.
+      waitUntilBlockedBy(closer, flusher);
+      closeBlocked.countDown();
+
+      flush.get(30, TimeUnit.SECONDS);
+      close.get(30, TimeUnit.SECONDS);
+      assertThat(bucket.getKey("key").getDataSize()).isEqualTo(data.length);
+      try (OzoneInputStream in = bucket.readKey("key")) {
+        byte[] read = new byte[data.length];
+        IOUtils.readFully(in, read);
+        assertThat(read).isEqualTo(data);
+      }
+    } finally {
+      closeBlocked.countDown();
+      joinThreads(flusher, closer);
+    }
+  }
+
+  private static OzoneClient newClient(OzoneConfiguration conf, XceiverClientFactory factory) throws IOException {
+    return new OzoneClient(conf, new RpcClient(conf, null) {
+      @Override
+      protected OmTransport createOmTransport(String omServiceId) {
+        return new MockOmTransport(new MultiNodePipelineBlockAllocator(conf, 3, 9));
+      }
+
+      @Nonnull
+      @Override
+      protected XceiverClientFactory createXceiverClientFactory(ServiceInfoEx serviceInfo) {
+        return factory;
+      }
+    });
+  }
+
+  private static OzoneBucket createBucket(OzoneClient client) throws IOException {
+    ObjectStore store = client.getObjectStore();
+    store.createVolume("vol");
+    store.getVolume("vol").createBucket("bucket");
+    return store.getVolume("vol").getBucket("bucket");
+  }
+
+  /** Report that the calling thread has reached the point and hold it there until it is released. */
+  private static void pause(CountDownLatch reached, CountDownLatch release) {
+    reached.countDown();
+    try {
+      release.await(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  /** Wait until the thread waits for a lock that the owner holds. */
+  private static void waitUntilBlockedBy(Thread thread, Thread owner) throws Exception {
+    ThreadMXBean threads = ManagementFactory.getThreadMXBean();
+    GenericTestUtils.waitFor(() -> {
+      ThreadInfo info = threads.getThreadInfo(thread.getId());
+      return info != null && info.getLockOwnerId() == owner.getId();
+    }, 10, 30000);
+  }
+
+  private static void joinThreads(Thread... threads) throws InterruptedException {
+    for (Thread thread : threads) {
+      if (thread != null) {
+        thread.interrupt();
+        thread.join(30000);
+      }
+    }
   }
 }
