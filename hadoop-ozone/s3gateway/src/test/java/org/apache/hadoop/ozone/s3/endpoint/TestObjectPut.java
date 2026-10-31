@@ -205,6 +205,18 @@ class TestObjectPut {
   }
 
   @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {"abc", "99999999999999999999", "0", "37"})
+  void testNonStreamingPutIgnoresDecodedContentLength(String decodedLength) throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(decodedLength);
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    assertThat(assertKeyContent(bucket, KEY_NAME, CONTENT).getDataSize()).isEqualTo(CONTENT.length());
+  }
+
+  @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testRejectMalformedContentSha256BeforeReadingBody(boolean streaming) throws Exception {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("invalid");
@@ -1292,6 +1304,18 @@ class TestObjectPut {
     assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
         () -> objectEndpoint.put(FSO_BUCKET_NAME, "dir/", new ByteArrayInputStream(body)));
     assertThatThrownBy(() -> fsoBucket.getKey("dir/")).isInstanceOf(IOException.class);
+  }
+
+  @Test
+  void testNonStreamingPutWithDecodedLengthZeroDoesNotCreateDirectory() throws Exception {
+    String path = "dir/";
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("0");
+
+    assertSucceeds(() -> putObject(FSO_BUCKET_NAME, path));
+
+    OzoneKeyDetails key = assertKeyContent(fsoBucket, path, CONTENT);
+    assertThat(key.isFile()).isTrue();
   }
 
   @Test
