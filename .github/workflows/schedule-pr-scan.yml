@@ -13,20 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This workflow periodically applies labels for PRs.
+# This workflow periodically scans open PRs to take write actions like adding labels or posting comments.
 
-name: scheduled-label-pull-requests
+name: scheduled-pull-request-scans
 
 on:
-  # every 30 minutes; component labeling scans all open PRs, so keep the
-  # cadence moderate
+  # every 30 minutes; both jobs scan open PRs, so keep the cadence moderate
   schedule:
     - cron: '*/30 * * * *'
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: { }
 
 jobs:
   label:
+    permissions:
+      contents: read
+      pull-requests: write
     uses: $/.github/workflows/label-pr.yml
+  zdu-compat:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: $/.github/workflows/zdu-compat-pr.yml
