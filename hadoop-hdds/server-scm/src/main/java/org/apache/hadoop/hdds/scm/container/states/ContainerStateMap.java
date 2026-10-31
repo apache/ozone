@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -94,6 +95,9 @@ public class ContainerStateMap {
    * 2. The {@link ContainerInfo} in the union of all the types in {@link #typeMap}.
    */
   private final ContainerMap containerMap = new ContainerMap();
+
+  /** Clock that records when containers enter a new state. */
+  private final Clock clock;
 
   /**
    * Two levels map.
@@ -184,6 +188,14 @@ public class ContainerStateMap {
    * Create a ContainerStateMap.
    */
   public ContainerStateMap() {
+    this(Clock.systemUTC());
+  }
+
+  /**
+   * Create a ContainerStateMap which records state changes with the given clock.
+   */
+  public ContainerStateMap(Clock clock) {
+    this.clock = clock;
   }
 
   /**
@@ -277,7 +289,7 @@ public class ContainerStateMap {
     }
     lifeCycleStateMap.update(currentState, newState, containerID);
     LOG.trace("Updated the container {} from {} to {}", containerID, currentState, newState);
-    currentInfo.setState(newState);
+    currentInfo.setState(newState, clock.instant());
   }
 
   /**

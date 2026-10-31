@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -34,7 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.node.PendingContainerTracker.TwoWindowBucket;
 import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
-import org.apache.hadoop.util.Time;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,7 @@ public class DatanodeInfo extends DatanodeDetails {
   private static final Logger LOG = LoggerFactory.getLogger(DatanodeInfo.class);
 
   private final ReadWriteLock lock;
+  private final Clock clock;
 
   private volatile long lastHeartbeatTime;
   private long lastStatsUpdatedTime;
@@ -73,9 +75,18 @@ public class DatanodeInfo extends DatanodeDetails {
    */
   public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
        DatanodeVersionProto versionInfo, long containerRollIntervalMs) {
+    this(datanodeDetails, nodeStatus, versionInfo, containerRollIntervalMs, new SlidingWindow.MonotonicClock());
+  }
+
+  /**
+   * Constructs DatanodeInfo which reads heartbeat and report timestamps from the given clock.
+   */
+  public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
+       DatanodeVersionProto versionInfo, long containerRollIntervalMs, Clock clock) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
-    this.lastHeartbeatTime = Time.monotonicNow();
+    this.clock = clock;
+    this.lastHeartbeatTime = clock.millis();
     this.lastKnownSoftwareVersion =
         HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getSoftwareVersion());
     this.lastKnownApparentVersion =
@@ -84,14 +95,14 @@ public class DatanodeInfo extends DatanodeDetails {
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
     this.commandCounts = new HashMap<>();
-    this.pendingContainerAllocations = new TwoWindowBucket(this.getID(), containerRollIntervalMs);
+    this.pendingContainerAllocations = new TwoWindowBucket(this.getID(), containerRollIntervalMs, clock);
   }
 
   /**
    * Updates the last heartbeat time with current time.
    */
   public void updateLastHeartbeatTime() {
-    updateLastHeartbeatTime(Time.monotonicNow());
+    updateLastHeartbeatTime(clock.millis());
   }
 
   /**
@@ -184,7 +195,7 @@ public class DatanodeInfo extends DatanodeDetails {
 
     try {
       lock.writeLock().lock();
-      lastStatsUpdatedTime = Time.monotonicNow();
+      lastStatsUpdatedTime = clock.millis();
       failedVolumeCount = failedCount;
       storageReports = reports;
     } finally {
@@ -201,7 +212,7 @@ public class DatanodeInfo extends DatanodeDetails {
       List<MetadataStorageReportProto> reports) {
     try {
       lock.writeLock().lock();
-      lastStatsUpdatedTime = Time.monotonicNow();
+      lastStatsUpdatedTime = clock.millis();
       metadataStorageReports = reports;
     } finally {
       lock.writeLock().unlock();

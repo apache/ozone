@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
@@ -62,6 +63,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -649,6 +651,55 @@ public class TestRatisUnderReplicationHandler {
     assertEquals(1, commandsSent.size());
     DatanodeDetails dn = commandsSent.iterator().next().getKey();
     assertTrue(unhealthyReplica.getDatanodeDetails().equals(dn) || unhealthyReplica2.getDatanodeDetails().equals(dn));
+  }
+
+  /**
+   * When there is only one target for several vulnerable UNHEALTHY replicas, only the first replica is replicated. This
+   * test asserts that the given Random decides which replica goes first: handlers with the same seed pick the same
+   * replicas, and over several calls each replica gets its turn.
+   */
+  @Test
+  public void testRandomDecidesWhichVulnerableReplicaGoesFirst() throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(5);
+    for (int i = 0; i < 3; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1));
+    }
+    final ContainerReplica unhealthyReplica = createContainerReplica(container.containerID(), 0,
+        DECOMMISSIONING, State.UNHEALTHY, sequenceID);
+    final ContainerReplica unhealthyReplica2 = createContainerReplica(container.containerID(), 0,
+        ENTERING_MAINTENANCE, State.UNHEALTHY, sequenceID);
+    replicas.add(unhealthyReplica);
+    replicas.add(unhealthyReplica2);
+    UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
+    when(result.hasVulnerableUnhealthy()).thenReturn(true);
+    policy = ReplicationTestUtil.getSameNodeTestPlacementPolicy(nodeManager, conf,
+        MockDatanodeDetails.randomDatanodeDetails());
+
+    List<DatanodeDetails> sources = replicatedSources(new Random(1), replicas, result);
+    assertEquals(sources, replicatedSources(new Random(1), replicas, result));
+    assertThat(sources).contains(unhealthyReplica.getDatanodeDetails(), unhealthyReplica2.getDatanodeDetails());
+  }
+
+  /**
+   * Calls a handler with the given Random 10 times, and returns the source of the one replicate command each call
+   * sends.
+   */
+  private List<DatanodeDetails> replicatedSources(Random random, Set<ContainerReplica> replicas,
+      UnderReplicatedHealthResult result) {
+    RatisUnderReplicationHandler handler = new RatisUnderReplicationHandler(policy, conf, replicationManager, random);
+    List<DatanodeDetails> sources = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      commandsSent.clear();
+      assertThrows(SCMException.class, () -> handler.processAndSendCommands(replicas, Collections.emptyList(),
+          result, 2));
+      assertEquals(1, commandsSent.size());
+      sources.add(commandsSent.iterator().next().getKey());
+    }
+    return sources;
   }
 
   @Test

@@ -31,6 +31,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -61,13 +62,23 @@ public class NetworkTopologyImpl implements NetworkTopology {
   private final NodeSchemaManager schemaManager;
   /** The algorithm to randomize nodes with equal distances. */
   private final Consumer<List<? extends Node>> shuffleOperation;
+  /** Random source used to choose nodes, or null for ThreadLocalRandom. */
+  private final Random random;
   /** Lock to coordinate cluster tree access. */
   private final ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
   public NetworkTopologyImpl(ConfigurationSource conf) {
+    this(conf, null);
+  }
+
+  /**
+   * Constructs a topology whose random choices and shuffles come from the given source, so they can be reproduced.
+   */
+  public NetworkTopologyImpl(ConfigurationSource conf, Random random) {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(conf);
-    shuffleOperation = Collections::shuffle;
+    this.random = random;
+    shuffleOperation = random == null ? Collections::shuffle : list -> Collections.shuffle(list, random);
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -80,6 +91,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     schemaManager.init(schemaFile);
     maxLevel = schemaManager.getMaxLevel();
     shuffleOperation = Collections::shuffle;
+    random = null;
     factory = InnerNodeImpl.FACTORY;
     this.clusterTree = clusterTree;
   }
@@ -89,6 +101,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
                              Consumer<List<? extends Node>> shuffleOperation) {
     schemaManager = manager;
     this.shuffleOperation = shuffleOperation;
+    random = null;
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -687,7 +700,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       ret = ((InnerNode)scopeNode).getLeaf(nodeIndex, mutableExcludedScopes,
           mutableExNodes, ancestorGen);
     } else {
-      nodeIndex = ThreadLocalRandom.current().nextInt(availableNodes);
+      nodeIndex = (random != null ? random : ThreadLocalRandom.current()).nextInt(availableNodes);
       ret = ((InnerNode)scopeNode).getLeaf(nodeIndex, mutableExcludedScopes,
           mutableExNodes, ancestorGen);
     }

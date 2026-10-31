@@ -25,6 +25,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,19 @@ public class TestPipelineStateMap {
 
   @AfterEach
   public void teardown() throws IOException {
+  }
+
+  @Test
+  public void testStateChangeTimeComesFromClock() throws IOException {
+    MockClock clock = MockClock.newInstance();
+    PipelineStateMap stateMap = new PipelineStateMap(clock);
+    Pipeline pipeline = MockPipeline.createRatisPipeline();
+    stateMap.addPipeline(pipeline);
+    clock.fastForward(60_000);
+
+    Pipeline closed = stateMap.updatePipelineState(pipeline.getId(), Pipeline.PipelineState.CLOSED);
+
+    assertEquals(clock.instant(), closed.getStateEnterTime());
   }
 
   @Test
