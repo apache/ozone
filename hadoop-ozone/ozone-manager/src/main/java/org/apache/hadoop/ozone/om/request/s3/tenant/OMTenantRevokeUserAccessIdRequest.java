@@ -22,11 +22,13 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -49,6 +51,7 @@ import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest.Builder;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeSTSTokenRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdResponse;
 import org.slf4j.Logger;
@@ -69,6 +72,8 @@ import org.slf4j.LoggerFactory;
 public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
   private static final Logger LOG = LoggerFactory.getLogger(
       OMTenantRevokeUserAccessIdRequest.class);
+
+  private static final Clock CLOCK = Clock.systemUTC();
 
   public OMTenantRevokeUserAccessIdRequest(OMRequest omRequest) {
     super(omRequest);
@@ -136,6 +141,9 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     }
 
     final Builder omRequestBuilder = omRequest.toBuilder()
+        .setRevokeSTSTokenRequest(RevokeSTSTokenRequest.newBuilder()
+            .setOriginalAccessKeyId(accessId)
+            .setRevocationTimeMillis(CLOCK.millis()))
         .setTenantRevokeUserAccessIdRequest(
             TenantRevokeUserAccessIdRequest.newBuilder()
                 .setAccessId(accessId)
@@ -205,6 +213,16 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           new CacheKey<>(accessId),
           CacheValue.get(transactionLogIndex));
 
+      // Old log entries have no cutoff; replay must not invent a new timestamp.
+      Long stsRevocationCutoff = null;
+      if (getOmRequest().hasRevokeSTSTokenRequest()) {
+        Table<String, Long> table = omMetadataManager.getS3RevokedStsTokenTable();
+        Long existing = table.getIfExist(accessId);
+        long requested = getOmRequest().getRevokeSTSTokenRequest().getRevocationTimeMillis();
+        stsRevocationCutoff = existing == null ? requested : Math.max(existing, requested);
+        table.addCacheEntry(new CacheKey<>(accessId), CacheValue.get(transactionLogIndex, stsRevocationCutoff));
+      }
+
       S3SecretManager s3SecretManager = ozoneManager.getS3SecretManager();
       s3SecretManager.invalidateCacheEntry(accessId);
       // Update tenant cache
@@ -216,7 +234,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
               .build());
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           omResponse.build(), accessId, userPrincipal, principalInfo,
-          s3SecretManager);
+          s3SecretManager, stsRevocationCutoff);
 
     } catch (IOException | InvalidPathException ex) {
       exception = ex;

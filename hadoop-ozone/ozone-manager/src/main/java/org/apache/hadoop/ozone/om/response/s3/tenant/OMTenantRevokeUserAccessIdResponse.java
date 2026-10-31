@@ -35,19 +35,22 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
   private String principal, accessId;
   private OmDBUserPrincipalInfo omDBUserPrincipalInfo;
   private S3SecretManager s3SecretManager;
+  private Long stsRevocationCutoff;
 
   @SuppressWarnings("checkstyle:parameternumber")
   public OMTenantRevokeUserAccessIdResponse(@Nonnull OMResponse omResponse,
       @Nonnull String accessId,
       @Nonnull String principal,
       @Nonnull OmDBUserPrincipalInfo omDBUserPrincipalInfo,
-      @Nonnull S3SecretManager s3SecretManager
+      @Nonnull S3SecretManager s3SecretManager,
+      Long stsRevocationCutoff
   ) {
     super(omResponse);
     this.principal = principal;
     this.accessId = accessId;
     this.omDBUserPrincipalInfo = omDBUserPrincipalInfo;
     this.s3SecretManager = s3SecretManager;
+    this.stsRevocationCutoff = stsRevocationCutoff;
   }
 
   /**
@@ -71,6 +74,10 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
       } else {
         s3SecretManager.revokeSecret(accessId);
       }
+    }
+
+    if (stsRevocationCutoff != null) {
+      omMetadataManager.getS3RevokedStsTokenTable().putWithBatch(batchOperation, accessId, stsRevocationCutoff);
     }
 
     omMetadataManager.getTenantAccessIdTable().deleteWithBatch(
