@@ -19,12 +19,15 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import javax.ws.rs.WebApplicationException;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +75,37 @@ public class TestPutBucketLifecycleConfigurationUnmarshaller {
 
     assertTrue(containsDisallowDoctypeDecl(ex),
         "Expected parser to reject DOCTYPE declarations");
+  }
+
+  /** Text directly inside an element that holds child elements is refused, as S3 refuses it inside Object. */
+  @Test
+  public void textInsideRuleIsRejected() {
+    String xml = "<LifecycleConfiguration><Rule>junk<ID>rule1</ID><Status>Enabled</Status>"
+        + "<Expiration><Days>1</Days></Expiration></Rule></LifecycleConfiguration>";
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class,
+        () -> new PutBucketLifecycleConfigurationUnmarshaller()
+            .readFrom(new ByteArrayInputStream(xml.getBytes(UTF_8))));
+
+    OS3Exception cause = assertInstanceOf(OS3Exception.class, ex.getCause());
+    assertEquals(S3ErrorTable.MALFORMED_XML.getCode(), cause.getCode());
+  }
+
+  /**
+   * Unlike the other request bodies, lifecycle refuses any element inside a value, even one holding no text: its
+   * allowlist of elements runs before the value rules.
+   */
+  @Test
+  public void emptyElementInsideIdIsRejected() {
+    String xml = "<LifecycleConfiguration><Rule><ID>ru<a/>le</ID><Status>Enabled</Status>"
+        + "<Expiration><Days>1</Days></Expiration></Rule></LifecycleConfiguration>";
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class,
+        () -> new PutBucketLifecycleConfigurationUnmarshaller()
+            .readFrom(new ByteArrayInputStream(xml.getBytes(UTF_8))));
+
+    OS3Exception cause = assertInstanceOf(OS3Exception.class, ex.getCause());
+    assertEquals(S3ErrorTable.MALFORMED_XML.getCode(), cause.getCode());
   }
 
   private static boolean containsDisallowDoctypeDecl(Throwable throwable) {

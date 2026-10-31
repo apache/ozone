@@ -51,15 +51,15 @@ public class PutBucketLifecycleConfigurationUnmarshaller
   }
 
   @Override
-  protected XmlNamespaceFilter createNamespaceFilter() {
-    return new LifecycleNamespaceFilter();
+  XmlNamespaceFilter createNamespaceFilter(XmlElementModel requestModel) {
+    return new LifecycleNamespaceFilter(requestModel);
   }
 
   private static class LifecycleNamespaceFilter extends XmlNamespaceFilter {
     private final Deque<String> parents = new ArrayDeque<>();
 
-    LifecycleNamespaceFilter() {
-      super(S3_XML_NAMESPACE);
+    LifecycleNamespaceFilter(XmlElementModel requestModel) {
+      super(S3_XML_NAMESPACE, requestModel);
     }
 
     @Override
