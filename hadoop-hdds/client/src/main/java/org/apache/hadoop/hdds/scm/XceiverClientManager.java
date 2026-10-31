@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -78,6 +79,8 @@ public class XceiverClientManager extends XceiverClientCreator {
       LoggerFactory.getLogger(XceiverClientManager.class);
 
   private final Cache<String, XceiverClientSpi> clientCache;
+  // The cache expires idle clients only while it is used, so this cleans it up periodically to close them anyway.
+  private final ScheduledExecutorService cleanupExecutor;
   private final CacheMetrics cacheMetrics;
   private static XceiverClientMetrics metrics;
   private final ConcurrentHashMap<String, DatanodeDetails> localDNCache;
@@ -130,9 +133,23 @@ public class XceiverClientManager extends XceiverClientCreator {
               }
             }
           }).build();
+    cleanupExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder()
+        .setNameFormat("XceiverClientManager-cleanup-%d").setDaemon(true).build());
+    if (staleThresholdMs > 0) {
+      cleanupExecutor.scheduleWithFixedDelay(this::cleanUpCache, staleThresholdMs, staleThresholdMs, MILLISECONDS);
+    }
 
     cacheMetrics = CacheMetrics.create(clientCache, this);
     this.localDNCache = new ConcurrentHashMap<>();
+  }
+
+  private void cleanUpCache() {
+    try {
+      clientCache.cleanUp();
+    } catch (RuntimeException e) {
+      // keep the task scheduled
+      LOG.warn("Failed to close idle clients", e);
+    }
   }
 
   @VisibleForTesting
@@ -321,6 +338,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public void close() {
     super.close();
+    cleanupExecutor.shutdown();
     final List<XceiverClientSpi> unreferenced = new ArrayList<>();
     synchronized (clientCache) {
       // the RemovalListener collects the unreferenced clients instead of closing them one by one
