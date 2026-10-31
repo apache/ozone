@@ -208,9 +208,7 @@ public interface ReplicationConfig {
               " can not be parsed.");
     }
 
-    ReplicationConfigValidator validator =
-        config.getObject(ReplicationConfigValidator.class);
-    validator.validate(replicationConfig);
+    ReplicationConfigValidator.get(config).validate(replicationConfig);
 
     return replicationConfig;
   }
