@@ -313,7 +313,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
     } catch (IOException ex) {
-      onFailure(containerData.getVolume());
+      onFailure(containerData.getVolume(), ex);
       final String op = tempContainerFile == null ? "create tmp file for "
           : (isCreate ? "create" : "update") + " container file ";
       throw new StorageContainerException(
@@ -353,7 +353,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // Container will be removed from tmp directory under the volume.
       // On datanode shutdown/restart any partial artifacts left
       // will be wiped from volume's tmp directory.
-      onFailure(containerData.getVolume());
+      onFailure(containerData.getVolume(), ex);
       final String errMsg = "Failed to cleanup " + containerData;
       LOG.error(errMsg, ex);
       throw new StorageContainerException(errMsg, ex, CONTAINER_INTERNAL_ERROR);
@@ -526,7 +526,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throw ex;
     } catch (IOException ex) {
       LOG.error("Error in DB compaction while closing container", ex);
-      onFailure(containerData.getVolume());
+      onFailure(containerData.getVolume(), ex);
       throw new StorageContainerException(ex, ERROR_IN_COMPACT_DB);
     }
   }
@@ -541,7 +541,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throw ex;
     } catch (IOException ex) {
       LOG.error("Error in DB sync while closing container", ex);
-      onFailure(containerData.getVolume());
+      onFailure(containerData.getVolume(), ex);
       throw new StorageContainerException(ex, ERROR_IN_DB_SYNC);
     }
   }

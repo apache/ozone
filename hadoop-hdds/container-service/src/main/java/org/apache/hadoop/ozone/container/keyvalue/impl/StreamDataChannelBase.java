@@ -75,8 +75,8 @@ abstract class StreamDataChannelBase
     return randomAccessFile.getChannel();
   }
 
-  protected void checkVolume() {
-    onFailure(containerData.getVolume());
+  protected void checkVolume(IOException e) {
+    onFailure(containerData.getVolume(), e);
   }
 
   @Override
@@ -84,7 +84,7 @@ abstract class StreamDataChannelBase
     try {
       getChannel().force(metadata);
     } catch (IOException e) {
-      checkVolume();
+      checkVolume(e);
       throw e;
     }
   }
@@ -144,7 +144,7 @@ abstract class StreamDataChannelBase
     try {
       randomAccessFile.close();
     } catch (IOException e) {
-      checkVolume();
+      checkVolume(e);
       throw e;
     }
   }
@@ -158,7 +158,7 @@ abstract class StreamDataChannelBase
       metrics.incContainerOpsLatencies(getType(), Time.monotonicNowNanos() - startTime);
       return writeBytes;
     } catch (IOException e) {
-      checkVolume();
+      checkVolume(e);
       throw e;
     }
   }

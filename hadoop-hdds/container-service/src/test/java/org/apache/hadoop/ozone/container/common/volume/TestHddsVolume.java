@@ -28,7 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
@@ -144,6 +146,23 @@ public class TestHddsVolume {
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
 
     // Shutdown the volume.
+    volume.shutdown();
+  }
+
+  @Test
+  public void testDataPathIOErrorsCounted() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    StorageVolumeUtil.onFailure(volume, new IOException("Input/output error"));
+    StorageVolumeUtil.onFailure(volume, new UncheckedIOException(new IOException("Read-only file system")));
+    // Errors that do not point at a failing disk are not counted.
+    StorageVolumeUtil.onFailure(volume, new NoSuchFileException("/data/hdds/chunk"));
+    StorageVolumeUtil.onFailure(volume, new IOException("No space left on device"));
+
+    assertEquals(2, volume.getVolumeInfoStats().getNumDataPathIOErrors());
+    // Counting errors does not change the volume state.
+    assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
     volume.shutdown();
   }
 
