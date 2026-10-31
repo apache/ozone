@@ -46,7 +46,7 @@ public class DefaultReplicationConfig {
           "Invalid argument: default replication config is null");
     }
     ReplicationConfig config = proto.hasEcReplicationConfig()
-        ? new ECReplicationConfig(proto.getEcReplicationConfig())
+        ? ECReplicationConfig.getInstance(proto.getEcReplicationConfig())
         : ReplicationConfig.fromProtoTypeAndFactor(
             proto.getType(), proto.getFactor());
     return new DefaultReplicationConfig(config);

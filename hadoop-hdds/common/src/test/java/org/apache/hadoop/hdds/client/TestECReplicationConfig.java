@@ -24,16 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
@@ -86,40 +78,45 @@ class TestECReplicationConfig {
     assertNotSame(config, ECReplicationConfig.getInstance("rs-6-3-2048k"));
   }
 
-  /** Callers racing to cache the same config must all get the one instance that won. */
+  /** Every config allowed by default by ozone.replication.allowed-configs, with each codec, is shared. */
   @Test
-  void testGetInstanceConcurrently() throws Exception {
-    final int threads = 8;
-    ExecutorService pool = Executors.newFixedThreadPool(threads);
-    try {
-      // a new config each round, so that every round races to add it; stays well below MAX_CACHED
-      for (int round = 1; round <= 32; round++) {
-        final ECReplicationConfig expected = new ECReplicationConfig(100 + round, 4);
-        CyclicBarrier start = new CyclicBarrier(threads);
-        List<Future<ECReplicationConfig>> futures = new ArrayList<>();
-        for (int i = 0; i < threads; i++) {
-          futures.add(pool.submit(() -> {
-            start.await();
-            return ECReplicationConfig.getInstance(expected.toProto());
-          }));
-        }
-        ECReplicationConfig first = futures.get(0).get(10, TimeUnit.SECONDS);
-        assertEquals(expected, first);
-        for (Future<ECReplicationConfig> f : futures) {
-          assertSame(first, f.get(10, TimeUnit.SECONDS));
+  void testGetInstanceReturnsPredefinedConfigs() {
+    for (ECReplicationConfig.EcCodec codec : ECReplicationConfig.EcCodec.values()) {
+      for (String scheme : new String[] {"3-2", "6-3", "10-4"}) {
+        for (String chunk : new String[] {"512k", "1024k", "2048k", "4096k"}) {
+          final String string = codec + "-" + scheme + "-" + chunk;
+          final ECReplicationConfig config = ECReplicationConfig.getInstance(string);
+          assertEquals(new ECReplicationConfig(string), config);
+          assertSame(config, ECReplicationConfig.getInstance(string));
+          assertSame(config, ECReplicationConfig.getInstance(config.toProto()));
+          assertSame(config, ECReplicationConfig.getInstance(config.toProto().toBuilder()
+              .setCodec(codec.name()).build()));
         }
       }
-    } finally {
-      pool.shutdownNow();
     }
   }
 
+  /** Other configs are created as before, for example from a client sending arbitrary values. */
+  @ParameterizedTest
+  @ValueSource(strings = {"rs-4-2-1024k", "rs-6-3-8192k", "rs-6-3-1000", "xor-3-1-1024k", "rs-10-4-256k"})
+  void testGetInstanceCreatesOtherConfigs(String string) {
+    final ECReplicationConfig expected = new ECReplicationConfig(string);
+
+    final ECReplicationConfig fromString = ECReplicationConfig.getInstance(string);
+    assertEquals(expected, fromString);
+    assertNotSame(fromString, ECReplicationConfig.getInstance(string));
+
+    final ECReplicationConfig fromProto = ECReplicationConfig.getInstance(expected.toProto());
+    assertEquals(expected, fromProto);
+    assertNotSame(fromProto, ECReplicationConfig.getInstance(expected.toProto()));
+  }
+
   @Test
-  void testHashCodeMatchesObjectsHash() {
-    for (ECReplicationConfig c : new ECReplicationConfig[] {new ECReplicationConfig(3, 2),
-        new ECReplicationConfig(10, 4, XOR, 4096 * 1024), new ECReplicationConfig(6, 3, RS, 12345)}) {
-      assertEquals(Objects.hash(c.getData(), c.getParity(), c.getCodec(), c.getEcChunkSize()), c.hashCode());
-    }
+  void testGetInstanceRejectsUnknownCodec() {
+    final HddsProtos.ECReplicationConfig proto = new ECReplicationConfig(6, 3).toProto().toBuilder()
+        .setCodec("foo").build();
+    assertThrows(IllegalArgumentException.class, () -> new ECReplicationConfig(proto));
+    assertThrows(IllegalArgumentException.class, () -> ECReplicationConfig.getInstance(proto));
   }
 
   @Test

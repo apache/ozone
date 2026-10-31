@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.EnumSet;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -42,14 +40,31 @@ public class ECReplicationConfig implements ReplicationConfig {
   //   XOR-10-4-4096K
   private static final Pattern STRING_FORMAT = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)([kK])?");
 
-  /**
-   * Upper bound on the number of cached instances. Only a few configs are used in practice, but protos come from
-   * clients and are not validated against ozone.replication.allowed-configs on the server, so the cache must not grow
-   * with whatever values they send. Configs beyond the limit are still returned, just not cached.
-   */
-  static final int MAX_CACHED = 64;
+  /** The data-parity schemes allowed by default by ozone.replication.allowed-configs. */
+  private static final int[][] PREDEFINED_SCHEMES = {{3, 2}, {6, 3}, {10, 4}};
+  /** The chunk sizes allowed by default: 512k, 1024k, 2048k and 4096k. */
+  private static final int PREDEFINED_MIN_CHUNK_SIZE = 512 * 1024;
+  private static final int PREDEFINED_CHUNK_SIZES = 4;
+  private static final EcCodec[] CODECS = EcCodec.values();
 
-  private static final ConcurrentMap<ECReplicationConfig, ECReplicationConfig> CACHE = new ConcurrentHashMap<>();
+  /**
+   * One shared instance for each config allowed by default by ozone.replication.allowed-configs, with each codec.
+   * Only these are used in practice, so {@link #getInstance} returns them instead of a new object; any other config,
+   * for example one a client sends, is created as before.
+   */
+  private static final ECReplicationConfig[] PREDEFINED =
+      new ECReplicationConfig[CODECS.length * PREDEFINED_SCHEMES.length * PREDEFINED_CHUNK_SIZES];
+
+  static {
+    for (EcCodec codec : CODECS) {
+      for (int scheme = 0; scheme < PREDEFINED_SCHEMES.length; scheme++) {
+        for (int chunk = 0; chunk < PREDEFINED_CHUNK_SIZES; chunk++) {
+          PREDEFINED[predefinedIndex(codec, scheme, chunk)] = new ECReplicationConfig(PREDEFINED_SCHEMES[scheme][0],
+              PREDEFINED_SCHEMES[scheme][1], codec, PREDEFINED_MIN_CHUNK_SIZE << chunk);
+        }
+      }
+    }
+  }
 
   private final int data;
 
@@ -78,31 +93,50 @@ public class ECReplicationConfig implements ReplicationConfig {
     }
   }
 
-  /** Same as {@link #ECReplicationConfig(String)}, but returns a cached instance when possible. */
+  /** Same as {@link #ECReplicationConfig(String)}, but returns a shared instance for the predefined configs. */
   public static ECReplicationConfig getInstance(String string) {
-    return intern(new ECReplicationConfig(string));
+    final ECReplicationConfig parsed = new ECReplicationConfig(string);
+    final ECReplicationConfig predefined = getPredefined(parsed.data, parsed.parity, parsed.codec, parsed.ecChunkSize);
+    return predefined != null ? predefined : parsed;
   }
 
-  /** Same as the proto constructor, but returns a cached instance when possible. */
+  /** Same as the proto constructor, but returns a shared instance for the predefined configs, without creating one. */
   public static ECReplicationConfig getInstance(HddsProtos.ECReplicationConfig proto) {
-    return intern(new ECReplicationConfig(proto));
+    final EcCodec codec = getCodec(proto.getCodec());
+    if (codec == null) {
+      return new ECReplicationConfig(proto); // throws the same exception as before
+    }
+    final ECReplicationConfig predefined = getPredefined(proto.getData(), proto.getParity(), codec,
+        proto.getEcChunkSize());
+    return predefined != null ? predefined
+        : new ECReplicationConfig(proto.getData(), proto.getParity(), codec, proto.getEcChunkSize());
   }
 
-  private static ECReplicationConfig intern(ECReplicationConfig config) {
-    final ECReplicationConfig cached = CACHE.get(config);
-    if (cached != null) {
-      return cached;
+  /** @return the predefined instance for the given values, or null if they are not a predefined config. */
+  private static ECReplicationConfig getPredefined(int data, int parity, EcCodec codec, int ecChunkSize) {
+    int scheme = PREDEFINED_SCHEMES.length - 1;
+    while (scheme >= 0 && (PREDEFINED_SCHEMES[scheme][0] != data || PREDEFINED_SCHEMES[scheme][1] != parity)) {
+      scheme--;
     }
-    if (CACHE.size() >= MAX_CACHED) {
-      return config;
+    int chunk = PREDEFINED_CHUNK_SIZES - 1;
+    while (chunk >= 0 && PREDEFINED_MIN_CHUNK_SIZE << chunk != ecChunkSize) {
+      chunk--;
     }
-    final ECReplicationConfig previous = CACHE.putIfAbsent(config, config);
-    return previous != null ? previous : config;
+    return scheme < 0 || chunk < 0 ? null : PREDEFINED[predefinedIndex(codec, scheme, chunk)];
   }
 
-  /** @return the number of cached instances, for tests. */
-  static int cacheSize() {
-    return CACHE.size();
+  private static int predefinedIndex(EcCodec codec, int scheme, int chunk) {
+    return (codec.ordinal() * PREDEFINED_SCHEMES.length + scheme) * PREDEFINED_CHUNK_SIZES + chunk;
+  }
+
+  /** Like {@code EcCodec.valueOf(name.toUpperCase())}, without creating a string; null if there is no such codec. */
+  private static EcCodec getCodec(String name) {
+    for (EcCodec codec : CODECS) {
+      if (codec.name().equalsIgnoreCase(name)) {
+        return codec;
+      }
+    }
+    return null;
   }
 
   public ECReplicationConfig(int data, int parity) {
@@ -238,11 +272,7 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   @Override
   public int hashCode() {
-    // same value as Objects.hash(data, parity, codec, ecChunkSize), without its array and boxing on the cache lookup
-    int hash = 31 + data;
-    hash = 31 * hash + parity;
-    hash = 31 * hash + Objects.hashCode(codec);
-    return 31 * hash + ecChunkSize;
+    return Objects.hash(data, parity, codec, ecChunkSize);
   }
 
   @Override
