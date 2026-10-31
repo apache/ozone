@@ -67,6 +67,12 @@ public final class HddsConfigKeys {
       "hdds.pipeline.action.max.limit";
   public static final int HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT =
       20;
+  // Maximum number of report messages (node, pipeline, command status, full and
+  // incremental container reports) a datanode includes in a single heartbeat.
+  public static final String HDDS_HEARTBEAT_REPORT_MAX_LIMIT =
+      "hdds.heartbeat.report.max.limit";
+  public static final int HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT =
+      10000;
   // Configuration to allow volume choosing policy.
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";

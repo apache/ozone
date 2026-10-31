@@ -1846,6 +1846,17 @@
     </description>
   </property>
   <property>
+    <name>hdds.heartbeat.report.max.limit</name>
+    <value>10000</value>
+    <tag>DATANODE</tag>
+    <description>
+      Maximum number of report messages (not containers) a datanode includes in
+      a single heartbeat to an SCM or Recon endpoint. Reports beyond the limit
+      stay queued and are sent in an immediate follow-up heartbeat. Values below
+      1 are treated as 1.
+    </description>
+  </property>
+  <property>
     <name>hdds.db.profile</name>
     <value>DISK</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
