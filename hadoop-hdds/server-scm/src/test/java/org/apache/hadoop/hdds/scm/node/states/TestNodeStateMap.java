@@ -78,7 +78,7 @@ public class TestNodeStateMap {
 
   private void runTestUpdateHealth(NodeStatus original, NodeState newHealth) throws Exception {
     addNode(original);
-    final NodeStatus returned = map.updateNodeHealthState(dn.getID(), newHealth);
+    final NodeStatus returned = map.updateNodeHealthState(map.getNodeInfo(dn.getID()), original.getHealth(), newHealth);
 
     final NodeStatus expected = NodeStatus.valueOf(
         original.getOperationalState(), newHealth, original.getOpStateExpiryEpochSeconds());
@@ -94,6 +94,21 @@ public class TestNodeStateMap {
   @Test
   public void testUpdateDecommissioningHealthyToStale() throws Exception {
     runTestUpdateHealth(DECOMMISSIONING_HEALTHY_999, NodeState.STALE);
+  }
+
+  @Test
+  public void testUpdateHealthSkipsChangedNode() throws Exception {
+    addNode(NodeStatus.inServiceHealthy());
+    final DatanodeInfo oldInfo = map.getNodeInfo(dn.getID());
+
+    // The caller thinks the node is STALE, but it is HEALTHY.
+    assertNull(map.updateNodeHealthState(oldInfo, NodeState.STALE, NodeState.DEAD));
+
+    // The node registered again, so the map holds a new DatanodeInfo.
+    map.updateNode(new DatanodeInfo(dn, NodeStatus.inServiceHealthy(), UpgradeUtils.defaultVersionProto(),
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
+    assertNull(map.updateNodeHealthState(oldInfo, NodeState.HEALTHY, NodeState.STALE));
+    assertEquals(NodeStatus.inServiceHealthy(), map.getNodeStatus(dn.getID()));
   }
 
   @Test
