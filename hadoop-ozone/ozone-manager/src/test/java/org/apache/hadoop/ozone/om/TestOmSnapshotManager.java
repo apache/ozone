@@ -95,6 +95,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -170,9 +171,17 @@ class TestOmSnapshotManager {
     omSnapshotManager.invalidateCache();
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 3, 4})
-  public void testGetActiveSnapshotWithExpectedId(int scenario) throws Exception {
+  private enum SnapshotScenario {
+    ACTIVE,
+    MISSING,
+    UUID_MISMATCH,
+    DELETED,
+    NAME_REUSED_AFTER_VALIDATION
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(SnapshotScenario.class)
+  public void testGetActiveSnapshotWithExpectedId(SnapshotScenario scenario) throws Exception {
     OzoneManager manager = mock(OzoneManager.class);
     OMMetadataManager metadata = mock(OMMetadataManager.class);
     @SuppressWarnings("unchecked")
@@ -185,13 +194,15 @@ class TestOmSnapshotManager {
     HddsWhiteboxTestUtils.setInternalState(snapshots, "snapshotCache", cache);
     UUID expected = UUID.randomUUID();
     SnapshotInfo info = SnapshotInfo.newInstance("vol", "bucket", "snap", expected, 1);
-    if (scenario == 3) {
+    if (scenario == SnapshotScenario.DELETED) {
       info.setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
     }
     SnapshotInfo replacement = info.toBuilder().setSnapshotId(UUID.randomUUID()).build();
-    when(table.get(info.getTableKey())).thenReturn(scenario == 1 ? null : scenario == 2 ? replacement : info);
+    when(table.get(info.getTableKey())).thenReturn(
+        scenario == SnapshotScenario.MISSING ? null : scenario == SnapshotScenario.UUID_MISMATCH ? replacement : info);
     Mockito.doCallRealMethod().when(snapshots).getActiveSnapshot("vol", "bucket", "snap", expected);
-    if (scenario >= 1 && scenario <= 3) {
+    if (scenario == SnapshotScenario.MISSING || scenario == SnapshotScenario.UUID_MISMATCH ||
+        scenario == SnapshotScenario.DELETED) {
       OMException failure = assertThrows(OMException.class,
           () -> snapshots.getActiveSnapshot("vol", "bucket", "snap", expected));
       assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, failure.getResult());
@@ -201,7 +212,7 @@ class TestOmSnapshotManager {
       UncheckedAutoCloseableSupplier<OmSnapshot> handle =
           mock(UncheckedAutoCloseableSupplier.class);
       when(cache.get(expected)).thenAnswer(invocation -> {
-        if (scenario == 4) {
+        if (scenario == SnapshotScenario.NAME_REUSED_AFTER_VALIDATION) {
           // Rename/name reuse after validation must not change the UUID passed to the cache.
           when(table.get(info.getTableKey())).thenReturn(replacement);
         }
