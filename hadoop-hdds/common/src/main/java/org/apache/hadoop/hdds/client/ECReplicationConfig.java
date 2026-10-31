@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -39,6 +41,15 @@ public class ECReplicationConfig implements ReplicationConfig {
   //   RS-3-2-2048
   //   XOR-10-4-4096K
   private static final Pattern STRING_FORMAT = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)([kK])?");
+
+  /**
+   * Upper bound on the number of cached instances. Only a few configs are used in practice, but protos come from
+   * clients and are not validated against ozone.replication.allowed-configs on the server, so the cache must not grow
+   * with whatever values they send. Configs beyond the limit are still returned, just not cached.
+   */
+  static final int MAX_CACHED = 64;
+
+  private static final ConcurrentMap<ECReplicationConfig, ECReplicationConfig> CACHE = new ConcurrentHashMap<>();
 
   private final int data;
 
@@ -65,6 +76,33 @@ public class ECReplicationConfig implements ReplicationConfig {
           .map(Enum::toString)
           .collect(Collectors.joining(","));
     }
+  }
+
+  /** Same as {@link #ECReplicationConfig(String)}, but returns a cached instance when possible. */
+  public static ECReplicationConfig getInstance(String string) {
+    return intern(new ECReplicationConfig(string));
+  }
+
+  /** Same as the proto constructor, but returns a cached instance when possible. */
+  public static ECReplicationConfig getInstance(HddsProtos.ECReplicationConfig proto) {
+    return intern(new ECReplicationConfig(proto));
+  }
+
+  private static ECReplicationConfig intern(ECReplicationConfig config) {
+    final ECReplicationConfig cached = CACHE.get(config);
+    if (cached != null) {
+      return cached;
+    }
+    if (CACHE.size() >= MAX_CACHED) {
+      return config;
+    }
+    final ECReplicationConfig previous = CACHE.putIfAbsent(config, config);
+    return previous != null ? previous : config;
+  }
+
+  /** @return the number of cached instances, for tests. */
+  static int cacheSize() {
+    return CACHE.size();
   }
 
   public ECReplicationConfig(int data, int parity) {
@@ -200,7 +238,11 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   @Override
   public int hashCode() {
-    return Objects.hash(data, parity, codec, ecChunkSize);
+    // same value as Objects.hash(data, parity, codec, ecChunkSize), without its array and boxing on the cache lookup
+    int hash = 31 + data;
+    hash = 31 * hash + parity;
+    hash = 31 * hash + Objects.hashCode(codec);
+    return 31 * hash + ecChunkSize;
   }
 
   @Override
