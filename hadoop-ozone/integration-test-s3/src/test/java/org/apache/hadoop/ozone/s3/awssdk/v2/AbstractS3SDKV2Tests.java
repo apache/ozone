@@ -1408,6 +1408,46 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testCompleteMultipartUploadWithSubsetOfParts() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    String uploadId = s3Client.createMultipartUpload(b -> b.bucket(bucketName).key(keyName)).uploadId();
+    byte[][] partBytes = {new byte[(int) (5 * MB)], new byte[4096], new byte[4096]};
+    String[] partETags = new String[partBytes.length];
+    for (int i = 0; i < partBytes.length; i++) {
+      ThreadLocalRandom.current().nextBytes(partBytes[i]);
+      final int partNumber = i + 1;
+      partETags[i] = stripQuotes(s3Client.uploadPart(b -> b
+              .bucket(bucketName)
+              .key(keyName)
+              .uploadId(uploadId)
+              .partNumber(partNumber),
+          RequestBody.fromBytes(partBytes[i])).eTag());
+    }
+
+    // Complete with parts 1 and 3 only; part 2 is uploaded but not part of the object.
+    completeMultipartUpload(bucketName, keyName, uploadId, Arrays.asList(
+        CompletedPart.builder().partNumber(1).eTag(partETags[0]).build(),
+        CompletedPart.builder().partNumber(3).eTag(partETags[2]).build()));
+
+    byte[] eTagsConcatenated = (partETags[0] + partETags[2]).getBytes(StandardCharsets.UTF_8);
+    String expectedETag = DatatypeConverter.printHexBinary(calculateDigest(
+        new ByteArrayInputStream(eTagsConcatenated), 0, eTagsConcatenated.length)).toLowerCase() + "-2";
+    HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals(expectedETag, stripQuotes(head.eTag()));
+    assertEquals(2, head.partsCount());
+    assertEquals((long) partBytes[0].length + partBytes[2].length, head.contentLength());
+
+    ByteArrayOutputStream expectedContent = new ByteArrayOutputStream();
+    expectedContent.write(partBytes[0]);
+    expectedContent.write(partBytes[2]);
+    assertArrayEquals(expectedContent.toByteArray(),
+        s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asByteArray());
+  }
+
+  @Test
   public void testCompleteMultipartUploadWithDuplicatePartNumbers() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
