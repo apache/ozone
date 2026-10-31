@@ -65,8 +65,7 @@ public class NodeDecommissionManager {
   private ContainerManager containerManager;
   private final SCMContext scmContext;
   private final boolean useHostnames;
-  private Integer maintenanceReplicaMinimum;
-  private Integer maintenanceRemainingRedundancy;
+  private final ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   // Decommissioning and Maintenance mode progress related metrics.
   private final NodeDecommissionMetrics metrics;
@@ -262,6 +261,7 @@ public class NodeDecommissionManager {
     this.nodeManager = nm;
     this.containerManager = cm;
     this.scmContext = scmContext;
+    this.rmConf = rm.getConfig();
 
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder()
@@ -280,10 +280,6 @@ public class NodeDecommissionManager {
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    ReplicationManager.ReplicationManagerConfiguration rmConf = rm.getConfig();
-    setMaintenanceConfigs(rmConf.getMaintenanceReplicaMinimum(),
-        rmConf.getMaintenanceRemainingRedundancy());
 
     monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
         rm);
@@ -585,9 +581,9 @@ public class NodeDecommissionManager {
           if (replicationType.equals(HddsProtos.ReplicationType.EC)) {
             int reqNodes = cif.getReplicationConfig().getRequiredNodes();
             int data = ((ECReplicationConfig)cif.getReplicationConfig()).getData();
-            minInService = Math.min((data + maintenanceRemainingRedundancy), reqNodes);
+            minInService = Math.min((data + rmConf.getMaintenanceRemainingRedundancy()), reqNodes);
           } else {
-            minInService = maintenanceReplicaMinimum;
+            minInService = rmConf.getMaintenanceReplicaMinimum();
           }
           if ((inServiceTotal - numMaintenance) < minInService) {
             final int unHealthyTotal = nodeManager.getAllNodeCount() - inServiceTotal;
@@ -638,20 +634,12 @@ public class NodeDecommissionManager {
   }
 
   @VisibleForTesting
-  public void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
-    synchronized (this) {
-      maintenanceRemainingRedundancy = remainingRedundancy;
-      maintenanceReplicaMinimum = replicaMinimum;
-    }
+  public int getMaintenanceReplicaMinimum() {
+    return rmConf.getMaintenanceReplicaMinimum();
   }
 
   @VisibleForTesting
-  public synchronized int getMaintenanceReplicaMinimum() {
-    return maintenanceReplicaMinimum;
-  }
-
-  @VisibleForTesting
-  public synchronized int getMaintenanceRemainingRedundancy() {
-    return maintenanceRemainingRedundancy;
+  public int getMaintenanceRemainingRedundancy() {
+    return rmConf.getMaintenanceRemainingRedundancy();
   }
 }
