@@ -82,18 +82,32 @@ class TestECReplicationConfig {
   @Test
   void testGetInstanceReturnsPredefinedConfigs() {
     for (ECReplicationConfig.EcCodec codec : ECReplicationConfig.EcCodec.values()) {
-      for (String scheme : new String[] {"3-2", "6-3", "10-4"}) {
-        for (String chunk : new String[] {"512k", "1024k", "2048k", "4096k"}) {
-          final String string = codec + "-" + scheme + "-" + chunk;
-          final ECReplicationConfig config = ECReplicationConfig.getInstance(string);
-          assertEquals(new ECReplicationConfig(string), config);
-          assertSame(config, ECReplicationConfig.getInstance(string));
+      for (int[] scheme : new int[][] {{3, 2}, {6, 3}, {10, 4}}) {
+        for (int chunkKB : new int[] {512, 1024, 2048, 4096}) {
+          final String prefix = codec + "-" + scheme[0] + "-" + scheme[1] + "-";
+          final ECReplicationConfig config = ECReplicationConfig.getInstance(prefix + chunkKB + "k");
+          assertEquals(new ECReplicationConfig(scheme[0], scheme[1], codec, chunkKB * 1024), config);
+
+          assertSame(config, ECReplicationConfig.getInstance(prefix + chunkKB + "k"));
+          // other spellings are parsed with the regex, then shared as well
+          assertSame(config, ECReplicationConfig.getInstance(prefix.toUpperCase() + chunkKB + "K"));
+          assertSame(config, ECReplicationConfig.getInstance(prefix + chunkKB * 1024));
           assertSame(config, ECReplicationConfig.getInstance(config.toProto()));
           assertSame(config, ECReplicationConfig.getInstance(config.toProto().toBuilder()
               .setCodec(codec.name()).build()));
         }
       }
     }
+  }
+
+  /** The constructor still creates a new object, also for the predefined configs. */
+  @ParameterizedTest
+  @ValueSource(strings = {"rs-6-3-1024k", "RS-6-3-1024K", "rs-4-2-1024k"})
+  void testConstructorCreatesNewInstance(String string) {
+    final ECReplicationConfig config = new ECReplicationConfig(string);
+    assertEquals(ECReplicationConfig.getInstance(string), config);
+    assertNotSame(ECReplicationConfig.getInstance(string), config);
+    assertNotSame(new ECReplicationConfig(string), config);
   }
 
   /** Other configs are created as before, for example from a client sending arbitrary values. */

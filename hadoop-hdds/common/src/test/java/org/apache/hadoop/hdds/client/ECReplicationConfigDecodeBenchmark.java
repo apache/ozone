@@ -65,13 +65,13 @@ public class ECReplicationConfigDecodeBenchmark {
   private static final int BATCH = 1_000;
 
   /** The EC configs a cluster typically uses. */
-  private static final HddsProtos.ECReplicationConfig[] EC_PROTOS =
-      protos("rs-3-2-1024k", "rs-6-3-1024k", "rs-10-4-1024k");
+  private static final String[] EC_STRINGS = {"rs-3-2-1024k", "rs-6-3-1024k", "rs-10-4-1024k"};
+  private static final HddsProtos.ECReplicationConfig[] EC_PROTOS = protos(EC_STRINGS);
   private static final HddsProtos.ContainerInfoProto[] CONTAINER_PROTOS = containerProtos(EC_PROTOS);
 
   /** Valid configs that ozone.replication.allowed-configs does not allow by default. */
-  private static final HddsProtos.ECReplicationConfig[] OTHER_EC_PROTOS =
-      protos("rs-4-2-1024k", "rs-6-3-8192k", "rs-12-4-1024k");
+  private static final String[] OTHER_EC_STRINGS = {"rs-4-2-1024k", "rs-6-3-8192k", "rs-12-4-1024k"};
+  private static final HddsProtos.ECReplicationConfig[] OTHER_EC_PROTOS = protos(OTHER_EC_STRINGS);
   private static final HddsProtos.ContainerInfoProto[] OTHER_CONTAINER_PROTOS = containerProtos(OTHER_EC_PROTOS);
 
   @Test
@@ -86,6 +86,7 @@ public class ECReplicationConfigDecodeBenchmark {
     printDecodeHeader("3 EC configs");
     decode("ReplicationConfig", fromProto(EC_PROTOS));
     decode("ContainerInfo", fromProtobuf(CONTAINER_PROTOS));
+    decode("ECReplicationConfig(String)", fromString(EC_STRINGS));
   }
 
   @Test
@@ -110,6 +111,7 @@ public class ECReplicationConfigDecodeBenchmark {
     printDecodeHeader("3 other EC configs");
     decode("ReplicationConfig", fromProto(OTHER_EC_PROTOS));
     decode("ContainerInfo", fromProtobuf(OTHER_CONTAINER_PROTOS));
+    decode("ECReplicationConfig(String)", fromString(OTHER_EC_STRINGS));
   }
 
   private static HddsProtos.ECReplicationConfig[] protos(String... configs) {
@@ -138,6 +140,10 @@ public class ECReplicationConfigDecodeBenchmark {
 
   private static IntFunction<Object> fromProto(HddsProtos.ECReplicationConfig[] protos) {
     return i -> ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null, protos[i % protos.length]);
+  }
+
+  private static IntFunction<Object> fromString(String[] strings) {
+    return i -> new ECReplicationConfig(strings[i % strings.length]);
   }
 
   private static IntFunction<Object> fromProtobuf(HddsProtos.ContainerInfoProto[] protos) {

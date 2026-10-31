@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.collect.ImmutableMap;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,10 +36,9 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   public static final String EC_REPLICATION_PARAMS_DELIMITER = "-";
 
-  // Acceptable patterns are like:
-  //   rs-3-2-1024k
-  //   RS-3-2-2048
-  //   XOR-10-4-4096K
+  // <codec>-<data>-<parity>-<chunk size>, usually as getReplication() prints it, such as rs-6-3-1024k. The codec and
+  // the "k" suffix are case-insensitive, and without "k" the chunk size is in bytes, so RS-6-3-1024K and
+  // rs-6-3-1048576 are accepted too.
   private static final Pattern STRING_FORMAT = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)([kK])?");
 
   /** The data-parity schemes allowed by default by ozone.replication.allowed-configs. */
@@ -55,6 +56,9 @@ public class ECReplicationConfig implements ReplicationConfig {
   private static final ECReplicationConfig[] PREDEFINED =
       new ECReplicationConfig[CODECS.length * PREDEFINED_SCHEMES.length * PREDEFINED_CHUNK_SIZES];
 
+  /** The predefined configs by their string form, such as rs-6-3-1024k, to look them up without the regex. */
+  private static final Map<String, ECReplicationConfig> PREDEFINED_BY_STRING;
+
   static {
     for (EcCodec codec : CODECS) {
       for (int scheme = 0; scheme < PREDEFINED_SCHEMES.length; scheme++) {
@@ -64,6 +68,11 @@ public class ECReplicationConfig implements ReplicationConfig {
         }
       }
     }
+    final ImmutableMap.Builder<String, ECReplicationConfig> byString = ImmutableMap.builder();
+    for (ECReplicationConfig config : PREDEFINED) {
+      byString.put(config.getReplication(), config);
+    }
+    PREDEFINED_BY_STRING = byString.build();
   }
 
   private final int data;
@@ -95,9 +104,7 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   /** Same as {@link #ECReplicationConfig(String)}, but returns a shared instance for the predefined configs. */
   public static ECReplicationConfig getInstance(String string) {
-    final ECReplicationConfig parsed = new ECReplicationConfig(string);
-    final ECReplicationConfig predefined = getPredefined(parsed.data, parsed.parity, parsed.codec, parsed.ecChunkSize);
-    return predefined != null ? predefined : parsed;
+    return parse(string);
   }
 
   /** Same as the proto constructor, but returns a shared instance for the predefined configs, without creating one. */
@@ -152,17 +159,38 @@ public class ECReplicationConfig implements ReplicationConfig {
   }
 
   /**
-   * Create an ECReplicationConfig object from a string representing the
-   * various parameters. Acceptable patterns are like:
-   *     rs-3-2-1024k
-   *     RS-3-2-2048k
-   *     XOR-10-4-4096K
-   * IllegalArgumentException will be thrown if the passed string does not
-   * match the defined pattern.
-   * @param string Parameters used to create ECReplicationConfig instances.
-   *       Format: &lt;codec&gt;-&lt;data&gt;-&lt;parity&gt;-&lt;chunksize&gt;
+   * Creates an ECReplicationConfig from a string in the form {@code <codec>-<data>-<parity>-<chunk size>}, usually
+   * as {@link #getReplication()} prints it, such as rs-6-3-1024k. The codec and the "k" suffix are case-insensitive,
+   * and without "k" the chunk size is in bytes, so RS-6-3-1024K and rs-6-3-1048576 are the same config as
+   * rs-6-3-1024k.
+   * <p>
+   * This always creates a new object; {@link #getInstance(String)} returns a shared one for the predefined configs.
+   *
+   * @param string the EC replication config
+   * @throws IllegalArgumentException if the string is not in this form, or the codec, data, parity or chunk size is
+   *         invalid
    */
   public ECReplicationConfig(String string) {
+    this(parse(string));
+  }
+
+  private ECReplicationConfig(ECReplicationConfig other) {
+    this(other.data, other.parity, other.codec, other.ecChunkSize);
+  }
+
+  /**
+   * Extracts the codec, data, parity and chunk size from a string such as rs-6-3-1024k. The predefined configs in
+   * their usual form, as {@link #getReplication()} prints them, are looked up without the regex.
+   *
+   * @return the predefined instance for these values, or a new instance for any other config
+   * @throws IllegalArgumentException if the string is not a valid EC replication config
+   */
+  private static ECReplicationConfig parse(String string) {
+    final ECReplicationConfig predefined = PREDEFINED_BY_STRING.get(string);
+    if (predefined != null) {
+      return predefined;
+    }
+
     final Matcher matcher = STRING_FORMAT.matcher(string);
     if (!matcher.matches()) {
       throw new IllegalArgumentException("EC replication config should be " +
@@ -170,6 +198,7 @@ public class ECReplicationConfig implements ReplicationConfig {
           " Provided configuration was: " + string);
     }
 
+    final EcCodec codec;
     try {
       codec = EcCodec.valueOf(matcher.group(1).toUpperCase());
     } catch (IllegalArgumentException e) {
@@ -178,8 +207,8 @@ public class ECReplicationConfig implements ReplicationConfig {
           e);
     }
 
-    data = Integer.parseInt(matcher.group(2));
-    parity = Integer.parseInt(matcher.group(3));
+    final int data = Integer.parseInt(matcher.group(2));
+    final int parity = Integer.parseInt(matcher.group(3));
     if (data <= 0 || parity <= 0) {
       throw new IllegalArgumentException("Data and parity part in EC " +
           "replication config supposed to be positive numbers");
@@ -194,7 +223,8 @@ public class ECReplicationConfig implements ReplicationConfig {
       // The "k" modifier is present, so multiply by 1024
       chunkSize = chunkSize * 1024;
     }
-    ecChunkSize = chunkSize;
+    final ECReplicationConfig other = getPredefined(data, parity, codec, chunkSize);
+    return other != null ? other : new ECReplicationConfig(data, parity, codec, chunkSize);
   }
 
   public ECReplicationConfig(
