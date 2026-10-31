@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -34,11 +35,16 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -67,6 +73,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.thirdparty.io.grpc.ConnectivityState;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -334,7 +341,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     for (DatanodeDetails dn : datanodeList) {
       try {
         request = reconstructRequestIfNeeded(request, dn);
-        futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
+        // the caller waits for the replies one by one, so the requests to the other nodes must not wait for it
+        futureHashMap.put(dn, sendCommandAsync(request, dn, new CompletableFuture<>()).getResponse());
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted.");
         // Re-interrupt the thread while catching InterruptedException
@@ -431,6 +439,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   List<DatanodeDetails> sortDatanodes(DatanodeBlockID blockID, ContainerProtos.Type cmdType) throws IOException {
+    if (pipeline.size() == 1) {
+      // nothing to order: every rule below yields the same single node
+      return pipeline.getNodes();
+    }
     List<DatanodeDetails> datanodeList = null;
 
     if (blockID != null) {
@@ -730,7 +742,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         builder.setVersion(ClientVersion.CURRENT.serialize());
       }
       XceiverClientReply asyncReply =
-          sendCommandAsync(builder.build(), pipeline.getFirstNode());
+          sendCommandAsync(builder.build(), pipeline.getFirstNode(), new CompletableFuture<>());
       if (shouldBlockAndWaitAsyncReply(request)) {
         asyncReply.getResponse().get();
       }
@@ -753,9 +765,25 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return !HddsUtils.isReadOnly(request);
   }
 
+  /**
+   * Sends the request to the given datanode for a caller that waits for the
+   * reply with {@link CompletableFuture#get()}: the response is delivered on
+   * the waiting thread, see {@link CallerRunsReplyFuture}.
+   */
   @VisibleForTesting
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
+      throws IOException, InterruptedException {
+    return sendCommandAsync(request, dn, new CallerRunsReplyFuture());
+  }
+
+  /**
+   * @param replyFuture completed with the reply; if it is an {@link Executor}
+   *        the call's callbacks run on it, otherwise on gRPC's default executor
+   */
+  private XceiverClientReply sendCommandAsync(
+      ContainerCommandRequestProto request, DatanodeDetails dn,
+      CompletableFuture<ContainerCommandResponseProto> replyFuture)
       throws IOException, InterruptedException {
     checkOpen(dn);
     DatanodeID dnId = dn.getID();
@@ -763,51 +791,300 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       LOG.debug("Send command {} to datanode {}",
           request.getCmdType(), dn);
     }
-    final CompletableFuture<ContainerCommandResponseProto> replyFuture =
-        new CompletableFuture<>();
     semaphore.acquire();
     long requestTime = Time.monotonicNow();
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
 
+    final ChannelInfo channelInfo = dnChannelInfoMap.get(dnId);
+    final ReplyObserver reply = new ReplyObserver(request, dn, replyFuture, requestTime);
+    if (replyFuture instanceof CallerRunsReplyFuture && !Span.current().getSpanContext().isValid()) {
+      // No trace context to send, so a pooled stream carries the same headers as a new one would.
+      channelInfo.leaseStream().send(request, reply, (CallerRunsReplyFuture) replyFuture,
+          System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout));
+      return new XceiverClientReply(replyFuture);
+    }
+
+    XceiverClientProtocolServiceStub stub = channelInfo.getStub().withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+    if (replyFuture instanceof Executor) {
+      stub = stub.withExecutor((Executor) replyFuture);
+    }
     // create a new grpc message stream pair for each call.
-    final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        dnChannelInfoMap.get(dnId).getStub().withDeadlineAfter(timeout, TimeUnit.MILLISECONDS)
-            .send(new StreamObserver<ContainerCommandResponseProto>() {
-              @Override
-              public void onNext(ContainerCommandResponseProto value) {
-                replyFuture.complete(value);
-                decreasePendingMetricsAndReleaseSemaphore();
-              }
-
-              @Override
-              public void onError(Throwable t) {
-                replyFuture.completeExceptionally(t);
-                decreasePendingMetricsAndReleaseSemaphore();
-              }
-
-              @Override
-              public void onCompleted() {
-                if (!replyFuture.isDone()) {
-                  replyFuture.completeExceptionally(new IOException(
-                      "Stream completed but no reply for request " +
-                          processForDebug(request)));
-                }
-              }
-
-              private void decreasePendingMetricsAndReleaseSemaphore() {
-                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = Time.monotonicNow() - requestTime;
-                metrics.addContainerOpsLatency(request.getCmdType(), cost);
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Executed command {} on datanode {}, cost = {}, cmdType = {}",
-                      processForDebug(request), dn, cost, request.getCmdType());
-                }
-                semaphore.release();
-              }
-            });
+    final StreamObserver<ContainerCommandRequestProto> requestObserver = stub.send(reply);
     requestObserver.onNext(request);
     requestObserver.onCompleted();
     return new XceiverClientReply(replyFuture);
+  }
+
+  /**
+   * Receives the reply to one request: completes its future, then releases
+   * its semaphore permit and updates the metrics.
+   */
+  @VisibleForTesting
+  final class ReplyObserver implements StreamObserver<ContainerCommandResponseProto> {
+    private final ContainerCommandRequestProto request;
+    private final DatanodeDetails dn;
+    private final CompletableFuture<ContainerCommandResponseProto> replyFuture;
+    private final long requestTime;
+
+    ReplyObserver(ContainerCommandRequestProto request, DatanodeDetails dn,
+        CompletableFuture<ContainerCommandResponseProto> replyFuture, long requestTime) {
+      this.request = request;
+      this.dn = dn;
+      this.replyFuture = replyFuture;
+      this.requestTime = requestTime;
+    }
+
+    @Override
+    public void onNext(ContainerCommandResponseProto value) {
+      replyFuture.complete(value);
+      decreasePendingMetricsAndReleaseSemaphore();
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      replyFuture.completeExceptionally(t);
+      decreasePendingMetricsAndReleaseSemaphore();
+    }
+
+    @Override
+    public void onCompleted() {
+      if (!replyFuture.isDone()) {
+        replyFuture.completeExceptionally(new IOException(
+            "Stream completed but no reply for request " +
+                processForDebug(request)));
+      }
+    }
+
+    private void decreasePendingMetricsAndReleaseSemaphore() {
+      metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+      long cost = Time.monotonicNow() - requestTime;
+      metrics.addContainerOpsLatency(request.getCmdType(), cost);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Executed command {} on datanode {}, cost = {}, cmdType = {}",
+            processForDebug(request), dn, cost, request.getCmdType());
+      }
+      semaphore.release();
+    }
+  }
+
+  /**
+   * A send stream kept open across requests, so a request does not pay for
+   * opening and closing an HTTP/2 stream. It carries one request at a time:
+   * the datanode serves the requests of a stream in order and replies to each
+   * one, so the next reply always belongs to the current request. The gRPC
+   * callbacks run on the current request's {@link CallerRunsReplyFuture}, as
+   * for a stream opened per request.
+   */
+  @VisibleForTesting
+  static final class PooledStream implements Executor,
+      ClientResponseObserver<ContainerCommandRequestProto, ContainerCommandResponseProto> {
+    private final ChannelInfo owner;
+    private ClientCallStreamObserver<ContainerCommandRequestProto> requestStream;
+    private final AtomicReference<ReplyObserver> current = new AtomicReference<>();
+    private volatile CallerRunsReplyFuture currentFuture;
+    private volatile boolean closed;
+
+    PooledStream(ChannelInfo owner) {
+      this.owner = owner;
+    }
+
+    @Override
+    public void beforeStart(ClientCallStreamObserver<ContainerCommandRequestProto> stream) {
+      requestStream = stream;
+    }
+
+    void send(ContainerCommandRequestProto request, ReplyObserver reply, CallerRunsReplyFuture future,
+        long deadlineNanos) {
+      future.setDeadline(deadlineNanos, this::cancel);
+      currentFuture = future;
+      current.set(reply);
+      if (closed && current.compareAndSet(reply, null)) {
+        // the stream ended after it was leased, before the request was attached, so its callbacks did not fail it
+        currentFuture = null;
+        reply.onError(Status.UNAVAILABLE.withDescription("pooled stream closed before the request was sent")
+            .asRuntimeException());
+        return;
+      }
+      requestStream.onNext(request);
+    }
+
+    @Override
+    public void execute(Runnable task) {
+      final CallerRunsReplyFuture future = current.get() != null ? currentFuture : null;
+      if (future != null) {
+        future.execute(task);
+      } else {
+        task.run();
+      }
+    }
+
+    @Override
+    public void onNext(ContainerCommandResponseProto value) {
+      final ReplyObserver reply = current.getAndSet(null);
+      currentFuture = null;
+      // back in the pool before the permit is released, so the thread woken by the permit finds the stream
+      owner.releaseStream(this);
+      reply.onNext(value);
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      closed = true;
+      final ReplyObserver reply = current.getAndSet(null);
+      currentFuture = null;
+      if (reply != null) {
+        reply.onError(t);
+      }
+    }
+
+    @Override
+    public void onCompleted() {
+      closed = true;
+      final ReplyObserver reply = current.getAndSet(null);
+      currentFuture = null;
+      if (reply != null) {
+        reply.onCompleted();
+      }
+    }
+
+    boolean isClosed() {
+      return closed;
+    }
+
+    /** Ends an idle stream, the datanode then completes it. */
+    void halfClose() {
+      closed = true;
+      requestStream.onCompleted();
+    }
+
+    /** Called when the request timed out or its waiter gave up; the stream fails the request and is dropped. */
+    private void cancel() {
+      closed = true;
+      requestStream.cancel("request abandoned by the client", null);
+    }
+  }
+
+  /**
+   * Reply future that is also the gRPC call executor. The callbacks of the
+   * call are queued and run by the thread waiting in {@link #get()}, so the
+   * response is parsed and the future completed on the caller, without a
+   * hand-off through gRPC's shared executor (as gRPC blocking stubs do).
+   * Once the waiter returns, queued and later callbacks run directly.
+   */
+  @VisibleForTesting
+  static final class CallerRunsReplyFuture
+      extends CompletableFuture<ContainerCommandResponseProto> implements Executor {
+    private static final Runnable WAKE_UP = () -> { };
+    private final LinkedBlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
+    private boolean detached;
+    // set for a request on a pooled stream, which has no gRPC deadline
+    private long deadlineNanos;
+    private Runnable onAbandon;
+
+    /**
+     * The waiter fails the request with DEADLINE_EXCEEDED once {@code deadline}
+     * (in {@link System#nanoTime()}) passes, and runs {@code abandon} when it
+     * times out or gives up before the reply.
+     */
+    void setDeadline(long deadline, Runnable abandon) {
+      this.deadlineNanos = deadline;
+      this.onAbandon = abandon;
+    }
+
+    // A pooled stream's callbacks may run on another request's waiter, so wake this one up.
+    @Override
+    public boolean complete(ContainerCommandResponseProto value) {
+      final boolean completed = super.complete(value);
+      execute(WAKE_UP);
+      return completed;
+    }
+
+    @Override
+    public boolean completeExceptionally(Throwable ex) {
+      final boolean completed = super.completeExceptionally(ex);
+      execute(WAKE_UP);
+      return completed;
+    }
+
+    @Override
+    public void execute(Runnable task) {
+      synchronized (tasks) {
+        if (!detached) {
+          tasks.add(task);
+          return;
+        }
+      }
+      task.run();
+    }
+
+    @Override
+    public ContainerCommandResponseProto get() throws InterruptedException, ExecutionException {
+      try {
+        if (onAbandon == null) {
+          while (!isDone()) {
+            tasks.take().run();
+          }
+        } else {
+          runTasksUntil(deadlineNanos);
+        }
+      } finally {
+        detach();
+      }
+      return super.get();
+    }
+
+    @Override
+    public ContainerCommandResponseProto get(long time, TimeUnit unit)
+        throws InterruptedException, ExecutionException, TimeoutException {
+      final long deadline = System.nanoTime() + unit.toNanos(time);
+      try {
+        if (onAbandon != null && deadlineNanos - deadline <= 0) {
+          runTasksUntil(deadlineNanos);
+        } else {
+          runTasksUntil(deadline, false);
+        }
+      } finally {
+        detach();
+      }
+      return super.get(0, TimeUnit.NANOSECONDS);
+    }
+
+    /** Runs the queued callbacks until the reply arrives or the request deadline passes. */
+    private void runTasksUntil(long deadline) throws InterruptedException {
+      runTasksUntil(deadline, true);
+    }
+
+    private void runTasksUntil(long deadline, boolean requestDeadline) throws InterruptedException {
+      while (!isDone()) {
+        final long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) {
+          if (requestDeadline) {
+            // what the gRPC call deadline reports for a stream opened per request
+            completeExceptionally(Status.DEADLINE_EXCEEDED.withDescription(
+                "deadline exceeded waiting for the reply").asRuntimeException());
+            onAbandon.run();
+          }
+          return;
+        }
+        final Runnable task = tasks.poll(remaining, TimeUnit.NANOSECONDS);
+        if (task != null) {
+          task.run();
+        }
+      }
+    }
+
+    private void detach() {
+      if (!isDone() && onAbandon != null) {
+        // the waiter was interrupted or timed out: nobody waits for the reply any more
+        onAbandon.run();
+      }
+      synchronized (tasks) {
+        detached = true;
+      }
+      for (Runnable task = tasks.poll(); task != null; task = tasks.poll()) {
+        task.run();
+      }
+    }
   }
 
   private void checkOpen(DatanodeDetails dn)
@@ -846,6 +1123,18 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return timeout;
   }
 
+  @VisibleForTesting
+  int getAvailablePermits() {
+    return semaphore.availablePermits();
+  }
+
+  /** Returns the number of idle pooled streams of the channel to {@code dn} that can still carry a request. */
+  @VisibleForTesting
+  int getIdleStreamCount(DatanodeDetails dn) {
+    final ChannelInfo channelInfo = dnChannelInfoMap.get(dn.getID());
+    return channelInfo == null ? 0 : channelInfo.getIdleStreamCount();
+  }
+
   /** Sets the deadline of each request in milliseconds. */
   public void setTimeout(long timeout) {
     this.timeout = timeout;
@@ -857,6 +1146,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private static class ChannelInfo {
     private final ManagedChannel channel;
     private final XceiverClientProtocolServiceStub stub;
+    // Idle pooled streams, most recently used first. There are never more than
+    // the requests in flight at once, which the client semaphore bounds.
+    private final ConcurrentLinkedDeque<PooledStream> idleStreams = new ConcurrentLinkedDeque<>();
+    private final AtomicBoolean watchingState = new AtomicBoolean();
 
     ChannelInfo(ManagedChannel channel, XceiverClientProtocolServiceStub stub) {
       this.channel = channel;
@@ -875,6 +1168,64 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       return channel == null
           || channel.isTerminated()
           || channel.isShutdown();
+    }
+
+    /** Takes an idle pooled stream, or opens a new one. */
+    PooledStream leaseStream() {
+      for (PooledStream stream = idleStreams.poll(); stream != null; stream = idleStreams.poll()) {
+        if (!stream.isClosed()) {
+          return stream;
+        }
+      }
+      if (watchingState.compareAndSet(false, true)) {
+        onStateChange();
+      }
+      final PooledStream stream = new PooledStream(this);
+      stub.withExecutor(stream).send(stream);
+      return stream;
+    }
+
+    int getIdleStreamCount() {
+      int count = 0;
+      for (PooledStream stream : idleStreams) {
+        if (!stream.isClosed()) {
+          count++;
+        }
+      }
+      return count;
+    }
+
+    void releaseStream(PooledStream stream) {
+      if (stream.isClosed()) {
+        return;
+      }
+      idleStreams.push(stream);
+      if (channel.getState(false) != ConnectivityState.READY) {
+        closeIdleStreams();
+      }
+    }
+
+    /**
+     * Ends the idle streams once the connection is not ready, e.g. when the
+     * datanode sends GOAWAY on shutdown, so that open streams do not hold up
+     * its graceful shutdown. Later requests open new streams.
+     */
+    private void onStateChange() {
+      final ConnectivityState state = channel.getState(false);
+      if (state != ConnectivityState.READY) {
+        closeIdleStreams();
+      }
+      if (state != ConnectivityState.SHUTDOWN) {
+        channel.notifyWhenStateChanged(state, this::onStateChange);
+      }
+    }
+
+    private void closeIdleStreams() {
+      for (PooledStream stream = idleStreams.poll(); stream != null; stream = idleStreams.poll()) {
+        if (!stream.isClosed()) {
+          stream.halfClose();
+        }
+      }
     }
   }
 }
