@@ -494,7 +494,7 @@ public class TestStreamBlockInputStream {
       assertEquals(-1, sbis.read(buf));
       sbis.seek(data.length);
     }
-    verify(client, times(1)).sendCommand(any(ContainerCommandRequestProto.class), any());
+    verify(client, times(1)).sendCommand(any(ContainerCommandRequestProto.class), any(), any());
   }
 
   @Test
@@ -509,7 +509,7 @@ public class TestStreamBlockInputStream {
       assertArrayEquals(data, buf.array());
       sbis.seek(0);
     }
-    verify(client, never()).sendCommand(any(ContainerCommandRequestProto.class), any());
+    verify(client, never()).sendCommand(any(ContainerCommandRequestProto.class), any(), any());
   }
 
   private XceiverClientGrpc mockGetBlockClient(byte[] data, Pipeline pipeline) throws Exception {
@@ -517,7 +517,8 @@ public class TestStreamBlockInputStream {
     when(client.getPipeline()).thenReturn(pipeline);
     DatanodeDetails datanode = pipeline.getFirstNode();
     when(pipeline.getClosestNode(any())).thenReturn(datanode);
-    when(client.sendCommand(any(ContainerCommandRequestProto.class), any())).thenAnswer(inv -> {
+    when(client.getDatanodesInOrder(any(), any())).thenReturn(Collections.singletonList(datanode));
+    when(client.sendCommand(any(ContainerCommandRequestProto.class), any(), any())).thenAnswer(inv -> {
       ContainerCommandRequestProto request = inv.getArgument(0);
       return ContainerCommandResponseProto.newBuilder()
           .setCmdType(Type.GetBlock)
