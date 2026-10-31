@@ -67,55 +67,6 @@ def generate_presigned_put_object_url(
     raise Exception(f"Failed to generate presigned URL: {str(e)}")
 
 
-def generate_presigned_delete_objects_url(
-    aws_access_key_id=None,
-    aws_secret_access_key=None,
-    bucket_name=None,
-    region_name='us-east-1',
-    expiration=3600,
-    endpoint_url=None,
-):
-  """
-  Generate a presigned URL for DeleteObjects. The request body (the XML list
-  of keys) is not part of the signature (UNSIGNED-PAYLOAD), so the caller can
-  send a body the AWS CLI would not build.
-  """
-  try:
-    import boto3
-    from botocore.config import Config
-
-    client_args = {
-      'service_name': 's3',
-      'region_name': region_name,
-    }
-
-    if aws_access_key_id and aws_secret_access_key:
-      client_args['aws_access_key_id'] = aws_access_key_id
-      client_args['aws_secret_access_key'] = aws_secret_access_key
-
-    if endpoint_url:
-      client_args['endpoint_url'] = endpoint_url
-
-    # Leave out the body (the Delete parameter): the caller sends it, and with
-    # a body SigV4 presigning tries to parse it as JSON and fails.
-    client_args['config'] = Config(parameter_validation=False)
-
-    s3_client = boto3.client(**client_args)
-
-    presigned_url = s3_client.generate_presigned_url(
-      ClientMethod='delete_objects',
-      Params={
-        'Bucket': bucket_name,
-      },
-      ExpiresIn=expiration
-    )
-
-    return presigned_url
-
-  except Exception as e:
-    raise Exception(f"Failed to generate presigned URL: {str(e)}")
-
-
 def generate_presigned_complete_multipart_upload_url(
     aws_access_key_id=None,
     aws_secret_access_key=None,

@@ -29,62 +29,99 @@ import org.xml.sax.helpers.XMLFilterImpl;
  * This filter will read the XML content as namespace qualified content
  * independent from the current namespace usage.
  * <p>
- * It also rejects mixed content: an element holding both text and child elements. No S3 request body has mixed
- * content, and JAXB keeps only the text after the last child, so a Key holding the text {@code a/}, an empty child
- * element and the text {@code b} would be read as {@code b} while other readers see {@code a/b}.
+ * It also reads value elements the way S3 does. JAXB keeps only the text after the last child element of an element
+ * it reads as one value, so a Key holding <code>tmp/&lt;a/&gt;secret</code> would be read as {@code secret}. S3 reads
+ * it as {@code tmp/secret}: inside a value, a child element holding nothing but XML whitespace is ignored and the text
+ * around it is joined, and a child element holding any other text makes the body malformed. So does text directly
+ * inside an element that holds child elements. Elements the request model does not define pass through unchanged,
+ * and JAXB ignores them.
  */
 public class XmlNamespaceFilter extends XMLFilterImpl {
 
   private String namespace;
 
-  /** Per open element: whether it holds non-whitespace text, and whether it holds a child element. */
-  private final Deque<boolean[]> content = new ArrayDeque<>();
+  /** The model of each open element the request model defines, with the document at the bottom. */
+  private final Deque<XmlElementModel> open = new ArrayDeque<>();
+
+  /** Open elements the request model does not define. They and everything in them pass through unchecked. */
+  private int unknownDepth;
+
+  /**
+   * Open elements inside a value. Their elements and text are not passed to JAXB. Processing instructions still are,
+   * and JAXB ignores them; ignorable whitespace needs a DTD, which the parser refuses.
+   */
+  private int insideValueDepth;
 
   /**
    * Create the filter.
    *
    * @param namespace to add to every elements.
+   * @param document how the request class reads the body, from {@link XmlElementModel#document(Class)}.
    */
-  public XmlNamespaceFilter(String namespace) {
+  XmlNamespaceFilter(String namespace, XmlElementModel document) {
     this.namespace = namespace;
+    open.push(document);
   }
 
   @Override
   public void startElement(String uri, String localName, String qName,
       Attributes atts) throws SAXException {
-    boolean[] parent = content.peek();
-    if (parent != null) {
-      if (parent[0]) {
-        throw new SAXException("Mixed content is not allowed: element " + qName + " follows text");
-      }
-      parent[1] = true;
+    if (insideValueDepth > 0 || unknownDepth == 0 && open.peek().isValue()) {
+      insideValueDepth++;
+      return;
     }
-    content.push(new boolean[2]);
+    if (unknownDepth > 0) {
+      unknownDepth++;
+    } else {
+      XmlElementModel child = open.peek().child(elementName(localName, qName));
+      if (child == null) {
+        unknownDepth = 1;
+      } else {
+        open.push(child);
+      }
+    }
     super.startElement(namespace, localName, qName, atts);
   }
 
   @Override
   public void endElement(String uri, String localName, String qName)
       throws SAXException {
-    content.pop();
+    if (insideValueDepth > 0) {
+      insideValueDepth--;
+      return;
+    }
+    if (unknownDepth > 0) {
+      unknownDepth--;
+    } else {
+      open.pop();
+    }
     super.endElement(namespace, localName, qName);
   }
 
   @Override
   public void characters(char[] ch, int start, int length) throws SAXException {
-    boolean[] current = content.peek();
-    if (current != null && !isWhitespace(ch, start, length)) {
-      if (current[1]) {
-        throw new SAXException("Mixed content is not allowed: text follows a child element");
+    if (insideValueDepth > 0) {
+      if (!isXmlWhitespace(ch, start, length)) {
+        throw new SAXException("An element inside a value holds text");
       }
-      current[0] = true;
+      return;
+    }
+    if (unknownDepth == 0 && !open.peek().isValue() && !isXmlWhitespace(ch, start, length)) {
+      throw new SAXException("Text is not allowed in an element that holds other elements");
     }
     super.characters(ch, start, length);
   }
 
-  private static boolean isWhitespace(char[] ch, int start, int length) {
+  /** The name JAXB matches: a parser that is not namespace-aware reports only the qualified name. */
+  private static String elementName(String localName, String qName) {
+    return localName == null || localName.isEmpty() ? qName : localName;
+  }
+
+  /** XML whitespace is space, tab, CR and LF only; S3 refuses any other character, such as U+3000, in these places. */
+  private static boolean isXmlWhitespace(char[] ch, int start, int length) {
     for (int i = start; i < start + length; i++) {
-      if (!Character.isWhitespace(ch[i])) {
+      char c = ch[i];
+      if (c != ' ' && c != '\t' && c != '\r' && c != '\n') {
         return false;
       }
     }

@@ -2681,6 +2681,49 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       assertEquals(CONTENT.length(), metadata.getContentLength());
     }
 
+    /**
+     * A DeleteObjects key is read the way AWS S3 reads it: an empty element inside the key is ignored and the text on
+     * both sides is one key, and an element holding text is refused with MalformedXML. The SDK escapes markup in keys,
+     * so the body is written by hand and sent through a presigned URL.
+     */
+    @Test
+    public void testPresignedUrlDeleteObjectsReadsKeyAsS3Does() throws Exception {
+      final String prefix = getKeyName() + "/";
+      final String joinedKey = prefix + "tmp/" + prefix + "secret";
+      final String trailingKey = prefix + "secret";
+      s3Client.putObject(BUCKET_NAME, joinedKey, CONTENT);
+      s3Client.putObject(BUCKET_NAME, trailingKey, CONTENT);
+
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, null).withMethod(HttpMethod.POST).withExpiration(expiration);
+      generatePresignedUrlRequest.addRequestParameter("delete", "");
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+      HttpURLConnection connection = postDeleteObjects(presignedUrl, prefix + "tmp/<a/>" + prefix + "secret");
+      try {
+        assertEquals(HttpURLConnection.HTTP_OK, connection.getResponseCode());
+      } finally {
+        connection.disconnect();
+      }
+      assertFalse(s3Client.doesObjectExist(BUCKET_NAME, joinedKey));
+      assertTrue(s3Client.doesObjectExist(BUCKET_NAME, trailingKey));
+
+      connection = postDeleteObjects(presignedUrl, "<a>" + prefix + "dir/</a> ");
+      try {
+        assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, connection.getResponseCode());
+        assertThat(IOUtils.toString(connection.getErrorStream(), StandardCharsets.UTF_8))
+            .contains("<Code>MalformedXML</Code>");
+      } finally {
+        connection.disconnect();
+      }
+      assertTrue(s3Client.doesObjectExist(BUCKET_NAME, trailingKey));
+    }
+
+    private HttpURLConnection postDeleteObjects(URL presignedUrl, String keyXml) throws IOException {
+      byte[] body = ("<Delete><Object><Key>" + keyXml + "</Key></Object></Delete>").getBytes(StandardCharsets.UTF_8);
+      return S3SDKTestUtils.openHttpURLConnection(presignedUrl, "POST", null, body);
+    }
+
     @Test
     public void testPresignedUrlHead() throws IOException {
       final String keyName = getKeyName();

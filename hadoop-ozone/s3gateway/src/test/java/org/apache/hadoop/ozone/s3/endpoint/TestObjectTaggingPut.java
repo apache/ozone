@@ -50,6 +50,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for PutObjectTagging.
@@ -115,6 +117,26 @@ public class TestObjectTaggingPut {
     assertErrorResponse(MALFORMED_XML, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, emptyTags()));
     assertErrorResponse(MALFORMED_XML, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, tagKeyNotSpecified()));
     assertErrorResponse(MALFORMED_XML, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, tagValueNotSpecified()));
+  }
+
+  /** A tag value split by an empty element is one value; AWS S3 stored it on 2026-10-31 (case T03). */
+  @Test
+  public void testTagValueSplitByAnEmptyElementIsJoined() throws Exception {
+    assertSucceeds(() -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME,
+        oneTag("<Key>k</Key><Value>pro<a/>tected</Value>")));
+    assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags())
+        .containsExactlyEntriesOf(ImmutableMap.of("k", "protected"));
+  }
+
+  /** A tag key or value holding an element with text is refused; AWS S3 answered 400 MalformedXML (T02, T04, T07). */
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "<Key>k</Key><Value><a>protected</a></Value>",
+      "<Key>k</Key><Value><a>x</a> </Value>",
+      "<Key><a>k</a></Key><Value>v</Value>"})
+  public void testTagHoldingAnElementWithTextIsRefused(String tag) throws Exception {
+    assertErrorResponse(MALFORMED_XML, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, oneTag(tag)));
+    assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags()).isEmpty();
   }
 
   @Test
@@ -201,6 +223,10 @@ public class TestObjectTaggingPut {
             "      </Tag>" +
             "   </TagSet>" +
             "</Tagging>";
+  }
+
+  private static String oneTag(String tag) {
+    return "<Tagging xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"><TagSet><Tag>" + tag + "</Tag></TagSet></Tagging>";
   }
 
   private String noTagSet() {
