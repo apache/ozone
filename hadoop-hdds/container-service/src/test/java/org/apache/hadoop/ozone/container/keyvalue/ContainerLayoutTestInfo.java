@@ -96,7 +96,7 @@ public enum ContainerLayoutTestInfo {
   @Target(ElementType.METHOD)
   @Retention(RetentionPolicy.RUNTIME)
   @ParameterizedTest
-  @MethodSource("org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion#getAllVersions")
+  @MethodSource("org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion#getSupportedVersions")
   public @interface ContainerTest {
     // composite annotation
   }
