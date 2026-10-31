@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.createStreamKey;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.getDatanodeService;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.validateData;
@@ -43,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -121,13 +121,20 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
         .isGreaterThanOrEqualTo(size);
   }
 
-  @Test
-  void testReadAfterHsyncWithPutBlockWithoutRaft() throws Exception {
-    // Smaller than PUT_BLOCK_REQUEST_LENGTH_MAX, so the datanodes still buffer all the data when hsync commits PutBlock
-    final int size = 1000;
+  private static Stream<Arguments> hsyncParameters() {
+    // The datanodes keep at least the last PUT_BLOCK_REQUEST_LENGTH_MAX bytes of a stream in memory.
+    // With 1000 bytes, all the data is still in memory when hsync commits the PutBlock.
+    // With 3 MiB + 1000 bytes, the first part of the data is already in the block file.
+    return Stream.of(1000, 3 * PUT_BLOCK_REQUEST_LENGTH_MAX + 1000).flatMap(size ->
+        Stream.of(false, true).map(putBlockWithoutRaft -> Arguments.of(size, putBlockWithoutRaft)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("hsyncParameters")
+  void testReadAfterHsync(int size, boolean putBlockWithoutRaft) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(true);
+    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
     conf.setFromObject(clientConfig);
 
     final String keyName = "hsync-" + UUID.randomUUID();
