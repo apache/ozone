@@ -121,30 +121,7 @@ class TestXceiverClientManagerCloseContention {
     // duration of each close() that actually closed a client
     List<Long> closeNanos = Collections.synchronizedList(new ArrayList<>());
 
-    try (XceiverClientManager manager =
-             new XceiverClientManager(conf, clientConf, (ClientTrustManager) null) {
-               @Override
-               protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) throws IOException {
-                 // the real gRPC client the manager creates for this pipeline, with close() timed
-                 XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
-                   @Override
-                   public void close() {
-                     final boolean open = !isClosed();
-                     final long startNanos = System.nanoTime();
-                     super.close();
-                     if (open) {
-                       closeNanos.add(System.nanoTime() - startNanos);
-                     }
-                   }
-                 };
-                 try {
-                   client.connect();
-                 } catch (Exception e) {
-                   throw new IOException(e);
-                 }
-                 return client;
-               }
-             }) {
+    try (XceiverClientManager manager = newManagerTimingCloses(conf, clientConf, closeNanos)) {
 
       ExecutorService pool = Executors.newFixedThreadPool(THREADS);
       CountDownLatch start = new CountDownLatch(1);
@@ -203,6 +180,36 @@ class TestXceiverClientManagerCloseContention {
               + "floor per close")
           .isLessThan(MAX_MEDIAN_MILLIS_PER_CLOSE);
     }
+  }
+
+  /**
+   * A manager that creates the same real {@link XceiverClientGrpc} it would otherwise, but adds the duration of each
+   * close() that actually closes a client to {@code closeNanos}.
+   */
+  private static XceiverClientManager newManagerTimingCloses(ConfigurationSource conf, ScmClientConfig clientConf,
+      List<Long> closeNanos) throws IOException {
+    return new XceiverClientManager(conf, clientConf, (ClientTrustManager) null) {
+      @Override
+      protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) throws IOException {
+        XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+          @Override
+          public void close() {
+            final boolean open = !isClosed();
+            final long startNanos = System.nanoTime();
+            super.close();
+            if (open) {
+              closeNanos.add(System.nanoTime() - startNanos);
+            }
+          }
+        };
+        try {
+          client.connect();
+        } catch (Exception e) {
+          throw new IOException(e);
+        }
+        return client;
+      }
+    };
   }
 
   /**
