@@ -20,10 +20,13 @@ package org.apache.hadoop.hdds.client;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.XOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -59,6 +62,75 @@ class TestECReplicationConfig {
   void testUnsuccessfulStringParsing(String invalidValue) {
     assertThrows(IllegalArgumentException.class,
             () -> new ECReplicationConfig(invalidValue));
+    assertThrows(IllegalArgumentException.class, () -> ECReplicationConfig.getInstance(invalidValue));
+  }
+
+  @Test
+  void testGetInstanceReusesInstance() {
+    ECReplicationConfig config = ECReplicationConfig.getInstance("rs-6-3-1024k");
+    assertEquals(new ECReplicationConfig(6, 3, RS, 1024 * 1024), config);
+
+    assertSame(config, ECReplicationConfig.getInstance("RS-6-3-1024K"));
+    assertSame(config, ECReplicationConfig.getInstance(config.toProto()));
+    assertSame(config, ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null, config.toProto()));
+    assertSame(config, ReplicationConfig.parse(ReplicationType.EC, "rs-6-3-1024k", new OzoneConfiguration()));
+
+    assertNotSame(config, ECReplicationConfig.getInstance("rs-6-3-2048k"));
+  }
+
+  /** Every config allowed by default by ozone.replication.allowed-configs, with each codec, is shared. */
+  @Test
+  void testGetInstanceReturnsPredefinedConfigs() {
+    for (ECReplicationConfig.EcCodec codec : ECReplicationConfig.EcCodec.values()) {
+      for (int[] scheme : new int[][] {{3, 2}, {6, 3}, {10, 4}}) {
+        for (int chunkKB : new int[] {512, 1024, 2048, 4096}) {
+          final String prefix = codec + "-" + scheme[0] + "-" + scheme[1] + "-";
+          final ECReplicationConfig config = ECReplicationConfig.getInstance(prefix + chunkKB + "k");
+          assertEquals(new ECReplicationConfig(scheme[0], scheme[1], codec, chunkKB * 1024), config);
+
+          assertSame(config, ECReplicationConfig.getInstance(prefix + chunkKB + "k"));
+          // other spellings are parsed with the regex, then shared as well
+          assertSame(config, ECReplicationConfig.getInstance(prefix.toUpperCase() + chunkKB + "K"));
+          assertSame(config, ECReplicationConfig.getInstance(prefix + chunkKB * 1024));
+          assertSame(config, ECReplicationConfig.getInstance(config.toProto()));
+          assertSame(config, ECReplicationConfig.getInstance(config.toProto().toBuilder()
+              .setCodec(codec.name()).build()));
+        }
+      }
+    }
+  }
+
+  /** The constructor still creates a new object, also for the predefined configs. */
+  @ParameterizedTest
+  @ValueSource(strings = {"rs-6-3-1024k", "RS-6-3-1024K", "rs-4-2-1024k"})
+  void testConstructorCreatesNewInstance(String string) {
+    final ECReplicationConfig config = new ECReplicationConfig(string);
+    assertEquals(ECReplicationConfig.getInstance(string), config);
+    assertNotSame(ECReplicationConfig.getInstance(string), config);
+    assertNotSame(new ECReplicationConfig(string), config);
+  }
+
+  /** Other configs are created as before, for example from a client sending arbitrary values. */
+  @ParameterizedTest
+  @ValueSource(strings = {"rs-4-2-1024k", "rs-6-3-8192k", "rs-6-3-1000", "xor-3-1-1024k", "rs-10-4-256k"})
+  void testGetInstanceCreatesOtherConfigs(String string) {
+    final ECReplicationConfig expected = new ECReplicationConfig(string);
+
+    final ECReplicationConfig fromString = ECReplicationConfig.getInstance(string);
+    assertEquals(expected, fromString);
+    assertNotSame(fromString, ECReplicationConfig.getInstance(string));
+
+    final ECReplicationConfig fromProto = ECReplicationConfig.getInstance(expected.toProto());
+    assertEquals(expected, fromProto);
+    assertNotSame(fromProto, ECReplicationConfig.getInstance(expected.toProto()));
+  }
+
+  @Test
+  void testGetInstanceRejectsUnknownCodec() {
+    final HddsProtos.ECReplicationConfig proto = new ECReplicationConfig(6, 3).toProto().toBuilder()
+        .setCodec("foo").build();
+    assertThrows(IllegalArgumentException.class, () -> new ECReplicationConfig(proto));
+    assertThrows(IllegalArgumentException.class, () -> ECReplicationConfig.getInstance(proto));
   }
 
   @Test

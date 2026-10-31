@@ -96,7 +96,7 @@ public interface ReplicationConfig {
       HddsProtos.ECReplicationConfig ecConfig) {
     switch (type) {
     case EC:
-      return new ECReplicationConfig(ecConfig);
+      return ECReplicationConfig.getInstance(ecConfig);
     case RATIS:
     case STAND_ALONE:
       return fromProtoTypeAndFactor(type, factor);
@@ -201,7 +201,7 @@ public interface ReplicationConfig {
       replicationConfig = fromTypeAndFactor(type, factor);
       break;
     case EC:
-      replicationConfig = new ECReplicationConfig(replication);
+      replicationConfig = ECReplicationConfig.getInstance(replication);
       break;
     default:
       throw new IllegalArgumentException("Replication type " + type +
