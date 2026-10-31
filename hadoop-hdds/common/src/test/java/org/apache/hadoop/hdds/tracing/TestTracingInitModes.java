@@ -20,11 +20,14 @@ package org.apache.hadoop.hdds.tracing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
@@ -32,6 +35,8 @@ import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
+import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -164,6 +169,29 @@ public class TestTracingInitModes {
           "Application-aware (with adopted global) must NOT manufacture a root span");
     }
     provider.shutdown();
+  }
+
+  /** app-aware: a SpanKind proxy made with no current span still traces calls made under an app span. */
+  @Test
+  public void testApplicationAwareSpanKindProxyCreatedAtStartup() {
+    installNoExportGlobalOpenTelemetry();
+    MutableConfigurationSource conf = config(false, true);
+    TracingUtil.initTracing("app-aware-proxy", conf);
+    ServiceImpl delegate = new ServiceImpl();
+    assertSame(delegate, TracingUtil.createProxy(delegate, Service.class, conf));
+    Service proxy = TracingUtil.createProxy(delegate, Service.class, SpanKind.INTERNAL);
+    assertNotSame(delegate, proxy);
+
+    proxy.normalMethod();
+    assertFalse(delegate.wasSpanActive(), "Application-aware mode must NOT manufacture a root span");
+
+    Span appSpan = GlobalOpenTelemetry.getTracer("app").spanBuilder("app-root").startSpan();
+    try (Scope ignored = appSpan.makeCurrent()) {
+      proxy.normalMethod();
+      assertTrue(delegate.wasSpanActive(), "Proxy call under an app span should create a child span");
+    } finally {
+      appSpan.end();
+    }
   }
 
   /** Both flags false: tracing is off. */

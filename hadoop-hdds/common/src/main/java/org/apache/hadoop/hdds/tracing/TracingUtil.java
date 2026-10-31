@@ -394,13 +394,34 @@ public final class TracingUtil {
    */
   public static <T> T createProxy(
       T delegate, Class<T> itf, ConfigurationSource conf) {
+    return createProxy(delegate, itf, conf, SpanKind.INTERNAL);
+  }
+
+  /** Same as {@link #createProxy(Object, Class, ConfigurationSource)}, with CLIENT spans for an RPC delegate. */
+  public static <T> T createClientProxy(T delegate, Class<T> itf, ConfigurationSource conf) {
+    return createProxy(delegate, itf, conf, SpanKind.CLIENT);
+  }
+
+  /** Creates a proxy with spans named {@code <delegate class>.<method>}, also usable at startup without a span. */
+  public static <T> T createProxy(T delegate, Class<T> itf, SpanKind spanKind) {
+    if (!tracingEnabled && !applicationAware) {
+      return delegate;
+    }
+    return newProxy(delegate, itf, delegate.getClass().getSimpleName(), spanKind);
+  }
+
+  private static <T> T createProxy(T delegate, Class<T> itf, ConfigurationSource conf, SpanKind spanKind) {
     if (!shouldCreateTracingProxy(conf)) {
       return delegate;
     }
+    return newProxy(delegate, itf, itf.getSimpleName(), spanKind);
+  }
+
+  private static <T> T newProxy(T delegate, Class<T> itf, String name, SpanKind spanKind) {
     Class<?> aClass = delegate.getClass();
     return itf.cast(Proxy.newProxyInstance(aClass.getClassLoader(),
         new Class<?>[] {itf},
-        new TraceAllMethod<>(delegate, itf.getSimpleName())));
+        new TraceAllMethod<>(delegate, name, spanKind)));
   }
 
   public static boolean isTracingEnabled(ConfigurationSource conf) {
@@ -499,7 +520,7 @@ public final class TracingUtil {
       return supplier.get();
     } catch (Exception ex) {
       span.addEvent("Failed with exception: " + ex.getMessage());
-      span.setStatus(StatusCode.ERROR);
+      recordException(span, ex);
       throw ex;
     } finally {
       span.end();
@@ -515,7 +536,7 @@ public final class TracingUtil {
       runnable.run();
     } catch (Exception ex) {
       span.addEvent("Failed with exception: " + ex.getMessage());
-      span.setStatus(StatusCode.ERROR);
+      recordException(span, ex);
       throw ex;
     } finally {
       span.end();
@@ -554,6 +575,63 @@ public final class TracingUtil {
 
   public static Span getActiveSpan() {
     return Span.current();
+  }
+
+  public static Span createSpan(String spanName) {
+    return createSpan(spanName, SpanKind.INTERNAL);
+  }
+
+  public static Span createSpan(String spanName, SpanKind spanKind) {
+    return buildSpan(spanName, spanKind);
+  }
+
+  public static void recordExceptionInCurrentSpan(Throwable t) {
+    recordException(Span.current(), t);
+  }
+
+  public static void recordException(Span span, Throwable t) {
+    if (t == null || !span.isRecording()) {
+      return;
+    }
+    span.recordException(t);
+    if (t.getMessage() == null) {
+      span.setStatus(StatusCode.ERROR);
+    } else {
+      span.setStatus(StatusCode.ERROR, t.getMessage());
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, String value) {
+    Span span = Span.current();
+    if (value != null && span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, long value) {
+    Span span = Span.current();
+    if (span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, boolean value) {
+    Span span = Span.current();
+    if (span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addEventToCurrentSpan(String name, String key, String value) {
+    Span span = Span.current();
+    if (!span.isRecording()) {
+      return;
+    }
+    if (value == null) {
+      span.addEvent(name);
+    } else {
+      span.addEvent(name, Attributes.of(AttributeKey.stringKey(key), value));
+    }
   }
 
   /**
