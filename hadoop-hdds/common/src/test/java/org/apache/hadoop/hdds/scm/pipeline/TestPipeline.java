@@ -129,24 +129,6 @@ public class TestPipeline {
     assertPerMemberVersions(expected, subject.getProtobufMessage(DEFAULT_VERSION, ALL_PORTS, overrides));
   }
 
-  @Test
-  public void testMemberAbsentFromOverrideKeepsOwnVersion() {
-    DatanodeDetails registered = randomDatanodeDetails();
-    registered.setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
-    DatanodeDetails unregistered = randomDatanodeDetails();
-    unregistered.setCurrentVersion(HDDSVersion.STREAM_BLOCK_SUPPORT);
-
-    Map<DatanodeID, ComponentVersion> overrides = new HashMap<>();
-    overrides.put(registered.getID(), HDDSVersion.SOFTWARE_VERSION);
-
-    Pipeline subject = MockPipeline.createPipeline(Arrays.asList(registered, unregistered));
-
-    Map<DatanodeID, Integer> expected = new HashMap<>();
-    expected.put(registered.getID(), HDDSVersion.SOFTWARE_VERSION.serialize());
-    expected.put(unregistered.getID(), HDDSVersion.STREAM_BLOCK_SUPPORT.serialize());
-    assertPerMemberVersions(expected, subject.getProtobufMessage(DEFAULT_VERSION, ALL_PORTS, overrides));
-  }
-
   private static void assertPerMemberVersions(Map<DatanodeID, Integer> expected, HddsProtos.Pipeline proto) {
     assertEquals(expected.size(), proto.getMembersCount());
     for (HddsProtos.DatanodeDetailsProto member : proto.getMembersList()) {

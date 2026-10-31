@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.Config;
@@ -113,8 +114,11 @@ public class WritableECContainerProvider
             excludeList);
       }
     }
+    // Skip pipelines with datanodes that have not registered since SCM started, they are not safe for writes.
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
-        repConfig, Pipeline.PipelineState.OPEN);
+        repConfig, Pipeline.PipelineState.OPEN).stream()
+        .filter(p -> !pipelineManager.isOpenWithUnregisteredNodes(p))
+        .collect(Collectors.toList());
     final int pipelineCount = existingPipelines.size();
     LOG.debug("Checking existing pipelines: {}", existingPipelines);
 

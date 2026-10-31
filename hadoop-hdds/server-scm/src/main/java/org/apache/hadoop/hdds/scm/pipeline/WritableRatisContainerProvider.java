@@ -149,8 +149,11 @@ public class WritableRatisContainerProvider
     // mentioned in HDDS-5655.
     pipelineManager.acquireReadLock();
     try {
+      // Skip pipelines with datanodes that have not registered since SCM started, they are not safe for writes.
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
-          excludeList, Pipeline.PipelineState.OPEN);
+          excludeList, Pipeline.PipelineState.OPEN).stream()
+          .filter(p -> !pipelineManager.isOpenWithUnregisteredNodes(p))
+          .collect(Collectors.toList());
       return selectContainer(availablePipelines, req, owner, excludeList);
     } finally {
       pipelineManager.releaseReadLock();

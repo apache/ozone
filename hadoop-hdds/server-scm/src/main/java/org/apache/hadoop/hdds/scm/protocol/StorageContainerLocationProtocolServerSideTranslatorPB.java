@@ -868,15 +868,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return builder.build();
   }
 
-  private Map<DatanodeID, ComponentVersion> currentVersions(ContainerWithPipeline containerWithPipeline) {
+  private Map<DatanodeID, ComponentVersion> currentVersions(ContainerWithPipeline containerWithPipeline)
+      throws SCMException {
     Map<DatanodeID, ComponentVersion> memberVersions = new HashMap<>();
     for (DatanodeDetails dn : containerWithPipeline.getPipeline().getNodes()) {
       DatanodeInfo live = scm.getScmNodeManager().getNode(dn.getID());
-      // A member may not be registered yet (e.g. stopped across an SCM restart). Leave it out so it keeps the version
-      // from the pipeline copy instead of failing the whole read.
-      if (live != null) {
-        memberVersions.put(live.getID(), live.getCurrentVersion());
+      if (live == null) {
+        throw new SCMException("Failed to lookup datanode " + dn + " in NodeManager",
+            SCMException.ResultCodes.NO_SUCH_DATANODE);
       }
+      memberVersions.put(live.getID(), live.getCurrentVersion());
     }
     return memberVersions;
   }

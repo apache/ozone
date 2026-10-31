@@ -18,8 +18,10 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -46,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -208,28 +211,14 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
     }
   }
 
-  /**
-   * A pipeline member that is not registered in NodeManager (e.g. stopped across an SCM restart) must not fail the
-   * read. It is returned with the version from its pipeline copy, and registered members keep their live version.
-   */
   @Test
-  public void testUnregisteredNodeIsStillReturned() throws Exception {
-    DatanodeDetails unregistered = nodes.get(1);
-    registry.remove(unregistered.getID());
+  public void testUnknownNodeThrows() throws Exception {
+    DatanodeDetails unknownNode = nodes.get(1);
+    registry.remove(unknownNode.getID());
     when(impl.getContainerWithPipeline(anyLong())).thenReturn(containerWithPipeline());
 
-    List<DatanodeDetailsProto> members = service.getContainerWithPipeline(
-        GetContainerWithPipelineRequestProto.newBuilder().setContainerID(1L).build(), ClientVersion.CURRENT)
-        .getContainerWithPipeline().getPipeline().getMembersList();
-
-    assertEquals(nodes.size(), members.size());
-    for (DatanodeDetailsProto member : members) {
-      DatanodeID id = DatanodeDetails.getFromProtoBuf(member).getID();
-      if (id.equals(unregistered.getID())) {
-        assertEquals(unregistered.getCurrentVersion().serialize(), member.getCurrentVersion());
-      } else {
-        assertEquals(registry.get(id).getCurrentVersion().serialize(), member.getCurrentVersion());
-      }
-    }
+    SCMException ex = assertThrows(SCMException.class, () -> service.getContainerWithPipeline(
+        GetContainerWithPipelineRequestProto.newBuilder().setContainerID(1L).build(), ClientVersion.CURRENT));
+    assertThat(ex.getMessage()).contains(unknownNode.toString());
   }
 }

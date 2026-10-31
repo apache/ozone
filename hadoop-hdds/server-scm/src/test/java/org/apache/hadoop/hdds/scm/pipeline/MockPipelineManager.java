@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -51,6 +52,7 @@ public class MockPipelineManager implements PipelineManager {
 
   private final PipelineStateManager stateManager;
   private final NodeManager nodeManager;
+  private final Set<DatanodeDetails> unregisteredNodes = new HashSet<>();
 
   public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager, NodeManager nodeManager)
       throws RocksDatabaseException, CodecException, DuplicatedPipelineIdException {
@@ -316,6 +318,16 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public void releaseWriteLock() {
 
+  }
+
+  /** Mock pipelines use generated datanodes that are not registered in the node manager, so only report those set. */
+  @Override
+  public boolean isOpenWithUnregisteredNodes(Pipeline pipeline) {
+    return pipeline.getNodes().stream().anyMatch(unregisteredNodes::contains);
+  }
+
+  public void setNodeUnregistered(DatanodeDetails dn) {
+    unregisteredNodes.add(dn);
   }
 
   @Override
