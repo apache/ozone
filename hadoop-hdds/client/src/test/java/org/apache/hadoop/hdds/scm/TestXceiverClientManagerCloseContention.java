@@ -219,4 +219,41 @@ class TestXceiverClientManagerCloseContention {
     // closing the manager waits for pending closes
     assertThat(closed).isTrue();
   }
+
+  @Test
+  void managerClosesCachedClientsInParallel() throws Exception {
+    CountDownLatch closeStarted = new CountDownLatch(3);
+    AtomicBoolean allClosesOverlapped = new AtomicBoolean(true);
+    AtomicBoolean closedUnderCacheLock = new AtomicBoolean();
+    ScmClientConfig clientConf = new XceiverClientManagerConfigBuilder()
+        .setMaxCacheSize(3)
+        .setStaleThresholdMs(TimeUnit.SECONDS.toMillis(30))
+        .build();
+    try (XceiverClientManager manager = new XceiverClientManager(new OzoneConfiguration(), clientConf, null) {
+      @Override
+      protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) {
+        XceiverClientSpi client = mock(XceiverClientSpi.class,
+            withSettings().useConstructor().defaultAnswer(CALLS_REAL_METHODS));
+        doAnswer(invocation -> {
+          if (Thread.holdsLock(getClientCache())) {
+            closedUnderCacheLock.set(true);
+          }
+          closeStarted.countDown();
+          if (!closeStarted.await(10, TimeUnit.SECONDS)) {
+            allClosesOverlapped.set(false);
+          }
+          return null;
+        }).when(client).close();
+        return client;
+      }
+    }) {
+      for (int i = 0; i < 3; i++) {
+        XceiverClientSpi client = manager.acquireClient(MockPipeline.createPipeline(1));
+        manager.releaseClient(client, false);
+      }
+    }
+    assertThat(closeStarted.getCount()).isZero();
+    assertThat(allClosesOverlapped).isTrue();
+    assertThat(closedUnderCacheLock).isFalse();
+  }
 }

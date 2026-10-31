@@ -25,11 +25,10 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.V
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -174,39 +173,43 @@ public class OMQuotaRepairRequest extends OMClientRequest {
       OMMetadataManager metadataManager, long transactionLogIndex) throws IOException {
     LOG.info("Starting volume quota support update");
     Map<String, OmVolumeArgs> volUpdateMap = new HashMap<>();
-    try (TableIterator<String, Table.KeyValue<String, OmVolumeArgs>>
-             iterator = metadataManager.getVolumeTable().iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> entry = iterator.next();
-        OmVolumeArgs omVolumeArgs = entry.getValue();
-        if (!(omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT
-            || omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT)) {
+    // The volume table is fully cached; iterate the cache to see volume changes not flushed yet.
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>> iterator = metadataManager.getVolumeIterator();
+    while (iterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry = iterator.next();
+      String volumeKey = entry.getKey().getCacheKey();
+      OmVolumeArgs omVolumeArgs = entry.getValue().getCacheValue();
+      if (omVolumeArgs == null || !(omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT
+          || omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT)) {
+        continue;
+      }
+      mergeOmLockDetails(metadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, omVolumeArgs.getVolume()));
+      boolean acquiredVolumeLock = getOmLockDetails().isLockAcquired();
+      try {
+        OmVolumeArgs currentVolumeArgs = metadataManager.getVolumeTable().get(volumeKey);
+        if (currentVolumeArgs == null) {
           continue;
         }
-        mergeOmLockDetails(metadataManager.getLock().acquireWriteLock(
-            VOLUME_LOCK, omVolumeArgs.getVolume()));
-        boolean acquiredVolumeLock = getOmLockDetails().isLockAcquired();
-        try {
-          OmVolumeArgs.Builder builder = omVolumeArgs.toBuilder();
-          boolean isQuotaReset = false;
-          if (omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
-            builder.setQuotaInBytes(QUOTA_RESET);
-            isQuotaReset = true;
-          }
-          if (omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-            builder.setQuotaInNamespace(QUOTA_RESET);
-            isQuotaReset = true;
-          }
-          if (isQuotaReset) {
-            OmVolumeArgs updated = builder.build();
-            metadataManager.getVolumeTable().addCacheEntry(
-                new CacheKey<>(entry.getKey()), CacheValue.get(transactionLogIndex, updated));
-            volUpdateMap.put(entry.getKey(), updated);
-          }
-        } finally {
-          if (acquiredVolumeLock) {
-            mergeOmLockDetails(metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, omVolumeArgs.getVolume()));
-          }
+        OmVolumeArgs.Builder builder = currentVolumeArgs.toBuilder();
+        boolean isQuotaReset = false;
+        if (currentVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
+          builder.setQuotaInBytes(QUOTA_RESET);
+          isQuotaReset = true;
+        }
+        if (currentVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+          builder.setQuotaInNamespace(QUOTA_RESET);
+          isQuotaReset = true;
+        }
+        if (isQuotaReset) {
+          OmVolumeArgs updated = builder.build();
+          metadataManager.getVolumeTable().addCacheEntry(
+              new CacheKey<>(volumeKey), CacheValue.get(transactionLogIndex, updated));
+          volUpdateMap.put(volumeKey, updated);
+        }
+      } finally {
+        if (acquiredVolumeLock) {
+          mergeOmLockDetails(metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, omVolumeArgs.getVolume()));
         }
       }
     }

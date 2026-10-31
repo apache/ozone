@@ -992,6 +992,7 @@ message SnapshotDiffJobProto {
   optional SnapshotDiffResponse.SubStatus subStatus = 12;
   optional double keysProcessedPct = 13;
   optional string largestEntryKey = 14;
+  optional bool ordered = 15;
 }
 
 message OzoneObj {
@@ -2242,6 +2243,7 @@ message SubmitSnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional bool forceFullDiff = 7;
   optional bool disableNativeDiff = 8;
+  optional bool ordered = 9;
 }
 
 message CancelSnapshotDiffRequest {

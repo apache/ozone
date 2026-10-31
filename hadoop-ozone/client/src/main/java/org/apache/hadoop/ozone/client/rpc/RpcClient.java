@@ -235,6 +235,7 @@ public class RpcClient implements ClientProtocol {
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
+  private final boolean resolveS3VolumeOnOm;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -283,6 +284,9 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
+    resolveS3VolumeOnOm = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false)
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION
+            .isSupportedBy(omVersion);
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -1092,14 +1096,15 @@ public class RpcClient implements ClientProtocol {
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.submitSnapshotDiff(volumeName, bucketName,
-        fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+        fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff, orderedReport);
   }
 
   @Override
@@ -3152,12 +3157,16 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
-      throws IOException {
+  public Map<String, String> getObjectTagging(
+      String volumeName, String bucketName, String keyName) throws IOException {
     if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(omVersion)) {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
+    boolean assumeS3Context = volumeName == null && resolveS3VolumeOnOm;
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
@@ -3165,6 +3174,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setAssumeS3Context(assumeS3Context)
         .build();
     return ozoneManagerClient.getObjectTagging(keyArgs);
   }

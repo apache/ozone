@@ -3930,7 +3930,8 @@
     <value/>
     <description>
       The supported SSL protocols used to restrict connections towards the WebUI of different components,
-      and the S3 GateWay.
+      and the S3 GateWay. If unset, hadoop.ssl.enabled.protocols is used when it is explicitly configured,
+      otherwise TLSv1.2,TLSv1.3.
     </description>
   </property>
   <property>
@@ -5099,6 +5100,16 @@
     <description>
       Maximum number of diff-candidate object IDs a snapshot diff job may retain
       in memory before spilling to a temporary RocksDB column family.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.optimized.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      When true, snapshot diff jobs use the optimized merge-join pipeline instead
+      of the legacy object-id map diff path.
     </description>
   </property>
 

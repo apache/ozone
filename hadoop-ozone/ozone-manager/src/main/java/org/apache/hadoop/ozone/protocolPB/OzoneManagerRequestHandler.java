@@ -442,7 +442,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case GetObjectTagging:
         OzoneManagerProtocolProtos.GetObjectTaggingResponse getObjectTaggingResponse =
-            getObjectTagging(request.getGetObjectTaggingRequest());
+            getObjectTagging(request.getGetObjectTaggingRequest(),
+                request.getAssumeS3Context());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
       case GetLifecycleConfiguration:
@@ -1671,7 +1672,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             submitSnapshotDiffRequest.getFromSnapshot(),
             submitSnapshotDiffRequest.getToSnapshot(),
             submitSnapshotDiffRequest.getForceFullDiff(),
-            submitSnapshotDiffRequest.getDisableNativeDiff());
+            submitSnapshotDiffRequest.getDisableNativeDiff(),
+            submitSnapshotDiffRequest.getOrdered());
 
     SubmitSnapshotDiffResponse.Builder builder = SubmitSnapshotDiffResponse
         .newBuilder();
@@ -1830,13 +1832,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
   }
 
-  private GetObjectTaggingResponse getObjectTagging(GetObjectTaggingRequest request)
-      throws IOException {
+  private GetObjectTaggingResponse getObjectTagging(
+      GetObjectTaggingRequest request, boolean assumeS3Context) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
     GetObjectTaggingResponse.Builder resp =
