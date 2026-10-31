@@ -780,13 +780,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @VisibleForTesting
-  public void setHandler(OzoneManagerRequestHandler handler) {
+  public void setHandler(RequestHandler handler) {
     this.handler = handler;
   }
 
   @VisibleForTesting
-  public OzoneManagerRequestHandler getHandler() {
-    return (OzoneManagerRequestHandler) this.handler;
+  public RequestHandler getHandler() {
+    return this.handler;
   }
 
   public void stop() {
