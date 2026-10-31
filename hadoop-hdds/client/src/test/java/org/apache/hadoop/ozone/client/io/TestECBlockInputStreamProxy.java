@@ -355,11 +355,21 @@ public class TestECBlockInputStreamProxy {
       return new ECStreamTestUtil.TestBlockInputStream(block.getBlockID(), block.getLength(), ByteBuffer.wrap(data)) {
         @Override
         public int read(ByteBuffer destination) throws IOException {
+          failIfHealthy();
+          return super.read(destination);
+        }
+
+        @Override
+        protected int readPositioned(long position, ByteBuffer destination) throws IOException {
+          failIfHealthy();
+          return super.readPositioned(position, destination);
+        }
+
+        private void failIfHealthy() throws IOException {
           if (!missing) {
             failedAttempts.incrementAndGet();
             throw new BadDataLocationException(bad, "failed data replica");
           }
-          return super.read(destination);
         }
       };
     };
@@ -412,6 +422,17 @@ public class TestECBlockInputStreamProxy {
       return new ECStreamTestUtil.TestBlockInputStream(block.getBlockID(), block.getLength(), ByteBuffer.wrap(data)) {
         @Override
         public int read(ByteBuffer destination) throws IOException {
+          beforeRead(destination);
+          return super.read(destination);
+        }
+
+        @Override
+        protected int readPositioned(long position, ByteBuffer destination) throws IOException {
+          beforeRead(destination);
+          return super.readPositioned(position, destination);
+        }
+
+        private void beforeRead(ByteBuffer destination) throws IOException {
           if ("failover".equals(mode) && !missing) {
             destination.put((byte) 0); // Retry must overwrite bytes from the failed attempt.
             throw new BadDataLocationException(info.getPipeline().getFirstNode(), "failed data replica");
@@ -424,7 +445,6 @@ public class TestECBlockInputStreamProxy {
           if ("failure".equals(mode)) {
             throw new IOException("injected failure");
           }
-          return super.read(destination);
         }
 
         @Override
@@ -458,6 +478,10 @@ public class TestECBlockInputStreamProxy {
       }
       assertEquals(71, stream.getPos());
       assertEquals(opened.get() - 1, closed.get());
+      if ("healthy".equals(mode)) {
+        // healthy positioned reads use the sequential reader, without changing its position
+        assertEquals(1, opened.get());
+      }
       assertEquals(-1, stream.read(data.length, ByteBuffer.allocate(1)));
     } finally {
       pool.shutdownNow();

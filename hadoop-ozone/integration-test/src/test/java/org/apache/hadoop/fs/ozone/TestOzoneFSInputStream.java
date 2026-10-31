@@ -44,7 +44,10 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
@@ -143,6 +146,13 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     try (FSDataInputStream stream = ecFs.open(path)) {
       stream.seek(123);
       PositionedReadTestHelper.runConcurrentPositionedReads(expected, stream::readFully);
+      assertEquals(123, stream.getPos());
+
+      // the index streams of the block are open now, so further positioned reads need no GetBlock
+      XceiverClientMetrics metrics = XceiverClientManager.getXceiverClientMetrics();
+      long getBlockCalls = metrics.getContainerOpCountMetrics(ContainerProtos.Type.GetBlock);
+      PositionedReadTestHelper.runConcurrentPositionedReads(expected, stream::readFully);
+      assertEquals(getBlockCalls, metrics.getContainerOpCountMetrics(ContainerProtos.Type.GetBlock));
       assertEquals(123, stream.getPos());
     }
   }

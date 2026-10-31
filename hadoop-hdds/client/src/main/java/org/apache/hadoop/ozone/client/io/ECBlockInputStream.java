@@ -37,9 +37,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -80,9 +80,11 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final String string;
   // Executor for reading the cells of a multi-cell read in parallel, or null to read them one at a time.
   private final Supplier<ExecutorService> parallelReadExecutor;
+  // Guards blockStreams and the switch of a location to a spare, as positioned reads open streams without the monitor.
+  private final Object streamLock = new Object();
 
   private long position = 0;
-  private boolean closed = false;
+  private volatile boolean closed = false;
   private boolean seeked = false;
   private OzoneClientConfig config;
 
@@ -190,6 +192,12 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * @return BlockInput stream to read from.
    */
   protected BlockExtendedInputStream getOrOpenStream(int locationIndex) throws IOException {
+    synchronized (streamLock) {
+      return openStreamIfNeeded(locationIndex);
+    }
+  }
+
+  private BlockExtendedInputStream openStreamIfNeeded(int locationIndex) throws IOException {
     BlockExtendedInputStream stream = blockStreams[locationIndex];
     if (stream == null) {
       // To read an EC block, we create a STANDALONE pipeline that contains the
@@ -327,15 +335,60 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     return blockLength() - position;
   }
 
+  /**
+   * Reads the cells covered by the buffer from the internal block streams of their data indexes with positioned
+   * reads, so neither this stream nor its internal streams change position, and calls may run concurrently with each
+   * other and with sequential reads. The indexes are read in parallel if the parallel read executor is set.
+   *
+   * <p>A failed index is not switched to a spare. Instead, a {@link BadDataLocationException} carrying every failed
+   * index is thrown, so that the caller can fall back to a reconstruction read for this call.
+   */
   @Override
-  protected int readPositioned(long offset, ByteBuffer buffer) {
-    throw new UnsupportedOperationException("Use ECBlockInputStreamProxy for positioned reads");
-  }
+  protected int readPositioned(long offset, ByteBuffer buffer) throws IOException {
+    checkOpen();
+    final long available = blockLength() - offset;
+    if (available <= 0) {
+      return EOF;
+    }
+    final int length = (int) Math.min(buffer.remaining(), available);
+    final int bufferStart = buffer.position();
 
-  @Override
-  public boolean hasCapability(String capability) {
-    return !StreamCapabilities.PREADBYTEBUFFER.equalsIgnoreCase(capability)
-        && super.hasCapability(capability);
+    final Map<Integer, DatanodeDetails> locations = new TreeMap<>();
+    final List<FutureTask<IndexReadResult>> tasks = new ArrayList<>();
+    for (Map.Entry<Integer, List<CellRead>> entry : splitCells(offset, length, new ArrayList<>()).entrySet()) {
+      int index = entry.getKey();
+      BlockExtendedInputStream stream;
+      synchronized (streamLock) {
+        // close() sets closed before it closes the streams under streamLock, so a read racing with close() either
+        // fails here, outside the try so that the locations are not reported as bad, or opens a stream that close()
+        // then closes, instead of leaving one open after close().
+        checkOpen();
+        locations.put(index, dataLocations[index]);
+        try {
+          stream = getOrOpenStream(index);
+        } catch (IOException e) {
+          throw new BadDataLocationException(dataLocations[index], index, e);
+        }
+      }
+      List<CellRead> indexCells = entry.getValue();
+      tasks.add(new FutureTask<>(() -> readCells(stream, indexCells, buffer, bufferStart, false, true)));
+    }
+
+    Map<Integer, IndexReadResult> results = new TreeMap<>();
+    Throwable unexpected = runIndexReads(tasks, results);
+    // A concurrent close fails the reads, although the locations are not bad, so they must not be reported.
+    checkOpen();
+    if (unexpected != null) {
+      Throwables.throwIfUnchecked(unexpected);
+      throw new IOException(unexpected);
+    }
+    BadDataLocationException failure = readFailure(results, locations::get);
+    if (failure != null) {
+      throw failure;
+    }
+    buffer.position(bufferStart + length);
+    LOG.trace("{}: positioned read of {} bytes at {} from {} indexes", this, length, offset, tasks.size());
+    return length;
   }
 
   @Override
@@ -376,15 +429,19 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   protected boolean shouldRetryFailedRead(int failedIndex) {
-    Deque<DatanodeDetails> spareLocations = spareDataLocations.get(failedIndex);
-    if (spareLocations != null && !spareLocations.isEmpty()) {
-      failedLocations.add(dataLocations[failedIndex]);
-      DatanodeDetails spare = spareLocations.removeFirst();
-      dataLocations[failedIndex] = spare;
-      LOG.debug("{}: switching [{}] to spare {}", this, failedIndex, spare);
-      return true;
+    synchronized (streamLock) {
+      Deque<DatanodeDetails> spareLocations = spareDataLocations.get(failedIndex);
+      if (spareLocations != null && !spareLocations.isEmpty()) {
+        failedLocations.add(dataLocations[failedIndex]);
+        DatanodeDetails spare = spareLocations.removeFirst();
+        dataLocations[failedIndex] = spare;
+        // a positioned read may have reopened the stream on the failed location
+        closeStream(failedIndex);
+        LOG.debug("{}: switching [{}] to spare {}", this, failedIndex, spare);
+        return true;
+      }
+      return false;
     }
-    return false;
   }
 
   /**
@@ -447,21 +504,10 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     final int length = (int) Math.min(buffer.remaining(), remaining());
     final int bufferStart = buffer.position();
 
-    // Split the range into cells, grouped by data index in the order they are first needed.
     final List<CellRead> cells = new ArrayList<>();
-    final Map<Integer, List<CellRead>> cellsByIndex = new LinkedHashMap<>();
-    for (int offset = 0; offset < length;) {
-      long cellPosition = startPosition + offset;
-      int cellLength = (int) Math.min(ecChunkSize - cellPosition % ecChunkSize, length - offset);
-      int index = (int) ((cellPosition / ecChunkSize) % repConfig.getData());
-      List<CellRead> indexCells = cellsByIndex.computeIfAbsent(index, k -> new ArrayList<>());
-      CellRead cell = new CellRead(index, indexCells.size(), cellPosition, offset, cellLength);
-      indexCells.add(cell);
-      cells.add(cell);
-      offset += cellLength;
-    }
+    final Map<Integer, List<CellRead>> cellsByIndex = splitCells(startPosition, length, cells);
 
-    // getOrOpenStream is not thread safe, so open every stream before reading.
+    // Open every stream before reading, so that a failure to open is reported for its index.
     final List<FutureTask<IndexReadResult>> tasks = new ArrayList<>();
     for (Map.Entry<Integer, List<CellRead>> entry : cellsByIndex.entrySet()) {
       int index = entry.getKey();
@@ -473,33 +519,11 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       }
       List<CellRead> indexCells = entry.getValue();
       boolean checkPosition = seeked;
-      tasks.add(new FutureTask<>(() -> readCells(stream, indexCells, buffer, bufferStart, checkPosition)));
+      tasks.add(new FutureTask<>(() -> readCells(stream, indexCells, buffer, bufferStart, checkPosition, false)));
     }
 
-    ExecutorService executor = parallelReadExecutor.get();
-    for (int i = 1; i < tasks.size(); i++) {
-      try {
-        executor.execute(tasks.get(i));
-      } catch (RejectedExecutionException e) {
-        // the task is run by this thread below
-        LOG.debug("{}: parallel read task rejected", this, e);
-      }
-    }
-    // FutureTask.run does nothing if the task has already been started by the executor.
-    for (FutureTask<IndexReadResult> task : tasks) {
-      task.run();
-    }
-    // Wait for every task, even after an unexpected error, as they all write into the caller's buffer.
     Map<Integer, IndexReadResult> results = new TreeMap<>();
-    Throwable unexpected = null;
-    for (FutureTask<IndexReadResult> task : tasks) {
-      try {
-        IndexReadResult result = Uninterruptibles.getUninterruptibly(task);
-        results.put(result.index, result);
-      } catch (ExecutionException e) {
-        unexpected = unexpected == null ? e.getCause() : unexpected;
-      }
-    }
+    Throwable unexpected = runIndexReads(tasks, results);
     // After a failure, the streams of indexes read past the cells that position advances by below, so a later read
     // must check the position of every stream, as after a seek.
     if (unexpected != null || results.values().stream().anyMatch(result -> result.error != null)) {
@@ -523,11 +547,78 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     buffer.position(bufferStart + read);
     LOG.trace("{}: read {} bytes from {} indexes in parallel", this, read, tasks.size());
 
+    BadDataLocationException failure = readFailure(results, index -> dataLocations[index]);
+    if (failure != null) {
+      throw failure;
+    }
+    return read;
+  }
+
+  /**
+   * Splits the range into cells, grouped by data index in the order they are first needed.
+   * @param cells receives every cell of the range, in order
+   */
+  private Map<Integer, List<CellRead>> splitCells(long startPosition, int length, List<CellRead> cells) {
+    final Map<Integer, List<CellRead>> cellsByIndex = new LinkedHashMap<>();
+    for (int offset = 0; offset < length;) {
+      long cellPosition = startPosition + offset;
+      int cellLength = (int) Math.min(ecChunkSize - cellPosition % ecChunkSize, length - offset);
+      int index = (int) ((cellPosition / ecChunkSize) % repConfig.getData());
+      List<CellRead> indexCells = cellsByIndex.computeIfAbsent(index, k -> new ArrayList<>());
+      CellRead cell = new CellRead(index, indexCells.size(), cellPosition, offset, cellLength);
+      indexCells.add(cell);
+      cells.add(cell);
+      offset += cellLength;
+    }
+    return cellsByIndex;
+  }
+
+  /**
+   * Runs the reads of the data indexes and waits for all of them. With the parallel read executor, the calling
+   * thread runs the first task, and any task the executor has not started yet; without it, the calling thread runs
+   * every task, one after another.
+   * @param results receives the result of every task that did not fail unexpectedly
+   * @return the first unexpected error, or null
+   */
+  private Throwable runIndexReads(List<FutureTask<IndexReadResult>> tasks, Map<Integer, IndexReadResult> results) {
+    if (parallelReadExecutor != null) {
+      ExecutorService executor = parallelReadExecutor.get();
+      for (int i = 1; i < tasks.size(); i++) {
+        try {
+          executor.execute(tasks.get(i));
+        } catch (RejectedExecutionException e) {
+          // the task is run by this thread below
+          LOG.debug("{}: parallel read task rejected", this, e);
+        }
+      }
+    }
+    // FutureTask.run does nothing if the task has already been started by the executor.
+    for (FutureTask<IndexReadResult> task : tasks) {
+      task.run();
+    }
+    // Wait for every task, even after an unexpected error, as they all write into the caller's buffer.
+    Throwable unexpected = null;
+    for (FutureTask<IndexReadResult> task : tasks) {
+      try {
+        IndexReadResult result = Uninterruptibles.getUninterruptibly(task);
+        results.put(result.index, result);
+      } catch (ExecutionException e) {
+        unexpected = unexpected == null ? e.getCause() : unexpected;
+      }
+    }
+    return unexpected;
+  }
+
+  /**
+   * Returns an exception carrying every failed index with the location it was read from, or null if none failed.
+   */
+  private static BadDataLocationException readFailure(Map<Integer, IndexReadResult> results,
+      IntFunction<DatanodeDetails> location) {
     Map<Integer, DatanodeDetails> failures = new TreeMap<>();
     IOException cause = null;
     for (IndexReadResult result : results.values()) {
       if (result.error != null) {
-        failures.put(result.index, dataLocations[result.index]);
+        failures.put(result.index, location.apply(result.index));
         if (cause == null) {
           cause = result.error;
         } else {
@@ -535,18 +626,16 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
         }
       }
     }
-    if (cause != null) {
-      throw new BadDataLocationException(failures, cause);
-    }
-    return read;
+    return cause == null ? null : new BadDataLocationException(failures, cause);
   }
 
   /**
    * Reads the given cells of one data index, in order, each into its own slice of the buffer. Called without the
    * stream monitor, so it only uses the given stream and state that does not change while the caller waits.
+   * @param positioned read with positioned reads, which do not change the position of the stream
    */
   private IndexReadResult readCells(BlockExtendedInputStream stream, List<CellRead> indexCells, ByteBuffer buffer,
-      int bufferStart, boolean checkPosition) {
+      int bufferStart, boolean checkPosition, boolean positioned) {
     int index = indexCells.get(0).index;
     int cellsRead = 0;
     try {
@@ -554,13 +643,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
         long streamPosition = (cell.position / stripeSize) * ecChunkSize + cell.position % ecChunkSize;
         // The cells of one index are contiguous in its stream, so its position only needs to be checked once
         // the stream has been seeked.
-        if (checkPosition && streamPosition != stream.getPos()) {
+        if (!positioned && checkPosition && streamPosition != stream.getPos()) {
           stream.seek(streamPosition);
         }
         ByteBuffer slice = buffer.duplicate();
         slice.position(bufferStart + cell.bufferOffset);
         slice.limit(bufferStart + cell.bufferOffset + cell.length);
-        int actualRead = stream.read(slice);
+        int actualRead = positioned ? stream.read(streamPosition, slice) : stream.read(slice);
         if (actualRead == EOF) {
           throw new IOException("Expected to read " + cell.length + " but got EOF"
               + " from blockGroup " + stream.getBlockID() + " index " + (index + 1));
@@ -689,8 +778,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void close() {
     LOG.debug("{}: close", this);
-    closeStreams();
+    // before closing the streams, so that a positioned read failing on a closed stream sees the stream closed
     closed = true;
+    closeStreams();
   }
 
   protected synchronized void closeStreams() {
@@ -704,14 +794,16 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   protected void closeStream(int i) {
-    if (blockStreams[i] != null) {
-      try {
-        blockStreams[i].close();
-        blockStreams[i] = null;
-        LOG.debug("{}: closed stream [{}]", this, i);
-      } catch (IOException e) {
-        LOG.error("{}: failed to close stream [{}]: {}", this,
-            i, blockStreams[i], e);
+    synchronized (streamLock) {
+      if (blockStreams[i] != null) {
+        try {
+          blockStreams[i].close();
+          blockStreams[i] = null;
+          LOG.debug("{}: closed stream [{}]", this, i);
+        } catch (IOException e) {
+          LOG.error("{}: failed to close stream [{}]: {}", this,
+              i, blockStreams[i], e);
+        }
       }
     }
   }
