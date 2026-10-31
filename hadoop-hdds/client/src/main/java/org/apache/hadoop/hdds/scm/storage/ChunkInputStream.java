@@ -175,7 +175,13 @@ public class ChunkInputStream extends InputStream
     acquireClient();
     int total = 0;
     while (len > 0) {
-      int available = prepareRead(len);
+      final int available;
+      try {
+        available = prepareRead(len);
+      } catch (IOException e) {
+        unread(total);
+        throw e;
+      }
       if (available == EOF) {
         // There is no more data in the chunk stream. The buffers should have
         // been released by now
@@ -206,7 +212,14 @@ public class ChunkInputStream extends InputStream
     acquireClient();
     int total = 0;
     while (len > 0) {
-      int available = prepareRead(len);
+      final int available;
+      try {
+        available = prepareRead(len);
+      } catch (IOException e) {
+        unread(total);
+        byteBuffer.position(byteBuffer.position() - total);
+        throw e;
+      }
       if (available == EOF) {
         // There is no more data in the chunk stream. The buffers should have
         // been released by now
@@ -227,6 +240,16 @@ public class ChunkInputStream extends InputStream
       }
     }
     return total;
+  }
+
+  /**
+   * Moves the position back by the {@code bytes} already copied by a read call that then fails, so that the
+   * failed call has no effect and a retry by the caller resumes from the position where that call started.
+   */
+  private void unread(int bytes) throws IOException {
+    if (bytes > 0) {
+      seek(getPos() - bytes);
+    }
   }
 
   /**
