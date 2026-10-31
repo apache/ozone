@@ -62,8 +62,11 @@ execute_command_in_container() {
 }
 
 assert_pipeline_exists() {
-   local count
-   count=$(execute_command_in_container scm-0 ozone admin pipeline list --state OPEN --filter-by-factor THREE --json | jq -r 'length')
+   local count ips
+   # SCM closes pipelines with an old datanode IP (e.g. from before restarting the pod), so only count current ones
+   ips=$(kubectl get pod -l component=datanode -o jsonpath='{.items[*].status.podIP}')
+   count=$(execute_command_in_container scm-0 ozone admin pipeline list --state OPEN --filter-by-factor THREE --json \
+     | jq -r --arg ips "$ips" '($ips | split(" ")) as $current | map(select(all(.nodes[]; .ipAddress | IN($current[])))) | length')
    [[ $count -gt 0 ]]
 }
 
