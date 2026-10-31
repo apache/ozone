@@ -20,11 +20,18 @@ package org.apache.hadoop.hdds.client;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ZERO;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -138,5 +145,73 @@ class TestReplicationConfigValidator {
     assertThrows(IllegalArgumentException.class,
         () -> validator.validate(RatisReplicationConfig.getInstance(ONE)));
 
+  }
+
+  @Test
+  void getReusesValidatorForSamePattern() {
+    MutableConfigurationSource config = new InMemoryConfigurationForTesting();
+    config.set("ozone.replication.allowed-configs", "RATIS/THREE");
+    MutableConfigurationSource sameAgain = new InMemoryConfigurationForTesting();
+    sameAgain.set("ozone.replication.allowed-configs", "RATIS/THREE");
+
+    ReplicationConfigValidator validator = ReplicationConfigValidator.get(config);
+    // no new validator, so no reflection and no pattern compilation, for the same pattern
+    assertSame(validator, ReplicationConfigValidator.get(config));
+    assertSame(validator, ReplicationConfigValidator.get(sameAgain));
+  }
+
+  @Test
+  void getFollowsConfigurationChanges() {
+    MutableConfigurationSource config = new InMemoryConfigurationForTesting();
+    config.set("ozone.replication.allowed-configs", "RATIS/THREE");
+    assertThrows(IllegalArgumentException.class,
+        () -> ReplicationConfig.parse(ReplicationType.RATIS, "ONE", config));
+
+    config.set("ozone.replication.allowed-configs", "");
+    assertEquals(RatisReplicationConfig.getInstance(ONE),
+        ReplicationConfig.parse(ReplicationType.RATIS, "ONE", config));
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidConfigsForEC")
+  void getUsesDefaultPattern(String invalid) {
+    ReplicationConfigValidator validator = ReplicationConfigValidator.get(new InMemoryConfigurationForTesting());
+
+    validator.validate(RatisReplicationConfig.getInstance(THREE));
+    validConfigsForEC().forEach(valid -> validator.validate(new ECReplicationConfig(valid)));
+    assertThrows(IllegalArgumentException.class, () -> validator.validate(new ECReplicationConfig(invalid)));
+  }
+
+  /** Callers with different patterns keep replacing the one cached validator, and each must still get its own. */
+  @Test
+  void getIsSafeWithConcurrentPatterns() throws Exception {
+    MutableConfigurationSource restricted = new InMemoryConfigurationForTesting();
+    restricted.set("ozone.replication.allowed-configs", "RATIS/THREE");
+    MutableConfigurationSource unrestricted = new InMemoryConfigurationForTesting();
+    unrestricted.set("ozone.replication.allowed-configs", "");
+
+    ExecutorService pool = Executors.newFixedThreadPool(8);
+    try {
+      List<Future<?>> futures = new ArrayList<>();
+      for (int t = 0; t < 8; t++) {
+        final boolean restrict = t % 2 == 0;
+        futures.add(pool.submit(() -> {
+          for (int i = 0; i < 1000; i++) {
+            if (restrict) {
+              assertThrows(IllegalArgumentException.class,
+                  () -> ReplicationConfig.parse(ReplicationType.RATIS, "ONE", restricted));
+            } else {
+              ReplicationConfig.parse(ReplicationType.RATIS, "ONE", unrestricted);
+            }
+          }
+          return null;
+        }));
+      }
+      for (Future<?> f : futures) {
+        f.get(60, TimeUnit.SECONDS);
+      }
+    } finally {
+      pool.shutdownNow();
+    }
   }
 }

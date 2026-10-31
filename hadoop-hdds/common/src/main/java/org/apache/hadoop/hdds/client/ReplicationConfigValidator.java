@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 
 /**
@@ -31,10 +32,16 @@ import org.apache.hadoop.hdds.conf.PostConstruct;
 @ConfigGroup(prefix = "ozone.replication")
 public class ReplicationConfigValidator {
 
-  @Config(key = "ozone.replication.allowed-configs",
-      defaultValue = "^((STANDALONE|RATIS)/(ONE|THREE))|"
-          + "(EC/(3-2|6-3|10-4)-(512|1024|2048|4096)k)"
-          + "$",
+  static final String ALLOWED_CONFIGS_KEY = "ozone.replication.allowed-configs";
+  static final String ALLOWED_CONFIGS_DEFAULT = "^((STANDALONE|RATIS)/(ONE|THREE))|"
+      + "(EC/(3-2|6-3|10-4)-(512|1024|2048|4096)k)"
+      + "$";
+
+  /** The validator {@link #get} built for the last pattern it saw. */
+  private static volatile ReplicationConfigValidator cached;
+
+  @Config(key = ALLOWED_CONFIGS_KEY,
+      defaultValue = ALLOWED_CONFIGS_DEFAULT,
       type = ConfigType.STRING,
       description = "Regular expression to restrict enabled " +
           "replication schemes",
@@ -42,6 +49,23 @@ public class ReplicationConfigValidator {
   private String validationPattern;
 
   private Pattern compiledValidationPattern;
+
+  /**
+   * Returns a validator for the pattern configured in {@code conf}. {@code conf.getObject(...)} creates a validator
+   * by reflection and compiles its pattern on every call; this reuses the one built for the same pattern, and still
+   * reads the pattern from {@code conf} each time, so a changed configuration takes effect at once.
+   * The returned validator is shared, so it is not exposed outside this package.
+   */
+  static ReplicationConfigValidator get(ConfigurationSource conf) {
+    final String pattern = conf.get(ALLOWED_CONFIGS_KEY, ALLOWED_CONFIGS_DEFAULT);
+    ReplicationConfigValidator validator = cached;
+    if (validator == null || !Objects.equals(validator.validationPattern, pattern)) {
+      validator = new ReplicationConfigValidator();
+      validator.setValidationPattern(pattern);
+      cached = validator;
+    }
+    return validator;
+  }
 
   public void disableValidation() {
     setValidationPattern("");
