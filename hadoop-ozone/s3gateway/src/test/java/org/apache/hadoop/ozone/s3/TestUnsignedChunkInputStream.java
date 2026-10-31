@@ -86,6 +86,39 @@ public class TestUnsignedChunkInputStream {
     }
   }
 
+  @ParameterizedTest
+  @CsvSource({"CRC32,y/Q5Jg==",
+      "CRC32C,4waSgw==",
+      "CRC64NVME,rosUhgp5mIg=",
+      "SHA1,98O8HYCOBHMq32eZZczDTKeuNEE=",
+      "SHA256,FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="})
+  void verifiesPayloadChecksum(TrailerHeader header, String value) throws IOException {
+    for (boolean singleByte : new boolean[]{false, true}) {
+      for (boolean correct : new boolean[]{true, false}) {
+        String payload = correct ? "123456789" : "123456780";
+        String body = "4\r\n" + payload.substring(0, 4) + "\r\n5\r\n" + payload.substring(4)
+            + "\r\n0\r\n" + header.getHeaderName() + ":" + value + "\r\n\r\n";
+        try (UnsignedChunksInputStream stream = wrapContent(body, header)) {
+          if (singleByte) {
+            for (char expected : payload.toCharArray()) {
+              assertThat(stream.read()).isEqualTo(expected);
+            }
+          } else {
+            assertThat(IOUtils.readFully(stream, payload.length())).isEqualTo(payload.getBytes(UTF_8));
+          }
+          if (correct) {
+            stream.verifyComplete();
+            assertThat(stream.getTrailerChecksum()).isEqualTo(Base64.getDecoder().decode(value));
+          } else {
+            OS3Exception error = assertThrows(OS3Exception.class, stream::verifyComplete);
+            assertThat(error.getCode()).isEqualTo(S3ErrorTable.BAD_DIGEST.getCode());
+            assertThat(stream.getTrailerChecksum()).isNull();
+          }
+        }
+      }
+    }
+  }
+
   @Test
   void exactLengthReadStillRequiresCompletion() throws IOException {
     ByteArrayInputStream original = new ByteArrayInputStream(BODY.getBytes(UTF_8));
