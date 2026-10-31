@@ -96,7 +96,7 @@ public class TestContainerProtocolCalls {
         .build();
 
     ContainerCommandRequestProto request =
-        ContainerProtocolCalls.getPutBlockRequest(pipeline, blockData, true, null);
+        ContainerProtocolCalls.getPutBlockRequest(pipeline, blockData, false, true, null);
 
     assertEquals(VERSION, request.getWritePipelineVersion());
   }
@@ -164,7 +164,7 @@ public class TestContainerProtocolCalls {
         .build();
 
     ContainerCommandRequestProto request =
-        ContainerProtocolCalls.getPutBlockRequest(pipeline, blockData, true, null);
+        ContainerProtocolCalls.getPutBlockRequest(pipeline, blockData, false, true, null);
 
     assertEquals(Integer.MAX_VALUE, request.getWritePipelineVersion());
   }

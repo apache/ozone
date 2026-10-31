@@ -258,15 +258,17 @@ abstract class ContainerStateMachineTests {
     assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
   }
 
-  @Test
-  public void testStreamCommandDrainsBuffersBeforePutBlock() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testStreamCommandDrainsBuffersBeforePutBlock(boolean sync) throws Exception {
     final KeyValueStreamDataChannel channel = mock(KeyValueStreamDataChannel.class);
     final StateMachine.DataStream stream = setUpStream(channel);
 
-    stream.onCommand(newPutBlockCommand(), 0).get();
+    stream.onCommand(newPutBlockCommand(sync), 0).get();
 
     final InOrder inOrder = inOrder(channel, dispatcher);
     inOrder.verify(channel).drainBuffers();
+    inOrder.verify(channel, times(sync ? 1 : 0)).force(false);
     inOrder.verify(dispatcher).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
         argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_COMMAND));
   }
@@ -310,11 +312,16 @@ abstract class ContainerStateMachineTests {
   }
 
   private static ByteBuffer newPutBlockCommand() {
+    return newPutBlockCommand(false);
+  }
+
+  private static ByteBuffer newPutBlockCommand(boolean sync) {
     final ContainerProtos.ContainerCommandRequestProto putBlock = ContainerProtos.ContainerCommandRequestProto
         .newBuilder()
         .setCmdType(ContainerProtos.Type.PutBlock)
         .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
-            .setBlockData(ContainerProtos.BlockData.newBuilder().setBlockID(newBlockID()).build()))
+            .setBlockData(ContainerProtos.BlockData.newBuilder().setBlockID(newBlockID()).build())
+            .setSync(sync))
         .setContainerID(1)
         .setDatanodeUuid(UUID.randomUUID().toString())
         .build();
