@@ -20,22 +20,31 @@ package org.apache.hadoop.ozone.recon.persistence;
 import static org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule.RECON_DAO_LIST;
 import static org.apache.ozone.recon.schema.SqlDbUtils.SQLITE_DRIVER_CLASS;
 import static org.apache.ozone.recon.schema.generated.Tables.RECON_TASK_STATUS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.inject.Provider;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.stream.Stream;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
+import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.sqlite.SQLiteDataSource;
 
 /**
  * Test Recon schema with different DBs.
@@ -47,10 +56,8 @@ public class TestReconWithDifferentSqlDBs {
   public static Stream<Object> parametersSource() throws IOException {
     return Stream.of(
         new AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider(
-            Files.createDirectory(temporaryFolder.resolve("JunitDerbyDB"))
-                .toFile()),
-        new SqliteDataSourceConfigurationProvider(Files.createDirectory(
-            temporaryFolder.resolve("JunitSQLDS")).toFile()));
+            Files.createTempDirectory(temporaryFolder, "JunitDerbyDB").toFile()),
+        new SqliteDataSourceConfigurationProvider(Files.createTempDirectory(temporaryFolder, "JunitSQLDS").toFile()));
   }
 
   /**
@@ -78,6 +85,56 @@ public class TestReconWithDifferentSqlDBs {
         delete(RECON_TASK_STATUS).execute();
     assertEquals(1, numRows);
     assertEquals(0, dao.findAll().size());
+  }
+
+  /**
+   * Make sure the task status columns are read back after a restart, so they
+   * are not reset when the status row is written again.
+   */
+  @ParameterizedTest
+  @MethodSource("parametersSource")
+  public void testTaskStatusPreservedOnReload(Provider<DataSourceConfiguration> provider) throws IOException {
+    AbstractReconSqlDBTest reconSqlDB = new AbstractReconSqlDBTest(provider);
+    reconSqlDB.createReconSchemaForTest(temporaryFolder);
+    ReconTaskStatusDao dao = reconSqlDB.getDao(ReconTaskStatusDao.class);
+    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, -1, 1));
+
+    new ReconTaskStatusUpdaterManager(dao).getTaskStatusUpdater("TestTask").updateDetails();
+
+    ReconTaskStatus taskStatus = dao.fetchOneByTaskName("TestTask");
+    assertEquals(-1, taskStatus.getLastTaskRunStatus());
+    assertEquals(1, taskStatus.getIsCurrentTaskRunning());
+  }
+
+  @Test
+  public void testSqliteUsesWalAndBusyTimeout() throws Exception {
+    DataSourceConfiguration configuration = new SqliteDataSourceConfigurationProvider(
+        Files.createTempDirectory(temporaryFolder, "JunitSqliteWal").toFile()).get();
+    try (Connection connection = new SqliteDataSourceProvider(configuration).get().getConnection()) {
+      DSLContext dsl = DSL.using(connection);
+      assertEquals("wal", String.valueOf(dsl.fetchValue("PRAGMA journal_mode")));
+      assertEquals(String.valueOf(SqliteDataSourceProvider.BUSY_TIMEOUT_MS),
+          String.valueOf(dsl.fetchValue("PRAGMA busy_timeout")));
+    }
+
+    // A journal mode and busy timeout set in the URL are kept.
+    DataSourceConfiguration urlConfiguration = mock(DataSourceConfiguration.class);
+    when(urlConfiguration.getJdbcUrl())
+        .thenReturn(configuration.getJdbcUrl() + "?journal_mode=TRUNCATE&busy_timeout=5000");
+    try (Connection connection = new SqliteDataSourceProvider(urlConfiguration).get().getConnection()) {
+      DSLContext dsl = DSL.using(connection);
+      assertEquals("truncate", String.valueOf(dsl.fetchValue("PRAGMA journal_mode")));
+      assertEquals("5000", String.valueOf(dsl.fetchValue("PRAGMA busy_timeout")));
+    }
+  }
+
+  @Test
+  public void testSqliteSelectedByUrlScheme() throws Exception {
+    // The resolved DB dir may contain "derby"; the URL scheme still decides the provider.
+    AbstractReconSqlDBTest reconSqlDB = new AbstractReconSqlDBTest(new SqliteDataSourceConfigurationProvider(
+        Files.createTempDirectory(temporaryFolder, "derby-old").toFile()));
+    reconSqlDB.createReconSchemaForTest(temporaryFolder);
+    assertThat(reconSqlDB.getDataSource()).isInstanceOf(SQLiteDataSource.class);
   }
 
   /**
