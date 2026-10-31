@@ -16,8 +16,18 @@
 *** Settings ***
 Documentation       Read Compatibility
 Resource            ../ozone-lib/shell.robot
+Resource            ../snapshot/lib.resource
 Resource            setup.robot
 Test Timeout        5 minutes
+
+
+*** Variables ***
+${FSO_BUCKET}        vol1/fso-bucket-${DATA_VERSION}
+${SNAPSHOT1}         snapshot-1-${DATA_VERSION}
+${SNAPSHOT2}         snapshot-2-${DATA_VERSION}
+${SNAPSHOT3}         snapshot-3-${DATA_VERSION}
+${SNAPSHOT_KEY1}     snapdiff-key1-${DATA_VERSION}
+${SNAPSHOT_KEY2}     snapdiff-key2-${DATA_VERSION}
 
 
 *** Keywords ***
@@ -148,19 +158,19 @@ FSO Bucket Can Be Read
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
     Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
-    File Should Match Local File    ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file    ${TESTFILE}
+    File Should Match Local File    ofs://om/${FSO_BUCKET}/dir/subdir/file    ${TESTFILE}
 
 HSync Lease Recover Can Be Used
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
-    Execute    ozone admin om lease recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file
+    Execute    ozone admin om lease recover --path=ofs://om/${FSO_BUCKET}/dir/subdir/file
 
 Key Info File Flag Should Be Set Correctly
     Pass Execution If    '${CLUSTER_VERSION}' <= '${EC_VERSION}'   Cluster does not support 'file' flag
     Pass Execution If    '${CLIENT_VERSION}' <= '${EC_VERSION}'    Client does not support 'file' flag
 
-    ${dirpath} =      Set Variable    /vol1/fso-bucket-${DATA_VERSION}/dir/subdir/
+    ${dirpath} =      Set Variable    /${FSO_BUCKET}/dir/subdir/
     ${filepath} =     Set Variable    ${dirpath}file
 
     ${key_info} =     Execute    ozone sh key info ${filepath}
@@ -168,3 +178,29 @@ Key Info File Flag Should Be Set Correctly
 
     ${dir_info} =     Execute    ozone sh key info ${dirpath}
     Should Contain    ${dir_info}    \"file\" : false
+
+Snapshots Can Be Diffed
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'    Cluster does not support snapshots
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Client does not support snapshots
+    Pass Execution If    '${CLIENT_VERSION}' >= '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Tested elsewhere with --get-report
+    Pass Execution If    '${DATA_VERSION}' < '${SNAPSHOT_VERSION}'    Skipped write test case
+
+    # old client does not support --get-report
+    # The snapshot diff command should return the report, submitting a job if necessary.
+    ${output} =    Wait For Snapshot diff  ${FSO_BUCKET}  ${SNAPSHOT1}  ${SNAPSHOT2}  ${SNAPSHOT_KEY1}
+    # Legacy Snapshot Diff Report Omits Dependency Metadata
+    Should Not Contain    ${output}    Report is dependency
+
+Can --get-report of Snapshot Diff
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'    Cluster does not support snapshots
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client does not support snapshot diff --get-report
+    Pass Execution If    '${DATA_VERSION}' < '${SNAPSHOT_VERSION}'    Skipped write test case
+
+    Wait For Snapshot diff --get-report  ${FSO_BUCKET}  ${SNAPSHOT1}  ${SNAPSHOT2}  ${SNAPSHOT_KEY1}
+
+Can --get-report of --ordered Snapshot Diff
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'    Cluster does not support snapshots
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client does not support snapshot diff --get-report
+    Pass Execution If    '${DATA_VERSION}' < '${SNAPSHOT_DIFF_ORDERED_VERSION}'    Skipped write test case
+
+    Wait For Snapshot diff --get-report  ${FSO_BUCKET}  ${SNAPSHOT1}  ${SNAPSHOT3}  ${SNAPSHOT_KEY1}  ${SNAPSHOT_KEY2}
