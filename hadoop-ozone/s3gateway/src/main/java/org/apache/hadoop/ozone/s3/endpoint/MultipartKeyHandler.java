@@ -59,6 +59,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
     final AuditLogger.PerformanceStringBuilder perf = context.getPerf();
 
     try {
+      ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
       int partMarker = parsePartNumberMarker(partNumberMarker);
       Response response = listParts(context.getVolume(), context.getBucketName(), keyPath, uploadId,
           partMarker, maxParts, perf);

@@ -132,6 +132,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
         .setStorageType(bucketArgs.getStorageType())
         .setVersioning(bucketArgs.getVersioning())
         .setOwner(bucketArgs.getOwner())
+        .setEncryptionKeyName(bucketArgs.getEncryptionKey())
         .setCreationTime(Time.now())
         .build());
   }
