@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -38,6 +39,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
@@ -46,6 +48,7 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInter
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -104,6 +107,21 @@ public class StorageContainerServiceProviderImpl
   public ContainerWithPipeline getContainerWithPipeline(long containerId)
       throws IOException {
     return scmClient.getContainerWithPipeline(containerId);
+  }
+
+  @Override
+  public ContainerInfo getContainerInfo(long containerId) throws IOException {
+    try {
+      return scmClient.getContainer(containerId);
+    } catch (RemoteException e) {
+      throw e.unwrapRemoteException(ContainerNotFoundException.class);
+    }
+  }
+
+  @Override
+  public List<ContainerInfo> getExistingContainersInBatch(List<ContainerID> containerIDs) throws IOException {
+    return scmClient.getExistingContainersInBatch(containerIDs.stream().map(ContainerID::getId)
+        .collect(Collectors.toList()));
   }
 
   @Override
@@ -207,4 +225,5 @@ public class StorageContainerServiceProviderImpl
     return scmClient.listContainer(
         startContainerID.getId(), count, state).getContainerInfoList();
   }
+
 }

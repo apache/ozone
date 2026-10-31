@@ -85,6 +85,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistingContainersInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
@@ -388,6 +389,23 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
 
     return cps;
+  }
+
+  @Override
+  public List<ContainerInfo> getExistingContainersInBatch(List<Long> containerIDs) throws IOException {
+    for (Long containerID : containerIDs) {
+      Preconditions.checkState(containerID >= 0, "Container ID cannot be negative");
+    }
+    GetExistingContainersInBatchRequestProto request = GetExistingContainersInBatchRequestProto.newBuilder()
+        .addAllContainerIDs(containerIDs).build();
+    ScmContainerLocationResponse response = submitRequest(Type.GetExistingContainersInBatch,
+        builder -> builder.setGetExistingContainersInBatchRequest(request));
+    List<ContainerInfo> containers = new ArrayList<>();
+    for (HddsProtos.ContainerInfoProto container :
+        response.getGetExistingContainersInBatchResponse().getContainersList()) {
+      containers.add(ContainerInfo.fromProtobuf(container));
+    }
+    return containers;
   }
 
   /**

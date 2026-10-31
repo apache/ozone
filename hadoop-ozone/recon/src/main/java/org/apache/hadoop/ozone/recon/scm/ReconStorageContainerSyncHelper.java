@@ -169,7 +169,8 @@ class ReconStorageContainerSyncHelper {
     boolean closed =
         syncContainersForState(HddsProtos.LifeCycleState.CLOSED, false);
     boolean deleted = syncDeletedContainers();
-    return open && quasiClosed && closed && deleted;
+    boolean suppressed = syncSuppressedFlags();
+    return open && quasiClosed && closed && deleted && suppressed;
   }
 
   /**
@@ -422,6 +423,45 @@ class ReconStorageContainerSyncHelper {
     } finally {
       updateContainerSyncDuration(HddsProtos.LifeCycleState.DELETED,
           Time.monotonicNow() - startTime);
+    }
+  }
+
+  /**
+   * Copies SCM's suppressed flag to the containers Recon already has. Fetching
+   * explicit IDs avoids SCM's full container scan for each filtered list page.
+   *
+   * @return {@code true} if all RPC calls completed without error
+   */
+  private boolean syncSuppressedFlags() {
+    try {
+      int batchSize = safeContainerWithPipelineBatchSize((int) getContainerCountPerCall(Integer.MAX_VALUE));
+      ContainerID start = ContainerID.valueOf(1);
+      int updated = 0;
+      while (true) {
+        List<ContainerID> ids = containerManager.getContainerIDs(start, batchSize, null, null);
+        if (ids.isEmpty()) {
+          break;
+        }
+        for (ContainerInfo scmContainer : scmServiceProvider.getExistingContainersInBatch(ids)) {
+          ContainerID id = scmContainer.containerID();
+          try {
+            ContainerInfo container = containerManager.getContainer(id);
+            if (container.isSuppressed() != scmContainer.isSuppressed()) {
+              containerManager.updateContainerInfo(id,
+                  container.getProtobuf().toBuilder().setSuppressed(scmContainer.isSuppressed()).build());
+              updated++;
+            }
+          } catch (ContainerNotFoundException e) {
+            LOG.debug("Container {} vanished from Recon during suppressed flag sync.", id);
+          }
+        }
+        start = ContainerID.valueOf(ids.get(ids.size() - 1).getId() + 1);
+      }
+      LOG.info("Suppressed flag sync complete, updated {}.", updated);
+      return true;
+    } catch (Exception e) {
+      LOG.error("Suppressed flag sync: unexpected error.", e);
+      return false;
     }
   }
 

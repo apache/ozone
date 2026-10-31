@@ -310,13 +310,17 @@ public class ReconReplicationManager extends ReplicationManager {
         ContainerID cid = container.containerID();
         Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
         List<ContainerReplicaOp> pendingOps = getPendingReplicationOps(cid);
+        if (container.isSuppressed()) {
+          // processContainer skips a suppressed container and would leave its last health state in place.
+          container.setHealthState(ContainerHealthState.HEALTHY);
+        }
 
         // Call inherited processContainer - this runs SCM's health check chain
         // readOnly=true ensures no commands are generated
         processContainer(container, replicas, pendingOps, nullQueue, report, true);
 
         // ADDITIONAL CHECK: Detect REPLICA_MISMATCH (Recon-specific, not in SCM)
-        if (hasDataChecksumMismatch(container, replicas)) {
+        if (!container.isSuppressed() && hasDataChecksumMismatch(container, replicas)) {
           report.addReplicaMismatchContainer(cid);
           LOG.debug("Container {} has data checksum mismatch across replicas", cid);
         }

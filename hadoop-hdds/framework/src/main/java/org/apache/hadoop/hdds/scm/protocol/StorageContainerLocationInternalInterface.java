@@ -129,6 +129,16 @@ public interface StorageContainerLocationInternalInterface extends Closeable {
       Iterable<? extends Long> containerIDs) throws IOException;
 
   /**
+   * Returns metadata for the requested containers without resolving pipelines.
+   * Missing containers are omitted from the result.
+   *
+   * @param containerIDs IDs of the requested containers
+   * @return metadata for containers that exist in SCM
+   * @throws IOException if the request fails
+   */
+  List<ContainerInfo> getExistingContainersInBatch(List<Long> containerIDs) throws IOException;
+
+  /**
    * Ask SCM which containers of the given list exist.
    *
    * @param containerIDs - IDs of a batch of containers.
