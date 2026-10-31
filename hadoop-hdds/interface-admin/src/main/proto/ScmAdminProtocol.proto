@@ -90,6 +90,8 @@ message ScmContainerLocationRequest {
   optional SCMListContainerIDsRequestProto scmListContainerIDsRequest = 51;
   optional SuppressContainerRequestProto suppressContainerRequest = 52;
   optional GetPeerUpgradeStatusRequestProto getPeerUpgradeStatusRequest = 53;
+  optional SubmitContainerIdExportRequestProto submitContainerIdExportRequest = 54;
+  optional GetContainerIdExportStatusRequestProto getContainerIdExportStatusRequest = 55;
 }
 
 message ScmContainerLocationResponse {
@@ -151,6 +153,8 @@ message ScmContainerLocationResponse {
   optional SCMListContainerIDsResponseProto scmListContainerIDsResponse = 51;
   optional SuppressContainerResponseProto suppressContainerResponse = 52;
   optional GetPeerUpgradeStatusResponseProto getPeerUpgradeStatusResponse = 53;
+  optional SubmitContainerIdExportResponseProto submitContainerIdExportResponse = 54;
+  optional GetContainerIdExportStatusResponseProto getContainerIdExportStatusResponse = 55;
 
   enum Status {
     OK = 1;
@@ -211,6 +215,8 @@ enum Type {
   ListContainerIDs = 47;
   SuppressContainer = 48;
   GetPeerUpgradeStatus = 49;
+  SubmitContainerIdExport = 50;
+  GetContainerIdExportStatus = 51;
 }
 
 /**
@@ -755,6 +761,43 @@ message SuppressContainerRequestProto {
 message SuppressContainerResponseProto {
   // Container IDs that failed to suppress or unsuppress. Empty if all succeeded.
   repeated int64 failedContainerIDs = 1;
+}
+
+message SubmitContainerIdExportRequestProto {
+  optional ContainerID startContainerID = 1;
+  optional LifeCycleState lifecycleState = 2;
+  optional string healthState = 3;
+  optional int64 maxRows = 4;
+  optional int32 batchSize = 5;
+  optional int32 partSize = 6;
+}
+
+message SubmitContainerIdExportResponseProto {
+  optional string jobId = 1;
+}
+
+message GetContainerIdExportStatusRequestProto {
+  optional string jobId = 1;
+}
+
+message GetContainerIdExportStatusResponseProto {
+  enum State {
+    RUNNING = 1;
+    SUCCEEDED = 2;
+    FAILED = 3;
+  }
+
+  optional string jobId = 1;
+  optional State state = 2;
+  optional LifeCycleState lifecycleState = 3;
+  optional string healthState = 4;
+  optional int64 maxRows = 5;
+  optional int32 batchSize = 6;
+  optional int32 partSize = 7;
+  optional int64 idsWritten = 8;
+  optional int64 elapsedMs = 9;
+  optional string tarPath = 10;
+  optional string errorMessage = 11;
 }
 
 /**
