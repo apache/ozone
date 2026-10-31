@@ -25,6 +25,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
@@ -64,12 +65,21 @@ public class WritableContainerFactory {
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
+    return getContainer(size, repConfig, owner, excludeList, null);
+  }
+
+  /**
+   * @param client The datanode the writer runs on, or null. Only Ratis containers prefer a pipeline on it.
+   */
+  public ContainerInfo getContainer(final long size,
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      DatanodeDetails client) throws IOException {
     switch (repConfig.getReplicationType()) {
     case STAND_ALONE:
       return standaloneProvider
           .getContainer(size, repConfig, owner, excludeList);
     case RATIS:
-      return ratisProvider.getContainer(size, repConfig, owner, excludeList);
+      return ratisProvider.getContainer(size, repConfig, owner, excludeList, client);
     case EC:
       return ecProvider.getContainer(size, (ECReplicationConfig)repConfig,
           owner, excludeList);

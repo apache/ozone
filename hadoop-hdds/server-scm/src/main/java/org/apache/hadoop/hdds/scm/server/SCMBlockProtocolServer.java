@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
@@ -114,6 +115,7 @@ public class SCMBlockProtocolServer implements
       protocolMessageMetrics;
   private final SCMPerformanceMetrics perfMetrics;
   private final String omPrincipal;
+  private final boolean preferClientLocalPipeline;
 
   /**
    * The RPC server that listens to requests from block service clients.
@@ -123,6 +125,7 @@ public class SCMBlockProtocolServer implements
     this.scm = scm;
     this.perfMetrics = scm.getPerfMetrics();
     this.omPrincipal = conf.get(OM_KERBEROS_PRINCIPAL_KEY, "");
+    this.preferClientLocalPipeline = conf.getObject(ScmConfig.class).isPreferClientLocalPipeline();
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
@@ -235,12 +238,15 @@ public class SCMBlockProtocolServer implements
           num, size, excludeList);
     }
     try {
+      final Node client = getClientNode(clientMachine);
+      final DatanodeDetails localDatanode = preferClientLocalPipeline && client instanceof DatanodeDetails
+          ? (DatanodeDetails) client : null;
       for (int i = 0; i < num; i++) {
-        AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, replicationConfig, owner, excludeList);
+        AllocatedBlock block = localDatanode == null
+            ? scm.getScmBlockManager().allocateBlock(size, replicationConfig, owner, excludeList)
+            : scm.getScmBlockManager().allocateBlock(size, replicationConfig, owner, excludeList, localDatanode);
         if (block != null) {
           // Sort the datanodes if client machine is specified
-          final Node client = getClientNode(clientMachine);
           if (client != null) {
             final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
             final List<DatanodeDetails> sorted = scm.getClusterMap()
