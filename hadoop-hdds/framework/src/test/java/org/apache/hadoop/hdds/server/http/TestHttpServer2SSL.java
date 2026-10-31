@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -32,7 +32,6 @@ import java.net.Socket;
 import java.net.URI;
 import java.net.URL;
 import java.security.KeyStore;
-import java.util.Arrays;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
@@ -150,13 +149,15 @@ public class TestHttpServer2SSL {
 
   @Test
   public void testEnabledProtocolsRejectsOther() throws Exception {
-    // Configure server to accept only TLSv1.2, try connecting with TLSv1.1
+    // Configure server to accept only TLSv1.2, try connecting with TLSv1.1 and TLSv1.3
     HttpServer2 server = buildServer(null, null, "TLSv1.2");
     server.start();
     try {
       InetSocketAddress addr = server.getConnectorAddress(0);
       SSLSocketFactory factory = createSocketFactory(null, new String[]{"TLSv1.1"});
       assertThrows(Exception.class, () -> connectWithFactory(factory, addr));
+      SSLSocketFactory tls13Factory = createSocketFactory(null, new String[]{"TLSv1.3"});
+      assertThrows(Exception.class, () -> connectWithFactory(tls13Factory, addr));
     } finally {
       server.stop();
     }
@@ -172,6 +173,8 @@ public class TestHttpServer2SSL {
       SSLSocketFactory factory = createSocketFactory(null, null);
       int responseCode = connectWithFactory(factory, addr);
       assertEquals(HttpURLConnection.HTTP_OK, responseCode);
+      SSLSocketFactory tls13Factory = createSocketFactory(null, new String[]{"TLSv1.3"});
+      assertEquals(HttpURLConnection.HTTP_OK, connectWithFactory(tls13Factory, addr));
     } finally {
       server.stop();
     }
@@ -235,7 +238,7 @@ public class TestHttpServer2SSL {
   public void testEnabledProtocolAppliedWhenConfigUnset() throws Exception {
     OzoneConfiguration serverConf = new OzoneConfiguration(conf);
     serverConf.unset(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY);
-    assertServerAppliesEnabledProtocol(serverConf, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT);
+    assertServerAppliesEnabledProtocol(serverConf, "TLSv1.2", "TLSv1.3");
   }
 
   @Test
@@ -252,8 +255,16 @@ public class TestHttpServer2SSL {
     assertServerAppliesEnabledProtocol(serverConf, "TLSv1.3");
   }
 
+  @Test
+  public void testOzoneEnabledProtocolsTakesPrecedence() throws Exception {
+    OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    serverConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2");
+    serverConf.set(OzoneConfigKeys.OZONE_SSL_ENABLED_PROTOCOLS, "TLSv1.3");
+    assertServerAppliesEnabledProtocol(serverConf, "TLSv1.3");
+  }
+
   private void assertServerAppliesEnabledProtocol(
-      OzoneConfiguration serverConf, String protocol) throws Exception {
+      OzoneConfiguration serverConf, String... protocols) throws Exception {
     HttpServer2 server = buildServer(serverConf, null, null, null);
     server.start();
     try {
@@ -265,11 +276,10 @@ public class TestHttpServer2SSL {
 
       SslContextFactory.Server sslContextFactory =
           (SslContextFactory.Server) connectionFactory.getSslContextFactory();
-      assertArrayEquals(new String[] {protocol},
-          sslContextFactory.getIncludeProtocols());
-      assertFalse(Arrays.asList(sslContextFactory.getExcludeProtocols())
-          .contains(protocol),
-          "Configured enabled protocol should be removed from excluded protocols");
+      assertArrayEquals(protocols, sslContextFactory.getIncludeProtocols());
+      assertThat(sslContextFactory.getExcludeProtocols())
+          .as("Configured enabled protocols should be removed from excluded protocols")
+          .doesNotContain(protocols);
     } finally {
       server.stop();
     }

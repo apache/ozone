@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
@@ -50,7 +51,9 @@ import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.Cancel
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_SUCCEEDED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELLED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
@@ -84,6 +87,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -166,7 +170,9 @@ import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ozone.test.tag.Slow;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.TestInstance;
 import org.rocksdb.LiveFileMetaData;
 
@@ -199,12 +205,13 @@ public abstract class OmSnapshotTests {
   private OzoneManager ozoneManager;
   private OzoneBucket ozoneBucket;
   private OzoneConfiguration conf;
+  private final AtomicInteger counter;
 
   private final BucketLayout bucketLayout;
   private final boolean enabledFileSystemPaths;
   private final boolean forceFullSnapshotDiff;
   private final boolean disableNativeDiff;
-  private final AtomicInteger counter;
+  private final boolean optimizedSnapshotDiffEnabled;
   private final boolean createLinkedBucket;
   private final Map<String, String> linkedBuckets = new HashMap<>();
 
@@ -212,12 +219,14 @@ public abstract class OmSnapshotTests {
                         boolean newEnableFileSystemPaths,
                         boolean forceFullSnapDiff,
                         boolean disableNativeDiff,
-                        boolean createLinkedBucket)
+                        boolean createLinkedBucket,
+                        boolean optimizedSnapshotDiffEnabled)
       throws Exception {
     this.enabledFileSystemPaths = newEnableFileSystemPaths;
     this.bucketLayout = newBucketLayout;
     this.forceFullSnapshotDiff = forceFullSnapDiff;
     this.disableNativeDiff = disableNativeDiff;
+    this.optimizedSnapshotDiffEnabled = optimizedSnapshotDiffEnabled;
     this.counter = new AtomicInteger();
     this.createLinkedBucket = createLinkedBucket;
     init();
@@ -225,6 +234,26 @@ public abstract class OmSnapshotTests {
     if (!disableNativeDiff) {
       assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
     }
+  }
+
+  protected boolean isOptimizedSnapshotDiffOnlySuite() {
+    return false;
+  }
+
+  protected MiniOzoneCluster getCluster() {
+    return cluster;
+  }
+
+  protected String getVolumeName() {
+    return volumeName;
+  }
+
+  protected String getBucketName() {
+    return bucketName;
+  }
+
+  protected OzoneBucket getOzoneBucket() {
+    return ozoneBucket;
   }
 
   /**
@@ -246,6 +275,7 @@ public abstract class OmSnapshotTests {
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
     conf.setBoolean(OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF, forceFullSnapshotDiff);
     conf.setBoolean(OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS, disableNativeDiff);
+    conf.setBoolean(OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED, optimizedSnapshotDiffEnabled);
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
@@ -345,6 +375,17 @@ public abstract class OmSnapshotTests {
         .getClientProxy().getOzoneManagerClient();
     omClient.finalizeUpgrade();
     OMUpgradeTestUtils.waitForFinalization(omClient);
+  }
+
+  @BeforeEach
+  void skipInheritedTestsOnOptimizedSnapshotDiffOnlySuite(TestInfo testInfo) {
+    if (!isOptimizedSnapshotDiffOnlySuite()) {
+      return;
+    }
+    if (testInfo.getTestMethod().isEmpty()) {
+      return;
+    }
+    assumeTrue(testInfo.getTestMethod().get().getDeclaringClass().equals(getClass()));
   }
 
   @AfterAll
@@ -2012,7 +2053,7 @@ public abstract class OmSnapshotTests {
     return createSnapshot(volName, buckName, UUID.randomUUID().toString());
   }
 
-  private String createSnapshot(String volName, String buckName,
+  protected String createSnapshot(String volName, String buckName,
       String snapshotName)
       throws IOException, InterruptedException, TimeoutException {
     store.createSnapshot(volName, buckName, snapshotName);
@@ -2043,7 +2084,7 @@ public abstract class OmSnapshotTests {
     return createFileKey(bucket, key);
   }
 
-  private String createFileKey(OzoneBucket bucket, String key)
+  protected String createFileKey(OzoneBucket bucket, String key)
           throws Exception {
     byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
@@ -2060,7 +2101,7 @@ public abstract class OmSnapshotTests {
     return key;
   }
 
-  private void createFileKey(FileSystem fs,
+  protected void createFileKey(FileSystem fs,
                              String path)
       throws IOException, InterruptedException, TimeoutException {
     byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
@@ -3945,5 +3986,26 @@ public abstract class OmSnapshotTests {
         SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, newKey2),
         SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, regularNewKey));
     assertEquals(expectedDiffs, diff.getDiffList());
+  }
+
+  protected SnapshotDiffResponse waitForDoneReportAfterOrderedSubmit(String volume, String bucket,
+      String fromSnap, String toSnap, boolean orderedReport)
+      throws IOException, InterruptedException, TimeoutException {
+    store.submitSnapshotDiff(volume, bucket, fromSnap, toSnap, false, false, orderedReport);
+    AtomicReference<SnapshotDiffResponse> responseRef = new AtomicReference<>();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        responseRef.set(store.snapshotDiff(volume, bucket, fromSnap, toSnap, null,
+            OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      if (responseRef.get().getJobStatus() == FAILED) {
+        fail("snap diff failed: " + responseRef.get().getReason());
+      }
+      assertThat(responseRef.get().getJobStatus()).isIn(QUEUED, IN_PROGRESS, DONE);
+      return responseRef.get().getJobStatus() == DONE;
+    }, POLL_INTERVAL_MILLIS, POLL_MAX_WAIT_MILLIS);
+    return responseRef.get();
   }
 }

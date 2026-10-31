@@ -241,6 +241,35 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ inputs.java-version }}
 
+      - name: Get versions
+        id: versions
+        # TODO remove hard-code in HDDS-17509
+        if: ${{ inputs.script == 'acceptance' }}
+        run: |
+          HADOOP_VERSION=$(mvn help:evaluate -N -Dexpression=hadoop.version -q -DforceStdout -Dscan=false)
+          echo "HADOOP_VERSION=$HADOOP_VERSION" >> $GITHUB_ENV
+          RANGER_VERSION=$(mvn help:evaluate -N -Dexpression=ranger.version -q -DforceStdout -Dscan=false)
+          echo "RANGER_VERSION=$RANGER_VERSION" >> $GITHUB_ENV
+
+      - name: Restore Hadoop
+        id: restore-hadoop
+        # TODO reduce hard-code in HDDS-17509
+        if: ${{ inputs.script == 'acceptance' && contains(inputs.split, 'test-s3a.sh') }}
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          clean: true
+          path: ~/.cache/ozone
+          key: hadoop-${{ env.HADOOP_VERSION }}
+
+      - name: Restore Ranger
+        id: restore-ranger
+        # TODO reduce hard-code in HDDS-17509
+        if: ${{ inputs.script == 'acceptance' && (contains(inputs.split, 'test-ranger.sh') || contains(inputs.split, 'test-sts.sh')) }}
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          path: ~/.cache/ozone
+          key: ranger-${{ env.RANGER_VERSION }}
+
       - name: Execute pre-test steps
         if: ${{ inputs.pre-script }}
         run: |

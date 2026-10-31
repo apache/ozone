@@ -21,9 +21,8 @@ on:
   push:
     branches:
       - master
-      - ozone-1.4
-      - ozone-2.0
       - ozone-2.1
+      - ozone-2.2
     paths:
       - 'pom.xml'
       - '**/pom.xml'
@@ -33,12 +32,17 @@ on:
 
 permissions: { }
 
+concurrency:
+  group: cache-${{ github.sha }}
+  cancel-in-progress: false
+
 env:
   # variables are duplicated from ci.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   TEST_JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
+  SKIP_APACHE_VERIFY_DOWNLOAD: false
 
 jobs:
   build:
@@ -59,16 +63,69 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
 
       - name: Setup Java
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
 
-      - name: Get NodeJS version
-        id: nodejs-version
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: echo "nodejs-version=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout -Dscan=false)" >> $GITHUB_OUTPUT
+      - name: Get versions
+        id: versions
+        run: |
+          NODEJS_VERSION=$(mvn help:evaluate -N -Dexpression=nodejs.version -q -DforceStdout -Dscan=false)
+          echo "NODEJS_VERSION=$NODEJS_VERSION" >> $GITHUB_ENV
+          HADOOP_VERSION=$(mvn help:evaluate -N -Dexpression=hadoop.version -q -DforceStdout -Dscan=false)
+          echo "HADOOP_VERSION=$HADOOP_VERSION" >> $GITHUB_ENV
+          RANGER_VERSION=$(mvn help:evaluate -N -Dexpression=ranger.version -q -DforceStdout -Dscan=false)
+          echo "RANGER_VERSION=$RANGER_VERSION" >> $GITHUB_ENV
+
+      - name: Restore Hadoop
+        id: restore-hadoop
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          clean: true
+          path: ~/.cache/ozone
+          key: hadoop-${{ env.HADOOP_VERSION }}
+
+      - name: Get Hadoop
+        if: steps.restore-hadoop.outputs.stash-hit != 'true'
+        run: |
+          rm -fr ~/.cache/ozone
+          source hadoop-ozone/dist/src/main/compose/testlib.sh
+          import_keys https://downloads.apache.org/hadoop/common/KEYS
+          download_hadoop
+
+      - name: Stash Hadoop
+        if: steps.restore-hadoop.outputs.stash-hit != 'true'
+        uses: apache/infrastructure-actions/stash/save@save/v1
+        with:
+          path: ~/.cache/ozone
+          key: hadoop-${{ env.HADOOP_VERSION }}
+          retention-days: 90
+
+      - name: Restore Ranger
+        id: restore-ranger
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          clean: true
+          path: ~/.cache/ozone
+          key: ranger-${{ env.RANGER_VERSION }}
+
+      - name: Get Ranger
+        if: steps.restore-ranger.outputs.stash-hit != 'true'
+        run: |
+          rm -fr ~/.cache/ozone
+          source hadoop-ozone/dist/src/main/compose/testlib.sh
+          import_keys https://downloads.apache.org/ranger/KEYS
+          download_ranger
+          download_ranger_ozone_plugin
+
+      - name: Stash Ranger
+        if: steps.restore-ranger.outputs.stash-hit != 'true'
+        uses: apache/infrastructure-actions/stash/save@save/v1
+        with:
+          path: ~/.cache/ozone
+          key: ranger-${{ env.RANGER_VERSION }}
+          retention-days: 90
 
       - name: Restore NodeJS tarballs
         id: restore-nodejs
@@ -76,13 +133,11 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.m2/repository/com/github/eirslett/node
-          key: nodejs-${{ steps.nodejs-version.outputs.nodejs-version }}
+          key: nodejs-${{ env.NODEJS_VERSION }}
 
       - name: Download NodeJS
         if: steps.restore-cache.outputs.cache-hit != 'true' && steps.restore-nodejs.outputs.cache-hit != 'true'
         run: dev-support/ci/download-nodejs.sh
-        env:
-          NODEJS_VERSION: ${{ steps.nodejs-version.outputs.nodejs-version }}
 
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
