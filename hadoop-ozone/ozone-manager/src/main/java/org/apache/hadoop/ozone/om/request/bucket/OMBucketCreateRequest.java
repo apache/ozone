@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -101,6 +102,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // OBS (Object Store) buckets must follow strict S3 bucket naming rules.
     // FSO and LEGACY buckets are not strictly bound to S3 naming semantics.
     OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
+    if (!ozoneManager.getConfig().ignoreClientACLs()) {
+      toOzoneAcls(bucketInfo.getAclsList());
+    }
 
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
@@ -206,6 +210,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OmBucketInfo omBucketInfo = null;
+    // Client ACLs are converted in the try block below, so that a malformed ACL fails the request.
+    final BucketInfo bucketInfoWithoutAcls = bucketInfo.toBuilder().clearAcls().build();
 
     // bucketInfo.hasBucketLayout() would be true when the request proto
     // specifies a bucket layout.
@@ -215,9 +221,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
       BucketLayout defaultBucketLayout =
           ozoneManager.getOMDefaultBucketLayout();
       omBucketInfo =
-          OmBucketInfo.getFromProtobuf(bucketInfo, defaultBucketLayout);
+          OmBucketInfo.getFromProtobuf(bucketInfoWithoutAcls, defaultBucketLayout);
     } else {
-      omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
+      omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfoWithoutAcls);
     }
 
     if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {
@@ -234,6 +240,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
 
     try {
+      final List<OzoneAcl> clientAcls = ozoneManager.getConfig().ignoreClientACLs()
+          ? emptyList() : toOzoneAcls(bucketInfo.getAclsList());
       mergeOmLockDetails(
           metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
@@ -267,6 +275,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
           .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
           .setUpdateID(transactionLogIndex);
 
+      builder.setAcls(clientAcls);
       addDefaultAcls(builder.acls(), omVolumeArgs, ozoneManager);
 
       omBucketInfo = builder.build();

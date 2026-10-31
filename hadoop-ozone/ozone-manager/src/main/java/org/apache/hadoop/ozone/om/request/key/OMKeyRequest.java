@@ -162,6 +162,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
       OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
       throws IOException {
+    if (!ozoneManager.getConfig().ignoreClientACLs()) {
+      toOzoneAcls(keyArgs.getAclsList());
+    }
     KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
     // check Acl
     checkKeyAcls(ozoneManager, resolvedArgs.getVolumeName(),
@@ -383,7 +386,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     final Set<OzoneAcl> acls = new LinkedHashSet<>(getDefaultAclList(createUGIForApi(), config));
     if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
-      acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+      acls.addAll(toOzoneAcls(keyArgs.getAclsList()));
     }
 
     // Inherit DEFAULT acls from prefix.
@@ -452,7 +455,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // add acls from clients
     if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
-      acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+      acls.addAll(toOzoneAcls(keyArgs.getAclsList()));
     }
     return acls;
   }

@@ -105,6 +105,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
@@ -743,6 +744,35 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
       OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(true, partNumber));
       OMClientResponse response = getOMKeyCreateRequest(modifiedOmRequest).validateAndUpdateCache(ozoneManager, 100L);
       assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testInvalidAcl(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(false, false));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    for (OzoneAclInfo acl : OMRequestTestUtils.invalidAcls()) {
+      OMRequest.Builder request = createKeyRequest(false, 0).toBuilder();
+      request.getCreateKeyRequestBuilder().getKeyArgsBuilder().addAcls(acl);
+      if (ignoreClientACLs) {
+        OMRequest modifiedRequest = doPreExecute(request.build());
+        OMClientResponse response =
+            getOMKeyCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 100L);
+        assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+        continue;
+      }
+      OMException e = assertThrows(OMException.class,
+          () -> getOMKeyCreateRequest(request.build()).preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+
+      OMRequest.Builder modifiedRequest = doPreExecute(createKeyRequest(false, 0)).toBuilder();
+      modifiedRequest.getCreateKeyRequestBuilder().getKeyArgsBuilder().addAcls(acl);
+      OMClientResponse response =
+          getOMKeyCreateRequest(modifiedRequest.build()).validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(INVALID_REQUEST, response.getOMResponse().getStatus());
     }
   }
 
