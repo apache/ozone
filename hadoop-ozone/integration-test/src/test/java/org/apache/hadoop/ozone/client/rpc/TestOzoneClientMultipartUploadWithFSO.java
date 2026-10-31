@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
@@ -470,6 +471,33 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  @Test
+  public void testDirectoryCreatedAfterFailedCompleteIsPersistedWithItsParent() throws Exception {
+    OzoneManager ozoneManager = cluster().getOzoneManager();
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    String parentDir = "parentOfFailedComplete";
+    TreeMap<Integer, String> partsMap = new TreeMap<>();
+    partsMap.put(1, "random");
+    OzoneManagerDoubleBuffer doubleBuffer =
+        ozoneManager.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
+
+    // Hold the flush so the directory is created while the failed complete is still in the double buffer.
+    doubleBuffer.pause();
+    try {
+      OzoneTestUtils.expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR,
+          () -> completeMultipartUpload(bucket, parentDir + "/" + keyName, "random", partsMap));
+      bucket.createDirectory(parentDir + "/child");
+    } finally {
+      doubleBuffer.unpause();
+    }
+    ozoneManager.awaitDoubleBufferFlush();
+
+    long volumeId = metadataManager.getVolumeId(volumeName);
+    long bucketId = metadataManager.getBucketId(volumeName, bucketName);
+    assertThat(metadataManager.getDirectoryTable().getSkipCache(
+        metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, parentDir))).isNotNull();
   }
 
   @Test
