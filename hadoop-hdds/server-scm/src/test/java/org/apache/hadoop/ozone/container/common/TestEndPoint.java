@@ -431,15 +431,8 @@ public class TestEndPoint {
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getPipelineReport()).thenReturn(
         HddsTestUtils.getRandomPipelineReports());
-    DatanodeVersionManager versionManager =
-        mock(DatanodeVersionManager.class);
-    when(versionManager.getApparentVersion())
-        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getSoftwareVersion())
-        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getVersionForClient())
-        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
     DatanodeStateMachine dn = mock(DatanodeStateMachine.class);
+    DatanodeVersionManager versionManager = ContainerTestUtils.mockDnVersionManager();
     when(dn.getVersionManager()).thenReturn(versionManager);
     if (!clearDatanodeDetails) {
       when(dn.getDatanodeDetails()).thenReturn(randomDatanodeDetails());

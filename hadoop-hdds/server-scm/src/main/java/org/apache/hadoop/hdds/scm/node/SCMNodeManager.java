@@ -2115,7 +2115,8 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     }
   }
 
-  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
+  @Override
+  public boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
     if (versionReport == null || !versionReport.hasSoftwareVersion() || !versionReport.hasApparentVersion()) {
       LOG.error("Datanode {} did not report its version. Not allowing it to join the cluster.", dnDetails);
       return true;

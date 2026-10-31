@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -149,6 +150,11 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private long reportIndex;
   private String largestReportKey;
   private boolean reportWriteStarted;
+  private boolean reportDependencyOrdered;
+
+  private long newListCount;
+  private long oldListCount;
+  private final EnumMap<DiffType, Long> classifiedCounts = new EnumMap<>(DiffType.class);
 
   /** Reusable big-endian key buffers; safe because RocksDB copies keys on put/get. */
   private final byte[] objectIdKeyBuffer = new byte[Long.BYTES];
@@ -234,16 +240,32 @@ public final class SnapDiffJobStore implements AutoCloseable {
 
   /** Writes a present-marker for {@code objectId} in {@code newList}. */
   public void putNewListPresentMarker(long objectId) throws IOException {
+    newListCount++;
     batchPut(newListCf, objectIdKeyBuffer(objectId), presentMarker);
   }
 
   /** Writes a full diff-candidate {@link EntryValue} for {@code objectId} in {@code newList}. */
   public void putNewList(long objectId, byte[] entryValue) throws IOException {
+    newListCount++;
     batchPut(newListCf, objectIdKeyBuffer(objectId), entryValue);
   }
 
   public void putOldList(long objectId, byte[] entryValue) throws IOException {
+    oldListCount++;
     batchPut(oldListCf, objectIdKeyBuffer(objectId), entryValue);
+  }
+
+  long getClassifiedCount(DiffType diffType) {
+    return classifiedCounts.getOrDefault(diffType, 0L);
+  }
+
+  long mergeJoinStepDenominator() {
+    return Math.max(1L, newListCount + oldListCount);
+  }
+
+  long classifiedEntryDenominator() {
+    return Math.max(1L, getClassifiedCount(DiffType.CREATE) + getClassifiedCount(DiffType.DELETE)
+        + getClassifiedCount(DiffType.MODIFY) + getClassifiedCount(DiffType.RENAME));
   }
 
   /** Writes {@code objectId -> (parentId, name)} on the to-side reverse edge index. */
@@ -338,6 +360,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
 
   /** Writes a classified entry keyed by {@code objectId}; diff type is implied by the CF. */
   public void putClassified(DiffType diffType, long objectId, byte[] value) throws IOException {
+    classifiedCounts.merge(diffType, 1L, Long::sum);
     batchPut(classifiedColumnFamily(diffType), objectIdKeyBuffer(objectId), value);
   }
 
@@ -570,6 +593,14 @@ public final class SnapDiffJobStore implements AutoCloseable {
     reportWriteStarted = true;
     reportIndex = 0;
     largestReportKey = "";
+    reportDependencyOrdered = false;
+  }
+
+  /**
+   * Whether the last finished report write applied dependency ordering (FSO merge-join).
+   */
+  public boolean isReportDependencyOrdered() {
+    return reportDependencyOrdered;
   }
 
   /**
@@ -610,12 +641,13 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /**
    * Flushes pending report rows and returns the entry count and largest report key.
    */
-  public Pair<Long, String> finishReportWrite() throws IOException {
+  public Pair<Long, String> finishReportWrite(boolean dependencyOrdered) throws IOException {
     if (!reportWriteStarted) {
       throw new IllegalStateException("Snap diff report write not started for job " + jobId);
     }
     flushWrites();
     reportWriteStarted = false;
+    reportDependencyOrdered = dependencyOrdered;
     return Pair.of(reportIndex, largestReportKey);
   }
 

@@ -60,8 +60,8 @@ import org.slf4j.LoggerFactory;
  * <p>For general-purpose buckets, individual {@code Part} elements under {@code ObjectParts}
  * are omitted unless an additional checksum is stored on the object, matching AWS S3 behavior.
  * For FSO layout buckets (Ozone directory buckets), {@code Part} elements are always returned,
- * matching AWS S3 directory-bucket behavior. Object versioning ({@code versionId}) and
- * SSE-C encryption headers are also not supported and are silently ignored.
+ * matching AWS S3 directory-bucket behavior. Object versioning ({@code versionId}) is not supported and is
+ * ignored. SSE-C encryption headers are not supported either, and are rejected with {@code NotImplemented}.
  *
  * <p>See https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAttributes.html
  */
@@ -124,6 +124,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
     }
 
     context.setAction(S3GAction.GET_OBJECT_ATTRIBUTES);
+    ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
 
     final long startNanos = context.getStartNanos();
     try {

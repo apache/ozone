@@ -573,6 +573,7 @@ public final class OzoneConfigKeys {
       "ozone.http.sni.host.check.enabled";
   public static final boolean OZONE_HTTP_SNI_HOST_CHECK_ENABLED_DEFAULT = false;
   public static final String  OZONE_SSL_ENABLED_PROTOCOLS = "ozone.ssl.enabled.protocols";
+  public static final String  OZONE_SSL_ENABLED_PROTOCOLS_DEFAULT = "TLSv1.2,TLSv1.3";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.server.keystore.resource";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
