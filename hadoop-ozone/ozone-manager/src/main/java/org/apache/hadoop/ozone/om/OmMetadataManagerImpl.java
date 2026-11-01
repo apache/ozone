@@ -317,7 +317,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setCreateCheckpointDirs(false)
         .setEnableRocksDbMetrics(enableRocksDbMetrics)
         .build();
-    initializeOmTables(CacheType.PARTIAL_CACHE, false);
+    try {
+      initializeOmTables(CacheType.PARTIAL_CACHE, false);
+    } catch (IOException | RuntimeException e) {
+      stop();
+      throw e;
+    }
     perfMetrics = null;
   }
 
@@ -345,7 +350,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           .build();
 
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       stop();
       throw e;
     }
