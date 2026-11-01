@@ -22,54 +22,64 @@ import java.util.zip.Checksum;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 /** Incrementally verifies a checksum over the decoded payload, independently of chunk signatures. */
-final class TrailerChecksum {
-  private final MessageDigest digest;
-  private final Checksum checksum;
-  private final int checksumLength;
-
-  TrailerChecksum(MessageDigest digest) {
-    this.digest = digest;
-    this.checksum = null;
-    this.checksumLength = digest.getDigestLength();
+abstract class TrailerChecksum {
+  private TrailerChecksum() {
   }
 
-  TrailerChecksum(Checksum checksum, int checksumLength) {
-    this.digest = null;
-    this.checksum = checksum;
-    this.checksumLength = checksumLength;
-  }
+  abstract void update(byte value);
 
-  void update(byte value) {
-    if (digest != null) {
-      digest.update(value);
-    } else {
-      checksum.update(value);
-    }
-  }
+  abstract void update(byte[] bytes, int offset, int length);
 
-  void update(byte[] bytes, int offset, int length) {
-    if (digest != null) {
-      digest.update(bytes, offset, length);
-    } else {
-      checksum.update(bytes, offset, length);
-    }
-  }
+  abstract byte[] finish();
 
-  void verify(byte[] expected, String resource) {
-    byte[] actual;
-    if (digest != null) {
-      actual = digest.digest();
-    } else {
-      actual = new byte[checksumLength];
-      long value = checksum.getValue();
-      for (int i = actual.length - 1; i >= 0; i--) {
-        actual[i] = (byte) value;
-        value >>>= Byte.SIZE;
-      }
-    }
-    if (!MessageDigest.isEqual(expected, actual)) {
+  final void verify(byte[] expected, String resource) {
+    if (!MessageDigest.isEqual(expected, finish())) {
       throw S3ErrorTable.newError(S3ErrorTable.BAD_DIGEST, resource);
     }
+  }
+
+  static TrailerChecksum of(MessageDigest digest) {
+    return new TrailerChecksum() {
+      @Override
+      void update(byte value) {
+        digest.update(value);
+      }
+
+      @Override
+      void update(byte[] bytes, int offset, int length) {
+        digest.update(bytes, offset, length);
+      }
+
+      @Override
+      byte[] finish() {
+        return digest.digest();
+      }
+    };
+  }
+
+  static TrailerChecksum of(Checksum checksum, int checksumLength) {
+    return new TrailerChecksum() {
+      @Override
+      void update(byte value) {
+        checksum.update(value);
+      }
+
+      @Override
+      void update(byte[] bytes, int offset, int length) {
+        checksum.update(bytes, offset, length);
+      }
+
+      @Override
+      byte[] finish() {
+        byte[] actual = new byte[checksumLength];
+        long value = checksum.getValue();
+        for (int i = actual.length - 1; i >= 0; i--) {
+          actual[i] = (byte) value;
+          value >>>= Byte.SIZE;
+        }
+        return actual;
+      }
+    };
   }
 
   /** CRC-64/NVME: reflected polynomial 0x9a6c9329ac4bc9b5, initial value and final XOR all ones. */

@@ -153,15 +153,15 @@ public class SignedChunksInputStream extends InputStream {
       case NONE:
         return null;
       case CRC32:
-        return new TrailerChecksum(new CRC32(), checksumLength);
+        return TrailerChecksum.of(new CRC32(), checksumLength);
       case CRC32C:
-        return new TrailerChecksum(new CRC32C(), checksumLength);
+        return TrailerChecksum.of(new CRC32C(), checksumLength);
       case CRC64NVME:
-        return new TrailerChecksum(new TrailerChecksum.Crc64Nvme(), checksumLength);
+        return TrailerChecksum.of(new TrailerChecksum.Crc64Nvme(), checksumLength);
       case SHA1:
-        return new TrailerChecksum(DigestUtils.getSha1Digest());
+        return TrailerChecksum.of(DigestUtils.getSha1Digest());
       case SHA256:
-        return new TrailerChecksum(DigestUtils.getSha256Digest());
+        return TrailerChecksum.of(DigestUtils.getSha256Digest());
       default:
         throw new IllegalStateException("Unsupported trailer checksum: " + this);
       }

@@ -358,8 +358,8 @@ public class TestSignedChunksInputStream {
       if (!correct) {
         checksum[0] ^= 1;
       }
-      String body = SignatureTestUtils.signedChunkedBodyWithTrailer(payload, header.getHeaderName(),
-          Base64.getEncoder().encodeToString(checksum));
+      String body = SignatureTestUtils.signedChunkedBodyWithTrailer(
+          new String[]{"1234", "56", "789"}, header.getHeaderName(), Base64.getEncoder().encodeToString(checksum));
       try (SignedChunksInputStream stream = new SignedChunksInputStream(
           new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, header)) {
         if (verify) {
@@ -368,7 +368,11 @@ public class TestSignedChunksInputStream {
               SignatureTestUtils.signatureInfo().getSignature(), KEY_PATH));
         }
         if (buffered) {
-          assertThat(IOUtils.readFully(stream, payload.length())).isEqualTo(payload.getBytes(UTF_8));
+          byte[] actual = new byte[payload.length() + 4];
+          Arrays.fill(actual, (byte) '!');
+          assertThat(stream.read(actual, 2, 5)).isEqualTo(5);
+          assertThat(stream.read(actual, 7, 4)).isEqualTo(4);
+          assertThat(actual).isEqualTo(("!!" + payload + "!!").getBytes(UTF_8));
         } else {
           for (char expected : payload.toCharArray()) {
             assertThat(stream.read()).isEqualTo(expected);

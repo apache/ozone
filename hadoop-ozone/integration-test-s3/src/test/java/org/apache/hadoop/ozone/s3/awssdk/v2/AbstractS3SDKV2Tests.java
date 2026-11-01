@@ -122,6 +122,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
+import software.amazon.awssdk.core.interceptor.Context;
+import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
+import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.HttpExecuteRequest;
 import software.amazon.awssdk.http.HttpExecuteResponse;
@@ -332,6 +335,37 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     assertEquals(content, objectBytes.asUtf8String());
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutDirectoryWithTrailingChecksum() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName() + "/";
+    createFsoBucket(bucketName);
+    try {
+      List<String> payloadModes = new ArrayList<>();
+      ExecutionInterceptor interceptor = new ExecutionInterceptor() {
+        @Override
+        public void beforeTransmission(Context.BeforeTransmission context, ExecutionAttributes executionAttributes) {
+          payloadModes.add(context.httpRequest().firstMatchingHeader(S3Consts.X_AMZ_CONTENT_SHA256).orElse(null));
+          assertThat(context.httpRequest().firstMatchingHeader(S3Consts.X_AMZ_TRAILER))
+              .contains("x-amz-checksum-crc32c");
+        }
+      };
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName).checksumAlgorithm(ChecksumAlgorithm.CRC32_C)
+          .overrideConfiguration(o -> o.addPlugin(c -> c.overrideConfiguration(
+              overrides -> overrides.addExecutionInterceptor(interceptor)))), RequestBody.empty());
+
+      assertThat(payloadModes).isNotEmpty().containsOnly(S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
+      try (OzoneClient ozoneClient = cluster.newClient()) {
+        OzoneBucket bucket = ozoneClient.getObjectStore().getS3Bucket(bucketName);
+        assertThat(bucket.getFileStatus(keyName).isDirectory()).isTrue();
+      }
+    } finally {
+      s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName));
+      deleteFsoBucket(bucketName);
+    }
   }
 
   @ParameterizedTest
