@@ -88,6 +88,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = getOzoneConf();
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
+    TracingUtil.installMdcContextStorage();
     TracingUtil.initTracing("S3gateway", OzoneConfigurationHolder.configuration());
     UserGroupInformation.setConfiguration(OzoneConfigurationHolder.configuration());
     loginS3GUser(OzoneConfigurationHolder.configuration());

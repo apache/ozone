@@ -36,20 +36,22 @@ public final class BucketDeletedBytes {
   private final long purgeableKeys;
   private final long snapshotTrappedDirs;
   private final long purgeableDirs;
+  private final long purgeableKeyBytes;
+  private final long purgeableDirBytes;
 
-  public BucketDeletedBytes(
-      long snapshotTrappedBytes,
-      long purgeableBytes,
-      long snapshotTrappedKeys,
-      long purgeableKeys,
-      long snapshotTrappedDirs,
-      long purgeableDirs) {
-    this.snapshotTrappedBytes = snapshotTrappedBytes;
-    this.purgeableBytes = purgeableBytes;
-    this.snapshotTrappedKeys = snapshotTrappedKeys;
-    this.purgeableKeys = purgeableKeys;
-    this.snapshotTrappedDirs = snapshotTrappedDirs;
-    this.purgeableDirs = purgeableDirs;
+  private BucketDeletedBytes(Builder b) {
+    this.snapshotTrappedBytes = b.snapshotTrappedBytes;
+    this.purgeableBytes = b.purgeableBytes;
+    this.snapshotTrappedKeys = b.snapshotTrappedKeys;
+    this.purgeableKeys = b.purgeableKeys;
+    this.snapshotTrappedDirs = b.snapshotTrappedDirs;
+    this.purgeableDirs = b.purgeableDirs;
+    this.purgeableKeyBytes = b.purgeableKeyBytes;
+    this.purgeableDirBytes = b.purgeableDirBytes;
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   public long getSnapshotTrappedBytes() {
@@ -75,5 +77,79 @@ public final class BucketDeletedBytes {
   public long getPurgeableDirs() {
     return purgeableDirs;
   }
-}
 
+  /**
+   * Purgeable bytes of entries in the deleted table, or -1 if OM did not report it.
+   */
+  public long getPurgeableKeyBytes() {
+    return purgeableKeyBytes;
+  }
+
+  /**
+   * Purgeable bytes of files found under deleted directories, or -1 if OM did not report it.
+   */
+  public long getPurgeableDirBytes() {
+    return purgeableDirBytes;
+  }
+
+  /**
+   * Builder for BucketDeletedBytes.
+   */
+  public static final class Builder {
+    private long snapshotTrappedBytes;
+    private long purgeableBytes;
+    private long snapshotTrappedKeys;
+    private long purgeableKeys;
+    private long snapshotTrappedDirs;
+    private long purgeableDirs;
+    private long purgeableKeyBytes = -1L;
+    private long purgeableDirBytes = -1L;
+
+    private Builder() {
+    }
+
+    public Builder setSnapshotTrappedBytes(long snapshotTrappedBytes) {
+      this.snapshotTrappedBytes = snapshotTrappedBytes;
+      return this;
+    }
+
+    public Builder setPurgeableBytes(long purgeableBytes) {
+      this.purgeableBytes = purgeableBytes;
+      return this;
+    }
+
+    public Builder setSnapshotTrappedKeys(long snapshotTrappedKeys) {
+      this.snapshotTrappedKeys = snapshotTrappedKeys;
+      return this;
+    }
+
+    public Builder setPurgeableKeys(long purgeableKeys) {
+      this.purgeableKeys = purgeableKeys;
+      return this;
+    }
+
+    public Builder setSnapshotTrappedDirs(long snapshotTrappedDirs) {
+      this.snapshotTrappedDirs = snapshotTrappedDirs;
+      return this;
+    }
+
+    public Builder setPurgeableDirs(long purgeableDirs) {
+      this.purgeableDirs = purgeableDirs;
+      return this;
+    }
+
+    public Builder setPurgeableKeyBytes(long purgeableKeyBytes) {
+      this.purgeableKeyBytes = purgeableKeyBytes;
+      return this;
+    }
+
+    public Builder setPurgeableDirBytes(long purgeableDirBytes) {
+      this.purgeableDirBytes = purgeableDirBytes;
+      return this;
+    }
+
+    public BucketDeletedBytes build() {
+      return new BucketDeletedBytes(this);
+    }
+  }
+}
