@@ -18,12 +18,15 @@
 package org.apache.hadoop.ozone.client.io;
 
 import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toList;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -36,6 +39,7 @@ import org.apache.hadoop.hdds.scm.storage.PartInputStream;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +60,7 @@ public class KeyInputStream extends MultipartInputStream {
       OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
       XceiverClientFactory xceiverClientFactory,
-      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       OzoneClientConfig config) throws IOException {
     boolean isHsyncFile = keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID);
@@ -77,9 +81,12 @@ public class KeyInputStream extends MultipartInputStream {
       Function<BlockID, BlockLocationInfo> retry;
       if (retryFunction != null) {
         retry = keyBlockID -> {
-          OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
-          return getBlockLocationInfo(newKeyInfo,
-              omKeyLocationInfo.getBlockID());
+          try {
+            return getBlockLocationInfo(retryFunction.apply(keyInfo), omKeyLocationInfo.getBlockID());
+          } catch (IOException e) {
+            LOG.error("Unable to lookup key {} on retry.", keyInfo.getKeyName(), e);
+            return null;
+          }
         };
       } else {
         retry = null;
@@ -120,7 +127,7 @@ public class KeyInputStream extends MultipartInputStream {
   private static LengthInputStream getFromOmKeyInfo(
       OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       List<OmKeyLocationInfo> locationInfos,
       OzoneClientConfig config) throws IOException {
@@ -137,7 +144,7 @@ public class KeyInputStream extends MultipartInputStream {
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       OzoneClientConfig config) throws IOException {
 
@@ -148,9 +155,12 @@ public class KeyInputStream extends MultipartInputStream {
         retryFunction, blockStreamFactory, keyLocationInfos, config);
   }
 
-  public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
+  /**
+   * @return a stream for each part of the multipart key, by part number.
+   */
+  public static SortedMap<Integer, LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       OzoneClientConfig config) throws IOException {
 
@@ -161,14 +171,13 @@ public class KeyInputStream extends MultipartInputStream {
     // corresponding part in the partsToBlockMap.
     Map<Integer, List<OmKeyLocationInfo>> partsToBlocksMap =
         keyLocationInfos.stream()
-            .collect(groupingBy(BlockLocationInfo::getPartNumber));
+            .collect(groupingBy(BlockLocationInfo::getPartNumber, TreeMap::new, toList()));
 
-    List<LengthInputStream> lengthInputStreams = new ArrayList<>();
+    SortedMap<Integer, LengthInputStream> lengthInputStreams = new TreeMap<>();
     // Create a KeyInputStream for each part.
-    for (List<OmKeyLocationInfo> locationInfo : partsToBlocksMap.values()) {
-      lengthInputStreams.add(getFromOmKeyInfo(keyInfo, xceiverClientFactory,
-          retryFunction, blockStreamFactory, locationInfo,
-          config));
+    for (Map.Entry<Integer, List<OmKeyLocationInfo>> part : partsToBlocksMap.entrySet()) {
+      lengthInputStreams.put(part.getKey(), getFromOmKeyInfo(keyInfo, xceiverClientFactory,
+          retryFunction, blockStreamFactory, part.getValue(), config));
     }
     return lengthInputStreams;
   }

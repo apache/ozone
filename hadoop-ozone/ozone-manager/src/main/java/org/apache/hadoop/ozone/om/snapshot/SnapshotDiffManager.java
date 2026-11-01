@@ -35,6 +35,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
@@ -42,6 +46,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FU
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
@@ -100,6 +105,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.commons.io.file.PathUtils;
@@ -109,9 +115,11 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -135,7 +143,12 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition;
+import org.apache.hadoop.ozone.om.snapshot.diff.DagDiffSequentialReader;
+import org.apache.hadoop.ozone.om.snapshot.diff.FullDiffSequentialReader;
+import org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter;
+import org.apache.hadoop.ozone.om.snapshot.diff.SnapDiffJobStore;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
 import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
@@ -163,6 +176,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMXBean {
+  private static final String DEPENDENCY_REPORT_REASON_PREFIX = "Report is dependency ";
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final Map<DiffType, String> DIFF_TYPE_STRING_MAP =
@@ -208,6 +222,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
   private final boolean diffDisableNativeLibs;
 
+  private final boolean optimizedSnapshotDiffEnabled;
+
+  private final int maxInMemoryEntriesPerJob;
+
   private final boolean isNativeLibsLoaded;
 
   private final BiFunction<SnapshotInfo, SnapshotInfo, String>
@@ -244,6 +262,14 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     this.diffDisableNativeLibs = ozoneManager.getConfiguration().getBoolean(
         OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS,
         OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT);
+
+    this.optimizedSnapshotDiffEnabled = ozoneManager.getConfiguration().getBoolean(
+        OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED,
+        OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED_DEFAULT);
+
+    this.maxInMemoryEntriesPerJob = ozoneManager.getConfiguration().getInt(
+        OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB,
+        OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT);
 
     this.maxAllowedKeyChangesForASnapDiff = ozoneManager.getConfiguration()
         .getLong(
@@ -522,7 +548,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
     SnapshotDiffJob snapDiffJob = getSnapDiffReportStatus(snapDiffJobKey,
         volumeName, bucketName, fromSnapshotName, toSnapshotName,
-        forceFullDiff, disableNativeDiff);
+        forceFullDiff, disableNativeDiff, false);
 
     OFSPath snapshotRoot = getSnapshotRootPath(volumeName, bucketName);
 
@@ -550,9 +576,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval(),
           snapDiffJob.getReason());
     case DONE:
-      SnapshotDiffReportOzone report = createPageResponse(snapDiffJob,
-          volumeName, bucketName, fromSnapshotName, toSnapshotName, index,
-          pageSize);
+      SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, volumeName, bucketName,
+          fromSnapshotName, toSnapshotName, index, pageSize);
       return new SnapshotDiffResponse(report, DONE, 0L);
     case REJECTED:
       return new SnapshotDiffResponse(
@@ -623,10 +648,9 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval(),
           snapDiffJob.getReason());
     case DONE:
-      SnapshotDiffReportOzone report = createPageResponse(snapDiffJob,
-          volumeName, bucketName, fromSnapshotName, toSnapshotName, index,
-          pageSize);
-      return new SnapshotDiffResponse(report, DONE, 0L);
+      SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, volumeName, bucketName,
+          fromSnapshotName, toSnapshotName, index, pageSize);
+      return new SnapshotDiffResponse(report, DONE, 0L, snapDiffJob.getReason());
     case CANCELLED:
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
@@ -645,7 +669,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final String fromSnapshotName,
       final String toSnapshotName,
       final boolean forceFullDiff,
-      final boolean disableNativeDiff
+      final boolean disableNativeDiff,
+      final boolean orderedReport
   ) throws IOException {
     SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
         volumeName, bucketName, fromSnapshotName);
@@ -654,50 +679,73 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
     String snapDiffJobKey = generateSnapDiffJobKey.apply(fsInfo, tsInfo);
 
+    if (orderedReport && !optimizedSnapshotDiffEnabled) {
+      LOG.info("Ignoring ordered report request for volume: {}, bucket: {} because optimized "
+          + "snapshot diff is disabled.", volumeName, bucketName);
+    }
+    final boolean effectiveOrderedReport = optimizedSnapshotDiffEnabled && orderedReport;
+
     SnapshotDiffJob snapDiffJob = getSnapDiffReportStatus(snapDiffJobKey,
         volumeName, bucketName, fromSnapshotName, toSnapshotName,
-        forceFullDiff, disableNativeDiff);
+        forceFullDiff, disableNativeDiff, effectiveOrderedReport);
 
     JobStatus prevStatus = snapDiffJob.getStatus();
-    String prevReason = isEmpty(snapDiffJob.getReason()) ? null : snapDiffJob.getReason();
+    String prevReason = snapDiffJob.getReason();
+    if (isEmpty(prevReason) || prevReason.startsWith(DEPENDENCY_REPORT_REASON_PREFIX)) {
+      prevReason = null;
+    }
     String jobId = snapDiffJob.getJobId();
+    boolean createNewJob = false;
+    boolean submitJob = false;
+    boolean isFso = getBucketLayout(volumeName, bucketName, activeOmMetadataManager).isFileSystemOptimized();
+    String responseMsg = "";
+
     if (prevStatus == FAILED || prevStatus == REJECTED || prevStatus == CANCELLED) {
+      createNewJob = true;
+      submitJob = true;
+    } else if ((prevStatus == QUEUED || prevStatus == DONE) &&
+        isFso && effectiveOrderedReport && !snapDiffJob.isOrderedReport()) {
+      createNewJob = true;
+      submitJob = true;
+      responseMsg = "Previous snapshot diff attempt found with an unordered report. Status: " + prevStatus
+          + ".\nSubmitting a new job with ordered report. Please retry after " + defaultWaitTime +
+          " ms using --get-report option to get the report.\n";
+    } else if (prevStatus == QUEUED) {
+      submitJob = true;
+    }
+
+    if (createNewJob) {
       jobId = createSnapDiffJob(snapDiffJobKey, volumeName, bucketName, fromSnapshotName,
-          toSnapshotName, forceFullDiff, disableNativeDiff, prevStatus, snapDiffJob);
+          toSnapshotName, forceFullDiff, disableNativeDiff, effectiveOrderedReport, QUEUED,
+          snapDiffJob);
     }
     final String submitJobId = jobId;
 
-    switch (prevStatus) {
-    case QUEUED:
-    case FAILED:
-    case REJECTED:
-    case CANCELLED:
+    if (submitJob) {
       LOG.info("Submitting snapshot diff generation request for" +
               " volume: {}, bucket: {}, fromSnapshot: {} and toSnapshot: {}",
           volumeName, bucketName, fromSnapshotName, toSnapshotName);
       try {
-        updateJobStatus(snapDiffJobKey, prevStatus, IN_PROGRESS);
+        updateJobStatus(snapDiffJobKey, QUEUED, IN_PROGRESS);
         snapDiffExecutor.execute(() -> generateSnapshotDiffReport(snapDiffJobKey, submitJobId,
             volumeName, bucketName, fromSnapshotName, toSnapshotName,
-            forceFullDiff, disableNativeDiff));
-        return new SubmitSnapshotDiffResponse(defaultWaitTime, prevStatus, prevReason);
+            forceFullDiff, disableNativeDiff, effectiveOrderedReport));
       } catch (RejectedExecutionException exception) {
         updateJobStatus(snapDiffJobKey, IN_PROGRESS, REJECTED);
         LOG.warn("Exceeded the snapDiff parallel requests processing " +
-                "limit. Rejecting the snapDiff job: {}.", snapDiffJobKey);
-        return new SubmitSnapshotDiffResponse("Snapshot diff job was rejected because parallel processing of " +
-            "snap diff jobs exceeded the limit. Please try again in " + defaultWaitTime + " ms.");
+            "limit. Rejecting the snapDiff job: {}.", snapDiffJobKey);
+        responseMsg = "Snapshot diff job was rejected because parallel processing of " +
+            "snap diff jobs exceeded the limit. Please try again in " + defaultWaitTime + " ms.";
       } catch (Exception exception) {
         updateJobStatusToFailed(snapDiffJobKey, exception.getMessage());
         LOG.error("Snapshot diff job: {} failed.", snapDiffJobKey, exception);
-        return new SubmitSnapshotDiffResponse("Snapshot diff job submission failed. Reason: " + exception.getMessage());
+        responseMsg = "Snapshot diff job submission failed. Reason: " + exception.getMessage();
       }
-    case IN_PROGRESS:
-    case DONE:
-      return new SubmitSnapshotDiffResponse(defaultWaitTime, prevStatus, prevReason);
-    default:
-      throw new IllegalStateException("Unknown snapshot job status: " + snapDiffJob.getStatus());
     }
+    if (!isEmpty(responseMsg)) {
+      return new SubmitSnapshotDiffResponse(responseMsg);
+    }
+    return new SubmitSnapshotDiffResponse(defaultWaitTime, prevStatus, prevReason);
   }
 
   @Nonnull
@@ -812,6 +860,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   }
 
   @SuppressWarnings("parameternumber")
+  @Deprecated
   private synchronized SnapshotDiffResponse submitSnapDiffJob(
       final String jobKey,
       final String volume,
@@ -859,7 +908,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
 
     return submitSnapDiffJob(jobKey, snapDiffJob.getJobId(), volume, bucket,
-        fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+        fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff, false);
   }
 
   @SuppressWarnings("parameternumber")
@@ -871,7 +920,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final String fromSnapshotName,
       final String toSnapshotName,
       final boolean forceFullDiff,
-      final boolean disableNativeDiff) {
+      final boolean disableNativeDiff,
+      boolean orderedReport) {
 
     LOG.info("Submitting snap diff report generation request for" +
             " volume: {}, bucket: {}, fromSnapshot: {} and toSnapshot: {}",
@@ -886,7 +936,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
       snapDiffExecutor.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, disableNativeDiff));
+          forceFullDiff, disableNativeDiff, orderedReport));
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
               bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
@@ -919,11 +969,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
   }
 
-  /**
-   * Check if there is an existing request for the same `fromSnapshot` and
-   * `toSnapshot`. If yes, then return that response otherwise adds a new entry
-   * to the table for the future requests and returns that.
-   */
+  @SuppressWarnings("parameternumber")
   private synchronized SnapshotDiffJob getSnapDiffReportStatus(
       String jobKey,
       String volumeName,
@@ -931,12 +977,13 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       String fromSnapshotName,
       String toSnapshotName,
       boolean forceFullDiff,
-      boolean disableNativeDiff) {
+      boolean disableNativeDiff,
+      boolean orderedReport) {
     SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
 
     if (snapDiffJob == null) {
       createSnapDiffJob(jobKey, volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, disableNativeDiff, QUEUED, null);
+          forceFullDiff, disableNativeDiff, orderedReport, QUEUED, null);
       snapDiffJob = snapDiffJobTable.get(jobKey);
     }
 
@@ -951,6 +998,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
                                                 String toSnapshotName,
                                                 boolean forceFullDiff,
                                                 boolean disableNativeDiff,
+                                                boolean orderedReport,
                                                 JobStatus jobStatus,
                                                 SnapshotDiffJob previousJob) {
     if (previousJob != null) {
@@ -960,6 +1008,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     SnapshotDiffJob snapDiffJob = new SnapshotDiffJob(System.currentTimeMillis(), jobId,
         jobStatus, volumeName, bucketName, fromSnapshotName, toSnapshotName, forceFullDiff,
         disableNativeDiff, 0L, null, 0.0, null);
+    snapDiffJob.setOrderedReport(orderedReport);
     snapDiffJobTable.put(jobKey, snapDiffJob);
     return jobId;
   }
@@ -1000,7 +1049,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     return true;
   }
 
-  @SuppressWarnings({"methodlength", "parameternumber"})
+  @SuppressWarnings({"parameternumber"})
   @VisibleForTesting
   void generateSnapshotDiffReport(final String jobKey,
                                   final String jobId,
@@ -1009,15 +1058,12 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
                                   final String fromSnapshotName,
                                   final String toSnapshotName,
                                   final boolean forceFullDiff,
-                                  final boolean disableNativeDiff) {
+                                  final boolean disableNativeDiff,
+                                  boolean orderedReport) {
     LOG.info("Started snap diff report generation for volume: '{}', " +
             "bucket: '{}', fromSnapshot: '{}', toSnapshot: '{}'",
         volumeName, bucketName, fromSnapshotName, toSnapshotName);
     ozoneManager.getMetrics().incNumSnapshotDiffJobs();
-
-    ColumnFamilyHandle fromSnapshotColumnFamily = null;
-    ColumnFamilyHandle toSnapshotColumnFamily = null;
-    ColumnFamilyHandle objectIDsColumnFamily = null;
 
     // Creates temporary unique dir for the snapDiff job to keep SST files
     // hardlinks. JobId is used as dir name for uniqueness.
@@ -1032,8 +1078,14 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     boolean performNonNativeDiff = diffDisableNativeLibs || disableNativeDiff || !isNativeLibsLoaded;
 
     Consumer<SubStatus> activityReporter = (jobStatus) -> recordActivity(jobKey, jobStatus);
-    try (DeltaFileComputer deltaFileComputer = new CompositeDeltaDiffComputer(ozoneManager.getOmSnapshotManager(),
-        activeOmMetadataManager, diffJobPath, activityReporter, useFullDiff, performNonNativeDiff)) {
+    try (CompositeDeltaDiffComputer deltaDiffComputer = new CompositeDeltaDiffComputer(
+        ozoneManager.getOmSnapshotManager(), activeOmMetadataManager, diffJobPath,
+        activityReporter, useFullDiff, performNonNativeDiff)) {
+      SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
+          volumeName, bucketName, fromSnapshotName);
+      SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
+          volumeName, bucketName, toSnapshotName);
+
       if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
           fromSnapshotName, toSnapshotName)) {
         return;
@@ -1045,12 +1097,127 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           ozoneManager.getOmSnapshotManager()
               .getActiveSnapshot(volumeName, bucketName, toSnapshotName);
 
-      OmSnapshot fromSnapshot = rcFromSnapshot.get();
-      OmSnapshot toSnapshot = rcToSnapshot.get();
-      SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
-          volumeName, bucketName, fromSnapshotName);
-      SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
-          volumeName, bucketName, toSnapshotName);
+      OMMetadataManager fromMeta = rcFromSnapshot.get().getMetadataManager();
+      OMMetadataManager toMeta = rcToSnapshot.get().getMetadataManager();
+      boolean isFso = getBucketLayout(volumeName, bucketName, fromMeta).isFileSystemOptimized();
+      TablePrefixInfo tablePrefixes = toMeta.getTableBucketPrefix(volumeName, bucketName);
+
+      if (!optimizedSnapshotDiffEnabled || (performNonNativeDiff && !useFullDiff)) {
+        LOG.info("Either optimized diff: {} or native diff: {} is disabled. Falling back to legacy diff",
+            optimizedSnapshotDiffEnabled, !performNonNativeDiff);
+        generateLegacySnapshotDiffReport(jobKey, jobId, volumeName, bucketName, fromSnapshotName,
+            toSnapshotName, performNonNativeDiff, deltaDiffComputer, fromMeta, toMeta, fsInfo, tsInfo);
+        return;
+      }
+
+      try (SnapDiffJobStore store = SnapDiffJobStore.open(db, codecRegistry, familyOptions, jobId,
+          isFso, snapDiffReportCfh, null, maxInMemoryEntriesPerJob)) {
+        Callable<Void>[] methodCalls = new Callable[]{
+            () -> {
+              String tableName;
+              if (isFso) {
+                recordActivity(jobKey, OBJECT_ID_MAP_GEN_FSO_FILE);
+                tableName = FILE_TABLE;
+              } else {
+                recordActivity(jobKey, OBJECT_ID_MAP_GEN_OBS);
+                tableName = KEY_TABLE;
+              }
+              long scanStart = Time.monotonicNow();
+              scanTablesForDiff(deltaDiffComputer, useFullDiff, fsInfo, tsInfo, tableName, jobKey,
+                  jobId, fromMeta, toMeta, tablePrefixes, store);
+              LOG.info("Optimized snapshot diff scan files stage elapsed: {}ms, jobId: {}",
+                  Time.monotonicNow() - scanStart, jobId);
+              return null;
+            },
+            () -> {
+              if (isFso) {
+                recordActivity(jobKey, OBJECT_ID_MAP_GEN_FSO_DIR);
+                long scanStart = Time.monotonicNow();
+                scanTablesForDiff(deltaDiffComputer, useFullDiff, fsInfo, tsInfo, DIRECTORY_TABLE, jobKey,
+                    jobId, fromMeta, toMeta, tablePrefixes, store);
+                LOG.info("Optimized snapshot diff scan directories stage elapsed: {}ms, jobId: {}",
+                    Time.monotonicNow() - scanStart, jobId);
+              }
+              return null;
+            },
+            () -> {
+              recordActivity(jobKey, DIFF_REPORT_GEN);
+              updateProgress(jobKey, 0.0);
+              long reportGenStart = Time.monotonicNow();
+              DoubleConsumer reportProgress = pct -> updateProgress(jobKey, pct);
+              Pair<Long, String> reportMeta = MergeJoinSnapDiffWriter.writeReport(this, store,
+                  fromMeta.getBucketId(volumeName, bucketName), isFso, orderedReport, reportProgress);
+              if (reportMeta.getKey() >= 0 && areDiffJobAndSnapshotsActive(volumeName,
+                  bucketName, fromSnapshotName, toSnapshotName)) {
+                LOG.info("Generated optimized snapshot diff report, entry count: {}, elapsed: {}ms, jobId: {}",
+                    reportMeta.getKey(), Time.monotonicNow() - reportGenStart, jobId);
+                updateJobStatusToDone(jobKey, jobId, reportMeta.getKey(), reportMeta.getValue(),
+                    store.isReportDependencyOrdered());
+              }
+              return null;
+            }
+        };
+        for (Callable<Void> methodCall : methodCalls) {
+          if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
+              fromSnapshotName, toSnapshotName)) {
+            return;
+          }
+          methodCall.call();
+        }
+      }
+    } catch (IOException | RocksDBException exception) {
+      updateJobStatusToFailed(jobKey, jobId, exception.getMessage());
+      LOG.error("Caught checked exception during diff report generation for " +
+              "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
+          volumeName, bucketName, fromSnapshotName, toSnapshotName, exception);
+      // TODO: [SNAPSHOT] Fail gracefully. Also check if it is even needed to
+      //  throw this exception.
+      throw new RuntimeException(exception);
+    } catch (Exception exception) {
+      updateJobStatusToFailed(jobKey, jobId, exception.getMessage());
+      LOG.error("Caught unchecked exception during diff report generation " +
+              "for volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
+          volumeName, bucketName, fromSnapshotName, toSnapshotName, exception);
+      // TODO: [SNAPSHOT] Fail gracefully. Also check if it is even needed to
+      //  throw this exception.
+      throw new RuntimeException(exception);
+    } finally {
+      // Decrement ref counts
+      if (rcFromSnapshot != null) {
+        rcFromSnapshot.close();
+      }
+      if (rcToSnapshot != null) {
+        rcToSnapshot.close();
+      }
+    }
+  }
+
+  /**
+   * Legacy snapshot diff pipeline (object-id maps, FSO path resolution, {@link #generateDiffReport}).
+   * Kept isolated so it can be removed once optimized diff is the only path.
+   */
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
+  private void generateLegacySnapshotDiffReport(final String jobKey,
+      final String jobId,
+      final String volumeName,
+      final String bucketName,
+      final String fromSnapshotName,
+      final String toSnapshotName,
+      final boolean performNonNativeDiff,
+      DeltaFileComputer deltaFileComputer,
+      OMMetadataManager fromMeta,
+      OMMetadataManager toMeta,
+      SnapshotInfo fsInfo,
+      SnapshotInfo tsInfo) throws Exception {
+    ColumnFamilyHandle fromSnapshotColumnFamily = null;
+    ColumnFamilyHandle toSnapshotColumnFamily = null;
+    ColumnFamilyHandle objectIDsColumnFamily = null;
+
+    try {
+      if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
+          fromSnapshotName, toSnapshotName)) {
+        return;
+      }
       // JobId is prepended to column families name to make them unique
       // for request.
       fromSnapshotColumnFamily =
@@ -1080,18 +1247,15 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           new RocksDbPersistentMap<>(db, objectIDsColumnFamily, codecRegistry,
               byte[].class, Boolean.class);
 
-      final BucketLayout bucketLayout = getBucketLayout(volumeName, bucketName,
-          fromSnapshot.getMetadataManager());
-      TablePrefixInfo tablePrefixes = toSnapshot.getMetadataManager().getTableBucketPrefix(volumeName, bucketName);
+      final BucketLayout bucketLayout = getBucketLayout(volumeName, bucketName, fromMeta);
+      TablePrefixInfo tablePrefixes = toMeta.getTableBucketPrefix(volumeName, bucketName);
 
       if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
           fromSnapshotName, toSnapshotName)) {
         return;
       }
-      Table<String, OmKeyInfo> fsKeyTable = fromSnapshot.getMetadataManager()
-          .getKeyTable(bucketLayout);
-      Table<String, OmKeyInfo> tsKeyTable = toSnapshot.getMetadataManager()
-          .getKeyTable(bucketLayout);
+      Table<String, OmKeyInfo> fsKeyTable = fromMeta.getKeyTable(bucketLayout);
+      Table<String, OmKeyInfo> tsKeyTable = toMeta.getKeyTable(bucketLayout);
       Table<String, OmDirectoryInfo> fsDirTable;
       Table<String, OmDirectoryInfo> tsDirTable;
 
@@ -1100,8 +1264,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       if (bucketLayout.isFileSystemOptimized()) {
         oldParentIds = Optional.of(new HashSet<>());
         newParentIds = Optional.of(new HashSet<>());
-        fsDirTable = fromSnapshot.getMetadataManager().getDirectoryTable();
-        tsDirTable = toSnapshot.getMetadataManager().getDirectoryTable();
+        fsDirTable = fromMeta.getDirectoryTable();
+        tsDirTable = toMeta.getDirectoryTable();
       } else {
         oldParentIds = Optional.empty();
         newParentIds = Optional.empty();
@@ -1144,17 +1308,16 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
             if (bucketLayout.isFileSystemOptimized()) {
               recordActivity(jobKey, PATH_RESOLUTION_FSO);
               long pathResolutionStart = Time.monotonicNow();
-              long bucketId = toSnapshot.getMetadataManager()
-                  .getBucketId(volumeName, bucketName);
-              String tablePrefix = tablePrefixes.getTablePrefix(fromSnapshot.getMetadataManager()
+              long bucketId = toMeta.getBucketId(volumeName, bucketName);
+              String tablePrefix = tablePrefixes.getTablePrefix(fromMeta
                   .getDirectoryTable().getName());
               oldParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
-                  fromSnapshot.getMetadataManager().getDirectoryTable())
+                  fromMeta.getDirectoryTable())
                   .getAbsolutePathForObjectIDs(oldParentIds, true));
               newParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
-                  toSnapshot.getMetadataManager().getDirectoryTable())
+                  toMeta.getDirectoryTable())
                   .getAbsolutePathForObjectIDs(newParentIds, true));
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Completed FSO path resolution for snapshot diff, resolved {} out of {} parent IDs, " +
@@ -1189,7 +1352,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
                 LOG.debug("Generated snapshot diff report, entry count: {}, elapsed: {}ms, jobId: {}",
                     reportEntries.getKey(), Time.monotonicNow() - reportGenStart, jobId);
               }
-              updateJobStatusToDone(jobKey, jobId, reportEntries.getKey(), reportEntries.getValue());
+              updateJobStatusToDone(jobKey, jobId, reportEntries.getKey(), reportEntries.getValue(), null);
             }
             return null;
           }
@@ -1203,34 +1366,81 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
         }
         methodCall.call();
       }
-    } catch (IOException | RocksDBException exception) {
-      updateJobStatusToFailed(jobKey, exception.getMessage());
-      LOG.error("Caught checked exception during diff report generation for " +
-              "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
-          volumeName, bucketName, fromSnapshotName, toSnapshotName, exception);
-      // TODO: [SNAPSHOT] Fail gracefully. Also check if it is even needed to
-      //  throw this exception.
-      throw new RuntimeException(exception);
-    } catch (Exception exception) {
-      updateJobStatusToFailed(jobKey, exception.getMessage());
-      LOG.error("Caught unchecked exception during diff report generation " +
-              "for volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
-          volumeName, bucketName, fromSnapshotName, toSnapshotName, exception);
-      // TODO: [SNAPSHOT] Fail gracefully. Also check if it is even needed to
-      //  throw this exception.
-      throw new RuntimeException(exception);
     } finally {
       // Clean up: drop the intermediate column family and close them.
       dropAndCloseColumnFamilyHandle(fromSnapshotColumnFamily);
       dropAndCloseColumnFamilyHandle(toSnapshotColumnFamily);
       dropAndCloseColumnFamilyHandle(objectIDsColumnFamily);
-      // Decrement ref counts
-      if (rcFromSnapshot != null) {
-        rcFromSnapshot.close();
+    }
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private void scanTablesForDiff(CompositeDeltaDiffComputer deltaDiffComputer, boolean useFullDiff,
+      SnapshotInfo fsInfo, SnapshotInfo tsInfo, String tableName, String jobKey, String jobId,
+      OMMetadataManager fromMeta, OMMetadataManager toMeta, TablePrefixInfo tablePrefixes, SnapDiffJobStore store)
+      throws Exception {
+    List<Path> deltaFiles = getDeltaFiles(tableName, deltaDiffComputer, fsInfo, tsInfo, jobId)
+        .stream().map(Pair::getLeft).collect(Collectors.toList());
+    if (deltaFiles.isEmpty()) {
+      updateProgress(jobKey, 1.0);
+      LOG.info("Skipped scan tables stage for table '{}' because there are no delta files, jobId: {}",
+          tableName, jobId);
+      return;
+    }
+    SstFileSetReader sstFileReader = new SstFileSetReader(deltaFiles);
+    validateEstimatedKeyChangesAreInLimits(sstFileReader);
+    long estimatedDeltaKeys = sstFileReader.getEstimatedTotalKeys();
+    updateProgress(jobKey, 0.0);
+    DoubleConsumer stageProgress = pct -> updateProgress(jobKey, pct);
+
+    boolean fullDiff = useFullDiff || deltaDiffComputer.isFullDiff();
+    deltaDiffComputer.resetFullDiffFallback();
+    // Raw RDBTable (DBStore#getTable): delta keys and values are byte[]; TypedTable would decode keys/values.
+    Table<byte[], byte[]> fromTable;
+    Table<byte[], byte[]> toTable;
+    try {
+      fromTable = fromMeta.getStore().getTable(tableName);
+      toTable = toMeta.getStore().getTable(tableName);
+    } catch (RocksDatabaseException e) {
+      throw new IOException(e);
+    }
+    byte[] tablePrefix = isEmpty(tablePrefixes.getTablePrefix(tableName)) ? null
+        : StringUtils.string2Bytes(tablePrefixes.getTablePrefix(tableName));
+    long estimatedToTableKeys = Math.max(1L, toTable.getEstimatedKeyCount());
+    long estimatedFromTableKeys = Math.max(1L, fromTable.getEstimatedKeyCount());
+
+    if (fullDiff) {
+      FullDiffSequentialReader reader = new FullDiffSequentialReader(store, resolveFullDiffUpdateIdGate(fsInfo));
+      if (fromTable.getName().equals(DIRECTORY_TABLE)) {
+        reader.scanDirectoryTables(fromTable, toTable, tablePrefix, stageProgress,
+            estimatedToTableKeys, estimatedFromTableKeys);
+      } else {
+        reader.scanFileTables(fromTable, toTable, tablePrefix, stageProgress,
+            estimatedToTableKeys, estimatedFromTableKeys);
       }
-      if (rcToSnapshot != null) {
-        rcToSnapshot.close();
-      }
+      return;
+    }
+
+    DagDiffSequentialReader reader = new DagDiffSequentialReader(store, resolveFromSnapshotDbTxSequenceNumber(fsInfo));
+    if (fromTable.getName().equals(DIRECTORY_TABLE)) {
+      reader.scanDirectoryTables(tablePrefix, deltaFiles, fromTable, toTable, stageProgress,
+          estimatedDeltaKeys, estimatedFromTableKeys, estimatedToTableKeys);
+    } else {
+      reader.scanFileTables(tablePrefix, deltaFiles, fromTable, stageProgress, estimatedDeltaKeys);
+    }
+  }
+
+  private Long resolveFullDiffUpdateIdGate(SnapshotInfo fromSnapshot) throws IOException {
+    if (fromSnapshot.getLastTransactionInfo() == null || fromSnapshot.getLastTransactionInfo().isEmpty()) {
+      return null;
+    }
+    return TransactionInfo.fromByteString(fromSnapshot.getLastTransactionInfo()).getTransactionIndex();
+  }
+
+  private long resolveFromSnapshotDbTxSequenceNumber(SnapshotInfo fromSnapshot) throws IOException {
+    try (ReadableOmSnapshotLocalDataProvider provider = ozoneManager.getOmSnapshotManager()
+        .getSnapshotLocalDataManager().getOmSnapshotLocalData(fromSnapshot.getSnapshotId())) {
+      return provider.getSnapshotLocalData().getDbTxSequenceNumber();
     }
   }
 
@@ -1246,15 +1456,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final Optional<Set<Long>> oldParentIds, final Optional<Set<Long>> newParentIds,
       final DeltaFileComputer deltaFileComputer, final String jobKey,
       final String jobId) throws IOException, RocksDBException {
-
-    long deltaFilesStart = Time.monotonicNow();
-    Set<String> tablesToLookUp = Collections.singleton(fsTable.getName());
-    Collection<Pair<Path, SstFileInfo>> deltaFiles = deltaFileComputer.getDeltaFiles(fsInfo, tsInfo,
-        tablesToLookUp);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Computed Delta SST File Set for table '{}', file count: {}, elapsed: {}ms, jobId: {}",
-          fsTable.getName(), deltaFiles.size(), Time.monotonicNow() - deltaFilesStart, jobId);
-    }
+    Collection<Pair<Path, SstFileInfo>> deltaFiles = getDeltaFiles(fsTable.getName(), deltaFileComputer,
+        fsInfo, tsInfo, jobId);
     recordActivity(jobKey,
         fsTable.getName().equals(FILE_TABLE) ? OBJECT_ID_MAP_GEN_FSO_FILE
             : fsTable.getName().equals(DIRECTORY_TABLE) ? OBJECT_ID_MAP_GEN_FSO_DIR
@@ -1262,6 +1465,21 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     addToObjectIdMap(fsTable, tsTable, deltaFiles.stream().map(Pair::getLeft).collect(Collectors.toList()),
         !skipNativeDiff, oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
         newParentIds, tablePrefixes, jobKey, jobId);
+  }
+
+  private Collection<Pair<Path, SstFileInfo>> getDeltaFiles(
+      final String fsTableName,
+      final DeltaFileComputer deltaFileComputer,
+      final SnapshotInfo fsInfo, final SnapshotInfo tsInfo,
+      final String jobId
+  ) throws IOException {
+    long deltaFilesStart = Time.monotonicNow();
+    Set<String> tablesToLookUp = Collections.singleton(fsTableName);
+    Collection<Pair<Path, SstFileInfo>> deltaFiles = deltaFileComputer.getDeltaFiles(fsInfo, tsInfo,
+        tablesToLookUp);
+    LOG.info("Computed Delta SST File Set for table '{}', file count: {}, elapsed: {}ms, jobId: {}",
+        fsTableName, deltaFiles.size(), Time.monotonicNow() - deltaFilesStart, jobId);
+    return deltaFiles;
   }
 
   @VisibleForTesting
@@ -1751,7 +1969,19 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
   private synchronized void updateJobStatusToFailed(String jobKey,
                                                     String reason) {
+    updateJobStatusToFailed(jobKey, null, reason);
+  }
+
+  @VisibleForTesting
+  synchronized void updateJobStatusToFailed(String jobKey,
+                                              String jobId,
+                                              String reason) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+    if (jobId != null && !snapshotDiffJob.getJobId().equals(jobId)) {
+      LOG.warn("Not marking snapshot diff job {} as FAILED: task jobId {} was superseded by jobId {}.",
+          jobKey, jobId, snapshotDiffJob.getJobId());
+      return;
+    }
     if (snapshotDiffJob.getStatus() != IN_PROGRESS) {
       throw new IllegalStateException("Invalid job status for jobID: " +
           snapshotDiffJob.getJobId() + ". Job's current status is '" +
@@ -1772,7 +2002,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   synchronized void updateJobStatusToDone(String jobKey,
                                           String jobId,
                                           long totalDiffEntries,
-                                          String largestJobKey) {
+                                          String largestJobKey,
+                                          Boolean orderedReportOutcome) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
     // A cancelled job's task keeps running, and a resubmit reuses the jobKey with a new jobId.
     if (!snapshotDiffJob.getJobId().equals(jobId)) {
@@ -1790,6 +2021,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     snapshotDiffJob.setStatus(DONE);
     snapshotDiffJob.setTotalDiffEntries(totalDiffEntries);
     snapshotDiffJob.setLargestEntryKey(largestJobKey);
+    if (orderedReportOutcome != null) {
+      snapshotDiffJob.setReason(DEPENDENCY_REPORT_REASON_PREFIX
+          + (orderedReportOutcome ? "ordered" : "unordered") + ".");
+    }
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
@@ -1880,7 +2115,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
               snapshotDiffJob.getFromSnapshot(),
               snapshotDiffJob.getToSnapshot(),
               snapshotDiffJob.isForceFullDiff(),
-              snapshotDiffJob.isNativeDiffDisabled());
+              snapshotDiffJob.isNativeDiffDisabled(),
+              snapshotDiffJob.isOrderedReport());
         }
       }
     }

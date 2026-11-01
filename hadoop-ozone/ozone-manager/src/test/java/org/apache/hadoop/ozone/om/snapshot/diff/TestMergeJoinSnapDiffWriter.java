@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME
 import static org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter.writeReport;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -163,7 +164,7 @@ class TestMergeJoinSnapDiffWriter {
 
       SnapshotDiffManager manager = mockManagerPassthroughDeletes();
       assertThrows(IOException.class,
-          () -> writeReport(manager, store, BUCKET_OBJECT_ID, false, false));
+          () -> writeReport(manager, store, BUCKET_OBJECT_ID, false, false, null));
     }
   }
 
@@ -207,7 +208,7 @@ class TestMergeJoinSnapDiffWriter {
       }).when(store).multiGetFromEdgeValues(any());
 
       long reportIndex = writeReport(mockManagerWithRealDeleteRetention(), store,
-          BUCKET_OBJECT_ID, true, false).getKey();
+          BUCKET_OBJECT_ID, true, false, null).getKey();
 
       assertEquals(2, multiGetCalls.get());
       assertEquals(1001, reportIndex);
@@ -250,6 +251,7 @@ class TestMergeJoinSnapDiffWriter {
         assertEquals("parent1", new String(entries.get(3).getSourcePath(), StandardCharsets.UTF_8));
         assertEquals(CREATE, entries.get(4).getType());
         assertEquals("parent1/child", new String(entries.get(4).getSourcePath(), StandardCharsets.UTF_8));
+        assertTrue(store.isReportDependencyOrdered());
       } else {
         assertEquals(DELETE, entries.get(0).getType());
         assertEquals("parent1", new String(entries.get(0).getSourcePath(), StandardCharsets.UTF_8));
@@ -262,6 +264,7 @@ class TestMergeJoinSnapDiffWriter {
         assertEquals("parent1", new String(entries.get(3).getSourcePath(), StandardCharsets.UTF_8));
         assertEquals(CREATE, entries.get(4).getType());
         assertEquals("parent1/child", new String(entries.get(4).getSourcePath(), StandardCharsets.UTF_8));
+        assertFalse(store.isReportDependencyOrdered());
       }
 
     }
@@ -286,7 +289,7 @@ class TestMergeJoinSnapDiffWriter {
       }).when(store).multiGetDependencyReportEntries(any());
 
       writeReport(mockManagerPassthroughDeletes(), store,
-          BUCKET_OBJECT_ID, true, true);
+          BUCKET_OBJECT_ID, true, true, null);
 
       assertEquals(2, batchLookups.get());
     }
@@ -302,8 +305,8 @@ class TestMergeJoinSnapDiffWriter {
       store.putNewList(202L, entry(200L, "child2", false, sig));
       store.flushWrites();
 
-      writeReport(mockManagerPassthroughDeletes(), store,
-          BUCKET_OBJECT_ID, true, true);
+      writeReport(mockManagerPassthroughDeletes(), store, BUCKET_OBJECT_ID, true, true, null);
+      assertFalse(store.isReportDependencyOrdered());
 
       List<DiffReportEntry> entries = store.readReportEntriesForTest();
       assertEquals(2, entries.size());
@@ -319,7 +322,7 @@ class TestMergeJoinSnapDiffWriter {
 
   private static List<DiffReportEntry> runWriteReportWithManager(SnapDiffJobStore store,
       long bucketObjectId, boolean fso, SnapshotDiffManager manager, boolean ordering) throws IOException {
-    writeReport(manager, store, bucketObjectId, fso, ordering);
+    writeReport(manager, store, bucketObjectId, fso, ordering, null);
     return store.readReportEntriesForTest();
   }
 

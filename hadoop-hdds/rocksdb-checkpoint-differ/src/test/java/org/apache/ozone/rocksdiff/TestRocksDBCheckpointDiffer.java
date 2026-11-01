@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -54,6 +55,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.MutableGraph;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -76,6 +78,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -89,10 +92,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
@@ -1601,6 +1606,72 @@ public class TestRocksDBCheckpointDiffer {
     for (String fileName : backupFiles) {
       assertTrue(Files.exists(sstBackUpDir.toPath().resolve(fileName + SST_FILE_EXTENSION)));
     }
+  }
+
+  /**
+   * A prune task can still be running when close() returns, because the scheduler wait is bounded, and RDBStore
+   * frees the DB right after close(). Such a task must not use the DB any more.
+   */
+  @Test
+  public void testPruneTasksDoNotUseDbAfterClose() throws Exception {
+    long oldCompactionTime = System.currentTimeMillis() - MINUTES.toMillis(20);
+    byte[] prunedKey = rocksDBCheckpointDiffer.addToCompactionLogTable(new CompactionLogEntry(1, oldCompactionTime,
+        Collections.singletonList(new CompactionFileInfo("000011", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        Collections.singletonList(new CompactionFileInfo("000012", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        null));
+    rocksDBCheckpointDiffer.pruneOlderSnapshotsWithCompactionHistory();
+    assertThat(activeRocksDB.get().get(compactionLogTableCFHandle, prunedKey)).isNull();
+
+    byte[] key = rocksDBCheckpointDiffer.addToCompactionLogTable(new CompactionLogEntry(2, oldCompactionTime,
+        Collections.singletonList(new CompactionFileInfo("000013", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        Collections.singletonList(new CompactionFileInfo("000014", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        null));
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+    SSTFilePruningMetrics pruningMetrics = rocksDBCheckpointDiffer.getPruningMetrics();
+    assertThat(pruningMetrics.getPruneQueueSize()).isEqualTo(1L);
+
+    rocksDBCheckpointDiffer.close();
+    rocksDBCheckpointDiffer.pruneSstFileValues();
+    rocksDBCheckpointDiffer.pruneOlderSnapshotsWithCompactionHistory();
+
+    assertThat(activeRocksDB.get().get(compactionLogTableCFHandle, key)).isNotNull();
+    assertThat(pruningMetrics.getPruneQueueSize()).isEqualTo(1L);
+  }
+
+  /**
+   * A prune task that waits for the differ lock while close() runs cannot be interrupted, so close() must not hold
+   * that lock while it waits for the tasks to end.
+   */
+  @Test
+  public void testCloseDoesNotWaitForTaskBlockedOnDifferLock(@TempDir Path dir) throws Exception {
+    ConfigurationSource config = mock(ConfigurationSource.class);
+    when(config.getTimeDuration(eq(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL), anyLong(), any()))
+        .thenReturn(TimeUnit.HOURS.toMillis(1));
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(dir.toString(), SST_BACK_UP_DIR_NAME,
+        COMPACTION_LOG_DIR_NAME, dir.resolve("db").toString(), config, readLock -> () -> { });
+    Scheduler scheduler = (Scheduler) FieldUtils.readField(differ, "scheduler", true);
+
+    CountDownLatch taskStarted = new CountDownLatch(1);
+    CountDownLatch closing = new CountDownLatch(1);
+    CountDownLatch taskDone = new CountDownLatch(1);
+    // Stands in for a prune task that reaches synchronized (this) between two entries while close() runs.
+    scheduler.schedule(() -> {
+      taskStarted.countDown();
+      Uninterruptibles.awaitUninterruptibly(closing);
+      synchronized (differ) {
+        taskDone.countDown();
+      }
+    }, 0, TimeUnit.MILLISECONDS);
+    assertThat(taskStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+    Thread closer = new Thread(differ::close);
+    closer.start();
+    GenericTestUtils.waitFor(scheduler::isClosed, 10, 10000);
+    closing.countDown();
+    closer.join(TimeUnit.SECONDS.toMillis(10));
+
+    assertThat(closer.isAlive()).as("close() still waiting").isFalse();
+    assertThat(taskDone.getCount()).isZero();
   }
 
   /**

@@ -118,4 +118,13 @@ class TestOzoneClientConfig {
 
     assertTrue(subject.isDatastreamPutBlockWithoutRaftEnabled());
   }
+
+  @Test
+  void testNettyWarmUpEnabledByDefault() {
+    assertTrue(new OzoneConfiguration().getObject(OzoneClientConfig.class).isNettyWarmUpEnabled());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.client.netty.warmup.enabled", false);
+    assertFalse(conf.getObject(OzoneClientConfig.class).isNettyWarmUpEnabled());
+  }
 }

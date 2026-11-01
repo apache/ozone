@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collection;
@@ -283,9 +282,6 @@ public abstract class Handler {
   public void setClusterID(String clusterID) {
     this.clusterId = clusterID;
   }
-
-  public abstract RandomAccessFile getBlockFile(ContainerCommandRequestProto request)
-      throws IOException;
 
   /**
    * Copy container to the destination path.

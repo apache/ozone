@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODE_ID_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -35,6 +34,7 @@ import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ha.RetriableWithFailOverException;
 import org.apache.hadoop.hdds.scm.ha.RetriableWithNoFailoverException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ipc_.RetriableException;
@@ -79,11 +79,6 @@ class TestSCMHAUtils {
   }
 
   @Test
-  void retriesOnRetriableWithNoFailoverServerException() {
-    assertNotEquals(RetryDecision.FAIL, getRetryDecision(fromServer(RetriableWithNoFailoverException.class)));
-  }
-
-  @Test
   void failsOnRemoteException() {
     assertEquals(RetryDecision.FAIL, getRetryDecision(new RemoteException(IOException.class.getName(), "error")));
   }
@@ -91,6 +86,22 @@ class TestSCMHAUtils {
   @Test
   void failsOverOnConnectionFailure() {
     assertEquals(RetryDecision.FAILOVER_AND_RETRY, getRetryDecision(new ConnectException("Connection refused")));
+  }
+
+  @Test
+  void retriesSameScmOnRetriableWithNoFailoverException() {
+    Exception e = new ServiceException(new RemoteException(RetriableWithNoFailoverException.class.getName(),
+        "SCM leader is not ready"));
+    assertThat(SCMHAUtils.checkRetriableWithNoFailoverException(e)).isTrue();
+    RetryAction action = SCMHAUtils.getRetryAction(0, 0, e, 15, 2000);
+    assertEquals(RetryDecision.RETRY, action.action);
+    assertEquals(2000, action.delayMillis);
+    // Fails after max retries
+    assertEquals(RetryDecision.FAIL, SCMHAUtils.getRetryAction(0, 15, e, 15, 2000).action);
+
+    // Other exceptions are not matched
+    Exception other = new ServiceException(new RemoteException(IOException.class.getName(), "error"));
+    assertThat(SCMHAUtils.checkRetriableWithNoFailoverException(other)).isFalse();
   }
 
   private static Exception fromServer(Class<?> serverException) {
