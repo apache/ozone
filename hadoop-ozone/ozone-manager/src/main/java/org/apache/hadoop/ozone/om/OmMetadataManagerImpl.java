@@ -495,7 +495,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   protected void initializeOmTables(CacheType cacheType,
                                     boolean addCacheMetrics)
       throws IOException {
-    final TableInitializer initializer = new TableInitializer(addCacheMetrics);
+    final TableInitializer initializer = new TableInitializer(cacheType, addCacheMetrics);
 
     userTable = initializer.get(OMDBDefinition.USER_TABLE_DEF);
 
@@ -2116,9 +2116,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   private class TableInitializer {
+    private final CacheType cacheType;
     private final boolean addCacheMetrics;
 
-    TableInitializer(boolean addCacheMetrics) {
+    TableInitializer(CacheType cacheType, boolean addCacheMetrics) {
+      this.cacheType = cacheType;
       this.addCacheMetrics = addCacheMetrics;
     }
 
@@ -2127,9 +2129,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       return get(definition.getTable(store));
     }
 
-    <KEY, VALUE> Table<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType cacheType)
+    <KEY, VALUE> Table<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType tableCacheType)
         throws IOException {
-      return get(definition.getTable(store, cacheType));
+      // A FULL_CACHE table loads the whole table and starts a cleanup thread on every open, so a DB opened with
+      // PARTIAL_CACHE (snapshot and checkpoint DBs, which are opened and closed repeatedly) must not have one.
+      if (tableCacheType == CacheType.FULL_CACHE && cacheType != CacheType.FULL_CACHE) {
+        throw new IllegalArgumentException("Table " + definition.getName() + " must not use " + tableCacheType
+            + " in a DB opened with " + cacheType);
+      }
+      return get(definition.getTable(store, tableCacheType));
     }
 
     private <KEY, VALUE> Table<KEY, VALUE> get(Table<KEY, VALUE> table) {

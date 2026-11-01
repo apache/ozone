@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESH
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELEGATION_TOKEN_TABLE;
@@ -85,6 +86,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -1410,6 +1413,35 @@ public class TestOmMetadataManager {
 
     final Set<String> tablesInManager = omMetadataManager.listTableNames();
     assertEquals(tablesByDefinition, tablesInManager);
+  }
+
+  /**
+   * Snapshot and checkpoint DBs are opened and closed repeatedly, so opening and closing one must not leave any
+   * thread behind.
+   */
+  @Test
+  public void testSnapshotDbOpenLeaksNoThread() throws Exception {
+    final String snapshotDirName = SnapshotInfo.getCheckpointDirName(UUID.randomUUID(), 0);
+    ((RDBStore) omMetadataManager.getStore()).getSnapshot(snapshotDirName);
+    final DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
+    final int iterations = 10;
+
+    // Warm up, so that threads started once on first use are not counted.
+    openAndCloseSnapshotDbs(snapshotDirName, checkpoint);
+    final Set<Thread> before = Thread.getAllStackTraces().keySet();
+    for (int i = 0; i < iterations; i++) {
+      openAndCloseSnapshotDbs(snapshotDirName, checkpoint);
+    }
+
+    final Set<Thread> leaked = new HashSet<>(Thread.getAllStackTraces().keySet());
+    leaked.removeAll(before);
+    // Tolerate a few transient threads; a per-open leak adds at least one per iteration.
+    assertThat(leaked).hasSizeLessThan(iterations);
+  }
+
+  private void openAndCloseSnapshotDbs(String snapshotDirName, DBCheckpoint checkpoint) throws Exception {
+    new OmMetadataManagerImpl(ozoneConfiguration, snapshotDirName, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT).close();
+    OmMetadataManagerImpl.createCheckpointMetadataManager(ozoneConfiguration, checkpoint).close();
   }
 
   @Test
