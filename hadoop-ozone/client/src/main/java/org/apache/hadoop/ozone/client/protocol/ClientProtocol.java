@@ -1647,12 +1647,14 @@ public interface ClientProtocol {
    * @param toSnapshot The name of the ending snapshot
    * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @param orderedReport when true, FSO diff reports apply dependency ordering
    * @return the result of submitting snapshot diff job.
    * @throws IOException in case of any exception while generating snapshot diff
    */
   SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName, String bucketName,
                                                 String fromSnapshot, String toSnapshot,
-                                                boolean forceFullDiff, boolean disableNativeDiff)
+                                                boolean forceFullDiff, boolean disableNativeDiff,
+                                                boolean orderedReport)
       throws IOException;
 
   /**

@@ -1672,7 +1672,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             submitSnapshotDiffRequest.getFromSnapshot(),
             submitSnapshotDiffRequest.getToSnapshot(),
             submitSnapshotDiffRequest.getForceFullDiff(),
-            submitSnapshotDiffRequest.getDisableNativeDiff());
+            submitSnapshotDiffRequest.getDisableNativeDiff(),
+            submitSnapshotDiffRequest.getOrdered());
 
     SubmitSnapshotDiffResponse.Builder builder = SubmitSnapshotDiffResponse
         .newBuilder();
