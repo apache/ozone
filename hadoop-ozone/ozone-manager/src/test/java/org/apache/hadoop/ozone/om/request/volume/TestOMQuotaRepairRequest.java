@@ -196,6 +196,40 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
         .isEqualTo(QUOTA_RESET);
   }
 
+  @Test
+  public void testOldVolumeQuotaRepairRemovesBareVolumeNameRows() throws Exception {
+    // State left by an earlier repair: the volume key still holds the old quota, the converted copy sits under the
+    // bare name. The second bare row belongs to a volume deleted since.
+    String volumeKey = addOldQuotaVolume(true);
+    Table<String, OmVolumeArgs> volumeTable = omMetadataManager.getVolumeTable();
+    String volumeName = volumeTable.get(volumeKey).getVolume();
+    addBareVolumeNameRow(volumeName);
+    String deletedVolumeName = UUID.randomUUID().toString();
+    addBareVolumeNameRow(deletedVolumeName);
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setClientId("test-client")
+        .setCmdType(Type.QuotaRepair)
+        .setQuotaRepairRequest(QuotaRepairRequest.newBuilder()
+            .setSupportVolumeOldQuota(true)
+            .build())
+        .build();
+    OMClientResponse omClientResponse = new OMQuotaRepairRequest(omRequest).validateAndUpdateCache(ozoneManager, 2L);
+    assertThat(omClientResponse.getOMResponse().getStatus()).isEqualTo(Status.OK);
+
+    assertThat(volumeTable.get(volumeName)).isNull();
+    assertThat(volumeTable.get(deletedVolumeName)).isNull();
+    assertThat(volumeTable.get(volumeKey).getQuotaInNamespace()).isEqualTo(QUOTA_RESET);
+
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    ((OMQuotaRepairResponse) omClientResponse).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    assertThat(volumeTable.getSkipCache(volumeName)).isNull();
+    assertThat(volumeTable.getSkipCache(deletedVolumeName)).isNull();
+    assertThat(volumeTable.getSkipCache(volumeKey).getQuotaInNamespace()).isEqualTo(QUOTA_RESET);
+  }
+
   /** Adds a volume as written by a release without namespace quota to the table cache, and to RocksDB if flushed. */
   private String addOldQuotaVolume(boolean flushed) throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -213,5 +247,17 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
       omMetadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey), CacheValue.get(1L, volumeArgs));
     }
     return volumeKey;
+  }
+
+  /** Adds a converted volume under its bare name to RocksDB and the table cache, as an earlier repair left it. */
+  private void addBareVolumeNameRow(String volumeName) throws Exception {
+    OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
+        .setVolume(volumeName)
+        .setAdminName("admin")
+        .setOwnerName("owner")
+        .setCreationTime(Time.now())
+        .build();
+    omMetadataManager.getVolumeTable().put(volumeName, volumeArgs);
+    omMetadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeName), CacheValue.get(1L, volumeArgs));
   }
 }

@@ -23,9 +23,11 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
@@ -86,14 +88,15 @@ public class OMQuotaRepairRequest extends OMClientRequest {
         updateBucketInfo(omMetadataManager, bucketCountInfo, transactionLogIndex, bucketMap);
       }
       Map<String, OmVolumeArgs> volUpdateMap;
+      List<String> bareVolumeNameKeys = new ArrayList<>();
       if (quotaRepairRequest.getSupportVolumeOldQuota()) {
-        volUpdateMap = updateOldVolumeQuotaSupport(omMetadataManager, transactionLogIndex);
+        volUpdateMap = updateOldVolumeQuotaSupport(omMetadataManager, transactionLogIndex, bareVolumeNameKeys);
       } else {
         volUpdateMap = Collections.emptyMap();
       }
       omResponse.setQuotaRepairResponse(
           OzoneManagerProtocolProtos.QuotaRepairResponse.newBuilder().build());
-      omClientResponse = new OMQuotaRepairResponse(omResponse.build(), volUpdateMap, bucketMap);
+      omClientResponse = new OMQuotaRepairResponse(omResponse.build(), volUpdateMap, bucketMap, bareVolumeNameKeys);
     } catch (IOException ex) {
       LOG.error("failed to update repair count", ex);
       omClientResponse = new OMQuotaRepairResponse(createErrorOMResponse(omResponse, ex));
@@ -170,7 +173,8 @@ public class OMQuotaRepairRequest extends OMClientRequest {
   }
 
   private Map<String, OmVolumeArgs> updateOldVolumeQuotaSupport(
-      OMMetadataManager metadataManager, long transactionLogIndex) throws IOException {
+      OMMetadataManager metadataManager, long transactionLogIndex, List<String> bareVolumeNameKeys)
+      throws IOException {
     LOG.info("Starting volume quota support update");
     Map<String, OmVolumeArgs> volUpdateMap = new HashMap<>();
     // The volume table is fully cached; iterate the cache to see volume changes not flushed yet.
@@ -179,7 +183,17 @@ public class OMQuotaRepairRequest extends OMClientRequest {
       Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry = iterator.next();
       String volumeKey = entry.getKey().getCacheKey();
       OmVolumeArgs omVolumeArgs = entry.getValue().getCacheValue();
-      if (omVolumeArgs == null || !(omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT
+      if (omVolumeArgs == null) {
+        continue;
+      }
+      // Repairs before HDDS-17240 wrote the converted volume under its bare name instead of its volume key.
+      if (volumeKey.equals(omVolumeArgs.getVolume())) {
+        metadataManager.getVolumeTable().addCacheEntry(
+            new CacheKey<>(volumeKey), CacheValue.get(transactionLogIndex));
+        bareVolumeNameKeys.add(volumeKey);
+        continue;
+      }
+      if (!(omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT
           || omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT)) {
         continue;
       }
@@ -213,7 +227,8 @@ public class OMQuotaRepairRequest extends OMClientRequest {
         }
       }
     }
-    LOG.info("Completed volume quota support update for volume count {}", volUpdateMap.size());
+    LOG.info("Completed volume quota support update for volume count {}, removed {} rows under the bare volume name",
+        volUpdateMap.size(), bareVolumeNameKeys.size());
     return volUpdateMap;
   }
 }
