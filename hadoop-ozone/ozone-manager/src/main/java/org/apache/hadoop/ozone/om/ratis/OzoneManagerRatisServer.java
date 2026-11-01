@@ -91,6 +91,7 @@ import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.exceptions.ReadException;
 import org.apache.ratis.protocol.exceptions.ReadIndexException;
+import org.apache.ratis.protocol.exceptions.ReconfigurationInProgressException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -326,10 +327,12 @@ public final class OzoneManagerRatisServer {
     List<RaftPeer> newPeersList = new ArrayList<>(getPeers(RaftPeerRole.FOLLOWER));
     List<RaftPeer> newListenerList = new ArrayList<>(getPeers(RaftPeerRole.LISTENER));
 
-    if (newOMNode.isRatisListener()) {
-      newListenerList.add(newRaftPeer);
-    } else {
-      newPeersList.add(newRaftPeer);
+    List<RaftPeer> targetPeers = newOMNode.isRatisListener() ? newListenerList : newPeersList;
+    boolean alreadyPresent = targetPeers.stream()
+        .anyMatch(peer -> peer.getId().equals(newRaftPeer.getId()));
+
+    if (!alreadyPresent) {
+      targetPeers.add(newRaftPeer);
     }
 
     updateRatisConfiguration(newPeersList, newListenerList, "add", newOMNodeId);
@@ -405,15 +408,27 @@ public final class OzoneManagerRatisServer {
     SetConfigurationRequest request = new SetConfigurationRequest(clientId,
         server.getId(), raftGroupId, nextCallId(), followers, listeners);
 
-    RaftClientReply raftClientReply = server.setConfiguration(request);
-    if (raftClientReply.isSuccess()) {
+    try {
+      RaftClientReply raftClientReply = server.setConfiguration(request);
+      if (!raftClientReply.isSuccess()) {
+        // Allow bootstrap to retry after leadership loss.
+        NotLeaderException ex = raftClientReply.getNotLeaderException();
+        if (ex != null) {
+          throw OMNotLeaderException.convertToOMNotLeaderException(
+              ex, getRaftPeerId()
+          );
+        }
+
+        LOG.error("Failed to {} OM {} in Ratis group {}. Ratis " +
+                "SetConfiguration reply: {}", operation.toLowerCase(), nodeId, raftGroupId,
+            raftClientReply);
+        throw new IOException("Failed to " + operation.toLowerCase() + " OM " + nodeId + " in " +
+            "Ratis ring.");
+      }
+
       LOG.info("{} OM {} in Ratis group {}.", operation, nodeId, raftGroupId);
-    } else {
-      LOG.error("Failed to {} OM {} in Ratis group {}. Ratis " +
-              "SetConfiguration reply: {}", operation.toLowerCase(), nodeId, raftGroupId,
-          raftClientReply);
-      throw new IOException("Failed to " + operation.toLowerCase() + " OM " + nodeId + " in " +
-          "Ratis ring.");
+    }  catch (ReconfigurationInProgressException ex) {
+      throw new OMLeaderNotReadyException(ex.getMessage());
     }
   }
 
