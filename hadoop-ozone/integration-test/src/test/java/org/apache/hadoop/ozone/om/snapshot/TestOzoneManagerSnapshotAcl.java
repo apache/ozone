@@ -39,7 +39,6 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -63,6 +62,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -546,7 +546,7 @@ public class TestOzoneManagerSnapshotAcl {
               snapshot1, snapshot2, null, 0, false, false);
     objectStore2.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
     objectStore2.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
-    objectStore2.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2, false, false);
+    objectStore2.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2, false, false, false);
     objectStore2.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10);
 
     // user3 has no ACL permissions, should not be able to list the snapshots, get snapshot info,
@@ -589,7 +589,7 @@ public class TestOzoneManagerSnapshotAcl {
     assertPermissionDenied(() -> objectStore3.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
         null, 0, false, false));
     assertPermissionDenied(() -> objectStore3.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
-        false, false));
+        false, false, false));
     assertPermissionDenied(() -> objectStore3.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10));
     assertPermissionDenied(() -> objectStore3.listSnapshot(volumeName, bucketName, null, null).hasNext());
     assertPermissionDenied(() -> objectStore3.listSnapshotDiffJobs(volumeName, bucketName, "", true, null));
@@ -605,7 +605,7 @@ public class TestOzoneManagerSnapshotAcl {
     assertPermissionDenied(() -> objectStore3.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
         null, 0, false, false));
     assertPermissionDenied(() -> objectStore3.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
-        false, false));
+        false, false, false));
     assertPermissionDenied(() -> objectStore3.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10));
   }
 

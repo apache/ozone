@@ -1214,11 +1214,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-docs</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-erasurecode</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -2971,7 +2966,6 @@
         <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodepnpm>true</skip.installnodepnpm>
         <skip.pnpm>true</skip.pnpm>
-        <skipDocs>true</skipDocs>
         <test>void</test>
       </properties>
     </profile>
@@ -3139,23 +3133,6 @@
                 <!-- default excludes -->
                 <exclude>**/*$*</exclude>
               </excludes>
-              <excludedGroups>${unstable-test-groups}</excludedGroups>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>test-recon</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <includes>
-                <include>org.apache.hadoop.ozone.recon.**</include>
-              </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>
