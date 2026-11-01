@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -192,7 +193,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
                 .getStreamBufferFlushSize());
 
     // A single thread executor handle the responses of async requests
-    responseExecutor = Executors.newSingleThreadExecutor();
+    responseExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+        .setNameFormat("BlockDataStreamOutput-response-%d").setDaemon(true).build());
     commitWatcher = new StreamCommitWatcher(xceiverClient, bufferList);
     totalDataFlushedLength = 0;
     writtenDataLength = 0;

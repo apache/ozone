@@ -84,9 +84,10 @@ public class TestObjectTaggingGet {
 
     getTagging(endpoint, BUCKET_NAME, KEY_WITH_TAG);
 
+    verify(volume, never()).getName();
     verify(volume, never()).getBucket(anyString());
     verify(protocol, never()).getBucketDetails(anyString(), anyString());
-    verify(protocol).getObjectTagging("s3Volume", BUCKET_NAME, KEY_WITH_TAG);
+    verify(protocol).getObjectTagging(null, BUCKET_NAME, KEY_WITH_TAG);
   }
 
   @Test

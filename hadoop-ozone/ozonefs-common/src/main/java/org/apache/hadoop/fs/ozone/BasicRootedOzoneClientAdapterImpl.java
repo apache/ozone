@@ -1253,13 +1253,13 @@ public class BasicRootedOzoneClientAdapterImpl
 
     OmKeyLocationInfoGroup omKeyLocationInfoGroup =
         keyInfo.getLatestVersionLocations();
-    BlockLocation[] blockLocations = new BlockLocation[
-        omKeyLocationInfoGroup.getBlocksLatestVersionOnly().size()];
+    List<OmKeyLocationInfo> blocks =
+        omKeyLocationInfoGroup.getBlocksLatestVersionOnly();
+    BlockLocation[] blockLocations = new BlockLocation[blocks.size()];
 
     int i = 0;
     long offsetOfBlockInFile = 0L;
-    for (OmKeyLocationInfo omKeyLocationInfo :
-        omKeyLocationInfoGroup.getBlocksLatestVersionOnly()) {
+    for (OmKeyLocationInfo omKeyLocationInfo : blocks) {
       List<String> hostList = new ArrayList<>();
       List<String> nameList = new ArrayList<>();
       omKeyLocationInfo.getPipeline().getNodes()

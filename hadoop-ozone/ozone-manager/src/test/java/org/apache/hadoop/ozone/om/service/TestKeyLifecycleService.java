@@ -668,7 +668,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertNotNull(scanState);
       assertNull(scanState.getScanEndTime(),
           "Aborted scan must not persist scanEndTime so a new leader can resume");
-      assertTrue(logCapturer.getOutput().contains("KeyLifecycleService is suspended, disabled, or leader not ready"));
+      assertTrue(logCapturer.getOutput()
+          .contains("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart"));
       keyLifecycleService.resume();
       deleteLifecyclePolicy(volumeName, bucketName);
     }

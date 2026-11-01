@@ -316,7 +316,7 @@ public final class DBStoreBuilder {
    */
   public DBStoreBuilder setProfile(DBProfile prof) {
     setDBOptions(prof.getDBOptions());
-    setDefaultCFOptions(prof.getColumnFamilyOptions());
+    setDefaultCFOptions(prof.getColumnFamilyOptions(rocksDBConfiguration.getCompactionDeletionRatio()));
     return this;
   }
 
@@ -359,7 +359,7 @@ public final class DBStoreBuilder {
 
   private ManagedColumnFamilyOptions getDefaultCfOptions() {
     return Optional.ofNullable(defaultCfOptions)
-        .orElseGet(defaultCfProfile::getColumnFamilyOptions);
+        .orElseGet(() -> defaultCfProfile.getColumnFamilyOptions(rocksDBConfiguration.getCompactionDeletionRatio()));
   }
 
   private ManagedColumnFamilyOptions getFromFileOrDefault(String cfName) {
