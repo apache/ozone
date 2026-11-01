@@ -175,8 +175,8 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       // actions the derived data already has, so start from the initial version to run all of them.
       ReconVersion newSqlDbVersion = existingInstall ? ReconVersion.INITIAL_VERSION : ReconVersion.SOFTWARE_VERSION;
       reconSchemaManager.createReconSchema(newSqlDbVersion);
-      File legacyDerbyDb = new File(injector.getInstance(ReconUtils.class).getReconDbDir(configuration,
-          OZONE_RECON_DB_DIR), ReconSqlDbConfig.LEGACY_DERBY_DB_NAME);
+      File legacyDerbyDb = new File(injector.getInstance(ReconUtils.class).getReconDbDir(
+          injector.getInstance(OzoneConfiguration.class), OZONE_RECON_DB_DIR), ReconSqlDbConfig.LEGACY_DERBY_DB_NAME);
       if (legacyDerbyDb.exists()) {
         LOG.info("Recon now uses SQLite. {} is no longer used and can be deleted.", legacyDerbyDb);
       }
