@@ -113,6 +113,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1717,5 +1718,28 @@ public class TestOmMetadataManager {
         .map(OmKeyInfo::getKeyName)
         .collect(Collectors.toList());
     assertEquals(Collections.singletonList(newlinePrefixed), newlinePrefixMatches);
+  }
+
+  @Test
+  public void testStopShutsDownTableCacheThreads() throws Exception {
+    omMetadataManager.stop();
+    Set<Thread> otherThreads = tableCacheThreads();
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    // A cleanup starts the thread of a partial table cache, full table caches start theirs when created.
+    omMetadataManager.getKeyTable(BucketLayout.DEFAULT).cleanupCache(Collections.singletonList(1L));
+    Set<Thread> threads = tableCacheThreads();
+    threads.removeAll(otherThreads);
+    assertThat(threads).extracting(Thread::getName)
+        .anyMatch(name -> name.contains("FullTableCache-Cleanup"))
+        .anyMatch(name -> name.contains("PartialTableCache-Cleanup"));
+
+    omMetadataManager.stop();
+    GenericTestUtils.waitFor(() -> threads.stream().noneMatch(Thread::isAlive), 100, 10_000);
+  }
+
+  private static Set<Thread> tableCacheThreads() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .filter(t -> t.getName().contains("TableCache-Cleanup"))
+        .collect(Collectors.toSet());
   }
 }

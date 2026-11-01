@@ -30,6 +30,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -119,6 +122,7 @@ public class TestReconOmMetadataManagerImpl {
 
     //Before accepting a snapshot, the metadata should have null tables.
     assertNull(reconOMMetadataManager.getBucketTable());
+    Set<Thread> otherThreads = fullTableCacheThreads();
 
     //Update Recon OM DB with the OM DB checkpoint location.
     reconOMMetadataManager.updateOmDB(
@@ -145,10 +149,21 @@ public class TestReconOmMetadataManagerImpl {
     assertNotNull(newCheckpoint.getCheckpointLocation());
     // Update again with an existing OM DB.
     DBStore current = reconOMMetadataManager.getStore();
+    Set<Thread> replacedThreads = fullTableCacheThreads();
+    replacedThreads.removeAll(otherThreads);
+    assertThat(replacedThreads).isNotEmpty();
     reconOMMetadataManager.updateOmDB(
         newCheckpoint.getCheckpointLocation().toFile(), true);
     // Verify that the existing DB instance is closed.
     assertTrue(current.isClosed());
+    // The caches of the replaced tables stop their cleanup threads.
+    GenericTestUtils.waitFor(() -> replacedThreads.stream().noneMatch(Thread::isAlive), 100, 10_000);
+  }
+
+  private static Set<Thread> fullTableCacheThreads() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .filter(t -> t.getName().contains("FullTableCache-Cleanup"))
+        .collect(Collectors.toSet());
   }
 
   @Test
