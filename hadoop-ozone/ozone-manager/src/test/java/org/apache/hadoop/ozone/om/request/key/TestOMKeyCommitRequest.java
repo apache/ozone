@@ -607,7 +607,8 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     // The key has not been overwritten, so the writer A can still hsync it.
     clientID = hsyncClientID;
-    OMKeyCommitRequest hsyncRequest = getOmKeyCommitRequest(doPreExecute(createCommitKeyRequest(allocatedKeyLocationList, true)));
+    OMKeyCommitRequest hsyncRequest =
+        getOmKeyCommitRequest(doPreExecute(createCommitKeyRequest(allocatedKeyLocationList, true)));
     assertEquals(OK, hsyncRequest.validateAndUpdateCache(ozoneManager, 102L).getOMResponse().getStatus());
   }
 

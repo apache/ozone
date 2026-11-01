@@ -286,8 +286,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             .setUpdateID(trxnLogIndex)
             .build();
         openKeyToDelete.setModificationTime(Time.now());
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-            dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
@@ -382,6 +380,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omBucketInfo.getObjectID(), pseudoKeyInfo, oldKeyVersionsToDeleteMap);
 
       // Add to cache of open key table and key table.
+      if (isOverwrittenHsyncKey) {
+        // Flag the overwritten open key only now that the commit can no longer be rejected.
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+            dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
+      }
       if (!isHSync) {
         // If !isHSync = true, put a tombstone in OpenKeyTable cache,
         // indicating the key is removed from OpenKeyTable.

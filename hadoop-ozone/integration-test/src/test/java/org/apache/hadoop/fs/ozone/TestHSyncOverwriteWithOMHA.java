@@ -56,8 +56,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests hsync and a rejected overwrite commit in OM HA setup.
  *
- * <p>HDDS-16765: a rejected overwrite commit leaves OVERWRITTEN_HSYNC_KEY on another writer's open
- * entry in the open file table cache until the double buffer flushes and evicts that epoch.
+ * <p>HDDS-16765: a rejected overwrite commit used to leave OVERWRITTEN_HSYNC_KEY on another writer's
+ * open entry in the open file table cache until the double buffer flushed and evicted that epoch.
  *
  * <p>Client sequence (FileSystem API only), bucket namespace quota = 2:
  * <pre>
@@ -69,7 +69,8 @@ import org.junit.jupiter.api.Test;
  * </pre>
  *
  * <p>The same sequence is run in four situations, and each asserts the same outcome: writer A keeps
- * its own stream writable and every OM ends up holding what A committed. What they show today:
+ * its own stream writable and every OM ends up holding what A committed. What they showed before
+ * the fix:
  * <pre>
  *   no flush lag, repeated rounds -&gt; the window is not hit on timing alone
  *   every OM flushed beforehand   -&gt; passes cleanly
@@ -136,8 +137,7 @@ public class TestHSyncOverwriteWithOMHA {
 
   /**
    * Control: every OM has flushed and evicted the open file table cache entry the rejected commit
-   * flagged before writer A continues, so no OM can serve A from a stale cached entry. Passes
-   * cleanly.
+   * flagged before the fix, so even then no OM could serve writer A from a stale cached entry.
    */
   @Test
   public void testRejectedOverwriteAfterAllOMsFlushed() throws Exception {
@@ -145,10 +145,10 @@ public class TestHSyncOverwriteWithOMHA {
   }
 
   /**
-   * One follower's double buffer flush is held, so that follower is the only OM left holding the
-   * cached open entry the rejected commit flagged. Writer A talks to the leader, which has already
-   * evicted the entry, so A sees its writes succeed while the lagging follower rejects them and
-   * its RocksDB diverges from the other two.
+   * One follower's double buffer flush is held, so before the fix that follower was the only OM left
+   * holding the cached open entry the rejected commit flagged. Writer A talks to the leader, which
+   * has already evicted the entry, so A saw its writes succeed while the lagging follower rejected
+   * them and its RocksDB diverged from the other two.
    */
   @Test
   public void testRejectedOverwriteWhileFollowerFlushLags() throws Exception {
@@ -156,9 +156,9 @@ public class TestHSyncOverwriteWithOMHA {
   }
 
   /**
-   * The leader's double buffer flush is held instead. Writer A's own commit now goes to the OM
-   * still holding the flagged cached entry, so A's close is rejected as overwritten even though
-   * the followers applied its earlier writes.
+   * The leader's double buffer flush is held instead. Writer A's own commit now goes to the OM that
+   * before the fix still held the flagged cached entry, so A's close was rejected as overwritten
+   * even though the followers had applied its earlier writes.
    */
   @Test
   public void testRejectedOverwriteWhileLeaderFlushLags() throws Exception {
