@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
@@ -187,7 +188,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
         continue;
       }
       // Repairs before HDDS-17240 wrote the converted volume under its bare name instead of its volume key.
-      if (volumeKey.equals(omVolumeArgs.getVolume())) {
+      if (!volumeKey.startsWith(OM_KEY_PREFIX) && volumeKey.equals(omVolumeArgs.getVolume())) {
         metadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(volumeKey), CacheValue.get(transactionLogIndex));
         bareVolumeNameKeys.add(volumeKey);

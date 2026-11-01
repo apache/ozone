@@ -206,6 +206,10 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
     addBareVolumeNameRow(volumeName);
     String deletedVolumeName = UUID.randomUUID().toString();
     addBareVolumeNameRow(deletedVolumeName);
+    // Has the shape of a volume key, so it is not treated as a bare-name row.
+    String slashPrefixedName = omMetadataManager.getVolumeKey(UUID.randomUUID().toString());
+    addBareVolumeNameRow(slashPrefixedName);
+    assertThat(omMetadataManager.listVolumes(null, volumeName, null, 10)).hasSize(2);
 
     OMRequest omRequest = OMRequest.newBuilder()
         .setClientId("test-client")
@@ -219,7 +223,9 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
 
     assertThat(volumeTable.get(volumeName)).isNull();
     assertThat(volumeTable.get(deletedVolumeName)).isNull();
+    assertThat(volumeTable.get(slashPrefixedName)).isNotNull();
     assertThat(volumeTable.get(volumeKey).getQuotaInNamespace()).isEqualTo(QUOTA_RESET);
+    assertThat(omMetadataManager.listVolumes(null, volumeName, null, 10)).hasSize(1);
 
     BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
     ((OMQuotaRepairResponse) omClientResponse).addToDBBatch(omMetadataManager, batchOperation);
@@ -227,6 +233,7 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
 
     assertThat(volumeTable.getSkipCache(volumeName)).isNull();
     assertThat(volumeTable.getSkipCache(deletedVolumeName)).isNull();
+    assertThat(volumeTable.getSkipCache(slashPrefixedName)).isNotNull();
     assertThat(volumeTable.getSkipCache(volumeKey).getQuotaInNamespace()).isEqualTo(QUOTA_RESET);
   }
 
