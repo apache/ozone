@@ -159,6 +159,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return keyArgs;
   }
 
+  protected KeyArgs resolveBucketLinkForAudit(OzoneManager ozoneManager,
+      KeyArgs keyArgs) {
+    try {
+      return resolveBucketLink(ozoneManager, keyArgs);
+    } catch (IOException e) {
+      return keyArgs;
+    }
+  }
+
   protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
       OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
       throws IOException {

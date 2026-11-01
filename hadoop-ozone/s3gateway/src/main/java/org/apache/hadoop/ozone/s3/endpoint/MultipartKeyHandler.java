@@ -78,7 +78,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     final String uploadId = queryParams().get(QueryParams.UPLOAD_ID);
-    if (StringUtils.isEmpty(uploadId)) {
+    if (uploadId == null) {
       // not MPU -> let next handler run
       return null;
     }
@@ -86,6 +86,11 @@ class MultipartKeyHandler extends ObjectOperationHandler {
     context.setAction(S3GAction.ABORT_MULTIPART_UPLOAD);
 
     try {
+      if (uploadId.isEmpty()) {
+        // An empty uploadId names no upload. Letting the next handler run would turn this abort into a delete of the
+        // committed key.
+        throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId);
+      }
       Response r = abortMultipartUpload(context.getBucketName(), keyPath, uploadId);
 
       getMetrics().updateAbortMultipartUploadSuccessStats(context.getStartNanos());

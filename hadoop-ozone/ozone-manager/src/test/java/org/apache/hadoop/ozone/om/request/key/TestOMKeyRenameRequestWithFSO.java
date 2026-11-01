@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -363,6 +365,19 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   @Override
   protected OMKeyRenameRequest getOMKeyRenameRequest(OMRequest omRequest) {
     return new OMKeyRenameRequestWithFSO(omRequest, getBucketLayout());
+  }
+
+  @Override
+  protected OMKeyRenameRequest createDeniedRenameRequest() {
+    return new OMKeyRenameRequestWithFSO(
+        createRenameKeyRequest(volumeName, bucketName, fromKeyName, toKeyName),
+        getBucketLayout()) {
+      @Override
+      protected void checkACLsWithFSO(OzoneManager ozoneManager, String volumeName,
+          String bucketName, String keyName, IAccessAuthorizer.ACLType aclType) throws IOException {
+        throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
   }
 
   @Override
