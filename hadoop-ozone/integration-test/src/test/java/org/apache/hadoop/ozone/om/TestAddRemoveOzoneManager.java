@@ -694,6 +694,8 @@ public class TestAddRemoveOzoneManager {
 
     // Keep the new OM alive during the forced election.
     cluster.getConf().setTimeDuration(OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY, 60, TimeUnit.SECONDS);
+    cluster.getConf().setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
     String appendEntries = "RaftServerImpl.appendEntries";
     AtomicBoolean newOMWasSentChange = new AtomicBoolean();
