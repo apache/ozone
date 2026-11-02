@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -182,7 +183,9 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volume);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, this.volume);
     auditMap.put(OzoneConsts.BUCKET, this.bucket);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, this.bucket);
     if (this.bucketObjectID != null) {
       auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.bucketObjectID));
     }

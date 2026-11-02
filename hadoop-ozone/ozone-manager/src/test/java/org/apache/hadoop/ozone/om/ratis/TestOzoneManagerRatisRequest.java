@@ -38,11 +38,13 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -131,6 +133,38 @@ public class TestOzoneManagerRatisRequest {
       }
 
       collector.assertAttribute("request", OmTracingAttributes.OM_BUCKET_LAYOUT, "FILE_SYSTEM_OPTIMIZED");
+    }
+  }
+
+  @Test
+  public void testKeyArgsAuditFieldsAreRecordedOnSpan() {
+    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade)
+        .setClientId("test-client-id")
+        .build();
+    OzoneManagerProtocolProtos.KeyArgs keyArgs = OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+        .setVolumeName("vol1")
+        .setBucketName("bucket1")
+        .setKeyName("key1")
+        .setDataSize(1024)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .build();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        new OMStartFinalizeUpgradeRequest(omRequest).buildKeyArgsAuditMap(keyArgs);
+      } finally {
+        span.end();
+      }
+
+      collector.assertAttribute("request", OzoneConsts.VOLUME, "vol1");
+      collector.assertAttribute("request", OzoneConsts.BUCKET, "bucket1");
+      collector.assertAttribute("request", OzoneConsts.KEY, "key1");
+      collector.assertAttribute("request", OzoneConsts.DATA_SIZE, 1024L);
+      collector.assertAttribute("request", OzoneConsts.REPLICATION_TYPE, "RATIS");
+      collector.assertAttribute("request", OzoneConsts.REPLICATION_FACTOR, "THREE");
     }
   }
 

@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Iterator;
 import java.util.Map;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -93,6 +94,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     Map<String, String> auditMap = buildVolumeAuditMap(volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, bucketName);
 
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     Exception exception = null;

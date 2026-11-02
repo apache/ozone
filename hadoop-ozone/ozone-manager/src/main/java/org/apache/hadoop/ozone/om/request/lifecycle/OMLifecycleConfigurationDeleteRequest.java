@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -111,6 +112,7 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     Map<String, String> auditMap = buildVolumeAuditMap(volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, bucketName);
 
     UserInfo userInfo = getOmRequest().getUserInfo();
     IOException exception = null;

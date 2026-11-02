@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -566,8 +567,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, getVolumeName());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, getVolumeName());
     auditMap.put(OzoneConsts.BUCKET, getBucketName());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, getBucketName());
     auditMap.put(OzoneConsts.OM_SNAPSHOT_NAME, this.name);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.OM_SNAPSHOT_NAME, this.name);
     return auditMap;
   }
 

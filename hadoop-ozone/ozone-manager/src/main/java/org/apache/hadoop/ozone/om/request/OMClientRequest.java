@@ -589,6 +589,7 @@ public abstract class OMClientRequest implements IOMClientRequest {
   public Map<String, String> buildVolumeAuditMap(String volume) {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volume);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, volume);
     return auditMap;
   }
 

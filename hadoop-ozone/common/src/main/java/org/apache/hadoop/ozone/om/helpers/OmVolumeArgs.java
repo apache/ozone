@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import net.jcip.annotations.Immutable;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -373,6 +374,7 @@ public final class OmVolumeArgs extends WithObjectID
       auditMap.put(OzoneConsts.ADMIN, this.adminName);
       auditMap.put(OzoneConsts.OWNER, this.ownerName);
       auditMap.put(OzoneConsts.VOLUME, this.volume);
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, this.volume);
       auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
       auditMap.put(OzoneConsts.MODIFICATION_TIME,
           String.valueOf(this.modificationTime));

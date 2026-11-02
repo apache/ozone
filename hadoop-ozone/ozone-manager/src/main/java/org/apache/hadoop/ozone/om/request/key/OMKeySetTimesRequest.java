@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -88,8 +89,11 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
         // Ensure audit log captures preExecute failures
         Map<String, String> auditMap = new LinkedHashMap<>();
         auditMap.put(OzoneConsts.VOLUME, newKeyArgs.getVolumeName());
+        TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, newKeyArgs.getVolumeName());
         auditMap.put(OzoneConsts.BUCKET, newKeyArgs.getBucketName());
+        TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, newKeyArgs.getBucketName());
         auditMap.put(OzoneConsts.KEY, newKeyArgs.getKeyName());
+        TracingUtil.addAttributesToCurrentSpan(OzoneConsts.KEY, newKeyArgs.getKeyName());
         auditMap.put(OzoneConsts.MODIFICATION_TIME,
             String.valueOf(getModificationTime()));
         markForAudit(ozoneManager.getAuditLogger(),
@@ -174,8 +178,11 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     }
 
     auditMap.put(OzoneConsts.VOLUME, getVolumeName());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, getVolumeName());
     auditMap.put(OzoneConsts.BUCKET, getBucketName());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, getBucketName());
     auditMap.put(OzoneConsts.KEY, getKeyName());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.KEY, getKeyName());
     auditMap.put(OzoneConsts.MODIFICATION_TIME,
         String.valueOf(getModificationTime()));
     markForAudit(auditLogger, buildAuditMessage(OMAction.SET_TIMES, auditMap,
