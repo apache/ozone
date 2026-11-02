@@ -26,6 +26,8 @@ import java.io.PrintStream;
 import java.util.Arrays;
 import org.apache.hadoop.fs.shell.Command;
 import org.apache.hadoop.fs.shell.CommandFactory;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.ToolRunner;
 import org.junit.jupiter.api.Test;
 
@@ -61,6 +63,44 @@ public class TestOzoneFsShell {
     } finally {
       shell.close();
       System.setErr(oldErr);
+    }
+  }
+
+  @Test
+  public void testParseCommandNameIsCommandWithoutArguments() {
+    assertEquals("ozone fs -ls", OzoneFsShell.parseCommandName(new String[] {"-ls", "-R", "/vol1/bucket1"}));
+    assertEquals("ozone fs -put",
+        OzoneFsShell.parseCommandName(new String[] {"-D", "ozone.om.address=om1", "-put", "/tmp/a", "/vol1/b/a"}));
+    assertEquals("ozone fs", OzoneFsShell.parseCommandName(new String[0]));
+  }
+
+  @Test
+  public void testCommandAttributesHaveOptionsAndArgs() {
+    String[] argv = {"-fs", "ofs://om1", "-put", "-f", "/tmp/a", "/vol1/bucket1/a"};
+
+    try (TestSpanCollector collector = TestSpanCollector.install("FsShell")) {
+      TracingUtil.executeInNewSpan("request", () -> OzoneFsShell.addCommandAttributes(argv));
+
+      collector.assertAttribute("request", FsShellTracingAttributes.CLI_COMMAND, "ozone fs -put");
+      collector.assertAttribute("request", FsShellTracingAttributes.CLI_OPTION_PREFIX + "-fs", "ofs://om1");
+      collector.assertAttribute("request", FsShellTracingAttributes.CLI_OPTION_PREFIX + "-f", true);
+      collector.assertAttribute("request", FsShellTracingAttributes.CLI_ARGS, "/tmp/a /vol1/bucket1/a");
+    }
+  }
+
+  @Test
+  public void testRedactedOptionsAreNotAdded() {
+    String[] argv = {"-D", "fs.s3a.secret.key=mySecret", "-Dozone.om.address=om1", "-tokenCacheFile", "/tmp/tokens",
+        "-ls", "/vol1"};
+
+    try (TestSpanCollector collector = TestSpanCollector.install("FsShell")) {
+      TracingUtil.executeInNewSpan("request", () -> OzoneFsShell.addCommandAttributes(argv));
+
+      collector.assertAttribute("request", FsShellTracingAttributes.CLI_COMMAND, "ozone fs -ls");
+      collector.assertNoAttribute("request", FsShellTracingAttributes.CLI_OPTION_PREFIX + "-D");
+      collector.assertNoAttribute("request", FsShellTracingAttributes.CLI_OPTION_PREFIX + "-Dozone.om.address=om1");
+      collector.assertNoAttribute("request", FsShellTracingAttributes.CLI_OPTION_PREFIX + "-tokenCacheFile");
+      collector.assertAttribute("request", FsShellTracingAttributes.CLI_ARGS, "/vol1");
     }
   }
 }
