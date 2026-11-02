@@ -556,7 +556,7 @@ public class KeyManagerImpl implements KeyManager {
     Objects.requireNonNull(args, "args == null");
 
     OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
-        () -> readKeyInfo(args, bucket.bucketLayout()));
+        () -> TracingUtil.executeInNewSpan("OM.readKeyInfo", () -> readKeyInfo(args, bucket.bucketLayout())));
 
     // If operation is head, do not perform any additional steps based on flags.
     // As head operation does not need any of those details.
@@ -570,10 +570,10 @@ public class KeyManagerImpl implements KeyManager {
       // based on OmKeyArgs.refreshPipeline flag
       // value won't be null as the check is done inside try/catch block.
       captureLatencyNs(metrics.getLookupRefreshLocationLatencyNs(),
-          () -> refresh(value));
+          () -> TracingUtil.executeInNewSpan("OM.refreshPipeline", () -> refresh(value)));
 
       if (args.getSortDatanodes()) {
-        sortDatanodes(clientAddress, value);
+        TracingUtil.executeInNewSpan("OM.sortDatanodes", () -> sortDatanodes(clientAddress, value));
       }
     }
 
@@ -2218,7 +2218,7 @@ public class KeyManagerImpl implements KeyManager {
       }
 
       final String ezKeyName = ezInfo.getKeyName();
-      EncryptedKeyVersion edek = generateEDEK(ezKeyName);
+      EncryptedKeyVersion edek = TracingUtil.executeInNewSpan("OM.key.generateEDEK", () -> generateEDEK(ezKeyName));
       encInfo = new FileEncryptionInfo(ezInfo.getSuite(), ezInfo.getVersion(),
           edek.getEncryptedKeyVersion().getMaterial(),
           edek.getEncryptedKeyIv(),
@@ -2482,7 +2482,7 @@ public class KeyManagerImpl implements KeyManager {
 
     OmKeyInfo value = captureLatencyNs(
         metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
-        () -> readKeyInfo(args, bucket.bucketLayout()));
+        () -> TracingUtil.executeInNewSpan("OM.readKeyInfo", () -> readKeyInfo(args, bucket.bucketLayout())));
 
     // If operation is head, do not perform any additional steps based on flags.
     // As head operation does not need any of those details.
@@ -2494,12 +2494,12 @@ public class KeyManagerImpl implements KeyManager {
 
       // get container pipeline info from cache.
       captureLatencyNs(metrics.getGetKeyInfoRefreshLocationLatencyNs(),
-          () -> refreshPipelineFromCache(value,
-              args.isForceUpdateContainerCacheFromSCM()));
+          () -> TracingUtil.executeInNewSpan("OM.refreshPipelineFromCache", () -> refreshPipelineFromCache(value,
+              args.isForceUpdateContainerCacheFromSCM())));
 
       if (args.getSortDatanodes()) {
         captureLatencyNs(metrics.getGetKeyInfoSortDatanodesLatencyNs(),
-            () -> sortDatanodes(clientAddress, value));
+            () -> TracingUtil.executeInNewSpan("OM.sortDatanodes", () -> sortDatanodes(clientAddress, value)));
       }
     }
     return value;
