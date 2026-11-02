@@ -103,8 +103,6 @@ public class TestScmStartupInvalidApparentVersion {
    */
   @Test
   public void testStartupUpdatesDBWhenVersionFileAheadOfDB() throws Exception {
-    // Create an SCM whose VERSION file is already at SOFTWARE_VERSION (simulates the crash scenario where the
-    // VERSION file was written during finalization but the DB was not yet flushed).
     OzoneConfiguration conf = createScmStorage(SOFTWARE_VERSION.serialize());
     StorageContainerManager scm = HddsTestUtils.getScm(conf, new SCMConfigurator());
     try {
