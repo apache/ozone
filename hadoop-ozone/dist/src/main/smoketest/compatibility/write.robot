@@ -114,10 +114,10 @@ Snapshot Diff Can Be Requested
     ${expected} =    Expected Snapshot Diff Output
     Should Contain    ${output}    ${expected}
 
-Snapshot Diff --get-report fallback
+Snapshot Diff --get-report Submits Job On Old Cluster
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client does not support snapshot diff submit
     Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Cluster does not support snapshots
-    Pass Execution If    '${CLUSTER_VERSION}' >= '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client supports snapshot diff submit, no fallback
+    Pass Execution If    '${CLUSTER_VERSION}' >= '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Cluster supports snapshot diff submit, no fallback
 
     ${output} =    Execute    ozone sh snapshot diff --get-report ${FSO_BUCKET} ${SNAPSHOT2} ${SNAPSHOT3}
     ${expected} =    Expected Snapshot Diff Output
