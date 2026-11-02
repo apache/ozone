@@ -114,7 +114,7 @@ public final class SCMContainerPlacementCapacity
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;
     }
-    return getResultSet(nodesRequired, healthyNodes);
+    return getResultSet(nodesRequired, healthyNodes, storageType);
   }
 
   /**
@@ -127,6 +127,19 @@ public final class SCMContainerPlacementCapacity
    */
   @Override
   public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
+    return chooseNode(healthyNodes, null);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * When a storage type is given, the two candidates are compared on their usage
+   * of that storage type rather than their overall usage, so a node that is
+   * lightly used overall but nearly full on the requested tier is not preferred.
+   */
+  @Override
+  public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes,
+      StorageType storageType) {
     metrics.incrDatanodeChooseAttemptCount();
     int firstNodeNdx = getRand().nextInt(healthyNodes.size());
     int secondNodeNdx = getRand().nextInt(healthyNodes.size());
@@ -143,8 +156,10 @@ public final class SCMContainerPlacementCapacity
           getNodeManager().getNodeStat(firstNodeDetails);
       SCMNodeMetric secondNodeMetric =
           getNodeManager().getNodeStat(secondNodeDetails);
-      datanodeDetails = !firstNodeMetric.isGreater(secondNodeMetric.get())
-          ? firstNodeDetails : secondNodeDetails;
+      boolean firstIsFuller = storageType == null
+          ? firstNodeMetric.isGreater(secondNodeMetric.get())
+          : firstNodeMetric.isGreater(secondNodeMetric.get(), storageType);
+      datanodeDetails = !firstIsFuller ? firstNodeDetails : secondNodeDetails;
     }
     healthyNodes.remove(datanodeDetails);
     metrics.incrDatanodeChooseSuccessCount();
