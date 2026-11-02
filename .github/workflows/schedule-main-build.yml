@@ -31,12 +31,47 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  MARKER_FILE: scheduled-build
+  STASH_KEY: scheduled-build-${{ github.sha }}
+
 jobs:
+  pre-check:
+    runs-on: ubuntu-slim
+    outputs:
+      hit: ${{ steps.stash.outputs.stash-hit || 'false' }}
+    steps:
+      - name: Check for previous successful build of ${{ github.sha }}
+        id: stash
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          clean: true
+          path: ${{ env.MARKER_FILE }}
+          key: ${{ env.STASH_KEY }}
+        continue-on-error: true
+
   CI:
+    needs: pre-check
     # no scheduled run in forks
-    if: github.repository_owner == 'apache' || github.event_name == 'workflow_dispatch'
+    if: (github.repository_owner == 'apache' && needs.pre-check.outputs.hit != 'true') || github.event_name == 'workflow_dispatch'
     uses: $/.github/workflows/ci.yml
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+
+  store-success:
+    needs: CI
+    runs-on: ubuntu-slim
+    steps:
+      - name: Create marker file
+        run: |
+          echo "$GITHUB_SHA" > "$MARKER_FILE"
+
+      - name: Record successful build of ${{ github.sha }}
+        uses: apache/infrastructure-actions/stash/save@save/v1
+        with:
+          path: ${{ env.MARKER_FILE }}
+          key: ${{ env.STASH_KEY }}
+          retention-days: 90
+        continue-on-error: true
