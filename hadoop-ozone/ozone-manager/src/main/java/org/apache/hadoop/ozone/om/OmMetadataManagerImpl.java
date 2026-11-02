@@ -1612,6 +1612,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return count;
   }
 
+  @Override
+  public long countLiveBuckets() throws IOException {
+    long count = 0;
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> iterator = getBucketIterator();
+    while (iterator.hasNext()) {
+      if (iterator.next().getValue().getCacheValue() != null) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   /**
    * Get the merged and paginated list of multipart upload keys from cache and DB.
    * Only return at most maxUploads + 1 keys (lexicographical order).

@@ -703,6 +703,9 @@ public class KeyValueHandler extends Handler {
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
+      if (request.getPutBlock().getSync()) {
+        kvContainer.flushAndSyncDB();
+      }
 
       blockDataProto = blockData.getProtoBufMessage();
 

@@ -58,6 +58,19 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
   }
 
   @Override
+  protected S3MultipartUploadAbortRequest getS3MultipartUploadAbortReq(OMRequest omRequest) {
+    return new S3MultipartUploadAbortRequestWithFSO(omRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Override
+  protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(OMRequest omRequest) throws IOException {
+    S3MultipartUploadCompleteRequest request = new S3MultipartUploadCompleteRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
+  }
+
+  @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
       OMRequest initiateMPURequest) throws IOException {
     S3InitiateMultipartUploadRequest request = new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,

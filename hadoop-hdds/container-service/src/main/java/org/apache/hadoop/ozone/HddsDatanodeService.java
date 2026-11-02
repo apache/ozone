@@ -79,6 +79,7 @@ import org.apache.hadoop.hdds.server.StartupProgress;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -191,6 +192,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
   @Override
   public Void call() throws Exception {
+    TracingUtil.installMdcContextStorage();
     OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
       HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,

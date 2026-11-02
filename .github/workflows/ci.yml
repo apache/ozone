@@ -327,14 +327,15 @@ jobs:
       script-args: ${{ matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.suite }}
-      timeout-minutes: 150
+      timeout-minutes: 60
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
         exclude:
-          - suite: compat-old
+          - suite: xcompat/test-old.sh
       fail-fast: false
+      max-parallel: 10
 
   # acceptance (compat-old), split by old Ozone version
   compat-old:
@@ -353,7 +354,7 @@ jobs:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: acceptance
-      script-args: compat-old ${{ matrix.version }}
+      script-args: xcompat/test-old.sh ${{ matrix.version }}
       sha: ${{ needs.build-info.outputs.sha }}
       split: compat-old-${{ matrix.version }}
       timeout-minutes: 30
@@ -362,6 +363,7 @@ jobs:
       matrix:
         version: ${{ fromJson(needs.build-info.outputs.acceptance-versions) }}
       fail-fast: false
+      max-parallel: 3
 
   kubernetes:
     needs:
@@ -387,6 +389,7 @@ jobs:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.kubernetes-suites) }}
       fail-fast: false
+      max-parallel: 3
 
   # runs only ozone-integration-test, split by profiles
   integration:
