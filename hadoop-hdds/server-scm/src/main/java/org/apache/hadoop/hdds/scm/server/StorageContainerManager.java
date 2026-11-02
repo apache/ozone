@@ -1538,6 +1538,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void start() throws IOException {
     // If the SCM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB, and
     // the finalization included in the snapshot is not in the Raft log to be replayed.
+    // The metadata store may have been closed by a prior stop(); start() is idempotent and reopens it if needed.
+    scmMetadataStore.start(configuration);
     versionManager.finalizeFromDBIfRequired(scmMetadataStore.getMetaTable());
     if (LOG.isInfoEnabled()) {
       LOG.info(buildRpcServerStartMessage(
