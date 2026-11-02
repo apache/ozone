@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.BekInfoUtils;
@@ -418,14 +419,14 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   public static OMRequest disallowSetBucketPropertyWithStoragePolicy(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)) {
+        .isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
       SetBucketPropertyRequest propReq = req.getSetBucketPropertyRequest();
       if (propReq.hasBucketArgs()
           && (propReq.getBucketArgs().hasStoragePolicy()
           || propReq.getBucketArgs().hasAllowFallbackStoragePolicy()
           || propReq.getBucketArgs().hasUnsetStoragePolicy())) {
-        throw new OMException("Cluster does not have the bucket storage policy"
-            + " support feature finalized yet, but the request contains storage"
+        throw new OMException("Cluster does not have the storage policy"
+            + " feature finalized yet, but the request contains storage"
             + " policy arguments. Rejecting the request, please finalize the"
             + " cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
