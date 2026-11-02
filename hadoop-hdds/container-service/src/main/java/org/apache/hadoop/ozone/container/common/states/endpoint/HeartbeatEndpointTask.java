@@ -250,13 +250,15 @@ public class HeartbeatEndpointTask
    * @param requestBuilder builder to which the report has to be added.
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    // Keep FCR snapshots and ICR collection independent of finalization.
-    boolean supportsFCRLease = rpcEndpoint.supportsFullContainerReportLease();
-    String excludedReportType = null;
-    if (supportsFCRLease) {
-      addFullContainerReport(requestBuilder);
-      // FCR is already set so don't set it again
+    String excludedReportType;
+    if (rpcEndpoint.supportsFullContainerReportLease()) {
+      // Generate a fresh FCR here, even before finalization enables lease requests.
+      addFullContainerReportOrRequestLease(requestBuilder);
+      // Never fall back to queued FCRs while waiting for a lease.
       excludedReportType = StateContext.CONTAINER_REPORTS_PROTO_NAME;
+    } else {
+      // Older SCMs and Recon receive queued FCRs through the report loop below.
+      excludedReportType = null;
     }
 
     for (Message report : context.getAllAvailableReports(rpcEndpoint.getAddress(), excludedReportType)) {
@@ -283,7 +285,7 @@ public class HeartbeatEndpointTask
    *
    * @param requestBuilder builder to which the report or lease request has to be added
    */
-  private void addFullContainerReport(SCMHeartbeatRequestProto.Builder requestBuilder) {
+  private void addFullContainerReportOrRequestLease(SCMHeartbeatRequestProto.Builder requestBuilder) {
     if (!context.isFullContainerReportReady(rpcEndpoint.getAddress())) {
       return;
     }
