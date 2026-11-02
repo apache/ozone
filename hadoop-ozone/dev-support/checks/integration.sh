@@ -17,30 +17,46 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=integration
 ERROR_PATTERN="\[ERROR\]"
+
 PHASE=test
 
 args=""
 
 if [[ "$@" =~ -Ptest-([a-z]+) ]]; then
+  # test-... profile
   split="${BASH_REMATCH[1]}"
+  args="$args -Dscan.value.testset=${split}"
+
   if [[ "${split}" == "flaky" ]]; then
     args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
     # tests may pass on re-run, so we cannot rely on output for status
     ERROR_PATTERN=""
-  fi
-
-  if [[ "${split}" == "filesystem" ]]; then
-    if [[ "${CI:-}" == "true" ]]; then
-      args="$args -DskipShade --activate-profiles CI"
-    else
-      # shading is performed in `package` phase, which is after `test`
-      PHASE=verify
-    fi
-  else
+    # flaky tests may be present in any module, not setting project list
+    # but skip shaded ones
     args="$args -DskipShade"
+  else
+    # apply profile only to the integration test module
+    # ozone-main is needed for fetching libhadoop
+    args="$args -pl :ozone-main,:ozone-integration-test"
+
+    if [[ "${CI:-}" != "true" ]]; then
+      # build requirements, too
+      args="$args --also-make"
+    fi
   fi
 
+elif [[ "$@" =~ "-pl :([a-z0-9-]+)" ]]; then
+  # specific module
+  split="${BASH_REMATCH[1]}"
   args="$args -Dscan.value.testset=${split}"
+
+  if [[ "${split}" =~ "ozone-filesystem-hadoop.*" ]] && [[ "${CI:-}" != "true" ]]; then
+    # shading is performed in `package` phase, which is after `test`
+    PHASE=verify
+  fi
+
+  # --also-make is not added even for local run, since without test filter all tests would be run
+  # for local test, please build before running this script
 fi
 
 source "${DIR}/junit.sh" $args "$@"

@@ -370,7 +370,9 @@ public class OzoneClientConfig {
       defaultValue = "1048576",
       type = ConfigType.INT,
       tags = {ConfigTag.CLIENT},
-      description = "Chunk size of streaming read responses from datanodes.")
+      description = "Amount of block data the datanode sends in each streaming read response. "
+          + "A response must fit in the 32 MB gRPC message limit, and 1 MB of that is reserved for metadata "
+          + "such as checksums, so the datanode caps this value at 31 MB.")
   private int streamReadResponseDataSize = 1 << 20;
 
   @Config(key = "ozone.client.stream.read.timeout",
@@ -379,6 +381,16 @@ public class OzoneClientConfig {
       tags = {ConfigTag.CLIENT},
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
+
+  @Config(key = "ozone.client.netty.warmup.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.CLIENT},
+      description = "When the client is created, initialize Netty, and netty-tcnative (BoringSSL) if gRPC TLS is " +
+          "enabled, on a background thread, so the first datanode connection does not wait for them. This takes " +
+          "about 0.1 s in a new JVM, so it matters for short-lived clients such as YARN containers and CLI " +
+          "commands. It needs a spare CPU core to help.")
+  private boolean nettyWarmUpEnabled = true;
 
   @PostConstruct
   public void validate() {
@@ -471,6 +483,14 @@ public class OzoneClientConfig {
 
   public boolean isShortCircuitEnabled() {
     return shortCircuitEnabled;
+  }
+
+  public boolean isNettyWarmUpEnabled() {
+    return nettyWarmUpEnabled;
+  }
+
+  public void setNettyWarmUpEnabled(boolean nettyWarmUpEnabled) {
+    this.nettyWarmUpEnabled = nettyWarmUpEnabled;
   }
 
   public void setShortCircuit(boolean enabled) {

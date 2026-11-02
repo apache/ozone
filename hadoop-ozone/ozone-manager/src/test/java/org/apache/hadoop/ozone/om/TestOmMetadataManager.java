@@ -536,6 +536,44 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testListKeysWithStartKeyBeforePrefix() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "startKeyBeforePrefix";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // Even index keys go to the DB and odd index keys to the cache.
+    addKeysToOM(volumeName, bucketName, "dir1/dir2/file1", 0);
+    addKeysToOM(volumeName, bucketName, "dir1/file2", 2);
+    addKeysToOM(volumeName, bucketName, "dir1bh/file1", 4);
+    addKeysToOM(volumeName, bucketName, "dir1bha/file1", 6);
+    addKeysToOM(volumeName, bucketName, "dir1bhb/file1", 1);
+    addKeysToOM(volumeName, bucketName, "dir2/file1", 8);
+
+    List<String> expected = Arrays.asList("dir1bh/file1", "dir1bha/file1", "dir1bhb/file1");
+
+    // startKey exists and sorts before keyPrefix, with non-matching keys in between.
+    assertEquals(expected, listKeyNames(volumeName, bucketName, "dir1/dir2/file1", "dir1bh", 100));
+    // startKey does not exist and sorts before keyPrefix.
+    assertEquals(expected, listKeyNames(volumeName, bucketName, "a", "dir1bh", 100));
+    assertEquals(expected, listKeyNames(volumeName, bucketName, null, "dir1bh", 100));
+
+    // Pagination continues from the last returned key.
+    assertEquals(expected.subList(0, 2), listKeyNames(volumeName, bucketName, "dir1/dir2/file1", "dir1bh", 2));
+    assertEquals(expected.subList(2, 3), listKeyNames(volumeName, bucketName, "dir1bha/file1", "dir1bh", 2));
+
+    // startKey sorts after every key matching keyPrefix.
+    assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "dir1bi", "dir1bh", 100));
+  }
+
+  private List<String> listKeyNames(String volumeName, String bucketName, String startKey, String keyPrefix,
+      int maxKeys) throws IOException {
+    return omMetadataManager.listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+  }
+
+  @Test
   public void testListKeysWithFewDeleteEntriesInCache() throws Exception {
     String volumeNameA = "volumeA";
     String ozoneBucket = "ozoneBucket";

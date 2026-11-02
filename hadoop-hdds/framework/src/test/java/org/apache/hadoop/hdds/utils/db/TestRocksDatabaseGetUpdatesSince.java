@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
@@ -30,9 +31,12 @@ import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -60,18 +64,27 @@ public class TestRocksDatabaseGetUpdatesSince {
 
   private TableConfig defaultTable;
   private RocksDatabase db;
+  private final CountDownLatch dbClosed = new CountDownLatch(1);
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
     defaultTable = new TableConfig(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
         new ManagedColumnFamilyOptions());
-    db = spy(RocksDatabase.open(tempDir, TestRDBStore.newManagedDBOptions(), new ManagedWriteOptions(),
+    ManagedDBOptions options = spy(TestRDBStore.newManagedDBOptions());
+    doAnswer(invocation -> {
+      invocation.callRealMethod();
+      // DB options are the last resource closed by RocksDatabase.
+      dbClosed.countDown();
+      return null;
+    }).when(options).close();
+    db = spy(RocksDatabase.open(tempDir, options, new ManagedWriteOptions(),
         Collections.singleton(defaultTable), false));
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws Exception {
     db.close();
+    assertTrue(dbClosed.await(10, TimeUnit.SECONDS), "Database cleanup must finish before closing table options");
     defaultTable.close();
   }
 

@@ -135,6 +135,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
     newBucketInfo.setCreationTime(initialTime)
         .setModificationTime(initialTime);
 
+    // reset usage counters to 0 to prevent arbitrary values set in the request by any other client
+    newBucketInfo.clearUsedBytes()
+        .clearUsedNamespace()
+        .clearSnapshotUsedBytes()
+        .clearSnapshotUsedNamespace();
+
     if (bucketInfo.hasBeinfo()) {
       newBucketInfo.setBeinfo(
           BekInfoUtils.getBekInfo(kmsProvider, bucketInfo.getBeinfo()));
@@ -174,8 +180,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     if (maxBucket <= 0) {
       maxBucket = OMConfigKeys.OZONE_OM_MAX_BUCKET_DEFAULT;
     }
-    long nrOfBuckets = ozoneManager.getMetadataManager().getBucketTable()
-        .getEstimatedKeyCount();
+    long nrOfBuckets = ozoneManager.getMetadataManager().countLiveBuckets();
     if (nrOfBuckets >= maxBucket) {
       throw new OMException("Cannot create more than " + maxBucket
           + " buckets",

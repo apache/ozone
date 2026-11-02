@@ -899,7 +899,8 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                        final String fromSnapshot,
                                                        final String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
 
@@ -910,7 +911,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     SubmitSnapshotDiffResponse snapshotDiffResponse =
         snapshotDiffManager.submitSnapshotDiff(volume, bucket,
-            fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+            fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff, orderedReport);
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffResponse;

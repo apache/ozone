@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -246,6 +247,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           ContainerCommandResponseProto responseProto = null;
           IOException ioException = null;
           XceiverClientReply reply = new XceiverClientReply(null);
+          CompletableFuture<ContainerCommandResponseProto> future = null;
 
           if (request.getCmdType() != ContainerProtos.Type.GetBlock &&
               request.getCmdType() != ContainerProtos.Type.Echo) {
@@ -258,7 +260,8 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
               LOG.debug("Executing command {} on datanode {}", request, dn);
             }
             reply.addDatanode(dn);
-            responseProto = sendCommandInternal(finalPayload).getResponse().get();
+            future = sendCommandInternal(finalPayload).getResponse();
+            responseProto = future.get();
             if (validators != null && !validators.isEmpty()) {
               for (Validator validator : validators) {
                 validator.accept(request, responseProto);
@@ -287,6 +290,8 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           } catch (InterruptedException e) {
             LOG.error("Command execution was interrupted ", e);
             Thread.currentThread().interrupt();
+            ioException = (IOException) new InterruptedIOException(
+                "Command " + processForDebug(request) + " was interrupted.").initCause(e);
           }
 
           if (responseProto != null) {
@@ -294,6 +299,13 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
             return reply;
           } else {
             Objects.requireNonNull(ioException);
+            if (future != null && request.getCmdType() == ContainerProtos.Type.GetBlock) {
+              // Complete the future before looking in the cache. If the stream has already arrived it is closed here;
+              // if it arrives later, the receiver thread finds the future completed and closes the stream itself.
+              future.completeExceptionally(ioException);
+              IOUtils.closeQuietly(getFileInputStream(finalPayload.getCallId(),
+                  finalPayload.getGetBlock().getBlockID().getLocalID()));
+            }
             String message = "Failed to execute command {}";
             if (LOG.isDebugEnabled()) {
               LOG.debug(message + " on the datanode {} {}.", request, dn, domainSocket, ioException);
@@ -473,6 +485,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           long processStartTime = System.nanoTime();
           ContainerProtos.Result result = responseProto.getResult();
           if (result == ContainerProtos.Result.SUCCESS) {
+            BlockStreamKey streamKey = null;
             if (type == ContainerProtos.Type.GetBlock) {
               try {
                 ContainerProtos.GetBlockResponseProto getBlockResponse = responseProto.getGetBlock();
@@ -496,7 +509,8 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
                       DATA_TRANSFER_MAGIC_CODE + ", Received: " + buf[0] + ")");
                 }
                 DatanodeBlockID blockID = getBlockResponse.getBlockData().getBlockID();
-                blockStreamCache.put(new BlockStreamKey(responseProto.getCallId(), blockID.getLocalID()), fis[0]);
+                streamKey = new BlockStreamKey(responseProto.getCallId(), blockID.getLocalID());
+                blockStreamCache.put(streamKey, fis[0]);
               } catch (IOException e) {
                 LOG.warn("Failed to handle short-circuit information exchange", e);
                 // disable docket socket for a while
@@ -505,7 +519,10 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
                 continue;
               }
             }
-            entry.getFuture().complete(responseProto);
+            if (!entry.getFuture().complete(responseProto) && streamKey != null) {
+              // the caller already gave up on this request, so nobody will claim the stream from the cache
+              IOUtils.closeQuietly(blockStreamCache.remove(streamKey));
+            }
           } else {
             // response result is not SUCCESS
             entry.getFuture().complete(responseProto);
