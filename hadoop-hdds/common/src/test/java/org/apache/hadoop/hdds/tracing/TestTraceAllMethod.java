@@ -221,11 +221,8 @@ public class TestTraceAllMethod {
     }
   }
 
-  /**
-   * Annotated subclass: only the methods it declares itself are INTERNAL.
-   */
-  @InternalSpanKind
   public static class InternalServiceImpl extends ServiceImpl {
+    @InternalSpanKind
     @Override
     public String otherMethod(String name) {
       return "Internal " + name;
