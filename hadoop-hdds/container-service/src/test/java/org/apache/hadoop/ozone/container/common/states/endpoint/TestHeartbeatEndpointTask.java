@@ -68,7 +68,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.util.EnumCounters;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -137,21 +136,13 @@ public class TestHeartbeatEndpointTask {
       return response.build();
     });
     HostAndPort otherAddress = new HostAndPort("other-scm", 9861);
-    HostAndPort legacyAddress = new HostAndPort("legacy-scm", 9861);
     HostAndPort reconAddress = new HostAndPort("recon", 9861);
-    VersionResponse capability = VersionResponse.newBuilder().setVersion(1)
-        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build();
     try (EndpointStateMachine waiting = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "");
          EndpointStateMachine other = new EndpointStateMachine(otherAddress, scm, conf, "");
-         EndpointStateMachine legacy = new EndpointStateMachine(legacyAddress, scm, conf, "");
          EndpointStateMachine recon = new EndpointStateMachine(reconAddress, scm, conf, "")) {
       waiting.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
-      waiting.setVersion(capability);
-      other.setVersion(capability);
-      legacy.setVersion(VersionResponse.newBuilder().setVersion(1).build());
-      recon.setVersion(capability);
       recon.setPassive(true);
-      List<EndpointStateMachine> endpoints = Arrays.asList(waiting, other, legacy, recon);
+      List<EndpointStateMachine> endpoints = Arrays.asList(waiting, other, recon);
       when(connections.getValues()).thenReturn(endpoints);
       endpoints.forEach(endpoint -> context.addEndpoint(endpoint.getAddress()));
       IncrementalContainerReportProto icr = IncrementalContainerReportProto.newBuilder()
@@ -164,7 +155,6 @@ public class TestHeartbeatEndpointTask {
       assertTrue(containers.getMissingContainerSet().contains(2L));
       assertEquals(1, containers.containerCount());
       ContainerReportsProto expected = containers.getContainerReport();
-      assertEquals(Collections.singletonList(expected), context.getAllAvailableReports(legacyAddress));
       assertEquals(Collections.singletonList(expected), context.getAllAvailableReports(reconAddress));
       verify(datanode).triggerHeartbeat();
       HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
@@ -227,8 +217,6 @@ public class TestHeartbeatEndpointTask {
     });
     try (EndpointStateMachine endpoint = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "")) {
       endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
-      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
-          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
       HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
           .setEndpointStateMachine(endpoint).build();
 
@@ -276,8 +264,6 @@ public class TestHeartbeatEndpointTask {
             .setDatanodeUUID(datanode.getDatanodeDetails().getUuidString()).build());
     try (EndpointStateMachine endpoint = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "")) {
       endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
-      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
-          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
       SCMConnectionManager connections = mock(SCMConnectionManager.class);
       when(datanode.getConnectionManager()).thenReturn(connections);
       when(connections.getValues()).thenReturn(Collections.singletonList(endpoint));
@@ -302,7 +288,7 @@ public class TestHeartbeatEndpointTask {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  void testFCRLeaseStartsAfterFinalization(boolean scmSupportsLease, @TempDir Path tempDir) throws Exception {
+  void testFCRLeaseStartsAfterFinalization(boolean recon, @TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.toString());
     DatanodeStateMachine datanode = mockDatanodeStateMachine();
@@ -332,8 +318,8 @@ public class TestHeartbeatEndpointTask {
       StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
       context.addEndpoint(TEST_SCM_ENDPOINT);
       endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
-      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
-          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.toString(scmSupportsLease)).build());
+      endpoint.setPassive(recon);
+      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1).build());
       HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
           .setEndpointStateMachine(endpoint).build();
 
@@ -355,8 +341,8 @@ public class TestHeartbeatEndpointTask {
       context.refreshFullReport(report);
       task.call();
 
-      assertEquals(scmSupportsLease ? 4 : 3, requests.getAllValues().size());
-      assertEquals(scmSupportsLease, requests.getValue().getContainerReport().hasFullContainerReportLease());
+      assertEquals(recon ? 3 : 4, requests.getAllValues().size());
+      assertEquals(!recon, requests.getValue().getContainerReport().hasFullContainerReportLease());
       assertEquals(report.getReportsList(), requests.getValue().getContainerReport().getReportsList());
       verify(scm, never()).getVersion(any());
       verify(scm, never()).register(any(), any(), any(), any(), any());
@@ -523,6 +509,8 @@ public class TestHeartbeatEndpointTask {
   public void testheartbeatWithContainerReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    when(datanodeStateMachine.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(false);
+    stubFullContainerReport(datanodeStateMachine, ContainerReportsProto.getDefaultInstance());
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -551,6 +539,7 @@ public class TestHeartbeatEndpointTask {
     assertTrue(heartbeat.hasDatanodeDetails());
     assertFalse(heartbeat.hasNodeReport());
     assertTrue(heartbeat.hasContainerReport());
+    assertFalse(heartbeat.getRequestFullContainerReportLease());
     assertEquals(0, heartbeat.getCommandStatusReportsCount());
     assertFalse(heartbeat.hasContainerActions());
   }
@@ -586,10 +575,6 @@ public class TestHeartbeatEndpointTask {
     EndpointStateMachine endpointStateMachine = new EndpointStateMachine(
         TEST_SCM_ENDPOINT, scm, conf, "");
     endpointStateMachine.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
-    endpointStateMachine.setVersion(VersionResponse.newBuilder()
-        .setVersion(1)
-        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
-        .build());
     HeartbeatEndpointTask endpointTask = HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
         .setContext(context)
@@ -645,8 +630,6 @@ public class TestHeartbeatEndpointTask {
     });
     try (EndpointStateMachine endpoint = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "")) {
       endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
-      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
-          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
       endpoint.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).build());
       HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
           .setEndpointStateMachine(endpoint).build();
@@ -703,8 +686,6 @@ public class TestHeartbeatEndpointTask {
     });
     try (EndpointStateMachine endpoint = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "")) {
       endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
-      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
-          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
       HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
           .setEndpointStateMachine(endpoint).build();
 
@@ -774,10 +755,6 @@ public class TestHeartbeatEndpointTask {
 
     EndpointStateMachine endpointStateMachine = new EndpointStateMachine(
         TEST_SCM_ENDPOINT, scm, conf, "");
-    endpointStateMachine.setVersion(VersionResponse.newBuilder()
-        .setVersion(1)
-        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
-        .build());
     endpointStateMachine.setFullContainerReportLease(
         FullContainerReportLeaseProto.newBuilder()
             .setId(99L)
@@ -831,8 +808,6 @@ public class TestHeartbeatEndpointTask {
     context.addIncrementalReport(CommandStatusReportsProto.getDefaultInstance());
     try (EndpointStateMachine endpoint = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "")) {
       endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
-      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
-          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
       endpoint.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).build());
       HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
           .setEndpointStateMachine(endpoint).build();
@@ -893,10 +868,6 @@ public class TestHeartbeatEndpointTask {
 
     EndpointStateMachine endpointStateMachine = new EndpointStateMachine(
         TEST_SCM_ENDPOINT, scm, conf, "");
-    endpointStateMachine.setVersion(VersionResponse.newBuilder()
-        .setVersion(1)
-        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
-        .build());
     endpointStateMachine.setFullContainerReportLease(
         FullContainerReportLeaseProto.newBuilder()
             .setId(99L)
@@ -951,10 +922,6 @@ public class TestHeartbeatEndpointTask {
 
     EndpointStateMachine endpointStateMachine = new EndpointStateMachine(
         TEST_SCM_ENDPOINT, scm, conf, "");
-    endpointStateMachine.setVersion(VersionResponse.newBuilder()
-        .setVersion(1)
-        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
-        .build());
     endpointStateMachine.setFullContainerReportLease(
         FullContainerReportLeaseProto.newBuilder()
             .setId(99L)
@@ -1065,6 +1032,8 @@ public class TestHeartbeatEndpointTask {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine =
         mockDatanodeStateMachine();
+    when(datanodeStateMachine.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(false);
+    stubFullContainerReport(datanodeStateMachine, ContainerReportsProto.getDefaultInstance());
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -1103,6 +1072,7 @@ public class TestHeartbeatEndpointTask {
     assertTrue(heartbeat.hasDatanodeDetails());
     assertTrue(heartbeat.hasNodeReport());
     assertTrue(heartbeat.hasContainerReport());
+    assertFalse(heartbeat.getRequestFullContainerReportLease());
     assertNotEquals(0, heartbeat.getCommandStatusReportsCount());
     assertTrue(heartbeat.hasContainerActions());
     assertTrue(heartbeat.hasCommandQueueReport());

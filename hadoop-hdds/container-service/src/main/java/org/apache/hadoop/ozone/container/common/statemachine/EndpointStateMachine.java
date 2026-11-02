@@ -33,7 +33,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -115,13 +114,6 @@ public class EndpointStateMachine
    */
   public void setVersion(VersionResponse version) {
     this.version = version;
-  }
-
-  public boolean supportsFullContainerReportLease() {
-    VersionResponse currentVersion = version;
-    return !isPassive && currentVersion != null
-        && Boolean.parseBoolean(currentVersion.getValue(
-            OzoneConsts.SCM_FCR_LEASE_SUPPORTED));
   }
 
   public boolean hasFullContainerReportLease() {

@@ -67,14 +67,12 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdfs.util.EnumCounters;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.report.ContainerReportPublisher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
@@ -308,7 +306,7 @@ public class TestStateContext {
   }
 
   @Test
-  public void testPeriodicFullContainerReportPreservesLeasedEndpointICRs() throws IOException {
+  public void testPeriodicFullContainerReportPreservesScmICRs() throws IOException {
     StateContext context = createSubject();
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMConnectionManager connectionManager = mock(SCMConnectionManager.class);
@@ -317,22 +315,14 @@ public class TestStateContext {
         mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
     HostAndPort waitingAddress = new HostAndPort("waiting-scm", 9001);
     HostAndPort leasedAddress = new HostAndPort("leased-scm", 9002);
-    HostAndPort legacyAddress = new HostAndPort("legacy-scm", 9003);
     HostAndPort reconAddress = new HostAndPort("recon", 9004);
-    VersionResponse leaseVersion = VersionResponse.newBuilder().setVersion(1)
-        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build();
     try (EndpointStateMachine waiting = new EndpointStateMachine(waitingAddress, scm, conf, "");
          EndpointStateMachine leased = new EndpointStateMachine(leasedAddress, scm, conf, "");
-         EndpointStateMachine legacy = new EndpointStateMachine(legacyAddress, scm, conf, "");
          EndpointStateMachine recon = new EndpointStateMachine(reconAddress, scm, conf, "")) {
-      waiting.setVersion(leaseVersion);
-      leased.setVersion(leaseVersion);
       leased.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).build());
-      legacy.setVersion(VersionResponse.newBuilder().setVersion(1).build());
-      recon.setVersion(leaseVersion);
       recon.setPassive(true);
-      when(connectionManager.getValues()).thenReturn(Arrays.asList(waiting, leased, legacy, recon));
-      Arrays.asList(waitingAddress, leasedAddress, legacyAddress, reconAddress).forEach(context::addEndpoint);
+      when(connectionManager.getValues()).thenReturn(Arrays.asList(waiting, leased, recon));
+      Arrays.asList(waitingAddress, leasedAddress, reconAddress).forEach(context::addEndpoint);
       IncrementalContainerReportProto icr = IncrementalContainerReportProto.newBuilder()
           .addReport(ContainerReplicaProto.newBuilder().setContainerID(1).setState(ContainerReplicaProto.State.CLOSING))
           .build();
@@ -353,7 +343,6 @@ public class TestStateContext {
           context.getAllAvailableReports(leasedAddress, StateContext.CONTAINER_REPORTS_PROTO_NAME));
       assertTrue(context.isFullContainerReportReady(waitingAddress));
       assertTrue(context.isFullContainerReportReady(leasedAddress));
-      assertEquals(Collections.singletonList(report), context.getAllAvailableReports(legacyAddress));
       assertEquals(Collections.singletonList(report), context.getAllAvailableReports(reconAddress));
     }
   }

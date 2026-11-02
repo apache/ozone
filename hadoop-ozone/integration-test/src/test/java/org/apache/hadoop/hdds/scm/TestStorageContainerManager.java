@@ -705,10 +705,9 @@ public class TestStorageContainerManager {
       DatanodeStateMachine datanode = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine();
       EndpointStateMachine endpoint = datanode.getConnectionManager().getValues().stream()
           .filter(peer -> !peer.isPassive()).findFirst().orElseThrow(AssertionError::new);
-      VersionResponse capability = endpoint.getVersion();
+      VersionResponse versionResponse = endpoint.getVersion();
       String metricsSource = MetricUtil.getMetricsSourceName(SCMFullContainerReportLeaseMetrics.class.getSimpleName(),
           scm.getScmId());
-      assertTrue(endpoint.supportsFullContainerReportLease());
       assertFalse(datanode.getContext().isFullContainerReportLeaseEnabled(endpoint));
       assertEquals(0, getLongCounter("NumFCRLeaseRequests", getMetrics(metricsSource)));
 
@@ -717,7 +716,7 @@ public class TestStorageContainerManager {
       GenericTestUtils.waitFor(() -> datanode.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)
           && getLongCounter("NumFCRReportsProcessedWithLease", getMetrics(metricsSource)) > 0, 100, 30_000);
       assertTrue(datanode.getContext().isFullContainerReportLeaseEnabled(endpoint));
-      assertThat(endpoint.getVersion()).isSameAs(capability);
+      assertThat(endpoint.getVersion()).isSameAs(versionResponse);
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, endpoint.getState());
     }
   }

@@ -386,13 +386,11 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
    */
   @Override
   public VersionResponse getVersion(SCMVersionRequestProto versionRequest) {
-    // Advertise binary support independently of finalization; apparent version gates lease use.
     return VersionResponse.newBuilder()
         .setVersion(this.version.getVersion())
         .addValue(OzoneConsts.SCM_ID,
             this.scmStorageConfig.getScmId())
         .addValue(OzoneConsts.CLUSTER_ID, this.scmStorageConfig.getClusterID())
-        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
         .build();
   }
 

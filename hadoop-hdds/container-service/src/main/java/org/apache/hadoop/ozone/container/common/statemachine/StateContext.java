@@ -408,10 +408,11 @@ public class StateContext {
   }
 
   /**
-   * Checks the current apparent version so finalization activates leases without refreshing endpoint capabilities.
+   * Enables leases for SCM endpoints when the current apparent version allows them. Recon does not use FCR leases.
+   * SCM registration fences datanodes whose software or apparent version is newer than SCM's.
    */
   public boolean isFullContainerReportLeaseEnabled(EndpointStateMachine endpoint) {
-    return endpoint.supportsFullContainerReportLease()
+    return !endpoint.isPassive()
         && parentDatanodeStateMachine.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE);
   }
 
@@ -419,11 +420,11 @@ public class StateContext {
    * Gets a periodic snapshot, preserving ICRs for endpoints that generate their FCR when sending.
    */
   public ContainerReportsProto getFullContainerReport() throws IOException {
-    Set<HostAndPort> leasedEndpoints = parentDatanodeStateMachine.getConnectionManager().getValues().stream()
-        .filter(EndpointStateMachine::supportsFullContainerReportLease)
+    Set<HostAndPort> scmEndpoints = parentDatanodeStateMachine.getConnectionManager().getValues().stream()
+        .filter(endpoint -> !endpoint.isPassive())
         .map(EndpointStateMachine::getAddress)
         .collect(Collectors.toSet());
-    return getFullContainerReportDiscardPendingICR(endpoint -> !leasedEndpoints.contains(endpoint));
+    return getFullContainerReportDiscardPendingICR(endpoint -> !scmEndpoints.contains(endpoint));
   }
 
   private ContainerReportsProto getFullContainerReportDiscardPendingICR(Predicate<HostAndPort> discardPendingICR)

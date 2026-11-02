@@ -476,10 +476,10 @@ public class TestEndPoint {
   }
 
   @ParameterizedTest
-  @CsvSource({"false, true, false", "true, true, false", "true, false, false", "true, true, true"})
-  public void testRegisterTaskDefersFCROnlyWhenLeaseEnabled(boolean finalized, boolean scmSupportsLease, boolean recon)
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  public void testRegisterTaskDefersFCROnlyWhenLeaseEnabled(boolean finalized, boolean recon)
       throws Exception {
-    boolean deferred = finalized && scmSupportsLease && !recon;
+    boolean deferred = finalized && !recon;
     OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
@@ -531,11 +531,7 @@ public class TestEndPoint {
       assertFalse(context.isFullContainerReportReady(otherScm));
       rpcEndpoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
       rpcEndpoint.setPassive(recon);
-      rpcEndpoint.setVersion(VersionResponse.newBuilder()
-          .setVersion(1)
-          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED,
-              Boolean.toString(scmSupportsLease))
-          .build());
+      rpcEndpoint.setVersion(VersionResponse.newBuilder().setVersion(1).build());
       RegisterEndpointTask endpointTask = new RegisterEndpointTask(
           rpcEndpoint, ozoneContainer, context);
 

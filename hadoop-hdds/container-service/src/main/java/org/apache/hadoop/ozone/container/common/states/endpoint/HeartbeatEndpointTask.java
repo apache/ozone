@@ -183,7 +183,7 @@ public class HeartbeatEndpointTask
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
-      if (requestBuilder.hasContainerReport() && rpcEndpoint.supportsFullContainerReportLease()) {
+      if (requestBuilder.hasContainerReport() && !rpcEndpoint.isPassive()) {
         context.markFullContainerReportPending(rpcEndpoint.getAddress());
       }
       rpcEndpoint.logIfNeeded(ex);
@@ -251,13 +251,13 @@ public class HeartbeatEndpointTask
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
     String excludedReportType;
-    if (rpcEndpoint.supportsFullContainerReportLease()) {
+    if (!rpcEndpoint.isPassive()) {
       // Generate a fresh FCR here, even before finalization enables lease requests.
       addFullContainerReportOrRequestLease(requestBuilder);
       // Never fall back to queued FCRs while waiting for a lease.
       excludedReportType = StateContext.CONTAINER_REPORTS_PROTO_NAME;
     } else {
-      // Older SCMs and Recon receive queued FCRs through the report loop below.
+      // Recon receives queued FCRs through the report loop below.
       excludedReportType = null;
     }
 
@@ -279,7 +279,7 @@ public class HeartbeatEndpointTask
   }
 
   /**
-   * Adds a fresh FCR or requests its lease for an endpoint that supports FCR leases.
+   * Adds a fresh FCR for an SCM endpoint, requesting a lease first if the apparent version enables leases.
    *
    * <p>Callers must hold the endpoint lock and invoke this before collecting queued ICRs.
    *

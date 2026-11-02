@@ -117,8 +117,6 @@ public class TestRunningDatanodeState {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try (EndpointStateMachine endpoint = new EndpointStateMachine(new HostAndPort("scm", 9861), scm, conf, "")) {
       endpoint.setState(EndPointStates.REGISTER);
-      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
-          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
       context.addEndpoint(endpoint.getAddress());
       when(connections.getValues()).thenReturn(Collections.singletonList(endpoint));
       RunningDatanodeState running = new RunningDatanodeState(conf, connections, context);
@@ -286,8 +284,6 @@ public class TestRunningDatanodeState {
             new EndpointStateMachine(new HostAndPort("scm" + i, 9861), i < 2 ? blockedScm : healthyScm, conf, "");
         endpoints.add(endpoint);
         endpoint.setState(EndPointStates.HEARTBEAT);
-        endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
-            .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
         context.addEndpoint(endpoint.getAddress());
       }
       when(connections.getValues()).thenReturn(endpoints);
