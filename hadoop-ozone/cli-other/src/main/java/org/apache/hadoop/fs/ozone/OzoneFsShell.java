@@ -18,6 +18,13 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.SpanKind;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.shell.CommandFactory;
@@ -32,6 +39,12 @@ import org.apache.hadoop.util.ToolRunner;
 public class OzoneFsShell extends FsShell {
 
   private static final String OZONE_USAGE_PREFIX = "Usage: ozone fs [generic options]";
+
+  static final Set<String> GENERIC_OPTIONS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+      "-conf", "-D", "-fs", "-jt", "-files", "-libjars", "-archives", "-tokenCacheFile")));
+
+  static final Set<String> REDACTED_OPTIONS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+      "-D", "-tokenCacheFile")));
 
   /**
    * Default ctor with no configuration.  Be sure to invoke
@@ -78,8 +91,8 @@ public class OzoneFsShell extends FsShell {
   public static void main(String[] argv) throws Exception {
     OzoneFsShell shell = newShellInstance();
     OzoneConfiguration conf = new OzoneConfiguration();
-    String spanName = "ozone fs " + String.join(" ", argv);
-    int res = TracingUtil.execute("FsShell", spanName, conf, () -> {
+    int res = TracingUtil.execute("FsShell", parseCommandName(argv), SpanKind.CLIENT, conf, () -> {
+      addCommandAttributes(argv);
       conf.setQuietMode(false);
       shell.setConf(conf);
       return shell.execute(argv);
@@ -106,5 +119,38 @@ public class OzoneFsShell extends FsShell {
   @VisibleForTesting
   public CommandFactory getCommandFactory() {
     return commandFactory;
+  }
+
+  /** @return the FsShell command that was run, for example {@code ozone fs -ls}, without options or arguments. */
+  static String parseCommandName(String[] argv) {
+    for (int i = 0; i < argv.length; i++) {
+      if (GENERIC_OPTIONS.contains(argv[i])) {
+        i++;
+      } else if (!argv[i].startsWith("-D")) {
+        return "ozone fs " + argv[i];
+      }
+    }
+    return "ozone fs";
+  }
+
+  /** Adds the command, its options and its arguments to the current span; {@link #REDACTED_OPTIONS} are skipped. */
+  static void addCommandAttributes(String[] argv) {
+    TracingUtil.addAttributesToCurrentSpan(FsShellTracingAttributes.CLI_COMMAND, parseCommandName(argv));
+    List<String> args = new ArrayList<>();
+    for (int i = 0; i < argv.length; i++) {
+      String arg = argv[i];
+      if (REDACTED_OPTIONS.contains(arg)) {
+        i++;
+      } else if (GENERIC_OPTIONS.contains(arg) && i + 1 < argv.length) {
+        TracingUtil.addAttributesToCurrentSpan(FsShellTracingAttributes.CLI_OPTION_PREFIX + arg, argv[++i]);
+      } else if (!arg.startsWith("-")) {
+        args.add(arg);
+      } else if (!arg.startsWith("-D")) {
+        TracingUtil.addAttributesToCurrentSpan(FsShellTracingAttributes.CLI_OPTION_PREFIX + arg, true);
+      }
+    }
+    if (!args.isEmpty()) {
+      TracingUtil.addAttributesToCurrentSpan(FsShellTracingAttributes.CLI_ARGS, String.join(" ", args));
+    }
   }
 }
