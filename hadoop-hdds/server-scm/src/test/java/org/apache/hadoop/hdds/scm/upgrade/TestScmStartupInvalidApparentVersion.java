@@ -84,6 +84,10 @@ public class TestScmStartupInvalidApparentVersion {
       // The DB is ahead of the VERSION file, as the interrupted install leaves it. The SCM finalizes to the
       // software version
       scm = restartWithDBVersion(scm, SOFTWARE_VERSION);
+      // finalizeFromDBIfRequired is called by scm.start(), but calling that here makes the tests slow and we would
+      // need more setup for safemode etc. As this test is unit testing finalizeFromDBIfRequired we call it directly
+      // to keep the tests simple.
+      scm.getVersionManager().finalizeFromDBIfRequired(scm.getScmMetadataStore().getMetaTable());
       assertVersions(scm, SOFTWARE_VERSION, SOFTWARE_VERSION);
       assertThat(scm.getVersionManager().needsFinalization()).isFalse();
     } finally {
@@ -111,6 +115,10 @@ public class TestScmStartupInvalidApparentVersion {
 
       // On restart, finalizeFromSnapshotIfRequired should detect VERSION file > DB and update the DB.
       scm = HddsTestUtils.getScm(scm.getConfiguration(), new SCMConfigurator());
+      // finalizeFromDBIfRequired is called by scm.start(), but calling that here makes the tests slow and we would
+      // need more setup for safemode etc. As this test is unit testing finalizeFromDBIfRequired we call it directly
+      // to keep the tests simple.
+      scm.getVersionManager().finalizeFromDBIfRequired(scm.getScmMetadataStore().getMetaTable());
       assertVersions(scm, SOFTWARE_VERSION, SOFTWARE_VERSION);
     } finally {
       scm.stop();
