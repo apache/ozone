@@ -49,6 +49,7 @@ import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -66,7 +67,8 @@ class TestStorageContainerManager {
     try {
       boolean enabled = !"false".equals(value);
       assertGauge("FCRRateLimitEnabled", enabled ? 1 : 0,
-          getMetrics(SCMFullContainerReportLeaseMetrics.class.getSimpleName()));
+          getMetrics(MetricUtil.getMetricsSourceName(SCMFullContainerReportLeaseMetrics.class.getSimpleName(),
+              scm.getScmId())));
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage())
           .setRequestFullContainerReportLease(true).build();
@@ -83,7 +85,8 @@ class TestStorageContainerManager {
   @Test
   void reconfigureFcrRateLimitValidatesValuesAndRestoresDefault(@TempDir File tempDir) throws Exception {
     StorageContainerManager scm = HddsTestUtils.getScm(SCMTestUtils.getConf(tempDir));
-    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    String source = MetricUtil.getMetricsSourceName(SCMFullContainerReportLeaseMetrics.class.getSimpleName(),
+        scm.getScmId());
     ReconfigurationHandler handler = scm.getReconfigurationHandler();
     try {
       assertGauge("FCRRateLimitEnabled", 1, getMetrics(source));
@@ -138,7 +141,8 @@ class TestStorageContainerManager {
   @Test
   void fcrLeaseMetricsFollowScmLifecycle(@TempDir File tempDir) throws Exception {
     StorageContainerManager scm = HddsTestUtils.getScm(SCMTestUtils.getConf(tempDir));
-    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    String source = MetricUtil.getMetricsSourceName(SCMFullContainerReportLeaseMetrics.class.getSimpleName(),
+        scm.getScmId());
     try {
       scm.getDatanodeProtocolServer().stop();
 

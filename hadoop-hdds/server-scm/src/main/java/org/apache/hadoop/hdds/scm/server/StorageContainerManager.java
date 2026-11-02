@@ -471,7 +471,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmReadOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
 
-    fcrLeaseMetrics = SCMFullContainerReportLeaseMetrics.create();
+    fcrLeaseMetrics = SCMFullContainerReportLeaseMetrics.create(getScmId());
     fcrLeaseManager = createFCRLeaseManager(conf);
     scmNodeManager.setDatanodeRemovedCallback(fcrLeaseManager::removeDatanode);
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this, eventQueue, scmContext, fcrLeaseManager);

@@ -333,7 +333,7 @@ class TestSCMDatanodeProtocolServer {
   void testUnavailableLeaseTermRejectsReportWithoutDroppingHeartbeat(boolean finalized, boolean rateLimitEnabled)
       throws Exception {
     server.stop();
-    SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create();
+    SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create("scm");
     try {
       leases = spy(new SCMFullContainerReportLeaseManager(1, 5_000L, rateLimitEnabled, () -> 0L, metrics));
       SCMContext context = mock(SCMContext.class);

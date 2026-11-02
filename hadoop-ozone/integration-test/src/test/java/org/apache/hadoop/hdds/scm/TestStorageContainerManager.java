@@ -151,6 +151,7 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.log4j.Level;
@@ -706,7 +707,8 @@ public class TestStorageContainerManager {
       EndpointStateMachine endpoint = datanode.getConnectionManager().getValues().stream()
           .filter(peer -> !peer.isPassive()).findFirst().orElseThrow(AssertionError::new);
       VersionResponse capability = endpoint.getVersion();
-      String metricsSource = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+      String metricsSource = MetricUtil.getMetricsSourceName(SCMFullContainerReportLeaseMetrics.class.getSimpleName(),
+          scm.getScmId());
       assertTrue(endpoint.supportsFullContainerReportLease());
       assertFalse(datanode.getContext().isFullContainerReportLeaseEnabled(endpoint));
       assertEquals(0, getLongCounter("NumFCRLeaseRequests", getMetrics(metricsSource)));

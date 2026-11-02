@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseMetrics;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -72,7 +73,8 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void fullContainerReportRateLimit() throws ReconfigurationException {
-    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    String source = MetricUtil.getMetricsSourceName(SCMFullContainerReportLeaseMetrics.class.getSimpleName(),
+        cluster().getStorageContainerManager().getScmId());
     try {
       for (boolean enabled : new boolean[] {false, true}) {
         String value = Boolean.toString(enabled);

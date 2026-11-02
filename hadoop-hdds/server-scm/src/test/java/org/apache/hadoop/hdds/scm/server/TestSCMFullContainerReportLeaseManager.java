@@ -34,6 +34,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -141,8 +144,8 @@ class TestSCMFullContainerReportLeaseManager {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void shouldReportRateLimitModeAndOutstandingLeases(boolean rateLimitEnabled) {
-    SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create();
-    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create("scm");
+    String source = MetricUtil.getMetricsSourceName(SCMFullContainerReportLeaseMetrics.class.getSimpleName(), "scm");
     try {
       SCMFullContainerReportLeaseManager leaseManager =
           new SCMFullContainerReportLeaseManager(1, 5_000L, rateLimitEnabled, () -> 0L, metrics);
@@ -166,6 +169,32 @@ class TestSCMFullContainerReportLeaseManager {
       assertThat(metrics.getNumFCRReportsProcessedWithLease()).isEqualTo(1L);
     } finally {
       metrics.unregister();
+    }
+  }
+
+  @Test
+  void shouldUnregisterOnlyOwnMetricsSource() {
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    MetricsSystem metricsSystem = DefaultMetricsSystem.initialize("FCRLeaseMetricsTest");
+    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    String firstSource = MetricUtil.getMetricsSourceName(source, "scm1");
+    String secondSource = MetricUtil.getMetricsSourceName(source, "scm2");
+    try {
+      SCMFullContainerReportLeaseMetrics first = SCMFullContainerReportLeaseMetrics.create("scm1");
+      SCMFullContainerReportLeaseMetrics second = SCMFullContainerReportLeaseMetrics.create("scm2");
+
+      second.unregister();
+      assertThat(metricsSystem.getSource(secondSource)).isNull();
+      assertThat(metricsSystem.getSource(firstSource)).isNotNull();
+
+      first.unregister();
+      assertThat(metricsSystem.getSource(firstSource)).isNull();
+    } finally {
+      metricsSystem.unregisterSource(firstSource);
+      metricsSystem.unregisterSource(secondSource);
+      DefaultMetricsSystem.shutdown();
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
     }
   }
 

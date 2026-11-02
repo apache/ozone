@@ -25,6 +25,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics for full container report lease management.
@@ -38,6 +39,8 @@ public final class SCMFullContainerReportLeaseMetrics {
   private static final String SOURCE_NAME =
       SCMFullContainerReportLeaseMetrics.class.getSimpleName();
 
+  private final String sourceName;
+
   private @Metric MutableCounterLong numFCRLeaseRequests;
   private @Metric MutableCounterLong numFCRLeasesGranted;
   private @Metric MutableCounterLong numFCRLeasesRejected;
@@ -48,18 +51,20 @@ public final class SCMFullContainerReportLeaseMetrics {
   @Metric({"FCRRateLimitEnabled", "Whether FCR rate limiting is enabled (1 enabled, 0 disabled)"})
   private MutableGaugeInt fcrRateLimitEnabled;
 
-  private SCMFullContainerReportLeaseMetrics() {
+  private SCMFullContainerReportLeaseMetrics(String sourceName) {
+    this.sourceName = sourceName;
   }
 
-  public static SCMFullContainerReportLeaseMetrics create() {
+  public static SCMFullContainerReportLeaseMetrics create(String scmId) {
     MetricsSystem metricsSystem = DefaultMetricsSystem.instance();
-    return metricsSystem.register(SOURCE_NAME,
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, scmId);
+    return metricsSystem.register(sourceName,
         "SCM Full Container Report Lease Metrics",
-        new SCMFullContainerReportLeaseMetrics());
+        new SCMFullContainerReportLeaseMetrics(sourceName));
   }
 
   public void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void incNumFCRLeaseRequests() {
