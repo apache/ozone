@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +58,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -65,6 +68,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -305,6 +309,98 @@ class TestOpenKeyCleanupService {
   }
 
   /**
+   * A deleted hsync'ed file must not come back when its writer commits,
+   * and its open key must be removed by OpenKeyCleanupService.
+   */
+  @Test
+  public void testCleanupDeletedHsyncKey() throws Exception {
+    OpenKeyCleanupService openKeyCleanupService =
+        (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
+
+    openKeyCleanupService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL);
+
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    createVolumeAndBucket(volume, bucket, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName(UUID.randomUUID().toString())
+        .setAcls(Collections.emptyList())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setLocationInfoList(new ArrayList<>())
+        .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+        .build();
+    OpenKeySession session = writeClient.openKey(keyArgs);
+    keyArgs.addLocationInfo(writeClient.allocateBlock(keyArgs, session.getId(), new ExcludeList()));
+    writeClient.hsyncKey(keyArgs, session.getId());
+
+    writeClient.deleteKey(keyArgs);
+    // the deletion has to be flushed to DB and evicted from the table cache
+    om.awaitDoubleBufferFlush();
+
+    OMException e = assertThrows(OMException.class, () -> writeClient.commitKey(keyArgs, session.getId()));
+    assertEquals(KEY_NOT_FOUND, e.getResult());
+
+    // wait for the open key to expire
+    Thread.sleep(EXPIRE_THRESHOLD_MS);
+    assertEquals(1, getExpiredOpenKeys(false, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+
+    openKeyCleanupService.resume();
+    waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    assertThat(getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, true))
+        .noneMatch(openKey -> openKey.getBucketName().equals(bucket));
+  }
+
+  /**
+   * An expired hsync'ed open key whose file is no longer in the file table
+   * must be deleted, and must not stop OpenKeyCleanupService. The marked row
+   * that an OM without the OMKeyDeleteResponseWithFSO fix wrote under the
+   * openKeyTable key format must be deleted as well.
+   */
+  @Test
+  public void testCleanupHsyncKeyWithoutCommittedFile() throws Exception {
+    OpenKeyCleanupService openKeyCleanupService =
+        (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
+
+    openKeyCleanupService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL);
+
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    String key = UUID.randomUUID().toString();
+    createVolumeAndBucket(volume, bucket, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    createOpenKey(volume, bucket, key, 1, true, false);
+    om.awaitDoubleBufferFlush();
+    List<OmKeyInfo> openKeys = getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, true);
+    openKeys.removeIf(info -> !bucket.equals(info.getBucketName()));
+    assertEquals(1, openKeys.size());
+    OmKeyInfo openKeyInfo = openKeys.get(0);
+    // Reproduce what an OM without the OMKeyDeleteResponseWithFSO fix left behind when deleting an hsync'ed file:
+    // the file is gone, its open key is unmarked, and the marker sits in a stray row under the openKeyTable key.
+    long bucketId = omMetadataManager.getBucketId(volume, bucket);
+    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).delete(
+        omMetadataManager.getOzonePathKey(omMetadataManager.getVolumeId(volume), bucketId, bucketId, key));
+    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(
+        omMetadataManager.getOpenKey(volume, bucket, key, openKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)),
+        openKeyInfo.withMetadataMutations(metadata -> metadata.put(OzoneConsts.DELETED_HSYNC_KEY, "true")));
+
+    // wait for the open keys to expire
+    Thread.sleep(EXPIRE_THRESHOLD_MS);
+    // the unmarked open key and the stray row are both deleted, neither is committed
+    assertEquals(2, getExpiredOpenKeys(false, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+    assertEquals(0, getExpiredOpenKeys(true, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+
+    openKeyCleanupService.resume();
+    waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    assertThat(getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, true))
+        .noneMatch(openKey -> openKey.getBucketName().equals(bucket));
+  }
+
+  /**
    * In this test, we create a bunch of incomplete MPU keys and try to run
    * openKeyCleanupService on it. We make sure that none of these incomplete
    * MPU keys are actually deleted.
@@ -435,8 +531,8 @@ class TestOpenKeyCleanupService {
     try {
       final ExpiredOpenKeys expired = keyManager.getExpiredOpenKeys(
           EXPIRE_THRESHOLD, 100, layout, EXPIRE_THRESHOLD);
-      return (hsync ? expired.getHsyncKeys() : expired.getOpenKeyBuckets())
-          .size();
+      return hsync ? expired.getHsyncKeys().size()
+          : expired.getOpenKeyBuckets().stream().mapToInt(OpenKeyBucket.Builder::getKeysCount).sum();
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
