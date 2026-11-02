@@ -1181,10 +1181,9 @@ public class TestECUnderReplicationHandler {
       verify(replicationManager, times(1))
           .processOverReplicatedContainer(underRep);
       assertEquals(1, commandsSent.size());
-      DatanodeCommand pair = commandsSent.iterator().next();
-      assertEquals(newNode, pair.datanode());
-      assertEquals(SCMCommandProto.Type.reconstructECContainersCommand,
-          pair.command().getType());
+      DatanodeCommand datanodeCommand = commandsSent.iterator().next();
+      assertEquals(newNode, datanodeCommand.datanode());
+      assertEquals(SCMCommandProto.Type.reconstructECContainersCommand, datanodeCommand.command().getType());
       clearInvocations(replicationManager);
       commandsSent.clear();
     }
@@ -1395,8 +1394,7 @@ public class TestECUnderReplicationHandler {
     ContainerReplica maintReplica = createContainerReplica(container.containerID(), 2, ENTERING_MAINTENANCE, CLOSED);
     availableReplicas.add(maintReplica);
 
-    Set<DatanodeCommand> cmds = testUnderReplicationWithMissingIndexes(emptyList(),
-            availableReplicas, 0, 1, policy);
+    Set<DatanodeCommand> cmds = testUnderReplicationWithMissingIndexes(emptyList(), availableReplicas, 0, 1, policy);
     assertEquals(0, cmds.size());
 
     // Change the remaining redundancy to ensure something needs copied.

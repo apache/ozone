@@ -70,12 +70,10 @@ public final class ReplicationTestUtil {
   private ReplicationTestUtil() {
   }
 
-  @SafeVarargs
   public static Set<ContainerReplica> createReplicas(ContainerID containerID, NodeOperationalStateAndIndex... nodes) {
     return createReplicas(containerID, CLOSED, nodes);
   }
 
-  @SafeVarargs
   public static Set<ContainerReplica> createReplicas(ContainerID containerID,
       ContainerReplicaProto.State replicaState,
       NodeOperationalStateAndIndex... nodes) {
@@ -288,14 +286,12 @@ public final class ReplicationTestUtil {
         .build();
   }
 
-  @SafeVarargs
   public static Set<ContainerReplica> createReplicas(
       NodeOperationalStateAndIndex... states) {
     return createReplicas(CLOSED,
         states);
   }
 
-  @SafeVarargs
   public static Set<ContainerReplica> createReplicas(
       ContainerReplicaProto.State replicaState,
       NodeOperationalStateAndIndex... states) {

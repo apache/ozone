@@ -417,8 +417,7 @@ public class TestRatisUnderReplicationHandler {
 
     Set<DatanodeCommand> commands =
         testProcessing(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2, 2);
-    commands.forEach(command -> assertEquals(closedReplica.getDatanodeDetails(),
-            command.datanode()));
+    commands.forEach(command -> assertEquals(closedReplica.getDatanodeDetails(), command.datanode()));
   }
 
   /**
@@ -438,8 +437,7 @@ public class TestRatisUnderReplicationHandler {
 
     Set<DatanodeCommand> commands = testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 1);
-    commands.forEach(command -> assertNotEquals(unhealthyReplica.getDatanodeDetails(),
-            command.datanode()));
+    commands.forEach(command -> assertNotEquals(unhealthyReplica.getDatanodeDetails(), command.datanode()));
   }
 
   @Test
@@ -541,8 +539,7 @@ public class TestRatisUnderReplicationHandler {
 
     final Set<DatanodeCommand> commands =
         testProcessing(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2, 2);
-    commands.forEach(command -> assertNotEquals(quasiClosedReplica.getDatanodeDetails(),
-            command.datanode()));
+    commands.forEach(command -> assertNotEquals(quasiClosedReplica.getDatanodeDetails(), command.datanode()));
   }
 
   /**
@@ -657,8 +654,7 @@ public class TestRatisUnderReplicationHandler {
 
     final Set<DatanodeCommand> commands = testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 2);
-    commands.forEach(command -> assertEquals(quasiClosedReplica.getDatanodeDetails(),
-            command.datanode()));
+    commands.forEach(command -> assertEquals(quasiClosedReplica.getDatanodeDetails(), command.datanode()));
   }
 
   @Test
@@ -677,8 +673,7 @@ public class TestRatisUnderReplicationHandler {
 
     final Set<DatanodeCommand> commands =
         testProcessing(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2, 1);
-    commands.forEach(command -> assertEquals(closedReplica.getDatanodeDetails(),
-            command.datanode()));
+    commands.forEach(command -> assertEquals(closedReplica.getDatanodeDetails(), command.datanode()));
   }
 
   @Test

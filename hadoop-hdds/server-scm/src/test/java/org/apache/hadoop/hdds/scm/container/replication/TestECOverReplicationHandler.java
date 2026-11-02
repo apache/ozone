@@ -334,8 +334,8 @@ public class TestECOverReplicationHandler {
     assertEquals(totalDeleteCommandNum, commandsSent.size());
 
     // Each command should have a non-zero replica index
-    commandsSent.forEach(pair -> assertNotEquals(0,
-        ((DeleteContainerCommand) pair.command()).getReplicaIndex()));
+    commandsSent.forEach(datanodeCommand -> assertNotEquals(0,
+        ((DeleteContainerCommand) datanodeCommand.command()).getReplicaIndex()));
 
     // command num of each index should be equal to the excess num
     // of this index
@@ -344,8 +344,8 @@ public class TestECOverReplicationHandler {
             ContainerReplica::getDatanodeDetails,
             ContainerReplica::getReplicaIndex));
     Map<Integer, Integer> index2commandNum = new HashMap<>();
-    commandsSent.forEach(pair -> index2commandNum.merge(
-        datanodeDetails2Index.get(pair.datanode()), 1, Integer::sum)
+    commandsSent.forEach(datanodeCommand -> index2commandNum.merge(
+        datanodeDetails2Index.get(datanodeCommand.datanode()), 1, Integer::sum)
     );
 
     index2commandNum.keySet().forEach(i -> {

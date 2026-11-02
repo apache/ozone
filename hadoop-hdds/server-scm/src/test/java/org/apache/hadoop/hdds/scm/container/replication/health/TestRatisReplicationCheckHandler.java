@@ -243,11 +243,11 @@ public class TestRatisReplicationCheckHandler {
   @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#outOfServiceStates")
   void testUnderReplicatedDueToAllOutOfService(
       HddsProtos.NodeOperationalState state) {
-    NodeOperationalStateAndIndex pair = new NodeOperationalStateAndIndex(state, 0);
+    NodeOperationalStateAndIndex nodeState = new NodeOperationalStateAndIndex(state, 0);
 
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        pair, pair, pair);
+        nodeState, nodeState, nodeState);
 
     ContainerCheckRequest checkRequest = requestBuilder
         .setContainerReplicas(replicas)

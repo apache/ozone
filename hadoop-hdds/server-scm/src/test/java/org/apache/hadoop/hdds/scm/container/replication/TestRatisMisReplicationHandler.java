@@ -92,8 +92,8 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
           throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 0),
-                new NodeOperationalStateAndIndex(IN_SERVICE, 0),
-                new NodeOperationalStateAndIndex(IN_SERVICE, 0));
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(),
             0, misreplicationCount, Math.min(misreplicationCount, 3));
   }
@@ -104,7 +104,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
       int misreplicationCount) throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(State.QUASI_CLOSED, new NodeOperationalStateAndIndex(IN_SERVICE, 0),
-                new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0));
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(),
         0, misreplicationCount, Math.min(misreplicationCount, 3));
   }
@@ -134,7 +134,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
           int misreplicationCount) throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
             .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 0),
-                    new NodeOperationalStateAndIndex(IN_SERVICE, 0), 
+                    new NodeOperationalStateAndIndex(IN_SERVICE, 0),
                     new NodeOperationalStateAndIndex(IN_MAINTENANCE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(),
             0, misreplicationCount, Math.min(misreplicationCount, 2));
@@ -199,7 +199,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
   public void testCopyIsSkippedUntilItReducesMisReplication() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 0),
-                new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0),
             new NodeOperationalStateAndIndex(IN_SERVICE, 0));
     // The target doesn't help, e.g. because it is on the same rack as all the existing replicas.
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
@@ -267,8 +267,8 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
 
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 0),
-                new NodeOperationalStateAndIndex(IN_SERVICE, 0),
-                new NodeOperationalStateAndIndex(IN_SERVICE, 0));
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 0));
     assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
             Collections.emptyList(), 0, 1, 1, 0));

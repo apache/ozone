@@ -168,8 +168,7 @@ public class TestReplicationManager {
     commandsSent = new HashSet<>();
     eventPublisher = mock(EventPublisher.class);
     doAnswer(invocation -> {
-      commandsSent.add(new DatanodeIdCommand(invocation.getArgument(0),
-          invocation.getArgument(1)));
+      commandsSent.add(new DatanodeIdCommand(invocation.getArgument(0), invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
@@ -1783,8 +1782,7 @@ public class TestReplicationManager {
         "Second report should have 50 samples after reconfiguration");
   }
 
-  @SafeVarargs
-  private final Set<ContainerReplica>  addReplicas(ContainerInfo container,
+  private Set<ContainerReplica> addReplicas(ContainerInfo container,
       ContainerReplicaProto.State replicaState,
       NodeOperationalStateAndIndex... nodes) {
     final Set<ContainerReplica> replicas =

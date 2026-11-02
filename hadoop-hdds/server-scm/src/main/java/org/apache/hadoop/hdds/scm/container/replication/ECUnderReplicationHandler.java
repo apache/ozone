@@ -144,9 +144,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     }
 
     Map<Integer, SourceReplica> sources = filterSources(replicas, deletionInFlight);
-    List<DatanodeDetails> availableSourceNodes = sources.values().stream().map(SourceReplica::replica)
-        .map(ContainerReplica::getDatanodeDetails).filter(datanodeDetails ->
-             datanodeDetails.getPersistedOpState() == HddsProtos.NodeOperationalState.IN_SERVICE)
+    List<DatanodeDetails> availableSourceNodes = sources.values().stream()
+        .map(SourceReplica::replica)
+        .map(ContainerReplica::getDatanodeDetails)
+        .filter(dn -> dn.getPersistedOpState() == HddsProtos.NodeOperationalState.IN_SERVICE)
         .collect(Collectors.toList());
 
     try {
@@ -247,8 +248,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         // all through they would not get used anyway.
         // If neither of the nodes are in service, we just pass one through,
         // as it will be decommission or maintenance.
-        .collect(Collectors.toMap(source -> source.replica().getReplicaIndex(),
-            source -> source, (p1, p2) -> {
+        .collect(Collectors.toMap(
+            source -> source.replica().getReplicaIndex(),
+            source -> source,
+            (p1, p2) -> {
               if (p1.nodeStatus().getOperationalState() == IN_SERVICE) {
                 return p1;
               } else {
@@ -442,7 +445,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
   private static boolean hasSufficientSourcesForDecommissionReconstruction(Map<Integer, SourceReplica> sources,
       Set<Integer> decomIndexes, int requiredDataSources) {
-    long nonDecommissionSourceCount = sources.keySet().stream().filter(index -> !decomIndexes.contains(index))
+    long nonDecommissionSourceCount = sources.keySet().stream()
+        .filter(index -> !decomIndexes.contains(index))
         .count();
     return nonDecommissionSourceCount >= requiredDataSources;
   }
@@ -498,7 +502,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           metrics.incrEcReconstructionGlobalLimitReachedTotal();
           break;
         }
-        LOG.info("Source node {} is highly loaded, switching to " + "reconstruction for decommissioning container {}",
+        LOG.info("Source node {} is highly loaded, switching to reconstruction for decommissioning container {}",
             source.replica().getDatanodeDetails(), container.containerID());
         try {
           int commandsSent = processReconstruction(replicaCount,
@@ -562,7 +566,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         LOG.warn("Couldn't find enough targets. Available source"
             + " nodes: {}, the target nodes: {}, excluded nodes: {},"
             + " usedNodes: {}, and the decommission indexes: {}",
-            sources.values().stream().map(SourceReplica::replica).collect(Collectors.toSet()),
+            sources.values().stream()
+                .map(SourceReplica::replica)
+                .collect(Collectors.toSet()),
             selectedDatanodes, excludedNodes, usedNodes, decomIndexes);
         break;
       }
@@ -652,7 +658,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 + " nodes: {}, target nodes: {}, excluded nodes: {},"
                 + " usedNodes: {} and"
                 + " maintenance indexes: {}",
-            sources.values().stream().map(SourceReplica::replica).collect(Collectors.toSet()),
+            sources.values().stream()
+                .map(SourceReplica::replica)
+                .collect(Collectors.toSet()),
             targets, excludedNodes, usedNodes, maintIndexes);
         break;
       }

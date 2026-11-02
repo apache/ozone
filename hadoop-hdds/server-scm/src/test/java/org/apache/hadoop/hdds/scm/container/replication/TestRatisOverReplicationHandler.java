@@ -359,7 +359,9 @@ public class TestRatisOverReplicationHandler {
 
     Set<DatanodeCommand> commands = testProcessing(
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 2);
-    Set<DatanodeDetails> datanodes = commands.stream().map(DatanodeCommand::datanode).collect(Collectors.toSet());
+    Set<DatanodeDetails> datanodes = commands.stream()
+        .map(DatanodeCommand::datanode)
+        .collect(Collectors.toSet());
     assertThat(datanodes).contains(quasiClosedReplica.getDatanodeDetails());
   }
 
@@ -381,7 +383,9 @@ public class TestRatisOverReplicationHandler {
 
     Set<DatanodeCommand> commands = testProcessing(
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
-    Set<DatanodeDetails> datanodes = commands.stream().map(DatanodeCommand::datanode).collect(Collectors.toSet());
+    Set<DatanodeDetails> datanodes = commands.stream()
+        .map(DatanodeCommand::datanode)
+        .collect(Collectors.toSet());
     assertThat(datanodes).doesNotContain(decommissioningReplica.getDatanodeDetails());
     assertThat(datanodes).doesNotContain(maintenanceReplica.getDatanodeDetails());
   }
