@@ -41,6 +41,18 @@ public final class OmTracingAttributes {
   /** Raft role of the OM applying a transaction: leader or follower. */
   public static final String OM_ROLE = "om.role";
 
+  /** Time an OM request waited for its locks, in nanoseconds. */
+  public static final String OM_LOCK_WAIT_NS = "om.lock.wait_ns";
+
+  /** Time an OM request held read locks, in nanoseconds. */
+  public static final String OM_LOCK_READ_NS = "om.lock.read_ns";
+
+  /** Time an OM request held write locks, in nanoseconds. */
+  public static final String OM_LOCK_WRITE_NS = "om.lock.write_ns";
+
+  /** Bucket layout resolved for an OM key request, for example {@code FILE_SYSTEM_OPTIMIZED}. */
+  public static final String OM_BUCKET_LAYOUT = "om.bucket_layout";
+
   private OmTracingAttributes() {
   }
 }

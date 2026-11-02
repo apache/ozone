@@ -253,6 +253,37 @@ public class TestOMResponse {
   }
 
   @Test
+  public void testLockDetailsAreRecordedOnSpan() throws Exception {
+    OMExecutionFlow executionFlow = mockLinearizableRead();
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.ServiceList)
+        .setClientId("test-client")
+        .build();
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(request.getCmdType())
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setSuccess(true)
+        .setOmLockDetails(OzoneManagerProtocolProtos.OMLockDetailsProto.newBuilder()
+            .setWaitLockNanos(11)
+            .setReadLockNanos(22)
+            .setWriteLockNanos(33))
+        .build();
+    when(executionFlow.submit(any(OMRequest.class), eq(false))).thenReturn(response);
+
+    Server.Call call = new Server.Call(1, 0, null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER, new byte[0]);
+    Server.getCurCall().set(call);
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      createTranslator(OMVersionManagerTestUtils.mockFinalizedOmVersionManager()).submitRequest(null, request);
+
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_LOCK_WAIT_NS, 11L);
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_LOCK_READ_NS, 22L);
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_LOCK_WRITE_NS, 33L);
+    } finally {
+      Server.getCurCall().remove();
+    }
+  }
+
+  @Test
   public void testOkWithoutSuccessIsNotError() throws Exception {
     OMExecutionFlow executionFlow = mockLinearizableRead();
     OMRequest request = OMRequest.newBuilder()
