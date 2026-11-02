@@ -56,6 +56,9 @@ public final class OmTracingAttributes {
   /** Whether the last OM ACL check of the current span granted access. */
   public static final String OM_ACL_GRANTED = "om.acl.granted";
 
+  /** Number of transactions in an OM double-buffer flush. */
+  public static final String OM_BATCH_SIZE = "om.batch_size";
+
   private OmTracingAttributes() {
   }
 }

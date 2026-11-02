@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -285,22 +286,23 @@ public final class OzoneManagerDoubleBuffer {
       runnable.run();
       return;
     }
-    String spanName = "DB-commitWriteBatch-Size-" + batchSize;
-    TracingUtil.executeAsChildSpan(spanName, parentName, runnable);
+    TracingUtil.executeAsChildSpan("DB-commitWriteBatch", parentName, () -> {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_BATCH_SIZE, batchSize);
+      runnable.run();
+    });
   }
 
   /**
    * Add to writeBatch {@link TransactionInfo}.
    */
   private void addToBatchTransactionInfoWithTrace(String parentName,
-      long transactionIndex, CheckedRunnable<IOException> runnable)
+      CheckedRunnable<IOException> runnable)
       throws IOException {
     if (!isTracingEnabled) {
       runnable.run();
       return;
     }
-    String spanName = "DB-addWriteBatch-transactioninfo-" + transactionIndex;
-    TracingUtil.executeAsChildSpan(spanName, parentName, runnable);
+    TracingUtil.executeAsChildSpan("DB-addWriteBatch-transactioninfo", parentName, runnable);
   }
 
   /**
@@ -419,7 +421,6 @@ public final class OzoneManagerDoubleBuffer {
 
 
       addToBatchTransactionInfoWithTrace(lastTraceId,
-          lastTransaction.getIndex(),
           () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
               batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
 

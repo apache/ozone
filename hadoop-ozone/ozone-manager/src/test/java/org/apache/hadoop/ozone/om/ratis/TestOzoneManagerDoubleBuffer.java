@@ -32,6 +32,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,12 +47,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretCache;
 import org.apache.hadoop.ozone.om.S3SecretLockedManager;
@@ -477,6 +482,42 @@ class TestOzoneManagerDoubleBuffer {
     assertTrue(tasks.get(3).get());
     assertEquals(0, fn.notifyFlush());
 
+  }
+
+  @Test
+  public void testFlushSpansUseFixedNames() throws Exception {
+    // Replace the started buffer with one that has tracing on and no daemon, so the flush runs on this thread.
+    doubleBuffer.stop();
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
+        .setOmMetadataManager(ozoneManager.getMetadataManager())
+        .setS3SecretManager(secretManager)
+        .setMaxUnFlushedTransactionCount(1000)
+        .enableTracing(true)
+        .build();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      String traceId;
+      Span span = TracingUtil.createInternalSpan("test");
+      try (Scope ignored = span.makeCurrent()) {
+        traceId = TracingUtil.exportCurrentSpan();
+      } finally {
+        span.end();
+      }
+      OMClientResponse response = mock(OMClientResponse.class);
+      when(response.getOMResponse()).thenReturn(OMResponse.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+          .setStatus(OzoneManagerProtocolProtos.Status.OK)
+          .setTraceID(traceId)
+          .build());
+
+      doubleBuffer.add(response, TransactionInfo.getTermIndex(1));
+      doubleBuffer.flushCurrentBuffer();
+
+      collector.assertParent("DB-addToWriteBatch-CreateKey", "test");
+      collector.assertParent("DB-addWriteBatch-transactioninfo", "test");
+      collector.assertParent("DB-commitWriteBatch", "test");
+      collector.assertAttribute("DB-commitWriteBatch", OmTracingAttributes.OM_BATCH_SIZE, 1L);
+    }
   }
 
   private static Future<Boolean> waitFN(OzoneManagerDoubleBuffer.FlushNotifier fn) {
