@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.tracing.SkipTracing;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -538,6 +539,7 @@ public abstract class OMClientRequest implements IOMClientRequest {
   protected OMResponse createErrorOMResponse(
       @Nonnull OMResponse.Builder omResponse, @Nonnull Exception ex) {
 
+    TracingUtil.recordExceptionInCurrentSpan(ex);
     omResponse.setSuccess(false);
     String errorMsg = exceptionErrorMessage(ex);
     if (errorMsg != null) {

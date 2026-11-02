@@ -29,12 +29,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -224,6 +228,29 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     assertNotNull(omResponse.getCreateBucketResponse());
     assertEquals(OzoneManagerProtocolProtos.Status
             .BUCKET_ALREADY_EXISTS, omResponse.getStatus());
+  }
+
+  @Test
+  public void testBucketAlreadyExistsIsRecordedOnTheCurrentSpan() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName, bucketName);
+    doValidateAndUpdateCache(volumeName, bucketName, omBucketCreateRequest.getOmRequest());
+
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      OMClientResponse omClientResponse;
+      Span span = TracingUtil.createInternalSpan("validateAndUpdateCache");
+      try (Scope ignored = span.makeCurrent()) {
+        omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 2);
+      } finally {
+        span.end();
+      }
+
+      assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_ALREADY_EXISTS,
+          omClientResponse.getOMResponse().getStatus());
+      collector.assertError("validateAndUpdateCache", "Bucket already exist");
+      collector.assertExceptionRecorded("validateAndUpdateCache", OMException.class);
+    }
   }
 
   @Test
