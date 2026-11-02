@@ -40,9 +40,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
  * expire and survive local leadership changes and datanode removal until the report completes or is discarded.
  * Disabling rate limiting bypasses only the capacity check; validation and duplicate-report checks still apply.
  *
- * <p>Deferred registration IDs identify registrations whose FCR has not completed. Each grant captures the current
- * ID, or zero if none is pending. Successful completion clears only that same ID, so an older report cannot clear
- * the pending FCR of a newer registration. These IDs and leases are local, in-memory state, not replicated metadata.
+ * <p>A deferred registration stamp detects intervening registrations, similar to the version stamp in
+ * {@link java.util.concurrent.atomic.AtomicStampedReference} or optimistic-read validation in
+ * {@link java.util.concurrent.locks.StampedLock}. Each grant captures the current stamp, or zero if no registration is
+ * pending. Successful completion clears only a matching stamp, so an older report cannot clear a newer registration's
+ * pending FCR. Stamps do not provide synchronization; the manager's monitor does. Stamps and leases are local,
+ * in-memory state, not replicated metadata.
  *
  * <p>This object's monitor guards all mutable manager and {@link Lease} state. Expired grants and grants from other
  * terms are removed during lease requests, rather than by a background task. Callers determine upgrade and SCM
@@ -54,8 +57,8 @@ public class SCMFullContainerReportLeaseManager {
   private final LongSupplier clock;
   private final SCMFullContainerReportLeaseMetrics metrics;
   private final Map<String, Lease> outstandingLeases = new HashMap<>();
-  private final Map<String, Long> deferredRegistrationIds = new HashMap<>();
-  private long nextDeferredRegistrationId;
+  private final Map<String, Long> deferredRegistrationStamps = new HashMap<>();
+  private long nextDeferredRegistrationStamp;
   private boolean rateLimitEnabled;
 
   public SCMFullContainerReportLeaseManager(int maxOutstandingLeases, long leaseExpiryMs, boolean rateLimitEnabled,
@@ -117,10 +120,9 @@ public class SCMFullContainerReportLeaseManager {
     }
 
     long leaseId = nextLeaseId();
-    long deferredRegistrationId =
-        deferredRegistrationIds.getOrDefault(datanodeId, 0L);
+    long deferredRegistrationStamp = deferredRegistrationStamps.getOrDefault(datanodeId, 0L);
     outstandingLeases.put(datanodeId,
-        new Lease(leaseId, term, now, deferredRegistrationId));
+        new Lease(leaseId, term, now, deferredRegistrationStamp));
     incrementLeasesGranted();
     updateOutstandingLeaseMetric();
     return OptionalLong.of(leaseId);
@@ -178,7 +180,7 @@ public class SCMFullContainerReportLeaseManager {
 
     lease.state = LeaseState.CLAIMED;
     return Optional.of(new LeaseClaim(this, datanodeId, leaseId,
-        lease.deferredRegistrationId != 0));
+        lease.deferredRegistrationStamp != 0));
   }
 
   private synchronized boolean startProcessing(String datanodeId, long leaseId) {
@@ -198,10 +200,10 @@ public class SCMFullContainerReportLeaseManager {
     }
     outstandingLeases.remove(datanodeId);
     if (reportProcessed) {
-      if (lease.deferredRegistrationId != 0
-          && deferredRegistrationIds.getOrDefault(datanodeId, 0L)
-          == lease.deferredRegistrationId) {
-        deferredRegistrationIds.remove(datanodeId);
+      if (lease.deferredRegistrationStamp != 0
+          && deferredRegistrationStamps.getOrDefault(datanodeId, 0L)
+          == lease.deferredRegistrationStamp) {
+        deferredRegistrationStamps.remove(datanodeId);
       }
       incrementReportsProcessedWithLease();
     }
@@ -210,16 +212,16 @@ public class SCMFullContainerReportLeaseManager {
 
   /**
    * Records a new registration that still needs an FCR and invalidates any earlier unclaimed grant.
-   * A claimed lease retains capacity, but its completion cannot clear this newer registration's ID.
+   * A claimed lease retains capacity, but its completion cannot clear this newer registration's stamp.
    */
   public synchronized void markFullContainerReportDeferred(
       DatanodeDetails datanode) {
-    long deferredRegistrationId = ++nextDeferredRegistrationId;
-    if (deferredRegistrationId == 0) {
-      deferredRegistrationId = ++nextDeferredRegistrationId;
+    long deferredRegistrationStamp = ++nextDeferredRegistrationStamp;
+    if (deferredRegistrationStamp == 0) {
+      deferredRegistrationStamp = ++nextDeferredRegistrationStamp;
     }
     String datanodeId = datanode.getUuidString();
-    deferredRegistrationIds.put(datanodeId, deferredRegistrationId);
+    deferredRegistrationStamps.put(datanodeId, deferredRegistrationStamp);
     Lease lease = outstandingLeases.get(datanodeId);
     if (lease != null && lease.state == LeaseState.GRANTED) {
       outstandingLeases.remove(datanodeId);
@@ -228,11 +230,11 @@ public class SCMFullContainerReportLeaseManager {
   }
 
   /**
-   * Clears the pending registration ID when registration supplies an actual, unleased FCR.
+   * Clears the pending registration stamp when registration supplies an actual, unleased FCR.
    */
   public synchronized void clearFullContainerReportDeferred(
       DatanodeDetails datanode) {
-    deferredRegistrationIds.remove(datanode.getUuidString());
+    deferredRegistrationStamps.remove(datanode.getUuidString());
   }
 
   /**
@@ -245,7 +247,7 @@ public class SCMFullContainerReportLeaseManager {
       outstandingLeases.remove(datanodeId);
       updateOutstandingLeaseMetric();
     }
-    deferredRegistrationIds.remove(datanodeId);
+    deferredRegistrationStamps.remove(datanodeId);
   }
 
   private long nextLeaseId() {
@@ -348,15 +350,15 @@ public class SCMFullContainerReportLeaseManager {
     private final long leaseId;
     private final long term;
     private final long createdAtMs;
-    private final long deferredRegistrationId;
+    private final long deferredRegistrationStamp;
     private LeaseState state = LeaseState.GRANTED;
 
     private Lease(long leaseId, long term, long createdAtMs,
-        long deferredRegistrationId) {
+        long deferredRegistrationStamp) {
       this.leaseId = leaseId;
       this.term = term;
       this.createdAtMs = createdAtMs;
-      this.deferredRegistrationId = deferredRegistrationId;
+      this.deferredRegistrationStamp = deferredRegistrationStamp;
     }
   }
 
@@ -396,7 +398,7 @@ public class SCMFullContainerReportLeaseManager {
 
     /**
      * Releases the matching lease's capacity in either outcome. A successful report also updates success metrics
-     * and clears its deferred registration ID only if that registration is still current.
+     * and clears its deferred registration stamp only if that registration is still current.
      * Repeated completion cannot release a newer lease for the same datanode.
      *
      * @param processed true if report processing completed successfully; false on failure or discard
