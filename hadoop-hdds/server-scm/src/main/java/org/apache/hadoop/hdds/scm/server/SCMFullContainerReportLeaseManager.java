@@ -37,7 +37,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
  * </pre>
  * A GRANTED lease expires if the datanode does not send its report in time. Claiming validates the grant and marks it
  * CLAIMED, retaining capacity while the report is dispatched, queued or processed. CLAIMED and PROCESSING leases do not
- * expire and survive local leadership changes and datanode removal until the report completes or is discarded.
+ * expire and survive datanode removal until the report completes or is discarded. Local leadership changes do not
+ * invalidate outstanding leases.
  * Disabling rate limiting bypasses only the capacity check; validation and duplicate-report checks still apply.
  *
  * <p>A deferred registration stamp detects intervening registrations, similar to the version stamp in
@@ -47,9 +48,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
  * pending FCR. Stamps do not provide synchronization; the manager's monitor does. Stamps and leases are local,
  * in-memory state, not replicated metadata.
  *
- * <p>This object's monitor guards all mutable manager and {@link Lease} state. Expired grants and grants from other
- * terms are removed during lease requests, rather than by a background task. Callers determine upgrade and SCM
- * eligibility before requesting or claiming leases; this class does not consult SCM leadership or version state.
+ * <p>This object's monitor guards all mutable manager and {@link Lease} state. Expired grants are removed during
+ * lease requests, rather than by a background task. Callers determine upgrade and SCM eligibility before requesting or
+ * claiming leases; this class does not consult SCM leadership or version state.
  */
 public class SCMFullContainerReportLeaseManager {
   private final int maxOutstandingLeases;
@@ -95,15 +96,12 @@ public class SCMFullContainerReportLeaseManager {
    * Grants a nonzero lease ID if capacity is available, replacing any unclaimed grant for this datanode.
    *
    * @param datanode datanode requesting permission to send an FCR
-   * @param term term selected by the caller's SCM eligibility policy
    * @return the new grant, or empty if capacity is unavailable or this datanode already has a claimed lease
    */
-  public synchronized OptionalLong requestLease(
-      DatanodeDetails datanode, long term) {
+  public synchronized OptionalLong requestLease(DatanodeDetails datanode) {
     incrementLeaseRequests();
     long now = clock.getAsLong();
     pruneExpiredGrants(now);
-    removeGrantsFromOtherTerms(term);
     String datanodeId = datanode.getUuidString();
     Lease existingLease = outstandingLeases.get(datanodeId);
     if (existingLease != null && existingLease.state != LeaseState.GRANTED) {
@@ -121,8 +119,7 @@ public class SCMFullContainerReportLeaseManager {
 
     long leaseId = nextLeaseId();
     long deferredRegistrationStamp = deferredRegistrationStamps.getOrDefault(datanodeId, 0L);
-    outstandingLeases.put(datanodeId,
-        new Lease(leaseId, term, now, deferredRegistrationStamp));
+    outstandingLeases.put(datanodeId, new Lease(leaseId, now, deferredRegistrationStamp));
     incrementLeasesGranted();
     updateOutstandingLeaseMetric();
     return OptionalLong.of(leaseId);
@@ -132,14 +129,11 @@ public class SCMFullContainerReportLeaseManager {
    * Validates an incoming report's grant and moves it from GRANTED to CLAIMED without releasing capacity.
    *
    * @param datanode datanode sending the FCR
-   * @param currentTerm term selected by the caller's SCM eligibility policy
-   * @param leaseTerm term attached to the incoming report
    * @param leaseId lease ID attached to the incoming report
    * @return the report's lease claim, or empty if the grant is invalid, expired or already claimed
    */
-  public synchronized Optional<LeaseClaim> claimLease(
-      DatanodeDetails datanode, long currentTerm, long leaseTerm, long leaseId) {
-    if (currentTerm != leaseTerm || leaseId == 0) {
+  public synchronized Optional<LeaseClaim> claimLease(DatanodeDetails datanode, long leaseId) {
+    if (leaseId == 0) {
       incrementInvalidLeaseReports();
       return Optional.empty();
     }
@@ -161,15 +155,6 @@ public class SCMFullContainerReportLeaseManager {
       incrementLeaseExpired();
       incrementInvalidLeaseReports();
       updateOutstandingLeaseMetric();
-      return Optional.empty();
-    }
-
-    if (lease.term != currentTerm) {
-      if (currentTerm > lease.term) {
-        outstandingLeases.remove(datanodeId);
-        updateOutstandingLeaseMetric();
-      }
-      incrementInvalidLeaseReports();
       return Optional.empty();
     }
 
@@ -275,22 +260,6 @@ public class SCMFullContainerReportLeaseManager {
     }
   }
 
-  private void removeGrantsFromOtherTerms(long term) {
-    Iterator<Map.Entry<String, Lease>> iterator = outstandingLeases.entrySet()
-        .iterator();
-    boolean removed = false;
-    while (iterator.hasNext()) {
-      Lease lease = iterator.next().getValue();
-      if (lease.state == LeaseState.GRANTED && lease.term != term) {
-        iterator.remove();
-        removed = true;
-      }
-    }
-    if (removed) {
-      updateOutstandingLeaseMetric();
-    }
-  }
-
   private boolean isExpired(Lease lease, long now) {
     return now - lease.createdAtMs >= leaseExpiryMs;
   }
@@ -348,15 +317,12 @@ public class SCMFullContainerReportLeaseManager {
 
   private static final class Lease {
     private final long leaseId;
-    private final long term;
     private final long createdAtMs;
     private final long deferredRegistrationStamp;
     private LeaseState state = LeaseState.GRANTED;
 
-    private Lease(long leaseId, long term, long createdAtMs,
-        long deferredRegistrationStamp) {
+    private Lease(long leaseId, long createdAtMs, long deferredRegistrationStamp) {
       this.leaseId = leaseId;
-      this.term = term;
       this.createdAtMs = createdAtMs;
       this.deferredRegistrationStamp = deferredRegistrationStamp;
     }
@@ -364,7 +330,7 @@ public class SCMFullContainerReportLeaseManager {
 
   /**
    * Holds a claimed FCR lease until the report completes.
-   * The claim remains valid while its report is queued, even after grant expiry or term changes.
+   * The claim remains valid while its report is queued, even after grant expiry or SCM leadership changes.
    */
   public static final class LeaseClaim {
     private final SCMFullContainerReportLeaseManager leaseManager;

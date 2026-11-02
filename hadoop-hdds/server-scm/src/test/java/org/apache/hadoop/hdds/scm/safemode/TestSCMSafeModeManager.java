@@ -200,7 +200,7 @@ public class TestSCMSafeModeManager {
         new SCMFullContainerReportLeaseManager(2, 100L, true, now::get, null);
     doAnswer(invocation -> {
       ContainerReplica replica = invocation.getArgument(1);
-      assertThat(leaseManager.requestLease(replica.getDatanodeDetails(), 7L))
+      assertThat(leaseManager.requestLease(replica.getDatanodeDetails()))
           .as("A report must retain its lease until processing completes").isEmpty();
       return null;
     }).when(containerManager).updateContainerReplica(any(), any());
@@ -229,10 +229,10 @@ public class TestSCMSafeModeManager {
         for (int i = 0; i < 2; i++) {
           DatanodeDetails datanode = datanodes.get(batch == 0 ? i : i + 3);
           ContainerInfo container = containers.get(batch * 2 + i);
-          OptionalLong lease = leaseManager.requestLease(datanode, 7L);
+          OptionalLong lease = leaseManager.requestLease(datanode);
           assertThat(lease).isPresent();
           LeaseClaim claim =
-              leaseManager.claimLease(datanode, 7L, 7L, lease.getAsLong())
+              leaseManager.claimLease(datanode, lease.getAsLong())
                   .orElseThrow(AssertionError::new);
           ContainerReportsProto report = HddsTestUtils.getContainerReports(ContainerReplicaProto.newBuilder()
               .setContainerID(container.getContainerID())
@@ -249,10 +249,10 @@ public class TestSCMSafeModeManager {
         if (batch == 0) {
           // Datanode 2 never retries; its denied request must not block datanodes 3 and 4.
           for (int i = 2; i < datanodes.size(); i++) {
-            assertThat(leaseManager.requestLease(datanodes.get(i), 7L)).isEmpty();
+            assertThat(leaseManager.requestLease(datanodes.get(i))).isEmpty();
           }
         }
-        assertThat(leaseManager.requestLease(datanodes.get(batch == 0 ? 4 : 0), 7L)).isEmpty();
+        assertThat(leaseManager.requestLease(datanodes.get(batch == 0 ? 4 : 0))).isEmpty();
         assertEquals(batch * 2, metrics.getCurrentContainersWithOneReplicaReportedCount().value());
         assertTrue(scmSafeModeManager.getInSafeMode());
 

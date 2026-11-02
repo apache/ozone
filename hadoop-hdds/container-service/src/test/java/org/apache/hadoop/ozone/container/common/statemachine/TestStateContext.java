@@ -327,7 +327,7 @@ public class TestStateContext {
          EndpointStateMachine recon = new EndpointStateMachine(reconAddress, scm, conf, "")) {
       waiting.setVersion(leaseVersion);
       leased.setVersion(leaseVersion);
-      leased.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).setTerm(7).build());
+      leased.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).build());
       legacy.setVersion(VersionResponse.newBuilder().setVersion(1).build());
       recon.setVersion(leaseVersion);
       recon.setPassive(true);

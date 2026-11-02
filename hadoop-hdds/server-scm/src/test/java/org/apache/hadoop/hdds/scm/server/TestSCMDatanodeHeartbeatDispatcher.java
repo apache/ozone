@@ -387,8 +387,8 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     if (registrationDeferred) {
       leases.markFullContainerReportDeferred(datanode);
     }
-    long leaseId = leases.requestLease(datanode, 7L).getAsLong();
-    LeaseClaim claim = leases.claimLease(datanode, 7L, 7L, leaseId).orElseThrow(AssertionError::new);
+    long leaseId = leases.requestLease(datanode).getAsLong();
+    LeaseClaim claim = leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new);
 
     ContainerReportFromDatanode report =
         new ContainerReportFromDatanode(datanode, ContainerReportsProto.getDefaultInstance(), claim);
@@ -396,7 +396,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     assertEquals(registrationDeferred, report.isRegistrationReport());
     assertTrue(report.startProcessing());
     report.complete(true);
-    assertTrue(leases.requestLease(datanode, 7L).isPresent());
+    assertTrue(leases.requestLease(datanode).isPresent());
   }
 
   @Test
@@ -411,9 +411,9 @@ public class TestSCMDatanodeHeartbeatDispatcher {
       throws NodeNotFoundException {
     DatanodeDetails datanode = randomDatanodeDetails();
     SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
-    long leaseId = leases.requestLease(datanode, 7L).getAsLong();
+    long leaseId = leases.requestLease(datanode).getAsLong();
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
-        leases.claimLease(datanode, 7L, 7L, leaseId).orElseThrow(AssertionError::new);
+        leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new);
     ContainerReportFromDatanode report =
         new ContainerReportFromDatanode(datanode, ContainerReportsProto.getDefaultInstance(), claim);
     NodeManager nodeManager = mock(NodeManager.class);
@@ -436,7 +436,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
 
     assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(heartbeat, report));
 
-    assertTrue(leases.requestLease(randomDatanodeDetails(), 7L).isPresent());
+    assertTrue(leases.requestLease(randomDatanodeDetails()).isPresent());
   }
 
   @Test
@@ -463,9 +463,9 @@ public class TestSCMDatanodeHeartbeatDispatcher {
   public void testDispatchedContainerReportKeepsCompletionOwnership() throws NodeNotFoundException {
     DatanodeDetails datanode = randomDatanodeDetails();
     SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
-    long leaseId = leases.requestLease(datanode, 7L).getAsLong();
+    long leaseId = leases.requestLease(datanode).getAsLong();
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
-        leases.claimLease(datanode, 7L, 7L, leaseId).orElseThrow(AssertionError::new);
+        leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new);
     ContainerReportQueue queue = new ContainerReportQueue();
     NodeManager nodeManager = mock(NodeManager.class);
     when(nodeManager.isNodeRegistered(any())).thenReturn(true);
@@ -496,18 +496,18 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     assertThrows(IllegalStateException.class,
         () -> dispatcher.dispatch(heartbeat, providedReport));
     DatanodeDetails nextDatanode = randomDatanodeDetails();
-    assertFalse(leases.requestLease(nextDatanode, 7L).isPresent());
+    assertFalse(leases.requestLease(nextDatanode).isPresent());
     ContainerReportFromDatanode queuedReport = (ContainerReportFromDatanode) queue.remove();
     assertSame(providedReport, queuedReport);
     assertTrue(queuedReport.startProcessing());
     queuedReport.complete(true);
-    assertTrue(leases.requestLease(nextDatanode, 7L).isPresent());
+    assertTrue(leases.requestLease(nextDatanode).isPresent());
   }
 
   private static LeaseClaim claimLease(DatanodeDetails datanode) {
     SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
-    long leaseId = leases.requestLease(datanode, 7L).getAsLong();
-    return leases.claimLease(datanode, 7L, 7L, leaseId).orElseThrow(AssertionError::new);
+    long leaseId = leases.requestLease(datanode).getAsLong();
+    return leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new);
   }
 
   /**

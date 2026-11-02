@@ -61,7 +61,7 @@ class TestContainerReportQueue {
 
   private static LeaseClaim claimLease(DatanodeDetails datanode) {
     SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
-    long leaseId = leases.requestLease(datanode, 7L).getAsLong();
-    return leases.claimLease(datanode, 7L, 7L, leaseId).orElseThrow(AssertionError::new);
+    long leaseId = leases.requestLease(datanode).getAsLong();
+    return leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new);
   }
 }

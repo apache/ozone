@@ -383,7 +383,6 @@ public class HeartbeatEndpointTask
             .equalsIgnoreCase(datanodeDetailsProto.getUuid()),
         "Unexpected datanode ID in the response.");
     if (response.hasTerm()) {
-      rpcEndpoint.clearFullContainerReportLeaseIfStale(response.getTerm());
       context.updateTermOfLeaderSCM(response.getTerm());
     }
     if (response.hasFullContainerReportLease()

@@ -107,7 +107,7 @@ public class TestRunningDatanodeState {
           throw new IOException("SCM unavailable");
         }
         if (requestCount > 2) {
-          response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).setTerm(7));
+          response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99));
         }
       } else if (request.hasContainerReport()) {
         reports.incrementAndGet();
@@ -271,7 +271,7 @@ public class TestRunningDatanodeState {
       if (request.getRequestFullContainerReportLease()) {
         leaseRequested.countDown();
         assertThat(releaseLease.await(30, TimeUnit.SECONDS)).isTrue();
-        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).setTerm(7));
+        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99));
       } else if (request.hasContainerReport()) {
         report.set(request);
         reportSent.countDown();
@@ -305,7 +305,6 @@ public class TestRunningDatanodeState {
       healthy.getExecutorService().submit(() -> { }).get(5, TimeUnit.SECONDS);
       assertThat(report.get().getRequestFullContainerReportLease()).isFalse();
       assertThat(report.get().getContainerReport().getFullContainerReportLease().getId()).isEqualTo(99);
-      assertThat(report.get().getContainerReport().getFullContainerReportLease().getTerm()).isEqualTo(7);
       assertThat(context.isFullContainerReportReady(healthy.getAddress())).isFalse();
       assertThat(healthy.hasFullContainerReportLease()).isFalse();
       verify(healthyScm, times(2)).sendHeartbeat(any());

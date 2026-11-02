@@ -103,7 +103,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
@@ -820,7 +819,7 @@ public class TestStorageContainerManager {
       assertTrue(response.hasFullContainerReportLease());
       FullContainerReportLeaseProto lease =
           response.getFullContainerReportLease();
-      assertEquals(SCMContext.INVALID_TERM, lease.getTerm());
+      assertThat(lease.getId()).isNotZero();
 
       SCMHeartbeatRequestProto report = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanode.getProtoBufMessage())

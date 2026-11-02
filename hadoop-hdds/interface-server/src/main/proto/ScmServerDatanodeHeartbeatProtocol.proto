@@ -163,7 +163,6 @@ message CommandQueueReportProto {
 
 message FullContainerReportLeaseProto {
   required uint64 id = 1;
-  required int64 term = 2;
 }
 
 /*

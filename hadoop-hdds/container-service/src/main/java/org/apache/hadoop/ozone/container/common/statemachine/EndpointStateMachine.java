@@ -143,13 +143,6 @@ public class EndpointStateMachine
     fullContainerReportLease = null;
   }
 
-  public void clearFullContainerReportLeaseIfStale(long term) {
-    if (hasFullContainerReportLease()
-        && term > fullContainerReportLease.getTerm()) {
-      clearFullContainerReportLease();
-    }
-  }
-
   /**
    * Returns the current State this end point is in.
    *

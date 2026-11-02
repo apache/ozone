@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
@@ -151,7 +150,7 @@ class TestSCMDatanodeProtocolServer {
     leases.setRateLimitEnabled(rateLimitEnabled);
     SCMContext context = mock(SCMContext.class);
     when(context.isLeader()).thenReturn(leader);
-    when(context.getTermOfLeaderIfReady()).thenReturn(leader && ready ? OptionalLong.of(7L) : OptionalLong.empty());
+    when(context.isLeaderReady()).thenReturn(ready);
     when(context.getTermOfLeader()).thenReturn(7L);
     server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, context, leases);
     versionManager.finalizeUpgrade();
@@ -161,16 +160,14 @@ class TestSCMDatanodeProtocolServer {
     SCMHeartbeatResponseProto response = server.sendHeartbeat(request);
 
     assertEquals(!leader || ready, response.hasFullContainerReportLease());
-    if (response.hasFullContainerReportLease()) {
-      assertEquals(leader ? 7L : SCMContext.INVALID_TERM, response.getFullContainerReportLease().getTerm());
-    } else {
-      when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.of(7L));
-      assertEquals(7L, server.sendHeartbeat(request).getFullContainerReportLease().getTerm());
+    if (!response.hasFullContainerReportLease()) {
+      when(context.isLeaderReady()).thenReturn(true);
+      assertTrue(server.sendHeartbeat(request).hasFullContainerReportLease());
     }
   }
 
   @Test
-  void testNonHaScmGrantsLeaseWithLocalTerm() throws Exception {
+  void testNonHaScmGrantsLease() throws Exception {
     versionManager.finalizeUpgrade();
     SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
         .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
@@ -178,7 +175,38 @@ class TestSCMDatanodeProtocolServer {
     SCMHeartbeatResponseProto response = server.sendHeartbeat(request);
 
     assertTrue(response.hasFullContainerReportLease());
-    assertEquals(SCMContext.INVALID_TERM, response.getFullContainerReportLease().getTerm());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, true", "true, false", "true, true"})
+  void testGrantedLeaseSurvivesLeadershipChanges(boolean initiallyLeader, boolean becomesLeader) throws Exception {
+    server.stop();
+    SCMContext context = SCMContext.emptyContext();
+    context.updateLeaderAndTerm(initiallyLeader, 7L);
+    if (initiallyLeader) {
+      context.setLeaderReady();
+    }
+    server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, context, leases);
+    versionManager.finalizeUpgrade();
+    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+    FullContainerReportLeaseProto lease = server.sendHeartbeat(request).getFullContainerReportLease();
+
+    context.updateLeaderAndTerm(becomesLeader, 8L);
+    if (becomesLeader) {
+      context.setLeaderReady();
+    }
+    SCMHeartbeatRequestProto otherRequest = request.toBuilder()
+        .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage()).build();
+    assertFalse(server.sendHeartbeat(otherRequest).hasFullContainerReportLease());
+    SCMHeartbeatRequestProto reportRequest = request.toBuilder().setRequestFullContainerReportLease(false)
+        .setContainerReport(ContainerReportsProto.newBuilder().setFullContainerReportLease(lease)).build();
+
+    assertFalse(server.sendHeartbeat(reportRequest).getFullContainerReportLeaseRejected());
+    ArgumentCaptor<ContainerReportFromDatanode> report = ArgumentCaptor.forClass(ContainerReportFromDatanode.class);
+    verify(publisher).fireEvent(eq(CONTAINER_REPORT), report.capture());
+    report.getValue().complete(true);
+    assertTrue(server.sendHeartbeat(otherRequest).hasFullContainerReportLease());
   }
 
   @Test
@@ -191,7 +219,7 @@ class TestSCMDatanodeProtocolServer {
 
     assertFalse(server.sendHeartbeat(request).hasFullContainerReportLease());
     assertTrue(server.sendHeartbeat(request.toBuilder().setContainerReport(ContainerReportsProto.newBuilder()
-        .setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99L).setTerm(7L))).build())
+        .setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99L))).build())
         .getFullContainerReportLeaseRejected());
     assertEquals(SCMRegisteredResponseProto.ErrorCode.success,
         register(ContainerReportsProto.getDefaultInstance()).getErrorCode());
@@ -330,7 +358,7 @@ class TestSCMDatanodeProtocolServer {
 
   @ParameterizedTest
   @CsvSource({"false, false", "false, true", "true, false", "true, true"})
-  void testUnavailableLeaseTermRejectsReportWithoutDroppingHeartbeat(boolean finalized, boolean rateLimitEnabled)
+  void testIneligibleScmRejectsReportWithoutDroppingHeartbeat(boolean finalized, boolean rateLimitEnabled)
       throws Exception {
     server.stop();
     SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create("scm");
@@ -339,22 +367,22 @@ class TestSCMDatanodeProtocolServer {
       SCMContext context = mock(SCMContext.class);
       when(context.isLeader()).thenReturn(true);
       when(context.getTermOfLeader()).thenReturn(7L);
-      when(context.getTermOfLeaderIfReady()).thenReturn(finalized ? OptionalLong.empty() : OptionalLong.of(7L));
+      when(context.isLeaderReady()).thenReturn(!finalized);
       if (finalized) {
         versionManager.finalizeUpgrade();
       }
       server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, context, leases);
-      long leaseId = leases.requestLease(datanode, 7L).getAsLong();
+      long leaseId = leases.requestLease(datanode).getAsLong();
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true)
           .setContainerReport(ContainerReportsProto.newBuilder()
-              .setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(leaseId).setTerm(7L)))
+              .setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(leaseId)))
           .setNodeReport(NodeReportProto.getDefaultInstance())
           .addIncrementalContainerReport(IncrementalContainerReportProto.getDefaultInstance()).build();
 
       assertTrue(server.sendHeartbeat(request).getFullContainerReportLeaseRejected());
       assertEquals(1L, metrics.getNumFCRReportsRejectedInvalidLease());
-      verify(leases, never()).claimLease(any(), anyLong(), anyLong(), anyLong());
+      verify(leases, never()).claimLease(any(), anyLong());
       verify(publisher).fireEvent(eq(NODE_REPORT), any());
       verify(publisher).fireEvent(eq(INCREMENTAL_CONTAINER_REPORT), any());
       verify(publisher, never()).fireEvent(eq(CONTAINER_REPORT), any());
@@ -362,7 +390,7 @@ class TestSCMDatanodeProtocolServer {
       if (!finalized) {
         versionManager.finalizeUpgrade();
       }
-      when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.of(7L));
+      when(context.isLeaderReady()).thenReturn(true);
 
       assertFalse(server.sendHeartbeat(request).getFullContainerReportLeaseRejected());
       assertEquals(1L, metrics.getNumFCRReportsRejectedInvalidLease());

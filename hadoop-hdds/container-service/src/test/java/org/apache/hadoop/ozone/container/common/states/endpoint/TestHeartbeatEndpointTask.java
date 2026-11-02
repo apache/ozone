@@ -132,7 +132,7 @@ public class TestHeartbeatEndpointTask {
       SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
           .setDatanodeUUID(request.getDatanodeDetails().getUuid());
       if (request.getRequestFullContainerReportLease() && grantLease.get()) {
-        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).setTerm(7));
+        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99));
       }
       return response.build();
     });
@@ -221,7 +221,7 @@ public class TestHeartbeatEndpointTask {
       SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
           .setDatanodeUUID(request.getDatanodeDetails().getUuid());
       if (request.getRequestFullContainerReportLease()) {
-        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).setTerm(7));
+        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99));
       }
       return response.build();
     });
@@ -322,7 +322,7 @@ public class TestHeartbeatEndpointTask {
       SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
           .setDatanodeUUID(request.getDatanodeDetails().getUuid());
       if (request.getRequestFullContainerReportLease()) {
-        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).setTerm(7));
+        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99));
       }
       return response.build();
     });
@@ -578,7 +578,7 @@ public class TestHeartbeatEndpointTask {
               .setDatanodeUUID(request.getDatanodeDetails().getUuid()).setTerm(7L);
           if (request.getRequestFullContainerReportLease()) {
             response.setFullContainerReportLease(
-                FullContainerReportLeaseProto.newBuilder().setId(99L).setTerm(7L));
+                FullContainerReportLeaseProto.newBuilder().setId(99L));
           }
           return response.build();
         });
@@ -609,8 +609,6 @@ public class TestHeartbeatEndpointTask {
     assertTrue(secondHeartbeat.hasContainerReport());
     assertEquals(99L, secondHeartbeat.getContainerReport()
         .getFullContainerReportLease().getId());
-    assertEquals(7L, secondHeartbeat.getContainerReport()
-        .getFullContainerReportLease().getTerm());
     assertFalse(secondHeartbeat.getRequestFullContainerReportLease());
     assertFalse(context.isFullContainerReportReady(TEST_SCM_ENDPOINT));
     assertFalse(endpointStateMachine.hasFullContainerReportLease());
@@ -620,6 +618,61 @@ public class TestHeartbeatEndpointTask {
     assertFalse(argument.getValue().hasContainerReport());
     assertFalse(argument.getValue().getRequestFullContainerReportLease());
     verify(datanodeStateMachine, never()).triggerHeartbeat();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void leasedFCRSurvivesHigherHeartbeatTermUnlessReregistered(boolean reregister) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanode = mockDatanodeStateMachine();
+    stubFullContainerReport(datanode, ContainerReportsProto.getDefaultInstance());
+    when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    context.getFullContainerReportDiscardPendingICR(TEST_SCM_ENDPOINT);
+    context.setTermOfLeaderSCM(7);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> requests = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(requests.capture())).thenAnswer(invocation -> {
+      SCMHeartbeatRequestProto request = invocation.getArgument(0);
+      SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
+          .setDatanodeUUID(request.getDatanodeDetails().getUuid()).setTerm(8);
+      if (reregister) {
+        response.addCommands(SCMCommandProto.newBuilder().setCommandType(SCMCommandProto.Type.reregisterCommand));
+      }
+      return response.build();
+    });
+    try (EndpointStateMachine endpoint = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "")) {
+      endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
+      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
+          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
+      endpoint.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).build());
+      HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
+          .setEndpointStateMachine(endpoint).build();
+
+      task.call();
+
+      assertEquals(1, requests.getAllValues().size());
+      assertFalse(requests.getValue().hasContainerReport());
+      assertFalse(requests.getValue().getRequestFullContainerReportLease());
+      assertEquals(OptionalLong.of(8), context.getTermOfLeaderSCM());
+      assertEquals(!reregister, endpoint.hasFullContainerReportLease());
+      if (reregister) {
+        assertEquals(EndpointStateMachine.EndPointStates.GETVERSION, endpoint.getState());
+      } else {
+        context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+
+        task.call();
+
+        assertEquals(2, requests.getAllValues().size());
+        assertTrue(requests.getValue().hasContainerReport());
+        assertEquals(99, requests.getValue().getContainerReport().getFullContainerReportLease().getId());
+        assertFalse(requests.getValue().getRequestFullContainerReportLease());
+        assertFalse(endpoint.hasFullContainerReportLease());
+        assertFalse(context.isFullContainerReportReady(TEST_SCM_ENDPOINT));
+      }
+    }
   }
 
   @ParameterizedTest
@@ -641,7 +694,7 @@ public class TestHeartbeatEndpointTask {
           .setDatanodeUUID(((SCMHeartbeatRequestProto) invocation.getArgument(0)).getDatanodeDetails().getUuid());
       if (grantPresent) {
         response.setFullContainerReportLease(
-            FullContainerReportLeaseProto.newBuilder().setId(leaseId).setTerm(7L));
+            FullContainerReportLeaseProto.newBuilder().setId(leaseId));
       }
       if (reregister) {
         response.addCommands(SCMCommandProto.newBuilder().setCommandType(SCMCommandProto.Type.reregisterCommand));
@@ -728,7 +781,6 @@ public class TestHeartbeatEndpointTask {
     endpointStateMachine.setFullContainerReportLease(
         FullContainerReportLeaseProto.newBuilder()
             .setId(99L)
-            .setTerm(7L)
             .build());
     HeartbeatEndpointTask endpointTask = HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
@@ -781,7 +833,7 @@ public class TestHeartbeatEndpointTask {
       endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
       endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
           .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
-      endpoint.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).setTerm(7).build());
+      endpoint.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).build());
       HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
           .setEndpointStateMachine(endpoint).build();
 
@@ -848,7 +900,6 @@ public class TestHeartbeatEndpointTask {
     endpointStateMachine.setFullContainerReportLease(
         FullContainerReportLeaseProto.newBuilder()
             .setId(99L)
-            .setTerm(7L)
             .build());
     HeartbeatEndpointTask endpointTask = HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
@@ -893,7 +944,7 @@ public class TestHeartbeatEndpointTask {
           SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
               .setDatanodeUUID(request.getDatanodeDetails().getUuid());
           if (request.getRequestFullContainerReportLease()) {
-            response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(100L).setTerm(7L));
+            response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(100L));
           }
           return response.build();
         });
@@ -907,7 +958,6 @@ public class TestHeartbeatEndpointTask {
     endpointStateMachine.setFullContainerReportLease(
         FullContainerReportLeaseProto.newBuilder()
             .setId(99L)
-            .setTerm(7L)
             .build());
     HeartbeatEndpointTask endpointTask = HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)

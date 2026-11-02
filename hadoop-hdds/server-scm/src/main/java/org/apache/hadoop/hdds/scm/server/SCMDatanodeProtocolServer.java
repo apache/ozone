@@ -410,67 +410,42 @@ public class SCMDatanodeProtocolServer implements
    */
   private Optional<LeaseClaim> validateAndClaimFullContainerReportLease(
       DatanodeDetails datanodeDetails, FullContainerReportLeaseProto lease) {
-    OptionalLong currentTerm = getFCRLeaseTermIfAllowed();
     Optional<LeaseClaim> claim = Optional.empty();
     if (fcrLeaseManager != null) {
-      if (currentTerm.isPresent()) {
-        claim = fcrLeaseManager.claimLease(datanodeDetails, currentTerm.getAsLong(), lease.getTerm(), lease.getId());
+      if (isFCRLeaseAllowed()) {
+        claim = fcrLeaseManager.claimLease(datanodeDetails, lease.getId());
       } else {
         fcrLeaseManager.incrementInvalidLeaseReports();
       }
     }
     if (claim.isEmpty()) {
-      LOG.warn("Ignoring full container report from datanode {} with invalid "
-              + "lease id {} and term {}.", datanodeDetails.getUuidString(), lease.getId(), lease.getTerm());
+      LOG.warn("Ignoring full container report from datanode {} with invalid lease id {}.",
+          datanodeDetails.getUuidString(), lease.getId());
     }
     return claim;
   }
 
   private void addFCRLeaseIfRequested(SCMHeartbeatRequestProto heartbeat,
       SCMHeartbeatResponseProto.Builder builder) {
-    if (fcrLeaseManager == null || !heartbeat.getRequestFullContainerReportLease()) {
-      return;
-    }
-
-    OptionalLong term = getFCRLeaseTermIfAllowed();
-    if (term.isEmpty()) {
+    if (fcrLeaseManager == null || !heartbeat.getRequestFullContainerReportLease() || !isFCRLeaseAllowed()) {
       return;
     }
 
     DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
         heartbeat.getDatanodeDetails());
-    OptionalLong leaseId = fcrLeaseManager.requestLease(datanodeDetails,
-        term.getAsLong());
+    OptionalLong leaseId = fcrLeaseManager.requestLease(datanodeDetails);
     if (leaseId.isPresent()) {
-      builder.setFullContainerReportLease(
-          FullContainerReportLeaseProto.newBuilder()
-              .setId(leaseId.getAsLong())
-              .setTerm(term.getAsLong()));
+      builder.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(leaseId.getAsLong()));
     }
   }
 
   /**
-   * Selects the term used to grant leases and validate incoming FCR leases. Capacity-limit bypass does not affect
-   * these SCM leadership and upgrade checks. This is not necessarily the leader term attached to SCM commands.
-   *
-   * <ul>
-   * <li>Recon (no SCM context) or an unfinalized feature: no lease term.</li>
-   * <li>HA leader that is not ready: no lease term.</li>
-   * <li>Ready HA leader: its current term.</li>
-   * <li>HA follower or non-HA SCM: {@link SCMContext#INVALID_TERM}, identifying leases local to this SCM.</li>
-   * </ul>
+   * Whether this SCM may grant or claim FCR leases. Followers and non-HA SCMs are eligible, but an HA leader must
+   * be ready. Recon and unfinalized SCMs are ineligible. Disabling rate limiting does not bypass these checks.
    */
-  private OptionalLong getFCRLeaseTermIfAllowed() {
-    if (scmContext == null || !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)) {
-      return OptionalLong.empty();
-    }
-
-    OptionalLong leaderTerm = scmContext.getTermOfLeaderIfReady();
-    if (leaderTerm.isPresent()) {
-      return leaderTerm;
-    }
-    return scmContext.isLeader()
-        ? OptionalLong.empty() : OptionalLong.of(SCMContext.INVALID_TERM);
+  private boolean isFCRLeaseAllowed() {
+    return scmContext != null && scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)
+        && (!scmContext.isLeader() || scmContext.isLeaderReady());
   }
 
   private OptionalLong getTermIfLeader() {
