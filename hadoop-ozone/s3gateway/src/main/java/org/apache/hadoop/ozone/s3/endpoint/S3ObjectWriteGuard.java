@@ -47,6 +47,7 @@ class S3ObjectWriteGuard implements AutoCloseable {
       new ArrayList<>();
   private long writtenLength;
   private Throwable transferFailure;
+  private boolean transferComplete;
 
   S3ObjectWriteGuard(
       OzoneOutputStream outputStream, long expectedLength, String keyPath) {
@@ -77,6 +78,9 @@ class S3ObjectWriteGuard implements AutoCloseable {
     }
     EndpointBase.validateContentLength(
         expectedLength, writtenLength, keyPath).run();
+    if (!transferComplete) {
+      throw new IOException("S3 object transfer did not complete before commit: " + keyPath);
+    }
   }
 
   private void recordTransferFailure(Throwable failure) {
@@ -91,6 +95,13 @@ class S3ObjectWriteGuard implements AutoCloseable {
 
   void addPreCommit(CheckedRunnable<IOException> preCommit) {
     preCommits.add(preCommit);
+  }
+
+  /**
+   * Allows close() to commit the key. Call last, after the metadata and all pre-commit checks are registered.
+   */
+  void markTransferComplete() {
+    transferComplete = true;
   }
 
   void checkContentSha256(MultiDigestInputStream body, String expectedSha256) {

@@ -94,6 +94,7 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -1381,6 +1382,21 @@ class TestObjectPut {
     // WHEN/THEN
     OS3Exception ex = assertErrorResponse(s3Error, () -> putObject(CONTENT));
     assertThat(ex.getErrorMessage()).contains(s3Error.getErrorMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutObjectNotCommittedOnErrorAfterBodyCopy(boolean datastream) throws Exception {
+    assertSucceeds(() -> putObject("previous"));
+    doReturn(datastream).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(DigestUtils.sha256Hex("other"));
+    // Content-MD5 is read after copying the body, before the digest checks are registered.
+    OutOfMemoryError failure = new OutOfMemoryError("after body copy");
+    when(headers.getHeaderString("Content-MD5")).thenThrow(failure);
+
+    assertThatThrownBy(() -> putObject(CONTENT)).isSameAs(failure);
+    assertKeyContent(bucket, KEY_NAME, "previous");
   }
 
   private HttpHeaders newMockHttpHeaders() {

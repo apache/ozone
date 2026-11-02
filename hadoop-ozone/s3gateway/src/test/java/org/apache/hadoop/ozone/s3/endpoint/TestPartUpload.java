@@ -34,6 +34,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOA
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -446,6 +447,19 @@ public class TestPartUpload {
       verify(messageDigest, times(1)).reset();
       verify(sha256Digest, times(1)).reset();
     }
+  }
+
+  @Test
+  public void testPartUploadNotCommittedOnErrorAfterBodyCopy() throws Exception {
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(DigestUtils.sha256Hex("other"));
+    // Content-MD5 is read after copying the body, before the digest checks are registered.
+    OutOfMemoryError failure = new OutOfMemoryError("after body copy");
+    when(headers.getHeaderString("Content-MD5")).thenThrow(failure);
+
+    assertThatThrownBy(() -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, "Multipart Upload"))
+        .isSameAs(failure);
+    assertNoParts(uploadID, OzoneConsts.KEY);
   }
 
   @Test

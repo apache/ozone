@@ -18,9 +18,12 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -33,6 +36,7 @@ import org.apache.hadoop.ozone.client.OzoneBucketStub.KeyMetadataAwareOutputStre
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -154,6 +158,52 @@ class TestS3ObjectWriteGuard {
 
     assertSame(failure, thrown);
     assertCommitBlockedBy(guard, failure);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "content"})
+  void transferNotMarkedCompleteBlocksCommit(String content) throws IOException {
+    KeyMetadataAwareOutputStream keyOutputStream = new KeyMetadataAwareOutputStream(Collections.emptyMap());
+    byte[] bytes = content.getBytes(UTF_8);
+    S3ObjectWriteGuard guard = new S3ObjectWriteGuard(
+        new OzoneOutputStream(keyOutputStream, null), bytes.length, KEY_PATH);
+    guard.copyFrom(new ByteArrayInputStream(bytes), CONTENT.length);
+
+    IOException failure = assertThrows(IOException.class, guard::close);
+
+    assertThat(failure).hasMessage("S3 object transfer did not complete before commit: " + KEY_PATH);
+    assertThat(keyOutputStream.getModificationTime()).isZero();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "content"})
+  void completedTransferCommits(String content) throws IOException {
+    KeyMetadataAwareOutputStream keyOutputStream = new KeyMetadataAwareOutputStream(Collections.emptyMap());
+    byte[] bytes = content.getBytes(UTF_8);
+    S3ObjectWriteGuard guard = new S3ObjectWriteGuard(
+        new OzoneOutputStream(keyOutputStream, null), bytes.length, KEY_PATH);
+    guard.copyFrom(new ByteArrayInputStream(bytes), CONTENT.length);
+    guard.markTransferComplete();
+
+    guard.close();
+
+    assertThat(keyOutputStream.toByteArray()).isEqualTo(bytes);
+    assertThat(keyOutputStream.getModificationTime()).isPositive();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void finalChunkErrorBlocksCommitAfterExactLengthRead(boolean datastream) throws IOException {
+    S3ObjectWriteGuard guard = datastream ? new S3ObjectStreamingWriteGuard(
+        new OzoneDataStreamOutput(new KeyMetadataAwareByteBufferStreamOutput(Collections.emptyMap()), null),
+        CONTENT.length, KEY_PATH) : newGuard(CONTENT.length);
+    SignedChunksInputStream chunks = spy(new SignedChunksInputStream(
+        new ByteArrayInputStream(signedChunkedBody("content").getBytes(UTF_8)), KEY_PATH));
+    OutOfMemoryError failure = new OutOfMemoryError("final chunk verification");
+    doThrow(failure).when(chunks).verifyComplete();
+
+    assertSame(failure, assertThrows(OutOfMemoryError.class, () -> guard.copyFrom(chunks, CONTENT.length)));
+    assertThrows(IOException.class, guard::close);
   }
 
   private static S3ObjectWriteGuard newGuard(long expectedLength) {
