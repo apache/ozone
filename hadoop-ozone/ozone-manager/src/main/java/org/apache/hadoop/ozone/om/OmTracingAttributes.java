@@ -59,6 +59,24 @@ public final class OmTracingAttributes {
   /** Number of transactions in an OM double-buffer flush. */
   public static final String OM_BATCH_SIZE = "om.batch_size";
 
+  /** Number of blocks OM asks SCM to allocate for a key write. */
+  public static final String OM_KEY_REQUESTED_BLOCKS = "om.key.requested_blocks";
+
+  /** Number of blocks a key commit carries. */
+  public static final String OM_KEY_COMMITTED_BLOCKS = "om.key.committed_blocks";
+
+  /** Whether a key commit is a client hsync. */
+  public static final String OM_KEY_HSYNC = "om.key.hsync";
+
+  /** Whether a key commit is a client lease recovery. */
+  public static final String OM_KEY_RECOVERY = "om.key.recovery";
+
+  /** Whether a key read forced a refresh of the container location cache from SCM. */
+  public static final String OM_KEY_FORCE_REFRESH = "om.key.force_refresh";
+
+  /** Number of containers whose locations OM looked up for a key read. */
+  public static final String OM_KEY_CONTAINER_COUNT = "om.key.container_count";
+
   private OmTracingAttributes() {
   }
 }

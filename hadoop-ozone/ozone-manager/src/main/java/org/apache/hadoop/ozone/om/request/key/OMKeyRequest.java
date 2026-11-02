@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.Server;
@@ -80,6 +81,7 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
@@ -216,6 +218,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
     final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_KEY_REQUESTED_BLOCKS, numBlocks);
 
     final String scmClientMachine;
     // Sorted order cached by datanode set so blocks whose pipelines share the
