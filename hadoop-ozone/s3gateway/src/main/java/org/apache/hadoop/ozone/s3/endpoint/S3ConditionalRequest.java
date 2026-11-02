@@ -60,10 +60,19 @@ final class S3ConditionalRequest {
         S3Consts.IF_UNMODIFIED_SINCE_HEADER),
 
     /**
-     * For CopyObject and UploadPartCopy source validation. Always throws 412 Precondition Failed
+     * For CopyObject source validation. Always throws 412 Precondition Failed
      * when any condition is not met (no 304 responses).
      */
     COPY_SOURCE(
+        S3Consts.COPY_SOURCE_IF_MATCH,
+        S3Consts.COPY_SOURCE_IF_NONE_MATCH,
+        S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE,
+        S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE),
+
+    /**
+     * For UploadPartCopy source validation, preserving the existing timestamp comparisons and ignoring future dates.
+     */
+    UPLOAD_PART_COPY_SOURCE(
         S3Consts.COPY_SOURCE_IF_MATCH,
         S3Consts.COPY_SOURCE_IF_NONE_MATCH,
         S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE,
@@ -104,14 +113,14 @@ final class S3ConditionalRequest {
 
     String ifUnmodifiedSince = headers.getHeaderString(context.ifUnmodifiedSinceHeader);
     if (ifMatch == null && ifUnmodifiedSince != null
-        && !matchesIfUnmodifiedSince(key, ifUnmodifiedSince)) {
+        && !matchesIfUnmodifiedSince(key, ifUnmodifiedSince, context)) {
       throw newError(PRECOND_FAILED, keyPath);
     }
 
     String ifNoneMatch = headers.getHeaderString(context.ifNoneMatchHeader);
     if (ifNoneMatch != null) {
       if (eTagMatches(ifNoneMatch, currentETag)) {
-        if (context == PreconditionContext.COPY_SOURCE) {
+        if (context != PreconditionContext.READ) {
           throw newError(PRECOND_FAILED, keyPath);
         }
         return buildNotModifiedResponse(key);
@@ -120,8 +129,8 @@ final class S3ConditionalRequest {
     }
 
     String ifModifiedSince = headers.getHeaderString(context.ifModifiedSinceHeader);
-    if (ifModifiedSince != null && !matchesIfModifiedSince(key, ifModifiedSince)) {
-      if (context == PreconditionContext.COPY_SOURCE) {
+    if (ifModifiedSince != null && !matchesIfModifiedSince(key, ifModifiedSince, context)) {
+      if (context != PreconditionContext.READ) {
         throw newError(PRECOND_FAILED, keyPath);
       }
       return buildNotModifiedResponse(key);
@@ -195,10 +204,13 @@ final class S3ConditionalRequest {
   }
 
   private static boolean matchesIfModifiedSince(OzoneKey key,
-      String headerValue) {
-    Instant since = parseConditionalInstant(headerValue);
+      String headerValue, PreconditionContext context) {
+    Instant since = parseConditionalInstant(headerValue, context);
     if (since == null) {
       return true;
+    }
+    if (context == PreconditionContext.UPLOAD_PART_COPY_SOURCE) {
+      return !key.getModificationTime().isBefore(since);
     }
     Instant lastModified = key.getModificationTime()
         .truncatedTo(ChronoUnit.SECONDS);
@@ -206,23 +218,28 @@ final class S3ConditionalRequest {
   }
 
   private static boolean matchesIfUnmodifiedSince(OzoneKey key,
-      String headerValue) {
-    Instant since = parseConditionalInstant(headerValue);
+      String headerValue, PreconditionContext context) {
+    Instant since = parseConditionalInstant(headerValue, context);
     if (since == null) {
       return true;
     }
-    Instant lastModified = key.getModificationTime()
-        .truncatedTo(ChronoUnit.SECONDS);
+    Instant lastModified = key.getModificationTime();
+    if (context != PreconditionContext.UPLOAD_PART_COPY_SOURCE) {
+      lastModified = lastModified.truncatedTo(ChronoUnit.SECONDS);
+    }
     return !lastModified.isAfter(since);
   }
 
-  private static Instant parseConditionalInstant(String headerValue) {
+  private static Instant parseConditionalInstant(String headerValue, PreconditionContext context) {
     if (headerValue == null) {
       return null;
     }
     try {
-      return Instant.ofEpochMilli(OzoneUtils.formatDate(headerValue))
-          .truncatedTo(ChronoUnit.SECONDS);
+      Instant since = Instant.ofEpochMilli(OzoneUtils.formatDate(headerValue));
+      if (context == PreconditionContext.UPLOAD_PART_COPY_SOURCE && since.isAfter(Instant.now())) {
+        return null;
+      }
+      return since.truncatedTo(ChronoUnit.SECONDS);
     } catch (IllegalArgumentException | ParseException ex) {
       return null;
     }

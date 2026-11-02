@@ -258,19 +258,19 @@ public class TestMultipartUploadWithCopy {
 
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_AFTER_TS(
         futureTimeStr, afterSourceKeyModificationTimeStr,
-        ERROR_CODE),
+        null),
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_BEFORE_TS(
         futureTimeStr, beforeSourceKeyModificationTimeStr,
         ERROR_CODE),
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_NULL_TS(
         futureTimeStr, null,
-        ERROR_CODE),
+        null),
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_FUTURE_TS(
         futureTimeStr, futureTimeStr,
-        ERROR_CODE),
+        null),
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
         futureTimeStr, UNPARSABLE_TIME_STR,
-        ERROR_CODE);
+        null);
     
     private final String modifiedTimestamp;
     private final String unmodifiedTimestamp;
@@ -335,6 +335,30 @@ public class TestMultipartUploadWithCopy {
     headers.put("match".equals(condition) ? COPY_SOURCE_IF_UNMODIFIED_SINCE : COPY_SOURCE_IF_MODIFIED_SINCE,
         beforeSourceKeyModificationTimeStr);
     setHeaders(headers);
+    if (rejected) {
+      OS3Exception ex = assertThrows(OS3Exception.class,
+          () -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+      assertEquals(ERROR_CODE, ex.getCode());
+      assertEquals(412, ex.getHttpCode());
+    } else {
+      assertSucceeds(() -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "match, true, false", "match, false, true",
+      "none-match, true, true", "none-match, false, false"
+  })
+  public void testMultipartETagWithFutureDate(String condition, boolean matching, boolean rejected) throws Exception {
+    String key = "etag-future-" + condition + "-" + matching;
+    setHeaders();
+    String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, key);
+    setHeaders(ImmutableMap.of(
+        COPY_SOURCE_HEADER, OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY,
+        COPY_SOURCE_IF_PREFIX + condition,
+        "\"" + (matching ? DigestUtils.md5Hex(EXISTING_KEY_CONTENT) : "wrong-etag") + "\"",
+        COPY_SOURCE_IF_MODIFIED_SINCE, futureTimeStr));
     if (rejected) {
       OS3Exception ex = assertThrows(OS3Exception.class,
           () -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
