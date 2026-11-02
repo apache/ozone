@@ -397,7 +397,7 @@ public final class TracingUtil {
     return createProxy(delegate, itf, conf, SpanKind.INTERNAL);
   }
 
-  /** Same as {@link #createInternalProxy(Object, Class, ConfigurationSource)}, with CLIENT spans for an RPC delegate. */
+  /** Same as {@link #createInternalProxy(Object, Class, ConfigurationSource)}, with CLIENT spans for an RPC delegate.*/
   public static <T> T createClientProxy(T delegate, Class<T> itf, ConfigurationSource conf) {
     return createProxy(delegate, itf, conf, SpanKind.CLIENT);
   }

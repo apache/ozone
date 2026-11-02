@@ -221,6 +221,9 @@ public class TestTraceAllMethod {
     }
   }
 
+  /**
+   * Implementation for inherited test scenarios.
+   */
   public static class InternalServiceImpl extends ServiceImpl {
     @InternalSpanKind
     @Override
