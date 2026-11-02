@@ -577,7 +577,7 @@ public final class TracingUtil {
     return Span.current();
   }
 
-  public static Span createSpan(String spanName) {
+  public static Span createInternalSpan(String spanName) {
     return createSpan(spanName, SpanKind.INTERNAL);
   }
 

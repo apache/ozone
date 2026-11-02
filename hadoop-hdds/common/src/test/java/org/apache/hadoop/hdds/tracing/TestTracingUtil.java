@@ -156,7 +156,7 @@ public class TestTracingUtil {
   public void testSpanKindProxyCreatesChildSpans() {
     try (TestSpanCollector collector = TestSpanCollector.install("test-service")) {
       Service proxy = createProxy(new ServiceImpl(), Service.class, SpanKind.CLIENT);
-      Span parent = TracingUtil.createSpan("parent");
+      Span parent = TracingUtil.createInternalSpan("parent");
       try (Scope ignored = parent.makeCurrent()) {
         assertEquals("normal", proxy.normalMethod());
         assertEquals("skipped", proxy.skippedMethod());
@@ -265,7 +265,7 @@ public class TestTracingUtil {
       assertThrows(IOException.class, () -> TracingUtil.executeInNewSpan("supplier", () -> {
         throw new IOException("supplier failed");
       }));
-      Span parent = TracingUtil.createSpan("parent");
+      Span parent = TracingUtil.createInternalSpan("parent");
       try (Scope ignored = parent.makeCurrent()) {
         String parentContext = TracingUtil.exportCurrentSpan();
         assertThrows(IllegalStateException.class, () -> TracingUtil.executeAsChildSpan("runnable", parentContext,
@@ -430,7 +430,7 @@ public class TestTracingUtil {
   @Test
   public void testCreateSpanIsChildOfCurrentSpan() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span parent = TracingUtil.createSpan("parent");
+      Span parent = TracingUtil.createInternalSpan("parent");
       try (Scope ignored = parent.makeCurrent()) {
         Span child = TracingUtil.createSpan("child", SpanKind.CLIENT);
         child.end();
@@ -450,7 +450,7 @@ public class TestTracingUtil {
   @Test
   public void testCreateSpanWithoutParentStartsRootWhenEnabled() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span span = TracingUtil.createSpan("root");
+      Span span = TracingUtil.createInternalSpan("root");
       assertTrue(span.getSpanContext().isValid());
       span.end();
       assertFalse(finishedSpan(collector, "root").getParentSpanContext().isValid());
@@ -460,7 +460,7 @@ public class TestTracingUtil {
   @Test
   public void testRecordExceptionSetsErrorAndAddsEvent() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span span = TracingUtil.createSpan("failing");
+      Span span = TracingUtil.createInternalSpan("failing");
       try (Scope ignored = span.makeCurrent()) {
         TracingUtil.recordExceptionInCurrentSpan(new IOException("disk failed"));
       } finally {
@@ -480,9 +480,9 @@ public class TestTracingUtil {
   @Test
   public void testRecordExceptionInCatchMarksSpanNotParent() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span parent = TracingUtil.createSpan("parent");
+      Span parent = TracingUtil.createInternalSpan("parent");
       try (Scope ignored = parent.makeCurrent()) {
-        Span span = TracingUtil.createSpan("failing");
+        Span span = TracingUtil.createInternalSpan("failing");
         try (Scope ignored2 = span.makeCurrent()) {
           throw new IOException("disk failed");
         } catch (IOException e) {
@@ -504,7 +504,7 @@ public class TestTracingUtil {
   @Test
   public void testRecordExceptionWithoutMessageSetsError() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span span = TracingUtil.createSpan("failing");
+      Span span = TracingUtil.createInternalSpan("failing");
       try (Scope ignored = span.makeCurrent()) {
         TracingUtil.recordExceptionInCurrentSpan(new IllegalStateException());
       } finally {
@@ -519,7 +519,7 @@ public class TestTracingUtil {
   @Test
   public void testRecordExceptionIgnoresNull() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span span = TracingUtil.createSpan("ok");
+      Span span = TracingUtil.createInternalSpan("ok");
       try (Scope ignored = span.makeCurrent()) {
         TracingUtil.recordExceptionInCurrentSpan(null);
       } finally {
@@ -532,7 +532,7 @@ public class TestTracingUtil {
   @Test
   public void testCurrentSpanHelpersSetAttributesAndEvents() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span span = TracingUtil.createSpan("request");
+      Span span = TracingUtil.createInternalSpan("request");
       try (Scope ignored = span.makeCurrent()) {
         TracingUtil.addAttributesToCurrentSpan("volume", "vol1");
         TracingUtil.addAttributesToCurrentSpan("bucket", (String) null);
