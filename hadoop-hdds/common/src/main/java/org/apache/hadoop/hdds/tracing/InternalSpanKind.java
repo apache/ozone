@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
  * Used for methods that do not send an outbound RPC.
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Target({ElementType.METHOD})
 public @interface InternalSpanKind {
 }
 

@@ -86,8 +86,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
   }
 
   private static SpanKind findSpanKind(Method method, SpanKind defaultSpanKind) {
-    if (method.isAnnotationPresent(InternalSpanKind.class)
-        || method.getDeclaringClass().isAnnotationPresent(InternalSpanKind.class)) {
+    if (method.isAnnotationPresent(InternalSpanKind.class)) {
       return SpanKind.INTERNAL;
     }
     return defaultSpanKind;

@@ -139,15 +139,6 @@ public class TestTracingAnnotations {
   }
 
   @Test
-  public void testImplClassAnnotationOverridesKind() {
-    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
-      LocalService serviceProxy = createClientProxy(new LocalServiceImpl(), LocalService.class, tracingEnabled());
-      assertEquals("local", serviceProxy.call());
-      spans.assertKind("LocalService.call", SpanKind.INTERNAL);
-    }
-  }
-
-  @Test
   public void testCreateProxyKinds() {
     try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
       createProxy(new ServiceImpl(), Service.class, tracingEnabled()).normalMethod();
@@ -165,16 +156,4 @@ public class TestTracingAnnotations {
   public interface LocalService {
     String call();
   }
-
-  /**
-   * Implementation whose methods are all in-process.
-   */
-  @InternalSpanKind
-  public static class LocalServiceImpl implements LocalService {
-    @Override
-    public String call() {
-      return "local";
-    }
-  }
-
 }
