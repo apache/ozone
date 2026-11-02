@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.PRIMARY_SCM_NODE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CERT_SERIAL_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_HA;
@@ -28,10 +27,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.common.Storage;
 
 /**
@@ -40,7 +39,7 @@ import org.apache.hadoop.ozone.common.Storage;
  */
 public class SCMStorageConfig extends Storage {
 
-  public static final String TESTING_INIT_LAYOUT_VERSION_KEY = "testing.hdds.scm.init.layout.version";
+  public static final String TESTING_INIT_APPARENT_VERSION_KEY = "testing.hdds.scm.init.apparent.version";
 
   /**
    * Construct SCMStorageConfig.
@@ -48,13 +47,12 @@ public class SCMStorageConfig extends Storage {
    */
   public SCMStorageConfig(OzoneConfiguration conf) throws IOException {
     super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR,
-        getInitLayoutVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
-            HDDSLayoutVersionManager::maxLayoutVersion));
+        getInitApparentVersion(conf, TESTING_INIT_APPARENT_VERSION_KEY, HDDSVersion.SOFTWARE_VERSION::serialize));
   }
 
   public SCMStorageConfig(NodeType type, File root, String sdName)
       throws IOException {
-    super(type, root, sdName, maxLayoutVersion());
+    super(type, root, sdName, HDDSVersion.SOFTWARE_VERSION.serialize());
   }
 
   public void setScmId(String scmId) throws IOException {

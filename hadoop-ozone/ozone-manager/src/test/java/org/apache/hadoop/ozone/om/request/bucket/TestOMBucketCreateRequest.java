@@ -49,12 +49,12 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
@@ -129,6 +129,26 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
 
+  }
+
+  @Test
+  public void testNewBucketIgnoresUsageCountersFromRequest() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(newBucketInfoBuilder(bucketName, volumeName)
+        .setUsedBytes(1000L)
+        .setUsedNamespace(10L)
+        .setSnapshotUsedBytes(100L)
+        .setSnapshotUsedNamespace(1L));
+    doValidateAndUpdateCache(volumeName, bucketName, omBucketCreateRequest.getOmRequest());
+
+    OmBucketInfo bucketInfo =
+        omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertEquals(0, bucketInfo.getUsedBytes());
+    assertEquals(0, bucketInfo.getUsedNamespace());
+    assertEquals(0, bucketInfo.getSnapshotUsedBytes());
+    assertEquals(0, bucketInfo.getSnapshotUsedNamespace());
   }
 
   @Test
@@ -462,7 +482,7 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
             .setStoragePolicy(StoragePolicyProto.COLD)
             .setAllowFallbackStoragePolicy(true)).build();
 
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    OMVersionManager versionManager = mock(OMVersionManager.class);
     when(versionManager.isAllowed(
         OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(true);
 
@@ -471,7 +491,7 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
   }
 
   private ValidationContext preFinalizedContext() {
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    OMVersionManager versionManager = mock(OMVersionManager.class);
     when(versionManager.isAllowed(
         OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(false);
     return of(versionManager, omMetadataManager);

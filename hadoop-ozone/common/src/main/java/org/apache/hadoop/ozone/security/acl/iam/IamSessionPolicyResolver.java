@@ -111,6 +111,10 @@ public final class IamSessionPolicyResolver {
   @VisibleForTesting
   static final Map<String, Set<S3Action>> S3_ACTION_MAP_CI = buildCaseInsensitiveS3ActionMap();
 
+  // The actions that support s3:prefix condition
+  private static final Set<S3Action> PREFIX_CONDITION_ACTIONS = Collections.unmodifiableSet(
+      EnumSet.of(S3Action.LIST_BUCKET, S3Action.LIST_BUCKET_VERSIONS));
+
   private IamSessionPolicyResolver() {
   }
 
@@ -170,9 +174,9 @@ public final class IamSessionPolicyResolver {
         continue;
       }
 
-      // s3:prefix is only applicable to the ListBucket action because we don't support ListBucketVersions
+      // s3:prefix is only applicable to the ListBucket and ListBucketVersions actions
       // (see https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazons3.html and search for
-      // s3:prefix).  If a statement carries a Condition, non-ListBucket actions (ex GetObject, PutObject,
+      // s3:prefix).  If a statement carries a Condition, non-listing actions (ex GetObject, PutObject,
       // ListBucketMultipartUploads, etc.) in that statement do not apply.
       final Set<S3Action> filteredS3Actions = filterActionsWhenConditionPresent(mappedS3Actions, condition);
       if (filteredS3Actions.isEmpty()) {
@@ -530,20 +534,17 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
-   * Filters out actions when a Condition is present if the action is not ListBucket.
+   * Filters out actions when a Condition is present if the action does not support s3:prefix.
    */
   private static Set<S3Action> filterActionsWhenConditionPresent(Set<S3Action> mappedS3Actions, Condition condition) {
     if (condition == null) {
       return mappedS3Actions;
     }
 
-    if (mappedS3Actions.contains(S3Action.LIST_BUCKET)) {
-      final Set<S3Action> filteredActions = new HashSet<>();
-      filteredActions.add(S3Action.LIST_BUCKET);
-      return filteredActions;
-    }
-
-    return Collections.emptySet();
+    final Set<S3Action> filteredActions = EnumSet.noneOf(S3Action.class);
+    filteredActions.addAll(mappedS3Actions);
+    filteredActions.retainAll(PREFIX_CONDITION_ACTIONS);
+    return filteredActions;
   }
 
   /**
@@ -748,7 +749,7 @@ public final class IamSessionPolicyResolver {
       addAclsForObj(objToAclsMap, volumeObj, action.volumePerms);
       addAclsForObj(objToAclsMap, bucketObj, action.bucketPerms);
 
-      if (condition != null && action == S3Action.LIST_BUCKET) {
+      if (condition != null && PREFIX_CONDITION_ACTIONS.contains(action)) {
         // Ensure the volume and bucket get the action
         addActionForKind(objToActionsMap, action, volumeObj, bucketObj, null);
 
@@ -795,9 +796,9 @@ public final class IamSessionPolicyResolver {
         addActionForKind(objToActionsMap, action, volumeObj, bucketObj, null);
       }
 
-      if (action == S3Action.LIST_BUCKET) {
+      if (PREFIX_CONDITION_ACTIONS.contains(action)) {
         // If condition prefixes are present, these would constrain the object permissions if the action
-        // is s3:ListBucket
+        // is s3:ListBucket or s3:ListBucketVersions
         if (condition != null && condition.prefixes != null && !condition.prefixes.isEmpty()) {
           for (String prefix : condition.prefixes) {
             // If operator is StringEquals, we should ignore any prefix containing wildcards - this is AWS behavior
@@ -929,7 +930,7 @@ public final class IamSessionPolicyResolver {
       addActionForObj(objToActionsMap, bucketObj, action.name);
     }
     if (objectObj != null) {
-      if (kind == ActionKind.OBJECT || action == S3Action.LIST_BUCKET) {
+      if (kind == ActionKind.OBJECT || PREFIX_CONDITION_ACTIONS.contains(action)) {
         addActionForObj(objToActionsMap, objectObj, action.name);
       }
     }
@@ -1135,10 +1136,21 @@ public final class IamSessionPolicyResolver {
         EnumSet.noneOf(ACLType.class)),
     // Used for HeadBucket, ListObjects and ListObjectsV2 apis
     LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST), EnumSet.of(READ)),
+    // Used for ListObjectVersions API
+    LIST_BUCKET_VERSIONS("s3:ListBucketVersions", ActionKind.BUCKET, EnumSet.of(READ),
+        EnumSet.of(READ, LIST), EnumSet.of(READ)),
     // Used for ListMultipartUploads API
     LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads", ActionKind.BUCKET, EnumSet.of(READ),
         EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),
     PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, READ_ACL, WRITE_ACL),
+        EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_TAGGING("s3:GetBucketTagging", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.noneOf(ACLType.class)),
+    PUT_BUCKET_TAGGING("s3:PutBucketTagging", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, WRITE),
+        EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_LIFECYCLE("s3:GetLifecycleConfiguration", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.noneOf(ACLType.class)),
+    PUT_BUCKET_LIFECYCLE("s3:PutLifecycleConfiguration", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, WRITE),
         EnumSet.noneOf(ACLType.class)),
 
     // Object-scope
@@ -1151,6 +1163,8 @@ public final class IamSessionPolicyResolver {
         EnumSet.of(WRITE)),
     // Used for HeadObject, CopyObject (for source bucket), GetObject (without versionId parameter) APIs
     GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
+    GET_OBJECT_ATTRIBUTES("s3:GetObjectAttributes", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(READ)),
     GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
     // Used for ListParts API
     LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),

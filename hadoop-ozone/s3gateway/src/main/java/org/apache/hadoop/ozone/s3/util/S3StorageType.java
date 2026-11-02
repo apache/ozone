@@ -24,8 +24,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
  * Maps S3 storage class values to Ozone replication values.
+ *
+ * @deprecated Use {@link S3StorageClass} and {@link S3StorageClassResolver}, which also cover
+ *     storage policy. Kept until the S3 Gateway call sites move to them.
  */
-
+@Deprecated
 public enum S3StorageType {
 
   REDUCED_REDUNDANCY(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)),
@@ -43,15 +46,11 @@ public enum S3StorageType {
     return replicationConfig;
   }
 
+  /**
+   * The storage class implied by replication alone. Delegates to {@link S3StorageClassResolver}
+   * so the two mappings cannot drift apart.
+   */
   public static S3StorageType fromReplicationConfig(ReplicationConfig config) {
-    if (config.getReplicationType() == HddsProtos.ReplicationType.EC) {
-      return STANDARD_IA;
-    }
-    if (config.getReplicationType() == HddsProtos.ReplicationType.STAND_ALONE ||
-        config.getRequiredNodes() == 1) {
-      return S3StorageType.REDUCED_REDUNDANCY;
-    } else {
-      return S3StorageType.STANDARD;
-    }
+    return valueOf(S3StorageClassResolver.fromReplicationConfig(config).name());
   }
 }

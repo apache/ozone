@@ -103,6 +103,36 @@ public final class S3GatewayConfigKeys {
   public static final int OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT = 1000;
 
   /**
+   * Configuration key that makes an explicit {@code x-amz-storage-class: STANDARD} use the {@code ozone.replication}
+   * setting, when set, instead of {@link org.apache.hadoop.ozone.s3.util.S3StorageType#STANDARD}.
+   */
+  public static final String OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY =
+      "ozone.s3g.standard.storage-class.use-client-default";
+  public static final boolean OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT = false;
+
+  /**
+   * Storage policy for writes that request the STANDARD storage class: HOT, WARM, or empty to
+   * inherit the bucket's policy. COLD is not allowed, because those writes would then report
+   * GLACIER.
+   */
+  public static final String OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY =
+      "ozone.s3g.storage-class.standard.storage-policy";
+
+  /**
+   * Storage policy for writes that request the REDUCED_REDUNDANCY storage class: HOT, WARM, or
+   * empty to inherit the bucket's policy. COLD is not allowed.
+   */
+  public static final String OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY =
+      "ozone.s3g.storage-class.reduced-redundancy.storage-policy";
+
+  /**
+   * Storage policy for writes that request the STANDARD_IA storage class: HOT, WARM, or empty to
+   * inherit the bucket's policy. COLD is not allowed, because those writes would report DEEP_ARCHIVE.
+   */
+  public static final String OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY =
+      "ozone.s3g.storage-class.standard-ia.storage-policy";
+
+  /**
    * Never constructed.
    */
   private S3GatewayConfigKeys() {

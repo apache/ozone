@@ -39,7 +39,7 @@ class TestDatanodeUsageInfo {
   void testToProtoReportsStorageTypesWithoutChangingAggregateUsage() throws Exception {
     DatanodeUsageInfo info = new DatanodeUsageInfo(randomDatanodeDetails(), twoTierStat());
     DatanodeUsageInfoProto proto = DatanodeUsageInfoProto.parseFrom(
-        info.toProto(ClientVersion.CURRENT_VERSION).toByteArray());
+        info.toProto(ClientVersion.CURRENT).toByteArray());
 
     assertThat(proto.getCapacity()).isEqualTo(200);
     assertThat(proto.getUsed()).isEqualTo(110);
@@ -74,7 +74,7 @@ class TestDatanodeUsageInfo {
     DatanodeUsageInfo info = new DatanodeUsageInfo(randomDatanodeDetails(), stat);
     info.setReserved(42L);
 
-    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT_VERSION);
+    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT);
 
     assertThat(proto.getReserved()).isEqualTo(42L);
     assertThat(proto.getStorageTypeUsageCount()).isEqualTo(1);
@@ -89,7 +89,7 @@ class TestDatanodeUsageInfo {
   void testToProtoWithoutStatsOmitsStorageTypeUsage() {
     DatanodeUsageInfo info = new DatanodeUsageInfo(randomDatanodeDetails(), null);
 
-    assertThat(info.toProto(ClientVersion.CURRENT_VERSION).getStorageTypeUsageList()).isEmpty();
+    assertThat(info.toProto(ClientVersion.CURRENT).getStorageTypeUsageList()).isEmpty();
   }
 
   @Test
@@ -105,7 +105,7 @@ class TestDatanodeUsageInfo {
     );
 
     DatanodeUsageInfo info = new DatanodeUsageInfo(dn, stat);
-    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT_VERSION);
+    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT);
 
     assertThat(proto.hasFsCapacity()).isFalse();
     assertThat(proto.hasFsAvailable()).isFalse();
@@ -129,7 +129,7 @@ class TestDatanodeUsageInfo {
     DatanodeUsageInfo info = new DatanodeUsageInfo(dn, stat);
     info.setFilesystemUsage(2000L, 1500L);
 
-    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT_VERSION);
+    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT);
 
     assertThat(proto.hasFsCapacity()).isTrue();
     assertThat(proto.hasFsAvailable()).isTrue();

@@ -50,9 +50,11 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.FinalizeUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.QueryUpgradeStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
@@ -104,6 +106,13 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   private SCMBlockLocationFailoverProxyProvider failoverProxyProvider;
 
   /**
+   * SCM Ratis follower replication lag (Raft log entries) observed on the most
+   * recent {@link #deleteKeyBlocks} call. Advisory; read by OM to throttle
+   * block-deletion load. 0 means no lag or not yet observed.
+   */
+  private volatile long lastKnownFollowerReplicationLag;
+
+  /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
    *
    * @param proxyProvider {@link SCMBlockLocationFailoverProxyProvider}
@@ -131,7 +140,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   private SCMBlockLocationRequest.Builder createSCMBlockRequest(Type cmdType) {
     return SCMBlockLocationRequest.newBuilder()
         .setCmdType(cmdType)
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setTraceID(TracingUtil.exportCurrentSpan());
   }
 
@@ -307,6 +316,10 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     final DeleteScmKeyBlocksResponseProto resp =
         wrappedResponse.getDeleteScmKeyBlocksResponse();
 
+    // Record the advisory SCM follower replication lag so OM can throttle its
+    // block-deletion load. Absent/old SCM leaves this at the proto default 0.
+    lastKnownFollowerReplicationLag = resp.getScmFollowerReplicationLag();
+
     List<DeleteBlockGroupResult> results =
         new ArrayList<>(resp.getResultsCount());
     results.addAll(resp.getResultsList().stream().map(
@@ -315,6 +328,11 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
                 .convertBlockResultProto(result.getBlockResultsList())))
         .collect(Collectors.toList()));
     return results;
+  }
+
+  @Override
+  public long getLastKnownFollowerReplicationLag() {
+    return lastKnownFollowerReplicationLag;
   }
 
   /**
@@ -407,6 +425,38 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
     return (InnerNode) setParent(
         InnerNodeImpl.fromProtobuf(resp.getClusterTree()));
+  }
+
+  @Override
+  public void finalizeUpgrade() throws IOException {
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
+    FinalizeUpgradeRequestProto request = FinalizeUpgradeRequestProto.newBuilder()
+        .setForce(force)
+        .build();
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.FinalizeUpgrade)
+        .setFinalizeUpgradeRequest(request)
+        .build();
+    handleError(submitRequest(wrapper));
+  }
+
+  @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
+    QueryUpgradeStatusRequestProto request =
+        QueryUpgradeStatusRequestProto.newBuilder().build();
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.QueryUpgradeStatus)
+        .setQueryUpgradeStatusRequest(request)
+        .build();
+    final SCMBlockLocationResponse wrappedResponse =
+        handleError(submitRequest(wrapper));
+    return wrappedResponse.getQueryUpgradeStatusResponse().getStatus();
   }
 
   /**

@@ -341,7 +341,7 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
     OzoneManagerProtocolProtos.OMRequest readRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.ListVolume)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(randomUUID().toString())
             .build();
 

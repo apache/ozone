@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -62,7 +62,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -126,8 +126,8 @@ public class TestOpenContainerCount {
     pipeline2 = getRandomPipeline(datanodeDetails);
     pipelineId2 = pipeline2.getId().getId().toString();
 
-    StorageContainerLocationProtocol mockScmClient = mock(
-            StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface mockScmClient = mock(
+            StorageContainerLocationInternalInterface.class);
     mockScmServiceProvider = mock(
             StorageContainerServiceProviderImpl.class);
 
@@ -205,7 +205,7 @@ public class TestOpenContainerCount {
                     .addBinding(NodeEndpoint.class)
                     .addBinding(MetricsServiceProviderFactory.class)
                     .addBinding(ReconUtils.class, reconUtilsMock)
-                    .addBinding(StorageContainerLocationProtocol.class,
+                    .addBinding(StorageContainerLocationInternalInterface.class,
                             mockScmClient)
                     .build();
 
@@ -321,7 +321,7 @@ public class TestOpenContainerCount {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto,
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     });
@@ -411,7 +411,7 @@ public class TestOpenContainerCount {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto,
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     });

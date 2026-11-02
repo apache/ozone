@@ -265,7 +265,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path path) throws IOException {
-    ozoneManager.getMetrics().incNumGetFileStatus();
+    ozoneManager.getMetrics().incNumTrashGetFileStatus();
     OmKeyArgs keyArgs = constructOmKeyArgs(path);
     OzoneFileStatus ofs = ozoneManager.getKeyManager().getFileStatus(keyArgs);
     FileStatus fileStatus = convertToFileStatus(ofs);
@@ -455,7 +455,7 @@ public class TrashOzoneFileSystem extends FileSystem {
        createOMRequest(OzoneManagerProtocolProtos.Type cmdType) throws IOException {
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setClientId(CLIENT_ID.toString())
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setUserInfo(getUserInfo())
         .setCmdType(cmdType);
   }
