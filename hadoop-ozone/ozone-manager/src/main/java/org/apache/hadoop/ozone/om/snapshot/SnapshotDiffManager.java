@@ -115,6 +115,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -1191,12 +1192,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     } finally {
       try {
         // Decrement ref counts
-        if (rcFromSnapshot != null) {
-          rcFromSnapshot.close();
-        }
-        if (rcToSnapshot != null) {
-          rcToSnapshot.close();
-        }
+        IOUtils.close(LOG, rcFromSnapshot, rcToSnapshot);
       } finally {
         if (snapshotLocks.isLockAcquired()) {
           snapshotLocks.releaseLock();

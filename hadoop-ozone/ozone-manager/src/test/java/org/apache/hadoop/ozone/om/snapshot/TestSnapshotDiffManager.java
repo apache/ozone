@@ -156,6 +156,7 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -167,6 +168,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
@@ -384,10 +386,29 @@ public class TestSnapshotDiffManager {
     when(omSnapshotManager.getDiffCleanupServiceInterval()).thenReturn(0L);
   }
 
+  private static Stream<Arguments> snapshotDiffLockScenarios() {
+    // 0 returns before opening; 1/2 fail on that open; 3 allows both opens to succeed.
+    return Stream.of(
+        Arguments.of(0, false, false), Arguments.of(1, false, false),
+        Arguments.of(2, false, false), Arguments.of(3, false, false),
+        Arguments.of(3, true, false), Arguments.of(0, false, true),
+        Arguments.of(1, false, true), Arguments.of(2, false, true),
+        Arguments.of(3, false, true), Arguments.of(3, true, true));
+  }
+
   @ParameterizedTest
-  @CsvSource({"0, false, false", "1, false, false", "2, false, false", "3, false, false",
-      "3, true, false", "0, false, true", "1, false, true", "2, false, true", "3, false, true", "3, true, true"})
+  @MethodSource("snapshotDiffLockScenarios")
   public void testSnapshotDiffLocks(int failOnOpen, boolean sameSnapshot, boolean optimized) throws Exception {
+    testSnapshotDiffLocks(failOnOpen, sameSnapshot, optimized, false);
+  }
+
+  @Test
+  public void testSnapshotDiffLocksAfterCloseFailure() throws Exception {
+    testSnapshotDiffLocks(3, false, false, true);
+  }
+
+  private void testSnapshotDiffLocks(int failOnOpen, boolean sameSnapshot, boolean optimized,
+      boolean failOnClose) throws Exception {
     SnapshotInfo from = snapshotInfo;
     SnapshotInfo to = sameSnapshot ? from : snapshotInfoList.get(0);
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
@@ -406,7 +427,17 @@ public class TestSnapshotDiffManager {
           throw new IOException("Snapshot load failed");
         }
         String name = invocation.getArgument(2);
-        return cache.get(name.equals(from.getName()) ? from.getSnapshotId() : to.getSnapshotId());
+        UncheckedAutoCloseableSupplier<OmSnapshot> handle =
+            cache.get(name.equals(from.getName()) ? from.getSnapshotId() : to.getSnapshotId());
+        if (failOnClose && opens.get() == 1) {
+          UncheckedAutoCloseableSupplier<OmSnapshot> failingHandle = spy(handle);
+          doAnswer(closeInvocation -> {
+            handle.close();
+            throw new IllegalStateException("Snapshot close failed");
+          }).when(failingHandle).close();
+          return failingHandle;
+        }
+        return handle;
       }).when(omSnapshotManager).getActiveSnapshot(anyString(), anyString(), anyString(), any(UUID.class));
       String jobKey = generateSnapDiffJobKey.apply(from, to);
       String jobId = UUID.randomUUID().toString();
@@ -430,7 +461,7 @@ public class TestSnapshotDiffManager {
   }
 
   @ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(ints = {1, 2})
+  @ValueSource(ints = {1, 2})
   public void testSnapshotDiffLocksAfterSnapshotNameReuse(int replaceOnOpen) throws Exception {
     SnapshotInfo from = snapshotInfo;
     SnapshotInfo to = snapshotInfoList.get(0);
@@ -471,7 +502,7 @@ public class TestSnapshotDiffManager {
 
       RuntimeException failure = assertThrows(RuntimeException.class, () -> manager.generateSnapshotDiffReport(
           jobKey, jobId, VOLUME_NAME, BUCKET_NAME, from.getName(), to.getName(), true, false, false));
-      assertTrue(failure.getCause().getMessage().contains("Snapshot name mapping changed"));
+      assertThat(failure).cause().hasMessageContaining("Snapshot name mapping changed");
       assertEquals(FAILED, manager.getSnapDiffJobTable().get(jobKey).getStatus());
       assertEquals(replaceOnOpen, opens.get());
       assertEquals(replaceOnOpen - 1, openedIds.size());

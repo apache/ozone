@@ -171,6 +171,22 @@ class TestOmSnapshotManager {
     omSnapshotManager.invalidateCache();
   }
 
+  @Test
+  public void testGetActiveSnapshotWithNullExpectedId() throws Exception {
+    OmSnapshotManager snapshots = mock(OmSnapshotManager.class);
+    OzoneManager manager = mock(OzoneManager.class);
+    SnapshotCache cache = mock(SnapshotCache.class);
+    HddsWhiteboxTestUtils.setInternalState(snapshots, "ozoneManager", manager);
+    HddsWhiteboxTestUtils.setInternalState(snapshots, "snapshotCache", cache);
+    Mockito.doCallRealMethod().when(snapshots).getActiveSnapshot("vol", "bucket", "snap", null);
+
+    OMException failure = assertThrows(OMException.class,
+        () -> snapshots.getActiveSnapshot("vol", "bucket", "snap", null));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, failure.getResult());
+    assertThat(failure).hasMessage("expectedSnapshotId must not be null");
+    Mockito.verifyNoInteractions(manager, cache);
+  }
+
   private enum SnapshotScenario {
     ACTIVE,
     MISSING,

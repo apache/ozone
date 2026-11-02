@@ -661,7 +661,9 @@ public final class OmSnapshotManager implements AutoCloseable {
   /** Opens an active snapshot only if its name still identifies the expected UUID. */
   public UncheckedAutoCloseableSupplier<OmSnapshot> getActiveSnapshot(
       String volumeName, String bucketName, String snapshotName, UUID expectedSnapshotId) throws IOException {
-    Objects.requireNonNull(expectedSnapshotId, "expectedSnapshotId");
+    if (expectedSnapshotId == null) {
+      throw new OMException("expectedSnapshotId must not be null", OMException.ResultCodes.INVALID_REQUEST);
+    }
     if (snapshotName == null || snapshotName.isEmpty()) {
       throw new OMException(INVALID_KEY_NAME);
     }
