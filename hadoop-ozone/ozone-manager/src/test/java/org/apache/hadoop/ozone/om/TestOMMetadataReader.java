@@ -1157,6 +1157,26 @@ public class TestOMMetadataReader {
     verify(keyManager).getKeyInfo(any(OmKeyArgs.class), any(ResolvedBucket.class), any());
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testAclResultIsRecordedOnSpan(boolean granted) throws Exception {
+    final IAccessAuthorizer accessAuthorizer = mock(IAccessAuthorizer.class);
+    when(accessAuthorizer.checkAccess(any(OzoneObj.class), any(RequestContext.class))).thenReturn(granted);
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        assertEquals(granted,
+            omMetadataReader.checkAcls(createTestOzoneObj(), createTestRequestContextBuilder(), false));
+      } finally {
+        span.end();
+      }
+
+      collector.assertAttribute("request", OmTracingAttributes.OM_ACL_GRANTED, granted);
+    }
+  }
+
   @Test
   public void getBucketInfoResolvesS3VolumeWhenAssumeS3Context() throws Exception {
     BucketManager bucketManager = mock(BucketManager.class);

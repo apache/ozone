@@ -796,17 +796,21 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   private boolean checkAccessIncludingDependentS3Actions(OzoneObj obj, RequestContext context)
       throws OMException {
     if (!accessAuthorizer.checkAccess(obj, context)) {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_ACL_GRANTED, false);
       return false;
     }
     final String s3Action = context.getS3Action();
     if (s3Action == null || accessAuthorizer.isNative()) {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_ACL_GRANTED, true);
       return true;
     }
     for (String dependentAction : DEPENDENT_S3_ACTIONS.getOrDefault(s3Action, Collections.emptyList())) {
       if (!accessAuthorizer.checkAccess(obj, context.toBuilder().setS3Action(dependentAction).build())) {
+        TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_ACL_GRANTED, false);
         return false;
       }
     }
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_ACL_GRANTED, true);
     return true;
   }
 

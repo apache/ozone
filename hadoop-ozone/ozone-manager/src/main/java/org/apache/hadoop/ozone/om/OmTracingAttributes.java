@@ -53,6 +53,9 @@ public final class OmTracingAttributes {
   /** Bucket layout resolved for an OM key request, for example {@code FILE_SYSTEM_OPTIMIZED}. */
   public static final String OM_BUCKET_LAYOUT = "om.bucket_layout";
 
+  /** Whether the last OM ACL check of the current span granted access. */
+  public static final String OM_ACL_GRANTED = "om.acl.granted";
+
   private OmTracingAttributes() {
   }
 }
