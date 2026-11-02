@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.parseETag;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.OptionalLong;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
@@ -61,7 +60,7 @@ final class S3ConditionalRequest {
         S3Consts.IF_UNMODIFIED_SINCE_HEADER),
 
     /**
-     * For CopyObject source validation. Always throws 412 Precondition Failed
+     * For CopyObject and UploadPartCopy source validation. Always throws 412 Precondition Failed
      * when any condition is not met (no 304 responses).
      */
     COPY_SOURCE(
@@ -129,27 +128,6 @@ final class S3ConditionalRequest {
     }
 
     return null;
-  }
-
-  static boolean checkCopySourceModificationTime(Long lastModificationTime,
-      String copySourceIfModifiedSinceStr,
-      String copySourceIfUnmodifiedSinceStr) {
-    long copySourceIfModifiedSince = Long.MIN_VALUE;
-    long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
-
-    OptionalLong modifiedDate =
-        parseAndValidatePastOrPresentDate(copySourceIfModifiedSinceStr);
-    if (modifiedDate.isPresent()) {
-      copySourceIfModifiedSince = modifiedDate.getAsLong();
-    }
-
-    OptionalLong unmodifiedDate =
-        parseAndValidatePastOrPresentDate(copySourceIfUnmodifiedSinceStr);
-    if (unmodifiedDate.isPresent()) {
-      copySourceIfUnmodifiedSince = unmodifiedDate.getAsLong();
-    }
-    return (copySourceIfModifiedSince <= lastModificationTime)
-        && (lastModificationTime <= copySourceIfUnmodifiedSince);
   }
 
   static WriteConditions parseWriteConditions(HttpHeaders headers,
@@ -248,26 +226,6 @@ final class S3ConditionalRequest {
     } catch (IllegalArgumentException | ParseException ex) {
       return null;
     }
-  }
-
-  private static OptionalLong parseAndValidatePastOrPresentDate(
-      String ozoneDateStr) {
-    if (ozoneDateStr == null) {
-      return OptionalLong.empty();
-    }
-
-    long ozoneDateInMs;
-    try {
-      ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
-    } catch (ParseException e) {
-      return OptionalLong.empty();
-    }
-
-    long currentDate = System.currentTimeMillis();
-    if (ozoneDateInMs <= currentDate) {
-      return OptionalLong.of(ozoneDateInMs);
-    }
-    return OptionalLong.empty();
   }
 
   static final class WriteConditions {
