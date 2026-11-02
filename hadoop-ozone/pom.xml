@@ -42,6 +42,7 @@
     <module>iceberg</module>
     <module>insight</module>
     <module>integration-test</module>
+    <module>integration-test-freon</module>
     <module>integration-test-full-deps</module>
     <module>integration-test-recon</module>
     <module>integration-test-s3</module>

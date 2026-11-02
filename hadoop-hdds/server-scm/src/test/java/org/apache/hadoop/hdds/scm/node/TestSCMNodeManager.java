@@ -2252,6 +2252,11 @@ public class TestSCMNodeManager {
       assertEquals(2, nodeManager.getNodesByAddress("1.2.3.4").size());
       assertEquals(1, nodeManager.getNodesByAddress("2.3.4.5").size());
       assertEquals(0, nodeManager.getNodesByAddress("1.9.8.7").size());
+
+      DatanodeDetails ipv6Node = createDatanodeDetails(
+          DatanodeID.randomID(), "host6", "2001:db8:0:0:0:0:0:1", null);
+      nodeManager.register(ipv6Node, null, null);
+      assertEquals(1, nodeManager.getNodesByAddress("2001:db8::1").size());
     }
   }
 

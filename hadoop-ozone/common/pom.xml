@@ -206,11 +206,7 @@
             <phase>generate-resources</phase>
             <configuration>
               <source>
-                <directory>${basedir}/../</directory>
-                <includes>
-                  <include>*/src/main/java/**/*.java</include>
-                  <include>*/src/main/proto/*.proto</include>
-                </includes>
+                <directory>${project.basedir}/src/main/resources</directory>
               </source>
             </configuration>
           </execution>

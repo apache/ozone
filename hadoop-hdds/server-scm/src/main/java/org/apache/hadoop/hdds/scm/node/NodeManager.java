@@ -409,6 +409,16 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   void processVersionReport(DatanodeDetails datanodeDetails, DatanodeVersionProto versionReport);
 
   /**
+   * Returns true if the datanode should be blocked from joining the cluster due to a version
+   * incompatibility with this SCM. See {@code SCMNodeManager.shouldFenceDatanode} for the full
+   * set of conditions. Returns false by default for test implementations that do not enforce versioning.
+   */
+  default boolean shouldFenceDatanode(DatanodeDetails datanodeDetails,
+      DatanodeVersionProto versionReport) {
+    return false;
+  }
+
+  /**
    * Get the number of commands of the given type queued on the datanode at the
    * last heartbeat. If the Datanode has not reported information for the given
    * command type, -1 will be returned.
