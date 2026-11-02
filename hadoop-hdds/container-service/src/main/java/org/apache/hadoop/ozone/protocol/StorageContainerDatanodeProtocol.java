@@ -37,7 +37,7 @@ import org.apache.hadoop.security.KerberosInfo;
 /**
  * The protocol spoken between datanodes and SCM. For specifics please the
  * Protoc file that defines this protocol.
- * Service authorization reads {@link KerberosInfo} here, since this is the {@code ProtocolInfo} name of the PB protocol.
+ * Service authorization reads {@link KerberosInfo} here: this is the {@code ProtocolInfo} name of the PB protocol.
  */
 @KerberosInfo(
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
