@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -212,6 +213,7 @@ public class S3GetSecretRequest extends OMClientRequest {
 
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put(OzoneConsts.S3_GETSECRET_USER, accessId);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.S3_GETSECRET_USER, accessId);
 
     // audit log
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(

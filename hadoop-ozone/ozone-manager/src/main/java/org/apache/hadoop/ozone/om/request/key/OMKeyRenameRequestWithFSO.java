@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -464,7 +465,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.remove(OzoneConsts.KEY);
     auditMap.put(OzoneConsts.SRC_KEY, keyArgs.getKeyName());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.SRC_KEY, keyArgs.getKeyName());
     auditMap.put(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
     return auditMap;
   }
 

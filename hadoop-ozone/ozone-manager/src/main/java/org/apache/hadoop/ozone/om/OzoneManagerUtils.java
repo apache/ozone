@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -176,7 +177,11 @@ public final class OzoneManagerUtils {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.DELEGATION_TOKEN_KIND,
         token.getKind() == null ? "" : token.getKind().toString());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.DELEGATION_TOKEN_KIND,
+        token.getKind() == null ? "" : token.getKind().toString());
     auditMap.put(OzoneConsts.DELEGATION_TOKEN_SERVICE,
+        token.getService() == null ? "" : token.getService().toString());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.DELEGATION_TOKEN_SERVICE,
         token.getService() == null ? "" : token.getService().toString());
 
     return auditMap;

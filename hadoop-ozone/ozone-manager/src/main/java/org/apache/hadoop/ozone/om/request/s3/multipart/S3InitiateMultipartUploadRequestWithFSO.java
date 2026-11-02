@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -79,6 +80,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();

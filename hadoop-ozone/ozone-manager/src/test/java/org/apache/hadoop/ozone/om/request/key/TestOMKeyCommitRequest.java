@@ -30,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -41,12 +43,15 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -144,6 +149,35 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertEquals(allocatedLocationList,
         omKeyInfo.getLatestVersionLocations().createLocationList());
 
+  }
+
+  @Test
+  public void testCommitAttributesAreRecordedOnSpan() throws Exception {
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
+    OMKeyCommitRequest omKeyCommitRequest = getOmKeyCommitRequest(modifiedOmRequest);
+    KeyArgs keyArgs = modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
+    List<OmKeyLocationInfo> allocatedLocationList = keyArgs.getKeyLocationsList().stream()
+        .map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        omKeyCommitRequest.getBucketLayout());
+    addKeyToOpenKeyTable(allocatedLocationList);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      OMClientResponse omClientResponse;
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
+      } finally {
+        span.end();
+      }
+
+      assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+      collector.assertAttribute("request", OmTracingAttributes.OM_KEY_HSYNC, false);
+      collector.assertAttribute("request", OmTracingAttributes.OM_KEY_RECOVERY, false);
+      collector.assertAttribute("request", OmTracingAttributes.OM_KEY_COMMITTED_BLOCKS,
+          (long) keyArgs.getKeyLocationsCount());
+    }
   }
 
   @Test

@@ -379,7 +379,10 @@ public final class OmVolumeArgs extends WithObjectID
       auditMap.put(OzoneConsts.MODIFICATION_TIME,
           String.valueOf(this.modificationTime));
       auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
       auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+          String.valueOf(this.quotaInNamespace));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_NAMESPACE,
           String.valueOf(this.quotaInNamespace));
       auditMap.put(OzoneConsts.USED_NAMESPACE,
           String.valueOf(this.usedNamespace));

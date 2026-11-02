@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -133,6 +134,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();

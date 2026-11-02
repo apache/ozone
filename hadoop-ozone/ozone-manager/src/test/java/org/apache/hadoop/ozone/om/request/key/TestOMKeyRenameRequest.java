@@ -27,9 +27,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -106,6 +111,28 @@ public class TestOMKeyRenameRequest extends OMKeyRequestTests {
     addKeyToTable(fromKeyInfo);
     doPreExecute(createRenameKeyRequest(
         volumeName, bucketName, fromKeyName, toKeyName));
+  }
+
+  @Test
+  public void testRenameKeysAreRecordedOnSpan() throws Exception {
+    addKeyToTable(fromKeyInfo);
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, toKeyName));
+    OMKeyRenameRequest omKeyRenameRequest = getOMKeyRenameRequest(modifiedOmRequest);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      OMClientResponse omKeyRenameResponse;
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        omKeyRenameResponse = omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
+      } finally {
+        span.end();
+      }
+
+      assertEquals(OzoneManagerProtocolProtos.Status.OK, omKeyRenameResponse.getOMResponse().getStatus());
+      collector.assertAttribute("request", OzoneConsts.SRC_KEY, fromKeyName);
+      collector.assertAttribute("request", OzoneConsts.DST_KEY, toKeyName);
+    }
   }
 
   @Test

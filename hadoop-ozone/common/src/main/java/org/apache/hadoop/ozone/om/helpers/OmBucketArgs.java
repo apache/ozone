@@ -193,6 +193,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         getMetadata().get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
                 String.valueOf(this.isVersionEnabled));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.IS_VERSION_ENABLED,
+                String.valueOf(this.isVersionEnabled));
     if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
     }
@@ -203,20 +205,31 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         (this.quotaInBytes != OzoneConsts.QUOTA_RESET)) {
       auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
           String.valueOf(this.quotaInBytes));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_BYTES,
+          String.valueOf(this.quotaInBytes));
     }
     if (this.quotaInNamespaceSet && quotaInNamespace > 0 ||
         (this.quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
       auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
           String.valueOf(this.quotaInNamespace));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_NAMESPACE,
+          String.valueOf(this.quotaInNamespace));
     }
     if (this.bekInfo != null) {
       auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
+          this.bekInfo.getKeyName());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET_ENCRYPTION_KEY,
           this.bekInfo.getKeyName());
     }
     if (this.defaultReplicationConfig != null) {
       auditMap.put(OzoneConsts.REPLICATION_TYPE, String.valueOf(
           this.defaultReplicationConfig.getType()));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_TYPE, String.valueOf(
+          this.defaultReplicationConfig.getType()));
       auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+          this.defaultReplicationConfig.getReplicationConfig()
+              .getReplication());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_CONFIG,
           this.defaultReplicationConfig.getReplicationConfig()
               .getReplication());
     }

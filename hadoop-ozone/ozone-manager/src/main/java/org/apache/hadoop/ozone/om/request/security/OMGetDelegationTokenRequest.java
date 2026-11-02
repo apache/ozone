@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.io.Text;
@@ -165,6 +166,9 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
           readProtoBuf(ozoneTokenIdentifierToken.getIdentifier());
       auditMap.put(OzoneConsts.DELEGATION_TOKEN_RENEWER,
+          ozoneTokenIdentifier.getRenewer() == null ? "" :
+              ozoneTokenIdentifier.getRenewer().toString());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.DELEGATION_TOKEN_RENEWER,
           ozoneTokenIdentifier.getRenewer() == null ? "" :
               ozoneTokenIdentifier.getRenewer().toString());
 

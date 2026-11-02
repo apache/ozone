@@ -416,8 +416,11 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.START_KEY, startKey);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.START_KEY, startKey);
     auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
     auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.KEY_PREFIX, keyPrefix);
 
     try {
       if (isAclEnabled) {

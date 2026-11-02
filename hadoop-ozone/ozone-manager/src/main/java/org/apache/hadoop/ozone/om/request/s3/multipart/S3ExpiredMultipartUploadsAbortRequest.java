@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -192,6 +193,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
             .build();
         Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgsForAudit);
         auditMap.put(OzoneConsts.UPLOAD_ID, abortInfo.getOmMultipartKeyInfo()
+            .getUploadID());
+        TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, abortInfo.getOmMultipartKeyInfo()
             .getUploadID());
         markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
             OMAction.ABORT_EXPIRED_MULTIPART_UPLOAD, auditMap,

@@ -228,6 +228,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     auditMap.put(OzoneConsts.REPLICATION_CONFIG,
         (this.replicationConfig != null) ?
             this.replicationConfig.toString() : null);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_CONFIG,
+        (this.replicationConfig != null) ?
+            this.replicationConfig.toString() : null);
     return auditMap;
   }
 

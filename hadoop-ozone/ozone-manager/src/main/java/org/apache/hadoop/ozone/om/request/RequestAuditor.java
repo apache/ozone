@@ -101,6 +101,8 @@ public interface RequestAuditor {
       if (keyArgs.hasExpectedDataGeneration()) {
         auditMap.put(OzoneConsts.REWRITE_GENERATION,
             String.valueOf(keyArgs.getExpectedDataGeneration()));
+        TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REWRITE_GENERATION,
+            String.valueOf(keyArgs.getExpectedDataGeneration()));
       }
       for (HddsProtos.KeyValue item : keyArgs.getMetadataList()) {
         if (ETAG.equals(item.getKey())) {

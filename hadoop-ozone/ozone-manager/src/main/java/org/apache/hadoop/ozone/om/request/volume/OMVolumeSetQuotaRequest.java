@@ -89,6 +89,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, volume);
         auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
             String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
+        TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_BYTES,
+            String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
         markForAudit(ozoneManager.getAuditLogger(),
             buildAuditMessage(OMAction.SET_QUOTA, auditMap, ex,
                 omRequest.getUserInfo()));
@@ -128,6 +130,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     Map<String, String> auditMap = buildVolumeAuditMap(volume);
     auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
+        String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_BYTES,
         String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();

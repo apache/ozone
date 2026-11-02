@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -99,6 +100,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     } catch (IOException ex) {
       Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
       auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
       markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
           OMAction.ABORT_MULTIPART_UPLOAD, auditMap, ex, getOmRequest().getUserInfo()));
       throw ex;
@@ -120,6 +122,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         .getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();

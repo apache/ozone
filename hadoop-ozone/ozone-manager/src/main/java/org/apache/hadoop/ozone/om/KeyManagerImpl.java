@@ -137,6 +137,7 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -2552,8 +2553,10 @@ public class KeyManagerImpl implements KeyManager {
       throws IOException {
     Set<Long> containerIds = extractContainerIDs(keyInfo)
         .collect(Collectors.toSet());
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_KEY_CONTAINER_COUNT, containerIds.size());
 
     metrics.setForceContainerCacheRefresh(forceRefresh);
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_KEY_FORCE_REFRESH, forceRefresh);
     Map<Long, Pipeline> containerLocations =
         scmClient.getContainerLocations(containerIds, forceRefresh);
 

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -110,6 +111,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
 
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put(OzoneConsts.S3_REVOKESECRET_USER, kerberosID);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.S3_REVOKESECRET_USER, kerberosID);
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.REVOKE_S3_SECRET, auditMap,
         exception, getOmRequest().getUserInfo()));

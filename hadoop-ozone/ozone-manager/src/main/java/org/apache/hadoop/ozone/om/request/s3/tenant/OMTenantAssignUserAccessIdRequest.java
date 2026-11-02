@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -344,6 +345,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
     // Audit
     auditMap.put(OzoneConsts.TENANT, tenantId);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.TENANT, tenantId);
     auditMap.put("user", userPrincipal);
     auditMap.put("accessId", accessId);
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(

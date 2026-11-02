@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -168,7 +170,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     boolean isHSync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_KEY_HSYNC, isHSync);
     boolean isRecovery = commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_KEY_RECOVERY, isRecovery);
     // isHsync = true, a commit request as a result of client side hsync call
     // isRecovery = true, a commit request as a result of client side recoverLease call
     // none of isHsync and isRecovery is true, a commit request as a result of client side normal
@@ -464,6 +468,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
       locationInfoList.add(locationInfo);
     }
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_KEY_COMMITTED_BLOCKS, locationInfoList.size());
     return locationInfoList;
   }
 
@@ -629,6 +634,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // in the open key entry.
       Long expectedGen = toCommit.getExpectedDataGeneration();
       auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
 
       if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         if (existing != null) {
