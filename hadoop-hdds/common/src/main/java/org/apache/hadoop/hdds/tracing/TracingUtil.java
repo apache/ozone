@@ -392,12 +392,12 @@ public final class TracingUtil {
    * @return A new interface which implements interface but delegate all the
    * calls to the delegate and also enables tracing.
    */
-  public static <T> T createProxy(
+  public static <T> T createInternalProxy(
       T delegate, Class<T> itf, ConfigurationSource conf) {
     return createProxy(delegate, itf, conf, SpanKind.INTERNAL);
   }
 
-  /** Same as {@link #createProxy(Object, Class, ConfigurationSource)}, with CLIENT spans for an RPC delegate. */
+  /** Same as {@link #createInternalProxy(Object, Class, ConfigurationSource)}, with CLIENT spans for an RPC delegate. */
   public static <T> T createClientProxy(T delegate, Class<T> itf, ConfigurationSource conf) {
     return createProxy(delegate, itf, conf, SpanKind.CLIENT);
   }

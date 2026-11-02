@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.tracing;
 
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createClientProxy;
-import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -80,7 +79,7 @@ public class TestTracingAnnotations {
   public void testSkipTracingNoSpan() {
     TracingUtil.initTracing("TestService", tracingEnabled());
     ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
+    Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
 
     serviceProxy.skippedMethod();
     assertFalse(impl.wasSpanActive(), "Span should NOT be created for @SkipTracing methods.");
@@ -90,7 +89,7 @@ public class TestTracingAnnotations {
   public void testSkipTracingExceptionUnwrapped() {
     TracingUtil.initTracing("TestService", tracingEnabled());
     ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
+    Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
 
     IOException ex = assertThrows(IOException.class,
         () -> serviceProxy.throwingMethod());
@@ -103,7 +102,7 @@ public class TestTracingAnnotations {
     installNoExportGlobalOpenTelemetry();
     TracingUtil.initTracing("TestService", tracingEnabled());
     ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
+    Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
 
     serviceProxy.normalMethod();
     assertTrue(impl.wasSpanActive(), "Normal method should have an active span.");
@@ -141,7 +140,7 @@ public class TestTracingAnnotations {
   @Test
   public void testCreateProxyKinds() {
     try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
-      createProxy(new ServiceImpl(), Service.class, tracingEnabled()).normalMethod();
+      TracingUtil.createInternalProxy(new ServiceImpl(), Service.class, tracingEnabled()).normalMethod();
       spans.assertKind("Service.normalMethod", SpanKind.INTERNAL);
     }
     try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {

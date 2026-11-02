@@ -130,7 +130,7 @@ public class TestTracingUtil {
 
   @Test
   public void testDefaultMethod() {
-    Service subject = createProxy(new ServiceImpl(), Service.class,
+    Service subject = TracingUtil.createInternalProxy(new ServiceImpl(), Service.class,
         tracingEnabled());
 
     assertEquals("Hello default", subject.defaultMethod());

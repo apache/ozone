@@ -178,7 +178,7 @@ public class TestTracingInitModes {
     MutableConfigurationSource conf = config(false, true);
     TracingUtil.initTracing("app-aware-proxy", conf);
     ServiceImpl delegate = new ServiceImpl();
-    assertSame(delegate, TracingUtil.createProxy(delegate, Service.class, conf));
+    assertSame(delegate, TracingUtil.createInternalProxy(delegate, Service.class, conf));
     Service proxy = TracingUtil.createProxy(delegate, Service.class, SpanKind.INTERNAL);
     assertNotSame(delegate, proxy);
 
