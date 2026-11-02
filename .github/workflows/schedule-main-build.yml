@@ -35,6 +35,8 @@ env:
   MARKER_FILE: scheduled-build
   STASH_KEY: scheduled-build-${{ github.sha }}
 
+run-name: CI for ${{ github.sha }} on ${{ github.event_name }}
+
 jobs:
   pre-check:
     runs-on: ubuntu-slim
@@ -49,6 +51,12 @@ jobs:
           path: ${{ env.MARKER_FILE }}
           key: ${{ env.STASH_KEY }}
         continue-on-error: true
+      - name: Debug
+        id: debug
+        run: |
+          echo "Found successful build of $GITHUB_SHA: $found"
+        env:
+          found: ${{ steps.stash.outputs.stash-hit == 'true' }}
 
   CI:
     needs: pre-check
