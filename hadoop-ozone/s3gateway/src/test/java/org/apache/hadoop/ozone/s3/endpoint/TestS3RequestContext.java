@@ -60,6 +60,17 @@ class TestS3RequestContext {
   }
 
   @Test
+  void bucketLookupReusesCachedVolume() throws IOException {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    when(volume.getName()).thenReturn("volume1");
+    when(endpoint.getVolume()).thenReturn(volume);
+    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    context.getVolume();
+    assertThat(context.getBucket("bucket1")).isSameAs(bucket);
+    verify(proxy, never()).getBucketDetails(null, "bucket1");
+  }
+
+  @Test
   void volumeNameReusesCachedBucket() throws IOException {
     when(bucket.getVolumeName()).thenReturn("volume1");
     context.getBucket("bucket1");

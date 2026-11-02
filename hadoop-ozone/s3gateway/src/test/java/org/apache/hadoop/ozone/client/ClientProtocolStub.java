@@ -236,7 +236,7 @@ public class ClientProtocolStub implements ClientProtocol {
     if (volumeName == null) {
       return objectStoreStub.getS3Volume().getBucket(bucketName);
     }
-    return null;
+    return objectStoreStub.getVolume(volumeName).getBucket(bucketName);
   }
 
   @Override

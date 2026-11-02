@@ -238,6 +238,7 @@ public class TestPermissionCheck {
   @Test
   public void testSetAcl() throws Exception {
     when(objectStore.getS3Volume()).thenReturn(volume);
+    when(clientProtocol.getBucketDetails("s3Volume", "bucketName")).thenReturn(bucket);
     doThrow(exception).when(bucket).setAcl(any());
 
     when(headers.getHeaderString(S3Acl.GRANT_READ))
