@@ -22,9 +22,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
  * Storage Container Manager Upgrade Action interface. An upgrade action is an operation that
- * needs to be executed during finalization. It may also run while the SCM is being constructed, if its DB
- * records a higher apparent version than its VERSION file, before the managers created after the version
- * manager exist.
+ * needs to be executed during finalization.
  */
 public interface ScmUpgradeAction extends UpgradeAction<OzoneStorageContainerManager> {
 }
