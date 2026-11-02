@@ -354,7 +354,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     BucketEncryptionKeyInfo ezInfo = bucketInfo.getEncryptionKeyInfo();
     if (ezInfo != null) {
       final String ezKeyName = ezInfo.getKeyName();
-      EncryptedKeyVersion edek = generateEDEK(ozoneManager, ezKeyName);
+      EncryptedKeyVersion edek =
+          TracingUtil.executeInNewSpan("OM.key.generateEDEK", () -> generateEDEK(ozoneManager, ezKeyName));
       encInfo = Optional.of(new FileEncryptionInfo(ezInfo.getSuite(),
         ezInfo.getVersion(),
           edek.getEncryptedKeyVersion().getMaterial(),

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -66,7 +67,7 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
         key, snapshotInfo);
 
     // Create the snapshot checkpoint. Also cleans up some tables.
-    OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
-        snapshotInfo, batchOperation);
+    TracingUtil.executeInNewSpan("OM.snapshot.createCheckpoint",
+        () -> OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager, snapshotInfo, batchOperation));
   }
 }
