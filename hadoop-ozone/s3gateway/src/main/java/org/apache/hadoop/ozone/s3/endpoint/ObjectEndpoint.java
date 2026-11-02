@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_PART_ORDER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
@@ -208,6 +209,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       OzoneVolume volume = context.getVolume();
       OzoneBucket bucket = context.getBucket();
+      final Map<String, String> sseHeaders = ServerSideEncryption.checkWrite(getHeaders(), bucket, keyPath);
       final String lengthHeader = getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH);
       long length = lengthHeader != null ? Long.parseLong(lengthHeader) : 0;
 
@@ -218,8 +220,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           context.setAction(S3GAction.CREATE_MULTIPART_KEY_BY_COPY);
         }
         // If uploadID is specified, it is a request for upload part
-        return createMultipartKey(volume, bucket, keyPath, length,
-            body, perf);
+        return ServerSideEncryption.withHeaders(createMultipartKey(volume, bucket, keyPath, length,
+            body, perf), sseHeaders);
       }
 
       copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
@@ -238,8 +240,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         context.setAction(S3GAction.COPY_OBJECT);
         CopyObjectResponse copyObjectResponse = copyObject(volume,
             bucket, keyPath, replicationConfig, perf);
-        return Response.status(Status.OK).entity(copyObjectResponse).header(
-            "Connection", "close").build();
+        return ServerSideEncryption.withHeaders(Response.status(Status.OK).entity(copyObjectResponse).header(
+            "Connection", "close").build(), sseHeaders);
       }
 
       boolean canCreateDirectory = getOzoneConfiguration()
@@ -269,7 +271,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         long metadataLatencyNs =
             getMetrics().updatePutKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
-        return Response.ok().status(HttpStatus.SC_OK).build();
+        return ServerSideEncryption.withHeaders(Response.ok().status(HttpStatus.SC_OK).build(), sseHeaders);
       }
 
       S3ConditionalRequest.WriteConditions writeConditions =
@@ -334,10 +336,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       perf.appendSizeBytes(putLength);
       long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
       perf.appendOpLatencyNanos(opLatencyNs);
-      return Response.ok()
+      return ServerSideEncryption.withHeaders(Response.ok()
           .header(HttpHeaders.ETAG, wrapInQuotes(md5Hash))
           .status(HttpStatus.SC_OK)
-          .build();
+          .build(), sseHeaders);
     } catch (IOException | RuntimeException ex) {
       if (copyHeader != null) {
         getMetrics().updateCopyObjectFailureStats(startNanos);
@@ -381,6 +383,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   Response handleGetRequest(ObjectRequestContext context, String keyPath)
       throws IOException, OS3Exception {
 
+    ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
     final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
     // A negative part number is not a valid part; reject it as InvalidArgument.
     if (partNumber < 0) {
@@ -632,6 +635,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       @PathParam(PATH) String keyPath) throws IOException, OS3Exception {
     ObjectRequestContext context = new ObjectRequestContext(S3GAction.HEAD_KEY, bucketName);
     long startNanos = context.getStartNanos();
+    ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
     final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
     // A negative part number is not a valid part; reject it as InvalidArgument.
     if (partNumber < 0) {
@@ -802,6 +806,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       OzoneBucket ozoneBucket = getVolume().getBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
+      final Map<String, String> sseHeaders = ServerSideEncryption.checkWrite(getHeaders(), ozoneBucket, key);
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
@@ -824,8 +829,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       auditWriteSuccess(context.getAction());
       getMetrics().updateInitMultipartUploadSuccessStats(startNanos);
-      return Response.status(Status.OK).entity(
-          multipartUploadInitiateResponse).build();
+      return ServerSideEncryption.withHeaders(Response.status(Status.OK).entity(
+          multipartUploadInitiateResponse).build(), sseHeaders);
     } catch (OMException ex) {
       auditWriteFailure(context.getAction(), ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
@@ -860,6 +865,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      ServerSideEncryption.rejectCustomerKey(getHeaders(), key);
       // Reject an empty part list before contacting OM.
       if (partList == null || partList.isEmpty()) {
         throw newError(MALFORMED_XML, key);
@@ -870,7 +876,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
 
       for (CompleteMultipartUploadRequest.Part part : partList) {
-        partsMap.put(part.getPartNumber(), stripQuotes(part.getETag()));
+        if (partsMap.put(part.getPartNumber(), stripQuotes(part.getETag())) != null) {
+          throw newError(INVALID_PART_ORDER, key);
+        }
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Parts map {}", partsMap);
