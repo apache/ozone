@@ -21,11 +21,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -190,15 +187,7 @@ public abstract class XceiverClientSpi implements Closeable {
   public List<DatanodeDetails> getDatanodesInOrder(
       ContainerProtos.DatanodeBlockID blockID, ContainerProtos.Type cmdType)
       throws IOException {
-    final Pipeline pipeline = getPipeline();
-    final List<DatanodeDetails> datanodes = new ArrayList<>(pipeline.size());
-    final Set<DatanodeDetails> excluded = new HashSet<>();
-    while (excluded.size() < pipeline.size()) {
-      final DatanodeDetails d = pipeline.getClosestNode(excluded);
-      datanodes.add(d);
-      excluded.add(d);
-    }
-    return datanodes;
+    return getPipeline().getNodesInOrder();
   }
 
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
