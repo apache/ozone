@@ -1766,6 +1766,7 @@ public class TestOmMetadataManager {
     }
   }
 
+  @Test
   public void testS3RevokedStsTokenTablePutAndGet() throws Exception {
     // Ensure the table is initialized
     assertNotNull(omMetadataManager.getS3RevokedStsTokenTable(), "s3RevokedStsTokenTable should be initialized");
