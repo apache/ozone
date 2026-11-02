@@ -28,6 +28,20 @@ public final class ScmTracingAttributes {
   /** {@code Type} of an SCM request, for example {@code AllocateScmBlock}. */
   public static final String SCM_CMD_TYPE = "scm.cmd_type";
 
+  /** ID of the container a block was allocated in. */
+  public static final String HDDS_CONTAINER_ID = "hdds.container.id";
+
+  public static final String HDDS_BLOCK_LOCAL_ID = "hdds.block.local_id";
+
+  /** ID of the pipeline of the container a block was allocated in. */
+  public static final String PIPELINE_ID = "pipeline.id";
+
+  /** {@code true} when SCM created a new pipeline to allocate a container. */
+  public static final String SCM_PIPELINE_CREATED = "scm.pipeline.created";
+
+  /** Event added when SCM could not find a container for a block and returns no block. */
+  public static final String SCM_ALLOCATE_FAILED = "scm.allocate.failed";
+
   private ScmTracingAttributes() {
   }
 }

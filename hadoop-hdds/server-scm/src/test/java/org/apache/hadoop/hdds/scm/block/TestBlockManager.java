@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -79,6 +80,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.lease.LeaseManager;
@@ -199,6 +201,24 @@ public class TestBlockManager {
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
         replicationConfig, OzoneConsts.OZONE, new ExcludeList());
     assertNotNull(block);
+  }
+
+  @Test
+  public void testAllocateBlockRecordsBlockIdAndPipelineOnSpan() throws Exception {
+    pipelineManager.createPipeline(replicationConfig);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
+          new ExcludeList());
+
+      collector.assertAttribute("BlockManagerImpl.allocateBlock", ScmTracingAttributes.HDDS_CONTAINER_ID,
+          block.getBlockID().getContainerID());
+      collector.assertAttribute("BlockManagerImpl.allocateBlock", ScmTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          block.getBlockID().getLocalID());
+      collector.assertAttribute("BlockManagerImpl.allocateBlock", ScmTracingAttributes.PIPELINE_ID,
+          block.getPipeline().getId().toString());
+    }
   }
 
   @Test

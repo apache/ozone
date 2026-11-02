@@ -227,8 +227,11 @@ public class SCMBlockProtocolServer implements
     long startNanos = Time.monotonicNowNanos();
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
+    TracingUtil.addAttributesToCurrentSpan("size", size);
     auditMap.put("num", String.valueOf(num));
+    TracingUtil.addAttributesToCurrentSpan("num", num);
     auditMap.put("replication", replicationConfig.toString());
+    TracingUtil.addAttributesToCurrentSpan("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
     auditMap.put("client", clientMachine);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
@@ -259,6 +262,7 @@ public class SCMBlockProtocolServer implements
       }
 
       auditMap.put("allocated", String.valueOf(blocks.size()));
+      TracingUtil.addAttributesToCurrentSpan("allocated", blocks.size());
       String blockIDs = blocks.stream().limit(10)
           .map(block -> block.getBlockID().toString())
           .collect(Collectors.joining(", ", "[", "]"));

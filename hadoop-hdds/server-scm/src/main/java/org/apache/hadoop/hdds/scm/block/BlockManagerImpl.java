@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -44,6 +45,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeletedBlock;
@@ -164,6 +166,9 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
         size, replicationConfig, owner, excludeList);
 
     if (containerInfo != null) {
+      TracingUtil.addAttributesToCurrentSpan(ScmTracingAttributes.HDDS_CONTAINER_ID, containerInfo.getContainerID());
+      TracingUtil.addAttributesToCurrentSpan(ScmTracingAttributes.PIPELINE_ID,
+          containerInfo.getPipelineID().toString());
       return newBlock(containerInfo);
     }
     // we have tried all strategies we know and but somehow we are not able
@@ -171,6 +176,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     LOG.error(
         "Unable to allocate a block for the size: {}, replicationConfig: {}",
         size, replicationConfig);
+    TracingUtil.addEventToCurrentSpan(ScmTracingAttributes.SCM_ALLOCATE_FAILED, "replication",
+        replicationConfig.toString());
     return null;
   }
 
@@ -186,6 +193,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
       long localID = sequenceIdGen.getNextId(SequenceIdType.localId);
+      TracingUtil.addAttributesToCurrentSpan(ScmTracingAttributes.HDDS_BLOCK_LOCAL_ID, localID);
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))
