@@ -61,7 +61,7 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
                 "software version {}. User may have incorrectly run finalization before all components were " +
                 "upgraded. Finalizing this component to its software version.",
             apparentVersionInNewDB, getApparentVersion(), getSoftwareVersion());
-      } else {
+      } else if (getApparentVersion().serialize() < apparentVersionInNewDB.serialize()) {
         LOG.info("Version file has lower apparent version ({}) than DB ({}). Finalizing to the DB version.",
             getApparentVersion(), apparentVersionInNewDB);
       }
