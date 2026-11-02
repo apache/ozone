@@ -53,6 +53,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -535,6 +536,44 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testListKeysWithStartKeyBeforePrefix() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "startKeyBeforePrefix";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // Even index keys go to the DB and odd index keys to the cache.
+    addKeysToOM(volumeName, bucketName, "dir1/dir2/file1", 0);
+    addKeysToOM(volumeName, bucketName, "dir1/file2", 2);
+    addKeysToOM(volumeName, bucketName, "dir1bh/file1", 4);
+    addKeysToOM(volumeName, bucketName, "dir1bha/file1", 6);
+    addKeysToOM(volumeName, bucketName, "dir1bhb/file1", 1);
+    addKeysToOM(volumeName, bucketName, "dir2/file1", 8);
+
+    List<String> expected = Arrays.asList("dir1bh/file1", "dir1bha/file1", "dir1bhb/file1");
+
+    // startKey exists and sorts before keyPrefix, with non-matching keys in between.
+    assertEquals(expected, listKeyNames(volumeName, bucketName, "dir1/dir2/file1", "dir1bh", 100));
+    // startKey does not exist and sorts before keyPrefix.
+    assertEquals(expected, listKeyNames(volumeName, bucketName, "a", "dir1bh", 100));
+    assertEquals(expected, listKeyNames(volumeName, bucketName, null, "dir1bh", 100));
+
+    // Pagination continues from the last returned key.
+    assertEquals(expected.subList(0, 2), listKeyNames(volumeName, bucketName, "dir1/dir2/file1", "dir1bh", 2));
+    assertEquals(expected.subList(2, 3), listKeyNames(volumeName, bucketName, "dir1bha/file1", "dir1bh", 2));
+
+    // startKey sorts after every key matching keyPrefix.
+    assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "dir1bi", "dir1bh", 100));
+  }
+
+  private List<String> listKeyNames(String volumeName, String bucketName, String startKey, String keyPrefix,
+      int maxKeys) throws IOException {
+    return omMetadataManager.listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+  }
+
+  @Test
   public void testListKeysWithFewDeleteEntriesInCache() throws Exception {
     String volumeNameA = "volumeA";
     String ozoneBucket = "ozoneBucket";
@@ -789,6 +828,61 @@ public class TestOmMetadataManager {
       assertEquals(clientID, keySession.getId());
       assertEquals(0, keySession.getOpenVersion());
     }
+  }
+
+  /**
+   * The open key of a multipart upload ends with the upload ID, not a client ID.
+   * listOpenFiles lists it with client ID 0 next to the other open keys, whether or not it carries the
+   * isMultipartKey flag (rows written before HDDS-9017 do not), while the open key of a part being written,
+   * which has the flag, keeps its client ID.
+   */
+  @ParameterizedTest
+  @EnumSource
+  public void testListOpenFilesWithMultipartUpload(BucketLayout bucketLayout) throws Exception {
+    final long clientID = 1000L;
+    final long partClientID = 2000L;
+    String volumeName = "volume-lof-mpu";
+    String bucketName = "bucket-" + bucketLayout.name().toLowerCase();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
+
+    OmKeyInfo openKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key0",
+        RatisReplicationConfig.getInstance(ONE)).build();
+    OmKeyInfo uploadKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key1",
+        RatisReplicationConfig.getInstance(ONE)).build();
+    OmKeyInfo partKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key1",
+        RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true)).build();
+    String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    String dbPrefix;
+    if (bucketLayout.isFileSystemOptimized()) {
+      OMRequestTestUtils.addFileToKeyTable(true, false, openKey.getFileName(), openKey, clientID, 0L,
+          omMetadataManager);
+      OMRequestTestUtils.addMultipartKeyToOpenFileTable(false, uploadKey.getFileName(), uploadKey, uploadId, 0L,
+          omMetadataManager);
+      OMRequestTestUtils.addFileToKeyTable(true, false, partKey.getFileName(), partKey, partClientID, 0L,
+          omMetadataManager);
+      dbPrefix = omMetadataManager.getOzoneKeyFSO(volumeName, bucketName, "");
+    } else {
+      OMRequestTestUtils.addKeyToTable(true, false, openKey, clientID, 0L, omMetadataManager);
+      OMRequestTestUtils.addMultipartKeyToOpenKeyTable(false, uploadKey, uploadId, 0L, omMetadataManager);
+      OMRequestTestUtils.addKeyToTable(true, false, partKey, partClientID, 0L, omMetadataManager);
+      dbPrefix = omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+    }
+
+    ListOpenFilesResult res = omMetadataManager.listOpenFiles(bucketLayout, 100, dbPrefix, false, dbPrefix);
+    assertThat(res.getTotalOpenKeyCount()).isEqualTo(3);
+    assertThat(res.hasMore()).isFalse();
+    assertThat(res.getOpenKeys())
+        .extracting(s -> s.getKeyInfo().getKeyName(), OpenKeySession::getId)
+        .containsExactlyInAnyOrder(tuple("key0", clientID), tuple("key1", partClientID), tuple("key1", 0L));
+
+    // Page through it: the continuation token of the first page is the open key before the upload
+    res = omMetadataManager.listOpenFiles(bucketLayout, 1, dbPrefix, false, dbPrefix);
+    assertThat(res.hasMore()).isTrue();
+    res = omMetadataManager.listOpenFiles(bucketLayout, 2, dbPrefix, true, res.getContinuationToken());
+    assertThat(res.hasMore()).isFalse();
+    assertThat(res.getOpenKeys())
+        .extracting(s -> s.getKeyInfo().getKeyName(), OpenKeySession::getId)
+        .containsExactlyInAnyOrder(tuple("key1", partClientID), tuple("key1", 0L));
   }
 
   private static BucketLayout getDefaultBucketLayout() {
@@ -1527,6 +1621,149 @@ public class TestOmMetadataManager {
         volumeName, bucketName, prefix, null, null, 10, true);
 
     assertEquals(25, noPagination.size());
+  }
+
+  @Test
+  public void testGetMultipartUploadKeysWithKeyMarkerBeforePrefix() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // "c-key" sorts between key-marker "a" and prefix "dir/".
+    addMultipartUpload(volumeName, bucketName, "c-key", "upload1", false);
+    addMultipartUpload(volumeName, bucketName, "dir/key1", "upload2", false);
+    addMultipartUpload(volumeName, bucketName, "dir/key2", "upload3", false);
+
+    // key-marker sorts before the prefix, so all uploads under the prefix are after the marker.
+    List<String> keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "dir/", "a", null, 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("dir/key1", "dir/key2"), keys);
+
+    keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "dir/", "a", "upload0", 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("dir/key1", "dir/key2"), keys);
+  }
+
+  @Test
+  public void testGetMultipartUploadKeysWithOnlyKeyMarker() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    addMultipartUpload(volumeName, bucketName, "a", "upload1", false);
+    addMultipartUpload(volumeName, bucketName, "a/x", "upload2", false);
+    addMultipartUpload(volumeName, bucketName, "ab", "upload3", false);
+    addMultipartUpload(volumeName, bucketName, "b", "upload4", false);
+    // The cache has to skip the uploads of key-marker itself but not the keys starting with "key-marker/" either.
+    addMultipartUpload(volumeName, bucketName, "a", "upload5", true);
+    addMultipartUpload(volumeName, bucketName, "a/y", "upload6", true);
+    addMultipartUpload(volumeName, bucketName, "a.txt", "upload7", false);
+
+    // Uploads are listed in DB key order, where "a.txt" sorts before "a" since "." < "/".
+    List<String> keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", null, null, 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("a.txt", "a", "a", "a/x", "a/y", "ab", "b"), keys);
+
+    // Without upload-id-marker, only uploads of key-marker itself are skipped, not keys starting with it.
+    // "a.txt" is not listed as it sorts before key-marker "a", unlike S3.
+    keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", "a", null, 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("a/x", "a/y", "ab", "b"), keys);
+
+    // "a" is listed as it sorts after key-marker "a.txt", unlike S3.
+    keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", "a.txt", null, 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("a", "a", "a/x", "a/y", "ab", "b"), keys);
+  }
+
+  @Test
+  public void testGetMultipartUploadKeysWithUploadIdMarker() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    addMultipartUpload(volumeName, bucketName, "a", "upload1", false);
+    addMultipartUpload(volumeName, bucketName, "a", "upload12", true);
+    addMultipartUpload(volumeName, bucketName, "a", "upload2", false);
+    addMultipartUpload(volumeName, bucketName, "b", "upload3", true);
+
+    // Only the marker itself is skipped, not upload IDs starting with it.
+    List<String> afterDbMarker = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", "a", "upload1",
+        10, false).stream()
+        .map(OmMultipartUpload::getUploadId)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("upload12", "upload2", "upload3"), afterDbMarker);
+
+    List<String> afterCacheMarker = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", "a",
+        "upload12", 10, false).stream()
+        .map(OmMultipartUpload::getUploadId)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("upload2", "upload3"), afterCacheMarker);
+  }
+
+  @Test
+  public void testGetMultipartUploadKeysPaginationListsEachUploadOnce() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    addMultipartUpload(volumeName, bucketName, "a.txt", "upload1", false);
+    addMultipartUpload(volumeName, bucketName, "a", "upload2", true);
+    addMultipartUpload(volumeName, bucketName, "a", "upload3", false);
+    addMultipartUpload(volumeName, bucketName, "a/x", "upload4", true);
+    addMultipartUpload(volumeName, bucketName, "ab", "upload5", false);
+    addMultipartUpload(volumeName, bucketName, "b", "upload6", true);
+
+    // Page through one upload at a time with both markers taken from the last upload of the previous page,
+    // as KeyManagerImpl does. "a" sorts after "a.txt" in DB key order, so its uploads must still be listed
+    // after key-marker "a.txt" even though "a" < "a.txt".
+    List<String> listed = new ArrayList<>();
+    String keyMarker = null;
+    String uploadIdMarker = null;
+    // Bounded in case a broken marker keeps returning the same upload.
+    for (int i = 0; i < 10; i++) {
+      List<OmMultipartUpload> page = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", keyMarker,
+          uploadIdMarker, 1, false);
+      if (page.isEmpty()) {
+        break;
+      }
+      OmMultipartUpload lastReturned = page.get(0);
+      listed.add(lastReturned.getKeyName() + "/" + lastReturned.getUploadId());
+      if (page.size() == 1) {
+        break;
+      }
+      keyMarker = lastReturned.getKeyName();
+      uploadIdMarker = lastReturned.getUploadId();
+    }
+    assertEquals(Arrays.asList("a.txt/upload1", "a/upload2", "a/upload3", "a/x/upload4", "ab/upload5", "b/upload6"),
+        listed);
+  }
+
+  private void addMultipartUpload(String volumeName, String bucketName, String keyName, String uploadId,
+      boolean cacheOnly) throws Exception {
+    OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        RatisReplicationConfig.getInstance(ONE)).build();
+    OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.createOmMultipartKeyInfo(uploadId, Time.now(),
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE, 0L);
+    if (cacheOnly) {
+      OMRequestTestUtils.addMultipartInfoToTableCache(keyInfo, multipartKeyInfo, 0L, omMetadataManager);
+    } else {
+      OMRequestTestUtils.addMultipartInfoToTable(false, keyInfo, multipartKeyInfo, 0L, omMetadataManager);
+    }
   }
 
   @Test

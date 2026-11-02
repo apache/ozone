@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SSL_
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
+import com.google.protobuf.ServiceException;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
@@ -31,7 +32,6 @@ import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.handler.ssl.SslContextBuilder;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -51,23 +51,18 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc_.RemoteException;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.ha.GrpcOMFailoverProxyProvider;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase;
+import org.apache.hadoop.ozone.om.ha.GrpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressClientInterceptor;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ratis.protocol.exceptions.ReadException;
-import org.apache.ratis.protocol.exceptions.ReadIndexException;
-import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,10 +94,7 @@ public class GrpcOmTransport implements OmTransport {
   private RetryPolicy retryPolicy;
   private final GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
       omFailoverProxyProvider;
-  private volatile boolean useFollowerRead;
-  private final ReadConsistencyHint followerReadConsistency;
-  private final ReadConsistencyHint leaderReadConsistency;
-  private int currentFollowerReadIndex = -1;
+  private final GrpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
 
   public static void setCaCerts(List<X509Certificate> x509Certificates) {
     caCerts = x509Certificates;
@@ -128,7 +120,7 @@ public class GrpcOmTransport implements OmTransport {
         omServiceId,
         OzoneManagerProtocolPB.class);
 
-    this.useFollowerRead = conf.getBoolean(
+    boolean defaultFollowerReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT);
     String defaultFollowerReadConsistencyStr = conf.get(
@@ -142,12 +134,8 @@ public class GrpcOmTransport implements OmTransport {
         OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT);
     ReadConsistency defaultLeaderReadConsistency =
         ReadConsistency.valueOf(defaultLeaderReadConsistencyStr);
-    Preconditions.assertTrue(defaultFollowerReadConsistency.allowFollowerRead(),
-        "Invalid follower read consistency " + defaultFollowerReadConsistency);
-    Preconditions.assertTrue(!defaultLeaderReadConsistency.allowFollowerRead(),
-        "Invalid leader read consistency " + defaultLeaderReadConsistency);
-    this.followerReadConsistency = defaultFollowerReadConsistency.getHint();
-    this.leaderReadConsistency = defaultLeaderReadConsistency.getHint();
+    this.followerReadFailoverProxyProvider = new GrpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider,
+        defaultFollowerReadConsistency, defaultLeaderReadConsistency, defaultFollowerReadEnabled);
 
     start();
   }
@@ -206,63 +194,6 @@ public class GrpcOmTransport implements OmTransport {
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
-    if (useFollowerRead && OmUtils.shouldSendToFollower(payload)) {
-      return submitRequestWithFollowerRead(payload);
-    }
-    return submitRequestToLeader(addReadConsistencyHint(payload,
-        leaderReadConsistency));
-  }
-
-  private OMResponse submitRequestWithFollowerRead(OMRequest payload)
-      throws IOException {
-    OMRequest followerPayload = addReadConsistencyHint(payload,
-        followerReadConsistency);
-    int failedCount = 0;
-    for (int i = 0; useFollowerRead &&
-        i < omFailoverProxyProvider.getOMProxyMap().getNodeIds().size(); i++) {
-      String nodeId = getCurrentFollowerReadNodeId();
-      String followerHost = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
-      try {
-        OMResponse response = submitRequestToHost(followerPayload, followerHost);
-        LOG.debug("Invocation with cmdType {} using follower read host {} was successful",
-            followerPayload.getCmdType(), followerHost);
-        return response;
-      } catch (StatusRuntimeException e) {
-        LOG.debug("Invocation with cmdType {} using follower read host {} failed",
-            followerPayload.getCmdType(), followerHost, e);
-        Exception unwrapped = unwrapException(new Exception(e));
-        if (OMFailoverProxyProviderBase.getNotLeaderException(unwrapped) != null) {
-          LOG.debug("Encountered OMNotLeaderException from {}. Disable OM follower read and retry OM leader directly.",
-              followerHost);
-          useFollowerRead = false;
-          break;
-        }
-        if (OMFailoverProxyProviderBase.getLeaderNotReadyException(unwrapped) != null) {
-          break;
-        }
-        ReadIndexException readIndexException =
-            OMFailoverProxyProviderBase.getReadIndexException(unwrapped);
-        ReadException readException =
-            OMFailoverProxyProviderBase.getReadException(unwrapped);
-        if (readIndexException != null || readException != null ||
-            omFailoverProxyProvider.shouldFailoverForFollowerRead(unwrapped)) {
-          failedCount++;
-          changeFollowerReadProxy(nodeId);
-        } else {
-          throw e;
-        }
-      }
-    }
-    if (failedCount > 0) {
-      LOG.warn("{} nodes have failed for read request with cmdType {}. Falling back to leader.",
-          failedCount, payload.getCmdType());
-    }
-    return submitRequestToLeader(addReadConsistencyHint(payload,
-        leaderReadConsistency));
-  }
-
-  private OMResponse submitRequestToLeader(OMRequest payload)
-      throws IOException {
     int requestFailoverCount = 0;
     boolean tryOtherHost = true;
     int expectedFailoverCount = 0;
@@ -271,7 +202,8 @@ public class GrpcOmTransport implements OmTransport {
       tryOtherHost = false;
       expectedFailoverCount = globalFailoverCount.get();
       try {
-        return submitRequestToHost(payload, host.get());
+        return followerReadFailoverProxyProvider.submitRequest(payload, this::submitRequestToHost,
+            this::submitRequestToLeader);
       } catch (StatusRuntimeException e) {
         LOG.error("Failed to submit request", e);
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
@@ -292,6 +224,10 @@ public class GrpcOmTransport implements OmTransport {
     throw new OMException(resultCode);
   }
 
+  private OMResponse submitRequestToLeader(OMRequest payload) throws IOException {
+    return submitRequestToHost(payload, host.get());
+  }
+
   private OMResponse submitRequestToHost(OMRequest payload, String targetHost)
       throws IOException {
     AtomicReference<OMResponse> resp = new AtomicReference<>();
@@ -306,33 +242,7 @@ public class GrpcOmTransport implements OmTransport {
     return resp.get();
   }
 
-  private OMRequest addReadConsistencyHint(OMRequest payload,
-      ReadConsistencyHint readConsistencyHint) {
-    if (!payload.hasReadConsistencyHint() && readConsistencyHint != null) {
-      return payload.toBuilder()
-          .setReadConsistencyHint(readConsistencyHint)
-          .build();
-    }
-    return payload;
-  }
-
-  private synchronized String getCurrentFollowerReadNodeId() {
-    if (currentFollowerReadIndex < 0) {
-      currentFollowerReadIndex = 0;
-    }
-    return new ArrayList<>(omFailoverProxyProvider.getOMProxyMap().getNodeIds())
-        .get(currentFollowerReadIndex);
-  }
-
-  private synchronized void changeFollowerReadProxy(String currentNodeId) {
-    String currentFollowerReadNodeId = getCurrentFollowerReadNodeId();
-    if (currentFollowerReadNodeId.equals(currentNodeId)) {
-      currentFollowerReadIndex = (currentFollowerReadIndex + 1) %
-          omFailoverProxyProvider.getOMProxyMap().getNodeIds().size();
-    }
-  }
-
-  private Exception unwrapException(Exception ex) {
+  public static Exception unwrapException(Exception ex) {
     Exception grpcException = null;
     try {
       StatusRuntimeException srexp =
@@ -341,24 +251,10 @@ public class GrpcOmTransport implements OmTransport {
       LOG.debug("GRPC exception wrapped: {}", status.getDescription());
       if (status.getCode() == Status.Code.INTERNAL) {
         // exception potentially generated by OzoneManagerServiceGrpc
-        Class<?> realClass = Class.forName(status.getDescription()
-            .substring(0, status.getDescription()
-                .indexOf(':')));
-        Class<? extends Exception> cls = realClass
-            .asSubclass(Exception.class);
-        Constructor<? extends Exception> cn = cls.getConstructor(String.class);
-        cn.setAccessible(true);
-        grpcException = cn.newInstance(status.getDescription());
-        IOException remote = null;
-        try {
-          String description = status.getDescription();
-          int colonIndex = description.indexOf(':');
-          remote = new RemoteException(description.substring(0, colonIndex),
-              description.substring(colonIndex + 2));
-          grpcException.initCause(remote);
-        } catch (Exception e) {
-          LOG.error("cannot get cause for remote exception");
-        }
+        String description = status.getDescription();
+        int colonIndex = description.indexOf(':');
+        grpcException = new ServiceException(new RemoteException(description.substring(0, colonIndex),
+            description.substring(colonIndex + 2)));
       } else if ((status.getCode() == Status.Code.RESOURCE_EXHAUSTED) ||
               (status.getCode() == Status.Code.DATA_LOSS)) {
         grpcException = srexp;
@@ -501,15 +397,8 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   @VisibleForTesting
-  public synchronized void changeFollowerReadInitialProxy(String nodeId) {
-    List<String> nodeIds = new ArrayList<>(
-        omFailoverProxyProvider.getOMProxyMap().getNodeIds());
-    for (int i = 0; i < nodeIds.size(); i++) {
-      if (nodeIds.get(i).equals(nodeId)) {
-        currentFollowerReadIndex = i;
-        return;
-      }
-    }
+  public void changeFollowerReadInitialProxy(String nodeId) {
+    followerReadFailoverProxyProvider.changeInitialProxyForTest(nodeId);
   }
 
   @VisibleForTesting

@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayVersionMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -65,6 +66,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
   private BaseHttpServer contentServer;
   private BaseHttpServer stsServer;
   private S3GatewayMetrics metrics;
+  private S3GatewayVersionMetrics versionMetrics;
   private NettyMetrics nettyMetrics;
 
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
@@ -86,6 +88,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = getOzoneConf();
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
+    TracingUtil.installMdcContextStorage();
     TracingUtil.initTracing("S3gateway", OzoneConfigurationHolder.configuration());
     UserGroupInformation.setConfiguration(OzoneConfigurationHolder.configuration());
     loginS3GUser(OzoneConfigurationHolder.configuration());
@@ -94,6 +97,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
     contentServer = new S3GatewayWebAdminServer(OzoneConfigurationHolder.configuration(), "s3g-web");
     stsServer = new S3STSHttpServer(OzoneConfigurationHolder.configuration(), "s3g-sts");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
+    versionMetrics = S3GatewayVersionMetrics.create();
     nettyMetrics = NettyMetrics.create();
     start();
 
@@ -126,6 +130,9 @@ public class Gateway extends GenericCli implements Callable<Void> {
     IOUtils.closeQuietly(httpServer, contentServer, stsServer);
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
+    if (versionMetrics != null) {
+      versionMetrics.unRegister();
+    }
     if (nettyMetrics != null) {
       nettyMetrics.unregister();
     }
@@ -154,7 +161,6 @@ public class Gateway extends GenericCli implements Callable<Void> {
     }
   }
 
-  @VisibleForTesting
   public InetSocketAddress getHttpAddress() {
     return this.httpServer.getHttpAddress();
   }

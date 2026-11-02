@@ -18,7 +18,10 @@
 package org.apache.hadoop.ozone.om.request.util;
 
 import com.google.protobuf.ByteString;
+import java.io.IOException;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -28,6 +31,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.util.PayloadUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Handles EchoRPC request (write).
@@ -36,6 +40,19 @@ public class OMEchoRPCWriteRequest extends OMClientRequest {
 
   public OMEchoRPCWriteRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest request = super.preExecute(ozoneManager);
+    // The caller chooses the size of the response payload, so EchoRPC is limited to admins.
+    // The user info of the request falls back to the OM user for a call without an RPC user, so check the RPC user.
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (ozoneManager.isAdminAuthorizationEnabled() && !ozoneManager.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi + ". Superuser privilege is required for EchoRPC.",
+          OMException.ResultCodes.ACCESS_DENIED);
+    }
+    return request;
   }
 
   @Override

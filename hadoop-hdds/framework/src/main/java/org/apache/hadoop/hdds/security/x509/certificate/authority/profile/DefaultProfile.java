@@ -269,7 +269,7 @@ public class DefaultProfile implements PKIProfile {
       return false;
     }
 
-    return EXTENSIONS_MAP.getOrDefault(extension.getExtnId(), (x, y) -> false)
+    return getExtensionsMap().getOrDefault(extension.getExtnId(), (x, y) -> false)
         .test(extension, this);
   }
 

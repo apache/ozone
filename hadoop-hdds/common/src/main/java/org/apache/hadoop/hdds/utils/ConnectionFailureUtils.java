@@ -120,7 +120,7 @@ public final class ConnectionFailureUtils {
         t = t.getCause();
         continue;
       }
-      if (t.getCause() instanceof IOException) {
+      if (t.getCause() instanceof IOException || t.getCause() instanceof ExecutionException) {
         t = t.getCause();
         continue;
       }

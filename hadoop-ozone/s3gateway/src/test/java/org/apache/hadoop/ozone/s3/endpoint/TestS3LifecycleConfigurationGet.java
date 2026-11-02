@@ -19,22 +19,43 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Testing for GetBucketLifecycleConfiguration.
@@ -141,6 +162,75 @@ public class TestS3LifecycleConfigurationGet {
     assertEquals("Enabled", rule.getStatus());
     assertEquals("2044-01-19T00:00:00+00:00", rule.getExpiration().getDate());
     assertNull(rule.getExpiration().getDays());
+  }
+
+  @ParameterizedTest
+  @CsvSource({", 0", "'', 0", "owner, 1"})
+  public void testGetLifecycleOnlyLooksUpBucketForOwner(String expectedOwner, int bucketLookups) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
+    BucketEndpoint endpoint = newEndpoint(proxy, headers);
+    when(proxy.getLifecycleConfiguration("volume1", "bucket1"))
+        .thenReturn(new OzoneLifecycleConfiguration("volume1", "bucket1", 0, Collections.emptyList()));
+
+    try (Response response = endpoint.get("bucket1")) {
+      assertThat(response.getStatus()).isEqualTo(HTTP_OK);
+      assertThat(((S3LifecycleConfiguration) response.getEntity()).getRules()).isEmpty();
+    }
+
+    verify(proxy, times(bucketLookups)).getBucketDetails("volume1", "bucket1");
+    verify(proxy).getLifecycleConfiguration("volume1", "bucket1");
+  }
+
+  @Test
+  public void testGetLifecycleRejectsIncorrectOwnerBeforeReadingConfiguration() throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("other-owner");
+    BucketEndpoint endpoint = newEndpoint(proxy, headers);
+
+    assertErrorResponse(ACCESS_DENIED, () -> endpoint.get("bucket1"));
+
+    verify(proxy).getBucketDetails("volume1", "bucket1");
+    verify(proxy, never()).getLifecycleConfiguration("volume1", "bucket1");
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "LIFECYCLE_CONFIGURATION_NOT_FOUND, NO_SUCH_LIFECYCLE_CONFIGURATION",
+      "BUCKET_NOT_FOUND, NO_SUCH_BUCKET",
+      "VOLUME_NOT_FOUND, NO_SUCH_BUCKET",
+      "PERMISSION_DENIED, ACCESS_DENIED"
+  })
+  public void testGetLifecycleProtocolErrors(ResultCodes resultCode, S3ErrorTable expectedError) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newEndpoint(proxy, mock(HttpHeaders.class));
+    when(proxy.getLifecycleConfiguration("volume1", "bucket1"))
+        .thenThrow(new OMException("Lifecycle lookup failed", resultCode));
+
+    assertErrorResponse(expectedError, () -> endpoint.get("bucket1"));
+
+    verify(proxy, never()).getBucketDetails("volume1", "bucket1");
+    verify(proxy).getLifecycleConfiguration("volume1", "bucket1");
+  }
+
+  private BucketEndpoint newEndpoint(ClientProtocol proxy, HttpHeaders headers) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneVolume volume = OzoneVolume.newBuilder(conf, proxy)
+        .setName("volume1").setAcls(Collections.emptyList()).build();
+    OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
+        .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
+    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    ObjectStore objectStore = mock(ObjectStore.class);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(objectStore.getClientProxy()).thenReturn(proxy);
+    OzoneClient client = mock(OzoneClient.class);
+    when(client.getObjectStore()).thenReturn(objectStore);
+    when(client.getProxy()).thenReturn(proxy);
+    BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder().setClient(client).setHeaders(headers).build();
+    endpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
+    return endpoint;
   }
 
   private static InputStream getBody() {

@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -40,10 +41,10 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,6 +96,18 @@ public class TestRequestValidations {
           .load()
           .validateRequest(aCreateKeyRequest(currentClientVersion()));
     });
+  }
+
+  @Test
+  public void testOlderClientConditionsByClientVersion() {
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
+    int bucketLayoutClient = ClientVersion.BUCKET_LAYOUT_SUPPORT.serialize();
+    assertTrue(ValidationCondition.OLDER_CLIENT_REQUESTS.shouldApply(aCreateKeyRequest(bucketLayoutClient - 1), ctx));
+    assertFalse(ValidationCondition.OLDER_CLIENT_REQUESTS.shouldApply(aCreateKeyRequest(bucketLayoutClient), ctx));
+    assertTrue(ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT.shouldApply(
+        aCreateKeyRequest(bucketLayoutClient), ctx));
+    assertFalse(ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT.shouldApply(
+        aCreateKeyRequest(currentClientVersion()), ctx));
   }
 
   @Test
@@ -284,11 +297,11 @@ public class TestRequestValidations {
   }
 
   private int olderClientVersion() {
-    return ClientVersion.CURRENT_VERSION - 1;
+    return ClientVersion.BUCKET_LAYOUT_SUPPORT.serialize() - 1;
   }
 
   private int currentClientVersion() {
-    return ClientVersion.CURRENT_VERSION;
+    return ClientVersion.CURRENT.serialize();
   }
 
   private OMRequest aCreateKeyRequest(int clientVersion) {
@@ -330,14 +343,14 @@ public class TestRequestValidations {
         .build();
   }
 
-  private LayoutVersionManager aFinalizedVersionManager() {
-    LayoutVersionManager vm = mock(LayoutVersionManager.class);
+  private OMVersionManager aFinalizedVersionManager() {
+    OMVersionManager vm = mock(OMVersionManager.class);
     when(vm.needsFinalization()).thenReturn(false);
     return vm;
   }
 
-  private LayoutVersionManager anUnfinalizedVersionManager() {
-    LayoutVersionManager vm = mock(LayoutVersionManager.class);
+  private OMVersionManager anUnfinalizedVersionManager() {
+    OMVersionManager vm = mock(OMVersionManager.class);
     when(vm.needsFinalization()).thenReturn(true);
     return vm;
   }

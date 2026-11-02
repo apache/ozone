@@ -46,11 +46,17 @@ public final class S3SecretRequestHelper {
    * Retrieves thread-local UGI for request or construct new one
    * based on provided accessId.
    *
+   * @param ozoneManager OzoneManager instance.
    * @param accessId user identifier from request.
    * @return {@link UserGroupInformation} instance.
+   * @throws OMException if security is enabled and the request has no RPC user.
    */
-  public static UserGroupInformation getOrCreateUgi(String accessId) {
+  public static UserGroupInformation getOrCreateUgi(OzoneManager ozoneManager, String accessId) throws OMException {
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (ugi == null && ozoneManager.isSecurityEnabled()) {
+      throw new OMException("S3 secret operations on accessId '" + accessId + "' require an RPC user."
+          + " Send the request over the OM RPC transport.", ResultCodes.PERMISSION_DENIED);
+    }
     if (ugi == null && Strings.isNotEmpty(accessId)) {
       return UserGroupInformation.createRemoteUser(accessId, KERBEROS);
     } else {

@@ -1493,7 +1493,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void testCreateKeyIfNotExistsSuccess(BucketLayout layout) throws IOException {
-    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
     OzoneBucket bucket = createBucket(layout);
     String keyName = "create-if-not-exists-" + layout.name();
     byte[] content = "test-content".getBytes(UTF_8);
@@ -1511,7 +1511,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void testCreateKeyIfNotExistsFailsWhenKeyExists(BucketLayout layout) throws IOException {
-    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     byte[] newContent = "new-content".getBytes(UTF_8);
@@ -5662,6 +5662,34 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     assertEquals(tags.size(), tagsRetrieved.size());
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
+  }
+
+  @Test
+  public void testGetObjectTaggingWithS3Context() throws Exception {
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    Map<String, String> tags = singletonMap("tag-key", "tag-value");
+    byte[] value = string2Bytes("sample value");
+
+    store.createS3Bucket(bucketName);
+    OzoneBucket bucket = store.getS3Bucket(bucketName);
+    try (OzoneOutputStream out = bucket.createKey(keyName, value.length,
+        anyReplication(), new HashMap<>(), tags)) {
+      out.write(value);
+    }
+
+    String accessId = bucket.getOwner();
+    OzoneManager.setS3Auth(OzoneManagerProtocolProtos.S3Authentication
+        .newBuilder().setAccessId(accessId).build());
+    try {
+      Map<String, String> tagsRetrieved = ozoneManager.getObjectTagging(
+          new OmKeyArgs.Builder().setVolumeName(null).setBucketName(bucketName)
+              .setKeyName(keyName).setAssumeS3Context(true).build());
+
+      assertThat(tagsRetrieved).containsExactlyInAnyOrderEntriesOf(tags);
+    } finally {
+      OzoneManager.setS3Auth(null);
+    }
   }
 
   @ParameterizedTest

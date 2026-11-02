@@ -723,10 +723,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   /**
    * Update the processing details.
    *
-   * If Server.getCurCall() is null, which means it's write operation on Ratis,
-   * then we need to update the omLockDetails.
-   * If not null, it's read operation, or write operation on non-Ratis cluster,
-   * we can update ThreadLocal variable directly.
+   * If Server.getCurCall() is null, the operation is detached from a Hadoop
+   * RPC call, such as a write operation on Ratis, so update omLockDetails for
+   * propagation to the original call. Otherwise, update the call directly.
    * @param type IPC Timing types
    * @param deltaNanos consumed time
    */

@@ -1882,6 +1882,154 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testGetFileChecksumUsesSingleOmRpc() throws Exception {
+    Path filePath = new Path(bucketPath,
+        "checksum-rpc-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    ContractTestUtils.createFile(fs, filePath, true, "data".getBytes(StandardCharsets.UTF_8));
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+    long volumeInfosBefore = metrics.getNumVolumeInfos();
+    long keyLookupsBefore = metrics.getNumKeyLookups();
+
+    assertNotNull(fs.getFileChecksum(filePath));
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileChecksum must not trigger InfoBucket");
+    assertEquals(volumeInfosBefore, metrics.getNumVolumeInfos(),
+        "getFileChecksum must not trigger InfoVolume");
+    assertEquals(keyLookupsBefore, metrics.getNumKeyLookups(),
+        "getFileChecksum must use LookupFile, not LookupKey");
+  }
+
+  @Test
+  void testGetFileChecksumRejectsObsBucket() throws Exception {
+    OzoneBucket obsBucket =
+        DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    String keyName = "obs-key-" + RandomStringUtils.secure().nextAlphabetic(5);
+    DataTestUtil.createKey(obsBucket, keyName,
+        "data".getBytes(StandardCharsets.UTF_8));
+    Path keyPath = new Path(new Path(
+        new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()),
+        obsBucket.getName()), keyName);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> fs.getFileChecksum(keyPath));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileChecksum must not trigger InfoBucket");
+  }
+
+  @Test
+  void testGetFileChecksumOnDirectory() throws Exception {
+    Path dir = new Path(bucketPath,
+        "checksum-dir-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    fs.mkdirs(dir);
+
+    assertThrows(FileNotFoundException.class, () -> fs.getFileChecksum(dir));
+  }
+
+  @Test
+  void testGetFileChecksumOnNonExistentFile() throws Exception {
+    Path missing = new Path(bucketPath,
+        "checksum-missing-" + RandomStringUtils.secure().nextAlphanumeric(5));
+
+    assertThrows(FileNotFoundException.class,
+        () -> fs.getFileChecksum(missing));
+  }
+
+  @Test
+  void testListStatusDoesNotTriggerInfoBucket() throws Exception {
+    Path dir = new Path(bucketPath, "list-rpc-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    ContractTestUtils.touch(fs, new Path(dir, "file"));
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    assertEquals(1, fs.listStatus(dir).length);
+    assertTrue(fs.listStatusIterator(dir).hasNext());
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "listStatus must not trigger InfoBucket");
+  }
+
+  @Test
+  void testListStatusRejectsObsBucket() throws Exception {
+    OzoneBucket obsBucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    DataTestUtil.createKey(obsBucket, "obs-key", "data".getBytes(StandardCharsets.UTF_8));
+    Path obsBucketPath = new Path(new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()), obsBucket.getName());
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> fs.listStatus(obsBucketPath));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "listStatus must not trigger InfoBucket");
+  }
+
+  @Test
+  void testListStatusOrphanLinkBucketIsEmpty() throws Exception {
+    OzoneBucket sourceBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout);
+    OzoneVolume sourceVolume = objectStore.getVolume(sourceBucket.getVolumeName());
+    String linkBucketName = "orphan-link-" + RandomStringUtils.secure().nextNumeric(5);
+    createLinkBucket(sourceVolume.getName(), linkBucketName, sourceVolume.getName(), sourceBucket.getName());
+    sourceVolume.deleteBucket(sourceBucket.getName());
+    Path linkPath = new Path(new Path(OZONE_URI_DELIMITER, sourceVolume.getName()), linkBucketName);
+
+    assertEquals(0, fs.listStatus(linkPath).length);
+    assertFalse(fs.listStatusIterator(linkPath).hasNext());
+
+    // A bucket that does not exist still fails, unlike the orphan link.
+    Path missingBucket = new Path(new Path(OZONE_URI_DELIMITER, sourceVolume.getName()), "missing-bucket");
+    OMException exception = assertThrows(OMException.class, () -> fs.listStatus(missingBucket));
+    assertEquals(BUCKET_NOT_FOUND, exception.getResult());
+  }
+
+  @Test
+  void testOpenDoesNotTriggerInfoBucket() throws Exception {
+    Path file = new Path(bucketPath, "open-rpc-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    ContractTestUtils.writeTextFile(fs, file, "data", true);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    try (FSDataInputStream stream = fs.open(file)) {
+      assertEquals('d', stream.read());
+    }
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "open must not trigger InfoBucket");
+  }
+
+  @Test
+  void testOpenRejectsObsBucket() throws Exception {
+    OzoneBucket obsBucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    DataTestUtil.createKey(obsBucket, "obs-key", "data".getBytes(StandardCharsets.UTF_8));
+    Path obsKeyPath = new Path(new Path(new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()),
+        obsBucket.getName()), "obs-key");
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> fs.open(obsKeyPath));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "open must not trigger InfoBucket");
+  }
+
+  @Test
+  void testOpenInMissingBucketFails() throws Exception {
+    // The failure now comes from GetKeyInfo instead of InfoBucket, with the same result code.
+    Path missingFile = new Path(new Path(new Path(OZONE_URI_DELIMITER, volumeName), "missing-bucket"), "file");
+    OMException exception = assertThrows(OMException.class, () -> fs.open(missingFile));
+    assertEquals(BUCKET_NOT_FOUND, exception.getResult());
+  }
+
+  @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);
@@ -2195,6 +2343,11 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
     Path bucketPath1 = new Path(volumePath1, bucket1.getName());
     setTimes(bucketPath1);
+  }
+
+  @Test
+  void testSetVerifyChecksum() throws Exception {
+    setVerifyChecksum(cluster, new Path(bucketPath, "testSetVerifyChecksum"));
   }
 
   @Test

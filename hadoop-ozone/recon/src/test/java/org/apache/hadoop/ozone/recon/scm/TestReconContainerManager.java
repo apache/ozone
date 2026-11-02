@@ -25,8 +25,14 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -51,8 +57,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test Recon Container Manager.
@@ -382,6 +391,87 @@ public class TestReconContainerManager
     // And the only entry should match DN02
     assertEquals(id2,
         repHistMap.get(cIDlong1).keySet().iterator().next());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRemoveContainerReplicaRetainsHistoryOnPersistenceFailure(boolean readFailure) throws Exception {
+    ContainerReplica replica = addContainerReplicaWithHistory();
+    ReconContainerManager manager = getContainerManager();
+    ContainerID containerID = replica.getContainerID();
+    DatanodeID id = replica.getDatanodeDetails().getID();
+    ContainerReplicaHistory history = manager.getReplicaHistoryMap().get(containerID.getId()).get(id);
+    ReconContainerMetadataManager metadataManager = getReconContainerMetadataManager();
+    if (readFailure) {
+      doThrow(new IOException("History read failed")).when(metadataManager).getContainerReplicaHistory(anyLong());
+    } else {
+      doThrow(new IOException("History write failed"))
+          .when(metadataManager).storeContainerReplicaHistory(anyLong(), anyMap());
+    }
+
+    manager.removeContainerReplica(containerID, replica);
+
+    assertTrue(manager.getContainerReplicas(containerID).isEmpty());
+    assertSame(history, manager.getReplicaHistoryMap().get(containerID.getId()).get(id));
+    assertEquals(1, manager.getAllContainerHistory(containerID.getId()).size());
+    doAnswer(invocation -> {
+      Map<Long, Map<DatanodeID, ContainerReplicaHistory>> pending = invocation.getArgument(0);
+      assertSame(history, pending.get(containerID.getId()).get(id));
+      return null;
+    }).when(metadataManager).batchStoreContainerReplicaHistory(anyMap());
+    manager.flushReplicaHistoryMapToDB(true);
+    assertTrue(manager.getReplicaHistoryMap().isEmpty());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testFailedShutdownFlushRetainsHistoryForRetry(boolean clearMap) throws Exception {
+    ContainerReplica replica = addContainerReplicaWithHistory();
+    ReconContainerManager manager = getContainerManager();
+    long containerID = replica.getContainerID().getId();
+    DatanodeID id = replica.getDatanodeDetails().getID();
+    ContainerReplicaHistory history = manager.getReplicaHistoryMap().get(containerID).get(id);
+    ReconContainerMetadataManager metadataManager = getReconContainerMetadataManager();
+    doThrow(new IOException("History batch write failed"))
+        .when(metadataManager).batchStoreContainerReplicaHistory(anyMap());
+
+    manager.flushReplicaHistoryMapToDB(clearMap);
+
+    assertSame(history, manager.getReplicaHistoryMap().get(containerID).get(id));
+    doNothing().when(metadataManager).batchStoreContainerReplicaHistory(anyMap());
+    manager.flushReplicaHistoryMapToDB(clearMap);
+    if (clearMap) {
+      assertTrue(manager.getReplicaHistoryMap().isEmpty());
+    } else {
+      assertSame(history, manager.getReplicaHistoryMap().get(containerID).get(id));
+    }
+  }
+
+  @Test
+  void testUpsertContainerHistoryReportsPersistenceStatus() throws Exception {
+    ReconContainerManager manager = getContainerManager();
+    DatanodeID id = DatanodeID.randomID();
+    ContainerChecksums checksums = ContainerChecksums.of(1234L, 0L);
+    assertTrue(manager.upsertContainerHistory(1L, id, 10L, 20L, "OPEN", checksums));
+    ReconContainerMetadataManager metadataManager = getReconContainerMetadataManager();
+    doThrow(new IOException("History write failed")).doNothing()
+        .when(metadataManager).storeContainerReplicaHistory(anyLong(), anyMap());
+    assertFalse(manager.upsertContainerHistory(1L, id, 10L, 20L, "OPEN", checksums));
+    assertTrue(manager.upsertContainerHistory(1L, id, 10L, 20L, "OPEN", checksums));
+  }
+
+  private ContainerReplica addContainerReplicaWithHistory() throws IOException, TimeoutException {
+    ContainerWithPipeline container = getTestContainer(LifeCycleState.OPEN);
+    getContainerManager().addNewContainer(container);
+    ContainerReplica replica = ContainerReplica.newBuilder()
+        .setContainerID(container.getContainerInfo().containerID())
+        .setContainerState(State.OPEN)
+        .setDatanodeDetails(randomDatanodeDetails())
+        .setSequenceId(1001L)
+        .setChecksums(ContainerChecksums.of(1234L, 0L))
+        .build();
+    getContainerManager().updateContainerReplica(replica.getContainerID(), replica);
+    return replica;
   }
 
   @Test

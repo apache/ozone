@@ -152,8 +152,13 @@ public abstract class TestListKeys implements NonHATests.TestCase {
   private static Stream<Arguments> shallowListDataWithTrailingSlash() {
     return Stream.of(
 
-        // Case-1: StartKey is less than prefixKey, return emptyList.
-        of("a1/b2/", "a1", newLinkedList(Collections.emptyList())),
+        // Case-1: StartKey is less than prefixKey, return all immediate node.
+        of("a1/b2/", "a1", newLinkedList(Arrays.asList(
+            "a1/b2/",
+            "a1/b2/d1/",
+            "a1/b2/d2/",
+            "a1/b2/d3/"
+        ))),
 
         // Case-2: StartKey is empty, return all immediate node.
         of("a1/b2/", "", newLinkedList(Arrays.asList(
@@ -201,8 +206,12 @@ public abstract class TestListKeys implements NonHATests.TestCase {
   private static Stream<Arguments> shallowListObsDataWithTrailingSlash() {
     return Stream.of(
 
-        // Case-1: StartKey is less than prefixKey, return emptyList.
-        of("a1/b2/", "a1", newLinkedList(Collections.emptyList())),
+        // Case-1: StartKey is less than prefixKey, return all immediate node.
+        of("a1/b2/", "a1", newLinkedList(Arrays.asList(
+            "a1/b2/d1/",
+            "a1/b2/d2/",
+            "a1/b2/d3/"
+        ))),
 
         // Case-2: StartKey is empty, return all immediate node.
         of("a1/b2/", "", newLinkedList(Arrays.asList(
@@ -248,8 +257,15 @@ public abstract class TestListKeys implements NonHATests.TestCase {
   private static Stream<Arguments> shallowListDataWithoutTrailingSlash() {
     return Stream.of(
 
-        // Case-1: StartKey is less than prefixKey, return emptyList.
-        of("a1/b2", "a1", newLinkedList(Collections.emptyList())),
+        // Case-1: StartKey is less than prefixKey, return all immediate node.
+        of("a1/b2", "a1", newLinkedList(Arrays.asList(
+            "a1/b2/"
+        ))),
+
+        // Case-1a: StartKey is an existing key on a branch before prefixKey.
+        of("a1/b2", "a1/b1/c1/c1.tx", newLinkedList(Arrays.asList(
+            "a1/b2/"
+        ))),
 
         // Case-2: StartKey is empty, return all immediate node.
         of("a1/b2", "", newLinkedList(Arrays.asList(

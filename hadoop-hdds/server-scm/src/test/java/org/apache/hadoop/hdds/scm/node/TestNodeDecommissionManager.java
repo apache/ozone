@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -48,9 +49,11 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -59,6 +62,8 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
 /**
@@ -76,11 +81,12 @@ public class TestNodeDecommissionManager {
   void setup(@TempDir File dir) throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL, 1, TimeUnit.HOURS);
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     containerManager = mock(ContainerManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
-        SCMContext.emptyContext(), new EventQueue(), null);
+        SCMContext.emptyContext(), new EventQueue(), mockReplicationManager(conf));
     when(containerManager.allocateContainer(any(ReplicationConfig.class), anyString()))
         .thenAnswer(invocation -> createMockContainer((ReplicationConfig)invocation.getArguments()[0],
             (String) invocation.getArguments()[1]));
@@ -109,6 +115,13 @@ public class TestNodeDecommissionManager {
         .setState(OPEN)
         .setOwner("admin");
     return builder.build();
+  }
+
+  private ReplicationManager mockReplicationManager(OzoneConfiguration config) {
+    ReplicationManager rm = mock(ReplicationManager.class);
+    when(rm.getConfig()).thenReturn(
+        config.getObject(ReplicationManager.ReplicationManagerConfiguration.class));
+    return rm;
   }
 
   @Test
@@ -612,7 +625,7 @@ public class TestNodeDecommissionManager {
 
     nodeManager = mock(SCMNodeManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
-        SCMContext.emptyContext(), new EventQueue(), null);
+        SCMContext.emptyContext(), new EventQueue(), mockReplicationManager(conf));
     when(containerManager.getContainer(any(ContainerID.class)))
         .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
@@ -970,7 +983,7 @@ public class TestNodeDecommissionManager {
 
     nodeManager = mock(SCMNodeManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
-        SCMContext.emptyContext(), new EventQueue(), null);
+        SCMContext.emptyContext(), new EventQueue(), mockReplicationManager(conf));
     when(containerManager.getContainer(any(ContainerID.class)))
         .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
@@ -1018,6 +1031,62 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.NodeState.class, names = {"STALE", "DEAD"})
+  void testDecommissionCountsOnlyHealthyTargets(HddsProtos.NodeState health)
+      throws IOException, NodeNotFoundException {
+    // The container requires three replicas, but only two healthy datanodes are available.
+    DatanodeDetails target = prepareTargetWithContainer(health, 2);
+
+    List<DatanodeAdminError> errors = decom.decommissionNodes(singletonList(target.getIpAddress()), false);
+    assertThat(errors).singleElement().extracting(DatanodeAdminError::getHostname).isEqualTo("AllHosts");
+    assertThat(nodeManager.getNodeStatus(target).getOperationalState())
+        .isEqualTo(HddsProtos.NodeOperationalState.IN_SERVICE);
+
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+
+    assertThat(decom.decommissionNodes(singletonList(target.getIpAddress()), false)).isEmpty();
+    assertThat(nodeManager.getNodeStatus(target).getOperationalState())
+        .isEqualTo(HddsProtos.NodeOperationalState.DECOMMISSIONING);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.NodeState.class, names = {"STALE", "DEAD"})
+  void testMaintenanceCountsOnlyHealthyTargets(HddsProtos.NodeState health)
+      throws IOException, NodeNotFoundException {
+    int minimumHealthyNodes = decom.getMaintenanceReplicaMinimum();
+    DatanodeDetails target = prepareTargetWithContainer(health, minimumHealthyNodes - 1);
+
+    List<DatanodeAdminError> errors = decom.startMaintenanceNodes(singletonList(target.getIpAddress()), 1, false);
+    assertThat(errors).singleElement().extracting(DatanodeAdminError::getHostname).isEqualTo("AllHosts");
+    assertThat(nodeManager.getNodeStatus(target).getOperationalState())
+        .isEqualTo(HddsProtos.NodeOperationalState.IN_SERVICE);
+
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+
+    assertThat(decom.startMaintenanceNodes(singletonList(target.getIpAddress()), 1, false)).isEmpty();
+    assertThat(nodeManager.getNodeStatus(target).getOperationalState())
+        .isEqualTo(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE);
+  }
+
+  private DatanodeDetails prepareTargetWithContainer(HddsProtos.NodeState health, int healthyNodes)
+      throws IOException, NodeNotFoundException {
+    nodeManager.getNodeStateManager().pause();
+    int totalNodes = healthyNodes + 1;
+    for (int index = 0; index < totalNodes; index++) {
+      nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+    }
+    DatanodeDetails target = nodeManager.getAllNodes().get(0);
+    nodeManager.getNodeStateManager().getNode(target).setNodeStatus(
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.IN_SERVICE, health));
+    assertThat(nodeManager.getNodeCount(NodeStatus.inServiceHealthy())).isEqualTo(healthyNodes);
+    ContainerID containerID = ContainerID.valueOf(1);
+    setContainers(target, new HashSet<>(singletonList(containerID)));
+    when(containerManager.getContainer(containerID)).thenReturn(
+        getMockContainer(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), containerID));
+    return target;
   }
 
   private List<DatanodeDetails> getDatanodeDetailsList(String ipaddress, List<DatanodeDetails> dns) {
@@ -1100,5 +1169,27 @@ public class TestNodeDecommissionManager {
     nodeManager.register(dn, null, null);
 
     return dns;
+  }
+
+  @Test
+  public void testMaintenanceConfigsReadFromReplicationManagerConfiguration() {
+    // NodeDecommissionManager built in setup() uses the ReplicationManagerConfiguration defaults (2, 1).
+    assertEquals(2, decom.getMaintenanceReplicaMinimum());
+    assertEquals(1, decom.getMaintenanceRemainingRedundancy());
+
+    // Build a ReplicationManagerConfiguration with non-default maintenance values.
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        new OzoneConfiguration().getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    rmConf.setMaintenanceReplicaMinimum(5);
+    rmConf.setMaintenanceRemainingRedundancy(3);
+    ReplicationManager rm = mock(ReplicationManager.class);
+    when(rm.getConfig()).thenReturn(rmConf);
+
+    NodeDecommissionManager manager = new NodeDecommissionManager(conf, nodeManager,
+        containerManager, SCMContext.emptyContext(), new EventQueue(), rm);
+
+    // Constructor must read these from ReplicationManagerConfiguration, not hardcoded defaults.
+    assertEquals(5, manager.getMaintenanceReplicaMinimum());
+    assertEquals(3, manager.getMaintenanceRemainingRedundancy());
   }
 }

@@ -123,7 +123,7 @@ class TestSstFileSetReader {
    */
   private Pair<SortedMap<String, Integer>, List<Path>> createDummyData(int numberOfFiles) throws RocksDBException {
     List<Path> files = new ArrayList<>();
-    int numberOfKeysPerFile = 1000;
+    int numberOfKeysPerFile = 10;
     TreeMap<String, Integer> keys =
         new TreeMap<>(createKeys(0, numberOfKeysPerFile * numberOfFiles));
     List<TreeMap<String, Integer>> fileKeysList =

@@ -231,7 +231,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(om_metrics_num_keys[1m])",
+          "expr": "deriv(om_metrics_num_keys[1m])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -241,7 +241,7 @@
           "useBackend": false
         }
       ],
-      "title": "Key Creation Rate",
+      "title": "Key Count Change Rate",
       "type": "timeseries"
     },
     {

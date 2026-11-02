@@ -114,6 +114,11 @@ public class ContainerImporter {
             packer.unpackContainerDescriptor(input);
         containerData = getKeyValueContainerData(containerDescriptorYaml);
       }
+      if (containerData.getContainerID() != containerID) {
+        throw new StorageContainerException("Container ID " + containerData.getContainerID()
+            + " in the archive does not match the requested container " + containerID,
+            ContainerProtos.Result.INVALID_ARGUMENT);
+      }
       ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
       // lastDataScanTime should be cleared for an imported container
@@ -189,16 +194,16 @@ public class ContainerImporter {
   }
 
   /**
-   * Get space to reserve for replication. If replicateSize is provided,
-   * calculate required space based on that, otherwise return default
-   * replication space.
+   * Get space to reserve for replication. If a non-negative replicateSize is
+   * provided and the space required for it does not overflow, calculate required
+   * space based on that, otherwise return default replication space.
    *
    * @param replicateSize the size of the container to replicate in bytes
-   *                      (can be null)
+   *                      (can be null, or negative if the source's counter has drifted)
    * @return space to reserve for replication
    */
   public long getSpaceToReserve(Long replicateSize) {
-    if (replicateSize != null) {
+    if (replicateSize != null && replicateSize >= 0 && getRequiredReplicationSpace(replicateSize) >= 0) {
       return getRequiredReplicationSpace(replicateSize);
     } else {
       return getDefaultReplicationSpace();

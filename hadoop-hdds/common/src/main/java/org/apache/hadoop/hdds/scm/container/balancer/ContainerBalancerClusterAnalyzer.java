@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerClusterSnapshot.NodeUtilization;
@@ -120,6 +121,27 @@ public final class ContainerBalancerClusterAnalyzer {
       double thresholdRatio,
       Set<String> includeNodes,
       Set<String> excludeNodes) {
+    return analyze(nodes, thresholdRatio, includeNodes, excludeNodes, TOP_NODE_LIMIT);
+  }
+
+  /**
+   * Builds a cluster snapshot after applying include/exclude filters.
+   *
+   * @param nodes all nodes from getDatanodeUsageInfo (typically healthy IN_SERVICE)
+   * @param thresholdRatio threshold as ratio, e.g. 0.10 for 10%
+   * @param includeNodes empty = all included; non-empty = allow-list
+   * @param excludeNodes nodes to skip
+   * @param topNodeLimit max source/target nodes to include in the snapshot lists
+   */
+  public static ContainerBalancerClusterSnapshot analyze(
+      List<DatanodeUsageInfoProto> nodes,
+      double thresholdRatio,
+      Set<String> includeNodes,
+      Set<String> excludeNodes,
+      int topNodeLimit) {
+    if (topNodeLimit < 1) {
+      throw new IllegalArgumentException("topNodeLimit must be at least 1.");
+    }
     List<DatanodeUsageInfoProto> eligible = filterEligibleNodes(nodes, includeNodes, excludeNodes);
 
     if (eligible.isEmpty()) {
@@ -174,8 +196,8 @@ public final class ContainerBalancerClusterAnalyzer {
         .setTotalOverUtilizedBytes(totalOverUtilizedBytes)
         .setTotalUnderUtilizedBytes(totalUnderUtilizedBytes)
         .setImbalance(imbalance)
-        .setTopSourceNodes(topNodes(sources))
-        .setBottomTargetNodes(topNodes(targets))
+        .setTopSourceNodes(topNodes(sources, topNodeLimit))
+        .setBottomTargetNodes(topNodes(targets, topNodeLimit))
         .build();
   }
 
@@ -187,14 +209,19 @@ public final class ContainerBalancerClusterAnalyzer {
    */
   public static boolean shouldExcludeDatanode(DatanodeDetails datanode,
                                               Set<String> excludeNodes, Set<String> includeNodes) {
-    if (excludeNodes.contains(datanode.getHostName()) ||
-        excludeNodes.contains(datanode.getIpAddress())) {
+    if (containsAddress(excludeNodes, datanode.getHostName()) ||
+        containsAddress(excludeNodes, datanode.getIpAddress())) {
       return true;
     } else if (!includeNodes.isEmpty()) {
-      return !includeNodes.contains(datanode.getHostName()) &&
-          !includeNodes.contains(datanode.getIpAddress());
+      return !containsAddress(includeNodes, datanode.getHostName()) &&
+          !containsAddress(includeNodes, datanode.getIpAddress());
     }
     return false;
+  }
+
+  private static boolean containsAddress(Set<String> addresses, String address) {
+    return addresses.contains(address) || addresses.stream()
+        .anyMatch(candidate -> HddsUtils.isSameIpAddress(address, candidate));
   }
 
   static double calculateNodeUtilization(DatanodeUsageInfoProto node) {
@@ -242,8 +269,8 @@ public final class ContainerBalancerClusterAnalyzer {
     return datanode.getIpAddress();
   }
 
-  private static List<NodeUtilization> topNodes(List<NodeUtilization> nodes) {
-    int limit = Math.min(TOP_NODE_LIMIT, nodes.size());
+  private static List<NodeUtilization> topNodes(List<NodeUtilization> nodes, int topNodeLimit) {
+    int limit = Math.min(topNodeLimit, nodes.size());
     List<NodeUtilization> result = new ArrayList<>(limit);
     for (int i = 0; i < limit; i++) {
       result.add(nodes.get(i));

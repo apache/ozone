@@ -98,7 +98,7 @@ public class TestPermissionCheck {
     when(client.getConfiguration()).thenReturn(conf);
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
@@ -162,8 +162,7 @@ public class TestPermissionCheck {
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listMultipartUploads(any(), any(), any(), anyInt());
+    doThrow(exception).when(clientProtocol).listMultipartUploads(any(), any(), any(), any(), any(), anyInt());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -330,10 +329,9 @@ public class TestPermissionCheck {
   public void testObjectTagging() throws Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket("bucketName")).thenReturn(bucket);
-    when(bucket.getObjectTagging(anyString())).thenThrow(exception);
-    doThrow(exception).when(bucket).putObjectTagging(anyString(), anyMap());
-    doThrow(exception).when(bucket).deleteObjectTagging(anyString());
+    when(clientProtocol.getObjectTagging(isNull(), anyString(), anyString())).thenThrow(exception);
+    doThrow(exception).when(clientProtocol).putObjectTagging(anyString(), anyString(), anyString(), anyMap());
+    doThrow(exception).when(clientProtocol).deleteObjectTagging(anyString(), anyString(), anyString());
 
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)

@@ -34,7 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconFileMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconGlobalStatsManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
@@ -85,6 +86,7 @@ import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDa
 import org.apache.ratis.protocol.ClientId;
 import org.jooq.Configuration;
 import org.jooq.DAO;
+import org.jooq.SQLDialect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +110,7 @@ public class ReconControllerModule extends AbstractModule {
     bind(ReconHttpServer.class).in(Singleton.class);
     bind(ReconStorageConfig.class).in(Singleton.class);
     bind(ReconDBProvider.class).in(Singleton.class);
+    bind(ReconReplicaHistoryDBProvider.class).in(Singleton.class);
     bind(ReconOMMetadataManager.class)
         .to(ReconOmMetadataManagerImpl.class);
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
@@ -218,9 +221,9 @@ public class ReconControllerModule extends AbstractModule {
   }
 
   @Provides
-  StorageContainerLocationProtocol getSCMProtocol(
+  StorageContainerLocationInternalInterface getSCMProtocol(
       final OzoneConfiguration configuration) {
-    StorageContainerLocationProtocol storageContainerLocationProtocol = null;
+    StorageContainerLocationInternalInterface storageContainerLocationProtocol = null;
     storageContainerLocationProtocol = newContainerRpcClient(configuration);
     return storageContainerLocationProtocol;
   }
@@ -232,12 +235,19 @@ public class ReconControllerModule extends AbstractModule {
     ReconSqlDbConfig sqlDbConfig =
         ozoneConfiguration.getObject(ReconSqlDbConfig.class);
 
-    if (StringUtils.contains(sqlDbConfig.getJdbcUrl(), OZONE_RECON_DB_DIR)) {
+    // ${ozone.recon.db.dir} is left unresolved when the key is not set, so resolve it with the same fallback
+    // (ozone.metadata.dirs) as the other Recon DBs.
+    String reconDbDirPlaceholder = "${" + OZONE_RECON_DB_DIR + "}";
+    if (StringUtils.contains(sqlDbConfig.getJdbcUrl(), reconDbDirPlaceholder)) {
       ReconUtils reconUtils = new ReconUtils();
       File reconDbDir =
           reconUtils.getReconDbDir(ozoneConfiguration, OZONE_RECON_DB_DIR);
-      sqlDbConfig.setJdbcUrl(
-          "jdbc:derby:" + reconDbDir.getPath() + "/ozone_recon_derby.db");
+      sqlDbConfig.setJdbcUrl(StringUtils.replace(sqlDbConfig.getJdbcUrl(), reconDbDirPlaceholder,
+          reconDbDir.getPath()));
+    }
+    // Only the SQLITE dialect works with SQLite, so setting the URL is enough to switch to SQLite.
+    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:sqlite:")) {
+      sqlDbConfig.setSqlDbDialect(SQLDialect.SQLITE.name());
     }
 
     return new DataSourceConfiguration() {

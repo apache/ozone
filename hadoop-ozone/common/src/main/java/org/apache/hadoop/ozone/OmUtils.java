@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
 import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
@@ -151,8 +152,8 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         OZONE_OM_ADDRESS_KEY);
 
-    return host.orElse(OZONE_OM_BIND_HOST_DEFAULT) + ":" +
-        getOmRpcPort(conf);
+    return getHostPortString(host.orElse(OZONE_OM_BIND_HOST_DEFAULT),
+        getOmRpcPort(conf));
   }
 
   /**
@@ -161,14 +162,22 @@ public final class OmUtils {
    * @param conf configuration
    * @param confKey configuration key to lookup address from
    * @return Target InetSocketAddress for the OM RPC server.
+   * @throws ConfigurationException if the configured host cannot be advertised
+   *         to the other OMs of the service
    */
   public static String getOmRpcAddress(ConfigurationSource conf,
       String confKey) {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
-      return host.get() + ":" + getPortNumberFromConfigKeys(conf, confKey)
-              .orElse(OZONE_OM_PORT_DEFAULT);
+      // Without a service and node suffix this is the non-HA OM's own RPC
+      // address, which defaults to a wildcard.
+      if (!OZONE_OM_ADDRESS_KEY.equals(confKey)) {
+        validateAdvertisedHost(confKey, host.get());
+      }
+      return getHostPortString(host.get(),
+          getPortNumberFromConfigKeys(conf, confKey)
+              .orElse(OZONE_OM_PORT_DEFAULT));
     } else {
       // The specified confKey is not set
       return null;
@@ -263,9 +272,15 @@ public final class OmUtils {
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetBucketTagging:
+    case GetBucketDeletedBytes:
       return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    // Prepare and CancelPrepare are now no-ops, but still produce responses for compatability.
+    // They are marked as read-only since they don't modify state anymore.
+    case Prepare:
+    case CancelPrepare:
+    case QueryUpgradeStatus:
     case GetLifecycleConfiguration:
     case GetLifecycleServiceStatus:
       return true;
@@ -303,8 +318,8 @@ public final class OmUtils {
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
     case FinalizeUpgrade:
-    case Prepare:
-    case CancelPrepare:
+    case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:
@@ -397,6 +412,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetLifecycleConfiguration:
     case GetLifecycleServiceStatus:
+    case GetBucketDeletedBytes:
       return true;
     case GetBucketTagging:
       return true;
@@ -433,6 +449,8 @@ public final class OmUtils {
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
     case FinalizeUpgrade:
+    case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
     case DeleteOpenKeys:
@@ -485,6 +503,7 @@ public final class OmUtils {
     case SetLifecycleServiceStatus:
     case SaveLifecycleScanState:
     case UnknownCommand:
+    case QueryUpgradeStatus:
       return false;
     case EchoRPC:
       return omRequest.getEchoRPCRequest().getReadOnly();
@@ -626,7 +645,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" + addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT));
   }
 
   /**
@@ -652,8 +672,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" +
-        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT));
   }
 
   public static File createOMDir(String dirPath) {

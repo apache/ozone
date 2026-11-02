@@ -120,6 +120,32 @@
         <sstDump.include>true</sstDump.include>
       </properties>
       <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <!-- Declare path passed to compiler via -h as output, to make compile goal cacheable -->
+              <groupId>com.gradle</groupId>
+              <artifactId>develocity-maven-extension</artifactId>
+              <configuration>
+                <develocity>
+                  <plugins combine.children="append">
+                    <plugin>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <outputs>
+                        <directories>
+                          <directory>
+                            <name>javah</name>
+                            <path>${project.build.directory}/native/javah</path>
+                          </directory>
+                        </directories>
+                      </outputs>
+                    </plugin>
+                  </plugins>
+                </develocity>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
         <plugins>
           <!-- rocksdbjni may carry a packaging/build suffix like 10.10.1.1,
                but upstream RocksDB source tags and tarballs are published as
@@ -206,7 +232,7 @@
             </executions>
           </plugin>
           <plugin>
-            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <groupId>io.github.download-maven-plugin</groupId>
             <artifactId>download-maven-plugin</artifactId>
             <executions>
               <execution>
@@ -359,7 +385,7 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
-              <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
+              <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.outputDirectory}</argLine>
             </configuration>
           </plugin>
         </plugins>

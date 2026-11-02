@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 /**
@@ -30,6 +32,7 @@ public class BadDataLocationException extends IOException {
 
   private final List<DatanodeDetails> failedLocations = new ArrayList<>();
   private int failedLocationIndex;
+  private final List<Integer> failedLocationIndexes = new ArrayList<>();
 
   /**
    * Required for Unwrapping {@code RemoteException}. Used by
@@ -74,6 +77,18 @@ public class BadDataLocationException extends IOException {
     failedLocationIndex = failedIndex;
   }
 
+  /**
+   * For a read that failed on several location indexes at once.
+   * @param failures the failed location of each failed index, in index order
+   * @param ex the cause of the first failure
+   */
+  public BadDataLocationException(Map<Integer, DatanodeDetails> failures, Throwable ex) {
+    super(ex);
+    failedLocations.addAll(failures.values());
+    failedLocationIndexes.addAll(failures.keySet());
+    failedLocationIndex = failedLocationIndexes.get(0);
+  }
+
   public List<DatanodeDetails> getFailedLocations() {
     return failedLocations;
   }
@@ -84,5 +99,11 @@ public class BadDataLocationException extends IOException {
 
   public int getFailedLocationIndex() {
     return failedLocationIndex;
+  }
+
+  public List<Integer> getFailedLocationIndexes() {
+    return failedLocationIndexes.isEmpty()
+        ? Collections.singletonList(failedLocationIndex)
+        : Collections.unmodifiableList(failedLocationIndexes);
   }
 }

@@ -24,18 +24,15 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_STORAGE_
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_CHUNKED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.MULTI_CHUNKS_UPLOAD_PREFIX;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
-import jakarta.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Objects;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
@@ -53,6 +50,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
  * Utilities.
  */
 public final class S3Utils {
+  private static final Pattern SHA256_HEX_PATTERN = Pattern.compile("[0-9a-fA-F]{64}");
 
   public static String urlDecode(String str)
       throws UnsupportedEncodingException {
@@ -105,17 +103,23 @@ public final class S3Utils {
    *                                   config.
    * @param clientConfiguredReplConfig - Client side configured replication
    *                                   config.
+   * @param standardUsesClientDefault  - whether STANDARD resolves to a non-null
+   *                                   clientConfiguredReplConfig.
    * @return client resolved replication config.
    */
   public static ReplicationConfig resolveS3ClientSideReplicationConfig(
       String s3StorageTypeHeader, String s3StorageConfigHeader,
       ReplicationConfig clientConfiguredReplConfig,
-      ReplicationConfig bucketReplConfig)
+      ReplicationConfig bucketReplConfig, boolean standardUsesClientDefault)
       throws OS3Exception {
 
     // If user provided s3 storage type header is not null then map it
     // to ozone replication config
     if (!StringUtils.isEmpty(s3StorageTypeHeader)) {
+      if (standardUsesClientDefault && clientConfiguredReplConfig != null
+          && S3StorageType.STANDARD.name().equals(s3StorageTypeHeader)) {
+        return clientConfiguredReplConfig;
+      }
       return toReplicationConfig(s3StorageTypeHeader, s3StorageConfigHeader);
     }
 
@@ -145,30 +149,6 @@ public final class S3Utils {
             .type(MediaType.APPLICATION_XML_TYPE)
             .entity(ex.toXml())
             .build());
-  }
-
-  public static boolean hasUnsignedPayload(@Nonnull String amzContentSha256Header) {
-    Objects.requireNonNull(amzContentSha256Header);
-    return amzContentSha256Header.equals(UNSIGNED_PAYLOAD) ||
-        amzContentSha256Header.equals(STREAMING_UNSIGNED_PAYLOAD_TRAILER);
-  }
-
-  public static boolean hasMultiChunksPayload(@Nonnull String amzContentSha256Header) {
-    Objects.requireNonNull(amzContentSha256Header);
-    // Multiple chunk uploads
-    // - https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming.html
-    // - https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming-trailers.html
-    // Possible values
-    // - STREAMING-UNSIGNED-PAYLOAD-TRAILER
-    // - STREAMING-AWS4-HMAC-SHA256-PAYLOAD
-    // - STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
-    // - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD
-    // - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
-    // Currently since all the multi chunks values have x-amz-content-sha256 header value that starts
-    // with STREAMING, we can use this prefix to differentiates between multi chunks and single chunks upload.
-    // In the future if there are more multi chunks signature algorithms that has the same prefix,
-    // this function will be able to handle detect it.
-    return amzContentSha256Header.startsWith(MULTI_CHUNKS_UPLOAD_PREFIX);
   }
 
   public static void validateMultiChunksUpload(HttpHeaders headers, String amzDecodedContentLength,
@@ -208,6 +188,17 @@ public final class S3Utils {
       OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
       ex.setErrorMessage("An error occurred (InvalidArgument): " +
           "The " + X_AMZ_CONTENT_SHA256 + " header is not specified");
+      throw ex;
+    }
+
+    S3ContentSha256Type payloadType = S3ContentSha256Type.fromHeaderValue(xAmzContentSha256Header);
+    if (payloadType.isUnsigned() || payloadType.isStreaming()) {
+      return xAmzContentSha256Header;
+    }
+    if (!SHA256_HEX_PATTERN.matcher(xAmzContentSha256Header).matches()) {
+      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
+      ex.setErrorMessage("An error occurred (InvalidArgument): " +
+          "The " + X_AMZ_CONTENT_SHA256 + " header must contain 64 hexadecimal characters");
       throw ex;
     }
 

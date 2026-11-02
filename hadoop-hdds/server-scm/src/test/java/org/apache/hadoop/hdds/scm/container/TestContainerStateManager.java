@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
@@ -56,6 +58,8 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -81,6 +85,7 @@ import org.mockito.ArgumentCaptor;
 public class TestContainerStateManager {
 
   private ContainerStateManager containerStateManager;
+  private SCMHAManager scmhaManager;
   @TempDir
   private File testDir;
   private DBStore dbStore;
@@ -94,7 +99,7 @@ public class TestContainerStateManager {
   @BeforeEach
   public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     pipelineManager = mock(PipelineManager.class);
@@ -233,6 +238,36 @@ public class TestContainerStateManager {
     containerStateManager.transitionDeletingOrDeletedToTargetState(cid, HddsProtos.LifeCycleState.CLOSED);
     assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(ContainerID.getFromProtobuf(cid))
         .getState());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class, names = {"DELETING", "DELETED"})
+  public void testApplyLegacyTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState lifeCycleState)
+      throws Exception {
+    final ContainerInfo container = getContainer(lifeCycleState);
+    containerStateManager.addContainer(container.getProtobuf());
+
+    assertThat(applyLegacyTransitionDeletingOrDeletedToClosedState(container).getException()).isNull();
+    assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID())
+        .getState());
+  }
+
+  @Test
+  public void testApplyLegacyTransitionDeletingOrDeletedToClosedStateRejectsClosedContainer() throws Exception {
+    final ContainerInfo container = getContainer(HddsProtos.LifeCycleState.CLOSED);
+    containerStateManager.addContainer(container.getProtobuf());
+
+    assertThat(applyLegacyTransitionDeletingOrDeletedToClosedState(container).getException())
+        .hasCauseInstanceOf(InvalidContainerStateException.class);
+  }
+
+  private SCMRatisResponse applyLegacyTransitionDeletingOrDeletedToClosedState(ContainerInfo container)
+      throws Exception {
+    // A Raft log entry as written by SCM 2.0 and 2.1, before the method was renamed.
+    final SCMRatisRequest entry = SCMRatisRequest.decode(SCMRatisRequest.of(RequestType.CONTAINER,
+        "transitionDeletingOrDeletedToClosedState", new Class<?>[] {HddsProtos.ContainerID.class},
+        container.containerID().getProtobuf()).encode());
+    return scmhaManager.getRatisServer().submitRequest(entry);
   }
 
   @ParameterizedTest

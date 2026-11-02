@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.replication;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -170,7 +169,7 @@ class TestGrpcReplicationService {
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
 
     ReplicationTask task =
-        new ReplicationTask(toTarget(CONTAINER_ID, datanode), pushReplicator);
+        new ReplicationTask(ContainerTestUtils.getReplicateContainerCommand(CONTAINER_ID, datanode), pushReplicator);
 
     pushReplicator.replicate(task);
 
@@ -200,7 +199,7 @@ class TestGrpcReplicationService {
 
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
     ReplicationTask task = new ReplicationTask(
-        toTarget(CONTAINER_ID, datanode), pushReplicator);
+        ContainerTestUtils.getReplicateContainerCommand(CONTAINER_ID, datanode), pushReplicator);
 
     // WHEN
     pushReplicator.replicate(task);

@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -31,6 +32,11 @@ import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
@@ -40,6 +46,20 @@ import org.apache.ratis.util.function.CheckedSupplier;
 
 /** Utilities for unit-testing S3 endpoints. */
 public final class EndpointTestUtils {
+
+  /** Create an object endpoint backed by the supplied protocol and volume mocks. */
+  static ObjectEndpoint createObjectEndpoint(ClientProtocol protocol, OzoneVolume volume, String bucketName)
+      throws IOException {
+    OzoneClient mockClient = mock(OzoneClient.class);
+    ObjectStore objectStore = mock(ObjectStore.class);
+    when(mockClient.getObjectStore()).thenReturn(objectStore);
+    when(mockClient.getProxy()).thenReturn(protocol);
+    when(objectStore.getClientProxy()).thenReturn(protocol);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getName()).thenReturn("s3Volume");
+    when(volume.getBucket(bucketName)).thenReturn(mock(OzoneBucket.class));
+    return EndpointBuilder.newObjectEndpointBuilder().setClient(mockClient).build();
+  }
 
   /** Get key content. */
   public static Response get(
