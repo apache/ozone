@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -232,6 +233,25 @@ public class TestMultipartUploadComplete {
     OS3Exception ex = assertThrows(OS3Exception.class,
         () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, partsList));
     assertEquals(S3ErrorTable.INVALID_PART_ORDER.getCode(), ex.getCode());
+  }
+
+  @Test
+  public void testMultipartDuplicatePartNumberError() throws Exception {
+    String key = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(key);
+
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
+    Part part2 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 2, uploadID, "Multipart Upload 2");
+
+    assertErrorResponse(S3ErrorTable.INVALID_PART_ORDER,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, Arrays.asList(part1, part1)));
+    assertErrorResponse(S3ErrorTable.INVALID_PART_ORDER,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, Arrays.asList(part1, part2, part1)));
+    assertThrows(IOException.class, () -> client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key));
+
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, Arrays.asList(part1, part2));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key,
+        "Multipart Upload 1" + "Multipart Upload 2");
   }
 
   @Test

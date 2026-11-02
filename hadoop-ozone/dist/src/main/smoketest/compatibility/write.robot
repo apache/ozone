@@ -101,6 +101,51 @@ Snapshot Diff RPC Is Compatible
     Snapshot Diff Report Should Contain Created Keys
     ...    /vol1/${bucket}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
 
+Snapshot Diff Ordered Submit Is Compatible
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_ORDERED_VERSION}'    Client does not support --ordered
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Snapshot CLI not supported by this client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Snapshot CLI not supported by this cluster
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Cluster does not support snapshot diff submit
+
+    ${bucket} =      Set Variable    snapdiff-ordered-${CLIENT_VERSION}
+    ${fromSnap} =    Set Variable    snapdiff-ordered-from-${CLIENT_VERSION}
+    ${toSnap} =      Set Variable    snapdiff-ordered-to-${CLIENT_VERSION}
+    ${key1} =        Set Variable    snapdiff-ordered-key1-${CLIENT_VERSION}
+
+    Execute          ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/${bucket}
+    Execute          ozone sh key put /vol1/${bucket}/base ${TESTFILE}
+    Execute          ozone sh snapshot create /vol1/${bucket} ${fromSnap}
+    Execute          ozone sh key put /vol1/${bucket}/${key1} ${TESTFILE}
+    Execute          ozone sh snapshot create /vol1/${bucket} ${toSnap}
+
+    ${submitOutput} =    Execute    ozone sh snapshot diff --ordered /vol1/${bucket} ${fromSnap} ${toSnap}
+    Should Contain    ${submitOutput}    Submitting a new job
+    Wait Until Keyword Succeeds    2min    5sec
+    ...    Snapshot Diff Command Should Contain Created Keys
+    ...    ozone sh snapshot diff --get-report /vol1/${bucket} ${fromSnap} ${toSnap}
+    ...    ${fromSnap}    ${toSnap}    ${key1}    ${key1}
+
+Snapshot Diff Legacy Client Ignores Ordered Report Metadata
+    Pass Execution If    '${CLIENT_VERSION}' >= '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client uses submit path
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Snapshot CLI not supported by this client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Snapshot CLI not supported by this client
+
+    ${bucket} =      Set Variable    snapdiff-legacy-${CLIENT_VERSION}
+    ${fromSnap} =    Set Variable    snapdiff-legacy-from-${CLIENT_VERSION}
+    ${toSnap} =      Set Variable    snapdiff-legacy-to-${CLIENT_VERSION}
+    ${key1} =        Set Variable    snapdiff-legacy-key1-${CLIENT_VERSION}
+
+    Execute          ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/${bucket}
+    Execute          ozone sh key put /vol1/${bucket}/base ${TESTFILE}
+    Execute          ozone sh snapshot create /vol1/${bucket} ${fromSnap}
+    Execute          ozone sh key put /vol1/${bucket}/${key1} ${TESTFILE}
+    Execute          ozone sh snapshot create /vol1/${bucket} ${toSnap}
+
+    Wait Until Keyword Succeeds    2min    5sec
+    ...    Legacy Snapshot Diff Report Omits Dependency Metadata
+    ...    ozone sh snapshot diff /vol1/${bucket} ${fromSnap} ${toSnap}
+    ...    ${fromSnap}    ${toSnap}    ${key1}
+
 *** Keywords ***
 Snapshot Diff Report Should Contain Created Keys
     [Arguments]    ${bucketPath}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
@@ -144,3 +189,10 @@ Snapshot Diff Command Should Contain Created Keys
     Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
     Should Contain    ${output}    ${key1}
     Should Contain    ${output}    ${key2}
+
+Legacy Snapshot Diff Report Omits Dependency Metadata
+    [Arguments]    ${command}    ${fromSnap}    ${toSnap}    ${key1}
+    ${output} =    Execute    ${command}
+    Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
+    Should Contain    ${output}    ${key1}
+    Should Not Contain    ${output}    Report is dependency

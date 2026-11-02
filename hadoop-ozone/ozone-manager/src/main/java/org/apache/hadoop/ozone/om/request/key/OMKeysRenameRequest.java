@@ -27,9 +27,11 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -75,6 +77,28 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
   public OMKeysRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+    // OMKeysRenameResponse writes the pairs in no fixed order, so pairs sharing a key would leave the DB
+    // different from the cache.
+    Set<String> keyNames = new HashSet<>();
+    for (RenameKeysMap pair : omRequest.getRenameKeysRequest().getRenameKeysArgs().getRenameKeysMapList()) {
+      String fromKeyName = pair.getFromKeyName();
+      String toKeyName = pair.getToKeyName();
+      if (fromKeyName.isEmpty() || toKeyName.isEmpty()) {
+        continue; // never applied, see validateAndUpdateCache
+      }
+      if (keyNames.contains(fromKeyName) || keyNames.contains(toKeyName)) {
+        throw new OMException("Rename of " + fromKeyName + " to " + toKeyName + " shares a key with an earlier pair",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+      keyNames.add(fromKeyName);
+      keyNames.add(toKeyName);
+    }
+    return omRequest;
   }
 
   @Override
