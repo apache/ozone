@@ -61,8 +61,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
@@ -318,6 +316,7 @@ import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleServiceConfig;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
@@ -433,6 +432,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private OmConfig config;
+  private final KeyLifecycleServiceConfig keyLifecycleServiceConfig;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
@@ -578,6 +578,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omStorage = new OMStorage(conf);
     omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
+    keyLifecycleServiceConfig = conf.getObject(KeyLifecycleServiceConfig.class);
     reconfigurationHandler =
         new ReconfigurationHandler("OM", conf, this::checkAdminUserPrivilege)
             .register(config)
@@ -595,9 +596,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_BLACKLIST_GROUPS, this::reconfOzoneBlacklistGroups)
             .register(OZONE_READ_BLACKLIST_USERS, this::reconfOzoneReadBlacklistUsers)
             .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
-    KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES.forEach(property ->
-        reconfigurationHandler.register(property, newVal -> validateKeyLifecycleProperty(property, newVal)));
-    reconfigurationHandler.registerCompleteCallback(this::reconfKeyLifecycleService);
+    reconfigurationHandler.register(keyLifecycleServiceConfig)
+        .registerCompleteCallback(this::reconfKeyLifecycleService);
 
     // Allow dynamic SCM node/address reconfiguration without restarting OM.
     // Address keys use prefix matching to discover new nodes added after startup.
@@ -3694,8 +3694,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     KeyLifecycleService keyLifecycleService = keyManager.getKeyLifecycleService();
     if (keyLifecycleService == null) {
       return GetLifecycleServiceStatusResponse.newBuilder()
-          .setIsEnabled(getConfiguration().getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
-              OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT))
+          .setIsEnabled(keyLifecycleServiceConfig.isEnabled())
           .build();
     }
     return keyLifecycleService.status();
@@ -5143,6 +5142,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return config;
   }
 
+  public KeyLifecycleServiceConfig getKeyLifecycleServiceConfig() {
+    return keyLifecycleServiceConfig;
+  }
+
   @VisibleForTesting
   public void setConfiguration(OzoneConfiguration conf) {
     this.configuration = conf;
@@ -6279,27 +6282,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return newVal;
   }
 
-  private String validateKeyLifecycleProperty(String property, String newVal) {
-    OzoneConfiguration newConf = new OzoneConfiguration(getConfiguration());
-    if (newVal == null) {
-      newConf.unset(property);
-    } else {
-      newConf.set(property, newVal);
-    }
-    KeyLifecycleService.validate(newConf);
-    return newVal;
-  }
-
   /**
    * Apply all changed KeyLifecycleService properties at once, after each of them is validated and stored
-   * in the OM configuration.
+   * in {@link KeyLifecycleServiceConfig}.
    */
   private void reconfKeyLifecycleService(Map<String, Boolean> changedKeys, Configuration newConf) {
     KeyLifecycleService keyLifecycleService = getKeyManager().getKeyLifecycleService();
     // If the service is not running, the new values are picked up from the configuration when it is started.
     if (keyLifecycleService != null
-        && changedKeys.keySet().stream().anyMatch(KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES::contains)) {
-      keyLifecycleService.reconfigure(getConfiguration());
+        && changedKeys.keySet().stream().anyMatch(keyLifecycleServiceConfig.reconfigurableProperties()::contains)) {
+      keyLifecycleService.reconfigure(keyLifecycleServiceConfig);
     }
   }
 
