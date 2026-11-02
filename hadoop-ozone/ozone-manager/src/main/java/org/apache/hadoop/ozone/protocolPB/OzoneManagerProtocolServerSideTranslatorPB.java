@@ -151,10 +151,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         OzoneManagerProtocolProtos.OMLockDetailsProto lockDetails = response.getOmLockDetails();
         call.getProcessingDetails().add(
             Timing.LOCKWAIT, lockDetails.getWaitLockNanos(), TimeUnit.NANOSECONDS);
+        TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_LOCK_WAIT_NS, lockDetails.getWaitLockNanos());
         call.getProcessingDetails().add(
             Timing.LOCKSHARED, lockDetails.getReadLockNanos(), TimeUnit.NANOSECONDS);
+        TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_LOCK_READ_NS, lockDetails.getReadLockNanos());
         call.getProcessingDetails().add(
             Timing.LOCKEXCLUSIVE, lockDetails.getWriteLockNanos(), TimeUnit.NANOSECONDS);
+        TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_LOCK_WRITE_NS, lockDetails.getWriteLockNanos());
       }
     }
     return response;

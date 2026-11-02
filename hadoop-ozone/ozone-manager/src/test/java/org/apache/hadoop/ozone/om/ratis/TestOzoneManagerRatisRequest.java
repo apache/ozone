@@ -31,12 +31,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -44,9 +47,11 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.IOMClientRequest;
@@ -104,6 +109,29 @@ public class TestOzoneManagerRatisRequest {
             ozoneManager));
     assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
         omException.getResult());
+  }
+
+  @Test
+  public void testKeyRequestRecordsBucketLayout() throws Exception {
+    ozoneManager = mock(OzoneManager.class);
+    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS, folder.resolve("om").toAbsolutePath().toString());
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB("vol1", "fsoBucket", omMetadataManager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
+        .createCompleteMPURequest("vol1", "fsoBucket", "mpuKey", "mpuKeyID", new ArrayList<>());
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+      } finally {
+        span.end();
+      }
+
+      collector.assertAttribute("request", OmTracingAttributes.OM_BUCKET_LAYOUT, "FILE_SYSTEM_OPTIMIZED");
+    }
   }
 
   @Test
