@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -36,6 +35,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 
 /**
  * Test utility for creating a dummy OM, the associated
@@ -105,6 +105,7 @@ public final class OmTestManagers {
         new ScmBlockLocationTestingClient(null, null, 0);
 
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
+    conf.setIfUnset(OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED, "false");
     DefaultMetricsSystem.setMiniClusterMode(true);
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId("omtest");

@@ -92,6 +92,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -181,6 +182,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
+    // Pin format_version like DBProfile does, so db.snapdiff stays readable after a downgrade.
+    this.columnFamilyOptions.setTableFormatConfig(
+        new ManagedBlockBasedTableConfig().setFormatVersion(ManagedBlockBasedTableConfig.FORMAT_VERSION));
     this.columnFamilyDescriptors = new ArrayList<>();
     this.columnFamilyHandles = new ArrayList<>();
     CodecRegistry codecRegistry = createCodecRegistryForSnapDiff();
@@ -895,7 +899,8 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                        final String fromSnapshot,
                                                        final String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
 
@@ -906,7 +911,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     SubmitSnapshotDiffResponse snapshotDiffResponse =
         snapshotDiffManager.submitSnapshotDiff(volume, bucket,
-            fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+            fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff, orderedReport);
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffResponse;

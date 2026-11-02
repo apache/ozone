@@ -12,10 +12,7 @@ We welcome contributions of:
  * **Code**. File a bug and submit a patch, or pick up any one of the unassigned Jiras.
    * [Newbie Ozone jiras](https://s.apache.org/OzoneNewbieJiras)
    * [All open and unassigned Ozone jiras](https://s.apache.org/OzoneUnassignedJiras)
- * **Documentation Improvements**: You can submit improvements to either:
-     * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/OZONE/Modifying+the+Ozone+Website)
-     * Developer docs. These are markdown files [checked into the Apache Ozone Source tree](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs/content).
- * The [wiki pages](https://cwiki.apache.org/confluence/display/OZONE/Contributing+to+Ozone): Please contact us at dev@ozone.apache.org and we can provide you write access to the wiki.
+ * **Documentation Improvements**: You can submit improvements to the Ozone website at https://github.com/apache/ozone-site
  * **Testing**: We always need help to improve our testing
       * Unit Tests (JUnit / Java)
       * Acceptance Tests (docker + robot framework)
@@ -128,6 +125,7 @@ We use GitHub pull requests for contributing changes to the repository. The main
 ### Pull request guidelines
 
 * Keep distinct issues in separate PRs, and avoid unrelated changes, such as reformatting or renaming adjacent code.
+* Submit user-facing documentation changes as a separate PR to [apache/ozone-site](https://github.com/apache/ozone-site), not to this repository. Design docs and configuration descriptions in `ozone-default.xml` stay in this repository.
 * Move build changes, refactoring or cleanup into a follow-up PR when they obscure the functional change.
 * For cleanup, consider compatibility and deprecation before removing public interfaces, and notify the original authors when practical.
 * For test fixes, inspect the failure evidence and address the cause instead of only increasing a timeout.
@@ -179,7 +177,6 @@ The [`hadoop-ozone/dev-support/checks` directory](https://github.com/apache/ozon
     * `author.sh`: checks for `@author` tags
     * `bats.sh`: unit test for shell scripts
     * `rat.sh`: checks for Apache license header
-    * `docs.sh`: sanity checks for [Ozone documentation](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs)
     * `dependency.sh`: compares list of jars in build output with known list
     * `checkstyle.sh`: Checkstyle
     * `pmd.sh`: PMD
@@ -195,7 +192,7 @@ The set of tests run by `integration` and `acceptance` may be limited via argume
 
 Some scripts require third-party tools, but most of these are installed during the first run, if needed.
 
-Most scripts (except `build.sh`) output results in `target/<name>`, e.g. `target/docs`.
+Most scripts (except `build.sh`) output results in `target/<name>`, e.g. `target/rat`.
 
 ## Using IDE
 

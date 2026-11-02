@@ -187,6 +187,42 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
         omMetadataManager.getBucketTable().getSkipCache(bucketKey).getUsedNamespace());
   }
 
+  @Test
+  public void testDuplicateKeysReleaseQuotaOnce() throws Exception {
+    createPreRequisites();
+    DeleteKeyArgs keys = omRequest.getDeleteKeysRequest().getDeleteKeys();
+    OMRequest request = omRequest.toBuilder().setDeleteKeysRequest(omRequest.getDeleteKeysRequest().toBuilder()
+        .setDeleteKeys(keys.toBuilder().addAllKeys(deleteKeyList))).build();
+    checkDuplicateKeysReleaseQuotaOnce(request, deleteKeyList.size());
+  }
+
+  protected void checkDuplicateKeysReleaseQuotaOnce(OMRequest request, int uniqueKeys) throws Exception {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    // The fixtures insert entries directly, so account for the entries being deleted here.
+    omMetadataManager.getBucketTable().getCacheValue(new CacheKey<>(bucketKey))
+        .getCacheValue().incrUsedNamespace(uniqueKeys);
+    long usedNamespace = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+    long totalNamespace = omMetadataManager.getBucketTable().get(bucketKey).getTotalBucketNamespace();
+    OMClientResponse response = getOmKeysDeleteRequest(request).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(Status.OK, response.getOMResponse().getStatus());
+    assertEquals(0, response.getOMResponse().getDeleteKeysResponse().getUnDeletedKeys().getKeysCount());
+    assertEquals(0, response.getOMResponse().getDeleteKeysResponse().getErrorsCount());
+    assertEquals(usedNamespace - uniqueKeys, omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+    if (!getBucketLayout().isFileSystemOptimized()) {
+      // The base fixture contains empty keys, whose namespace is released immediately.
+      assertEquals(totalNamespace - uniqueKeys,
+          omMetadataManager.getBucketTable().get(bucketKey).getTotalBucketNamespace());
+    }
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    assertEquals(usedNamespace - uniqueKeys,
+        omMetadataManager.getBucketTable().getSkipCache(bucketKey).getUsedNamespace());
+    assertEquals(uniqueKeys, ozoneManager.getMetrics().getNumKeyDeletes());
+  }
+
   protected long expectedNamespaceReleasedOnPartialDelete() {
     return KEY_COUNT;
   }
