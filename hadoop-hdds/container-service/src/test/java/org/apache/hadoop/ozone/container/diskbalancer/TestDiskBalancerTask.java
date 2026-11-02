@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DISK_BALANCER_DIR;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,11 +58,13 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -69,11 +72,14 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -323,6 +329,48 @@ public class TestDiskBalancerTask {
     containerIterator = destVolume.getContainerIterator();
     assertTrue(containerIterator.hasNext());
     assertEquals(CONTAINER_ID, containerIterator.next());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveKeepsContainerReport(ContainerTestVersionInfo versionInfo) throws IOException {
+    setLayoutAndSchemaForTest(versionInfo);
+    KeyValueContainer container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    KeyValueContainerData data = container.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(data, conf)) {
+      db.getStore().getBlockDataTable().put(data.getBlockKey(1L), new BlockData(new BlockID(CONTAINER_ID, 1L)));
+      db.getStore().getMetadataTable().put(data.getBlockCountKey(), 1L);
+      db.getStore().getMetadataTable().put(data.getBytesUsedKey(), CONTAINER_SIZE);
+    }
+    ozoneContainer.getController().updateContainerChecksum(CONTAINER_ID, buildTestTree(conf));
+    // Load the in-memory container data from disk, as a datanode start does.
+    KeyValueContainerUtil.parseKVContainerData(data, conf);
+    ContainerReplicaProto reportBeforeMove = container.getContainerReport();
+    assertThat(reportBeforeMove.getDataChecksum()).isNotZero();
+
+    getTask().call();
+
+    Container<?> newContainer = containerSet.getContainer(CONTAINER_ID);
+    assertThat(newContainer).isNotSameAs(container);
+    assertThat(newContainer.getContainerData().getVolume()).isEqualTo(destVolume);
+    // The container has seen no I/O, so the next container report must be the same as before.
+    assertThat(newContainer.getContainerReport()).isEqualTo(reportBeforeMove);
+    assertThat(ContainerDataYaml.readContainerFile(newContainer.getContainerFile()).getState()).isEqualTo(State.CLOSED);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveOfContainerWithoutDataChecksum(ContainerTestVersionInfo versionInfo) throws IOException {
+    setLayoutAndSchemaForTest(versionInfo);
+    createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+
+    getTask().call();
+
+    Container<?> newContainer = containerSet.getContainer(CONTAINER_ID);
+    assertThat(newContainer.getContainerData().getVolume()).isEqualTo(destVolume);
+    // No merkle tree was written yet, so the checksum stays unset for the scanner to fill in.
+    assertThat(newContainer.getContainerData().needsDataChecksum()).isTrue();
+    assertThat(newContainer.getContainerReport().getDataChecksum()).isZero();
+    // The container has no blocks, which the import detects as a datanode start does.
+    assertThat(newContainer.getContainerData().isEmpty()).isTrue();
   }
 
   @ContainerTestVersionInfo.ContainerTest

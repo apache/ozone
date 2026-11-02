@@ -687,9 +687,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
     private int addToDataBuffer(int i, byte[] b, int off, int len) {
       final ByteBuffer buf = dataBuffers[i];
       final int pos = buf.position() + len;
-      Preconditions.checkState(pos <= cellSize,
-          "Position(" + pos + ") is greater than the cellSize("
-              + cellSize + ").");
+      Preconditions.checkState(pos <= cellSize, "Position(%s) is greater than the cellSize(%s).", pos, cellSize);
       buf.put(b, off, len);
       return pos;
     }

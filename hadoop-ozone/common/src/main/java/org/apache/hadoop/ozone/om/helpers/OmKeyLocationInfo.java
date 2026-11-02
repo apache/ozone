@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.security.token.Token;
@@ -101,11 +102,11 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
     }
   }
 
-  public KeyLocation getProtobuf(int clientVersion) {
+  public KeyLocation getProtobuf(ClientVersion clientVersion) {
     return getProtobuf(false, clientVersion);
   }
 
-  public KeyLocation getProtobuf(boolean ignorePipeline, int clientVersion) {
+  public KeyLocation getProtobuf(boolean ignorePipeline, ClientVersion clientVersion) {
     KeyLocation.Builder builder = KeyLocation.newBuilder()
         .setBlockID(getBlockID().getProtobuf())
         .setLength(getLength())

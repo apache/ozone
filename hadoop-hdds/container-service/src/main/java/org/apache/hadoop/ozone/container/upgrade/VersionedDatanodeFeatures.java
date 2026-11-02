@@ -19,25 +19,30 @@ package org.apache.hadoop.ozone.container.upgrade;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 /**
  * Utility class to retrieve the version of a feature that corresponds to the
- * metadata layout version specified by the provided
- * {@link HDDSLayoutVersionManager}.
+ * apparent version specified by the provided
+ * {@link DatanodeVersionManager}.
  */
 public final class VersionedDatanodeFeatures {
-  private static HDDSLayoutVersionManager versionManager;
+  private static DatanodeVersionManager versionManager;
 
   private VersionedDatanodeFeatures() { }
 
-  public static void initialize(
-      HDDSLayoutVersionManager manager) {
+  public static void initialize(DatanodeVersionManager manager) {
     versionManager = manager;
   }
 
@@ -146,6 +151,53 @@ public final class VersionedDatanodeFeatures {
         return true;
       }
       return false;
+    }
+  }
+
+  /**
+   * Methods to handle persisting ports to be compatible with older Datanode versions that would fail on unknown port
+   * fields.
+   */
+  public static class DatanodePorts {
+    /**
+     * Version that must be present before persisting each port name to disk.
+     * Ports omitted from this map are always persisted.
+     */
+    private static final Map<DatanodeDetails.Port.Name, HDDSLayoutFeature> PORT_TO_VERSION = new HashMap<>();
+
+    static {
+      PORT_TO_VERSION.put(DatanodeDetails.Port.Name.RATIS_DATASTREAM,
+          HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS);
+      PORT_TO_VERSION.put(
+          DatanodeDetails.Port.Name.HTTP,
+          HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS);
+      PORT_TO_VERSION.put(
+          DatanodeDetails.Port.Name.HTTPS,
+          HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS);
+      PORT_TO_VERSION.put(
+          DatanodeDetails.Port.Name.CLIENT_RPC,
+          HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS);
+    }
+
+    private static boolean shouldPersistPort(DatanodeDetails.Port port, DatanodeStorage datanodeLayoutStorage) {
+      HDDSLayoutFeature portVersion = PORT_TO_VERSION.get(port.getName());
+      return portVersion == null || portVersion.isSupportedBy(datanodeLayoutStorage.getApparentVersion());
+    }
+
+    public static Map<String, Integer> getPortsToPersist(DatanodeDetails datanodeDetails, ConfigurationSource conf)
+        throws IOException {
+      DatanodeStorage datanodeLayoutStorage = new DatanodeStorage(conf, datanodeDetails.getUuidString());
+      Map<String, Integer> portDetails = new LinkedHashMap<>();
+
+      final List<DatanodeDetails.Port> ports = datanodeDetails.getPorts();
+      if (!CollectionUtils.isEmpty(ports)) {
+        for (DatanodeDetails.Port port : ports) {
+          if (shouldPersistPort(port, datanodeLayoutStorage)) {
+            portDetails.put(port.getName().toString(), port.getValue());
+          }
+        }
+      }
+      return portDetails;
     }
   }
 }

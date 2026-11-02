@@ -49,7 +49,7 @@ import org.junit.jupiter.api.Test;
 public class TestOMFailoverProxyProvider {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final String NODE_ID_BASE_STR = "omNode-";
-  private static final String DUMMY_NODE_ADDR = "0.0.0.0:8080";
+  private static final String DUMMY_NODE_ADDR = "localhost:8080";
   private HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> provider;
   private long waitBetweenRetries;
   private int numNodes = 3;

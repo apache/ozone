@@ -26,6 +26,7 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -61,6 +62,7 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.SnapshotManagementRequest;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.server.DivisionInfo;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -211,6 +213,18 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public RaftServer.Division getDivision() {
     return division;
+  }
+
+  @Override
+  public long getFollowerReplicationLag() {
+    final DivisionInfo info = division.getInfo();
+    if (!info.isLeader()) {
+      return 0;
+    }
+    final long leaderIndex = info.getLastAppliedIndex();
+    final long minFollowerIndex = Arrays.stream(info.getFollowerNextIndices())
+        .min().orElse(leaderIndex);
+    return Math.max(0, leaderIndex - minFollowerIndex);
   }
 
   @VisibleForTesting

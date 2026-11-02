@@ -24,12 +24,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.ratis.util.function.CheckedFunction;
 
 /**
  * Interface for key-value store that stores ozone metadata. Ozone metadata is
@@ -125,6 +127,26 @@ public interface Table<KEY, VALUE> {
    */
   default VALUE getReadCopy(KEY key) throws RocksDatabaseException, CodecException {
     throw new NotImplementedException("getReadCopy is not implemented");
+  }
+
+  /**
+   * Returns a projection of the value mapped to the given key, i.e. only the fields the caller needs,
+   * or null if the key is not found. Implementations may decode {@code fromPersistedValue} straight
+   * from the serialized value instead of materializing the whole VALUE object.
+   * <p>
+   * {@code fromCachedValue} is applied to the cached object itself, without the defensive copy
+   * {@link #get} makes, so it must neither mutate nor retain it.
+   *
+   * @param key metadata key
+   * @param fromCachedValue extracts the projection from a value found in the cache
+   * @param fromPersistedValue extracts the projection from the serialized value read from the store
+   * @return the projection, or null if the key is not found.
+   */
+  default <R> R getProjected(KEY key, Function<VALUE, R> fromCachedValue,
+      CheckedFunction<CodecBuffer, R, CodecException> fromPersistedValue)
+      throws RocksDatabaseException, CodecException {
+    final VALUE value = get(key);
+    return value == null ? null : fromCachedValue.apply(value);
   }
 
   /**

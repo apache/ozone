@@ -23,6 +23,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,6 +83,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -120,7 +124,6 @@ import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -253,11 +256,65 @@ class TestKeyDeletingService extends OzoneTestBase {
           () -> getDeletedKeyCount() >= initialDeletedCount + keyCount,
           100, 10000);
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
+      // deletedKeyCount is updated once the purge request is applied, before the double buffer flushes it to the DB.
+      om.awaitDoubleBufferFlush();
       try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
           keyManager, om.getMetadataManager().getLock())) {
         assertThat(keyManager.getPendingDeletionKeys(filter, Integer.MAX_VALUE).getPurgedKeys()).isEmpty();
       }
+    }
+
+    /**
+     * When SCM reports follower replication lag at or above the configured
+     * threshold, the service must reduce its per-task key limit and
+     * record the throttle in metrics; below the threshold it uses the full
+     * limit.
+     */
+    @Test
+    void throttlesKeyDeletionWhenScmFollowerLagHigh() {
+      OzoneConfiguration throttleConf = new OzoneConfiguration(conf);
+      throttleConf.setInt(OZONE_KEY_DELETING_LIMIT_PER_TASK, 50);
+      throttleConf.setInt(OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD, 10);
+      throttleConf.setInt(OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK, 5);
+
+      ScmBlockLocationProtocol laggedClient = Mockito.spy(scmBlockTestingClient);
+      KeyDeletingService service = new KeyDeletingService(
+          om, laggedClient, 100, 10000, throttleConf, 10, false);
+
+      // No lag observed yet -> full limit.
+      Mockito.doReturn(0L).when(laggedClient).getLastKnownFollowerReplicationLag();
+      assertEquals(50, service.getEffectiveKeyLimitPerTask());
+
+      long throttledBefore = service.getMetrics().getNumKeyDeletionThrottledBySCMLag();
+
+      // Lag at/above threshold -> throttled limit and a throttle metric increment.
+      Mockito.doReturn(20L).when(laggedClient).getLastKnownFollowerReplicationLag();
+      assertEquals(5, service.getEffectiveKeyLimitPerTask());
+      assertEquals(throttledBefore + 1, service.getMetrics().getNumKeyDeletionThrottledBySCMLag());
+
+      // Lag below threshold -> full limit, no further throttling.
+      Mockito.doReturn(5L).when(laggedClient).getLastKnownFollowerReplicationLag();
+      assertEquals(50, service.getEffectiveKeyLimitPerTask());
+      assertEquals(throttledBefore + 1, service.getMetrics().getNumKeyDeletionThrottledBySCMLag());
+    }
+
+    /**
+     * A threshold of 0 (or less) disables the throttle entirely, regardless of
+     * the lag SCM reports.
+     */
+    @Test
+    void scmLagThrottleDisabledWhenThresholdNonPositive() {
+      OzoneConfiguration disabledConf = new OzoneConfiguration(conf);
+      disabledConf.setInt(OZONE_KEY_DELETING_LIMIT_PER_TASK, 50);
+      disabledConf.setInt(OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD, 0);
+
+      ScmBlockLocationProtocol laggedClient = Mockito.spy(scmBlockTestingClient);
+      KeyDeletingService service = new KeyDeletingService(
+          om, laggedClient, 100, 10000, disabledConf, 10, false);
+
+      Mockito.doReturn(1_000_000L).when(laggedClient).getLastKnownFollowerReplicationLag();
+      assertEquals(50, service.getEffectiveKeyLimitPerTask());
     }
 
     /**
@@ -433,6 +490,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 100000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
+      om.awaitDoubleBufferFlush();
       try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
           keyManager, om.getMetadataManager().getLock())) {
@@ -659,7 +717,6 @@ class TestKeyDeletingService extends OzoneTestBase {
        of Snap3 should be empty.
      */
     @Test
-    @Flaky("HDDS-13880")
     void testSnapshotDeepClean() throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
@@ -721,23 +778,29 @@ class TestKeyDeletingService extends OzoneTestBase {
       keyDeletingService.resume();
       directoryDeletingService.resume();
 
+      // Hold the snap3 DB handle only while its tables are read: the handle keeps a snapshot DB read lock, and the
+      // OMDoubleBuffer flush thread needs a colliding write lock on the same stripe to purge snap2 below.
       try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
                om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
-        OmSnapshot snapshot3 = rcOmSnapshot.get();
-
         Table<String, RepeatedOmKeyInfo> snap3deletedTable =
-            snapshot3.getMetadataManager().getDeletedTable();
-
+            rcOmSnapshot.get().getMetadataManager().getDeletedTable();
         // 5 keys can be deep cleaned as it was stuck previously
         assertTableRowCount(snap3deletedTable, initialDeletedCount + 10, metadataManager);
-
-        writeClient.deleteSnapshot(volumeName, bucketName, snap2);
-        assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
-
-        assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
-        assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
-        checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       }
+
+      writeClient.deleteSnapshot(volumeName, bucketName, snap2);
+      assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
+
+      // Re-fetch the deleted table: SnapshotCache may have closed and reloaded snap3 while no handle was held.
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
+               om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
+        Table<String, RepeatedOmKeyInfo> snap3deletedTable =
+            rcOmSnapshot.get().getMetadataManager().getDeletedTable();
+        assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
+      }
+
+      assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
+      checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       sstFilteringService.resume();
     }
 
@@ -1368,6 +1431,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // wait for AOS deleted keys to be reclaimed and
       // snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 10, 100, 10000);
       // Verify last run AOS deletion metrics.
@@ -1386,6 +1450,8 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Delete snap1. Which also sets the snap2 to be deep cleaned.
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
+      // SnapshotDeletingService silently skips snap1 until its delete is flushed, and the 1h interval never retries.
+      om.awaitDoubleBufferFlush();
       keyManager.getSnapshotDeletingService().runPeriodicalTaskNow();
       // Wait for changes to the snap2 to be flushed.
       GenericTestUtils.waitFor(
@@ -1400,6 +1466,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // wait for snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 20, 100, 10000);
 

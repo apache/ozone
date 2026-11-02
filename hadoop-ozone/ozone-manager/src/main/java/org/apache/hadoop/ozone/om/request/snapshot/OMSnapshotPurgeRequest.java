@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -74,6 +75,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    OMMetrics omMetrics = ozoneManager.getMetrics();
     OmSnapshotInternalMetrics omSnapshotIntMetrics = ozoneManager.getOmSnapshotIntMetrics();
 
     final long trxnLogIndex = context.getIndex();
@@ -95,6 +97,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
     try {
       List<String> purgedSnapshotsForLog = new ArrayList<>();
+      long numDeletedSnapshotsPurged = 0;
 
       // Each snapshot purge operation does three things:
       //  1. Update the deep clean flag for the next active snapshot (So that it can be
@@ -124,6 +127,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         omMetadataManager.getSnapshotInfoTable()
             .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
         updatedSnapshotInfos.remove(fromSnapshot.getTableKey());
+        if (fromSnapshot.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+          numDeletedSnapshotsPurged++;
+        }
       }
       // Update the snapshotInfo lastTransactionInfo.
       for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
@@ -136,6 +142,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           transactionInfo);
 
       omSnapshotIntMetrics.incNumSnapshotPurges();
+      omMetrics.decNumSnapshotDeleted(numDeletedSnapshotsPurged);
       LOG.info("Successfully executed snapshotPurgeRequest for snapshots: {} along with updating snapshots: {}.",
           purgedSnapshotsForLog, updatedSnapshotInfos);
       if (LOG.isDebugEnabled()) {

@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.ozone.DatanodeStartupPhase;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -78,6 +79,7 @@ public class VersionEndpointTask implements
             Objects.requireNonNull(scmId, "scmId == null");
             Objects.requireNonNull(clusterId, "clusterId == null");
 
+            ozoneContainer.getStartupProgress().beginPhase(DatanodeStartupPhase.PREPARING_VOLUMES);
             // Check DbVolumes, format DbVolume at first register time.
             checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
 
@@ -87,6 +89,7 @@ public class VersionEndpointTask implements
             // Start the container services after getting the version information
             ozoneContainer.start(clusterId);
           } catch (Exception | Error ex) {
+            ozoneContainer.getStartupProgress().fail();
             // Handle this in the task: its caller may already have timed out waiting for startup.
             LOG.error("Failed to start required container services for SCM {}. Shutting down datanode.",
                 rpcEndPoint.getAddress(), ex);

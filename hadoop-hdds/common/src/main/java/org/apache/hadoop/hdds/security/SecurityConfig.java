@@ -167,7 +167,7 @@ public class SecurityConfig {
     this.size = configuration.getInt(HDDS_KEY_LEN, HDDS_DEFAULT_KEY_LEN);
     this.keyAlgo = configuration.get(HDDS_KEY_ALGORITHM,
         HDDS_DEFAULT_KEY_ALGORITHM);
-    initSecurityProvider(configuration);
+    // The provider is registered by getProvider(), when something needs it: most clients never do.
     this.providerString = configuration.get(HDDS_SECURITY_PROVIDER, HDDS_DEFAULT_SECURITY_PROVIDER);
 
     // Please Note: To make it easy for our customers we will attempt to read
@@ -304,10 +304,22 @@ public class SecurityConfig {
         : Collections.unmodifiableList(Arrays.asList(configuration.getTrimmedStrings(HDDS_GRPC_TLS_CIPHERS)));
   }
 
-  public static synchronized void initSecurityProvider(ConfigurationSource configuration) {
+  public static void initSecurityProvider(ConfigurationSource configuration) {
+    initSecurityProvider(configuration.get(HDDS_SECURITY_PROVIDER, HDDS_DEFAULT_SECURITY_PROVIDER));
+  }
+
+  /**
+   * Registers the security provider, BouncyCastle for "BC", if no provider has been resolved yet.
+   */
+  public static void initSecurityProvider(String providerString) {
+    if (SecurityConfig.provider == null) {
+      initSecurityProviderSynchronized(providerString);
+    }
+  }
+
+  private static synchronized void initSecurityProviderSynchronized(String providerString) {
     // First Startup -- if the provider is null, check for the provider.
     if (SecurityConfig.provider == null) {
-      String providerString = configuration.get(HDDS_SECURITY_PROVIDER, HDDS_DEFAULT_SECURITY_PROVIDER);
       provider = Security.getProvider(providerString);
       if (SecurityConfig.provider == null) {
         // Provider not found, let us try to Dynamically initialize the
@@ -504,12 +516,13 @@ public class SecurityConfig {
   }
 
   /**
-   * Returns the Provider name. SCM defaults to using Bouncy Castle and will
-   * return "BC".
+   * Returns the Provider name, after registering the provider so that it can be looked up by that name.
+   * SCM defaults to using Bouncy Castle and will return "BC".
    *
    * @return String Provider name.
    */
   public String getProvider() {
+    initSecurityProvider(providerString);
     return providerString;
   }
 

@@ -13,7 +13,7 @@ We welcome contributions of:
    * [Newbie Ozone jiras](https://s.apache.org/OzoneNewbieJiras)
    * [All open and unassigned Ozone jiras](https://s.apache.org/OzoneUnassignedJiras)
  * **Documentation Improvements**: You can submit improvements to either:
-     * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/OZONE/Modifying+the+Ozone+Website)
+     * Ozone website and user documentation, in the [apache/ozone-site](https://github.com/apache/ozone-site) repository. Instructions are in its [contribution guide](https://github.com/apache/ozone-site/blob/master/CONTRIBUTING.md).
      * Developer docs. These are markdown files [checked into the Apache Ozone Source tree](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs/content).
  * The [wiki pages](https://cwiki.apache.org/confluence/display/OZONE/Contributing+to+Ozone): Please contact us at dev@ozone.apache.org and we can provide you write access to the wiki.
  * **Testing**: We always need help to improve our testing
@@ -40,8 +40,8 @@ If you have any questions, please don't hesitate to contact
 Requirements to compile the code:
 
 * Unix System
-* JDK 17 or later; client modules can be built with JDK 8
-* Maven 3.6.3 or later
+* JDK 17 or later
+* Maven 3.9.6 or later
 * Internet connection for first build (to fetch all Maven and Ozone dependencies)
 
 (Standard development tools such as make, gcc, etc. are required.)
@@ -109,9 +109,12 @@ We use GitHub pull requests for contributing changes to the repository. The main
   4. Create a local branch for your contribution (eg. `git checkout -b HDDS-1234`)
   5. Make your changes locally.
      * For complex changes, committing each logical part is recommended.
+     * Start commit messages with the Jira ID, e.g. `HDDS-1234. Fix snapshot purge regression`.
+     * If you include non-trivial content created using generative AI tooling, disclose it in each commit's message as `Co-authored-by: TOOL (MODEL)` (see [ASF Generative Tooling Guidance](https://www.apache.org/legal/generative-tooling.html) for details).  Validate changes proposed by the tools before relying on it.
   6. Push your changes to your fork of Ozone
   7. Wait for the `build-branch` workflow to complete successfully for your commit.
   8. Create a pull request for your changes
+     * Use the Jira ID and summary as the PR title, e.g. `HDDS-1234. Fix snapshot purge regression`.
      * Please include the Jira link, problem description and testing instruction (follow the [template](https://github.com/apache/ozone/blob/master/.github/pull_request_template.md))
   9. Set the Jira issue to "Patch Available" state
   10. Address any review comments if applicable
@@ -121,6 +124,24 @@ We use GitHub pull requests for contributing changes to the repository. The main
       * In general, please try to avoid force-push when updating the PR.  Here are some great articles that explain why:
         * https://developers.mattermost.com/blog/submitting-great-prs/#4-avoid-force-pushing
         * https://www.freecodecamp.org/news/optimize-pull-requests-for-reviewer-happiness#request-a-review
+
+### Pull request guidelines
+
+* Keep distinct issues in separate PRs, and avoid unrelated changes, such as reformatting or renaming adjacent code.
+* Submit user-facing documentation changes as a separate PR to [apache/ozone-site](https://github.com/apache/ozone-site), not to this repository. Design docs and configuration descriptions in `ozone-default.xml` stay in this repository.
+* Move build changes, refactoring or cleanup into a follow-up PR when they obscure the functional change.
+* For cleanup, consider compatibility and deprecation before removing public interfaces, and notify the original authors when practical.
+* For test fixes, inspect the failure evidence and address the cause instead of only increasing a timeout.
+* Keep the PR in draft while the implementation is unstable, fork CI is failing, or you are still addressing review comments.
+* CI resources are shared. Do not run CI for obsolete revisions, trigger it only when necessary, and do not rerun unrelated flaky tests that are already fixed on `master`.
+* Keep PR descriptions concise.
+* If you use generative AI tooling for drafting pull request text, please include `Generated-by: TOOL (MODEL)` in the description.
+
+## Committer guidelines
+
+* Allow at least 24 hours for contributors in all time zones to provide feedback before merging non-trivial PRs, except for fixes of CI breakage.
+* Before merging another PR to `master`, wait until most CI jobs for the previous merge have completed (typically about one hour), leaving CI capacity for other PRs.
+
 ## Code convention and tests
 
 Basic code conventions followed by Ozone:
@@ -135,6 +156,20 @@ These are checked by tools like Checkstyle and RAT.
 Ozone code style is shared via `.editorconfig` configuration file and will be automatically imported when the project is opened.
 
 See https://www.jetbrains.com/help/idea/configure-project-settings.html#share-project-through-vcs for detailed instructions.
+
+### Design guidelines
+
+* Match the surrounding code. Reuse existing helpers, test scaffolding and abstractions (e.g. bucket layout, snapshot, upgrade) instead of adding one-off conditionals or new abstractions for a single call site.
+* Keep service responsibilities separated. Do not move OM logic into SCM paths, bypass existing request/response layers, or introduce cross-service shortcuts.
+* Changing a wire type usually requires updating the Protobuf definition, translators, server-side logic, and compatibility or integration tests.
+* Do not hand-edit generated sources or web artifacts when a source file or generation step exists.
+* Keep comments concrete and local to the code.
+
+### Tests
+
+* New behavior and bug fixes should come with tests.
+* Start with the narrowest useful test: unit tests for local logic, integration tests when the behavior depends on service boundaries, cluster lifecycle, storage, RPC or upgrade flows.
+* Prefer extending an existing test suite, base class or cluster provider over creating a new `MiniOzoneCluster` lifecycle for similar coverage.
 
 ### Check your contribution
 

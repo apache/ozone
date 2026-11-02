@@ -116,7 +116,7 @@ public class TestSimplePipelineProvider {
     Pipeline pipeline =
         provider.create(StandaloneReplicationConfig.getInstance(factor), storageTier);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto);
     assertEquals(pipeline.getType(), HddsProtos.ReplicationType.STAND_ALONE);
     assertEquals(pipeline.getReplicationConfig().getRequiredNodes(), factor.getNumber());
@@ -128,7 +128,7 @@ public class TestSimplePipelineProvider {
     Pipeline pipeline1 =
         provider.create(StandaloneReplicationConfig.getInstance(factor), storageTier);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto1);
     assertEquals(pipeline1.getType(), HddsProtos.ReplicationType.STAND_ALONE);
     assertEquals(
@@ -212,7 +212,7 @@ public class TestSimplePipelineProvider {
       HddsProtos.StorageTypeProto... storageTypes) {
     DatanodeInfo datanodeInfo = new DatanodeInfo(
         MockDatanodeDetails.randomDatanodeDetails(),
-        NodeStatus.inServiceHealthy(), UpgradeUtils.defaultLayoutVersionProto(),
+        NodeStatus.inServiceHealthy(), UpgradeUtils.defaultVersionProto(),
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     List<StorageReportProto> storageReports = new ArrayList<>();
     for (HddsProtos.StorageTypeProto storageType : storageTypes) {

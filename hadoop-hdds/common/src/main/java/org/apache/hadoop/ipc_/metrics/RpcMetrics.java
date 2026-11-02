@@ -22,6 +22,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -29,16 +32,22 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * This class is for maintaining  the various RPC statistics
  * and publishing them through the metrics interfaces.
+ *
+ * The three latency rates are kept outside the {@link MetricsRegistry} as
+ * lock-free {@link ConcurrentMutableRate}s, because they are updated on every
+ * RPC by every handler thread and {@code MutableStat.add} is synchronized.
+ * This class therefore implements {@link MetricsSource} itself and snapshots
+ * them next to the registry, keeping the emitted metric names unchanged.
  */
 @Metrics(about="Aggregate RPC metrics", context="rpc")
-public class RpcMetrics {
+public class RpcMetrics implements MetricsSource {
 
   static final Logger LOG = LoggerFactory.getLogger(RpcMetrics.class);
   final Server server;
@@ -55,6 +64,11 @@ public class RpcMetrics {
     registry = new MetricsRegistry("rpc")
         .tag("port", "RPC port", port)
         .tag("serverName", "Name of the RPC server", server.getServerName());
+    // Names match what MutableMetricsFactory derived from the field names, so
+    // the emitted metrics are unchanged
+    rpcQueueTime = new ConcurrentMutableRate("RpcQueueTime", "Queue time", false);
+    rpcLockWaitTime = new ConcurrentMutableRate("RpcLockWaitTime", "Lock wait time", false);
+    rpcProcessingTime = new ConcurrentMutableRate("RpcProcessingTime", "Processing time", false);
     int[] intervals = conf.getInts(
         CommonConfigurationKeys.RPC_METRICS_PERCENTILES_INTERVALS_KEY);
     rpcQuantileEnable = (intervals.length > 0) && conf.getBoolean(
@@ -94,11 +108,11 @@ public class RpcMetrics {
 
   @Metric("Number of received bytes") MutableCounterLong receivedBytes;
   @Metric("Number of sent bytes") MutableCounterLong sentBytes;
-  @Metric("Queue time") MutableRate rpcQueueTime;
+  final ConcurrentMutableRate rpcQueueTime;
   MutableQuantiles[] rpcQueueTimeQuantiles;
-  @Metric("Lock wait time") MutableRate rpcLockWaitTime;
+  final ConcurrentMutableRate rpcLockWaitTime;
   MutableQuantiles[] rpcLockWaitTimeQuantiles;
-  @Metric("Processing time") MutableRate rpcProcessingTime;
+  final ConcurrentMutableRate rpcProcessingTime;
   MutableQuantiles[] rpcProcessingTimeQuantiles;
   @Metric("Number of authentication failures")
   MutableCounterLong rpcAuthenticationFailures;
@@ -243,10 +257,10 @@ public class RpcMetrics {
     rpcSlowCalls.incr();
   }
   /**
-   * Returns a MutableRate Counter.
+   * Returns the processing time rate counter.
    * @return Mutable Rate
    */
-  public MutableRate getRpcProcessingTime() {
+  public ConcurrentMutableRate getRpcProcessingTime() {
     return rpcProcessingTime;
   }
 
@@ -284,5 +298,18 @@ public class RpcMetrics {
 
   public MetricsTag getTag(String tagName) {
     return registry.getTag(tagName);
+  }
+
+  /**
+   * Emits the registry (tags, counters, gauges and quantiles) and the three
+   * latency rates that are held outside of it
+   */
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    MetricsRecordBuilder builder = collector.addRecord(registry.info());
+    registry.snapshot(builder, all);
+    rpcQueueTime.snapshot(builder, all);
+    rpcLockWaitTime.snapshot(builder, all);
+    rpcProcessingTime.snapshot(builder, all);
   }
 }

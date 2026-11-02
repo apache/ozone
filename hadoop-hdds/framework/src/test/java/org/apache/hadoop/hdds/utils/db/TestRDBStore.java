@@ -55,6 +55,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.TickerType;
 
 /**
  * RDBStore Tests.
@@ -348,6 +349,35 @@ public class TestRDBStore {
     DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 5);
     assertEquals(2, dbUpdatesSince.getData().size());
     assertEquals(2, dbUpdatesSince.getCurrentSequenceNumber());
+  }
+
+  @Test
+  public void testDirectWritesHonorSyncWriteOption(@TempDir File tempDir) throws Exception {
+    final ManagedDBOptions dbOptions = newManagedDBOptions();
+    final Statistics statistics = dbOptions.statistics();
+    final ManagedWriteOptions writeOptions = new ManagedWriteOptions();
+    writeOptions.setSync(true);
+    final Set<TableConfig> tableConfigs = new HashSet<>();
+    tableConfigs.add(new TableConfig(families.get(0), new ManagedColumnFamilyOptions()));
+
+    try (RDBStore store = new RDBStore(tempDir, dbOptions, null, writeOptions, tableConfigs, false, null, false, null,
+        MAX_DB_UPDATES_SIZE_THRESHOLD, true, null, false)) {
+      final RDBTable table = store.getTable(families.get(0));
+      final byte[] key = getBytesUtf16("Key1");
+      final byte[] endKey = getBytesUtf16("Key2");
+
+      long synced = statistics.getTickerCount(TickerType.WAL_FILE_SYNCED);
+      table.put(key, key);
+      assertThat(statistics.getTickerCount(TickerType.WAL_FILE_SYNCED)).isGreaterThan(synced);
+
+      synced = statistics.getTickerCount(TickerType.WAL_FILE_SYNCED);
+      table.delete(key);
+      assertThat(statistics.getTickerCount(TickerType.WAL_FILE_SYNCED)).isGreaterThan(synced);
+
+      synced = statistics.getTickerCount(TickerType.WAL_FILE_SYNCED);
+      table.deleteRange(key, endKey);
+      assertThat(statistics.getTickerCount(TickerType.WAL_FILE_SYNCED)).isGreaterThan(synced);
+    }
   }
 
   @Test

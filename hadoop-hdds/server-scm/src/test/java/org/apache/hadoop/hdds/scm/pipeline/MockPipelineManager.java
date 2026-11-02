@@ -95,7 +95,7 @@ public class MockPipelineManager implements PipelineManager {
     }
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT));
     return pipeline;
   }
 
@@ -119,7 +119,7 @@ public class MockPipelineManager implements PipelineManager {
   public void addEcPipeline(Pipeline pipeline)
       throws IOException {
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT));
   }
 
   @Override
@@ -305,16 +305,6 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void freezePipelineCreation() {
-
-  }
-
-  @Override
-  public void resumePipelineCreation() {
-
-  }
-
-  @Override
   public void close() {
   }
 
@@ -341,11 +331,6 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public void releaseWriteLock() {
 
-  }
-
-  @Override
-  public boolean isPipelineCreationFrozen() {
-    return false;
   }
 
   @Override

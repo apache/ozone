@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import java.io.InputStream;
 import java.util.Set;
 import javax.ws.rs.core.Response;
@@ -47,9 +48,13 @@ class BucketOperationNotImplementedHandler extends BucketOperationHandler {
       QueryParams.PUBLIC_ACCESS_BLOCK, QueryParams.REPLICATION, QueryParams.REQUEST_PAYMENT, QueryParams.SESSION,
       QueryParams.VERSIONING, QueryParams.VERSIONS, QueryParams.WEBSITE);
 
+  // ListObjectVersions is implemented by BucketEndpoint
+  private static final Set<String> GET_SUBRESOURCES =
+      Sets.difference(SUBRESOURCES, ImmutableSet.of(QueryParams.VERSIONS)).immutableCopy();
+
   @Override
   Response handleGetRequest(S3RequestContext context, String bucketName) {
-    return rejectNotImplemented(context, SUBRESOURCES, bucketName);
+    return rejectNotImplemented(context, GET_SUBRESOURCES, bucketName);
   }
 
   @Override

@@ -95,9 +95,9 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveTableKeysReques
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotRenameRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotSetPropertyRequest;
-import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
-import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
-import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMCompleteFinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequestLegacy;
 import org.apache.hadoop.ozone.om.request.util.OMEchoRPCWriteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMQuotaRepairRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
@@ -197,11 +197,11 @@ public final class OzoneManagerRatisUtils {
     case GetS3Secret:
       return new S3GetSecretRequest(omRequest);
     case FinalizeUpgrade:
-      return new OMFinalizeUpgradeRequest(omRequest);
-    case Prepare:
-      return new OMPrepareRequest(omRequest);
-    case CancelPrepare:
-      return new OMCancelPrepareRequest(omRequest);
+      return new OMStartFinalizeUpgradeRequestLegacy(omRequest);
+    case StartFinalizeUpgrade:
+      return new OMStartFinalizeUpgradeRequest(omRequest);
+    case CompleteFinalizeUpgrade:
+      return new OMCompleteFinalizeUpgradeRequest(omRequest);
     case SetS3Secret:
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
@@ -333,6 +333,13 @@ public final class OzoneManagerRatisUtils {
       break;
     case AbortMultiPartUpload:
       keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
+      if (omRequest.getAssumeS3Context()) {
+        // Resolve before choosing the bucket layout and write the resolved volume to Ratis.
+        keyArgs = keyArgs.toBuilder().setVolumeName(
+            ozoneManager.getS3VolumeContext().getOmVolumeArgs().getVolume()).build();
+        omRequest = omRequest.toBuilder().setAbortMultiPartUploadRequest(
+            omRequest.getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(keyArgs)).build();
+      }
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;

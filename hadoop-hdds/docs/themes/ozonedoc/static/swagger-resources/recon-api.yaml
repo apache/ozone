@@ -1061,7 +1061,7 @@ paths:
     get:
       tags:
         - Utilization
-      summary: Returns the file counts within different file ranges with fileSize in the response object being the upper cap for file size range.
+      summary: Returns file counts by size bin, with fileSize representing the bin upper bound.
       operationId: getFileCounts
       parameters:
         - name: volume
@@ -1081,7 +1081,11 @@ paths:
         - name: fileSize
           in: query
           description: |
-            Filters the results based on the given file size.<br>
+            Filters the results by the exact upper bound of a file-size histogram bin, in bytes.<br>
+            It is not an arbitrary file size or a cumulative less-than-or-equal threshold.<br>
+            A positive value that is not a bin upper bound returns an empty result.<br>
+            The first bin has an upper bound of 1024 bytes; for example, the bin with upper bound 2048 contains files larger than 1024 bytes and up to 2048 bytes.<br>
+            This filter can be used independently or together with volume and/or bucket.<br>
             The smallest file size being tracked for count is 1 KB i.e. 1024 bytes.
           example: 1024
           required: false

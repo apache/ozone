@@ -95,6 +95,9 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         volumeInfo.toBuilder()
             .setCreationTime(initialTime)
             .setModificationTime(initialTime)
+            // reset usedNamespace and refCount to 0 to prevent arbitrary values set in the request by any other client
+            .clearUsedNamespace()
+            .clearRefCount()
             .build();
 
     return getOmRequest().toBuilder().setCreateVolumeRequest(
