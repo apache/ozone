@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -455,6 +456,32 @@ public class TestRpcClient {
       verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
       assertEquals(assumeContext ? "s3v" : "tenant-volume", args.getValue().getVolumeName());
       assertEquals("upload-id", args.getValue().getMultipartUploadID());
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"LIST_STATUS_REJECTS_OBS", "S3_VOLUME_CONTEXT_RESOLUTION", "GET_KEY_INFO_REJECTS_OBS"})
+  void testGetObjectTaggingWithNullVolume(OzoneManagerVersion version) throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      if (OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version)) {
+        client.getObjectTagging(null, "bucket", "key");
+
+        ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+        verify(om).getObjectTagging(args.capture());
+        assertThat(args.getValue().isAssumeS3Context()).isTrue();
+      } else {
+        // An older OM would ignore assumeS3Context and look up the key in the default S3 volume.
+        assertThrows(NullPointerException.class, () -> client.getObjectTagging(null, "bucket", "key"));
+        verifyNoInteractions(om);
+      }
     } finally {
       client.close();
     }

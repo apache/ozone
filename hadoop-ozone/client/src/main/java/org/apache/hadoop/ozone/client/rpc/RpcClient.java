@@ -1337,7 +1337,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(
       String volumeName, String bucketName) throws IOException {
-    if (volumeName == null) {
+    if (volumeName == null && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion)) {
       verifyBucketName(bucketName);
       // Volume name is not important, as we call InfoBucket with
       // assumeS3Context = true, OM will infer the correct s3 volume.
@@ -3173,7 +3173,8 @@ public class RpcClient implements ClientProtocol {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
-    boolean assumeS3Context = volumeName == null;
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion);
     if (assumeS3Context) {
       volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
     }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import jakarta.annotation.Nonnull;
@@ -161,6 +162,17 @@ public class TestS3ClientGetBucketDetails {
       // An older OM ignores assumeS3Context, so the resolved volume must be sent instead.
       assertEquals(TENANT_VOLUME, requests.get(1).getInfoBucketRequest().getVolumeName());
       assertEquals(USER_PRINCIPAL, client.getProxy().getThreadLocalS3Auth().getUserPrincipal());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "LIST_STATUS_REJECTS_OBS"})
+  public void rejectsNullVolumeWithoutS3ClientForOlderOm(OzoneManagerVersion omVersion) throws IOException {
+    try (OzoneClient client = newClient(omVersion, false)) {
+      // An older OM would ignore assumeS3Context and look up the bucket in the default S3 volume.
+      assertThrows(NullPointerException.class, () -> client.getProxy().getBucketDetails(null, BUCKET));
+      assertThat(requests).isEmpty();
     }
   }
 
