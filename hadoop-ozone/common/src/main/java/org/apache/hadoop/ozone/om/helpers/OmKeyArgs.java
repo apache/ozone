@@ -67,7 +67,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // Original S3/list prefix when keyName is empty (root listing). Used for STS
   // auth to check LIST on this prefix instead of "*".
   private final String listPrefix;
+  // Set by file system clients so that OM rejects a listing or a key info
+  // read on an OBJECT_STORE bucket.
+  private final boolean requireFileSystemLayout;
   private final String expectedETag;
+  private final String excludedETag;
   private final boolean derivedKeyPiggyBacking;
   // When null, OM resolves the policy from the bucket, then the cluster default.
   private final StoragePolicy storagePolicy;
@@ -93,7 +97,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
     this.listPrefix = b.listPrefix;
+    this.requireFileSystemLayout = b.requireFileSystemLayout;
     this.expectedETag = b.expectedETag;
+    this.excludedETag = b.excludedETag;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
     this.storagePolicy = b.storagePolicy;
   }
@@ -186,8 +192,20 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return listPrefix;
   }
 
+  /**
+   * Whether OM must reject the request if the resolved bucket layout is
+   * OBJECT_STORE, because the caller needs file system semantics.
+   */
+  public boolean isRequireFileSystemLayout() {
+    return requireFileSystemLayout;
+  }
+
   public String getExpectedETag() {
     return expectedETag;
+  }
+
+  public String getExcludedETag() {
+    return excludedETag;
   }
 
   public boolean isDerivedKeyPiggyBacking() {
@@ -247,6 +265,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     if (expectedETag != null) {
       builder.setExpectedETag(expectedETag);
     }
+    if (excludedETag != null) {
+      builder.setExcludedETag(excludedETag);
+    }
     if (storagePolicy != null) {
       builder.setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
     }
@@ -276,7 +297,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
     private String listPrefix = null;
+    private boolean requireFileSystemLayout;
     private String expectedETag;
+    private String excludedETag;
     private boolean derivedKeyPiggyBacking;
     private StoragePolicy storagePolicy;
 
@@ -325,11 +348,13 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
+      this.excludedETag = obj.excludedETag;
       this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
       this.storagePolicy = obj.storagePolicy;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
       this.listPrefix = obj.listPrefix;
+      this.requireFileSystemLayout = obj.requireFileSystemLayout;
     }
 
     public Builder setVolumeName(String volume) {
@@ -468,8 +493,18 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    public Builder setRequireFileSystemLayout(boolean require) {
+      this.requireFileSystemLayout = require;
+      return this;
+    }
+
     public Builder setExpectedETag(String eTag) {
       this.expectedETag = eTag;
+      return this;
+    }
+
+    public Builder setExcludedETag(String eTag) {
+      this.excludedETag = eTag;
       return this;
     }
 

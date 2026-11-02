@@ -375,9 +375,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
       final ContainerReplicaHistory ts = replicaLastSeenMap.get(id);
       if (ts != null) {
         // Flush to DB, then remove from in-memory map
-        upsertContainerHistory(cid, id, ts.getLastSeenTime(), ts.getBcsId(),
-            state, ts.getChecksums());
-        replicaLastSeenMap.remove(id);
+        if (upsertContainerHistory(cid, id, ts.getLastSeenTime(), ts.getBcsId(), state, ts.getChecksums())) {
+          replicaLastSeenMap.remove(id);
+        }
       }
     }
   }
@@ -462,18 +462,20 @@ public class ReconContainerManager extends ContainerManagerImpl {
     synchronized (replicaHistoryMap) {
       try {
         cdbServiceProvider.batchStoreContainerReplicaHistory(replicaHistoryMap);
+        if (clearMap) {
+          replicaHistoryMap.clear();
+        }
       } catch (IOException e) {
-        LOG.debug("Error flushing container replica history to DB. {}",
-            e.getMessage());
-      }
-      if (clearMap) {
-        replicaHistoryMap.clear();
+        LOG.warn("Error flushing container replica history to DB.", e);
       }
     }
   }
 
-  public void upsertContainerHistory(long containerID, DatanodeID id, long time,
-                                     long bcsId, String state, ContainerChecksums checksums) {
+  /**
+   * Persist replica history and report whether it is safe to discard the in-memory entry.
+   */
+  public boolean upsertContainerHistory(long containerID, DatanodeID id, long time,
+                                        long bcsId, String state, ContainerChecksums checksums) {
     Map<DatanodeID, ContainerReplicaHistory> tsMap;
     try {
       tsMap = cdbServiceProvider.getContainerReplicaHistory(containerID);
@@ -489,8 +491,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
         ts.setChecksums(checksums);
       }
       cdbServiceProvider.storeContainerReplicaHistory(containerID, tsMap);
+      return true;
     } catch (IOException e) {
-      LOG.debug("Error on DB operations. {}", e.getMessage());
+      LOG.warn("Unable to persist replica history for container {} on datanode {}", containerID, id, e);
+      return false;
     }
   }
 

@@ -73,6 +73,7 @@ import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -245,6 +246,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTime
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdResponse;
@@ -330,7 +332,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OMRequest.Builder createOMRequest(Type cmdType) {
     return OMRequest.newBuilder()
         .setCmdType(cmdType)
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setClientId(clientID);
   }
 
@@ -790,6 +792,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getExpectedETag() != null) {
       keyArgs.setExpectedETag(args.getExpectedETag());
     }
+    if (args.getExcludedETag() != null) {
+      keyArgs.setExcludedETag(args.getExcludedETag());
+    }
     if (args.getStoragePolicy() != null) {
       keyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(args.getStoragePolicy()));
     }
@@ -909,8 +914,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize())
         .addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()))
         .addAllKeyLocations(locationInfoList.stream()
-            // TODO use OM version?
-            .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
+            .map(info -> info.getProtobuf(ClientVersion.CURRENT))
             .collect(Collectors.toList()));
 
     setReplicationConfig(args.getReplicationConfig(), keyArgsBuilder);
@@ -953,6 +957,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     GetKeyInfoRequest.Builder req = GetKeyInfoRequest.newBuilder();
     req.setKeyArgs(args.toProtobuf());
     req.setAssumeS3Context(assumeS3Context);
+    if (args.isRequireFileSystemLayout()) {
+      req.setRequireFileSystemLayout(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.GetKeyInfo)
         .setGetKeyInfoRequest(req)
@@ -1868,8 +1875,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(omKeyArgs.getDataSize())
         .addAllMetadata(KeyValueUtil.toProtobuf(omKeyArgs.getMetadata()))
         .addAllKeyLocations(locationInfoList.stream()
-            // TODO use OM version?
-            .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
+            .map(info -> info.getProtobuf(ClientVersion.CURRENT))
             .collect(Collectors.toList()));
     multipartCommitUploadPartRequest.setClientID(clientId);
     multipartCommitUploadPartRequest.setKeyArgs(keyArgs.build());
@@ -1912,6 +1918,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (omKeyArgs.getExpectedETag() != null) {
       keyArgs.setExpectedETag(omKeyArgs.getExpectedETag());
     }
+    if (omKeyArgs.getExcludedETag() != null) {
+      keyArgs.setExcludedETag(omKeyArgs.getExcludedETag());
+    }
 
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());
     multipartUploadCompleteRequest.addAllPartsList(multipartUploadList
@@ -1934,6 +1943,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
+    abortMultipartUpload(omKeyArgs, false);
+  }
+
+  @Override
+  public void abortMultipartUpload(OmKeyArgs omKeyArgs, boolean assumeS3Context) throws IOException {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(omKeyArgs.getVolumeName())
         .setBucketName(omKeyArgs.getBucketName())
@@ -1947,6 +1961,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(
         Type.AbortMultiPartUpload)
         .setAbortMultiPartUploadRequest(multipartUploadAbortRequest.build())
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
     handleError(submitRequest(omRequest));
@@ -2164,6 +2179,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public void finalizeUpgrade() throws IOException {
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
+    StartFinalizeUpgradeRequest req = StartFinalizeUpgradeRequest.newBuilder()
+        .setForce(force)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.StartFinalizeUpgrade)
+        .setStartFinalizeUpgradeRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException {
@@ -2188,6 +2225,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList()
     );
+  }
+
+  @Override
+  public OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException {
+    OzoneManagerProtocolProtos.QueryUpgradeStatusRequest
+        req = OzoneManagerProtocolProtos.QueryUpgradeStatusRequest.newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.QueryUpgradeStatus)
+        .setQueryUpgradeStatusRequest(req)
+        .build();
+
+    return handleError(submitRequest(omRequest)).getQueryUpgradeStatusResponse();
   }
 
   /**
@@ -2336,6 +2385,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @SkipTracing
   public ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return this.threadLocalS3Auth;
+  }
+
+  @Override
+  @SkipTracing
+  public ThreadLocal<ReadConsistencyHint> getReadConsistencyHintProvider() {
+    return this.threadLocalReadConsistencyHint;
   }
 
   @Override
@@ -2617,6 +2672,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
+    return listStatusPage(args, recursive, startKey, numEntries, allowPartialPrefixes).getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<OzoneFileStatus> listStatusPage(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries, boolean allowPartialPrefixes) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -2627,6 +2688,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(
         keyArgs, recursive, startKey, numEntries, allowPartialPrefixes);
+    if (args.isRequireFileSystemLayout()) {
+      listStatusRequestBuilder.setRequireFileSystemLayout(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.ListStatus)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2639,13 +2703,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .getStatusesList()) {
       statusList.add(OzoneFileStatus.getFromProtobuf(fileStatus));
     }
-    return statusList;
+    return listStatusResponse.hasIsTruncated()
+        ? ListStatusResult.of(statusList, listStatusResponse.getIsTruncated())
+        : ListStatusResult.unknown(statusList);
   }
 
   @Override
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
+    return listStatusLightPage(args, recursive, startKey, numEntries, allowPartialPrefixes).getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<OzoneFileStatusLight> listStatusLightPage(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries, boolean allowPartialPrefixes) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -2660,6 +2732,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (listPrefix != null && !listPrefix.isEmpty()) {
       listStatusRequestBuilder.setListPrefix(listPrefix);
     }
+    if (args.isRequireFileSystemLayout()) {
+      listStatusRequestBuilder.setRequireFileSystemLayout(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.ListStatusLight)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2673,7 +2748,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       statusList.add(OzoneFileStatusLight.getFromProtobuf(fileStatus));
     }
-    return statusList;
+    return listStatusLightResponse.hasIsTruncated()
+        ? ListStatusResult.of(statusList, listStatusLightResponse.getIsTruncated())
+        : ListStatusResult.unknown(statusList);
   }
 
   private ListStatusRequest.Builder createListStatusRequestBuilder(KeyArgs keyArgs, boolean recursive, String startKey,

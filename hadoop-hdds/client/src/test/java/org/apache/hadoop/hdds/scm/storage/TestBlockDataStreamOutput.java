@@ -28,6 +28,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -87,6 +88,23 @@ class TestBlockDataStreamOutput {
       Type expected = putBlockWithoutRaft ? Type.StreamInitWithPutBlock : Type.StreamInit;
       assertEquals(expected, pipeline.getStreamInitType());
     }
+  }
+
+  @Test
+  void putBlockGoesThroughRaftWhenDatanodeDoesNotSupportStreamPutBlock() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    pipeline.getPipeline().getNodes().get(1).setCurrentVersion(HDDSVersion.ZDU);
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    byte[] data = randomBytes(400);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      assertEquals(Type.StreamInit, pipeline.getStreamInitType());
+      stream.write(ByteBuffer.wrap(data), 0, data.length);
+      assertEquals(1, pipeline.getReceivedPutBlocks().size());
+    }
+    assertEquals(0, pipeline.getReceivedCommands().size());
+    assertEquals(2, pipeline.getReceivedPutBlocks().size());
+    assertArrayEquals(data, pipeline.getAllReceivedData());
   }
 
   @Test

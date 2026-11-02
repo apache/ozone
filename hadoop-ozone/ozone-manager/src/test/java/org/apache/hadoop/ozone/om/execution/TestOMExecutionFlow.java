@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.execution;
 
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -40,6 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
+import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -139,6 +142,32 @@ class TestOMExecutionFlow {
     assertEquals("original-access-id", submitted.getS3Authentication().getResolvedStsOriginalAccessKeyId());
     assertEquals("temp-access-id", submitted.getS3Authentication().getResolvedStsTempAccessKeyId());
     assertEquals(secretKeyId.toString(), submitted.getS3Authentication().getResolvedStsSecretKeyId());
+  }
+
+  @Test
+  void writeRequestClearsS3Context() throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
+    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
+    AtomicReference<OMRequest> submittedRequest = new AtomicReference<>();
+    when(ozoneManager.getPerfMetrics()).thenReturn(metrics);
+    when(metrics.getPreExecuteLatencyNs()).thenReturn(mock(ConcurrentMutableRate.class));
+    when(ozoneManager.getOmRatisServer()).thenReturn(ratisServer);
+    when(ratisServer.submitRequest(any(OMRequest.class), eq(true))).thenAnswer(invocation -> {
+      submittedRequest.set(invocation.getArgument(0));
+      return successResponse();
+    });
+
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.EchoRPC)
+        .setClientId("client-id")
+        .setAssumeS3Context(true)
+        .setUserInfo(UserInfo.newBuilder().setUserName("user").setRemoteAddress("127.0.0.1"))
+        .build();
+
+    new OMExecutionFlow(ozoneManager).submit(request, true);
+
+    assertFalse(submittedRequest.get().hasAssumeS3Context());
   }
 
   private static Server.Call createCall(UserGroupInformation user, InetAddress remoteAddress) {

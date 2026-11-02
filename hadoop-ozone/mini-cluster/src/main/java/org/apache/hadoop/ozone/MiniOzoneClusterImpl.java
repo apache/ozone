@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.server.http.BaseHttpServer.SERVER_DIR;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
@@ -41,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -79,7 +79,7 @@ import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -116,6 +116,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   private OzoneConfiguration conf;
   private final SCMConfigurator scmConfigurator;
+  // Whether to assert no metrics sources leak on shutdown.  Tests running
+  // multiple clusters concurrently disable this via the builder.
+  private boolean metricsLeakAssertEnabled = true;
   private StorageContainerManager scm;
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
@@ -166,6 +169,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   protected void setConf(OzoneConfiguration newConf) {
     this.conf = newConf;
+  }
+
+  void setMetricsLeakAssertEnabled(boolean enabled) {
+    this.metricsLeakAssertEnabled = enabled;
   }
 
   public void waitForSCMToBeReady() throws TimeoutException,
@@ -393,12 +400,23 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       stop();
       FileUtils.deleteDirectory(baseDir);
       ContainerCache.getInstance(conf).shutdownCache();
-      DefaultMetricsSystem.shutdown();
+      // RocksDB object leaks are often the root cause; check them first.
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
+      // Assert before tearing down the metrics system: Hadoop does not clear
+      // allSources on shutdown, but checking before shutdown makes the
+      // assertion independent of that behavior.  Tests running multiple
+      // clusters concurrently disable this because the registry is JVM-wide.
+      if (metricsLeakAssertEnabled) {
+        MetricsLeakAssertion.assertNoLeaks();
+      }
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
     } finally {
-      resetStaticMappingIfConfigured(conf);
+      try {
+        DefaultMetricsSystem.shutdown();
+      } finally {
+        resetStaticMappingIfConfigured(conf);
+      }
     }
   }
 
@@ -539,6 +557,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
             hddsDatanodes, getServices());
+        cluster.setMetricsLeakAssertEnabled(metricsLeakAssertEnabled);
         cluster.startServices();
 
         cluster.setCAClient(certClient);
@@ -630,6 +649,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
           numOfDatanodes >= 3 ? 3 : 1);
+      // Enable metrics percentile collection so that the quantile code paths
+      // are exercised by every integration test.
+      conf.setIfUnset(OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY, "60,300");
+      conf.setIfUnset(OzoneConfigKeys.OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, "60,300");
+      conf.setIfUnset(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY, "60,300");
+      conf.setIfUnset(HddsConfigKeys.OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, "60,300");
 
       configureHostAndRackTopology();
     }
@@ -815,8 +840,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           .build();
       datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
 
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(dnConf,
-          datanodeDetails.getUuidString(), maxLayoutVersion());
+      DatanodeStorage layoutStorage = new DatanodeStorage(dnConf,
+          datanodeDetails.getUuidString(), HDDSVersion.SOFTWARE_VERSION.serialize());
       if (layoutStorage.getState() != StorageState.INITIALIZED) {
         layoutStorage.initialize();
       }

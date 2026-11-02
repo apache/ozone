@@ -73,6 +73,7 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
   }
 
   @Override
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
@@ -187,7 +188,6 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
   }
 
   @Override
-  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OmSnapshotInternalMetrics omSnapshotIntMetrics = ozoneManager.getOmSnapshotIntMetrics();
 

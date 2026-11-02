@@ -69,7 +69,7 @@ public class ContainerBalancerConfigOptions {
 
   @Option(names = {"--balancing-iteration-interval-minutes"},
       description = "The interval period in minutes between each iteration of Container Balancer. " +
-          "The value should be positive, with a default of 70 (specify '70' for 70 minutes).")
+          "The value should be positive, with a default of 3 (specify '3' for 3 minutes).")
   private Optional<Integer> balancingInterval;
 
   @Option(names = {"--move-timeout-minutes"},

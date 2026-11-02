@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -90,5 +91,16 @@ public class TestGrpcOmTransport {
     } finally {
       client.shutdown();
     }
+  }
+
+  @Test
+  public void testStartStopWithIpv6OmAddress() throws Exception {
+    OzoneConfiguration ipv6Conf = new OzoneConfiguration(conf);
+    ipv6Conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]:9862");
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+
+    // the constructor starts the transport
+    GrpcOmTransport client = new GrpcOmTransport(ipv6Conf, ugi, "");
+    client.shutdown();
   }
 }

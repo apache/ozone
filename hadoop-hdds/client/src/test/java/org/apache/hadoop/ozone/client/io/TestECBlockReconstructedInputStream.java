@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -28,9 +29,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -361,6 +365,41 @@ public class TestECBlockReconstructedInputStream {
       bufs[i] = ByteBuffer.allocate(size);
     }
     return bufs;
+  }
+
+  @Test
+  void concurrentPositionedReadsReconstructIndependentStripes() throws Exception {
+    int chunk = repConfig.getEcChunkSize();
+    int blockLength = chunk * 7 - 101;
+    ByteBuffer[] data = allocateBuffers(repConfig.getData(), chunk * 3);
+    ECStreamTestUtil.randomFill(data, chunk, dataGenerator, blockLength);
+    addDataStreamsToFactory(data, generateParity(data, repConfig));
+    byte[] expected = new byte[blockLength];
+    ECStreamTestUtil.randomFill(ByteBuffer.wrap(expected), new SplittableRandom(randomSeed));
+    BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(repConfig, blockLength,
+        ECStreamTestUtil.createIndexMap(2, 3, 4, 5));
+    streamFactory.setCurrentPipeline(info.getPipeline());
+    ECBlockInputStreamFactory factory = ECBlockInputStreamFactoryImpl.getInstance(streamFactory, bufferPool,
+        () -> ecReconstructExecutor);
+    ExecutorService readers = Executors.newFixedThreadPool(2);
+    try (ECBlockInputStreamProxy stream = new ECBlockInputStreamProxy(repConfig, info, null, null, factory,
+        conf.getObject(OzoneClientConfig.class))) {
+      List<Future<?>> futures = new ArrayList<>();
+      for (int offset : new int[] {chunk - 37, chunk * 3 - 29}) {
+        futures.add(readers.submit((Callable<Void>) () -> {
+          byte[] actual = new byte[chunk * 3 + 53];
+          stream.readFully(offset, actual);
+          assertArrayEquals(Arrays.copyOfRange(expected, offset, offset + actual.length), actual);
+          return null;
+        }));
+      }
+      for (Future<?> future : futures) {
+        future.get(20, TimeUnit.SECONDS);
+      }
+      assertEquals(0, stream.getPos());
+    } finally {
+      readers.shutdownNow();
+    }
   }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {

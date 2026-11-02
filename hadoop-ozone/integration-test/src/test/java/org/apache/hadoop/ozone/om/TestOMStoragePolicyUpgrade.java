@@ -83,8 +83,8 @@ public class TestOMStoragePolicyUpgrade {
 
   @BeforeEach
   public void init() throws Exception {
-    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY,
-        OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY,
+        OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.serialize());
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
@@ -113,8 +113,8 @@ public class TestOMStoragePolicyUpgrade {
 
   private void preFinalizationChecks() throws Exception {
     assertThat(cluster.getOzoneManager().getVersionManager()
-        .getMetadataLayoutVersion())
-        .isEqualTo(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
+        .getApparentVersion().serialize())
+        .isEqualTo(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.serialize());
 
     // CreateBucket carrying BucketInfo storage policy field: the request
     // succeeds, but the storage policy field is silently stripped.

@@ -162,7 +162,6 @@ public class TestBlockDeletion {
         100, TimeUnit.MILLISECONDS);
     conf.setInt(OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 100);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
-    conf.setQuietMode(false);
     conf.setTimeDuration("hdds.scm.replication.event.timeout", 2,
         TimeUnit.SECONDS);
     conf.setTimeDuration("hdds.scm.replication.event.timeout.datanode.offset",
@@ -520,7 +519,6 @@ public class TestBlockDeletion {
 
     // Delete key
     writeClient.deleteKey(keyArgs);
-    Thread.sleep(10000);
 
     GenericTestUtils.waitFor(() -> {
       try {
@@ -531,7 +529,7 @@ public class TestBlockDeletion {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 100, 10 * 1000);
+    }, 100, 20 * 1000);
 
     // Container state should be empty now as key got deleted
     assertTrue(getContainerFromDN(
@@ -649,7 +647,6 @@ public class TestBlockDeletion {
 
     // Delete key
     writeClient.deleteKey(keyArgs);
-    Thread.sleep(5000);
 
     // Ensure isEmpty are true for all replica after delete key
     GenericTestUtils.waitFor(() -> {
@@ -661,7 +658,7 @@ public class TestBlockDeletion {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 500, 5 * 2000);
+    }, 500, 15 * 1000);
 
     // Update container replica by making invalid keyCount in one replica
     ContainerReplica replicaOne = ContainerReplica.newBuilder()

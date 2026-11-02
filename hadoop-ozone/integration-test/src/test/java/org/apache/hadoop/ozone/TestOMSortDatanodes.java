@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.StaticMapping;
@@ -100,7 +100,8 @@ public class TestOMSortDatanodes {
     scm.exitSafeMode();
     nodeManager = scm.getScmNodeManager();
     datanodes.forEach(dn -> nodeManager.register(dn, null, null));
-    StorageContainerLocationProtocol mockScmContainerClient = mock(StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface mockScmContainerClient =
+        mock(StorageContainerLocationInternalInterface.class);
     OmTestManagers omTestManagers
         = new OmTestManagers(config, scm.getBlockProtocolServer(),
         mockScmContainerClient);

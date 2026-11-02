@@ -334,6 +334,7 @@ public class DefaultApprover implements CertificateApprover {
         LOG.error("Failed to verify the signature in CSR.");
         response.completeExceptionally(new SCMSecurityException("Failed to " +
             "verify the CSR."));
+        return response;
       }
 
       // Step 2: Verify the RDNs are in the correct format.
@@ -343,6 +344,7 @@ public class DefaultApprover implements CertificateApprover {
           LOG.error("Failed in verifying RDNs");
           response.completeExceptionally(new SCMSecurityException("Failed to " +
               "verify the RDNs. Please check the subject name."));
+          return response;
         }
       }
 
@@ -351,8 +353,9 @@ public class DefaultApprover implements CertificateApprover {
         LOG.error("failed in verification of extensions.");
         response.completeExceptionally(new SCMSecurityException("Failed to " +
             "verify extensions."));
+        return response;
       }
-
+      response.complete(null);
     } catch (OperatorCreationException | PKCSException e) {
       LOG.error("Approval Failure.", e);
       response.completeExceptionally(new SCMSecurityException(e));

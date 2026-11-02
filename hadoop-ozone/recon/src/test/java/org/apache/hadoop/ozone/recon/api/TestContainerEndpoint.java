@@ -65,9 +65,11 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -100,6 +102,7 @@ import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -107,6 +110,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperHelper;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
@@ -138,6 +142,7 @@ public class TestContainerEndpoint {
   private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
+  private ReconDBProvider reconDBProvider;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
@@ -208,6 +213,7 @@ public class TestContainerEndpoint {
         ozoneStorageContainerManager.getPipelineManager();
     reconContainerMetadataManager =
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
@@ -1067,6 +1073,54 @@ public class TestContainerEndpoint {
     assertEquals(4L, records.get(0).getContainerID());
     assertEquals(5L, records.get(1).getContainerID());
     assertEquals(6L, records.get(2).getContainerID());
+  }
+
+  @Test
+  public void testReplicaHistorySurvivesOmReprocess() throws Exception {
+    reconContainerManager.addNewContainer(getTestContainer(HddsProtos.LifeCycleState.CLOSED, 1L));
+    List<ContainerReplica> replicas = new ArrayList<>();
+    for (int i = 1; i <= 4; i++) {
+      DatanodeID id = newDatanode("host" + i, "127.0.0." + i);
+      ContainerReplica replica = ContainerReplica.newBuilder()
+          .setContainerID(containerID)
+          .setContainerState(ContainerReplicaProto.State.CLOSED)
+          .setDatanodeDetails(reconContainerManager.getNodeDB().get(id))
+          .setSequenceId(100L)
+          .setChecksums(ContainerChecksums.of(1234L, 0L))
+          .build();
+      reconContainerManager.updateContainerReplica(containerID, replica);
+      replicas.add(replica);
+    }
+    reconContainerManager.removeContainerReplica(containerID, replicas.get(3));
+    assertEquals(3, reconContainerManager.getReplicaHistoryMap().get(1L).size());
+    Map<DatanodeID, ContainerReplicaHistory> expected =
+        reconContainerMetadataManager.getContainerReplicaHistory(1L);
+    assertEquals(4, expected.size());
+    long expectedKeyCount = reconContainerMetadataManager.getKeyCountForContainer(1L);
+
+    for (int i = 0; i < 2; i++) {
+      ReconConstants.resetTableTruncatedFlags();
+      ReconDBProvider stagedProvider = reconDBProvider.getStagedReconDBProvider();
+      ReconContainerMetadataManager stagedManager =
+          reconContainerMetadataManager.getStagedReconContainerMetadataManager(stagedProvider.getDbStore());
+      assertTrue(new ContainerKeyMapperTaskOBS(stagedManager, omConfiguration)
+          .reprocess(reconOMMetadataManager).isTaskSuccess());
+      reconDBProvider.replaceStagedDb(stagedProvider);
+      reconContainerMetadataManager.reinitialize(reconDBProvider);
+      assertEquals(expectedKeyCount, reconContainerMetadataManager.getKeyCountForContainer(1L));
+
+      List<ContainerHistory> histories = (List<ContainerHistory>)
+          containerEndpoint.getReplicaHistoryForContainer(1L).getEntity();
+      assertEquals(4, histories.size());
+      assertTrue(histories.stream().anyMatch(history ->
+          history.getDatanodeUuid().equals(replicas.get(3).getDatanodeDetails().getID().toString())));
+      Map<DatanodeID, ContainerReplicaHistory> actual = reconContainerMetadataManager.getContainerReplicaHistory(1L);
+      expected.forEach((id, history) -> assertEquals(history.toProto(), actual.get(id).toProto()));
+    }
+
+    // A shutdown flush must preserve the departed datanode after reprocess as well.
+    reconContainerManager.flushReplicaHistoryMapToDB(true);
+    assertEquals(4, reconContainerManager.getAllContainerHistory(1L).size());
   }
 
   @Test

@@ -49,6 +49,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -64,8 +65,11 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class tests Upload request.
@@ -114,6 +118,46 @@ public class TestUploadWithStream {
   @Test
   public void testUpload() throws Exception {
     assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, S3_COPY_EXISTING_KEY_CONTENT));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testUploadIfMatchMissingKey(String ifMatch) throws Exception {
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
+        () -> put(rest, S3BUCKET, S3KEY, S3_COPY_EXISTING_KEY_CONTENT));
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    assertThrows(IOException.class, () -> bucket.getKey(S3KEY));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testCopyIfMatchMissingKey(String ifMatch) throws Exception {
+    assertSucceeds(() -> put(rest, S3BUCKET, S3_COPY_EXISTING_KEY, S3_COPY_EXISTING_KEY_CONTENT));
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(S3BUCKET + "/" + S3_COPY_EXISTING_KEY);
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_KEY, () -> put(rest, S3BUCKET, S3KEY, null));
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    assertKeyContent(bucket, S3_COPY_EXISTING_KEY, S3_COPY_EXISTING_KEY_CONTENT);
+    assertThrows(IOException.class, () -> bucket.getKey(S3KEY));
+  }
+
+  @Test
+  public void testUploadIfNoneMatchETag() throws Exception {
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    Response response = put(rest, S3BUCKET, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    assertKeyContent(bucket, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+
+    when(headers.getHeaderString("If-None-Match")).thenReturn(response.getHeaderString(HttpHeaders.ETAG));
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED, () -> put(rest, S3BUCKET, S3KEY, "new-content"));
+    assertKeyContent(bucket, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, "new-content"));
+    assertKeyContent(bucket, S3KEY, "new-content");
   }
 
   @Test

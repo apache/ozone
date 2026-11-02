@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collection;
@@ -284,9 +283,6 @@ public abstract class Handler {
     this.clusterId = clusterID;
   }
 
-  public abstract RandomAccessFile getBlockFile(ContainerCommandRequestProto request)
-      throws IOException;
-
   /**
    * Copy container to the destination path.
    */
@@ -302,5 +298,5 @@ public abstract class Handler {
   public abstract ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto msg, Container container,
       RandomAccessFileChannel blockFile,
-      StreamObserver<ContainerCommandResponseProto> streamObserver, boolean testVariableChunks);
+      StreamObserver<ContainerCommandResponseProto> streamObserver);
 }

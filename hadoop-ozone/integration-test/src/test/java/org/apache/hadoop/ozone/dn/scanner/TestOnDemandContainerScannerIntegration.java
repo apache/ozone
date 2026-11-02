@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandScannerMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -93,18 +94,18 @@ class TestOnDemandContainerScannerIntegration
   @BeforeAll
   static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED,
-        true);
-    // Disable both background container scanners to make sure only the
-    // on-demand scanner is detecting failures.
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED,
-        false);
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED,
-        false);
+    ContainerScannerConfiguration scannerConfig = ozoneConfig.getObject(ContainerScannerConfiguration.class);
+    scannerConfig.setEnabled(true);
+    // Disable the background metadata scanner.
+    scannerConfig.setMetadataScanEnabled(false);
+    ozoneConfig.setFromObject(scannerConfig);
     buildCluster(ozoneConfig);
+  }
+
+  @BeforeEach
+  void pauseBackgroundScanners() {
+    // Disabling data scanning also disables the on-demand scanner, so pause background scanning instead.
+    pauseScanner();
   }
 
   /**
