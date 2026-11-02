@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIO
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForScm;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -88,7 +90,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
     this.scm = scm;
     this.exitManager = new ExitManager();
     this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
-    this.ratisServer = new SCMRatisServerImpl(conf, scm, transactionBuffer);
+    this.ratisServer = TracingUtil.createProxy(new SCMRatisServerImpl(conf, scm, transactionBuffer),
+        SCMRatisServer.class, SpanKind.INTERNAL);
     this.scmSnapshotProvider = newScmSnapshotProvider(scm);
     this.grpcServer = new InterSCMGrpcProtocolService(conf, scm);
 

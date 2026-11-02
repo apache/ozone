@@ -97,7 +97,7 @@ public class TestBlockManager {
   private StorageContainerManager scm;
   private MockNodeManager nodeManager;
   private PipelineManagerImpl pipelineManager;
-  private BlockManagerImpl blockManager;
+  private BlockManager blockManager;
   private static final long DEFAULT_BLOCK_SIZE = 128 * MB;
   private EventQueue eventQueue;
   private int numContainerPerOwnerInPipeline;
@@ -171,7 +171,7 @@ public class TestBlockManager {
 
     // Initialize these fields so that the tests can pass.
     ContainerManager mapping = scm.getContainerManager();
-    blockManager = (BlockManagerImpl) scm.getScmBlockManager();
+    blockManager = scm.getScmBlockManager();
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
     CloseContainerEventHandler closeContainerHandler =
@@ -250,7 +250,7 @@ public class TestBlockManager {
               .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                   OzoneConsts.OZONE,
                   new ExcludeList()));
-        } catch (IOException e) {
+        } catch (IOException | TimeoutException e) {
           future.completeExceptionally(e);
         }
         return future;
@@ -297,7 +297,7 @@ public class TestBlockManager {
           blockList.add(block);
           allocatedBlockMap.put(containerId, blockList);
           future.complete(block);
-        } catch (IOException e) {
+        } catch (IOException | TimeoutException e) {
           future.completeExceptionally(e);
         }
         return future;
@@ -353,7 +353,7 @@ public class TestBlockManager {
           blockList.add(block);
           allocatedBlockMap.put(containerId, blockList);
           future.complete(block);
-        } catch (IOException e) {
+        } catch (IOException | TimeoutException e) {
           future.completeExceptionally(e);
         }
         return future;
@@ -413,7 +413,7 @@ public class TestBlockManager {
           blockList.add(block);
           allocatedBlockMap.put(containerId, blockList);
           future.complete(block);
-        } catch (IOException e) {
+        } catch (IOException | TimeoutException e) {
           future.completeExceptionally(e);
         }
         return future;
@@ -482,7 +482,7 @@ public class TestBlockManager {
                 new ExcludeList());
         return !block.getPipeline().getId()
             .equals(allocatedBlock.getPipeline().getId());
-      } catch (IOException e) {
+      } catch (IOException | TimeoutException e) {
       }
       return false;
     }, 100, 1000);
@@ -526,7 +526,7 @@ public class TestBlockManager {
             .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                 OzoneConsts.OZONE,
                 new ExcludeList());
-      } catch (IOException e) {
+      } catch (IOException | TimeoutException e) {
       }
       return verifyNumberOfContainersInPipelines(
           expectedContainersPerPipeline());
@@ -551,7 +551,7 @@ public class TestBlockManager {
             .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                 OzoneConsts.OZONE,
                 new ExcludeList());
-      } catch (IOException e) {
+      } catch (IOException | TimeoutException e) {
       }
       return verifyNumberOfContainersInPipelines(
           expectedContainersPerPipeline());
@@ -560,7 +560,7 @@ public class TestBlockManager {
 
   @Test
   public void testBlockAllocationWithNoAvailablePipelines()
-      throws IOException {
+      throws IOException, TimeoutException {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       pipelineManager.closePipeline(pipeline.getId());
     }

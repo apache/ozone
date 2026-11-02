@@ -32,6 +32,7 @@ import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -172,6 +173,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -823,7 +825,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
-      scmBlockManager = new BlockManagerImpl(conf, scmConfig, this);
+      scmBlockManager = TracingUtil.createProxy(new BlockManagerImpl(conf, scmConfig, this), BlockManager.class,
+          SpanKind.INTERNAL);
     }
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();

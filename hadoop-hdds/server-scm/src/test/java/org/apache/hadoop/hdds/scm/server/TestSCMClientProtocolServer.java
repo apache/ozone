@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -54,14 +55,17 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
@@ -74,11 +78,19 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 /**
  * Unit tests to validate the SCMClientProtocolServer
@@ -344,6 +356,51 @@ public class TestSCMClientProtocolServer {
   @Test
   public void testGetPeerUpgradeStatusReturnsLocalVersion() throws IOException {
     assertEquals(HDDSVersion.SOFTWARE_VERSION, server.getPeerUpgradeStatus());
+  }
+
+  @Test
+  public void testTransferLeadershipWithoutTargetPicksFirstNonLeaderPeer() throws Exception {
+    RaftPeer peer1 = RaftPeer.newBuilder().setId("scm1").build();
+    RaftPeer peer2 = RaftPeer.newBuilder().setId("scm2").build();
+    RaftPeer peer3 = RaftPeer.newBuilder().setId("scm3").build();
+
+    assertEquals(peer2.getId(), transferLeadershipTarget(peer1.getId(), peer1, peer2, peer3));
+    assertEquals(peer1.getId(), transferLeadershipTarget(peer2.getId(), peer1, peer2, peer3));
+  }
+
+  @Test
+  public void testTransferLeadershipWithoutOtherPeerFails() throws Exception {
+    RaftPeer leader = RaftPeer.newBuilder().setId("scm1").build();
+
+    IOException ex = assertThrows(IOException.class, () -> transferLeadershipTarget(leader.getId(), leader));
+    assertTrue(ex.getMessage().contains("Cannot find a new leader to transfer leadership."));
+  }
+
+  /**
+   * Runs {@code transferLeadership("")} on {@link #server} with an SCM whose Ratis group has {@code peers} and
+   * whose leader is {@code leaderId}, and returns the peer leadership was transferred to.
+   */
+  private static RaftPeerId transferLeadershipTarget(RaftPeerId leaderId, RaftPeer... peers) throws Exception {
+    RaftServer.Division division = mock(RaftServer.Division.class);
+    when(division.getGroup()).thenReturn(RaftGroup.valueOf(RaftGroupId.randomId(), peers));
+    SCMRatisServer ratisServer = mock(SCMRatisServer.class);
+    when(ratisServer.getDivision()).thenReturn(division);
+    when(ratisServer.getLeaderId()).thenReturn(leaderId);
+    SCMHAManager haManager = mock(SCMHAManager.class);
+    when(haManager.getRatisServer()).thenReturn(ratisServer);
+    StorageContainerManager mockScm = mock(StorageContainerManager.class);
+    when(mockScm.getScmHAManager()).thenReturn(haManager);
+    when(mockScm.getConfiguration()).thenReturn(new OzoneConfiguration());
+
+    ArgumentCaptor<RaftPeerId> target = ArgumentCaptor.forClass(RaftPeerId.class);
+    HddsWhiteboxTestUtils.setInternalState(server, "scm", mockScm);
+    try (MockedStatic<RatisHelper> ratisHelper = mockStatic(RatisHelper.class)) {
+      server.transferLeadership("");
+      ratisHelper.verify(() -> RatisHelper.transferRatisLeadership(any(), any(), target.capture(), any()));
+    } finally {
+      HddsWhiteboxTestUtils.setInternalState(server, "scm", scm);
+    }
+    return target.getValue();
   }
 
   private ContainerInfo newContainerWithLastUsedTime(long containerId,

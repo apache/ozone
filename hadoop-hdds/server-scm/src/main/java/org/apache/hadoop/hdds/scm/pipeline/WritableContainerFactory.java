@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
  * Factory class to obtain a container to which a block can be allocated for
@@ -43,20 +45,20 @@ public class WritableContainerFactory {
   public WritableContainerFactory(StorageContainerManager scm) {
     ConfigurationSource conf = scm.getConfiguration();
 
-    this.ratisProvider = new WritableRatisContainerProvider(
+    this.ratisProvider = TracingUtil.createProxy(new WritableRatisContainerProvider(
         scm.getPipelineManager(),
-        scm.getContainerManager(), scm.getPipelineChoosePolicy());
+        scm.getContainerManager(), scm.getPipelineChoosePolicy()), WritableContainerProvider.class, SpanKind.INTERNAL);
     this.standaloneProvider = ratisProvider;
 
     WritableECContainerProviderConfig ecProviderConfig =
         conf.getObject(WritableECContainerProviderConfig.class);
-    this.ecProvider = new WritableECContainerProvider(
+    this.ecProvider = TracingUtil.createProxy(new WritableECContainerProvider(
         ecProviderConfig,
         getConfiguredContainerSize(conf),
         scm.getScmNodeManager(),
         scm.getPipelineManager(),
         scm.getContainerManager(),
-        scm.getEcPipelineChoosePolicy());
+        scm.getEcPipelineChoosePolicy()), WritableContainerProvider.class, SpanKind.INTERNAL);
 
     scm.getReconfigurationHandler().register(ecProviderConfig);
   }

@@ -37,6 +37,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
+import io.opentelemetry.api.trace.SpanKind;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -95,7 +96,6 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -108,6 +108,7 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInter
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
@@ -170,7 +171,8 @@ public class SCMClientProtocolServer implements
     // SCM Container Service RPC
     BlockingService storageProtoPbService =
         newReflectiveBlockingService(
-            new StorageContainerLocationProtocolServerSideTranslatorPB(this,
+            new StorageContainerLocationProtocolServerSideTranslatorPB(
+                TracingUtil.createProxy(this, StorageContainerLocationInternalInterface.class, SpanKind.INTERNAL),
                 scm,
                 protocolMetrics));
 
@@ -1020,11 +1022,10 @@ public class SCMClientProtocolServer implements
       RaftGroup group = scmRatisServer.getDivision().getGroup();
       RaftPeerId targetPeerId;
       if (newLeaderId.isEmpty()) {
-        RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager()
-            .getRatisServer()).getLeader();
+        RaftPeerId curLeaderId = scmRatisServer.getLeaderId();
         targetPeerId = group.getPeers()
             .stream()
-            .filter(a -> !a.equals(curLeader)).findFirst()
+            .filter(a -> !a.getId().equals(curLeaderId)).findFirst()
             .map(RaftPeer::getId)
             .orElseThrow(() -> new IOException("Cannot" +
                 " find a new leader to transfer leadership."));
