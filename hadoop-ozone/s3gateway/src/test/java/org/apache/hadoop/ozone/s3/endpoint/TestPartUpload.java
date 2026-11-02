@@ -50,6 +50,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -59,6 +60,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Stream;
 import javax.ws.rs.HttpMethod;
@@ -145,6 +147,19 @@ public class TestPartUpload {
       assertNotNull(newETag);
       assertNotEquals(eTag, newETag);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 32, 64})
+  void testContentSha256(int uppercaseLength) throws Exception {
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+    String content = "Multipart Upload";
+    String hash = DigestUtils.sha256Hex(content);
+    hash = hash.substring(0, uppercaseLength).toUpperCase(Locale.ROOT) + hash.substring(uppercaseLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+
+    assertSucceeds(() -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
+    assertContentLength(uploadID, OzoneConsts.KEY, content.length());
   }
 
   @Test
@@ -386,6 +401,20 @@ public class TestPartUpload {
         .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
         .thenReturn(String.valueOf(contentLength));
+  }
+
+  @Test
+  public void testRejectMalformedContentSha256BeforeReadingBody() throws Exception {
+    String key = OzoneConsts.KEY;
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, key);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("invalid");
+    InputStream body = spy(new ByteArrayInputStream(new byte[] {1}));
+
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
+        () -> putPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, 1, body));
+
+    verifyNoInteractions(body);
+    assertNoParts(uploadID, key);
   }
 
   @Test
