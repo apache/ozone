@@ -90,9 +90,12 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "server-side when the request sets requireFileSystemLayout, so file "
           + "system clients no longer need the client-side InfoBucket layout "
           + "check for open"),
-
   S3_IF_NONE_MATCH_ETAG(104,
       "OzoneManager version that supports If-None-Match entity ETags for writes"),
+
+  MULTIPART_PART_IV(105,
+      "OzoneManager version that gives each multipart upload part in an "
+          + "encrypted bucket its own IV"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");

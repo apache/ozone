@@ -18,12 +18,15 @@
 package org.apache.hadoop.ozone.client.io;
 
 import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toList;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -152,7 +155,10 @@ public class KeyInputStream extends MultipartInputStream {
         retryFunction, blockStreamFactory, keyLocationInfos, config);
   }
 
-  public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
+  /**
+   * @return a stream for each part of the multipart key, by part number.
+   */
+  public static SortedMap<Integer, LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
       CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
@@ -165,14 +171,13 @@ public class KeyInputStream extends MultipartInputStream {
     // corresponding part in the partsToBlockMap.
     Map<Integer, List<OmKeyLocationInfo>> partsToBlocksMap =
         keyLocationInfos.stream()
-            .collect(groupingBy(BlockLocationInfo::getPartNumber));
+            .collect(groupingBy(BlockLocationInfo::getPartNumber, TreeMap::new, toList()));
 
-    List<LengthInputStream> lengthInputStreams = new ArrayList<>();
+    SortedMap<Integer, LengthInputStream> lengthInputStreams = new TreeMap<>();
     // Create a KeyInputStream for each part.
-    for (List<OmKeyLocationInfo> locationInfo : partsToBlocksMap.values()) {
-      lengthInputStreams.add(getFromOmKeyInfo(keyInfo, xceiverClientFactory,
-          retryFunction, blockStreamFactory, locationInfo,
-          config));
+    for (Map.Entry<Integer, List<OmKeyLocationInfo>> part : partsToBlocksMap.entrySet()) {
+      lengthInputStreams.put(part.getKey(), getFromOmKeyInfo(keyInfo, xceiverClientFactory,
+          retryFunction, blockStreamFactory, part.getValue(), config));
     }
     return lengthInputStreams;
   }

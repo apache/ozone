@@ -683,8 +683,11 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     private void setEnabledProtocols(SslContextFactory sslContextFactory) {
+      // core-default.xml sets hadoop.ssl.enabled.protocols to TLSv1.2, so honor it only when explicitly configured
       String enabledProtocols = conf.get(OzoneConfigKeys.OZONE_SSL_ENABLED_PROTOCOLS,
-          conf.get(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT));
+          conf.isExplicitlySet(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY)
+              ? conf.get(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY)
+              : OzoneConfigKeys.OZONE_SSL_ENABLED_PROTOCOLS_DEFAULT);
       List<String> originalExcludedProtocols = Arrays.asList(sslContextFactory.getExcludeProtocols());
       String[] enabledProtocolsArray = StringUtils.getTrimmedStrings(enabledProtocols);
 

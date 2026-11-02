@@ -786,6 +786,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * Checks access for the S3 action in the context and then for each S3 action it depends on (see
    * {@link #DEPENDENT_S3_ACTIONS}), so a single request does not need a separate RPC per action.
    * Each {@link IAccessAuthorizer#checkAccess} call carries exactly one S3 action.
+   * Dependent checks are skipped for the native authorizer because it does not evaluate S3 actions.
    *
    * @return true only if access is granted for the S3 action and all of its dependent S3 actions.
    */
@@ -795,7 +796,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       return false;
     }
     final String s3Action = context.getS3Action();
-    if (s3Action == null) {
+    if (s3Action == null || accessAuthorizer.isNative()) {
       return true;
     }
     for (String dependentAction : DEPENDENT_S3_ACTIONS.getOrDefault(s3Action, Collections.emptyList())) {
@@ -812,11 +813,16 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * S3 action from {@link S3Authentication} (set on S3 requests). Either or both may be absent, in
    * which case the corresponding field is left untouched on the builder.
    * <p>
-   * The S3 action is only propagated when the S3 STS feature flag is enabled, since it is only used
-   * for fine-grained STS authorization.
+   * The S3 action is always propagated so that authorizers such as Ranger can apply S3 action-based
+   * policies. The session policy is only propagated when the S3 STS feature flag is enabled.
    * @param contextBuilder the builder to enrich in-place
    */
   private void maybeAddToContextFromThreadLocal(RequestContext.Builder contextBuilder) {
+    final S3Authentication s3Authentication = OzoneManager.getS3Auth();
+    if (s3Authentication != null && s3Authentication.hasS3Action() && !s3Authentication.getS3Action().isEmpty()) {
+      contextBuilder.setS3Action(s3Authentication.getS3Action());
+    }
+
     if (!ozoneManager.isS3STSEnabled()) {
       return;
     }
@@ -824,11 +830,6 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
     if (stsTokenIdentifier != null) {
       contextBuilder.setSessionPolicy(stsTokenIdentifier.getSessionPolicy());
-    }
-
-    final S3Authentication s3Authentication = OzoneManager.getS3Auth();
-    if (s3Authentication != null && s3Authentication.hasS3Action() && !s3Authentication.getS3Action().isEmpty()) {
-      contextBuilder.setS3Action(s3Authentication.getS3Action());
     }
   }
 
