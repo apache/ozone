@@ -628,6 +628,25 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testPutObjectWithRfc2047Metadata() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String metadataValue = "café";
+    final String encodedMetadataValue = "=?UTF-8?Q?caf=C3=A9?=";
+    byte[] content = "bar".getBytes(StandardCharsets.UTF_8);
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setContentLength(content.length);
+    metadata.addUserMetadata("meta1", metadataValue);
+    s3Client.createBucket(bucketName);
+
+    s3Client.putObject(new PutObjectRequest(bucketName, keyName,
+        new ByteArrayInputStream(content), metadata));
+
+    assertEquals(encodedMetadataValue,
+        s3Client.getObjectMetadata(bucketName, keyName).getUserMetaDataOf("meta1"));
+  }
+
+  @Test
   public void testPutObjectWithEmptyContentType() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
