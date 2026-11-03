@@ -40,6 +40,7 @@ export const RootKeyHeatmap = {
           children: [
             {
               label: 'demo-key',
+              path: '/vol1/bucket1/demo-key',
               size: 256,
               accessCount: 84,
               color: 1
@@ -68,6 +69,7 @@ export const Vol1KeyHeatmap = {
       children: [
         {
           label: 'scoped-key',
+          path: '/vol1/bucket1/scoped-key',
           size: 128,
           accessCount: 42,
           color: 0.75

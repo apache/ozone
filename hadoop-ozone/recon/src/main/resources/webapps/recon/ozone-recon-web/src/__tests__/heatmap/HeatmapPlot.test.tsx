@@ -30,6 +30,9 @@ type AgChartOptions = {
     tooltip?: {
       renderer: (params: { datum: Record<string, unknown> }) => { content: string };
     };
+    listeners?: {
+      nodeClick?: (event: { datum: Record<string, unknown> }) => void;
+    };
   }>;
 };
 
@@ -57,6 +60,59 @@ function renderTooltipContent(datum: Record<string, unknown>): string {
   }
   return lastChartOptions.series[0].tooltip.renderer({ datum }).content;
 }
+
+function invokeNodeClick(datum: Record<string, unknown>): void {
+  const listener = lastChartOptions?.series?.[0]?.listeners?.nodeClick;
+  if (!listener) {
+    throw new Error('HeatmapPlot did not configure nodeClick');
+  }
+  listener({ datum });
+}
+
+describe('HeatmapPlot nodeClick', () => {
+  beforeEach(() => {
+    lastChartOptions = undefined;
+  });
+
+  test('calls onClick with path for a non-leaf group tile', () => {
+    const onClick = vi.fn();
+    render(
+      <HeatmapPlot
+        data={rootHeatmapData}
+        onClick={onClick}
+        colorScheme={CONSTANTS.colourScheme.amberAlert}
+        entityType="key"
+      />
+    );
+
+    invokeNodeClick({ label: 'vol1', path: '/vol1', size: 512, maxAccessCount: 100 });
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenCalledWith('/vol1');
+  });
+
+  test('does not call onClick for a leaf tile even when path is set', () => {
+    const onClick = vi.fn();
+    render(
+      <HeatmapPlot
+        data={rootHeatmapData}
+        onClick={onClick}
+        colorScheme={CONSTANTS.colourScheme.amberAlert}
+        entityType="key"
+      />
+    );
+
+    invokeNodeClick({
+      label: 'demo-key',
+      path: '/vol1/bucket1/demo-key',
+      size: 256,
+      accessCount: 84,
+      color: 1,
+    });
+
+    expect(onClick).not.toHaveBeenCalled();
+  });
+});
 
 describe('HeatmapPlot tooltips', () => {
   beforeEach(() => {

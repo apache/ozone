@@ -33,54 +33,21 @@ import {
 
 vi.spyOn(commonUtils, 'showDataFetchError');
 
-const { collectDrillDownTiles } = vi.hoisted(() => {
-  type MockHeatmapNode = {
-    label?: string | null;
-    path?: string;
-    color?: number;
-    children?: MockHeatmapNode[];
-  };
-
-  /** Non-leaf treemap tiles (no color, has path) call onClick — same rule as HeatmapPlot nodeClick. */
-  function collectDrillDownTiles(node: MockHeatmapNode, onClick: (path: string) => void): React.ReactNode[] {
-    const tiles: React.ReactNode[] = [];
-    node.children?.forEach((child) => {
-      if (child.path && child.color === undefined) {
-        tiles.push(
-          <div
-            key={child.path}
-            role="button"
-            tabIndex={0}
-            data-testid={`heatmap-tile-${child.label}`}
-            onClick={() => onClick(child.path!)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                onClick(child.path!);
-              }
-            }}
-          >
-            {child.label}
-          </div>
-        );
-      }
-      tiles.push(...collectDrillDownTiles(child, onClick));
-    });
-    return tiles;
-  }
-
-  return { collectDrillDownTiles };
-});
+const plotOnClickRef = vi.hoisted(() => ({
+  current: null as ((path: string) => void) | null,
+}));
 
 vi.mock('@/v2/components/plots/heatmapPlot', () => ({
   default: ({ data, onClick, entityType }: {
-    data: { label?: string | null; path?: string; color?: number; children?: unknown[] };
+    data: { label?: string | null };
     onClick: (path: string) => void;
     entityType: string;
-  }) => (
-    <div data-testid="heatmap-plot" data-label={data.label ?? ''} data-entity-type={entityType}>
-      {collectDrillDownTiles(data, onClick)}
-    </div>
-  ),
+  }) => {
+    plotOnClickRef.current = onClick;
+    return (
+      <div data-testid="heatmap-plot" data-label={data.label ?? ''} data-entity-type={entityType} />
+    );
+  },
 }));
 
 vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
@@ -192,7 +159,7 @@ describe('Heatmap page', () => {
     render(<Heatmap />);
     await waitForPlot('root');
 
-    fireEvent.click(screen.getByTestId('heatmap-tile-vol1'));
+    plotOnClickRef.current!('/vol1');
 
     await waitForPlot('vol1');
     expect(screen.getByPlaceholderText('/')).toHaveValue('/vol1');
