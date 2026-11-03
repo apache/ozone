@@ -43,10 +43,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -180,6 +182,33 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   /**
+   * For an OPEN container, SCM may return a pipeline built from the replicas that have reported instead of the
+   * container's write pipeline, for example while some of its datanodes have not registered with SCM yet. Recon
+   * records this pipeline as the one the container is written to, so fetch the real pipeline by the ID in the
+   * {@link ContainerInfo}. This is only needed when the returned pipeline has a different ID. If SCM no longer has
+   * the write pipeline, the container is recorded without a pipeline.
+   */
+  private ContainerWithPipeline withWritePipeline(ContainerWithPipeline containerWithPipeline) throws IOException {
+    ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
+    final Pipeline pipeline = containerWithPipeline.getPipeline();
+    if (containerInfo.getState() != HddsProtos.LifeCycleState.OPEN || containerInfo.getPipelineID() == null
+        || pipeline == null || pipeline.getId().equals(containerInfo.getPipelineID())) {
+      return containerWithPipeline;
+    }
+    try {
+      return new ContainerWithPipeline(containerInfo,
+          scmClient.getPipeline(containerInfo.getPipelineID().getProtobuf()));
+    } catch (IOException e) {
+      if (SCMHAUtils.unwrapException(e) instanceof PipelineNotFoundException) {
+        LOG.debug("Write pipeline {} of OPEN container {} is not found in SCM.", containerInfo.getPipelineID(),
+            containerInfo.containerID());
+        return new ContainerWithPipeline(containerInfo, null);
+      }
+      throw e;
+    }
+  }
+
+  /**
    * Transitions a container from OPEN to CLOSING, keeping the per-pipeline
    * open-container count in {@link #pipelineToOpenContainer} accurate.
    *
@@ -254,12 +283,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
    * the container is still recorded in the state manager without pipeline
    * tracking so that it is not permanently absent from Recon.
    *
-   * @param containerWithPipeline containerInfo with pipeline info (pipeline may be null)
+   * @param scmContainerWithPipeline containerInfo with pipeline info (pipeline may be null)
    * @throws IOException on Error.
    */
-  public void addNewContainer(ContainerWithPipeline containerWithPipeline)
+  public void addNewContainer(ContainerWithPipeline scmContainerWithPipeline)
       throws IOException {
     ReconPipelineManager reconPipelineManager = (ReconPipelineManager) pipelineManager;
+    ContainerWithPipeline containerWithPipeline = withWritePipeline(scmContainerWithPipeline);
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {

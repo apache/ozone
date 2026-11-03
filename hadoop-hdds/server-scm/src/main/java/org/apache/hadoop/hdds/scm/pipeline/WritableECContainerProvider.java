@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.Config;
@@ -114,12 +113,10 @@ public class WritableECContainerProvider
             excludeList);
       }
     }
-    // Skip pipelines with datanodes that have not registered since SCM started, they are not safe for writes.
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
-        repConfig, Pipeline.PipelineState.OPEN).stream()
-        .filter(p -> !pipelineManager.isOpenWithUnregisteredNodes(p))
-        .collect(Collectors.toList());
+        repConfig, Pipeline.PipelineState.OPEN);
     final int pipelineCount = existingPipelines.size();
+    int unregisteredPipelines = 0;
     LOG.debug("Checking existing pipelines: {}", existingPipelines);
 
     PipelineRequestInformation pri =
@@ -135,6 +132,13 @@ public class WritableECContainerProvider
         break;
       }
       Pipeline pipeline = existingPipelines.get(pipelineIndex);
+      // A pipeline loaded from the SCM DB can list datanodes that have not registered since SCM started.
+      // These are not safe for writes, and are left for the pipeline scrubber to close.
+      if (pipelineManager.hasUnregisteredNodes(pipeline)) {
+        existingPipelines.remove(pipelineIndex);
+        unregisteredPipelines++;
+        continue;
+      }
       synchronized (pipeline.getId()) {
         try {
           ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
@@ -175,6 +179,11 @@ public class WritableECContainerProvider
         synchronized (this) {
           return allocateContainer(repConfig, size, owner, excludeList);
         }
+      }
+      if (unregisteredPipelines > 0 && unregisteredPipelines == pipelineCount) {
+        throw new IOException("Pipeline limit (" + maximumPipelines + ") reached (" + openPipelineCount
+            + ") and all " + unregisteredPipelines + " open pipelines have datanodes that are not registered with SCM"
+            + " yet, none usable for writes");
       }
       throw new IOException("Pipeline limit (" + maximumPipelines
           + ") reached (" + openPipelineCount + "), none closed");

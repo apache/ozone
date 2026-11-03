@@ -120,10 +120,11 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void scrubPipelines() throws IOException;
 
   /**
-   * @return true if the pipeline is open and lists a datanode that is not registered in NodeManager, for example one
-   * that was stopped across an SCM restart. Such a pipeline must not be handed out to clients.
+   * @return true if the pipeline lists a datanode that is not registered in NodeManager, for example one that was
+   * stopped across an SCM restart. This applies to the pipeline in any state, including dormant ones that still
+   * serve reads, so callers must not hand such a pipeline out to clients.
    */
-  boolean isOpenWithUnregisteredNodes(Pipeline pipeline);
+  boolean hasUnregisteredNodes(Pipeline pipeline);
 
   void startPipelineCreator();
 

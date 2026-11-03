@@ -35,6 +35,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -57,7 +58,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -141,6 +144,60 @@ public class TestReconContainerManager
     assertTrue(containerManager.containerExist(containerID));
     assertEquals(LifeCycleState.OPEN,
         getContainerManager().getContainer(containerID).getState());
+  }
+
+  /**
+   * For an OPEN container SCM can return a pipeline built from reported replicas instead of the write pipeline.
+   * Recon must record the container against the pipeline in its ContainerInfo, fetched by ID.
+   */
+  @Test
+  public void testCheckAndAddNewOpenContainerUsesWritePipeline() throws Exception {
+    ContainerWithPipeline fromScm = getTestContainer(120L, LifeCycleState.OPEN);
+    Pipeline readPipeline = getRandomPipeline();
+    Pipeline writePipeline = fromScm.getPipeline();
+    ContainerInfo containerInfo = fromScm.getContainerInfo();
+    StorageContainerServiceProvider scmClient = getContainerManager().getScmClient();
+    when(scmClient.getContainerWithPipeline(containerInfo.getContainerID()))
+        .thenReturn(new ContainerWithPipeline(containerInfo, readPipeline));
+    when(scmClient.getPipeline(containerInfo.getPipelineID().getProtobuf())).thenReturn(writePipeline);
+
+    getContainerManager().checkAndAddNewContainer(containerInfo.containerID(), OPEN, randomDatanodeDetails());
+
+    assertTrue(getContainerManager().getPipelineToOpenContainer().containsKey(writePipeline.getId()));
+    assertFalse(getContainerManager().getPipelineToOpenContainer().containsKey(readPipeline.getId()));
+  }
+
+  /** The sync helper adds containers through addNewContainer directly, so it needs the same correction. */
+  @Test
+  public void testAddNewOpenContainerUsesWritePipeline() throws Exception {
+    ContainerWithPipeline fromScm = getTestContainer(122L, LifeCycleState.OPEN);
+    Pipeline readPipeline = getRandomPipeline();
+    Pipeline writePipeline = fromScm.getPipeline();
+    ContainerInfo containerInfo = fromScm.getContainerInfo();
+    when(getContainerManager().getScmClient().getPipeline(containerInfo.getPipelineID().getProtobuf()))
+        .thenReturn(writePipeline);
+
+    getContainerManager().addNewContainer(new ContainerWithPipeline(containerInfo, readPipeline));
+
+    assertTrue(getContainerManager().getPipelineToOpenContainer().containsKey(writePipeline.getId()));
+    assertFalse(getContainerManager().getPipelineToOpenContainer().containsKey(readPipeline.getId()));
+    assertFalse(getPipelineManager().containsPipeline(readPipeline.getId()));
+  }
+
+  @Test
+  public void testCheckAndAddNewOpenContainerWhenWritePipelineIsGone() throws Exception {
+    ContainerWithPipeline fromScm = getTestContainer(121L, LifeCycleState.OPEN);
+    ContainerInfo containerInfo = fromScm.getContainerInfo();
+    StorageContainerServiceProvider scmClient = getContainerManager().getScmClient();
+    when(scmClient.getContainerWithPipeline(containerInfo.getContainerID()))
+        .thenReturn(new ContainerWithPipeline(containerInfo, getRandomPipeline()));
+    when(scmClient.getPipeline(containerInfo.getPipelineID().getProtobuf()))
+        .thenThrow(new PipelineNotFoundException("gone"));
+
+    getContainerManager().checkAndAddNewContainer(containerInfo.containerID(), OPEN, randomDatanodeDetails());
+
+    assertTrue(getContainerManager().containerExist(containerInfo.containerID()));
+    assertTrue(getContainerManager().getPipelineToOpenContainer().isEmpty());
   }
 
   @Test

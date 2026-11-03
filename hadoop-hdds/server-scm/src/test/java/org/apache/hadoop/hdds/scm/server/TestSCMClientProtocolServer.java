@@ -266,10 +266,10 @@ public class TestSCMClientProtocolServer {
     SCMClientProtocolServer testServer = new SCMClientProtocolServer(
         new OzoneConfiguration(), storageContainerManager, mock(ReconfigurationHandler.class));
     try {
-      when(pipelineManager.isOpenWithUnregisteredNodes(storedPipeline)).thenReturn(false);
+      when(pipelineManager.hasUnregisteredNodes(storedPipeline)).thenReturn(false);
       assertEquals(storedPipeline, testServer.getContainerWithPipeline(container.getContainerID()).getPipeline());
 
-      when(pipelineManager.isOpenWithUnregisteredNodes(storedPipeline)).thenReturn(true);
+      when(pipelineManager.hasUnregisteredNodes(storedPipeline)).thenReturn(true);
       assertEquals(replicaPipeline, testServer.getContainerWithPipeline(container.getContainerID()).getPipeline());
     } finally {
       testServer.stop();

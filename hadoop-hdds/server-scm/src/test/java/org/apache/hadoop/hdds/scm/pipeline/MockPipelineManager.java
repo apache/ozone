@@ -322,7 +322,7 @@ public class MockPipelineManager implements PipelineManager {
 
   /** Mock pipelines use generated datanodes that are not registered in the node manager, so only report those set. */
   @Override
-  public boolean isOpenWithUnregisteredNodes(Pipeline pipeline) {
+  public boolean hasUnregisteredNodes(Pipeline pipeline) {
     return pipeline.getNodes().stream().anyMatch(unregisteredNodes::contains);
   }
 

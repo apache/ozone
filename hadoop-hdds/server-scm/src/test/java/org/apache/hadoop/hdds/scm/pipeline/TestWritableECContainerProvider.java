@@ -70,6 +70,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
@@ -483,6 +484,27 @@ public class TestWritableECContainerProvider {
       assertNotEquals(unregistered.getPipelineID(), container.getPipelineID(),
           "Returned a pipeline with an unregistered node");
     }
+  }
+
+  /**
+   * When the pipeline limit is reached and every open pipeline has an unregistered datanode, the write fails with a
+   * message that says so instead of the generic pipeline limit one.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testPipelineLimitReachedWithAllPipelinesUnregistered(PipelineChoosePolicy policy) throws IOException {
+    int nodeCount = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
+    providerConf.setMinimumPipelines(nodeCount);
+    provider = createSubject(policy);
+    Set<ContainerInfo> allocated = assertDistinctContainers(nodeCount);
+    for (ContainerInfo container : allocated) {
+      Pipeline pipeline = pipelineManager.getPipeline(container.getPipelineID());
+      ((MockPipelineManager) pipelineManager).setNodeUnregistered(pipeline.getNodes().get(0));
+    }
+
+    IOException e = assertThrows(IOException.class,
+        () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
+    assertThat(e.getMessage()).contains("not registered with SCM");
   }
 
   @ParameterizedTest

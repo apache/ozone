@@ -149,11 +149,8 @@ public class WritableRatisContainerProvider
     // mentioned in HDDS-5655.
     pipelineManager.acquireReadLock();
     try {
-      // Skip pipelines with datanodes that have not registered since SCM started, they are not safe for writes.
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
-          excludeList, Pipeline.PipelineState.OPEN).stream()
-          .filter(p -> !pipelineManager.isOpenWithUnregisteredNodes(p))
-          .collect(Collectors.toList());
+          excludeList, Pipeline.PipelineState.OPEN);
       return selectContainer(availablePipelines, req, owner, excludeList);
     } finally {
       pipelineManager.releaseReadLock();
@@ -179,9 +176,18 @@ public class WritableRatisContainerProvider
       List<Pipeline> availablePipelines, PipelineRequestInformation req,
       String owner, ExcludeList excludeList) {
 
+    int unregisteredPipelines = 0;
     while (!availablePipelines.isEmpty()) {
       Pipeline pipeline = pipelineChoosePolicy.choosePipeline(
           availablePipelines, req);
+
+      // A pipeline loaded from the SCM DB can list datanodes that have not registered since SCM started.
+      // These are not safe for writes.
+      if (pipelineManager.hasUnregisteredNodes(pipeline)) {
+        unregisteredPipelines++;
+        availablePipelines.remove(pipeline);
+        continue;
+      }
 
       // look for OPEN containers that match the criteria.
       final ContainerInfo containerInfo = containerManager.getMatchingContainer(
@@ -194,6 +200,10 @@ public class WritableRatisContainerProvider
       availablePipelines.remove(pipeline);
     }
 
+    if (unregisteredPipelines > 0) {
+      LOG.warn("Skipped {} open pipelines for a write because they have datanodes that are not registered yet.",
+          unregisteredPipelines);
+    }
     return null;
   }
 
