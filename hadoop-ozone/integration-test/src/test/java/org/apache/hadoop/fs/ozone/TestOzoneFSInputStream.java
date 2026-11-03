@@ -412,15 +412,17 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     IOUtils.copyBytes(input, output, 4096, true);
     input.close();
 
-    // Start SequenceFile.Reader test
-    SequenceFile.Reader in = new SequenceFile.Reader(ecFs, path, cluster().getConf());
-    long blockStart = -1;
-    // EOFException should not occur.
-    in.sync(0);
-    blockStart = in.getPosition();
-    // The behavior should be consistent with HDFS
-    assertEquals(srcfile.length(), blockStart);
-    in.close();
+    // Use the configured EC filesystem; the path-based constructor would obtain a separate cached one.
+    try (FSDataInputStream stream = ecFs.open(path);
+         SequenceFile.Reader in = new SequenceFile.Reader(cluster().getConf(),
+             SequenceFile.Reader.stream(stream), SequenceFile.Reader.length(srcfile.length()))) {
+      long blockStart = -1;
+      // EOFException should not occur.
+      in.sync(0);
+      blockStart = in.getPosition();
+      // The behavior should be consistent with HDFS
+      assertEquals(srcfile.length(), blockStart);
+    }
   }
 
   static Stream<Arguments> isStreamEnableAndData() {

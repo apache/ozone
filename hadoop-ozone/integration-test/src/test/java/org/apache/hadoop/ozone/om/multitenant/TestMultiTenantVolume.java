@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -261,17 +260,12 @@ public class TestMultiTenantVolume {
 
   private static ObjectStore getStoreForAccessID(String accessID)
       throws IOException {
-    // Cluster provider will modify our provided configuration. We must use
-    // this version to build the client.
-    OzoneConfiguration conf = cluster.getOzoneManager().getConfiguration();
-    conf.setBoolean(S3Auth.S3_AUTH_CHECK, true);
-    // Manually construct an object store instead of using the cluster
-    // provided one so we can specify the access ID.
-    RpcClient rpcClient = new RpcClient(conf, null);
+    cluster.getConf().setBoolean(S3Auth.S3_AUTH_CHECK, true);
+    // Use a separate client so its S3 auth does not affect the shared client.
+    ObjectStore store = cluster.newClient().getObjectStore();
     // userPrincipal is set to be the same as accessId for the test
-    rpcClient.setThreadLocalS3Auth(
-        new S3Auth("unused1", "unused2", accessID, accessID));
-    return new ObjectStore(conf, rpcClient);
+    store.getClientProxy().setThreadLocalS3Auth(new S3Auth("unused1", "unused2", accessID, accessID));
+    return store;
   }
 
   @Test

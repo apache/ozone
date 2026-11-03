@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assumptions.assumeThat;
 
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractContractDeleteTest;
 import org.apache.hadoop.fs.contract.AbstractContractGetFileStatusTest;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.tools.contract.AbstractContractDistCpTest;
 import org.apache.ozone.test.ClusterForTests;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -57,6 +59,12 @@ import org.junit.jupiter.api.TestInstance;
 abstract class AbstractOzoneContractTest extends ClusterForTests<MiniOzoneCluster> {
 
   private static final String CONTRACT_XML = "contract/ozone.xml";
+
+  @AfterAll
+  void closeFileSystems() throws IOException {
+    // Contracts cache filesystems for different buckets; release their clients before the cluster's leak check.
+    FileSystem.closeAll();
+  }
 
   /**
    * This must be implemented by all subclasses.

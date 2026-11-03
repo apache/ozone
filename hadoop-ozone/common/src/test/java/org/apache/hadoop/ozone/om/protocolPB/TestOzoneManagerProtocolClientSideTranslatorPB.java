@@ -17,21 +17,43 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY;
+import static org.apache.ozone.test.MetricsAsserts.getDoubleGauge;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.om.OmClientMetrics;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
@@ -51,7 +73,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQu
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 
 class TestOzoneManagerProtocolClientSideTranslatorPB {
@@ -60,6 +86,114 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   private final OzoneManagerProtocolClientSideTranslatorPB pb = new OzoneManagerProtocolClientSideTranslatorPB(
       omTransport, "test-client-id");
   private static final OmDeleteKeys DELETE_KEYS = new OmDeleteKeys("vol", "bucket", Arrays.asList("key1", "key2"));
+
+  @ParameterizedTest
+  @EnumSource(value = Status.class, names = {"OK", "KEY_NOT_FOUND", "ACCESS_DENIED"})
+  void recordsLatencyForSuccessfulAndErrorResponses(Status status) throws Exception {
+    when(omTransport.submitRequest(any())).thenReturn(serviceListResponse().toBuilder().setStatus(status).build());
+    try (OmClientMetrics.Handle handle = attachMetrics(pb)) {
+      if (status == Status.OK) {
+        pb.getServiceList();
+      } else {
+        assertThatThrownBy(pb::getServiceList).isInstanceOf(OMException.class);
+      }
+      assertThat(getLongCounter("ServiceListLatencyNsNumOps", getMetrics(handle.metrics()))).isEqualTo(1);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("transportFailures")
+  void recordsLatencyAndPreservesTransportFailure(Exception failure) throws Exception {
+    when(omTransport.submitRequest(any())).thenThrow(failure);
+    try (OmClientMetrics.Handle handle = attachMetrics(pb)) {
+      assertThatThrownBy(pb::getServiceList).isSameAs(failure);
+      assertThat(getLongCounter("ServiceListLatencyNsNumOps", getMetrics(handle.metrics()))).isEqualTo(1);
+    }
+  }
+
+  private static Stream<Exception> transportFailures() {
+    return Stream.of(new IOException("transport failed"), new SocketTimeoutException("timed out"),
+        new IllegalStateException("transport closed"));
+  }
+
+  @Test
+  void recordsTransportDurationInNanosecondsAfterCompletion() throws Exception {
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicLong transportNanos = new AtomicLong();
+    when(omTransport.submitRequest(any())).thenAnswer(invocation -> {
+      long start = Time.monotonicNowNanos();
+      entered.countDown();
+      assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+      transportNanos.set(Time.monotonicNowNanos() - start);
+      return serviceListResponse();
+    });
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (OmClientMetrics.Handle handle = attachMetrics(pb)) {
+      Future<?> request = executor.submit(pb::getServiceList);
+      assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+      verify(getMetrics(handle.metrics()), never()).addCounter(any(MetricsInfo.class), anyLong());
+      release.countDown();
+      request.get(10, TimeUnit.SECONDS);
+      MetricsRecordBuilder snapshot = getMetrics(handle.metrics());
+      assertThat(getLongCounter("ServiceListLatencyNsNumOps", snapshot)).isEqualTo(1);
+      assertThat(getDoubleGauge("ServiceListLatencyNsAvgTime", snapshot)).isGreaterThanOrEqualTo(transportNanos.get());
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  void transportRetriesAreOneSample() throws Exception {
+    when(omTransport.submitRequest(any())).thenThrow(new IOException("retry"))
+        .thenReturn(serviceListResponse());
+    OmTransport retrying = (OmTransport) RetryProxy.create(OmTransport.class, omTransport,
+        RetryPolicies.retryUpToMaximumCountWithFixedSleep(1, 1, TimeUnit.MILLISECONDS));
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(retrying, "retry-client");
+    try (OmClientMetrics.Handle handle = attachMetrics(client)) {
+      client.getServiceList();
+      verify(omTransport, times(2)).submitRequest(any());
+      assertThat(getLongCounter("ServiceListLatencyNsNumOps", getMetrics(handle.metrics()))).isEqualTo(1);
+    }
+  }
+
+  @Test
+  void safeModeRetriesOutsideTransportAreSeparateSamples() throws Exception {
+    when(omTransport.submitRequest(any())).thenReturn(
+        OMResponse.newBuilder().setCmdType(Type.AllocateBlock).setStatus(Status.SCM_IN_SAFE_MODE).build(),
+        OMResponse.newBuilder().setCmdType(Type.AllocateBlock).setStatus(Status.KEY_NOT_FOUND).build());
+    OmKeyArgs args = new OmKeyArgs.Builder().setVolumeName("vol").setBucketName("bucket").setKeyName("key").build();
+    try (OmClientMetrics.Handle handle = attachMetrics(pb)) {
+      assertThatThrownBy(() -> pb.allocateBlock(args, 1, new ExcludeList())).isInstanceOf(OMException.class);
+      verify(omTransport, times(2)).submitRequest(any());
+      assertThat(getLongCounter("AllocateBlockLatencyNsNumOps", getMetrics(handle.metrics()))).isEqualTo(2);
+    }
+  }
+
+  @Test
+  void validationBeforeTransportIsNotRecorded() throws Exception {
+    pb.setS3AuthCheck(true);
+    try (OmClientMetrics.Handle handle = attachMetrics(pb)) {
+      assertThatThrownBy(pb::getServiceList).isInstanceOf(IllegalArgumentException.class);
+      verifyNoInteractions(omTransport);
+      verify(getMetrics(handle.metrics()), never()).addCounter(any(MetricsInfo.class), anyLong());
+    }
+  }
+
+  private static OmClientMetrics.Handle attachMetrics(OzoneManagerProtocolClientSideTranslatorPB client) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, "");
+    OmClientMetrics.Handle handle = OmClientMetrics.acquireHandle(conf);
+    client.setOmClientMetrics(handle.metrics());
+    return handle;
+  }
+
+  private static OMResponse serviceListResponse() {
+    return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK)
+        .setServiceListResponse(ServiceListResponse.getDefaultInstance()).build();
+  }
 
   @Test
   void testStartQuotaRepair() throws IOException {

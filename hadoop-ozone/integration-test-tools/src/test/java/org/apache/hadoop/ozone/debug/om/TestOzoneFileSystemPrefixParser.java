@@ -87,10 +87,10 @@ public class TestOzoneFileSystemPrefixParser {
 
   @AfterAll
   public static void teardown() throws IOException {
+    IOUtils.closeQuietly(fs);
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @Test

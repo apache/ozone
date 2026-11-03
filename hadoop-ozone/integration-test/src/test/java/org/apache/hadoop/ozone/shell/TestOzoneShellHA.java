@@ -220,7 +220,8 @@ public class TestOzoneShellHA {
 
   @AfterParameterizedClassInvocation
   public void shutdown() {
-    IOUtils.closeQuietly(client, cluster);
+    // Shell commands cache filesystems; release their clients before the cluster's leak check.
+    IOUtils.closeQuietly(client, FileSystem::closeAll, cluster);
   }
 
   @BeforeEach
