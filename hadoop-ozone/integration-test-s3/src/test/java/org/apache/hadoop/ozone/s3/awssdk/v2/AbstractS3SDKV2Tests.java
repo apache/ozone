@@ -116,6 +116,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -2337,6 +2338,45 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.copyObject(copyReq));
     assertEquals(412, exception.statusCode());
     assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"match, true, false", "match, false, true", "none-match, true, true", "none-match, false, false"})
+  public void testUploadPartCopySourceETag(String condition, boolean matching, boolean rejected) {
+    final String bucketName = getBucketName();
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    final String sourceETag = s3Client.putObject(b -> b.bucket(bucketName).key(sourceKey),
+        RequestBody.fromString("copy-source-content")).eTag();
+    final String uploadId = s3Client.createMultipartUpload(b -> b.bucket(bucketName).key(destKey)).uploadId();
+    try {
+      UploadPartCopyRequest.Builder request = UploadPartCopyRequest.builder()
+          .sourceBucket(bucketName)
+          .sourceKey(sourceKey)
+          .destinationBucket(bucketName)
+          .destinationKey(destKey)
+          .uploadId(uploadId)
+          .partNumber(1);
+      String conditionalETag = matching ? sourceETag : "\"wrong-etag\"";
+      if ("match".equals(condition)) {
+        request.copySourceIfMatch(conditionalETag);
+      } else {
+        request.copySourceIfNoneMatch(conditionalETag);
+      }
+      if (rejected) {
+        S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.uploadPartCopy(request.build()));
+        assertEquals(412, exception.statusCode());
+        assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+        assertTrue(s3Client.listParts(b -> b.bucket(bucketName).key(destKey).uploadId(uploadId)).parts().isEmpty());
+      } else {
+        UploadPartCopyResponse response = s3Client.uploadPartCopy(request.build());
+        assertEquals(sourceETag, response.copyPartResult().eTag());
+        assertEquals(1, s3Client.listParts(b -> b.bucket(bucketName).key(destKey).uploadId(uploadId)).parts().size());
+      }
+    } finally {
+      s3Client.abortMultipartUpload(b -> b.bucket(bucketName).key(destKey).uploadId(uploadId));
+    }
   }
 
   @Test
