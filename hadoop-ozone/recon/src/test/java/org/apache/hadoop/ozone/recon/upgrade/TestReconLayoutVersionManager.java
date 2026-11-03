@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.doNothing;
@@ -111,6 +113,29 @@ public class TestReconLayoutVersionManager {
   public void testInitializationWithMockedValues() {
     assertEquals(0, layoutVersionManager.getCurrentMLV());
     assertEquals(2, layoutVersionManager.getCurrentSLV());
+  }
+
+  @Test
+  public void testInitializationWithCurrentLayoutVersion() throws SQLException {
+    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
+    ReconLayoutVersionManager manager = new ReconLayoutVersionManager(
+        schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
+    assertEquals(2, manager.getCurrentMLV());
+    assertEquals(2, manager.getCurrentSLV());
+  }
+
+  @Test
+  public void testInitializationRejectsNewerMetadataLayoutVersion() throws Exception {
+    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(3);
+
+    SQLException exception = assertThrows(SQLException.class, () -> new ReconLayoutVersionManager(
+        schemaVersionTableManager, mock(ReconContext.class), mockDataSource));
+
+    assertTrue(exception.getMessage().contains("metadata layout version 3"));
+    assertTrue(exception.getMessage().contains("software layout version 2"));
+    verify(mockDataSource, never()).getConnection();
+    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), any(Connection.class));
+    mockedEnum.verify(ReconLayoutFeature::registerUpgradeActions, times(1));
   }
 
   /**

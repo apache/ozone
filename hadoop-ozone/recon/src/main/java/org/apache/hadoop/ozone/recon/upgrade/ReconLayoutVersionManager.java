@@ -51,6 +51,12 @@ public class ReconLayoutVersionManager {
       throws SQLException {
     this.schemaVersionTableManager = schemaVersionTableManager;
     this.currentMLV = determineMLV();
+    int softwareLayoutVersion = determineSLV();
+    if (currentMLV > softwareLayoutVersion) {
+      throw new SQLException("Cannot start Recon: metadata layout version " + currentMLV
+          + " is newer than software layout version " + softwareLayoutVersion
+          + ". Use compatible Recon binaries or restore the pre-upgrade Recon backup before downgrading.");
+    }
     this.reconContext = reconContext;
     this.dataSource = dataSource;
     ReconLayoutFeature.registerUpgradeActions();  // Register actions via annotation
