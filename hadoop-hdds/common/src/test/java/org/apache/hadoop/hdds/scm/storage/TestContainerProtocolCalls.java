@@ -20,12 +20,15 @@ package org.apache.hadoop.hdds.scm.storage;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -46,6 +49,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
@@ -85,6 +90,22 @@ public class TestContainerProtocolCalls {
         .setChecksumData(new Checksum(ChecksumType.CRC32, 256)
             .computeChecksum(data).getProtoBufMessage())
         .build();
+  }
+
+  @Test
+  void readBlockRequestCarriesTraceIdOfCurrentSpan() throws IOException {
+    try (TestSpanCollector ignored = TestSpanCollector.install("client")) {
+      Span span = TracingUtil.createInternalSpan("read");
+      try (Scope scope = span.makeCurrent()) {
+        ContainerCommandRequestProto request = ContainerProtocolCalls.buildReadBlockCommandProto(
+            new BlockID(1, 1), 0, 10, 10, true, null, pipelineWithVersion(VERSION));
+
+        assertFalse(request.getTraceID().isEmpty());
+        assertEquals(TracingUtil.exportCurrentSpan(), request.getTraceID());
+      } finally {
+        span.end();
+      }
+    }
   }
 
   @Test
