@@ -287,8 +287,8 @@ public class TestNSSummaryEndpoint extends NSSummaryEndpointTestBase {
         ? reconOMMetadataManager.getOzonePathKey(AbstractTreeNSSummaryScenario.VOL_OBJECT_ID,
             AbstractTreeNSSummaryScenario.BUCKET_ONE_OBJECT_ID, AbstractTreeNSSummaryScenario.BUCKET_ONE_OBJECT_ID,
             AbstractTreeNSSummaryScenario.KEY_ONE)
-        : reconOMMetadataManager.getOzoneKey(AbstractTreeNSSummaryScenario.VOL, AbstractTreeNSSummaryScenario.BUCKET_ONE,
-            AbstractTreeNSSummaryScenario.KEY_ONE);
+        : reconOMMetadataManager.getOzoneKey(AbstractTreeNSSummaryScenario.VOL,
+            AbstractTreeNSSummaryScenario.BUCKET_ONE, AbstractTreeNSSummaryScenario.KEY_ONE);
     reconOMMetadataManager.getKeyTable(treeScenario().getBucketLayout()).delete(key);
     reconNamespaceSummaryManager.clearNSSummaryTable();
     treeScenario().reprocess(reconNamespaceSummaryManager, reconOMMetadataManager, conf);
