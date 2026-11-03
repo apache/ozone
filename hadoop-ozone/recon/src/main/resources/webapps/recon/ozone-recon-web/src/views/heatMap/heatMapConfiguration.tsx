@@ -94,7 +94,7 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
               nodeClick: (event) => {
               var data = event.datum;
               // Leaf level box should not call API
-              if (!data.color)
+              if (data.children?.length)
                 if (data.path) {
                   console.log('Path', data.path);
                   this.props.onClick(data.path);
