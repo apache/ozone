@@ -40,6 +40,7 @@ run-name: CI for ${{ github.sha }} on ${{ github.event_name }}
 jobs:
   pre-check:
     runs-on: ubuntu-slim
+    if: github.repository_owner == 'apache' || github.event_name == 'workflow_dispatch'
     outputs:
       hit: ${{ steps.stash.outputs.stash-hit || 'false' }}
     steps:
@@ -61,7 +62,7 @@ jobs:
   CI:
     needs: pre-check
     # no scheduled run in forks
-    if: (github.repository_owner == 'apache' && needs.pre-check.outputs.hit != 'true') || github.event_name == 'workflow_dispatch'
+    if: needs.pre-check.outputs.hit != 'true'
     uses: $/.github/workflows/ci.yml
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
