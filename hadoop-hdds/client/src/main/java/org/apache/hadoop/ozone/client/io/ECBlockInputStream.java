@@ -708,6 +708,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       try {
         blockStreams[i].close();
         blockStreams[i] = null;
+        // A reopened stream starts at offset 0, so it must be seeked before the next read.
+        seeked = true;
         LOG.debug("{}: closed stream [{}]", this, i);
       } catch (IOException e) {
         LOG.error("{}: failed to close stream [{}]: {}", this,
