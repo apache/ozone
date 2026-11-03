@@ -23,9 +23,7 @@ import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.protocol.Message;
 
-/** Originally generated for {@link FinalizationStateManager}. Manual edits have been
- * made to the generated code, so this class should not be regenerated again.
- */
+/** Code generated for {@link FinalizationStateManager}.  Do not modify. */
 public class FinalizationStateManagerInvoker extends ScmInvoker<FinalizationStateManager> {
   enum ReplicateMethod implements NameAndParameterTypes {
     finalizeUpgrade(new Class<?>[][] {
