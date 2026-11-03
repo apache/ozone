@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -71,6 +72,7 @@ public class TestNSSummaryEndpoint extends NSSummaryEndpointTestBase {
   @Parameter
   private NSSummaryTestScenario scenario;
 
+  private OzoneConfiguration conf;
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
@@ -84,7 +86,7 @@ public class TestNSSummaryEndpoint extends NSSummaryEndpointTestBase {
 
   @BeforeEach
   public void setUp() throws Exception {
-    OzoneConfiguration conf = scenario.newConfiguration();
+    conf = scenario.newConfiguration();
     OMMetadataManager omMetadataManager = scenario.initializeOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile(),
         conf);
@@ -263,6 +265,49 @@ public class TestNSSummaryEndpoint extends NSSummaryEndpointTestBase {
   public void testDiskUsageBucket() throws Exception {
     assumeTrue(scenario.hasDirectories());
     treeScenario().assertDiskUsageBucket(nsSummaryEndpoint);
+  }
+
+  @Test
+  public void testBucketDirectKeySizeExcludesSubdirectories() throws Exception {
+    assumeTrue(scenario.hasDirectories());
+    DUResponse response = getDiskUsage(nsSummaryEndpoint, AbstractTreeNSSummaryScenario.BUCKET_ONE_PATH, true);
+
+    assertAll(
+        () -> assertEquals(ResponseStatus.OK, response.getStatus()),
+        () -> assertEquals(AbstractTreeNSSummaryScenario.BUCKET_ONE_DATA_SIZE, response.getSize()),
+        () -> assertEquals(AbstractTreeNSSummaryScenario.REPLICA_UNDER_BUCKET1, response.getSizeWithReplica()),
+        () -> assertEquals(AbstractTreeNSSummaryScenario.KEY_ONE_SIZE, response.getKeySize(),
+            "Direct-key size must include only file1, excluding all files under dir1"));
+  }
+
+  @Test
+  public void testBucketWithoutDirectKeysHasZeroDirectKeySize() throws Exception {
+    assumeTrue(scenario.hasDirectories());
+    String key = scenario instanceof FsoNSSummaryScenario
+        ? reconOMMetadataManager.getOzonePathKey(AbstractTreeNSSummaryScenario.VOL_OBJECT_ID,
+            AbstractTreeNSSummaryScenario.BUCKET_ONE_OBJECT_ID, AbstractTreeNSSummaryScenario.BUCKET_ONE_OBJECT_ID,
+            AbstractTreeNSSummaryScenario.KEY_ONE)
+        : reconOMMetadataManager.getOzoneKey(AbstractTreeNSSummaryScenario.VOL, AbstractTreeNSSummaryScenario.BUCKET_ONE,
+            AbstractTreeNSSummaryScenario.KEY_ONE);
+    reconOMMetadataManager.getKeyTable(treeScenario().getBucketLayout()).delete(key);
+    reconNamespaceSummaryManager.clearNSSummaryTable();
+    treeScenario().reprocess(reconNamespaceSummaryManager, reconOMMetadataManager, conf);
+
+    DUResponse response = getDiskUsage(nsSummaryEndpoint, AbstractTreeNSSummaryScenario.BUCKET_ONE_PATH, true);
+    assertAll(
+        () -> assertEquals(AbstractTreeNSSummaryScenario.DIR_ONE_DATA_SIZE, response.getSize()),
+        () -> assertEquals(AbstractTreeNSSummaryScenario.REPLICA_UNDER_DIR1, response.getSizeWithReplica()),
+        () -> assertEquals(0, response.getKeySize()));
+  }
+
+  @Test
+  public void testDirectoryDirectKeySizeExcludesSubdirectories() throws Exception {
+    assumeTrue(scenario.hasDirectories());
+    DUResponse response = getDiskUsage(nsSummaryEndpoint, AbstractTreeNSSummaryScenario.DIR_ONE_PATH, true);
+    assertAll(
+        () -> assertEquals(AbstractTreeNSSummaryScenario.DIR_ONE_DATA_SIZE, response.getSize()),
+        () -> assertEquals(AbstractTreeNSSummaryScenario.REPLICA_UNDER_DIR1, response.getSizeWithReplica()),
+        () -> assertEquals(AbstractTreeNSSummaryScenario.KEY_SEVEN_SIZE, response.getKeySize()));
   }
 
   @Test
