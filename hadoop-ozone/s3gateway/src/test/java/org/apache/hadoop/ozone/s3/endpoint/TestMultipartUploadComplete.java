@@ -100,6 +100,35 @@ public class TestMultipartUploadComplete {
     return EndpointTestUtils.initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, key);
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"-1", "abc", "", "9223372036854775808"})
+  public void testInvalidExpectedObjectSize(String size) throws Exception {
+    String key = OzoneConsts.KEY;
+    String uploadID = initiateMultipartUpload(key);
+    Part part = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "content");
+    when(headers.getHeaderString(S3Consts.MP_OBJECT_SIZE_HEADER)).thenReturn(size);
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part)));
+    assertThrows(IOException.class, () -> client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key));
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {0, 6, 8})
+  public void testExpectedObjectSizeMismatchAndRetry(long size) throws Exception {
+    String key = OzoneConsts.KEY;
+    String uploadID = initiateMultipartUpload(key);
+    Part part = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "content");
+    uploadPart(rest, OzoneConsts.S3_BUCKET, key, 2, uploadID, "unused-part");
+    when(headers.getHeaderString(S3Consts.MP_OBJECT_SIZE_HEADER)).thenReturn(Long.toString(size));
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part)));
+    assertThrows(IOException.class, () -> client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key));
+
+    when(headers.getHeaderString(S3Consts.MP_OBJECT_SIZE_HEADER)).thenReturn("7");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, "content");
+  }
+
   @Test
   public void testMultipart() throws Exception {
     String uploadID = initiateMultipartUpload(OzoneConsts.KEY);

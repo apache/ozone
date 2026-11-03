@@ -1046,6 +1046,14 @@ public class OzoneBucket extends WithMetadata {
         partsMap);
   }
 
+  /** Completes a multipart upload with an optional expected object size. */
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key, String uploadID,
+      Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag, String excludedETag,
+      Long expectedDataSize) throws IOException {
+    return proxy.completeMultipartUpload(volumeName, name, key, uploadID, partsMap, expectedDataGeneration,
+        expectedETag, excludedETag, expectedDataSize);
+  }
+
   /** Completes a multipart upload with an additional If-None-Match entity ETag condition. */
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String key, String uploadID,
       Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag, String excludedETag)

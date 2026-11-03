@@ -892,6 +892,12 @@ public interface ClientProtocol {
       String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
       String excludedETag) throws IOException;
 
+  /** Completes a multipart upload with an optional expected object size. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag, Long expectedDataSize) throws IOException;
+
   /**
    * Abort Multipart upload request for the given key with given uploadID.
    * @param volumeName

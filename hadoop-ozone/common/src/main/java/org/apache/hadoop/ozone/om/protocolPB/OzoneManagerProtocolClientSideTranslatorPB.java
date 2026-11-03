@@ -1914,6 +1914,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       keyArgs.setExcludedETag(omKeyArgs.getExcludedETag());
     }
 
+    if (omKeyArgs.getExpectedDataSize() != null) {
+      // For completion, dataSize is the expected size of the selected parts.
+      keyArgs.setDataSize(omKeyArgs.getExpectedDataSize());
+    }
+
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());
     multipartUploadCompleteRequest.addAllPartsList(multipartUploadList
         .getPartsList());

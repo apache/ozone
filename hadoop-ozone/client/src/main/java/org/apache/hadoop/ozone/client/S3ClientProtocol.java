@@ -476,6 +476,15 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag, Long expectedDataSize) throws IOException {
+    return delegate.completeMultipartUpload(volumeName, bucketName, keyName, uploadID, partsMap, expectedDataGeneration,
+        expectedETag, excludedETag, expectedDataSize);
+  }
+
+  @Override
   public void abortMultipartUpload(String volumeName, String bucketName, String keyName, String uploadID)
       throws IOException {
     delegate.abortMultipartUpload(volumeName, bucketName, keyName, uploadID);
