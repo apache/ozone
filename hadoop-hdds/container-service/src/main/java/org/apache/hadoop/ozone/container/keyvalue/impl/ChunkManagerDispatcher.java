@@ -28,8 +28,10 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -57,11 +59,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
   private final Map<ContainerLayoutVersion, ChunkManager> handlers
       = new EnumMap<>(ContainerLayoutVersion.class);
 
-  ChunkManagerDispatcher(boolean sync, BlockManager manager) {
+  ChunkManagerDispatcher(boolean sync, BlockManager manager, ConfigurationSource conf) {
     handlers.put(FILE_PER_CHUNK,
-        new FilePerChunkStrategy(sync, manager));
+        TracingUtil.createInternalProxy(new FilePerChunkStrategy(sync, manager), ChunkManager.class, conf));
     handlers.put(FILE_PER_BLOCK,
-        new FilePerBlockStrategy(sync, manager));
+        TracingUtil.createInternalProxy(new FilePerBlockStrategy(sync, manager), ChunkManager.class, conf));
   }
 
   @Override

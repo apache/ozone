@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -884,6 +885,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     AuditAction action = getAuditAction(msg.getCmdType());
     EventType eventType = getEventType(msg);
 
+    Scope scope = span.makeCurrent();
     try (UncheckedAutoCloseable ignored = protocolMetrics.measure(cmdType)) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Command {}, trace ID: {}.", msg.getCmdType(), traceID);
@@ -948,6 +950,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           s, ioe, ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
     } finally {
+      scope.close();
       span.end();
     }
   }

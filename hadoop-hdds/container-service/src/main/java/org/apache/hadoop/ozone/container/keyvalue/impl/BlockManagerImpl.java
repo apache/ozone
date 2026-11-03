@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -396,21 +397,25 @@ public class BlockManagerImpl implements BlockManager {
   }
 
   @Override
+  @SkipTracing
   public int getDefaultReadBufferCapacity() {
     return defaultReadBufferCapacity;
   }
 
   @Override
+  @SkipTracing
   public int getReadMappedBufferThreshold() {
     return readMappedBufferThreshold;
   }
 
   @Override
+  @SkipTracing
   public int getReadMappedBufferMaxCount() {
     return readMappedBufferMaxCount;
   }
 
   @Override
+  @SkipTracing
   public boolean isReadNettyChunkedNioFile() {
     return readNettyChunkedNioFile;
   }

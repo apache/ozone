@@ -74,6 +74,6 @@ public final class ChunkManagerFactory {
       return new ChunkManagerDummyImpl();
     }
 
-    return new ChunkManagerDispatcher(sync, manager);
+    return new ChunkManagerDispatcher(sync, manager, conf);
   }
 }
