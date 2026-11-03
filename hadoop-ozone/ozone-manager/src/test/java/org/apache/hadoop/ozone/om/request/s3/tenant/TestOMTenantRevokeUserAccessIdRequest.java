@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.om.S3SecretLockedManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.TenantOp;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -135,6 +137,37 @@ public class TestOMTenantRevokeUserAccessIdRequest {
     revokeAndCommit(revokeRequest());
     assertNull(metadataManager.getS3RevokedStsTokenTable().get(ACCESS_ID));
     assertNull(metadataManager.getS3RevokedStsTokenTable().getSkipCache(ACCESS_ID));
+  }
+
+  @Test
+  public void testFailedRevokeDoesNotRecordCutoff() throws Exception {
+    assertFailedRevokeKeepsCutoff(null);
+  }
+
+  @Test
+  public void testFailedRevokeKeepsExistingCutoff() throws Exception {
+    assertFailedRevokeKeepsCutoff(1L);
+  }
+
+  private void assertFailedRevokeKeepsCutoff(Long existing) throws Exception {
+    if (existing != null) {
+      metadataManager.getS3RevokedStsTokenTable().put(ACCESS_ID, existing);
+      metadataManager.getS3RevokedStsTokenTable().addCacheEntry(
+          new CacheKey<>(ACCESS_ID), CacheValue.get(1L, existing));
+    }
+    OMRequest request = new OMTenantRevokeUserAccessIdRequest(revokeRequest()).preExecute(ozoneManager);
+    TenantOp cacheOp = ozoneManager.getMultiTenantManager().getCacheOp();
+    doThrow(new OMException("Tenant cache update failed", OMException.ResultCodes.INTERNAL_ERROR))
+        .when(cacheOp).revokeUserAccessId(ACCESS_ID, TENANT);
+    OMClientResponse response = new OMTenantRevokeUserAccessIdRequest(request)
+        .validateAndUpdateCache(ozoneManager, 2L);
+    assertEquals(Status.INTERNAL_ERROR, response.getOMResponse().getStatus());
+    assertEquals(existing, metadataManager.getS3RevokedStsTokenTable().get(ACCESS_ID));
+    try (BatchOperation batch = metadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(metadataManager, batch);
+      metadataManager.getStore().commitBatchOperation(batch);
+    }
+    assertEquals(existing, metadataManager.getS3RevokedStsTokenTable().getSkipCache(ACCESS_ID));
   }
 
   private OMRequest revokeRequest() {

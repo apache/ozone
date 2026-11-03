@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -44,6 +43,7 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.S3SecretRequestHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantRevokeUserAccessIdResponse;
@@ -213,20 +213,13 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           new CacheKey<>(accessId),
           CacheValue.get(transactionLogIndex));
 
-      // Old log entries have no cutoff; replay must not invent a new timestamp.
-      Long stsRevocationCutoff = null;
-      if (getOmRequest().hasRevokeSTSTokenRequest()) {
-        Table<String, Long> table = omMetadataManager.getS3RevokedStsTokenTable();
-        Long existing = table.getIfExist(accessId);
-        long requested = getOmRequest().getRevokeSTSTokenRequest().getRevocationTimeMillis();
-        stsRevocationCutoff = existing == null ? requested : Math.max(existing, requested);
-        table.addCacheEntry(new CacheKey<>(accessId), CacheValue.get(transactionLogIndex, stsRevocationCutoff));
-      }
-
       S3SecretManager s3SecretManager = ozoneManager.getS3SecretManager();
       s3SecretManager.invalidateCacheEntry(accessId);
       // Update tenant cache
       multiTenantManager.getCacheOp().revokeUserAccessId(accessId, tenantId);
+
+      Long stsRevocationCutoff = S3SecretRequestHelper.updateStsRevocationCutoff(
+          omMetadataManager, getOmRequest(), accessId, transactionLogIndex);
 
       // Generate response
       omResponse.setTenantRevokeUserAccessIdResponse(

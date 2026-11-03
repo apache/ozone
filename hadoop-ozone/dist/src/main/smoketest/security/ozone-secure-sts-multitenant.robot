@@ -325,6 +325,17 @@ Multitenant Revocation Scenarios
     Should contain                ${output}                     Revoked accessId '${TENANT_ONE}$${USER_A}'.
     Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
 
+    # Reassign the same access ID: the old token must stay revoked, while a new token must work.
+    ${accessKeyId}  ${secretKey} =  Assign User To Tenant And Get Credentials  ${USER_A}  ${TENANT_ONE}
+    Should Be Equal               ${accessKeyId}                ${USER_A_T1_PERM_ACCESS_KEY_ID}
+    Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+    Refresh Ranger Policy Cache
+    Assume Role And Get Temporary Credentials                   perm_access_key_id=${accessKeyId}  perm_secret_key=${secretKey}  role_arn=${ROLE_ARN}
+    Configure STS Profile         ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  ${STS_SESSION_TOKEN}
+    Get Object Should Succeed     ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    Configure STS Profile         ${USER_A_T1_STS_ACCESS_KEY_ID}  ${USER_A_T1_STS_SECRET_KEY}  ${USER_A_T1_STS_SESSION_TOKEN}
+    Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
     Configure STS Profile         ${USER_A_T2_STS_ACCESS_KEY_ID}  ${USER_A_T2_STS_SECRET_KEY}  ${USER_A_T2_STS_SESSION_TOKEN}
     Get Object Should Succeed     ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
 
