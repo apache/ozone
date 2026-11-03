@@ -78,10 +78,6 @@ public final class TestSpanCollector implements SpanProcessor, AutoCloseable {
     onlySpan(spanName);
   }
 
-  public void assertError(String spanName) {
-    assertEquals(StatusCode.ERROR, onlySpan(spanName).getStatus().getStatusCode(), () -> spanName + " status");
-  }
-
   public void assertError(String spanName, String expectedDescription) {
     SpanData span = onlySpan(spanName);
     assertEquals(StatusCode.ERROR, span.getStatus().getStatusCode(), () -> spanName + " status");

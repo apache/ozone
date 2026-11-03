@@ -25,10 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.sdk.trace.SdkTracerProvider;
-import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
-import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -59,16 +55,6 @@ public class TestTracingAnnotations {
     GlobalOpenTelemetry.resetForTest();
   }
 
-  /**
-   * Puts a real GlobalOpenTelemetry in place with no exporter, so tests stay offline.
-   */
-  private static void installNoExportGlobalOpenTelemetry() {
-    SdkTracerProvider provider =
-        SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.noop())).build();
-    OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
-    GlobalOpenTelemetry.set(sdk);
-  }
-
   private static MutableConfigurationSource tracingEnabled() {
     MutableConfigurationSource config = new InMemoryConfigurationForTesting();
     config.setBoolean("ozone.tracing.enabled", true);
@@ -77,46 +63,55 @@ public class TestTracingAnnotations {
 
   @Test
   public void testSkipTracingNoSpan() {
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      ServiceImpl impl = new ServiceImpl();
+      Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
 
-    serviceProxy.skippedMethod();
-    assertFalse(impl.wasSpanActive(), "Span should NOT be created for @SkipTracing methods.");
+      serviceProxy.skippedMethod();
+      assertFalse(impl.wasSpanActive(), "Span should NOT be created for @SkipTracing methods.");
+      assertTrue(spans.getSpans().isEmpty(), "No span should be collected for @SkipTracing methods.");
+    }
   }
 
   @Test
   public void testSkipTracingExceptionUnwrapped() {
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      ServiceImpl impl = new ServiceImpl();
+      Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
 
-    IOException ex = assertThrows(IOException.class,
-        () -> serviceProxy.throwingMethod());
-    assertEquals("Original Exception", ex.getMessage());
-    assertFalse(impl.wasSpanActive(), "Span should NOT have been created for a @SkipTracing throwing method.");
+      IOException ex = assertThrows(IOException.class, () -> serviceProxy.throwingMethod());
+      assertEquals("Original Exception", ex.getMessage());
+      assertFalse(impl.wasSpanActive(), "Span should NOT have been created for a @SkipTracing throwing method.");
+      assertTrue(spans.getSpans().isEmpty(), "No span should be collected for a @SkipTracing throwing method.");
+    }
   }
 
   @Test
   public void testProxyNormalVsSkipped() {
-    installNoExportGlobalOpenTelemetry();
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      ServiceImpl impl = new ServiceImpl();
+      Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
 
-    serviceProxy.normalMethod();
-    assertTrue(impl.wasSpanActive(), "Normal method should have an active span.");
+      serviceProxy.normalMethod();
+      assertTrue(impl.wasSpanActive(), "Normal method should have an active span.");
+      spans.assertSingleSpan("Service.normalMethod");
+
+      serviceProxy.skippedMethod();
+      assertFalse(impl.wasSpanActive(), "@SkipTracing method should NOT have an active span.");
+      assertTrue(spans.named("Service.skippedMethod").isEmpty(), "@SkipTracing method should not create a span.");
+    }
   }
 
   @Test
   public void testInternalSpanKind() {
-    installNoExportGlobalOpenTelemetry();
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createClientProxy(impl, Service.class, tracingEnabled());
-    serviceProxy.localMethod();
-    assertTrue(impl.wasSpanActive(), "Local method should have an active span.");
-    assertEquals(SpanKind.INTERNAL, impl.lastSpanKind(), "@InternalSpanKind method should use INTERNAL.");
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      ServiceImpl impl = new ServiceImpl();
+      Service serviceProxy = createClientProxy(impl, Service.class, tracingEnabled());
+      serviceProxy.localMethod();
+      assertTrue(impl.wasSpanActive(), "Local method should have an active span.");
+      assertEquals(SpanKind.INTERNAL, impl.lastSpanKind(), "@InternalSpanKind method should use INTERNAL.");
+      spans.assertKind("Service.localMethod", SpanKind.INTERNAL);
+    }
   }
 
   @Test

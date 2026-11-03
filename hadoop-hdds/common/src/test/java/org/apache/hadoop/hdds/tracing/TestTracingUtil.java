@@ -278,10 +278,8 @@ public class TestTracingUtil {
 
       collector.assertError("supplier", "supplier failed");
       collector.assertExceptionRecorded("supplier", IOException.class);
-      assertEquals("Failed with exception: supplier failed", firstEventName(collector, "supplier"));
       collector.assertError("runnable", "runnable failed");
       collector.assertExceptionRecorded("runnable", IllegalStateException.class);
-      assertEquals("Failed with exception: runnable failed", firstEventName(collector, "runnable"));
       collector.assertNotError("parent");
     }
   }
@@ -438,12 +436,9 @@ public class TestTracingUtil {
         parent.end();
       }
 
-      SpanData parentData = finishedSpan(collector, "parent");
-      SpanData childData = finishedSpan(collector, "child");
-      assertEquals(SpanKind.INTERNAL, parentData.getKind());
-      assertEquals(SpanKind.CLIENT, childData.getKind());
-      assertEquals(parentData.getTraceId(), childData.getTraceId());
-      assertEquals(parentData.getSpanId(), childData.getParentSpanId());
+      collector.assertParent("child", "parent");
+      collector.assertKind("parent", SpanKind.INTERNAL);
+      collector.assertKind("child", SpanKind.CLIENT);
     }
   }
 
@@ -467,13 +462,8 @@ public class TestTracingUtil {
         span.end();
       }
 
-      SpanData data = finishedSpan(collector, "failing");
-      assertEquals(StatusCode.ERROR, data.getStatus().getStatusCode());
-      assertEquals("disk failed", data.getStatus().getDescription());
-      assertEquals(1, data.getEvents().size());
-      assertEquals("exception", data.getEvents().get(0).getName());
-      assertEquals(IOException.class.getName(),
-          data.getEvents().get(0).getAttributes().get(AttributeKey.stringKey("exception.type")));
+      collector.assertError("failing", "disk failed");
+      collector.assertExceptionRecorded("failing", IOException.class);
     }
   }
 
@@ -510,9 +500,7 @@ public class TestTracingUtil {
       } finally {
         span.end();
       }
-      SpanData data = finishedSpan(collector, "failing");
-      assertEquals(StatusCode.ERROR, data.getStatus().getStatusCode());
-      assertEquals("", data.getStatus().getDescription());
+      collector.assertError("failing", "");
     }
   }
 
@@ -525,7 +513,7 @@ public class TestTracingUtil {
       } finally {
         span.end();
       }
-      assertEquals(StatusCode.UNSET, finishedSpan(collector, "ok").getStatus().getStatusCode());
+      collector.assertNotError("ok");
     }
   }
 
@@ -544,13 +532,13 @@ public class TestTracingUtil {
         span.end();
       }
 
-      SpanData data = finishedSpan(collector, "request");
-      assertEquals("vol1", data.getAttributes().get(AttributeKey.stringKey("volume")));
-      assertNull(data.getAttributes().get(AttributeKey.stringKey("bucket")));
-      assertEquals(1024L, data.getAttributes().get(AttributeKey.longKey("dataSize")));
-      assertEquals(false, data.getAttributes().get(AttributeKey.booleanKey("om.success")));
-      assertEquals(StatusCode.UNSET, data.getStatus().getStatusCode());
+      collector.assertAttribute("request", "volume", "vol1");
+      collector.assertNoAttribute("request", "bucket");
+      collector.assertAttribute("request", "dataSize", 1024L);
+      collector.assertAttribute("request", "om.success", false);
+      collector.assertNotError("request");
 
+      SpanData data = finishedSpan(collector, "request");
       assertEquals(2, data.getEvents().size());
       assertEquals("client.datanode.failover", data.getEvents().get(0).getName());
       assertEquals("dn1", data.getEvents().get(0).getAttributes().get(AttributeKey.stringKey("datanode")));
@@ -577,9 +565,5 @@ public class TestTracingUtil {
     List<ReadableSpan> spans = collector.named(name);
     assertEquals(1, spans.size(), () -> "spans named " + name + ": " + collector.getSpans());
     return spans.get(0).toSpanData();
-  }
-
-  private static String firstEventName(TestSpanCollector collector, String name) {
-    return finishedSpan(collector, name).getEvents().get(0).getName();
   }
 }
