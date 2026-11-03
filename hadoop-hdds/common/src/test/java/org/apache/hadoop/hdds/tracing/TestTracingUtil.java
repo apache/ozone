@@ -49,7 +49,6 @@ import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
@@ -148,7 +147,7 @@ public class TestTracingUtil {
       Service proxy = createProxy(new ServiceImpl(), Service.class, SpanKind.INTERNAL);
       assertEquals("normal", proxy.normalMethod());
       collector.assertKind("ServiceImpl.normalMethod", SpanKind.INTERNAL);
-      assertFalse(finishedSpan(collector, "ServiceImpl.normalMethod").getParentSpanContext().isValid());
+      assertFalse(collector.onlySpan("ServiceImpl.normalMethod").getParentSpanContext().isValid());
     }
   }
 
@@ -448,7 +447,7 @@ public class TestTracingUtil {
       Span span = TracingUtil.createInternalSpan("root");
       assertTrue(span.getSpanContext().isValid());
       span.end();
-      assertFalse(finishedSpan(collector, "root").getParentSpanContext().isValid());
+      assertFalse(collector.onlySpan("root").getParentSpanContext().isValid());
     }
   }
 
@@ -486,8 +485,8 @@ public class TestTracingUtil {
 
       collector.assertError("failing", "disk failed");
       collector.assertExceptionRecorded("failing", IOException.class);
-      assertEquals(StatusCode.UNSET, finishedSpan(collector, "parent").getStatus().getStatusCode());
-      assertTrue(finishedSpan(collector, "parent").getEvents().isEmpty());
+      assertEquals(StatusCode.UNSET, collector.onlySpan("parent").getStatus().getStatusCode());
+      assertTrue(collector.onlySpan("parent").getEvents().isEmpty());
     }
   }
 
@@ -538,7 +537,7 @@ public class TestTracingUtil {
       collector.assertAttribute("request", "om.success", false);
       collector.assertNotError("request");
 
-      SpanData data = finishedSpan(collector, "request");
+      SpanData data = collector.onlySpan("request");
       assertEquals(2, data.getEvents().size());
       assertEquals("client.datanode.failover", data.getEvents().get(0).getName());
       assertEquals("dn1", data.getEvents().get(0).getAttributes().get(AttributeKey.stringKey("datanode")));
@@ -558,12 +557,5 @@ public class TestTracingUtil {
       TracingUtil.recordExceptionInCurrentSpan(new IOException("ignored"));
       assertTrue(collector.getSpans().isEmpty());
     }
-  }
-
-  /** @return the only collected span named {@code name}; fails the test if there is not exactly one. */
-  private static SpanData finishedSpan(TestSpanCollector collector, String name) {
-    List<ReadableSpan> spans = collector.named(name);
-    assertEquals(1, spans.size(), () -> "spans named " + name + ": " + collector.getSpans());
-    return spans.get(0).toSpanData();
   }
 }

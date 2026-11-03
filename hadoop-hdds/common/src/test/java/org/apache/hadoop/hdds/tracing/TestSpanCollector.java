@@ -73,9 +73,11 @@ public final class TestSpanCollector implements SpanProcessor, AutoCloseable {
     return spans.stream().filter(span -> span.getName().equals(name)).collect(Collectors.toList());
   }
 
-  /** Fails unless exactly one ended span is named {@code spanName}. */
-  public void assertSingleSpan(String spanName) {
-    onlySpan(spanName);
+  /** @return the only ended span named {@code spanName}; fails unless there is exactly one. */
+  public SpanData onlySpan(String spanName) {
+    List<ReadableSpan> matches = named(spanName);
+    assertEquals(1, matches.size(), () -> "spans named " + spanName + ": " + spans);
+    return matches.get(0).toSpanData();
   }
 
   public void assertError(String spanName, String expectedDescription) {
@@ -127,12 +129,6 @@ public final class TestSpanCollector implements SpanProcessor, AutoCloseable {
     SpanData parent = onlySpan(parentName);
     assertEquals(parent.getTraceId(), child.getTraceId(), () -> childName + " trace ID");
     assertEquals(parent.getSpanId(), child.getParentSpanId(), () -> childName + " parent");
-  }
-
-  private SpanData onlySpan(String spanName) {
-    List<ReadableSpan> matches = named(spanName);
-    assertEquals(1, matches.size(), () -> "spans named " + spanName + ": " + spans);
-    return matches.get(0).toSpanData();
   }
 
   @Override

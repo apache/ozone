@@ -94,7 +94,7 @@ public class TestTracingAnnotations {
 
       serviceProxy.normalMethod();
       assertTrue(impl.wasSpanActive(), "Normal method should have an active span.");
-      spans.assertSingleSpan("Service.normalMethod");
+      assertEquals(1, spans.named("Service.normalMethod").size(), "Normal method should create exactly one span.");
 
       serviceProxy.skippedMethod();
       assertFalse(impl.wasSpanActive(), "@SkipTracing method should NOT have an active span.");
