@@ -244,7 +244,7 @@ public class RpcClient implements ClientProtocol {
   private static final long OM_VERSION_REFRESHING = -1L;
   private volatile OzoneManagerVersion omVersion;
   private final AtomicLong omVersionLastUpdate = new AtomicLong();
-  private final boolean resolveS3VolumeOnOm;
+  private final boolean s3AuthCheck;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -303,9 +303,7 @@ public class RpcClient implements ClientProtocol {
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
     omVersionLastUpdate.set(clock.millis());
-    resolveS3VolumeOnOm = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false)
-        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION
-            .isSupportedBy(omVersion);
+    s3AuthCheck = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false);
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -3207,7 +3205,8 @@ public class RpcClient implements ClientProtocol {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
-    boolean assumeS3Context = volumeName == null && resolveS3VolumeOnOm;
+    boolean assumeS3Context = volumeName == null && s3AuthCheck
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
     if (assumeS3Context) {
       volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
     }

@@ -472,6 +472,31 @@ public class TestRpcClient {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testObjectTaggingDiscoversS3VolumeContextResolution(boolean s3AuthCheck) throws Exception {
+    VersionedOmTransport transport = new VersionedOmTransport();
+    transport.version = OzoneManagerVersion.S3_OBJECT_TAGGING_API;
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(S3Auth.S3_AUTH_CHECK, s3AuthCheck);
+    MockClock clock = MockClock.newInstance();
+    RpcClient client = createRpcClient(transport, conf, clock);
+    try {
+      assertThrows(IOException.class, () -> client.getObjectTagging("volume", "bucket", "key"));
+      assertFalse(transport.lastObjectTaggingRequest.getAssumeS3Context());
+
+      transport.version = OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION;
+      clock.fastForward(omVersionRefreshInterval());
+      IOException reachedOm = assertThrows(IOException.class,
+          () -> client.getObjectTagging(s3AuthCheck ? null : "volume", "bucket", "key"));
+      assertThat(reachedOm).hasMessage("Reached OM after version check");
+      assertEquals(s3AuthCheck, transport.lastObjectTaggingRequest.getAssumeS3Context());
+      assertEquals(2, transport.serviceInfoCalls.get());
+    } finally {
+      client.close();
+    }
+  }
+
   @Test
   void testConcurrentOmVersionReadersShareRefresh() throws Exception {
     VersionedOmTransport transport = new VersionedOmTransport();
@@ -532,6 +557,7 @@ public class TestRpcClient {
     private boolean uncheckedFailure;
     private List<ServiceInfo> services;
     private OMRequest lastServiceInfoRequest;
+    private OMRequest lastObjectTaggingRequest;
 
     @Override
     public OMResponse submitRequest(OMRequest request) throws IOException {
@@ -564,6 +590,7 @@ public class TestRpcClient {
             .build();
       }
       if (request.getCmdType() == Type.GetObjectTagging) {
+        lastObjectTaggingRequest = request;
         throw new IOException("Reached OM after version check");
       }
       return super.submitRequest(request);
