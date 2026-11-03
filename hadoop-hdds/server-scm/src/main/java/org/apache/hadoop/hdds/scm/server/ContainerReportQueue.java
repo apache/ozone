@@ -38,6 +38,8 @@ import org.apache.hadoop.util.Time;
 /**
  * Customized queue to handle FCR and ICR from datanode optimally,
  * avoiding duplicate FCR reports.
+ * Superseding or clearing a queued FCR completes it as unprocessed, releasing any claimed lease capacity without
+ * clearing the datanode's pending registration FCR.
  */
 public class ContainerReportQueue
     implements BlockingQueue<ContainerReport>, IQueueMetrics {
@@ -86,6 +88,7 @@ public class ContainerReportQueue
             dataList.remove(i);
             --capacity;
             droppedCount.incrementAndGet();
+            reportInfo.complete(false);
             isReportRemoved = true;
             break;
           }
@@ -312,6 +315,9 @@ public class ContainerReportQueue
   @Override
   public void clear() {
     synchronized (this) {
+      dataMap.values().stream()
+          .flatMap(Collection::stream)
+          .forEach(report -> report.complete(false));
       orderingQueue.clear();
       dataMap.clear();
       capacity = 0;

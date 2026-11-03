@@ -38,12 +38,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -145,6 +147,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
   private final NonWritableNodeFilter nonWritableNodeFilter;
   private final int numContainerPerVolume;
+  private Consumer<DatanodeDetails> datanodeRemovedCallback = ignored -> { };
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -402,6 +405,19 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
             .build());
   }
 
+  @Override
+  public Optional<RegisteredCommand> getRegistrationVersionError(DatanodeDetails datanodeDetails,
+      DatanodeVersionProto versionReport) {
+    if (!shouldFenceDatanode(datanodeDetails, versionReport)) {
+      return Optional.empty();
+    }
+    return Optional.of(RegisteredCommand.newBuilder()
+        .setErrorCode(ErrorCode.errorNodeNotPermitted)
+        .setDatanode(datanodeDetails)
+        .setClusterID(this.scmStorageConfig.getClusterID())
+        .build());
+  }
+
   /**
    * Register the node if the node finds that it is not registered with any
    * SCM.
@@ -419,12 +435,9 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
       DatanodeVersionProto dnVersionInfo) {
-    if (shouldFenceDatanode(datanodeDetails, dnVersionInfo)) {
-      return RegisteredCommand.newBuilder()
-          .setErrorCode(ErrorCode.errorNodeNotPermitted)
-          .setDatanode(datanodeDetails)
-          .setClusterID(this.scmStorageConfig.getClusterID())
-          .build();
+    Optional<RegisteredCommand> error = getRegistrationVersionError(datanodeDetails, dnVersionInfo);
+    if (error.isPresent()) {
+      return error.get();
     }
 
     InetAddress dnAddress = Server.getRemoteIp();
@@ -2100,6 +2113,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     try {
       NodeStatus nodeStatus = this.getNodeStatus(datanodeDetails);
       if (datanodeDetails.isDecommissioned() || nodeStatus.isDead()) {
+        datanodeRemovedCallback.accept(datanodeDetails);
         if (clusterMap.contains(datanodeDetails)) {
           clusterMap.remove(datanodeDetails);
         }
@@ -2113,6 +2127,11 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     } finally {
       writeLock().unlock();
     }
+  }
+
+  @Override
+  public void setDatanodeRemovedCallback(Consumer<DatanodeDetails> callback) {
+    datanodeRemovedCallback = Objects.requireNonNull(callback);
   }
 
   @Override

@@ -44,21 +44,25 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.TextFormat;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
@@ -73,8 +77,9 @@ import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -110,7 +115,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Protocol Handler for Datanode Protocol.
+ * Protocol handler for datanode registration and heartbeats.
+ *
+ * <p>The SCM FCR lease flow is:
+ * <ol>
+ * <li>Registration supplies an actual FCR or records that it is deferred. Successful node registration is notified
+ * independently of whether its registration FCR has been processed.</li>
+ * <li>A heartbeat requests a grant from {@link SCMFullContainerReportLeaseManager}, when allowed by SCM leadership
+ * and upgrade state.</li>
+ * <li>An incoming leased FCR is validated and claimed before dispatch; unleased reports retain legacy behavior.
+ * Invalid leased FCRs are rejected without suppressing other heartbeat reports.</li>
+ * <li>The dispatcher transfers an accepted report to the queue. Processing or discard completes its claim and releases
+ * capacity; container SafeMode rules receive container IDs only after successful registration FCR processing.</li>
+ * </ol>
  */
 public class SCMDatanodeProtocolServer implements
     StorageContainerDatanodeProtocol, Auditor {
@@ -130,6 +147,9 @@ public class SCMDatanodeProtocolServer implements
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
+  // Owned by SCM; null for Recon, which does not participate in FCR leasing.
+  @Nullable
+  private final SCMFullContainerReportLeaseManager fcrLeaseManager;
   private ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type> protocolMessageMetrics;
 
   private final SCMContext scmContext;
@@ -137,7 +157,8 @@ public class SCMDatanodeProtocolServer implements
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
                                    OzoneStorageContainerManager scm,
                                    EventPublisher eventPublisher,
-                                   SCMContext scmContext)
+                                   SCMContext scmContext,
+                                   SCMFullContainerReportLeaseManager fcrLeaseManager)
       throws IOException {
 
     // This constructor has broken down to smaller methods so that Recon's
@@ -148,6 +169,8 @@ public class SCMDatanodeProtocolServer implements
     this.scm = scm;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
+    this.fcrLeaseManager = scmContext == null ? fcrLeaseManager
+        : Objects.requireNonNull(fcrLeaseManager, "FCR lease manager cannot be null for SCM");
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
@@ -242,17 +265,34 @@ public class SCMDatanodeProtocolServer implements
     // Read before the decision, so that a rejection made before this SCM became the ready leader is not final.
     final boolean leaderReady = scmContext == null || scmContext.isLeaderReady();
     // TODO : Return the list of Nodes that forms the SCM HA.
-    RegisteredCommand registeredCommand = scm.getScmNodeManager()
-        .register(datanodeDetails, nodeReport, pipelineReportsProto,
-            versionInfo);
+    RegisteredCommand registeredCommand;
+    // Reject unsupported deferral before register() can change node state. Prefer the structured version error for
+    // incompatible datanodes, and preserve rejection even if finalization advances during version validation.
+    if (containerReportsProto.getFullContainerReportDeferred()
+        && (fcrLeaseManager == null || !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE))) {
+      registeredCommand = scm.getScmNodeManager().getRegistrationVersionError(datanodeDetails, versionInfo)
+          .orElseThrow(() -> new IOException(
+              "Full container report leases must be supported and finalized before deferring registration reports."));
+    } else {
+      registeredCommand = scm.getScmNodeManager()
+          .register(datanodeDetails, nodeReport, pipelineReportsProto, versionInfo);
+    }
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
-      eventPublisher.fireEvent(CONTAINER_REPORT,
-          new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
-              datanodeDetails, containerReportsProto, true));
+      // A deferred FCR does not describe an empty datanode; record it for a later leased heartbeat.
+      if (containerReportsProto.getFullContainerReportDeferred()) {
+        fcrLeaseManager.markFullContainerReportDeferred(datanodeDetails);
+      } else {
+        if (fcrLeaseManager != null) {
+          fcrLeaseManager.clearFullContainerReportDeferred(datanodeDetails);
+        }
+        eventPublisher.fireEvent(CONTAINER_REPORT,
+            new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
+                datanodeDetails, containerReportsProto, true));
+      }
+      // Count successful node registration independently of container SafeMode progress after actual FCR processing.
       eventPublisher.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-          new NodeRegistrationContainerReport(datanodeDetails,
-              containerReportsProto));
+          new NodeRegistrationContainerReport(datanodeDetails));
       eventPublisher.fireEvent(PIPELINE_REPORT,
               new PipelineReportFromDatanode(datanodeDetails,
                       pipelineReportsProto));
@@ -312,8 +352,25 @@ public class SCMDatanodeProtocolServer implements
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
+    ContainerReportFromDatanode containerReport = null;
+    boolean leasedReportRejected = false;
+    if (heartbeat.hasContainerReport()) {
+      DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
+      ContainerReportsProto report = heartbeat.getContainerReport();
+      if (report.hasFullContainerReportLease()) {
+        Optional<LeaseClaim> claim =
+            validateAndClaimFullContainerReportLease(datanodeDetails, report.getFullContainerReportLease());
+        if (claim.isPresent()) {
+          containerReport = new ContainerReportFromDatanode(datanodeDetails, report, claim.get());
+        } else {
+          leasedReportRejected = true;
+        }
+      } else {
+        containerReport = new ContainerReportFromDatanode(datanodeDetails, report);
+      }
+    }
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
-    for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeat)) {
+    for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeat, containerReport)) {
       cmdResponses.add(getCommandResponse(cmd, scm));
     }
     final OptionalLong term = getTermIfLeader();
@@ -328,6 +385,8 @@ public class SCMDatanodeProtocolServer implements
               .setDatanodeUUID(heartbeat.getDatanodeDetails().getUuid())
               .addAllCommands(cmdResponses);
       term.ifPresent(builder::setTerm);
+      builder.setFullContainerReportLeaseRejected(leasedReportRejected);
+      addFCRLeaseIfRequested(heartbeat, builder);
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
@@ -342,6 +401,51 @@ public class SCMDatanodeProtocolServer implements
         );
       }
     }
+  }
+
+  /**
+   * Validates and claims the lease attached to an incoming FCR, retaining capacity until the report completes.
+   *
+   * @return the report's lease claim, or empty if leasing is unavailable or the grant is invalid
+   */
+  private Optional<LeaseClaim> validateAndClaimFullContainerReportLease(
+      DatanodeDetails datanodeDetails, FullContainerReportLeaseProto lease) {
+    Optional<LeaseClaim> claim = Optional.empty();
+    if (fcrLeaseManager != null) {
+      if (isFCRLeaseAllowed()) {
+        claim = fcrLeaseManager.claimLease(datanodeDetails, lease.getId());
+      } else {
+        fcrLeaseManager.incrementInvalidLeaseReports();
+      }
+    }
+    if (claim.isEmpty()) {
+      LOG.warn("Ignoring full container report from datanode {} with invalid lease id {}.",
+          datanodeDetails.getUuidString(), lease.getId());
+    }
+    return claim;
+  }
+
+  private void addFCRLeaseIfRequested(SCMHeartbeatRequestProto heartbeat,
+      SCMHeartbeatResponseProto.Builder builder) {
+    if (fcrLeaseManager == null || !heartbeat.getRequestFullContainerReportLease() || !isFCRLeaseAllowed()) {
+      return;
+    }
+
+    DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
+        heartbeat.getDatanodeDetails());
+    OptionalLong leaseId = fcrLeaseManager.requestLease(datanodeDetails);
+    if (leaseId.isPresent()) {
+      builder.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(leaseId.getAsLong()));
+    }
+  }
+
+  /**
+   * Whether this SCM may grant or claim FCR leases. Followers and non-HA SCMs are eligible, but an HA leader must
+   * be ready. Recon and unfinalized SCMs are ineligible. Disabling rate limiting does not bypass these checks.
+   */
+  private boolean isFCRLeaseAllowed() {
+    return scmContext != null && scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)
+        && (!scmContext.isLeader() || scmContext.isLeaderReady());
   }
 
   private OptionalLong getTermIfLeader() {
@@ -541,14 +645,34 @@ public class SCMDatanodeProtocolServer implements
   }
 
   /**
-   * Wrapper class for events with the datanode origin.
+   * Datanode details and container IDs for node registration and registration FCR processing events.
+   * {@link SCMEvents#NODE_REGISTRATION_CONT_REPORT} needs only datanode identity after successful registration.
+   * {@link SCMEvents#CONTAINER_REGISTRATION_REPORT} carries container IDs after successful registration FCR processing.
    */
-  public static class NodeRegistrationContainerReport extends
-      ReportFromDatanode<ContainerReportsProto> {
+  public static class NodeRegistrationContainerReport {
+    private final DatanodeDetails datanodeDetails;
+    private final long[] containerIDs;
+
+    public NodeRegistrationContainerReport(DatanodeDetails datanodeDetails) {
+      this(datanodeDetails, null);
+    }
 
     public NodeRegistrationContainerReport(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
-      super(datanodeDetails, report);
+      this.datanodeDetails = datanodeDetails;
+      int numContainers = report == null ? 0 : report.getReportsCount();
+      containerIDs = new long[numContainers];
+      for (int i = 0; i < numContainers; i++) {
+        containerIDs[i] = report.getReports(i).getContainerID();
+      }
+    }
+
+    public DatanodeDetails getDatanodeDetails() {
+      return datanodeDetails;
+    }
+
+    public long[] getContainerIDs() {
+      return containerIDs.clone();
     }
   }
 

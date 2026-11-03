@@ -17,10 +17,14 @@
 
 package org.apache.hadoop.ozone.container.common.states.datanode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.SHUTDOWN;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,11 +40,25 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.server.StartupProgress;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.DatanodeStartupPhase;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -48,7 +66,9 @@ import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.util.Time;
@@ -62,6 +82,101 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test class for RunningDatanodeState.
  */
 public class TestRunningDatanodeState {
+
+  @Test
+  void testRegistrationFcrRetriesOnHeartbeatCycles() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
+    StateContext context = registrationContext(conf, datanode);
+    SCMConnectionManager connections = mock(SCMConnectionManager.class);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    when(scm.register(any(), any(), any(), any(), any())).thenAnswer(invocation ->
+        SCMRegisteredResponseProto.newBuilder().setClusterID("cluster")
+            .setDatanodeUUID(datanode.getDatanodeDetails().getUuidString())
+            .setErrorCode(SCMRegisteredResponseProto.ErrorCode.success).build());
+    AtomicInteger requests = new AtomicInteger();
+    AtomicInteger reports = new AtomicInteger();
+    when(scm.sendHeartbeat(any())).thenAnswer(invocation -> {
+      SCMHeartbeatRequestProto request = invocation.getArgument(0);
+      SCMHeartbeatResponseProto.Builder response =
+          SCMHeartbeatResponseProto.newBuilder().setDatanodeUUID(request.getDatanodeDetails().getUuid()).setTerm(7);
+      if (request.getRequestFullContainerReportLease()) {
+        int requestCount = requests.incrementAndGet();
+        if (requestCount == 1) {
+          throw new IOException("SCM unavailable");
+        }
+        if (requestCount > 2) {
+          response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99));
+        }
+      } else if (request.hasContainerReport()) {
+        reports.incrementAndGet();
+      }
+      return response.build();
+    });
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (EndpointStateMachine endpoint = new EndpointStateMachine(new HostAndPort("scm", 9861), scm, conf, "")) {
+      endpoint.setState(EndPointStates.REGISTER);
+      context.addEndpoint(endpoint.getAddress());
+      when(connections.getValues()).thenReturn(Collections.singletonList(endpoint));
+      RunningDatanodeState running = new RunningDatanodeState(conf, connections, context);
+
+      running.execute(executor);
+      running.await(5, TimeUnit.SECONDS);
+
+      assertThat(endpoint.getState()).isEqualTo(EndPointStates.HEARTBEAT);
+      assertThat(context.isFullContainerReportReady(endpoint.getAddress())).isTrue();
+      verify(scm, never()).sendHeartbeat(any());
+
+      running.execute(executor);
+      running.await(5, TimeUnit.SECONDS);
+      assertThat(requests.get()).isEqualTo(1);
+      assertThat(reports.get()).isZero();
+      assertThat(context.isFullContainerReportReady(endpoint.getAddress())).isTrue();
+      assertThat(endpoint.getMissedCount()).isEqualTo(1);
+
+      running.execute(executor);
+      running.await(5, TimeUnit.SECONDS);
+      assertThat(requests.get()).isEqualTo(2);
+      assertThat(reports.get()).isZero();
+      assertThat(context.isFullContainerReportReady(endpoint.getAddress())).isTrue();
+      assertThat(endpoint.getMissedCount()).isZero();
+
+      running.execute(executor);
+      running.await(5, TimeUnit.SECONDS);
+      assertThat(requests.get()).isEqualTo(3);
+      assertThat(reports.get()).isEqualTo(1);
+      assertThat(context.isFullContainerReportReady(endpoint.getAddress())).isFalse();
+      verify(datanode, never()).triggerHeartbeat();
+      verify(datanode, never()).setNextHB(anyLong());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private static StateContext registrationContext(OzoneConfiguration conf, DatanodeStateMachine datanode)
+      throws IOException {
+    when(datanode.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+    DatanodeVersionManager versions = mock(DatanodeVersionManager.class);
+    when(versions.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versions.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versions.getVersionForClient()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versions.isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(true);
+    when(datanode.getVersionManager()).thenReturn(versions);
+    when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    OzoneContainer container = mock(OzoneContainer.class);
+    ContainerSet containers = mock(ContainerSet.class);
+    when(containers.getContainerReport()).thenReturn(ContainerReportsProto.getDefaultInstance());
+    when(container.getContainerSet()).thenReturn(containers);
+    when(container.getNodeReport()).thenReturn(NodeReportProto.getDefaultInstance());
+    when(container.getPipelineReport()).thenReturn(PipelineReportsProto.getDefaultInstance());
+    ContainerController controller = mock(ContainerController.class);
+    when(controller.getContainerReport()).thenReturn(ContainerReportsProto.getDefaultInstance());
+    when(container.getController()).thenReturn(controller);
+    when(datanode.getContainer()).thenReturn(container);
+    return new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+  }
+
   @Test
   public void testAwait() throws InterruptedException {
     SCMConnectionManager connectionManager = mock(SCMConnectionManager.class);
@@ -107,6 +222,101 @@ public class TestRunningDatanodeState {
     assertThat(endTime - startTime).isLessThan(500);
 
     executorService.shutdown();
+  }
+
+  @Test
+  void testLeasedFcrSentWhileOtherScmsAreBlocked() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 30, TimeUnit.SECONDS);
+    DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
+    SCMConnectionManager connections = mock(SCMConnectionManager.class);
+    OzoneContainer container = mock(OzoneContainer.class);
+    ContainerSet containers = mock(ContainerSet.class);
+    when(datanode.getContainer()).thenReturn(container);
+    when(datanode.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    when(versionManager.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getVersionForClient()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(true);
+    when(datanode.getVersionManager()).thenReturn(versionManager);
+    when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    when(container.getContainerSet()).thenReturn(containers);
+    when(container.getPipelineReport()).thenReturn(PipelineReportsProto.getDefaultInstance());
+    when(containers.getContainerReport()).thenReturn(ContainerReportsProto.getDefaultInstance());
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+    context.configureHeartbeatFrequency();
+    CountDownLatch peersBlocked = new CountDownLatch(2);
+    CountDownLatch releasePeers = new CountDownLatch(1);
+    CountDownLatch leaseRequested = new CountDownLatch(1);
+    CountDownLatch releaseLease = new CountDownLatch(1);
+    CountDownLatch reportSent = new CountDownLatch(1);
+    AtomicReference<SCMHeartbeatRequestProto> report = new AtomicReference<>();
+    StorageContainerDatanodeProtocolClientSideTranslatorPB blockedScm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    when(blockedScm.sendHeartbeat(any())).thenAnswer(invocation -> {
+      SCMHeartbeatRequestProto request = invocation.getArgument(0);
+      peersBlocked.countDown();
+      assertThat(releasePeers.await(30, TimeUnit.SECONDS)).isTrue();
+      return SCMHeartbeatResponseProto.newBuilder().setDatanodeUUID(request.getDatanodeDetails().getUuid()).build();
+    });
+    StorageContainerDatanodeProtocolClientSideTranslatorPB healthyScm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    when(healthyScm.sendHeartbeat(any())).thenAnswer(invocation -> {
+      SCMHeartbeatRequestProto request = invocation.getArgument(0);
+      SCMHeartbeatResponseProto.Builder response =
+          SCMHeartbeatResponseProto.newBuilder().setDatanodeUUID(request.getDatanodeDetails().getUuid());
+      if (request.getRequestFullContainerReportLease()) {
+        leaseRequested.countDown();
+        assertThat(releaseLease.await(30, TimeUnit.SECONDS)).isTrue();
+        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99));
+      } else if (request.hasContainerReport()) {
+        report.set(request);
+        reportSent.countDown();
+      }
+      return response.build();
+    });
+    List<EndpointStateMachine> endpoints = new ArrayList<>();
+    ExecutorService executor = Executors.newFixedThreadPool(4);
+    try {
+      for (int i = 0; i < 3; i++) {
+        EndpointStateMachine endpoint =
+            new EndpointStateMachine(new HostAndPort("scm" + i, 9861), i < 2 ? blockedScm : healthyScm, conf, "");
+        endpoints.add(endpoint);
+        endpoint.setState(EndPointStates.HEARTBEAT);
+        context.addEndpoint(endpoint.getAddress());
+      }
+      when(connections.getValues()).thenReturn(endpoints);
+      RunningDatanodeState running = new RunningDatanodeState(conf, connections, context);
+      running.execute(executor);
+      assertThat(peersBlocked.await(5, TimeUnit.SECONDS)).isTrue();
+      assertThat(leaseRequested.await(5, TimeUnit.SECONDS)).isTrue();
+      // Queue duplicate peer waits while the healthy endpoint's lease request is still in flight.
+      running.execute(executor);
+      releaseLease.countDown();
+
+      assertThat(reportSent.await(5, TimeUnit.SECONDS)).as("FCR sent before releasing blocked SCM peers").isTrue();
+      assertThat(releasePeers.getCount()).isEqualTo(1);
+      EndpointStateMachine healthy = endpoints.get(2);
+      healthy.getExecutorService().submit(() -> { }).get(5, TimeUnit.SECONDS);
+      assertThat(report.get().getRequestFullContainerReportLease()).isFalse();
+      assertThat(report.get().getContainerReport().getFullContainerReportLease().getId()).isEqualTo(99);
+      assertThat(context.isFullContainerReportReady(healthy.getAddress())).isFalse();
+      assertThat(healthy.hasFullContainerReportLease()).isFalse();
+      verify(healthyScm, times(2)).sendHeartbeat(any());
+    } finally {
+      releaseLease.countDown();
+      releasePeers.countDown();
+      executor.shutdownNow();
+      for (EndpointStateMachine endpoint : endpoints) {
+        endpoint.getExecutorService().shutdownNow();
+        endpoint.close();
+      }
+      assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+      for (EndpointStateMachine endpoint : endpoints) {
+        assertThat(endpoint.getExecutorService().awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+      }
+    }
   }
 
   @ParameterizedTest

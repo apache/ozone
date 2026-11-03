@@ -120,9 +120,9 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   @Override
   protected void process(NodeRegistrationContainerReport report) {
     final DatanodeID datanodeID = report.getDatanodeDetails().getID();
-    report.getReport().getReportsList().stream()
-        .map(c -> ContainerID.valueOf(c.getContainerID()))
-        .forEach(cid -> handleReportedContainer(cid, datanodeID));
+    for (long containerID : report.getContainerIDs()) {
+      handleReportedContainer(ContainerID.valueOf(containerID), datanodeID);
+    }
 
     if (scmInSafeMode()) {
       SCMSafeModeManager.getLogger().info(

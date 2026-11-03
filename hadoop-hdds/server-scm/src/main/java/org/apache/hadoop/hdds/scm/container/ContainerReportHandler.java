@@ -133,18 +133,21 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   @Override
   public void onMessage(final ContainerReportFromDatanode reportFromDatanode,
                         final EventPublisher publisher) {
-
     final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
-    final DatanodeInfo datanodeInfo = getNodeManager().getNode(dnFromReport.getID());
-    if (datanodeInfo == null) {
-      getLogger().warn("Datanode not found: {}", dnFromReport);
-      return;
-    }
-    final DatanodeDetails datanodeDetails = datanodeInfo;
-    final ContainerReportsProto containerReport =
-        reportFromDatanode.getReport();
+    boolean processed = false;
     try {
+      if (!reportFromDatanode.startProcessing()) {
+        return;
+      }
+      final DatanodeInfo datanodeInfo = getNodeManager().getNode(dnFromReport.getID());
+      if (datanodeInfo == null) {
+        getLogger().warn("Datanode not found: {}", dnFromReport);
+        return;
+      }
+      final DatanodeDetails datanodeDetails = datanodeInfo;
+      final ContainerReportsProto containerReport =
+          reportFromDatanode.getReport();
       // HDDS-5249 - we must ensure that an ICR and FCR for the same datanode
       // do not run at the same time or it can result in a data consistency
       // issue between the container list in NodeManager and the replicas in
@@ -191,17 +194,20 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         // list
         processMissingReplicas(datanodeDetails, expectedContainersInDatanode);
         getContainerManager().notifyContainerReportProcessing(true, true);
-        if (reportFromDatanode.isRegister()) {
+        // Container SafeMode rules advance only after the actual registration FCR has been processed.
+        if (reportFromDatanode.isRegistrationReport()) {
           publisher.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT,
               new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanodeDetails,
               reportFromDatanode.getReport()));
         }
+        processed = true;
       }
     } catch (NodeNotFoundException ex) {
       getContainerManager().notifyContainerReportProcessing(true, false);
-      getLogger().warn("Datanode not found: {}", datanodeDetails, ex);
+      getLogger().warn("Datanode not found: {}", dnFromReport, ex);
+    } finally {
+      reportFromDatanode.complete(processed);
     }
-
   }
 
   /**

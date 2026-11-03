@@ -42,7 +42,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -130,6 +132,25 @@ public class HeartbeatEndpointTask
   @Override
   public EndpointStateMachine.EndPointStates call() throws Exception {
     rpcEndpoint.lock();
+    try {
+      boolean fcrReadyAfterLeaseGrant = sendHeartbeat();
+      if (fcrReadyAfterLeaseGrant) {
+        // If an FCR lease is granted, we should send the FCR immediately
+        sendHeartbeat();
+      }
+    } finally {
+      rpcEndpoint.unlock();
+    }
+    return rpcEndpoint.getState();
+  }
+
+  /**
+   * Sends a heartbeat and processes its response.
+   *
+   * @return true if this heartbeat requested a lease, a lease is now cached and an FCR is pending, allowing an
+   *     immediate follow-up heartbeat; false otherwise, including on communication failure
+   */
+  private boolean sendHeartbeat() {
     SCMHeartbeatRequestProto.Builder requestBuilder = null;
     try {
       DatanodeVersionProto versionInfo = toVersionProto(
@@ -151,19 +172,40 @@ public class HeartbeatEndpointTask
       LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
           .sendHeartbeat(request);
+      if (isFullContainerReportLeaseRejected(request, response)) {
+        context.markFullContainerReportPending(rpcEndpoint.getAddress());
+      }
       processResponse(response, datanodeDetailsProto);
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
+      return isFullContainerReportReadyAfterLeaseGrant(request);
     } catch (IOException ex) {
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
+      if (requestBuilder.hasContainerReport() && !rpcEndpoint.isPassive()) {
+        context.markFullContainerReportPending(rpcEndpoint.getAddress());
+      }
       rpcEndpoint.logIfNeeded(ex);
       maybeRefreshScmAddress(ex);
-    } finally {
-      rpcEndpoint.unlock();
     }
-    return rpcEndpoint.getState();
+    return false;
+  }
+
+  private static boolean isFullContainerReportLeaseRejected(SCMHeartbeatRequestProto request,
+      SCMHeartbeatResponseProto response) {
+    return response.getFullContainerReportLeaseRejected()
+        && request.hasContainerReport()
+        && request.getContainerReport().hasFullContainerReportLease();
+  }
+
+  /**
+   * Checks whether a pending FCR can follow the lease-request heartbeat after its response has been processed.
+   * Callers must hold the endpoint lock.
+   */
+  private boolean isFullContainerReportReadyAfterLeaseGrant(SCMHeartbeatRequestProto request) {
+    return request.getRequestFullContainerReportLease() && rpcEndpoint.hasFullContainerReportLease()
+        && context.isFullContainerReportReady(rpcEndpoint.getAddress());
   }
 
   /**
@@ -208,8 +250,18 @@ public class HeartbeatEndpointTask
    * @param requestBuilder builder to which the report has to be added.
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    for (Message report :
-        context.getAllAvailableReports(rpcEndpoint.getAddress())) {
+    String excludedReportType;
+    if (!rpcEndpoint.isPassive()) {
+      // Generate a fresh FCR here, even before finalization enables lease requests.
+      addFullContainerReportOrRequestLease(requestBuilder);
+      // Never fall back to queued FCRs while waiting for a lease.
+      excludedReportType = StateContext.CONTAINER_REPORTS_PROTO_NAME;
+    } else {
+      // Recon receives queued FCRs through the report loop below.
+      excludedReportType = null;
+    }
+
+    for (Message report : context.getAllAvailableReports(rpcEndpoint.getAddress(), excludedReportType)) {
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
           SCMHeartbeatRequestProto.getDescriptor().getFields()) {
@@ -223,6 +275,38 @@ public class HeartbeatEndpointTask
           break;
         }
       }
+    }
+  }
+
+  /**
+   * Adds a fresh FCR for an SCM endpoint, requesting a lease first if the apparent version enables leases.
+   *
+   * <p>Callers must hold the endpoint lock and invoke this before collecting queued ICRs.
+   *
+   * @param requestBuilder builder to which the report or lease request has to be added
+   */
+  private void addFullContainerReportOrRequestLease(SCMHeartbeatRequestProto.Builder requestBuilder) {
+    if (!context.isFullContainerReportReady(rpcEndpoint.getAddress())) {
+      return;
+    }
+    boolean useFCRLease = context.isFullContainerReportLeaseEnabled(rpcEndpoint);
+    if (useFCRLease && !rpcEndpoint.hasFullContainerReportLease()) {
+      requestBuilder.setRequestFullContainerReportLease(true);
+      return;
+    }
+
+    try {
+      ContainerReportsProto report = context.getFullContainerReportDiscardPendingICR(rpcEndpoint.getAddress());
+      if (report == null) {
+        return;
+      }
+      if (useFCRLease) {
+        FullContainerReportLeaseProto lease = rpcEndpoint.takeFullContainerReportLease();
+        report = report.toBuilder().setFullContainerReportLease(lease).build();
+      }
+      requestBuilder.setContainerReport(report);
+    } catch (IOException | RuntimeException ex) {
+      LOG.warn("Failed to generate full container report for {}. Continuing heartbeat.", rpcEndpoint.getAddress(), ex);
     }
   }
 
@@ -300,6 +384,11 @@ public class HeartbeatEndpointTask
         "Unexpected datanode ID in the response.");
     if (response.hasTerm()) {
       context.updateTermOfLeaderSCM(response.getTerm());
+    }
+    if (response.hasFullContainerReportLease()
+        && response.getFullContainerReportLease().getId() != 0) {
+      rpcEndpoint.setFullContainerReportLease(
+          response.getFullContainerReportLease());
     }
     // Verify the response is indeed for this datanode.
     for (SCMCommandProto commandResponseProto : response.getCommandsList()) {
@@ -445,6 +534,7 @@ public class HeartbeatEndpointTask
         LOG.debug("Received SCM notification to register."
             + " Interrupt HEARTBEAT and transit to GETVERSION state.");
       }
+      rpcEndpoint.clearFullContainerReportLease();
       rpcEndpoint.setState(EndPointStates.GETVERSION);
       // trigger immediate GETVERSION
       context.getParent().setNextHB(Time.monotonicNow());

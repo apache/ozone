@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -41,9 +42,11 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,6 +56,9 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
@@ -63,6 +69,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.report.ContainerReportPublisher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -70,8 +77,11 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Test class for Datanode StateContext.
@@ -213,7 +223,7 @@ public class TestStateContext {
         StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
 
     // Get FCR
-    ctx.getFullContainerReportDiscardPendingICR();
+    ctx.getFullContainerReport();
 
     // Only FCR should be part of all available reports.
     expectedReportCount.put(
@@ -225,6 +235,163 @@ public class TestStateContext {
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
     expectedReportCount.remove(
         StateContext.CONTAINER_REPORTS_PROTO_NAME);
+  }
+
+  @Test
+  public void testMarkFullContainerReportPendingForOneEndpoint() throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9002);
+    context.addEndpoint(scm1);
+    context.addEndpoint(scm2);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+
+    context.getAllAvailableReports(scm1);
+    context.getAllAvailableReports(scm2);
+    assertFalse(context.isFullContainerReportReady(scm1));
+    assertFalse(context.isFullContainerReportReady(scm2));
+
+    context.markFullContainerReportPending(scm1);
+
+    assertTrue(context.isFullContainerReportReady(scm1));
+    assertFalse(context.isFullContainerReportReady(scm2));
+  }
+
+  @Test
+  public void testEndpointFullContainerReportDiscardsOnlyItsPendingICRs()
+      throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9002);
+    context.addEndpoint(scm1);
+    context.addEndpoint(scm2);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    context.addIncrementalReport(
+        IncrementalContainerReportProto.getDefaultInstance());
+
+    context.getFullContainerReportDiscardPendingICR(scm1);
+
+    assertTrue(context.getAllAvailableReports(scm1).isEmpty());
+    assertEquals(2, context.getAllAvailableReports(scm2).size());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  public void testFullContainerReportFailurePreservesICRs(boolean endpointReport, boolean runtimeFailure)
+      throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9002);
+    context.addEndpoint(scm1);
+    context.addEndpoint(scm2);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    IncrementalContainerReportProto icr = IncrementalContainerReportProto.getDefaultInstance();
+    context.addIncrementalReport(icr);
+    Exception failure =
+        runtimeFailure ? new IllegalStateException("snapshot failed") : new IOException("snapshot failed");
+    when(context.getParent().getContainer().getContainerSet().getContainerReport()).thenThrow(failure);
+
+    assertThrows(failure.getClass(), () -> {
+      if (endpointReport) {
+        context.getFullContainerReportDiscardPendingICR(scm1);
+      } else {
+        context.getFullContainerReport();
+      }
+    });
+
+    assertTrue(context.isFullContainerReportReady(scm1));
+    assertTrue(context.isFullContainerReportReady(scm2));
+    assertEquals(Collections.singletonList(icr), context.getIncrementalReports(scm1, Integer.MAX_VALUE));
+    assertEquals(Collections.singletonList(icr), context.getIncrementalReports(scm2, Integer.MAX_VALUE));
+  }
+
+  @Test
+  public void testPeriodicFullContainerReportPreservesScmICRs() throws IOException {
+    StateContext context = createSubject();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    SCMConnectionManager connectionManager = mock(SCMConnectionManager.class);
+    when(context.getParent().getConnectionManager()).thenReturn(connectionManager);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    HostAndPort waitingAddress = new HostAndPort("waiting-scm", 9001);
+    HostAndPort leasedAddress = new HostAndPort("leased-scm", 9002);
+    HostAndPort reconAddress = new HostAndPort("recon", 9004);
+    try (EndpointStateMachine waiting = new EndpointStateMachine(waitingAddress, scm, conf, "");
+         EndpointStateMachine leased = new EndpointStateMachine(leasedAddress, scm, conf, "");
+         EndpointStateMachine recon = new EndpointStateMachine(reconAddress, scm, conf, "")) {
+      leased.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).build());
+      recon.setPassive(true);
+      when(connectionManager.getValues()).thenReturn(Arrays.asList(waiting, leased, recon));
+      Arrays.asList(waitingAddress, leasedAddress, reconAddress).forEach(context::addEndpoint);
+      IncrementalContainerReportProto icr = IncrementalContainerReportProto.newBuilder()
+          .addReport(ContainerReplicaProto.newBuilder().setContainerID(1).setState(ContainerReplicaProto.State.CLOSING))
+          .build();
+      ContainerReportsProto report = ContainerReportsProto.newBuilder()
+          .addReports(ContainerReplicaProto.newBuilder().setContainerID(1).setState(ContainerReplicaProto.State.CLOSED))
+          .build();
+      context.addIncrementalReport(icr);
+      when(context.getParent().getContainer().getContainerSet().getContainerReport()).thenReturn(report);
+      ContainerReportPublisher publisher = new ContainerReportPublisher();
+      publisher.setConf(conf);
+      publisher.init(context, mock(ScheduledExecutorService.class));
+
+      publisher.run();
+
+      assertEquals(Collections.singletonList(icr),
+          context.getAllAvailableReports(waitingAddress, StateContext.CONTAINER_REPORTS_PROTO_NAME));
+      assertEquals(Collections.singletonList(icr),
+          context.getAllAvailableReports(leasedAddress, StateContext.CONTAINER_REPORTS_PROTO_NAME));
+      assertTrue(context.isFullContainerReportReady(waitingAddress));
+      assertTrue(context.isFullContainerReportReady(leasedAddress));
+      assertEquals(Collections.singletonList(report), context.getAllAvailableReports(reconAddress));
+    }
+  }
+
+  @Test
+  public void testEndpointFullContainerReportIsLinearizedWithICRGeneration()
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine =
+        mock(DatanodeStateMachine.class);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    ContainerSet containerSet = mock(ContainerSet.class);
+    CountDownLatch reportStarted = new CountDownLatch(1);
+    CountDownLatch releaseReport = new CountDownLatch(1);
+    when(datanodeStateMachine.getContainer()).thenReturn(ozoneContainer);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    when(containerSet.getContainerReport()).thenAnswer(invocation -> {
+      reportStarted.countDown();
+      assertTrue(releaseReport.await(5, TimeUnit.SECONDS));
+      return ContainerReportsProto.getDefaultInstance();
+    });
+    StateContext context = new StateContext(conf, DatanodeStates.getInitState(),
+        datanodeStateMachine, "");
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<ContainerReportsProto> fullReport = executor.submit(
+          () -> context.getFullContainerReportDiscardPendingICR(scm));
+      assertTrue(reportStarted.await(5, TimeUnit.SECONDS));
+      Future<?> incrementalReport = executor.submit(() -> {
+        synchronized (containerSet) {
+          context.addIncrementalReport(
+              IncrementalContainerReportProto.getDefaultInstance());
+        }
+      });
+
+      assertThrows(TimeoutException.class,
+          () -> incrementalReport.get(100, TimeUnit.MILLISECONDS));
+      releaseReport.countDown();
+
+      assertNotNull(fullReport.get(5, TimeUnit.SECONDS));
+      incrementalReport.get(5, TimeUnit.SECONDS);
+      assertEquals(1, context.getAllAvailableReports(scm).size());
+    } finally {
+      releaseReport.countDown();
+      executor.shutdownNow();
+    }
   }
 
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
@@ -763,6 +930,9 @@ public class TestStateContext {
     OzoneContainer o = mock(OzoneContainer.class);
     ContainerSet s = mock(ContainerSet.class);
     when(datanodeStateMachineMock.getContainer()).thenReturn(o);
+    SCMConnectionManager connections = mock(SCMConnectionManager.class);
+    when(datanodeStateMachineMock.getConnectionManager()).thenReturn(connections);
+    when(connections.getValues()).thenReturn(Collections.emptyList());
     when(o.getContainerSet()).thenReturn(s);
     when(s.getContainerReport())
         .thenReturn(

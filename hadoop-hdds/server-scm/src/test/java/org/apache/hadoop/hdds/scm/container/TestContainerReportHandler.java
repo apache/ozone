@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainerReports;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
@@ -26,9 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -69,6 +73,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -165,6 +171,56 @@ public class TestContainerReportHandler {
     if (dbStore != null) {
       dbStore.close();
     }
+  }
+
+  @Test
+  public void testCompletesProcessedReport() {
+    DatanodeDetails datanode =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    LeaseClaim claim = spy(claimLease(datanode));
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
+
+    new ContainerReportHandler(nodeManager, containerManager)
+        .onMessage(report, publisher);
+
+    verify(claim).complete(true);
+  }
+
+  @Test
+  public void testCompletesUnknownDatanodeReportAsUnprocessed() {
+    DatanodeDetails datanode = randomDatanodeDetails();
+    LeaseClaim claim = spy(claimLease(datanode));
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
+
+    new ContainerReportHandler(nodeManager, containerManager)
+        .onMessage(report, publisher);
+
+    verify(claim).complete(false);
+  }
+
+  @Test
+  public void testCompletesReportWithoutProcessingWhenClaimIsAlreadyCompleted() {
+    DatanodeDetails datanode =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    LeaseClaim completedClaim = claimLease(datanode);
+    completedClaim.complete(false);
+    LeaseClaim claim = spy(completedClaim);
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
+
+    new ContainerReportHandler(nodeManager, containerManager)
+        .onMessage(report, publisher);
+
+    verify(claim).complete(false);
+    verify(containerManager, never()).notifyContainerReportProcessing(anyBoolean(), anyBoolean());
+  }
+
+  private static LeaseClaim claimLease(DatanodeDetails datanode) {
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    long leaseId = leases.requestLease(datanode).getAsLong();
+    return leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new);
   }
 
   static Stream<Arguments> containerAndReplicaStates() {

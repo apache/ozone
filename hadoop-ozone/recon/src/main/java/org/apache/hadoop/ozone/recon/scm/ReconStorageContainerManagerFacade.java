@@ -692,6 +692,11 @@ public class ReconStorageContainerManagerFacade
     return datanodeProtocolServer;
   }
 
+  @Override
+  public ScmVersionManager getVersionManager() {
+    return scmVersionManager;
+  }
+
   private void initializePipelinesFromScm() {
     try {
       List<Pipeline> pipelinesFromScm = scmServiceProvider.getPipelines();

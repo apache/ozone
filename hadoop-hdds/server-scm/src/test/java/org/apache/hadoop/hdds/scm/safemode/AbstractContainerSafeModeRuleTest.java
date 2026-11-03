@@ -32,7 +32,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -144,18 +143,37 @@ public abstract class AbstractContainerSafeModeRuleTest {
   }
 
   private NodeRegistrationContainerReport getNewContainerReport(long containerID) {
-    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
-    ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
     NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
 
-    when(replica.getContainerID()).thenReturn(containerID);
-    when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
-    when(report.getReport()).thenReturn(containerReport);
+    when(report.getContainerIDs()).thenReturn(new long[] {containerID});
     when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
     when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
     return report;
+  }
+
+  @Test
+  public void testProcessRegistrationContainerIDs() {
+    containers.add(mockContainer(LifeCycleState.CLOSED, 42L));
+    containers.add(mockContainer(LifeCycleState.CLOSED, Long.MAX_VALUE));
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    ContainerReportsProto report = ContainerReportsProto.newBuilder()
+        .addReports(ContainerReplicaProto.newBuilder().setContainerID(42L)
+            .setState(ContainerReplicaProto.State.CLOSED).setKeyCount(100L))
+        .addReports(ContainerReplicaProto.newBuilder().setContainerID(Long.MAX_VALUE)
+            .setState(ContainerReplicaProto.State.CLOSED).setUsed(1024L))
+        .build();
+
+    assertEquals(0.0, rule.getCurrentContainerThreshold());
+    int minReplica = rule.getMinReplica(ContainerID.valueOf(42L));
+    for (int i = 0; i < minReplica; i++) {
+      DatanodeDetails datanode = mock(DatanodeDetails.class);
+      when(datanode.getID()).thenReturn(DatanodeID.randomID());
+      rule.process(new NodeRegistrationContainerReport(datanode, report));
+    }
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold());
   }
 
   @Test
@@ -222,14 +240,10 @@ public abstract class AbstractContainerSafeModeRuleTest {
     AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
 
-    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
-    ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
     NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
 
-    when(replica.getContainerID()).thenReturn(containerId);
-    when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
-    when(report.getReport()).thenReturn(containerReport);
+    when(report.getContainerIDs()).thenReturn(new long[] {containerId});
     when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
     when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
@@ -246,14 +260,10 @@ public abstract class AbstractContainerSafeModeRuleTest {
     AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(true);
 
-    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
-    ContainerReportsProto reportsProto = mock(ContainerReportsProto.class);
     NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
 
-    when(replica.getContainerID()).thenReturn(containerId);
-    when(reportsProto.getReportsList()).thenReturn(Collections.singletonList(replica));
-    when(report.getReport()).thenReturn(reportsProto);
+    when(report.getContainerIDs()).thenReturn(new long[] {containerId});
     when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
     when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 

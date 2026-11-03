@@ -25,8 +25,10 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -94,6 +96,12 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
         defaultVersionProto());
   }
+
+  /**
+   * Returns a version-related registration rejection, if any, without changing node state.
+   */
+  Optional<RegisteredCommand> getRegistrationVersionError(DatanodeDetails datanodeDetails,
+      DatanodeVersionProto versionReport);
 
   /**
    * Register a SendCommandNotify handler for a specific type of SCMCommand.
@@ -524,6 +532,16 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   default void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
 
+  }
+
+  /**
+   * Sets the callback for datanode removal.
+   *
+   * <p>{@link SCMNodeManager} invokes it synchronously under the node-manager write lock, before removing node state.
+   *
+   * @param callback datanode removal callback
+   */
+  default void setDatanodeRemovedCallback(Consumer<DatanodeDetails> callback) {
   }
 
   int openContainerLimit(List<DatanodeDetails> datanodes);

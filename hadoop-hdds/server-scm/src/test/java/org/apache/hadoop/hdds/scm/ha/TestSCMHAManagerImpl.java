@@ -258,6 +258,8 @@ class TestSCMHAManagerImpl {
     when(scm.getSystemClock()).thenReturn(Clock.system(ZoneOffset.UTC));
 
     if (FOLLOWER_SCM_ID.equals(scmID)) {
+      // Removal is detected on the next election attempt, which must fit within testRemoveSCM's wait.
+      conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT, 1, TimeUnit.SECONDS);
       final SCMNodeDetails leaderNodeDetails = mock(SCMNodeDetails.class);
       final List<SCMNodeDetails> peerNodeDetails = singletonList(leaderNodeDetails);
       when(scmHANodeDetails.getPeerNodeDetails()).thenReturn(peerNodeDetails);

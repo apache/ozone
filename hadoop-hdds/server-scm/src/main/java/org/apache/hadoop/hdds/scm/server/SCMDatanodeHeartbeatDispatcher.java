@@ -26,9 +26,11 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 
 import com.google.protobuf.Message;
+import jakarta.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -43,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.IEventInfo;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
@@ -74,127 +77,135 @@ public final class SCMDatanodeHeartbeatDispatcher {
   /**
    * Dispatches heartbeat to registered event handlers.
    *
+   * <p>Takes ownership of the prepared FCR until its {@link EventPublisher#fireEvent} call returns normally.
+   * Before that, every exit completes the report as unprocessed; afterwards, the queue and handler own completion.
+   * The event publisher does not acknowledge whether the report was accepted.
+   *
    * @param heartbeat heartbeat to be dispatched.
+   * @param containerReport prepared FCR, leased or legacy; null suppresses FCR dispatch regardless of heartbeat payload
    *
    * @return list of SCMCommand
    */
-  public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat) {
-    DatanodeDetails datanodeDetails =
-        DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
-    List<SCMCommand<?>> commands;
+  public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat,
+      ContainerReportFromDatanode containerReport) {
+    boolean containerReportDispatched = false;
+    try {
+      DatanodeDetails datanodeDetails =
+          DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
+      List<SCMCommand<?>> commands;
 
-    // If node is not registered, ask the node to re-register. Do not process
-    // Heartbeat for unregistered nodes.
-    if (!nodeManager.isNodeRegistered(datanodeDetails)) {
-      LOG.info("SCM received heartbeat from an unregistered datanode {}. " +
-          "Asking datanode to re-register.", datanodeDetails);
-      DatanodeID dnID = datanodeDetails.getID();
-      nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
+      // If node is not registered, ask the node to re-register. Do not process
+      // Heartbeat for unregistered nodes.
+      if (!nodeManager.isNodeRegistered(datanodeDetails)) {
+        LOG.info("SCM received heartbeat from an unregistered datanode {}. " +
+            "Asking datanode to re-register.", datanodeDetails);
+        DatanodeID dnID = datanodeDetails.getID();
+        nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
 
-      commands = nodeManager.getCommandQueue(dnID);
+        commands = nodeManager.getCommandQueue(dnID);
 
-    } else if (isUnhealthyWithIncompatibleVersion(datanodeDetails, heartbeat)) {
-      // Stale and dead nodes must pass a version compatibility check before their heartbeat
-      // timestamp is updated. Without this gate a node that went unhealthy during a rolling
-      // upgrade could resurrect at an incompatible software version. If the check fails, ask
-      // the node to re-register so the full registration fence runs with current version info.
-      LOG.info("Node {} is not healthy and reported an incompatible version {}. Asking to re-register.",
-          datanodeDetails, heartbeat.getDatanodeVersion());
-      nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
+      } else if (isUnhealthyWithIncompatibleVersion(datanodeDetails, heartbeat)) {
+        // Stale and dead nodes must pass a version compatibility check before their heartbeat
+        // timestamp is updated. Without this gate a node that went unhealthy during a rolling
+        // upgrade could resurrect at an incompatible software version. If the check fails, ask
+        // the node to re-register so the full registration fence runs with current version info.
+        LOG.info("Node {} is not healthy and reported an incompatible version {}. Asking to re-register.",
+            datanodeDetails, heartbeat.getDatanodeVersion());
+        nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
 
-      commands = nodeManager.getCommandQueue(datanodeDetails.getID());
+        commands = nodeManager.getCommandQueue(datanodeDetails.getID());
 
-    } else {
+      } else {
 
-      // Process the version report only after passing the fence check. Calling processVersionReport
-      // for fenced nodes would invoke shouldFenceDatanode a second time via sendFinalizeToDatanodeIfNeeded,
-      // producing duplicate log entries. Version details for fenced nodes are captured above.
-      if (heartbeat.hasDatanodeVersion()) {
-        LOG.debug("Processing DataNode version report.");
-        nodeManager.processVersionReport(datanodeDetails, heartbeat.getDatanodeVersion());
-      }
-
-      CommandQueueReportProto commandQueueReport = null;
-      if (heartbeat.hasCommandQueueReport()) {
-        commandQueueReport = heartbeat.getCommandQueueReport();
-      }
-
-      // should we dispatch heartbeat through eventPublisher?
-      commands = nodeManager.processHeartbeat(datanodeDetails, commandQueueReport);
-      if (heartbeat.hasNodeReport()) {
-        LOG.debug("Dispatching Node Report.");
-        eventPublisher.fireEvent(
-            NODE_REPORT,
-            new NodeReportFromDatanode(
-                datanodeDetails,
-                heartbeat.getNodeReport()));
-      }
-
-      if (heartbeat.hasContainerReport()) {
-        LOG.debug("Dispatching Container Report.");
-        eventPublisher.fireEvent(
-            CONTAINER_REPORT,
-            new ContainerReportFromDatanode(
-                datanodeDetails,
-                heartbeat.getContainerReport()));
-
-      }
-
-      final List<IncrementalContainerReportProto> icrs =
-          heartbeat.getIncrementalContainerReportList();
-
-      if (!icrs.isEmpty()) {
-        LOG.debug("Dispatching ICRs.");
-        for (IncrementalContainerReportProto icr : icrs) {
-          eventPublisher.fireEvent(INCREMENTAL_CONTAINER_REPORT,
-              new IncrementalContainerReportFromDatanode(
-                  datanodeDetails, icr));
+        // Process the version report only after passing the fence check. Calling processVersionReport
+        // for fenced nodes would invoke shouldFenceDatanode a second time via sendFinalizeToDatanodeIfNeeded,
+        // producing duplicate log entries. Version details for fenced nodes are captured above.
+        if (heartbeat.hasDatanodeVersion()) {
+          LOG.debug("Processing DataNode version report.");
+          nodeManager.processVersionReport(datanodeDetails, heartbeat.getDatanodeVersion());
         }
-      }
 
-      if (heartbeat.hasContainerActions()) {
-        LOG.debug("Dispatching Container Actions.");
-        eventPublisher.fireEvent(
-            CONTAINER_ACTIONS,
-            new ContainerActionsFromDatanode(
-                datanodeDetails,
-                heartbeat.getContainerActions()));
-      }
-
-      if (heartbeat.hasPipelineReports()) {
-        LOG.debug("Dispatching Pipeline Report.");
-        eventPublisher.fireEvent(
-            PIPELINE_REPORT,
-            new PipelineReportFromDatanode(
-                datanodeDetails,
-                heartbeat.getPipelineReports()));
-
-      }
-
-      if (heartbeat.hasPipelineActions()) {
-        LOG.debug("Dispatching Pipeline Actions.");
-        eventPublisher.fireEvent(
-            PIPELINE_ACTIONS,
-            new PipelineActionsFromDatanode(
-                datanodeDetails,
-                heartbeat.getPipelineActions()));
-      }
-
-      if (heartbeat.getCommandStatusReportsCount() != 0) {
-        LOG.debug("Dispatching Command Status Report.");
-        for (CommandStatusReportsProto commandStatusReport : heartbeat
-            .getCommandStatusReportsList()) {
+        CommandQueueReportProto commandQueueReport = null;
+        if (heartbeat.hasCommandQueueReport()) {
+          commandQueueReport = heartbeat.getCommandQueueReport();
+        }
+        // should we dispatch heartbeat through eventPublisher?
+        commands = nodeManager.processHeartbeat(datanodeDetails, commandQueueReport);
+        if (heartbeat.hasNodeReport()) {
+          LOG.debug("Dispatching Node Report.");
           eventPublisher.fireEvent(
-              CMD_STATUS_REPORT,
-              new CommandStatusReportFromDatanode(
+              NODE_REPORT,
+              new NodeReportFromDatanode(
                   datanodeDetails,
-                  commandStatusReport));
+                  heartbeat.getNodeReport()));
         }
+
+        if (containerReport != null) {
+          LOG.debug("Dispatching Container Report.");
+          eventPublisher.fireEvent(CONTAINER_REPORT, containerReport);
+          containerReportDispatched = true;
+        }
+
+        final List<IncrementalContainerReportProto> icrs =
+            heartbeat.getIncrementalContainerReportList();
+
+        if (!icrs.isEmpty()) {
+          LOG.debug("Dispatching ICRs.");
+          for (IncrementalContainerReportProto icr : icrs) {
+            eventPublisher.fireEvent(INCREMENTAL_CONTAINER_REPORT,
+                new IncrementalContainerReportFromDatanode(
+                    datanodeDetails, icr));
+          }
+        }
+
+        if (heartbeat.hasContainerActions()) {
+          LOG.debug("Dispatching Container Actions.");
+          eventPublisher.fireEvent(
+              CONTAINER_ACTIONS,
+              new ContainerActionsFromDatanode(
+                  datanodeDetails,
+                  heartbeat.getContainerActions()));
+        }
+
+        if (heartbeat.hasPipelineReports()) {
+          LOG.debug("Dispatching Pipeline Report.");
+          eventPublisher.fireEvent(
+              PIPELINE_REPORT,
+              new PipelineReportFromDatanode(
+                  datanodeDetails,
+                  heartbeat.getPipelineReports()));
+
+        }
+
+        if (heartbeat.hasPipelineActions()) {
+          LOG.debug("Dispatching Pipeline Actions.");
+          eventPublisher.fireEvent(
+              PIPELINE_ACTIONS,
+              new PipelineActionsFromDatanode(
+                  datanodeDetails,
+                  heartbeat.getPipelineActions()));
+        }
+
+        if (heartbeat.getCommandStatusReportsCount() != 0) {
+          LOG.debug("Dispatching Command Status Report.");
+          for (CommandStatusReportsProto commandStatusReport : heartbeat
+              .getCommandStatusReportsList()) {
+            eventPublisher.fireEvent(
+                CMD_STATUS_REPORT,
+                new CommandStatusReportFromDatanode(
+                    datanodeDetails,
+                    commandStatusReport));
+          }
+        }
+      }
+      LOG.debug("Heartbeat dispatched for datanode {} with commands {}", datanodeDetails, commands);
+
+      return commands;
+    } finally {
+      if (containerReport != null && !containerReportDispatched) {
+        containerReport.complete(false);
       }
     }
-    LOG.debug("Heartbeat dispatched for datanode {} with commands {}", datanodeDetails, commands);
-
-    return commands;
   }
 
   /**
@@ -283,6 +294,14 @@ public final class SCMDatanodeHeartbeatDispatcher {
     ContainerReportType getType();
 
     void mergeReport(ContainerReport val);
+
+    /**
+     * Signals the end of processing or discard. Reports owning resources release them in either outcome.
+     *
+     * @param processed true if processing completed successfully; false on processing failure or discard
+     */
+    default void complete(boolean processed) {
+    }
   }
 
   /**
@@ -302,24 +321,43 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
-   * Container report event payload with origin.
+   * FCR event payload with origin and an optional lease claim.
+   * A deferred registration's FCR can arrive in a heartbeat; its claim identifies it as a registration report.
+   * Completion is idempotent and releases the claim on either successful processing or discard.
    */
   public static class ContainerReportFromDatanode
       extends ReportFromDatanode<ContainerReportsProto>
       implements ContainerReport, IEventInfo {
     private long createTime = Time.monotonicNow();
-    // Used to identify whether container reporting is from a registration.
-    private boolean isRegister = false;
+    private final boolean registrationReport;
+    // Null for reports that do not use an FCR lease.
+    @Nullable
+    private final LeaseClaim leaseClaim;
+    private final AtomicBoolean completed = new AtomicBoolean();
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
-      super(datanodeDetails, report);
+      this(datanodeDetails, report, false);
     }
 
+    /**
+     * Creates an unleased report, including an FCR supplied directly during registration.
+     */
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
-        ContainerReportsProto report, boolean isRegister) {
+        ContainerReportsProto report, boolean registrationReport) {
       super(datanodeDetails, report);
-      this.isRegister = isRegister;
+      this.registrationReport = registrationReport;
+      this.leaseClaim = null;
+    }
+
+    /**
+     * Creates a leased report whose registration status is determined by its non-null claim.
+     */
+    public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
+        ContainerReportsProto report, LeaseClaim leaseClaim) {
+      super(datanodeDetails, report);
+      this.leaseClaim = Objects.requireNonNull(leaseClaim, "leaseClaim == null");
+      this.registrationReport = leaseClaim.isRegistrationReport();
     }
 
     @Override
@@ -342,8 +380,25 @@ public final class SCMDatanodeHeartbeatDispatcher {
       return createTime;
     }
 
-    public boolean isRegister() {
-      return isRegister;
+    public boolean isRegistrationReport() {
+      return registrationReport;
+    }
+
+    /**
+     * Starts a leased report once. Unleased reports are unrestricted; claimed leases do not expire while queued.
+     */
+    public boolean startProcessing() {
+      return leaseClaim == null || leaseClaim.startProcessing();
+    }
+
+    /**
+     * Releases this report's lease at most once. Only successful processing clears the matching pending registration.
+     */
+    @Override
+    public void complete(boolean processed) {
+      if (completed.compareAndSet(false, true) && leaseClaim != null) {
+        leaseClaim.complete(processed);
+      }
     }
 
     @Override

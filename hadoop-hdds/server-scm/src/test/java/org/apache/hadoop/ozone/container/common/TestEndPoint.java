@@ -22,11 +22,16 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.RETURNS_MOCKS;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -44,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeleteBlocksCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -57,6 +63,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
@@ -65,6 +72,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
@@ -81,13 +89,18 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
+import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests the endpoints.
@@ -460,6 +473,82 @@ public class TestEndPoint {
       // Successful register should move us to Heartbeat state.
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
     }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  public void testRegisterTaskDefersFCROnlyWhenLeaseEnabled(boolean finalized, boolean recon)
+      throws Exception {
+    boolean deferred = finalized && !recon;
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    ArgumentCaptor<ContainerReportsProto> containerReport =
+        ArgumentCaptor.forClass(ContainerReportsProto.class);
+    when(scm.register(any(), any(), containerReport.capture(), any(), any()))
+        .thenReturn(SCMRegisteredResponseProto.newBuilder()
+            .setClusterID(UUID.randomUUID().toString())
+            .setDatanodeUUID(datanodeDetails.getUuidString())
+            .setErrorCode(SCMRegisteredResponseProto.ErrorCode.success)
+            .build());
+
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    DatanodeID datanodeID = DatanodeID.randomID();
+    when(ozoneContainer.getNodeReport()).thenReturn(HddsTestUtils
+        .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
+            Arrays.asList(getMetadataStorageReports(datanodeID))));
+    ContainerController controller = mock(ContainerController.class);
+    if (deferred) {
+      when(controller.getContainerReport()).thenThrow(new IOException("snapshot unavailable"));
+    } else {
+      when(controller.getContainerReport()).thenReturn(HddsTestUtils.getRandomContainerReports(1));
+    }
+    when(ozoneContainer.getController()).thenReturn(controller);
+    when(ozoneContainer.getPipelineReport()).thenReturn(
+        HddsTestUtils.getRandomPipelineReports());
+    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    HDDSVersion apparentVersion = finalized ? HDDSVersion.SOFTWARE_VERSION : HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT;
+    when(versionManager.getApparentVersion()).thenReturn(apparentVersion);
+    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getVersionForClient()).thenReturn(apparentVersion);
+    when(versionManager.isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(finalized);
+
+    try (EndpointStateMachine rpcEndpoint = new EndpointStateMachine(
+        new HostAndPort(serverAddress.getHostName(), serverAddress.getPort()),
+        scm, conf, "")) {
+      DatanodeStateMachine datanode = mock(DatanodeStateMachine.class, RETURNS_MOCKS);
+      when(datanode.getDatanodeDetails()).thenReturn(datanodeDetails);
+      when(datanode.getVersionManager()).thenReturn(versionManager);
+      StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+      HostAndPort otherScm = new HostAndPort("other-scm", 9861);
+      context.addEndpoint(rpcEndpoint.getAddress());
+      context.addEndpoint(otherScm);
+      context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+      context.getAllAvailableReports(rpcEndpoint.getAddress());
+      context.getAllAvailableReports(otherScm);
+      assertFalse(context.isFullContainerReportReady(rpcEndpoint.getAddress()));
+      assertFalse(context.isFullContainerReportReady(otherScm));
+      rpcEndpoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
+      rpcEndpoint.setPassive(recon);
+      rpcEndpoint.setVersion(VersionResponse.newBuilder().setVersion(1).build());
+      RegisterEndpointTask endpointTask = new RegisterEndpointTask(
+          rpcEndpoint, ozoneContainer, context);
+
+      endpointTask.call();
+      assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
+      assertEquals(deferred, context.isFullContainerReportReady(rpcEndpoint.getAddress()));
+      assertFalse(context.isFullContainerReportReady(otherScm));
+      if (deferred) {
+        verify(controller, never()).getContainerReport();
+      } else {
+        verify(controller).getContainerReport();
+      }
+      verify(scm, never()).sendHeartbeat(any());
+    }
+
+    assertEquals(deferred, containerReport.getValue().getFullContainerReportDeferred());
+    assertEquals(deferred ? 0 : 1, containerReport.getValue().getReportsCount());
   }
 
   @Test

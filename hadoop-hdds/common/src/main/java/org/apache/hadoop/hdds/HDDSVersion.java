@@ -44,6 +44,8 @@ public enum HDDSVersion implements ComponentVersion {
 
   STREAM_PUTBLOCK_WITHOUT_RAFT(101, "PutBlock can be committed through a Ratis data stream without the Raft log."),
 
+  FULL_CONTAINER_REPORT_LEASE(102, "Full container reports can be rate limited using SCM leases."),
+
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
 
