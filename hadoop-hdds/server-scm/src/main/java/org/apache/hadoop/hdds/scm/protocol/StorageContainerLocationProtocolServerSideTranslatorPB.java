@@ -791,10 +791,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public GetContainerReplicasResponseProto getContainerReplicas(
       GetContainerReplicasRequestProto request, ClientVersion clientVersion)
       throws IOException {
-    List<HddsProtos.SCMContainerReplicaProto> replicas
-        = impl.getContainerReplicas(request.getContainerID(), clientVersion);
-    return GetContainerReplicasResponseProto.newBuilder()
-        .addAllContainerReplica(replicas).build();
+    return impl.getContainerReplicasResponse(request.getContainerID(),
+        clientVersion);
   }
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,

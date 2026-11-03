@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
@@ -114,6 +115,17 @@ public interface StorageContainerLocationInternalInterface extends Closeable {
    * @throws IOException
    */
   List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId, ClientVersion clientVersion) throws IOException;
+
+  /**
+   * Gets the replica response, including status derived from the replicas.
+   *
+   * @param containerId ID of the container
+   * @param clientVersion client protocol version
+   * @return replica response for the container
+   * @throws IOException on error
+   */
+  GetContainerReplicasResponseProto getContainerReplicasResponse(
       long containerId, ClientVersion clientVersion) throws IOException;
 
   /**

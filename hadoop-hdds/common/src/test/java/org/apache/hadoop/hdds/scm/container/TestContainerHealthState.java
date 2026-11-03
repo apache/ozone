@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.DATA_CHECKSUM_MISMATCH;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.EMPTY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING;
@@ -59,6 +60,7 @@ public class TestContainerHealthState {
     assertEquals(7, OPEN_UNHEALTHY.getValue());
     assertEquals(8, QUASI_CLOSED_STUCK.getValue());
     assertEquals(9, OPEN_WITHOUT_PIPELINE.getValue());
+    assertEquals(10, DATA_CHECKSUM_MISMATCH.getValue());
   }
 
   @Test
@@ -101,6 +103,7 @@ public class TestContainerHealthState {
     assertEquals(OPEN_UNHEALTHY, ContainerHealthState.fromValue((short) 7));
     assertEquals(QUASI_CLOSED_STUCK, ContainerHealthState.fromValue((short) 8));
     assertEquals(OPEN_WITHOUT_PIPELINE, ContainerHealthState.fromValue((short) 9));
+    assertEquals(DATA_CHECKSUM_MISMATCH, ContainerHealthState.fromValue((short) 10));
   }
 
   @Test
@@ -136,11 +139,11 @@ public class TestContainerHealthState {
 
   @Test
   public void testIndividualStateCount() {
-    // Should have 10 individual states (0-9)
+    // Should have 11 individual states (0-10)
     long individualCount = java.util.Arrays.stream(ContainerHealthState.values())
         .filter(s -> s.getValue() >= 0 && s.getValue() <= 99)
         .count();
-    assertEquals(10, individualCount, "Expected 10 individual states");
+    assertEquals(11, individualCount, "Expected 11 individual states");
   }
 
   @Test
@@ -154,10 +157,10 @@ public class TestContainerHealthState {
 
   @Test
   public void testNoGapsInIndividualValues() {
-    // Individual states should be sequential: 0-9
-    for (short i = 0; i <= 9; i++) {
+    // Individual states should be sequential: 0-10
+    for (short i = 0; i <= 10; i++) {
       ContainerHealthState state = ContainerHealthState.fromValue(i);
-      assertTrue(state.getValue() >= 0 && state.getValue() <= 9,
+      assertTrue(state.getValue() >= 0 && state.getValue() <= 10,
           "Value " + i + " should map to an individual state");
     }
   }

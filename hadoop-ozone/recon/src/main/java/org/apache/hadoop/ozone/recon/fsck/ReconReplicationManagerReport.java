@@ -28,15 +28,15 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
  *
  * <p>Recon persists container health using each container's final
  * {@code ContainerInfo#healthState}. This report keeps aggregate counters from
- * the base class and tracks Recon-only {@code REPLICA_MISMATCH} containers.</p>
+ * the base class and tracks all containers that need a
+ * {@code REPLICA_MISMATCH} database record.</p>
  *
- * <p><b>REPLICA_MISMATCH Handling:</b> Since SCM's HealthState enum doesn't include
- * REPLICA_MISMATCH (it's a Recon-specific check for data checksum mismatches),
- * we track it separately in replicaMismatchContainers.</p>
+ * <p>The separate list is needed because the base report only retains a
+ * limited sample of container IDs.</p>
  */
 public class ReconReplicationManagerReport extends ReplicationManagerReport {
 
-  // Captures containers with REPLICA_MISMATCH (Recon-specific, not in SCM's HealthState)
+  // Captures every container that needs a REPLICA_MISMATCH database record.
   private final List<ContainerID> replicaMismatchContainers = new ArrayList<>();
 
   public ReconReplicationManagerReport() {
@@ -46,8 +46,6 @@ public class ReconReplicationManagerReport extends ReplicationManagerReport {
 
   /**
    * Add a container to the REPLICA_MISMATCH list.
-   * This is a Recon-specific health state not tracked by SCM.
-   *
    * @param container The container ID with replica checksum mismatch
    */
   public void addReplicaMismatchContainer(ContainerID container) {

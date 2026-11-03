@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.container.ContainerReplicaChecksumMismatch.hasMismatch;
+
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -229,7 +233,6 @@ public class ReconReplicationManager extends ReplicationManager {
 
   /**
    * Checks if container replicas have mismatched data checksums.
-   * This is a Recon-specific check not done by SCM's ReplicationManager.
    *
    * <p>REPLICA_MISMATCH detection is crucial for identifying:
    * <ul>
@@ -240,29 +243,38 @@ public class ReconReplicationManager extends ReplicationManager {
    * </ul>
    * </p>
    *
-   * <p>EC replicas are compared only within the same replica index, since different indexes contain different data or
-   * parity fragments. Non-EC replicas are compared together.</p>
+   * <p>RATIS replicas are compared together. EC replicas are compared only within the same replica index, since
+   * different indexes contain different data or parity fragments. Within each group, only replicas with the same
+   * sequence ID and non-zero data checksums are compared.</p>
    *
    * @param container Container whose replicas are checked
    * @param replicas Set of container replicas to check
    * @return true if comparable replicas have different data checksums
    */
-  private boolean hasDataChecksumMismatch(ContainerInfo container, Set<ContainerReplica> replicas) {
-    if (replicas == null || replicas.isEmpty()) {
+  private boolean hasDataChecksumMismatch(
+      ContainerInfo container, Set<ContainerReplica> replicas) {
+    if (container.getState() != CLOSED || replicas == null) {
       return false;
     }
 
-    boolean isEC = container.getReplicationType() == ReplicationType.EC;
-    Map<Integer, Long> checksumsByIndex = new HashMap<>();
-    for (ContainerReplica replica : replicas) {
-      int replicaIndex = isEC ? replica.getReplicaIndex() : 0;
-      long checksum = replica.getDataChecksum();
-      Long previousChecksum = checksumsByIndex.putIfAbsent(replicaIndex, checksum);
-      if (previousChecksum != null && previousChecksum != checksum) {
-        return true;
-      }
+    if (container.getReplicationType() == RATIS) {
+      return hasMismatch(replicas, ContainerReplica::getSequenceId,
+          ContainerReplica::getDataChecksum);
     }
-    return false;
+
+    if (container.getReplicationType() != ReplicationType.EC) {
+      return false;
+    }
+
+    Map<Integer, List<ContainerReplica>> replicasByIndex = new HashMap<>();
+    for (ContainerReplica replica : replicas) {
+      replicasByIndex.computeIfAbsent(replica.getReplicaIndex(),
+          ignored -> new ArrayList<>()).add(replica);
+    }
+    return replicasByIndex.values().stream()
+        .anyMatch(indexReplicas -> hasMismatch(indexReplicas,
+            ContainerReplica::getSequenceId,
+            ContainerReplica::getDataChecksum));
   }
 
   /**
@@ -273,7 +285,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * <ol>
    *   <li>Get all containers from ContainerManager</li>
    *   <li>Process each container using inherited health check chain (SCM logic)</li>
-   *   <li>Additionally check for REPLICA_MISMATCH (Recon-specific)</li>
+   *   <li>Persist checksum mismatches as Recon REPLICA_MISMATCH records</li>
    *   <li>Capture ALL unhealthy container IDs per health state (no sampling limit)</li>
    *   <li>Store results in Recon's UNHEALTHY_CONTAINERS table</li>
    * </ol>
@@ -282,7 +294,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * <ul>
    *   <li>Uses ReconReplicationManagerReport (captures all containers)</li>
    *   <li>Uses MonitoringReplicationQueue (doesn't enqueue commands)</li>
-   *   <li>Adds REPLICA_MISMATCH detection (not done by SCM)</li>
+   *   <li>Persists REPLICA_MISMATCH health records</li>
    *   <li>Stores results in database instead of just keeping in-memory report</li>
    * </ul>
    */
@@ -315,7 +327,7 @@ public class ReconReplicationManager extends ReplicationManager {
         // readOnly=true ensures no commands are generated
         processContainer(container, replicas, pendingOps, nullQueue, report, true);
 
-        // ADDITIONAL CHECK: Detect REPLICA_MISMATCH (Recon-specific, not in SCM)
+        // Persist checksum mismatches in Recon's REPLICA_MISMATCH state.
         if (hasDataChecksumMismatch(container, replicas)) {
           report.addReplicaMismatchContainer(cid);
           LOG.debug("Container {} has data checksum mismatch across replicas", cid);

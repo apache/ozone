@@ -88,6 +88,15 @@ public class ReplicationManagerReport {
     incrementAndSample(stat.name(), containerInfo.containerID());
   }
 
+  /**
+   * Increments a health state and records the container ID without changing
+   * the primary health state of the container currently being processed.
+   */
+  public void incrementAndSampleAdditionalState(
+      ContainerHealthState stat, ContainerID containerID) {
+    incrementAndSample(stat.name(), containerID);
+  }
+
   public void increment(HddsProtos.LifeCycleState stat) {
     increment(stat.toString());
   }
