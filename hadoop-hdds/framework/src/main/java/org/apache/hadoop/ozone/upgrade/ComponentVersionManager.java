@@ -106,6 +106,11 @@ public abstract class ComponentVersionManager implements Closeable {
     }
     ComponentVersion prevVersion = apparentVersion;
     for (ComponentVersion newVersion : getUnfinalizedVersions(targetVersion)) {
+      if (!newVersion.isSupportedBy(targetVersion)) {
+        // Only finalize up to the target version, not beyond it. This should only be used by lagging RATIS logs
+        // which may have been created by a pre ZDU version of the software which have yet to be applied.
+        break;
+      }
       validateForFinalization(newVersion);
       runUpgradeAction(newVersion);
       persistApparentVersion(newVersion, prevVersion);
