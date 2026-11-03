@@ -59,6 +59,9 @@ class MultipartKeyHandler extends ObjectOperationHandler {
     final AuditLogger.PerformanceStringBuilder perf = context.getPerf();
 
     try {
+      if (maxParts <= 0) {
+        throw newError(S3ErrorTable.INVALID_ARGUMENT, QueryParams.MAX_PARTS).withMessage("max-parts must be positive");
+      }
       ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
       int partMarker = parsePartNumberMarker(partNumberMarker);
       Response response = listParts(context.getVolume(), context.getBucketName(), keyPath, uploadId,
