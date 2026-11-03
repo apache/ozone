@@ -137,8 +137,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
-import org.apache.hadoop.ozone.om.service.KeyLifecycleServiceConfig.Defaults;
-import org.apache.hadoop.ozone.om.service.KeyLifecycleServiceConfig.Keys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -218,7 +216,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
   static Stream<Arguments> stateSaveConfiguration() {
     return Stream.of(
         Arguments.of(1, 1),
-        Arguments.of(Defaults.STATE_SAVE_INTERVAL_MS, Defaults.STATE_SAVE_KEYS_PROCESSED)
+        Arguments.of(KeyLifecycleServiceConfig.Defaults.STATE_SAVE_INTERVAL_MS,
+            KeyLifecycleServiceConfig.Defaults.STATE_SAVE_KEYS_PROCESSED)
     );
   }
 
@@ -233,13 +232,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
     ServerUtils.setOzoneMetaDirPath(conf, testDir.toString());
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
         200, TimeUnit.MILLISECONDS);
-    conf.setBoolean(Keys.ENABLED, true);
-    conf.setTimeDuration(Keys.INTERVAL, SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
-    conf.setInt(Keys.DELETE_BATCH_SIZE, 50);
+    conf.setBoolean(KeyLifecycleServiceConfig.Keys.ENABLED, true);
+    conf.setTimeDuration(KeyLifecycleServiceConfig.Keys.INTERVAL, SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
+    conf.setInt(KeyLifecycleServiceConfig.Keys.DELETE_BATCH_SIZE, 50);
     conf.setQuietMode(false);
     conf.setBoolean(ENABLE_FILESYSTEM_PATHS, false);
-    conf.setLong(Keys.STATE_SAVE_INTERVAL_MS, stateSaveInternal);
-    conf.setLong(Keys.STATE_SAVE_KEYS_PROCESSED, maxKeysProcessedPerState);
+    conf.setLong(KeyLifecycleServiceConfig.Keys.STATE_SAVE_INTERVAL_MS, stateSaveInternal);
+    conf.setLong(KeyLifecycleServiceConfig.Keys.STATE_SAVE_KEYS_PROCESSED, maxKeysProcessedPerState);
     OmLCExpiration.setTest(true);
     KeyLifecycleService.setTest(true);
   }
@@ -3619,7 +3618,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
         KeyLifecycleService.setInjectors(null);
         keyLifecycleService.setOzoneTrash(null);
         keyLifecycleService.setMoveToTrashEnabled(true);
-        keyLifecycleService.setKeyDeleteBatchSize(conf.getInt(Keys.DELETE_BATCH_SIZE, Defaults.DELETE_BATCH_SIZE));
+        keyLifecycleService.setKeyDeleteBatchSize(conf.getInt(KeyLifecycleServiceConfig.Keys.DELETE_BATCH_SIZE,
+            KeyLifecycleServiceConfig.Defaults.DELETE_BATCH_SIZE));
         keyLifecycleService.resume();
       }
     }
