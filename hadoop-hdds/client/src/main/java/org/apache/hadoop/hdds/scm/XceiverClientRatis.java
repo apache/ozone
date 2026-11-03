@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Comparator;
@@ -254,27 +256,32 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         return CompletableFuture.completedFuture(response);
       }
     }
-    return TracingUtil.executeInNewSpan(
-        "XceiverClientRatis." + request.getCmdType().name(), SpanKind.CLIENT,
-        () -> {
-          final ContainerCommandRequestMessage message
-              = ContainerCommandRequestMessage.toMessage(
-              request, TracingUtil.exportCurrentSpan());
-          if (HddsUtils.isReadOnly(request)) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync ReadOnly {}", message);
-            }
-            return getClient().async().sendReadOnly(message);
-          } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync {}", message);
-            }
-            return getClient().async().send(message);
-          }
-
+    Span span = TracingUtil.createSpan("XceiverClientRatis." + request.getCmdType().name(), SpanKind.CLIENT);
+    CompletableFuture<RaftClientReply> reply;
+    try (Scope ignored = span.makeCurrent()) {
+      final ContainerCommandRequestMessage message
+          = ContainerCommandRequestMessage.toMessage(
+          request, TracingUtil.exportCurrentSpan());
+      if (HddsUtils.isReadOnly(request)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("sendCommandAsync ReadOnly {}", message);
         }
-
-    );
+        reply = getClient().async().sendReadOnly(message);
+      } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("sendCommandAsync {}", message);
+        }
+        reply = getClient().async().send(message);
+      }
+    } catch (RuntimeException e) {
+      TracingUtil.recordException(span, e);
+      span.end();
+      throw e;
+    }
+    return reply.whenComplete((r, e) -> {
+      TracingUtil.recordException(span, e);
+      span.end();
+    });
   }
 
   // gets the minimum log index replicated to all servers
