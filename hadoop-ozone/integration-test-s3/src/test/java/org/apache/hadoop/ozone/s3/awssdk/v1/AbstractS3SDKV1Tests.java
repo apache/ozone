@@ -2210,8 +2210,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(allPartContentLength, (partOneContentLength + partTwoContentLength + partThreeContentLength));
   }
 
-  @Test
-  public void testGetAndHeadObjectWithPartNumberAndRange(@TempDir Path tempDir) throws Exception {
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 0, 1, 2})
+  public void testGetAndHeadObjectWithPartNumberAndRange(int partNumber, @TempDir Path tempDir) throws Exception {
     String bucketName = getBucketName();
     String keyName = getKeyName();
     s3Client.createBucket(bucketName);
@@ -2222,7 +2223,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     GetObjectMetadataRequest headRequest = new GetObjectMetadataRequest(bucketName, keyName).withPartNumber(1);
     assertThat(s3Client.getObjectMetadata(headRequest).getContentLength()).isEqualTo(10);
 
-    GetObjectRequest getRequest = new GetObjectRequest(bucketName, keyName).withPartNumber(1).withRange(0, 4);
+    GetObjectRequest getRequest = new GetObjectRequest(bucketName, keyName).withPartNumber(partNumber).withRange(0, 4);
     AmazonServiceException getException = assertThrows(AmazonServiceException.class,
         () -> s3Client.getObject(getRequest).close());
     assertThat(getException.getStatusCode()).isEqualTo(400);
@@ -2230,6 +2231,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertThat(getException.getErrorMessage())
         .isEqualTo("Cannot specify both Range header and partNumber query parameter");
 
+    headRequest.setPartNumber(partNumber);
     headRequest.putCustomRequestHeader(RANGE_HEADER, "bytes=0-4");
     AmazonServiceException headException = assertThrows(AmazonServiceException.class,
         () -> s3Client.getObjectMetadata(headRequest));

@@ -68,7 +68,7 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -120,20 +120,24 @@ public class TestObjectGet {
     assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
   }
 
-  @ParameterizedTest
-  @NullSource
-  @ValueSource(strings = "bytes=0-4")
-  public void testGetWithNegativePartNumber(String range) throws Exception {
+  @Test
+  public void testGetWithNegativePartNumber() throws Exception {
     rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, -1);
-    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
     assertErrorResponse(INVALID_ARGUMENT,
         () -> get(rest, BUCKET_NAME, KEY_NAME));
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"bytes=0-4", "bytes=100-200", "bytes=abc", ""})
-  public void testGetWithPartNumberAndRange(String range) {
-    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 1);
+  @CsvSource({
+      "1, bytes=100-200",
+      "1, ''",
+      "0, bytes=0-4",
+      "-1, bytes=0-4",
+      "abc, bytes=0-4",
+      "'', bytes=0-4"
+  })
+  public void testGetWithPartNumberAndRange(String partNumber, String range) {
+    rest.queryParamsForTest().set(S3Consts.QueryParams.PART_NUMBER, partNumber);
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
     long failureBefore = rest.getMetrics().getGetKeyFailure();
 
@@ -142,17 +146,6 @@ public class TestObjectGet {
     assertThat(exception.getErrorMessage())
         .isEqualTo("Cannot specify both Range header and partNumber query parameter");
     assertThat(rest.getMetrics().getGetKeyFailure() - failureBefore).isEqualTo(1);
-  }
-
-  @Test
-  public void testGetWithZeroPartNumberAndRange() throws Exception {
-    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 0);
-    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-4");
-
-    try (Response response = get(rest, BUCKET_NAME, KEY_NAME)) {
-      assertThat(response.getStatus()).isEqualTo(Response.Status.PARTIAL_CONTENT.getStatusCode());
-      assertThat(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)).isEqualTo("5");
-    }
   }
 
   @Test

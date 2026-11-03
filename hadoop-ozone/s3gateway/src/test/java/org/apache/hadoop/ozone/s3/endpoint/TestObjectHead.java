@@ -81,9 +81,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.NullSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test head object.
@@ -137,20 +136,25 @@ public class TestObjectHead {
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, "badKeyName"));
   }
 
-  @ParameterizedTest
-  @NullSource
-  @ValueSource(strings = "bytes=0-4")
-  public void testHeadWithNegativePartNumber(String range) throws Exception {
+  @Test
+  public void testHeadWithNegativePartNumber() throws Exception {
     keyEndpoint.queryParamsForTest()
         .setInt(S3Consts.QueryParams.PART_NUMBER, -1);
-    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
     assertErrorResponse(INVALID_ARGUMENT,
         () -> keyEndpoint.head(bucketName, "key1"));
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"bytes=0-4", "bytes=100-200", "bytes=abc", ""})
-  public void testHeadWithPartNumberAndRange(String range) throws Exception {
+  @CsvSource({
+      "2, bytes=100-200",
+      "2, ''",
+      "0, bytes=0-4",
+      "-1, bytes=0-4",
+      "abc, bytes=0-4",
+      "'', bytes=0-4",
+      "1, bytes=0-4"
+  })
+  public void testHeadWithPartNumberAndRange(String partNumber, String range) throws Exception {
     String uploadId = initiateMultipartUpload(keyEndpoint, bucketName, RANGE_KEY);
     CompleteMultipartUploadRequest.Part part =
         uploadPart(keyEndpoint, bucketName, RANGE_KEY, 2, uploadId, RANGE_CONTENT);
@@ -159,6 +163,7 @@ public class TestObjectHead {
     keyEndpoint.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 2);
     assertSucceeds(() -> keyEndpoint.head(bucketName, RANGE_KEY));
 
+    keyEndpoint.queryParamsForTest().set(S3Consts.QueryParams.PART_NUMBER, partNumber);
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
     long failureBefore = keyEndpoint.getMetrics().getHeadKeyFailure();
 
@@ -167,18 +172,6 @@ public class TestObjectHead {
     assertThat(exception.getErrorMessage())
         .isEqualTo("Cannot specify both Range header and partNumber query parameter");
     assertThat(keyEndpoint.getMetrics().getHeadKeyFailure() - failureBefore).isEqualTo(1);
-  }
-
-  @Test
-  public void testHeadWithZeroPartNumberAndRange() throws Exception {
-    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
-    keyEndpoint.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 0);
-    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-4");
-
-    try (Response response = keyEndpoint.head(bucketName, RANGE_KEY)) {
-      assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_PARTIAL_CONTENT);
-      assertThat(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)).isEqualTo("5");
-    }
   }
 
   @ParameterizedTest
