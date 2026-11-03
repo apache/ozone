@@ -19,14 +19,21 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.ratis.thirdparty.io.grpc.Status.Code.CANCELLED;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.AbstractMap;
+import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +58,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -70,6 +78,7 @@ import org.slf4j.LoggerFactory;
  */
 public class StreamBlockInputStream extends BlockExtendedInputStream {
   private static final Logger LOG = LoggerFactory.getLogger(StreamBlockInputStream.class);
+  private static final String READ_BLOCK_SPAN = "XceiverClientGrpc.ReadBlock";
   private static final int EOF = -1;
   private static final String STREAM_CLOSE_REASON = "StreamBlockInputStream closed";
   private static final AtomicInteger STREAM_ID = new AtomicInteger(0);
@@ -215,7 +224,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         // On failure initStreamRead releases its own permit, so the reader is closed only after it succeeds.
         client.initStreamRead(blockID, reader, failedStreamingDatanodes);
         try {
-          return preadOnce(client, reader, pipeline, blockOffset, length, dst);
+          return TracingUtil.executeInNewSpan(READ_BLOCK_SPAN, SpanKind.CLIENT,
+              () -> preadOnce(client, reader, pipeline, blockOffset, length, dst));
         } finally {
           closeStream(reader);
         }
@@ -500,8 +510,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (r == null) {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
-    xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
-        blockID, requestedLength, length, responseDataSize, verifyChecksum, tokenRef.get(), pipelineRef.get()), r);
+    final Span span = TracingUtil.createSpan(READ_BLOCK_SPAN, SpanKind.CLIENT);
+    streamingReader.addPendingSpan(requestedLength + length, span);
+    try (Scope ignored = span.makeCurrent()) {
+      xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
+          blockID, requestedLength, length, responseDataSize, verifyChecksum, tokenRef.get(), pipelineRef.get()), r);
+    } catch (IOException | RuntimeException e) {
+      streamingReader.endPendingSpans(e);
+      throw e;
+    }
   }
 
   /**
@@ -633,6 +650,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     private final CompletableFuture<Void> future = new CompletableFuture<>();
     private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<StreamingReadResponse> response = new AtomicReference<>();
+    private final Queue<Map.Entry<Long, Span>> pendingSpans = new ConcurrentLinkedQueue<>();
 
     StreamingReader(XceiverClientGrpc client) {
       this.client = client;
@@ -737,6 +755,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           Checksum.validateChecksums(data, readBlock.getOffset(), 0, readBlock.getChunkInfoListList());
         }
         offerToQueue(readBlock);
+        endReceivedSpans(readBlock.getOffset() + readBlock.getData().size());
       } catch (Exception e) {
         // Record the failure first: the log and observer calls below must not mask it.
         setFailed(e);
@@ -793,6 +812,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     private boolean setFailed(Throwable throwable) {
+      endPendingSpans(throwable);
       final boolean completed = future.completeExceptionally(throwable);
       if (!completed) {
         LOG.warn("{}: Already completed, suppress ", this, throwable);
@@ -801,6 +821,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     private void setCompleted() {
+      endPendingSpans(null);
       final boolean changed = future.complete(null);
       if (changed) {
         LOG.debug("{} setCompleted success", this);
@@ -825,6 +846,26 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       }
       final boolean offered = responseQueue.offer(item);
       Preconditions.assertTrue(offered, () -> "Failed to offer " + item);
+    }
+
+    void addPendingSpan(long endOffset, Span span) {
+      pendingSpans.add(new AbstractMap.SimpleImmutableEntry<>(endOffset, span));
+    }
+
+    private void endReceivedSpans(long receivedEnd) {
+      for (Map.Entry<Long, Span> head = pendingSpans.peek(); head != null && head.getKey() <= receivedEnd;
+           head = pendingSpans.peek()) {
+        if (pendingSpans.remove(head)) {
+          head.getValue().end();
+        }
+      }
+    }
+
+    void endPendingSpans(Throwable failure) {
+      for (Map.Entry<Long, Span> pending = pendingSpans.poll(); pending != null; pending = pendingSpans.poll()) {
+        TracingUtil.recordException(pending.getValue(), failure);
+        pending.getValue().end();
+      }
     }
 
     @Override
