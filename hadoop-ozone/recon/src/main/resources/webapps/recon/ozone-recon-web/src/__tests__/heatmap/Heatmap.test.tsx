@@ -153,6 +153,12 @@ describe('Heatmap page', () => {
 
     expect(heatmapRequests).toHaveLength(1);
     expect(screen.getByTestId('heatmap-plot')).toHaveAttribute('data-label', 'root');
+
+    await selectFromDropdown(/Entity Type/, 'Bucket');
+    await waitFor(() => {
+      expect(heatmapRequests).toContainEqual({ path: '/', entityType: 'bucket', startDate: '24H' });
+    });
+    expect(heatmapRequests).toHaveLength(2);
   });
 
   test('drills down into the clicked entity and updates the path input', async () => {
