@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StoragePolicyProto;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -440,6 +442,51 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
   }
 
   @Test
+  public void testPreExecuteDefaultsStoragePolicyAfterFinalization() throws Exception {
+    BucketInfo result = preExecuteBucketInfo(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+            .clearStoragePolicy().clearAllowFallbackStoragePolicy());
+
+    assertThat(result.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.getDefaultPolicy().toProto());
+    assertThat(result.hasAllowFallbackStoragePolicy()).isTrue();
+    assertThat(result.getAllowFallbackStoragePolicy()).isTrue();
+  }
+
+  @Test
+  public void testPreExecuteKeepsExplicitStoragePolicyAfterFinalization() throws Exception {
+    BucketInfo result = preExecuteBucketInfo(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+            .setStoragePolicy(StoragePolicyProto.COLD)
+            .setAllowFallbackStoragePolicy(false));
+
+    assertThat(result.getStoragePolicy()).isEqualTo(StoragePolicyProto.COLD);
+    assertThat(result.getAllowFallbackStoragePolicy()).isFalse();
+  }
+
+  /**
+   * Before finalization no storage policy metadata may enter the replicated request.
+   */
+  @Test
+  public void testPreExecuteDoesNotDefaultStoragePolicyBeforeFinalization() throws Exception {
+    OMVersionManager preFinalized = mockPreFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(preFinalized);
+
+    BucketInfo result = preExecuteBucketInfo(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+            .clearStoragePolicy().clearAllowFallbackStoragePolicy());
+
+    assertThat(result.hasStoragePolicy()).isFalse();
+    assertThat(result.hasAllowFallbackStoragePolicy()).isFalse();
+  }
+
+  private BucketInfo preExecuteBucketInfo(BucketInfo.Builder bucketInfo) throws Exception {
+    addCreateVolumeToTable(bucketInfo.getVolumeName(), omMetadataManager);
+    OMRequest request = newCreateBucketRequest(bucketInfo).build();
+    return new OMBucketCreateRequest(request).preExecute(ozoneManager)
+        .getCreateBucketRequest().getBucketInfo();
+  }
+
+  @Test
   public void testRejectStoragePolicyBeforeFinalization() {
     assertStoragePolicyRejectedBeforeFinalization(
         newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
@@ -606,8 +653,10 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     assertEquals(original.getVolumeName(), updated.getVolumeName());
     assertEquals(original.getIsVersionEnabled(), updated.getIsVersionEnabled());
     assertEquals(original.getStoragePolicy(), updated.getStoragePolicy());
-    assertEquals(original.getAllowFallbackStoragePolicy(),
-        updated.getAllowFallbackStoragePolicy());
+    // A finalized OM defaults the fallback flag to true when the request does not carry it.
+    boolean expectedFallback = original.hasAllowFallbackStoragePolicy() ?
+        original.getAllowFallbackStoragePolicy() : true;
+    assertThat(updated.getAllowFallbackStoragePolicy()).isEqualTo(expectedFallback);
     assertEquals(original.getMetadataList(), updated.getMetadataList());
     assertNotEquals(original.getCreationTime(), updated.getCreationTime());
   }

@@ -29,6 +29,7 @@ import java.nio.file.InvalidPathException;
 import java.util.List;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -165,6 +166,11 @@ public class OMBucketCreateRequest extends OMClientRequest {
       DefaultReplicationConfig drc = OzoneConfigUtil.toDefaultReplicationConfig(
           bucketInfo.getDefaultReplicationConfig());
       ozoneManager.validateReplicationConfig(drc.getReplicationConfig());
+    }
+
+    // Before finalization the storage policy fields must not be persisted.
+    if (ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
+      applyStoragePolicyIfNotPresent(newBucketInfo);
     }
 
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
@@ -416,6 +422,19 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
     return true;
 
+  }
+
+  /**
+   * Fills in the OM default storage policy and the default fallback flag (true)
+   * for the fields the client did not send.
+   */
+  private static void applyStoragePolicyIfNotPresent(BucketInfo.Builder bucketInfo) {
+    if (!bucketInfo.hasStoragePolicy()) {
+      bucketInfo.setStoragePolicy(OzoneStoragePolicy.getDefaultPolicy().toProto());
+    }
+    if (!bucketInfo.hasAllowFallbackStoragePolicy()) {
+      bucketInfo.setAllowFallbackStoragePolicy(true);
+    }
   }
 
   @RequestFeatureValidator(

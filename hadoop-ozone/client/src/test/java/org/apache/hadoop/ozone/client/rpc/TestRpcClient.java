@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -54,6 +55,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.TestClientThreadShutdown;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -67,6 +69,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -652,6 +655,50 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * Ozone client must not send a StoragePolicy by default. The default must be set by OM.
+   * Sending one to a pre-finalized OM would be rejected.
+   */
+  @Test
+  public void testCreateBucketWithoutStoragePolicySendsNoPolicyFields() throws Exception {
+    BucketInfo sent = captureCreateBucketInfo(BucketArgs.newBuilder().build());
+
+    assertThat(sent.hasStoragePolicy()).isFalse();
+    assertThat(sent.hasAllowFallbackStoragePolicy()).isFalse();
+  }
+
+  @Test
+  public void testCreateBucketWithStoragePolicyPassesPolicyFieldsThrough() throws Exception {
+    BucketInfo sent = captureCreateBucketInfo(BucketArgs.newBuilder()
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
+        .setAllowFallbackStoragePolicy(false)
+        .build());
+
+    assertThat(sent.getStoragePolicy()).isEqualTo(HddsProtos.StoragePolicyProto.COLD);
+    assertThat(sent.getAllowFallbackStoragePolicy()).isFalse();
+  }
+
+  private static BucketInfo captureCreateBucketInfo(BucketArgs bucketArgs)
+      throws Exception {
+    AtomicReference<BucketInfo> captured = new AtomicReference<>();
+    RpcClient client = createRpcClient(new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.CreateBucket) {
+          captured.set(request.getCreateBucketRequest().getBucketInfo());
+        }
+        return super.submitRequest(request);
+      }
+    });
+    try {
+      client.createVolume("vol1");
+      client.createBucket("vol1", "bucket1", bucketArgs);
+    } finally {
+      client.close();
+    }
+    return captured.get();
+  }
+
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
   public void testIfNoneMatchETagReachesOMOrRejectsOldVersion(OzoneManagerVersion version) throws IOException {
@@ -686,7 +733,7 @@ public class TestRpcClient {
           "key", 1L, "excluded-etag", replication, Collections.emptyMap(), Collections.emptyMap(), false));
       IOException completeError = assertThrows(IOException.class, () -> client.completeMultipartUpload("vol", "bucket",
           "key", "upload-id", Collections.singletonMap(1, "part-etag"), null, null, "excluded-etag"));
-      if (version == OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) {
+      if (OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.isSupportedBy(version)) {
         assertEquals("captured", putError.getMessage());
         assertEquals("captured", streamError.getMessage());
         assertEquals("captured", completeError.getMessage());
