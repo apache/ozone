@@ -22,9 +22,6 @@ import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -102,7 +99,8 @@ public class S3RevokeSecretRequest extends OMClientRequest {
             if (s3SecretManager.hasS3Secret(kerberosID)) {
               LOG.info("Secret for {} exists in table, removing it.",
                   kerberosID);
-              final Long stsRevocationCutoff = updateStsRevocationCutoff(ozoneManager, kerberosID, context.getIndex());
+              final Long stsRevocationCutoff = S3SecretRequestHelper.updateStsRevocationCutoff(
+                  ozoneManager.getMetadataManager(), getOmRequest(), kerberosID, context.getIndex());
               // Invalid entry in table cache immediately
               s3SecretManager.invalidateCacheEntry(kerberosID);
               return new S3RevokeSecretResponse(kerberosID, stsRevocationCutoff, s3SecretManager,
@@ -139,19 +137,5 @@ public class S3RevokeSecretRequest extends OMClientRequest {
       LOG.error("Error when revoking secret for {}.", kerberosID, exception);
     }
     return omClientResponse;
-  }
-
-  /** Records the attached cutoff, never lowering an existing one; null if the entry has none (logged without it). */
-  private Long updateStsRevocationCutoff(OzoneManager ozoneManager, String accessId, long transactionIndex)
-      throws IOException {
-    if (!getOmRequest().hasRevokeSTSTokenRequest()) {
-      return null;
-    }
-    final Table<String, Long> table = ozoneManager.getMetadataManager().getS3RevokedStsTokenTable();
-    final Long existing = table.getIfExist(accessId);
-    final long requested = getOmRequest().getRevokeSTSTokenRequest().getRevocationTimeMillis();
-    final long cutoff = existing == null ? requested : Math.max(existing, requested);
-    table.addCacheEntry(new CacheKey<>(accessId), CacheValue.get(transactionIndex, cutoff));
-    return cutoff;
   }
 }
