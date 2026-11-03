@@ -306,7 +306,7 @@ public class ReconNodeManager extends SCMNodeManager {
    * it has finalized, unlike SCM.
    */
   @Override
-  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
+  public boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
     if (versionReport == null || !versionReport.hasSoftwareVersion() || !versionReport.hasApparentVersion()) {
       LOG.error("Datanode {} did not report its version. Not allowing it to join the cluster.", dnDetails);
       return true;

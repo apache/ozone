@@ -44,6 +44,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionPr
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -65,6 +66,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -84,8 +86,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -99,6 +103,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
@@ -1027,6 +1032,47 @@ public class TestSCMNodeManager {
         }
       }
     }
+  }
+
+  /**
+   * A datanode shuts down when SCM rejects its registration. An SCM that is not the ready leader may not have
+   * applied a finalization the leader has already sent to the datanodes, so its rejection must make the datanode
+   * retry. The rejection of the ready leader stays final, and a compatible datanode still registers with any SCM.
+   */
+  @Test
+  public void testOnlyReadyLeaderRejectsRegistrationAsFinal() throws Exception {
+    OzoneConfiguration conf = getConf();
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.serialize());
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      SCMDatanodeProtocolServer server = scm.getDatanodeProtocolServer();
+      // This SCM is pre-finalized. The first datanode is finalized, the second one is pre-finalized.
+      DatanodeDetails finalizedDn = randomDatanodeDetails();
+      DatanodeDetails preFinalizedDn = randomDatanodeDetails();
+      DatanodeVersionProto preFinalized =
+          toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION);
+      Callable<SCMRegisteredResponseProto> registerFinalized =
+          () -> register(server, finalizedDn, defaultVersionProto());
+
+      scm.getScmContext().updateLeaderAndTerm(false, 1);
+      assertThatThrownBy(registerFinalized::call).isInstanceOf(ServerNotLeaderException.class);
+      assertThat(register(server, preFinalizedDn, preFinalized).getErrorCode()).isEqualTo(success);
+
+      scm.getScmContext().updateLeaderAndTerm(true, 2);
+      assertThatThrownBy(registerFinalized::call).isInstanceOf(ServerNotLeaderException.class);
+
+      scm.getScmContext().setLeaderReady();
+      assertThat(registerFinalized.call().getErrorCode()).isEqualTo(errorNodeNotPermitted);
+      assertThat(nodeManager.getAllNodes()).extracting(DatanodeDetails::getID).containsExactly(preFinalizedDn.getID());
+    }
+  }
+
+  private static SCMRegisteredResponseProto register(SCMDatanodeProtocolServer server, DatanodeDetails dn,
+      DatanodeVersionProto version) throws IOException {
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+        dn.getID(), dn.getNetworkFullPath(), Long.MAX_VALUE);
+    NodeReportProto nodeReport = HddsTestUtils.createNodeReport(Collections.singletonList(storageReport), emptyList());
+    return server.register(dn.getExtendedProtoBufMessage(), nodeReport, HddsTestUtils.getRandomContainerReports(0),
+        getRandomPipelineReports(), version);
   }
 
   @ParameterizedTest
@@ -2206,6 +2252,11 @@ public class TestSCMNodeManager {
       assertEquals(2, nodeManager.getNodesByAddress("1.2.3.4").size());
       assertEquals(1, nodeManager.getNodesByAddress("2.3.4.5").size());
       assertEquals(0, nodeManager.getNodesByAddress("1.9.8.7").size());
+
+      DatanodeDetails ipv6Node = createDatanodeDetails(
+          DatanodeID.randomID(), "host6", "2001:db8:0:0:0:0:0:1", null);
+      nodeManager.register(ipv6Node, null, null);
+      assertEquals(1, nodeManager.getNodesByAddress("2001:db8::1").size());
     }
   }
 

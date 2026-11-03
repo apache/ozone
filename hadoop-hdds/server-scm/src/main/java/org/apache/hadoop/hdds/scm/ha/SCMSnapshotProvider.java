@@ -133,7 +133,10 @@ public class SCMSnapshotProvider {
     try (SCMSnapshotDownloader downloadClient =
         new InterSCMGrpcClient(host, port, conf, scmCertificateClient)) {
       downloadClient.download(targetFile.toPath()).get();
-    } catch (ExecutionException | InterruptedException e) {
+    } catch (ExecutionException e) {
+      LOG.error("Rocks DB checkpoint downloading failed", e);
+      throw new IOException(e);
+    } catch (InterruptedException e) {
       LOG.error("Rocks DB checkpoint downloading failed", e);
       Thread.currentThread().interrupt();
       throw new IOException(e);

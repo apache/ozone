@@ -62,6 +62,16 @@ class TestOmConfig {
   }
 
   @Test
+  void mpuPartEncryptionIvEnabledByDefault() {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    assertThat(conf.getObject(OmConfig.class).isMpuPartEncryptionIvEnabled()).isTrue();
+    assertThat(new OmConfig().isMpuPartEncryptionIvEnabled()).isTrue();
+
+    conf.setBoolean(OmConfig.Keys.MPU_PART_ENCRYPTION_IV_ENABLED, false);
+    assertThat(conf.getObject(OmConfig.class).isMpuPartEncryptionIvEnabled()).isFalse();
+  }
+
+  @Test
   void testCopy() {
     MutableConfigurationSource conf = new OzoneConfiguration();
     OmConfig original = conf.getObject(OmConfig.class);
@@ -80,6 +90,7 @@ class TestOmConfig {
     updated.setKeyNameCharacterCheckEnabled(!updated.isKeyNameCharacterCheckEnabled());
     updated.setMaxListSize(updated.getMaxListSize() + 1);
     updated.setMaxUserVolumeCount(updated.getMaxUserVolumeCount() + 1);
+    updated.setMpuPartEncryptionIvEnabled(!updated.isMpuPartEncryptionIvEnabled());
 
     subject.setFrom(updated);
 
@@ -91,6 +102,7 @@ class TestOmConfig {
     assertEquals(expected.isFileSystemPathEnabled(), actual.isFileSystemPathEnabled());
     assertEquals(expected.isKeyNameCharacterCheckEnabled(), actual.isKeyNameCharacterCheckEnabled());
     assertEquals(expected.getMaxUserVolumeCount(), actual.getMaxUserVolumeCount());
+    assertEquals(expected.isMpuPartEncryptionIvEnabled(), actual.isMpuPartEncryptionIvEnabled());
   }
 
 }
