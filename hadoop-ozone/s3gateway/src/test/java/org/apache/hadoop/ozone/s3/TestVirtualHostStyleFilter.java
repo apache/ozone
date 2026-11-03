@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,14 +30,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.net.URI;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
-import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -83,6 +87,17 @@ public class TestVirtualHostStyleFilter {
     when(requestContext.getHeaderString(HttpHeaders.HOST)).thenReturn(host);
     when(requestContext.getUriInfo()).thenReturn(uriInfo);
     return requestContext;
+  }
+
+  /** The request must be rejected with an S3 400 InvalidRequest, which clients do not retry, not a 500. */
+  private static void assertInvalidRequest(VirtualHostStyleFilter filter, ContainerRequestContext requestContext,
+      String expectErrorMessage) {
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> filter.filter(requestContext));
+    assertThat(exception.getResponse().getStatus()).isEqualTo(HTTP_BAD_REQUEST);
+    OS3Exception cause = assertInstanceOf(OS3Exception.class, exception.getCause());
+    assertThat(cause.getCode()).isEqualTo(INVALID_REQUEST.getCode());
+    assertThat(cause.getErrorMessage()).contains(expectErrorMessage);
   }
 
   @Test
@@ -169,15 +184,18 @@ public class TestVirtualHostStyleFilter {
   }
 
   @ParameterizedTest
-  @CsvSource(value = {"mybucket.myhost:9999,No matching domain", "mybucketlocalhost:9878,invalid format"})
+  @CsvSource(value = {
+      "mybucket.myhost:9999,No matching domain",
+      // a gateway whose own host name is missing from ozone.s3g.domain.name
+      "s3g.example.com:9878,No matching domain",
+      "mybucketlocalhost:9878,invalid format",
+  })
   public void testVirtualHostStyleWithInvalidInputs(String hostAddress,
                                                     String expectErrorMessage) throws Exception {
     VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
     virtualHostStyleFilter.setConfiguration(conf);
     ContainerRequestContext requestContext = createRequestContext(hostAddress, null);
-    InvalidRequestException exception = assertThrows(InvalidRequestException.class,
-        () -> virtualHostStyleFilter.filter(requestContext));
-    assertThat(exception).hasMessageContaining(expectErrorMessage);
+    assertInvalidRequest(virtualHostStyleFilter, requestContext, expectErrorMessage);
   }
 
   @ParameterizedTest
@@ -288,8 +306,6 @@ public class TestVirtualHostStyleFilter {
 
     ContainerRequestContext requestContext =
         createRequestContext(host, "/mybucket/myfile");
-    InvalidRequestException exception = assertThrows(InvalidRequestException.class,
-        () -> virtualHostStyleFilter.filter(requestContext));
-    assertThat(exception).hasMessageContaining("No matching domain");
+    assertInvalidRequest(virtualHostStyleFilter, requestContext, "No matching domain");
   }
 }

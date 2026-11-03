@@ -196,6 +196,16 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private boolean sortDatanodesForWriteEnabled;
 
+  @Config(key = "ozone.om.mpu.part.encryption.iv.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.SECURITY},
+      description = "If true, once Ozone Manager is finalized, each multipart upload part in an encrypted bucket "
+          + "gets its own encryption IV. Clients older than this version cannot read multipart keys that have "
+          + "such parts. Set to false to keep new multipart keys readable by older clients."
+  )
+  private boolean mpuPartEncryptionIvEnabled = Defaults.MPU_PART_ENCRYPTION_IV_ENABLED;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
   }
@@ -238,6 +248,14 @@ public class OmConfig extends ReconfigurableConfig {
 
   public boolean isSortDatanodesForWriteEnabled() {
     return sortDatanodesForWriteEnabled;
+  }
+
+  public boolean isMpuPartEncryptionIvEnabled() {
+    return mpuPartEncryptionIvEnabled;
+  }
+
+  public void setMpuPartEncryptionIvEnabled(boolean newValue) {
+    mpuPartEncryptionIvEnabled = newValue;
   }
 
   public boolean isFollowerReadLocalLeaseEnabled() {
@@ -340,6 +358,7 @@ public class OmConfig extends ReconfigurableConfig {
     userDefaultRights = other.userDefaultRights;
     groupDefaultRights = other.groupDefaultRights;
     allowLeaderSkipLinearizableRead = other.allowLeaderSkipLinearizableRead;
+    mpuPartEncryptionIvEnabled = other.mpuPartEncryptionIvEnabled;
 
     validate();
   }
@@ -352,6 +371,7 @@ public class OmConfig extends ReconfigurableConfig {
     public static final String LIST_ALL_VOLUMES_ALLOWED = "ozone.om.volume.listall.allowed";
     public static final String SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
     public static final String USER_MAX_VOLUME = "ozone.om.user.max.volume";
+    public static final String MPU_PART_ENCRYPTION_IV_ENABLED = "ozone.om.mpu.part.encryption.iv.enabled";
   }
 
   /**
@@ -361,6 +381,7 @@ public class OmConfig extends ReconfigurableConfig {
     public static final boolean ENABLE_FILESYSTEM_PATHS = false;
     public static final boolean LIST_ALL_VOLUMES_ALLOWED = true;
     public static final long SERVER_LIST_MAX_SIZE = 1000;
+    public static final boolean MPU_PART_ENCRYPTION_IV_ENABLED = true;
   }
 
 }

@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -101,6 +103,30 @@ public class TestOMKeysRenameResponse extends OMKeyResponseTests {
       assertFalse(omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
     }
 
+  }
+
+  @Test
+  public void testSecondRenameInSameBatchKeepsSnapshotName() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+    OMRequestTestUtils.addSnapshotToTable(volumeName, bucketName, "snap", omMetadataManager);
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, "key", 0L,
+        RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+    String fromKey = omMetadataManager.getOzoneKey(volumeName, bucketName, "key");
+    OmKeyInfo keyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(fromKey);
+    OMResponse omResponse = OMResponse.newBuilder()
+        .setRenameKeysResponse(RenameKeysResponse.getDefaultInstance())
+        .setStatus(Status.OK).setCmdType(Type.RenameKeys).build();
+
+    new OMKeysRenameResponse(omResponse, new OmRenameKeys(volumeName, bucketName, null,
+        Collections.singletonMap("key", keyInfo.toBuilder().setKeyName("key_b").build())))
+        .addToDBBatch(omMetadataManager, batchOperation);
+    new OMKeysRenameResponse(omResponse, new OmRenameKeys(volumeName, bucketName, null,
+        Collections.singletonMap("key_b", keyInfo.toBuilder().setKeyName("key_c").build())))
+        .addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    String renameDbKey = omMetadataManager.getRenameKey(volumeName, bucketName, keyInfo.getObjectID());
+    assertThat(omMetadataManager.getSnapshotRenamedTable().get(renameDbKey)).isEqualTo(fromKey);
   }
 
   private void createPreRequisities() throws Exception {
