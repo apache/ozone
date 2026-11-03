@@ -24,16 +24,16 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.metrics2.lib.MutableStat;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Class which maintains metrics related to OzoneManager DoubleBuffer.
  */
 public class OzoneManagerDoubleBufferMetrics {
 
-  private static OzoneManagerDoubleBufferMetrics instance;
-
   private static final String SOURCE_NAME =
       OzoneManagerDoubleBufferMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
 
   @Metric(about = "Total Number of flush operations happened in " +
       "OzoneManagerDoubleBuffer.")
@@ -59,18 +59,11 @@ public class OzoneManagerDoubleBufferMetrics {
   @Metric(about = "DoubleBuffer queue size.", valueName = "Size")
   private MutableStat queueSize;
 
-  public static synchronized OzoneManagerDoubleBufferMetrics create() {
-    if (instance != null) {
-      return instance;
-    } else {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      OzoneManagerDoubleBufferMetrics omDoubleBufferMetrics =
-          ms.register(SOURCE_NAME,
-              "OzoneManager DoubleBuffer Metrics",
-              new OzoneManagerDoubleBufferMetrics());
-      instance = omDoubleBufferMetrics;
-      return omDoubleBufferMetrics;
-    }
+  public static OzoneManagerDoubleBufferMetrics create() {
+    OzoneManagerDoubleBufferMetrics metrics = new OzoneManagerDoubleBufferMetrics();
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.register(metrics.sourceName, "OzoneManager DoubleBuffer Metrics", metrics);
+    return metrics;
   }
 
   public void incrTotalNumOfFlushOperations() {
@@ -143,10 +136,6 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   public void unRegister() {
-    synchronized (OzoneManagerDoubleBufferMetrics.class) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(SOURCE_NAME);
-      instance = null;
-    }
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 }

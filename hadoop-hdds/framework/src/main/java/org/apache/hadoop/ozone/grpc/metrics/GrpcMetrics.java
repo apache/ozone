@@ -59,6 +59,7 @@ public class GrpcMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       GrpcMetrics.class.getSimpleName();
 
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
   private final MetricsRegistry registry;
   private final boolean grpcQuantileEnable;
   // written by the gRPC handler threads and read by the metrics snapshot
@@ -128,15 +129,14 @@ public class GrpcMetrics implements MetricsSource {
    */
   public static synchronized GrpcMetrics create(Configuration conf) {
     GrpcMetrics metrics = new GrpcMetrics(conf);
-    return DefaultMetricsSystem.instance().register(SOURCE_NAME,
-        "Metrics for using gRPC", metrics);
+    return DefaultMetricsSystem.instance().register(metrics.sourceName, "Metrics for using gRPC", metrics);
   }
 
   /**
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
     MetricUtil.stop(grpcProcessingTimeNanosQuantiles);
     MetricUtil.stop(grpcQueueTimeNanosQuantiles);
   }

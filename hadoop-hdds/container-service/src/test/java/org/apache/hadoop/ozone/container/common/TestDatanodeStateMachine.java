@@ -37,8 +37,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -54,9 +56,13 @@ import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -150,14 +156,46 @@ public class TestDatanodeStateMachine {
     }
   }
 
+  @Test
+  void testCloseUnregistersClientCacheMetrics() throws Exception {
+    Set<String> before = clientCacheMetricsSources();
+    try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
+      assertThat(clientCacheMetricsSources().size()).isGreaterThan(before.size());
+    }
+    assertThat(clientCacheMetricsSources()).containsExactlyInAnyOrderElementsOf(before);
+  }
+
+  @Test
+  void testCloseReleasesContainerMetricsOnce() throws Exception {
+    ContainerMetrics metrics;
+    try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
+      OzoneContainer container = stateMachine.getContainer();
+      metrics = spy(container.getMetrics());
+      Field field = OzoneContainer.class.getDeclaredField("metrics");
+      field.setAccessible(true);
+      field.set(container, metrics);
+    }
+    verify(metrics).close();
+  }
+
+  private Set<String> clientCacheMetricsSources() throws ReflectiveOperationException {
+    Field field = MetricsSystemImpl.class.getDeclaredField("allSources");
+    field.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<String, MetricsSource> sources = (Map<String, MetricsSource>) field.get(DefaultMetricsSystem.instance());
+    Set<String> names = new HashSet<>(sources.keySet());
+    names.removeIf(name -> !name.startsWith("CacheMetrics-XceiverClientManager@"));
+    return names;
+  }
+
   /**
    * Assert that starting statemachine executes the Init State.
    */
   @Test
   public void testStartStopDatanodeStateMachine() throws IOException,
       InterruptedException, TimeoutException {
-    try (DatanodeStateMachine stateMachine =
-        new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
+    DatanodeStateMachine stateMachine = new DatanodeStateMachine(getNewDatanodeDetails(), conf);
+    try {
       stateMachine.startDaemon();
       SCMConnectionManager connectionManager =
           stateMachine.getConnectionManager();
@@ -167,10 +205,10 @@ public class TestDatanodeStateMachine {
             LOG.info("connectionManager.getValues().size() is {}", size);
             return size == 1;
           }, 1000, 30000);
-
+    } finally {
       stateMachine.stopDaemon();
-      assertTrue(stateMachine.isDaemonStopped());
     }
+    assertTrue(stateMachine.isDaemonStopped());
   }
 
   @Test

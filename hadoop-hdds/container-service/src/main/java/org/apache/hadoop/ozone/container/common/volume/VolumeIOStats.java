@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is used to track Volume IO stats for each HDDS Volume.
@@ -51,6 +52,7 @@ public class VolumeIOStats {
 
   @Deprecated
   public VolumeIOStats() {
+    metricsSourceName = MetricUtil.getMetricsSourceName(metricsSourceName);
     init();
   }
 
@@ -58,7 +60,7 @@ public class VolumeIOStats {
    * @param identifier Typically, path to volume root. e.g. /data/hdds
    */
   public VolumeIOStats(String identifier, String storageDirectory, int[] intervals) {
-    this.metricsSourceName += '-' + identifier;
+    this.metricsSourceName = MetricUtil.getMetricsSourceName(metricsSourceName + '-' + identifier);
     this.storageDirectory = storageDirectory;
 
     // Try initializing `readLatencyQuantiles` and `writeLatencyQuantiles`
@@ -86,6 +88,8 @@ public class VolumeIOStats {
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(metricsSourceName);
+    MetricUtil.stop(readLatencyQuantiles);
+    MetricUtil.stop(writeLatencyQuantiles);
   }
 
   public String getMetricsSourceName() {

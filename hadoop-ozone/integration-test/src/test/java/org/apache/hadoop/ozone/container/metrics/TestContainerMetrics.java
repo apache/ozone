@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -88,6 +89,7 @@ public class TestContainerMetrics {
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static final int DFS_METRICS_PERCENTILES_INTERVALS = 1;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
+  private ContainerMetrics metrics;
 
   @BeforeAll
   public static void setup() {
@@ -138,7 +140,7 @@ public class TestContainerMetrics {
     ContainerSet containerSet = newContainerSet();
     StateContext context = ContainerTestUtils.getMockContext(
         dd, CONF);
-    ContainerMetrics metrics = ContainerMetrics.create(CONF);
+    metrics = ContainerMetrics.create(CONF);
     Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerProtos.ContainerType containerType :
         ContainerProtos.ContainerType.values()) {
@@ -156,7 +158,7 @@ public class TestContainerMetrics {
     return dispatcher;
   }
 
-  static void runTestClientServer(
+  private void runTestClientServer(
       CheckedConsumer<Pipeline, IOException> initConf,
       CheckedFunction<Pipeline, XceiverClientSpi,
                 IOException> createClient,
@@ -199,8 +201,10 @@ public class TestContainerMetrics {
       response = client.sendCommand(readChunkRequest);
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
-      MetricsRecordBuilder containerMetrics = getMetrics(
-          "StorageContainerMetrics");
+      Field field = ContainerMetrics.class.getDeclaredField("metricsSourceName");
+      field.setAccessible(true);
+      String metricsSourceName = (String) field.get(metrics);
+      MetricsRecordBuilder containerMetrics = getMetrics(metricsSourceName);
       assertCounter("NumOps", 3L, containerMetrics);
       assertCounter("numCreateContainer", 1L, containerMetrics);
       assertCounter("numWriteChunk", 1L, containerMetrics);
@@ -223,7 +227,9 @@ public class TestContainerMetrics {
       assertCounter("WriteBytes", 1024L, volumeIOMetrics);
       assertCounter("WriteOpCount", 1L, volumeIOMetrics);
     } finally {
-      ContainerMetrics.remove();
+      if (metrics != null) {
+        metrics.close();
+      }
       if (volumeSet != null) {
         volumeSet.shutdown();
       }

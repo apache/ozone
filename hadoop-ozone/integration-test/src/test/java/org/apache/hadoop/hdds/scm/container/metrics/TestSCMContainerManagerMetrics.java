@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -53,11 +54,18 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
 
   private StorageContainerManager scm;
   private OzoneClient client;
+  private String metricsSourceName;
 
   @BeforeEach
   public void setup() throws Exception {
     client = cluster().newClient();
     scm = cluster().getStorageContainerManager();
+    Field metricsField = scm.getContainerManager().getClass().getDeclaredField("scmContainerManagerMetrics");
+    metricsField.setAccessible(true);
+    SCMContainerManagerMetrics source = (SCMContainerManagerMetrics) metricsField.get(scm.getContainerManager());
+    Field sourceNameField = SCMContainerManagerMetrics.class.getDeclaredField("sourceName");
+    sourceNameField.setAccessible(true);
+    metricsSourceName = (String) sourceNameField.get(source);
   }
 
   @AfterEach
@@ -69,7 +77,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
   public void testContainerOpsMetrics() throws Exception {
     MetricsRecordBuilder metrics;
     ContainerManager containerManager = scm.getContainerManager();
-    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    metrics = getMetrics(metricsSourceName);
     long numSuccessfulCreateContainers = getLongCounter(
         "NumSuccessfulCreateContainers", metrics);
     long numFailureCreateContainers = getLongCounter(
@@ -79,7 +87,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
 
-    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    metrics = getMetrics(metricsSourceName);
     assertEquals(getLongCounter("NumSuccessfulCreateContainers",
         metrics), ++numSuccessfulCreateContainers);
 
@@ -87,13 +95,13 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
         containerManager.allocateContainer(
             new ECReplicationConfig(8, 5), OzoneConsts.OZONE));
     // allocateContainer should fail, so it should have the old metric value.
-    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    metrics = getMetrics(metricsSourceName);
     assertEquals(getLongCounter("NumSuccessfulCreateContainers",
         metrics), numSuccessfulCreateContainers);
     assertEquals(getLongCounter("NumFailureCreateContainers",
         metrics), numFailureCreateContainers + 1);
 
-    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    metrics = getMetrics(metricsSourceName);
     long numSuccessfulDeleteContainers = getLongCounter(
         "NumSuccessfulDeleteContainers", metrics);
     long numFailureDeleteContainers = getLongCounter(
@@ -102,7 +110,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     containerManager.deleteContainer(
         ContainerID.valueOf(containerInfo.getContainerID()));
 
-    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    metrics = getMetrics(metricsSourceName);
     assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
         metrics), ++numSuccessfulDeleteContainers);
 
@@ -110,7 +118,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
         containerManager.deleteContainer(
             ContainerID.valueOf(RandomUtils.secure().randomLong(10000, 20000))));
     // deleteContainer should fail, so it should have the old metric value.
-    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    metrics = getMetrics(metricsSourceName);
     assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
         metrics), numSuccessfulDeleteContainers);
     assertEquals(getLongCounter("NumFailureDeleteContainers",
@@ -119,7 +127,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     long currentValue = getLongCounter("NumListContainerOps", metrics);
     containerManager.getContainers(
         ContainerID.valueOf(containerInfo.getContainerID()), 1);
-    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    metrics = getMetrics(metricsSourceName);
     assertEquals(currentValue + 1,
         getLongCounter("NumListContainerOps", metrics));
 
@@ -128,7 +136,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
   @Test
   public void testReportProcessingMetrics() throws Exception {
     MetricsRecordBuilder metrics =
-        getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+        getMetrics(metricsSourceName);
     assertThat(getLongCounter("NumContainerReportsProcessedSuccessful", metrics))
         .isPositive();
 
@@ -140,7 +148,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
 
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =
-          getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+          getMetrics(metricsSourceName);
       return getLongCounter("NumICRReportsProcessedSuccessful", scmMetrics) > previous;
     }, 100, 30_000);
   }

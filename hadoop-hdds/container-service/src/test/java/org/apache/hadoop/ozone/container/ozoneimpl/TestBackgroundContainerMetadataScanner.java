@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -73,6 +74,11 @@ public class TestBackgroundContainerMetadataScanner extends
   public void setup() {
     super.setup();
     scanner = new BackgroundContainerMetadataScanner(conf, controller);
+  }
+
+  @AfterEach
+  public void tearDown() {
+    scanner.shutdown();
   }
 
   @Test
@@ -122,7 +128,6 @@ public class TestBackgroundContainerMetadataScanner extends
     assertNotNull(DefaultMetricsSystem.instance().getSource(name));
 
     scanner.shutdown();
-    scanner.run();
 
     assertNull(DefaultMetricsSystem.instance().getSource(name));
   }
@@ -237,6 +242,14 @@ public class TestBackgroundContainerMetadataScanner extends
     verify(openContainer, never()).scanMetaData();
     verify(corruptData, never()).scanMetaData();
     verify(openCorruptMetadata, never()).scanMetaData();
+  }
+
+  @Test
+  public void testShutdownBeforeStartUnregistersMetrics() {
+    String name = scanner.getMetrics().getName();
+    assertNotNull(DefaultMetricsSystem.instance().getSource(name));
+    scanner.shutdown();
+    assertNull(DefaultMetricsSystem.instance().getSource(name));
   }
 
   @Test

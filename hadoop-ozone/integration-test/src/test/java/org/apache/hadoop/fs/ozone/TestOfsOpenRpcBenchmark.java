@@ -188,8 +188,8 @@ public class TestOfsOpenRpcBenchmark {
   }
 
   /** OMMetrics has no getter for this counter, so read it from the metrics source, as on the baseline. */
-  private static long getKeyInfoCount() {
-    return getLongCounter("NumGetKeyInfo", getMetrics("OMMetrics"));
+  private long getKeyInfoCount() {
+    return getLongCounter("NumGetKeyInfo", getMetrics(cluster.getOzoneManager().getMetrics()));
   }
 
   private Result runWorkload(int threads) throws IOException, InterruptedException {

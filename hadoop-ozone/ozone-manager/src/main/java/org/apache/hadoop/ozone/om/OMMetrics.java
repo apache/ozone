@@ -23,14 +23,18 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -38,9 +42,11 @@ import org.apache.hadoop.util.Time;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Manager Metrics", context = "dfs")
-public class OMMetrics implements OmMetadataReaderMetrics {
+public class OMMetrics implements OmMetadataReaderMetrics, MetricsSource {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
   private final LinkedList<String> ratisEvents = new LinkedList<>();
   private final int maxRatisEvents;
@@ -255,6 +261,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong ecBucketCreateTotal;
   private @Metric MutableCounterLong ecBucketCreateFailsTotal;
   private final DBCheckpointMetrics dbCheckpointMetrics;
+  private final OmSnapshotMetrics snapshotMetrics = OmSnapshotMetrics.create();
   private OMSnapshotDirectoryMetrics snapshotDirectoryMetrics;
 
   // Bucket Tagging Metrics
@@ -276,9 +283,13 @@ public class OMMetrics implements OmMetadataReaderMetrics {
         ? OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
         : conf.getInt(OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
-    return ms.register(SOURCE_NAME,
-        "Ozone Manager Metrics",
-        new OMMetrics(maxRatisEvents));
+    OMMetrics metrics = new OMMetrics(maxRatisEvents);
+    ms.register(metrics.sourceName, "Ozone Manager Metrics", metrics);
+    return metrics;
+  }
+
+  public OmSnapshotMetrics getSnapshotMetrics() {
+    return snapshotMetrics;
   }
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {
@@ -1618,14 +1629,28 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     }
   }
 
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName, "Ozone Manager Metrics", this);
+    dbCheckpointMetrics.register("OM Metrics");
+    snapshotMetrics.register();
+  }
+
   public void unRegister() {
+    snapshotMetrics.unregister();
     if (dbCheckpointMetrics != null) {
       dbCheckpointMetrics.unRegister();
     }
     if (snapshotDirectoryMetrics != null) {
       snapshotDirectoryMetrics.unRegister();
+      snapshotDirectoryMetrics = null;
     }
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    registry.snapshot(collector.addRecord(registry.info()), all);
+  }
+
 }

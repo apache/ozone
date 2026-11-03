@@ -375,6 +375,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void start() {
     LOG.info("Starting Recon Task Controller.");
+    if (executorService != null) {
+      controllerMetrics.register();
+      taskMetrics.register();
+    }
     
     // Clean up any pre-existing checkpoint directories from previous runs
     cleanupPreExistingCheckpoints();
@@ -400,6 +404,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     running = false;
     shutdownExecutorGracefully(this.executorService, "main task executor");
     shutdownExecutorGracefully(this.eventProcessingExecutor, "event processing executor");
+    taskMetrics.unRegister();
+    controllerMetrics.unRegister();
   }
 
   private void shutdownExecutorGracefully(ExecutorService executor, String name) {

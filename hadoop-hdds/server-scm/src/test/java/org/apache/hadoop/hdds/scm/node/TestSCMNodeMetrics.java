@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -51,6 +52,7 @@ import org.junit.jupiter.api.Test;
 public class TestSCMNodeMetrics {
 
   private static SCMNodeManager nodeManager;
+  private static SCMNodeMetrics metrics;
 
   private static DatanodeDetails registeredDatanode;
 
@@ -65,6 +67,10 @@ public class TestSCMNodeMetrics {
     nodeManager = new SCMNodeManager(source, config, publisher,
         new NetworkTopologyImpl(source), SCMContext.emptyContext(),
             versionManager);
+
+    Field metricsField = SCMNodeManager.class.getDeclaredField("metrics");
+    metricsField.setAccessible(true);
+    metrics = (SCMNodeMetrics) metricsField.get(nodeManager);
 
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")
@@ -166,87 +172,87 @@ public class TestSCMNodeMetrics {
 
     nodeManager.processNodeReport(registeredDatanode, nodeReport);
 
-    MetricsRecordBuilder metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
+    MetricsRecordBuilder metricsSource = getMetrics(metrics);
 
     assertGauge("InServiceHealthyNodes", 1,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("InServiceStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("InServiceDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissioningHealthyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissioningStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissioningDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedHealthyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("EnteringMaintenanceHealthyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("EnteringMaintenanceStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("EnteringMaintenanceDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("InMaintenanceHealthyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("InMaintenanceStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("InMaintenanceDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("MaintenanceDiskCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("MaintenanceDiskUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("MaintenanceDiskRemaining", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("MaintenanceSSDCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("MaintenanceSSDUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("MaintenanceSSDRemaining", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedDiskCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedDiskUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedDiskRemaining", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedSSDCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedSSDUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("DecommissionedSSDRemaining", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("AllNodes", 1,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     // The DN has no metadata volumes, so hasEnoughSpace() returns false indicating the DN is out of space.
     assertGauge("NonWritableNodes", 1,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("TotalOzoneCapacity", 100L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("TotalOzoneUsed", 10L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("TotalFilesystemCapacity", 200L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("TotalFilesystemUsed", 50L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     assertGauge("TotalFilesystemAvailable", 150L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+        getMetrics(metrics));
     nodeManager.processHeartbeat(registeredDatanode);
     GenericTestUtils.waitFor(
         () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1, 100, 5000);
-    metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
+    metricsSource = getMetrics(metrics);
     assertGauge("InServiceHealthyNodes", 1, metricsSource);
 
   }
 
   private long getCounter(String metricName) {
-    return getLongCounter(metricName, getMetrics(SCMNodeMetrics.SOURCE_NAME));
+    return getLongCounter(metricName, getMetrics(metrics));
   }
 
   private static NodeReportProto createNodeReport() {

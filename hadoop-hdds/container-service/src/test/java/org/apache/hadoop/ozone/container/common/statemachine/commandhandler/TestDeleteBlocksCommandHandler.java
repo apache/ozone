@@ -70,6 +70,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -106,6 +107,18 @@ public class TestDeleteBlocksCommandHandler {
   private BlockDeletingServiceMetrics blockDeleteMetrics;
   private static final long STALE_CONTAINER_ID = 5L;
 
+  @Test
+  public void testUsesBlockDeletingServiceMetrics() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneContainer container = mock(OzoneContainer.class);
+    BlockDeletingService service = mock(BlockDeletingService.class);
+    blockDeleteMetrics = mock(BlockDeletingServiceMetrics.class);
+    when(container.getBlockDeletingService()).thenReturn(service);
+    when(service.getMetrics()).thenReturn(blockDeleteMetrics);
+    handler = new DeleteBlocksCommandHandler(container, conf, conf.getObject(DatanodeConfiguration.class), "");
+    assertSame(blockDeleteMetrics, handler.getBlockDeleteMetrics());
+  }
+
   private void prepareTest(ContainerTestVersionInfo versionInfo)
       throws Exception {
     this.schemaVersion = versionInfo.getSchemaVersion();
@@ -137,6 +150,10 @@ public class TestDeleteBlocksCommandHandler {
     OzoneConfiguration conf = new OzoneConfiguration();
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    BlockDeletingService service = mock(BlockDeletingService.class);
+    blockDeleteMetrics = BlockDeletingServiceMetrics.create();
+    when(ozoneContainer.getBlockDeletingService()).thenReturn(service);
+    when(service.getMetrics()).thenReturn(blockDeleteMetrics);
     containerSet = newContainerSet();
     volume1 = mockHddsVolume("uuid-1");
     for (int i = 0; i <= 10; i++) {
@@ -171,7 +188,7 @@ public class TestDeleteBlocksCommandHandler {
   @AfterEach
   public void tearDown() {
     handler.stop();
-    BlockDeletingServiceMetrics.unRegister();
+    blockDeleteMetrics.unRegister();
     ExitUtils.clear();
   }
 
@@ -431,6 +448,9 @@ public class TestDeleteBlocksCommandHandler {
     tmpConf.setTimeDuration(BLOCK_DELETE_COMMAND_WORKER_INTERVAL, 3,
         TimeUnit.SECONDS);
     OzoneContainer container = mock(OzoneContainer.class);
+    BlockDeletingService service = mock(BlockDeletingService.class);
+    when(container.getBlockDeletingService()).thenReturn(service);
+    when(service.getMetrics()).thenReturn(blockDeleteMetrics);
     DatanodeConfiguration dnConf =
         tmpConf.getObject(DatanodeConfiguration.class);
     DeleteBlocksCommandHandler commandHandler =
@@ -468,6 +488,7 @@ public class TestDeleteBlocksCommandHandler {
     dnConf.setBlockDeleteQueueLimit(blockDeleteQueueLimit);
     handler = new DeleteBlocksCommandHandler(
         container, configuration, dnConf, "");
+    blockDeleteMetrics = handler.getBlockDeleteMetrics();
     // Stop the worker so that handle() can fill the queue without commands being consumed.
     handler.stop();
 
@@ -609,6 +630,10 @@ public class TestDeleteBlocksCommandHandler {
     OzoneConfiguration conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    BlockDeletingService service = mock(BlockDeletingService.class);
+    blockDeleteMetrics = BlockDeletingServiceMetrics.create();
+    when(ozoneContainer.getBlockDeletingService()).thenReturn(service);
+    when(service.getMetrics()).thenReturn(blockDeleteMetrics);
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
     ContainerSet realSet = newContainerSet();
     volume1 = mockHddsVolume("uuid-1");

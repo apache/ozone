@@ -32,6 +32,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is used to track Volume Info stats for each HDDS Volume.
@@ -105,8 +106,9 @@ public class VolumeInfoMetrics implements MetricsSource {
   public VolumeInfoMetrics(String identifier, HddsVolume volume) {
     this.volume = volume;
 
-    metricsSourceName = SOURCE_BASENAME + '-' + identifier;
-    registry = new MetricsRegistry(metricsSourceName);
+    String name = SOURCE_BASENAME + '-' + identifier;
+    metricsSourceName = MetricUtil.getMetricsSourceName(name);
+    registry = new MetricsRegistry(name);
 
     init();
   }

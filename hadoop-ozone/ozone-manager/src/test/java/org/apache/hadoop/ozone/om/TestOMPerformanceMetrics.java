@@ -85,9 +85,13 @@ public class TestOMPerformanceMetrics {
       "CreateKeySuccessLatencyNs",
   };
 
+  private OMPerformanceMetrics metrics;
+
   @AfterEach
   public void cleanUp() {
-    OMPerformanceMetrics.unregister();
+    if (metrics != null) {
+      metrics.unregister();
+    }
   }
 
   /**
@@ -97,7 +101,7 @@ public class TestOMPerformanceMetrics {
    */
   @Test
   public void testLatencyMetricNames() {
-    OMPerformanceMetrics metrics = OMPerformanceMetrics.register();
+    metrics = OMPerformanceMetrics.register();
     MetricsRecordBuilder rb = getMetrics(metrics);
     for (String name : LATENCY_STAT_NAMES) {
       assertCounter(name + "NumOps", 0L, rb);

@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.proto.RaftProtos;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -58,6 +59,7 @@ public class TestCommitInRatis {
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
+  private XceiverClientManager clientManager;
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
@@ -96,8 +98,9 @@ public class TestCommitInRatis {
         .getStorageContainerLocationClient();
   }
 
-  private void shutdown() {
-    IOUtils.closeQuietly(client);
+  @AfterEach
+  void shutdown() {
+    IOUtils.closeQuietly(client, clientManager);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -112,7 +115,7 @@ public class TestCommitInRatis {
     conf.setFromObject(ratisClientConfig);
     startCluster(conf);
     LogCapturer logCapturer = LogCapturer.captureLogs(XceiverClientRatis.class);
-    XceiverClientManager clientManager = new XceiverClientManager(conf);
+    clientManager = new XceiverClientManager(conf);
 
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -156,6 +159,5 @@ public class TestCommitInRatis {
     }
     clientManager.releaseClient(xceiverClient, false);
     logCapturer.stopCapturing();
-    shutdown();
   }
 }

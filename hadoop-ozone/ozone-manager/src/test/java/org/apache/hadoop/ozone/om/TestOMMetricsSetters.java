@@ -48,7 +48,7 @@ public class TestOMMetricsSetters {
     metrics.setNumDirs(4);
     metrics.setNumFiles(5);
 
-    MetricsRecordBuilder rb = getMetrics("OMMetrics");
+    MetricsRecordBuilder rb = getMetrics(metrics);
     assertGauge("NumVolumes", 1L, rb);
     assertGauge("NumBuckets", 2L, rb);
     assertGauge("NumKeys", 3L, rb);
@@ -71,7 +71,7 @@ public class TestOMMetricsSetters {
     metrics.incNumTenants();
     metrics.decNumTenants();
 
-    MetricsRecordBuilder rb = getMetrics("OMMetrics");
+    MetricsRecordBuilder rb = getMetrics(metrics);
     assertGauge("NumSnapshotActive", 2L, rb);
     assertGauge("NumSnapshotDeleted", 2L, rb);
     assertGauge("NumTenants", 4L, rb);

@@ -49,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -83,6 +84,7 @@ class TestOzoneFsSnapshot {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static OzoneManager ozoneManager;
   private static OzoneFsShell shell;
+  private static FileSystem fileSystem;
   private static AtomicInteger counter = new AtomicInteger();
   private static final String VOLUME =
       "vol-" + counter.incrementAndGet();
@@ -123,6 +125,7 @@ class TestOzoneFsSnapshot {
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
     shell = new OzoneFsShell(clientConf);
+    fileSystem = FileSystem.get(clientConf);
 
     createVolBuckKey();
   }
@@ -130,6 +133,7 @@ class TestOzoneFsSnapshot {
   @AfterAll
   static void shutdown() throws IOException {
     shell.close();
+    fileSystem.close();
     if (cluster != null) {
       cluster.shutdown();
     }

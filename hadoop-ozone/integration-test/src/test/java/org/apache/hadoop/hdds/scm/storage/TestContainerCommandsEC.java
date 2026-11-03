@@ -125,6 +125,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestContainerCommandsEC {
 
+  private final List<ECReconstructionMetrics> reconstructionMetrics = new ArrayList<>();
+
   private static final String ANY_USER = "any";
   private static MiniOzoneCluster cluster;
   private static StorageContainerManager scm;
@@ -208,6 +210,18 @@ public class TestContainerCommandsEC {
           createSingleNodePipeline(pipeline, datanodeDetails.get(i), i + 1),
           cluster.getConf()));
     }
+  }
+
+  private ECReconstructionMetrics createECReconstructionMetrics() {
+    ECReconstructionMetrics metrics = ECReconstructionMetrics.create();
+    reconstructionMetrics.add(metrics);
+    return metrics;
+  }
+
+  @AfterEach
+  public void closeMetrics() {
+    reconstructionMetrics.forEach(ECReconstructionMetrics::unRegister);
+    reconstructionMetrics.clear();
   }
 
   @AfterEach
@@ -368,7 +382,7 @@ public class TestContainerCommandsEC {
     try (ECReconstructionCoordinator coordinator =
              new ECReconstructionCoordinator(config, certClient,
                  secretKeyClient, null,
-                 ECReconstructionMetrics.create(), "")) {
+                 createECReconstructionMetrics(), "")) {
 
       // Attempt to reconstruct the container.
       coordinator.reconstructECContainerGroup(orphanContainerID,
@@ -680,7 +694,7 @@ public class TestContainerCommandsEC {
             new XceiverClientManager(config);
         ECReconstructionCoordinator coordinator =
             new ECReconstructionCoordinator(config, certClient, secretKeyClient,
-                null, ECReconstructionMetrics.create(), "2")) {
+                null, createECReconstructionMetrics(), "2")) {
 
       ECReconstructionMetrics metrics =
           coordinator.getECReconstructionMetrics();
@@ -839,15 +853,16 @@ public class TestContainerCommandsEC {
         for (Map.Entry<DatanodeDetails, Integer> entry : replicaIndexes.entrySet()) {
           DatanodeDetails key = entry.getKey();
           Integer value = entry.getValue();
-          XceiverClientManager xceiverClientManager = new XceiverClientManager(config);
-          Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
-              .generateToken(ANY_USER, ContainerID.valueOf(entryContainerID));
-          XceiverClientSpi client = xceiverClientManager.acquireClient(
-              createSingleNodePipeline(entryPipeline, key, value));
-          try {
-            ContainerProtocolCalls.closeContainer(client, entryContainerID, cToken.encodeToUrlString());
-          } finally {
-            xceiverClientManager.releaseClient(client, false);
+          try (XceiverClientManager xceiverClientManager = new XceiverClientManager(config)) {
+            Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
+                .generateToken(ANY_USER, ContainerID.valueOf(entryContainerID));
+            XceiverClientSpi client = xceiverClientManager.acquireClient(
+                createSingleNodePipeline(entryPipeline, key, value));
+            try {
+              ContainerProtocolCalls.closeContainer(client, entryContainerID, cToken.encodeToUrlString());
+            } finally {
+              xceiverClientManager.releaseClient(client, false);
+            }
           }
           break;
         }
@@ -914,7 +929,7 @@ public class TestContainerCommandsEC {
       try (ECReconstructionCoordinator coordinator =
                new ECReconstructionCoordinator(config, certClient,
                    secretKeyClient,
-                   null, ECReconstructionMetrics.create(), "")) {
+                   null, createECReconstructionMetrics(), "")) {
         coordinator.reconstructECContainerGroup(conID,
             (ECReplicationConfig) containerPipeline.getReplicationConfig(),
             sourceNodeMap, targetNodeMap);

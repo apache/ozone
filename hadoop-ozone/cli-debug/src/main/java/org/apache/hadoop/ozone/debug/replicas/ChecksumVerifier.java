@@ -48,6 +48,11 @@ public class ChecksumVerifier implements ReplicaVerifier {
     return CHECK_TYPE;
   }
 
+  @Override
+  public void close() {
+    containerClient.close();
+  }
+
   public ChecksumVerifier(OzoneConfiguration conf) throws IOException {
     this.conf = conf;
     this.containerClient = new ContainerOperationClient(conf);

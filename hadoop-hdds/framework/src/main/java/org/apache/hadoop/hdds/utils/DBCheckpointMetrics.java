@@ -19,21 +19,27 @@ package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This interface is for maintaining DB checkpoint statistics.
  */
 @InterfaceAudience.Private
 @Metrics(about = "DB checkpoint Metrics", context = "dfs")
-public class DBCheckpointMetrics {
+public class DBCheckpointMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       DBCheckpointMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
   // Metrics to track checkpoint statistics from last run.
   private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
@@ -49,14 +55,17 @@ public class DBCheckpointMetrics {
 
   public static DBCheckpointMetrics create(String parent) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        parent,
-        new DBCheckpointMetrics());
+    DBCheckpointMetrics metrics = new DBCheckpointMetrics();
+    return ms.register(metrics.sourceName, parent, metrics);
+  }
+
+  public void register(String parent) {
+    DefaultMetricsSystem.instance().register(sourceName, parent, this);
   }
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   @VisibleForTesting
@@ -116,4 +125,10 @@ public class DBCheckpointMetrics {
   public long getLastCheckpointStreamingNumSSTExcluded() {
     return lastCheckpointStreamingNumSSTExcluded.value();
   }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    registry.snapshot(collector.addRecord(registry.info()), all);
+  }
+
 }

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -125,6 +126,15 @@ public final class MetricUtil {
         }
       }
     }
+  }
+
+  /**
+   * Returns a unique registration name in a mini cluster, preserving the
+   * production name. Store the result and use it for both registration and
+   * unregistration so Hadoop cannot append an untracked numeric suffix.
+   */
+  public static String getMetricsSourceName(String sourceName) {
+    return DefaultMetricsSystem.inMiniClusterMode() ? sourceName + '-' + UUID.randomUUID() : sourceName;
   }
 
   /**

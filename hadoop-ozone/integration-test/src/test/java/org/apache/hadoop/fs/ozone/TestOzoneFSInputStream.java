@@ -413,14 +413,14 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     input.close();
 
     // Start SequenceFile.Reader test
-    SequenceFile.Reader in = new SequenceFile.Reader(ecFs, path, cluster().getConf());
-    long blockStart = -1;
-    // EOFException should not occur.
-    in.sync(0);
-    blockStart = in.getPosition();
-    // The behavior should be consistent with HDFS
-    assertEquals(srcfile.length(), blockStart);
-    in.close();
+    try (SequenceFile.Reader in = new SequenceFile.Reader(cluster().getConf(),
+        SequenceFile.Reader.stream(ecFs.open(path)))) {
+      // EOFException should not occur.
+      in.sync(0);
+      long blockStart = in.getPosition();
+      // The behavior should be consistent with HDFS
+      assertEquals(srcfile.length(), blockStart);
+    }
   }
 
   static Stream<Arguments> isStreamEnableAndData() {

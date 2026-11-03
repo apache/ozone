@@ -450,13 +450,17 @@ public class ECReconstructionCoordinator implements Closeable {
 
   @Override
   public void close() throws IOException {
-    if (containerOperationClient != null) {
-      containerOperationClient.close();
+    try {
+      if (containerOperationClient != null) {
+        containerOperationClient.close();
+      }
+    } finally {
+      if (ecReconstructWriteExecutor.isInitialized()) {
+        ecReconstructWriteExecutor.get().shutdownNow();
+      }
+      ecReconstructReadExecutor.shutdownNow();
+      ContainerClientMetrics.release();
     }
-    if (ecReconstructWriteExecutor.isInitialized()) {
-      ecReconstructWriteExecutor.get().shutdownNow();
-    }
-    ecReconstructReadExecutor.shutdownNow();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,

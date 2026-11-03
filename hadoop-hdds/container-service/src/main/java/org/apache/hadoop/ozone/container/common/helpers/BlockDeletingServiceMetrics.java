@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics related to Block Deleting Service running on Datanode.
@@ -32,9 +33,9 @@ import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
     + "background block deleting service on Datanode", context = "dfs")
 public final class BlockDeletingServiceMetrics {
 
-  private static BlockDeletingServiceMetrics instance;
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
 
   @Metric(about = "The number of successful delete blocks")
   private MutableCounterLong successCount;
@@ -87,23 +88,18 @@ public final class BlockDeletingServiceMetrics {
   private BlockDeletingServiceMetrics() {
   }
 
-  public static synchronized BlockDeletingServiceMetrics create() {
-    if (instance == null) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      instance = ms.register(SOURCE_NAME, "BlockDeletingService",
-          new BlockDeletingServiceMetrics());
-    }
-
-    return instance;
+  public static BlockDeletingServiceMetrics create() {
+    BlockDeletingServiceMetrics metrics = new BlockDeletingServiceMetrics();
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.register(metrics.sourceName, "BlockDeletingService", metrics);
+    return metrics;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static synchronized void unRegister() {
-    instance = null;
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+  public void unRegister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void incrSuccessCount(long count) {

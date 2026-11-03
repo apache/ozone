@@ -139,12 +139,13 @@ public class DeleteBucketHandler extends BucketHandler {
       final Path path = new Path(ofsPrefix);
       OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
       clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
-      FileSystem fs = FileSystem.get(clientConf);
-      if (!fs.delete(path, true)) {
-        out().printf("Could not delete bucket %s.%n", bucket.getName());
-        return;
+      try (FileSystem fs = FileSystem.newInstance(clientConf)) {
+        if (!fs.delete(path, true)) {
+          out().printf("Could not delete bucket %s.%n", bucket.getName());
+          return;
+        }
+        out().printf("Bucket %s is deleted%n", bucket.getName());
       }
-      out().printf("Bucket %s is deleted%n", bucket.getName());
     } catch (IOException e) {
       out().printf("Could not delete bucket %s.%n", e.getMessage());
     }

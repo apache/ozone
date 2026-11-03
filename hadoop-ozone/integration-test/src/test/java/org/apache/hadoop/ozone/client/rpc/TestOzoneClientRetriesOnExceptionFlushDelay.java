@@ -112,7 +112,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
 
   @AfterEach
   public void shutdown() {
-    IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(client, xceiverClientManager);
     if (cluster != null) {
       cluster.shutdown();
     }

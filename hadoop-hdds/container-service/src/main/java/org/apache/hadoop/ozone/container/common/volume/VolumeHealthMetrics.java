@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is used to track Volume Health metrics for all volumes on a datanode.
@@ -59,8 +60,9 @@ public final class VolumeHealthMetrics implements MetricsSource {
   private VolumeHealthMetrics(StorageVolume.VolumeType volumeType) {
     this.healthyVolumes = new AtomicInteger(0);
     this.failedVolumes = new AtomicInteger(0);
-    metricsSourceName = SOURCE_BASENAME + '-' + volumeType.name();
-    registry = new MetricsRegistry(metricsSourceName);
+    String name = SOURCE_BASENAME + '-' + volumeType.name();
+    metricsSourceName = MetricUtil.getMetricsSourceName(name);
+    registry = new MetricsRegistry(name);
   }
 
   /**

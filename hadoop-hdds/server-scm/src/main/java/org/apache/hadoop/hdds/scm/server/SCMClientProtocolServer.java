@@ -1680,6 +1680,12 @@ public class SCMClientProtocolServer implements
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("query", query);
     try {
+      String metricsQuery = "Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics";
+      if (metricsQuery.equals(query)) {
+        // A mini cluster registers separate metrics sources for each SCM in the JVM.
+        query = "Hadoop:service=StorageContainerManager,name="
+            + getScm().getScmDecommissionManager().getMetricsSourceName();
+      }
       FetchMetrics fetchMetrics = new FetchMetrics();
       String metrics = fetchMetrics.getMetrics(query);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(

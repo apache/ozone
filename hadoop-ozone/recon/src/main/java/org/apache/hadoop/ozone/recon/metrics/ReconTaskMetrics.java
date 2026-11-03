@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -31,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Per-task metrics for Recon task delta processing and reprocess operations.
@@ -63,19 +63,23 @@ public final class ReconTaskMetrics implements MetricsSource {
   private final ConcurrentMap<String, MutableRate> taskReprocessDuration =
       new ConcurrentHashMap<>();
 
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+
   private ReconTaskMetrics() {
   }
 
   public static ReconTaskMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        "Recon Task Metrics",
-        new ReconTaskMetrics());
+    ReconTaskMetrics metrics = new ReconTaskMetrics();
+    metrics.register();
+    return metrics;
+  }
+
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName, "Recon Task Metrics", this);
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   // Task Delta Processing Operations

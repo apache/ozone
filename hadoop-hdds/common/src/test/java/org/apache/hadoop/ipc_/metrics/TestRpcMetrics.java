@@ -19,17 +19,20 @@ package org.apache.hadoop.ipc_.metrics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc_.Server;
@@ -39,6 +42,7 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.lib.MetricsAnnotations;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +76,33 @@ public class TestRpcMetrics {
     // Same reflection DefaultMetricsSystem.register() performs: it populates the
     // @Metric counter fields and the @Metric methods into the registry
     source = MetricsAnnotations.makeSource(metrics);
+  }
+
+  @Test
+  public void testShutdownStopsQuantiles() throws Exception {
+    Server server = mock(Server.class);
+    when(server.getListenerAddress()).thenReturn(new InetSocketAddress(PORT));
+    when(server.getServerName()).thenReturn(SERVER_NAME);
+    Configuration conf = new Configuration(false);
+    conf.set("rpc.metrics.percentiles.intervals", "60");
+    conf.setBoolean("rpc.metrics.quantile.enable", true);
+    RpcMetrics quantileMetrics = RpcMetrics.create(server, conf);
+    ScheduledFuture<?>[] tasks = new ScheduledFuture<?>[3];
+    try {
+      Field taskField = MutableQuantiles.class.getDeclaredField("scheduledTask");
+      taskField.setAccessible(true);
+      MutableQuantiles[] quantiles = {quantileMetrics.rpcQueueTimeQuantiles[0],
+          quantileMetrics.rpcLockWaitTimeQuantiles[0], quantileMetrics.rpcProcessingTimeQuantiles[0]};
+      for (int i = 0; i < quantiles.length; i++) {
+        tasks[i] = (ScheduledFuture<?>) taskField.get(quantiles[i]);
+        assertNotNull(tasks[i]);
+      }
+    } finally {
+      quantileMetrics.shutdown();
+    }
+    for (ScheduledFuture<?> task : tasks) {
+      assertTrue(task.isCancelled());
+    }
   }
 
   @Test

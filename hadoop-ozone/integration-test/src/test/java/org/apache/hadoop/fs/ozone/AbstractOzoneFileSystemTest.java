@@ -223,11 +223,10 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
   @AfterAll
   void teardown() {
-    IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(client, fs, userO3fs);
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @AfterEach
@@ -562,6 +561,8 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   public void testObjectOwner() throws Exception {
     // Save the old user, and switch to the old user after test
     UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    OzoneFileSystem originalFs = fs;
+    List<FileSystem> userFileSystems = new ArrayList<>();
     try {
       // user1 create file /file1
       // user2 create directory /dir1
@@ -581,12 +582,15 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
       UserGroupInformation.setLoginUser(user1);
       fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
+      userFileSystems.add(fs);
       ContractTestUtils.touch(fs, file1);
       UserGroupInformation.setLoginUser(user2);
       fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
+      userFileSystems.add(fs);
       fs.mkdirs(dir1);
       UserGroupInformation.setLoginUser(user3);
       fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
+      userFileSystems.add(fs);
       ContractTestUtils.touch(fs, file2);
 
       assertEquals(2, fs.listStatus(root).length);
@@ -598,8 +602,9 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
       assertEquals(user3.getShortUserName(),
           fs.getFileStatus(file2).getOwner());
     } finally {
+      IOUtils.closeQuietly(userFileSystems);
       UserGroupInformation.setLoginUser(oldUser);
-      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
+      fs = originalFs;
     }
   }
 
@@ -607,6 +612,8 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   public void testObjectProxyUser() throws Exception {
     // Save the old user, and switch to the old user after test
     UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    OzoneFileSystem originalFs = fs;
+    List<FileSystem> userFileSystems = new ArrayList<>();
     try {
       // user1ProxyUser create file /file1
       // user2ProxyUser create directory /dir1
@@ -630,12 +637,15 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
       UserGroupInformation.setLoginUser(user1ProxyUser);
       fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
+      userFileSystems.add(fs);
       ContractTestUtils.touch(fs, file1);
       UserGroupInformation.setLoginUser(user2ProxyUser);
       fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
+      userFileSystems.add(fs);
       fs.mkdirs(dir1);
       UserGroupInformation.setLoginUser(user3ProxyUser);
       fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
+      userFileSystems.add(fs);
       ContractTestUtils.touch(fs, file2);
 
       assertEquals(2, fs.listStatus(root).length);
@@ -647,8 +657,9 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
       assertEquals(user3ProxyUser.getShortUserName(),
           fs.getFileStatus(file2).getOwner());
     } finally {
+      IOUtils.closeQuietly(userFileSystems);
       UserGroupInformation.setLoginUser(oldUser);
-      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
+      fs = originalFs;
     }
   }
 

@@ -18,13 +18,15 @@
 package org.apache.hadoop.ozone.recon.metrics;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsAnnotations;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics for Recon Task Controller operations.
@@ -68,19 +70,27 @@ public final class ReconTaskControllerMetrics {
   @Metric(about = "Total count of reinitialization events submitted to queue")
   private MutableCounterLong totalReprocessSubmittedToQueue;
 
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private MetricsSource source;
+
   private ReconTaskControllerMetrics() {
   }
 
   public static ReconTaskControllerMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        "Recon Task Controller Metrics",
-        new ReconTaskControllerMetrics());
+    ReconTaskControllerMetrics metrics = new ReconTaskControllerMetrics();
+    metrics.register();
+    return metrics;
+  }
+
+  public void register() {
+    if (source == null) {
+      source = MetricsAnnotations.makeSource(this);
+    }
+    DefaultMetricsSystem.instance().register(sourceName, "Recon Task Controller Metrics", source);
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   // Queue Management Operations

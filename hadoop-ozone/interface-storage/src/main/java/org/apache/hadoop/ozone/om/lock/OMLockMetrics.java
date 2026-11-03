@@ -26,6 +26,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.util.ConcurrentMutableStat;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is for maintaining the various Ozone Manager Lock Metrics.
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.util.ConcurrentMutableStat;
 public final class OMLockMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       OMLockMetrics.class.getSimpleName();
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
 
   private final ConcurrentMutableStat readLockWaitingTimeMsStat;
   private final ConcurrentMutableStat readLockHeldTimeMsStat;
@@ -63,8 +65,9 @@ public final class OMLockMetrics implements MetricsSource {
    */
   public static OMLockMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "Ozone Manager Lock Metrics",
-        new OMLockMetrics());
+    OMLockMetrics metrics = new OMLockMetrics();
+    ms.register(metrics.sourceName, "Ozone Manager Lock Metrics", metrics);
+    return metrics;
   }
 
   /**
@@ -72,7 +75,7 @@ public final class OMLockMetrics implements MetricsSource {
    */
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   /**

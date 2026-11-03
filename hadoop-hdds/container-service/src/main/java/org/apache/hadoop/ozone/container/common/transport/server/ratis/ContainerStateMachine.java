@@ -1368,9 +1368,15 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public void close() {
-    evictStateMachineCache();
-    executor.shutdown();
-    metrics.unRegister();
+    try {
+      evictStateMachineCache();
+    } finally {
+      executor.shutdown();
+      metrics.unRegister();
+      if (ratisServer != null) {
+        ratisServer.removeStateMachine(this);
+      }
+    }
   }
 
   @Override

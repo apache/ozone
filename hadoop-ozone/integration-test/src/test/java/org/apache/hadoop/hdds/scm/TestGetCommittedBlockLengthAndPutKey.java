@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -70,7 +70,7 @@ public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests
 
   @AfterAll
   void cleanup() {
-    IOUtils.cleanupWithLogger(null, storageContainerLocationClient);
+    IOUtils.cleanupWithLogger(null, xceiverClientManager, storageContainerLocationClient);
   }
 
   @Test

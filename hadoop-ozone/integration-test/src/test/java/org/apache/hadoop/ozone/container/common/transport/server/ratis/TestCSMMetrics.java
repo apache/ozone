@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -106,8 +107,13 @@ public class TestCSMMetrics {
       client.connect();
 
       // Before Read Chunk/Write Chunk
-      MetricsRecordBuilder metric = getMetrics(CSMMetrics.SOURCE_NAME +
-          RaftGroupId.valueOf(pipeline.getId().getId()));
+      XceiverServerRatis server = (XceiverServerRatis) servers.get(0);
+      ContainerStateMachine stateMachine = (ContainerStateMachine) server
+          .getServerDivision(RaftGroupId.valueOf(pipeline.getId().getId())).getStateMachine();
+      Field field = CSMMetrics.class.getDeclaredField("metricsSourceName");
+      field.setAccessible(true);
+      String source = (String) field.get(stateMachine.getMetrics());
+      MetricsRecordBuilder metric = getMetrics(source);
       assertCounter("NumWriteStateMachineOps", 0L, metric);
       assertCounter("NumReadStateMachineOps", 0L, metric);
       assertCounter("NumApplyTransactionOps", 0L, metric);
@@ -134,8 +140,7 @@ public class TestCSMMetrics {
       assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
-      metric = getMetrics(CSMMetrics.SOURCE_NAME +
-          RaftGroupId.valueOf(pipeline.getId().getId()));
+      metric = getMetrics(source);
       assertCounter("NumWriteStateMachineOps", 1L, metric);
       assertCounter("NumBytesWrittenCount", 1024L, metric);
       assertCounter("NumApplyTransactionOps", 1L, metric);
@@ -160,8 +165,7 @@ public class TestCSMMetrics {
       assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
-      metric = getMetrics(CSMMetrics.SOURCE_NAME +
-          RaftGroupId.valueOf(pipeline.getId().getId()));
+      metric = getMetrics(source);
       assertCounter("NumQueryStateMachineOps", 1L, metric);
       assertCounter("NumApplyTransactionOps", 1L, metric);
 

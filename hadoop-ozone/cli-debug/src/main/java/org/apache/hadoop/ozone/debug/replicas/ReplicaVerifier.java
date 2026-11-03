@@ -17,13 +17,14 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
+import java.io.Closeable;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 /**
  * Functional interface for implementing a block verifier.
  */
-public interface ReplicaVerifier {
+public interface ReplicaVerifier extends Closeable {
   BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation);
 
   String getType();

@@ -60,6 +60,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -209,13 +210,15 @@ public class TestSCMNodeManager {
    * @throws AuthenticationException
    */
   @Test
-  public void testScmHeartbeat()
-      throws IOException, AuthenticationException {
+  public void testScmHeartbeat() throws Exception {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       int registeredNodes = 5;
+      Field metricsField = SCMNodeManager.class.getDeclaredField("metrics");
+      metricsField.setAccessible(true);
+      SCMNodeMetrics metrics = (SCMNodeMetrics) metricsField.get(nodeManager);
       long hbProcessedBefore =
-          getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME));
+          getLongCounter("NumHBProcessed", getMetrics(metrics));
       // Send some heartbeats from different nodes.
       for (int x = 0; x < registeredNodes; x++) {
         DatanodeDetails datanodeDetails = HddsTestUtils
@@ -225,7 +228,7 @@ public class TestSCMNodeManager {
 
       // Each heartbeat above is processed synchronously by the node manager.
       assertEquals(hbProcessedBefore + registeredNodes,
-          getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME)),
+          getLongCounter("NumHBProcessed", getMetrics(metrics)),
           "All scheduled heartbeats should have been processed.");
     }
   }

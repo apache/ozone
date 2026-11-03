@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunk
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -99,6 +100,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -118,6 +120,7 @@ public class TestHddsDispatcher {
   private File testDir;
 
   private static VolumeChoosingPolicy volumeChoosingPolicy;
+  private ContainerMetrics metrics;
 
   public static final IncrementalReportSender<Container> NO_OP_ICR_SENDER =
       c -> {
@@ -126,6 +129,13 @@ public class TestHddsDispatcher {
   @BeforeAll
   public static void init() {
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(new OzoneConfiguration());
+  }
+
+  @AfterEach
+  void cleanupMetrics() {
+    ContainerMetrics closing = metrics;
+    metrics = null;
+    IOUtils.closeQuietly(closing);
   }
 
   /**
@@ -173,7 +183,7 @@ public class TestHddsDispatcher {
           scmId.toString());
       containerSet.addContainer(container);
       containerSet.addContainer(container2);
-      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerType containerType : ContainerType.values()) {
         handlers.put(containerType, Handler.getHandlerForContainerType(containerType, conf,
@@ -217,7 +227,7 @@ public class TestHddsDispatcher {
       verify(stateMachine, times(2)).triggerHeartbeat(); // was called twice before
     } finally {
       volumeSet.shutdown();
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -240,7 +250,7 @@ public class TestHddsDispatcher {
 
       assertEquals(ContainerProtos.Result.SUCCESS, smallFileResponse.getResult());
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -283,7 +293,7 @@ public class TestHddsDispatcher {
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest0), context);
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -329,7 +339,7 @@ public class TestHddsDispatcher {
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
           scmId.toString());
       containerSet.addContainer(container);
-      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerType containerType : ContainerType.values()) {
         handlers.put(containerType,
@@ -372,7 +382,7 @@ public class TestHddsDispatcher {
           scException.getMessage());
     } finally {
       volumeSet.shutdown();
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -425,7 +435,7 @@ public class TestHddsDispatcher {
         assertEquals(1, blockData.getChunksCount());
       }
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -459,7 +469,7 @@ public class TestHddsDispatcher {
           "ContainerID " + writeChunkRequest.getContainerID()
               + " does not exist");
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -493,7 +503,7 @@ public class TestHddsDispatcher {
           .contains("ContainerID " + writeChunkRequest.getContainerID()
               + " creation failed , Result: DISK_OUT_OF_SPACE");
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -535,7 +545,7 @@ public class TestHddsDispatcher {
       assertTrue(container.getContainerData().isOpen());
       assertFalse(container.getContainerData().isUnhealthy());
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -577,7 +587,7 @@ public class TestHddsDispatcher {
       assertTrue(container.getContainerData().isOpen());
       assertFalse(container.getContainerData().isUnhealthy());
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -635,7 +645,7 @@ public class TestHddsDispatcher {
         assertEquals(1, blockData.getChunksCount());
       }
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -647,17 +657,17 @@ public class TestHddsDispatcher {
    * @return HddsDispatcher HddsDispatcher instance.
    * @throws IOException
    */
-  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
     return createDispatcher(dd, scmId, conf, null);
   }
 
-  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier) throws IOException {
     return createDispatcher(dd, scmId, conf, tokenVerifier, ContainerTestUtils.getMockContext(dd, conf));
   }
 
-  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier, StateContext context) throws IOException {
     ContainerSet containerSet = newContainerSet();
     MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
@@ -671,7 +681,7 @@ public class TestHddsDispatcher {
       }
     });
     volumeSet.startAllVolume();
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    metrics = ContainerMetrics.create(conf);
     Map<ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
@@ -938,7 +948,7 @@ public class TestHddsDispatcher {
         assertTrue(verified.getAndSet(false));
       }
     } finally {
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 
@@ -1004,7 +1014,7 @@ public class TestHddsDispatcher {
       ContainerSet containerSet = newContainerSet();
       containerSet.addContainer(container);
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
-      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerType containerType : ContainerType.values()) {
         handlers.put(containerType,
@@ -1047,7 +1057,7 @@ public class TestHddsDispatcher {
           hddsVolume.getVolumeInfoStats().getNumWriteRequestsRejectedHardMinFreeSpace());
     } finally {
       volumeSet.shutdown();
-      ContainerMetrics.remove();
+      cleanupMetrics();
     }
   }
 

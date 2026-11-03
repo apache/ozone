@@ -24,8 +24,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
@@ -114,14 +116,15 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
         bucketName, volumeName, omServiceId);
     // Set fs.defaultFS
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    FileSystem fs = FileSystem.get(conf);
-    // Create some dirs
-    Path root = new Path("/");
-    Path dir1 = new Path(root, "dir1");
-    Path dir12 = new Path(dir1, "dir12");
-    Path dir2 = new Path(root, "dir2");
-    fs.mkdirs(dir12);
-    fs.mkdirs(dir2);
+    try (FileSystem fs = FileSystem.get(conf)) {
+      // Create some dirs
+      Path root = new Path("/");
+      Path dir1 = new Path(root, "dir1");
+      Path dir12 = new Path(dir1, "dir12");
+      Path dir2 = new Path(root, "dir2");
+      fs.mkdirs(dir12);
+      fs.mkdirs(dir2);
+    }
   }
 
   @AfterAll
@@ -185,11 +188,14 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
     clientConf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, leaderOMNodeAddr);
 
     FsShell shell = new FsShell(clientConf);
+    // PathData opens cached filesystems for each authority; FsShell.close() does not own these handles.
+    Set<FileSystem> fileSystems = new HashSet<>();
     int res;
     try {
       // Test case 1: ozone fs -ls /
       // Expectation: Success.
       res = ToolRunner.run(shell, new String[] {"-ls", "/"});
+      fileSystems.add(FileSystem.get(clientConf));
       // Check return value, should be 0 (success)
       assertEquals(0, res);
 
@@ -220,6 +226,7 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
           OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName,
           getHostFromAddress(leaderOMNodeAddr));
       res = ToolRunner.run(shell, new String[] {"-ls", qualifiedPath1});
+      fileSystems.add(new Path(qualifiedPath1).getFileSystem(clientConf));
       // Note: this test case will fail if the port is not from the leader node
       assertEquals(0, res);
 
@@ -229,6 +236,7 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
           OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName,
           leaderOMNodeAddr);
       res = ToolRunner.run(shell, new String[] {"-ls", qualifiedPath2});
+      fileSystems.add(new Path(qualifiedPath2).getFileSystem(clientConf));
       assertEquals(0, res);
 
       // Test case 6: ozone fs -ls o3fs://bucket.volume.id1/
@@ -255,6 +263,7 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
       // Check return value, should be -1 (failure)
       assertEquals(-1, res);
     } finally {
+      IOUtils.closeQuietly(fileSystems);
       shell.close();
     }
   }
@@ -315,6 +324,8 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
     clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     clientConf.set(OFS_IMPL_KEY, OFS_IMPL_VALUE);
     FsShell shell = new FsShell(clientConf);
+    // PathData opens cached filesystems for each authority; FsShell.close() does not own these handles.
+    Set<FileSystem> fileSystems = new HashSet<>();
     String incorrectSvcId = "dummy";
     String o3fsPathWithCorrectSvcId =
         String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
@@ -327,9 +338,11 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
     try {
       int res = ToolRunner.run(shell,
           new String[] {"-ls", ofsPathWithCorrectSvcId });
+      fileSystems.add(new Path(ofsPathWithCorrectSvcId).getFileSystem(clientConf));
       assertEquals(0, res);
       res = ToolRunner.run(shell,
           new String[] {"-ls", o3fsPathWithCorrectSvcId });
+      fileSystems.add(new Path(o3fsPathWithCorrectSvcId).getFileSystem(clientConf));
       assertEquals(0, res);
 
       try (GenericTestUtils.SystemErrCapturer capture = new
@@ -348,6 +361,7 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
         assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
     } finally {
+      IOUtils.closeQuietly(fileSystems);
       shell.close();
     }
 

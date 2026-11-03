@@ -98,6 +98,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -141,6 +142,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -180,6 +182,7 @@ public class TestKeyValueHandler {
   private OzoneConfiguration conf;
   private ContainerSet mockContainerSet;
   private long maxContainerSize;
+  private final List<ContainerMetrics> containerMetricsList = new ArrayList<>();
 
   @BeforeEach
   public void setup() throws IOException {
@@ -207,6 +210,18 @@ public class TestKeyValueHandler {
     maxContainerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+  }
+
+  @AfterEach
+  void cleanupMetrics() {
+    IOUtils.closeQuietly(containerMetricsList);
+    containerMetricsList.clear();
+  }
+
+  private ContainerMetrics createContainerMetrics() {
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    containerMetricsList.add(metrics);
+    return metrics;
   }
 
   /**
@@ -422,7 +437,7 @@ public class TestKeyValueHandler {
       // Ensures that KeyValueHandler falls back to FILE_PER_BLOCK.
       conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, "FILE_PER_CHUNK");
       ContainerTestUtils.getKeyValueHandler(conf,
-          context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet);
+          context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet, createContainerMetrics());
       assertEquals(ContainerLayoutVersion.FILE_PER_BLOCK,
           conf.getEnum(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_CHUNK));
     } finally {
@@ -547,7 +562,7 @@ public class TestKeyValueHandler {
 
     assertEquals(1, hddsVolumeList.size());
 
-    final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    final ContainerMetrics metrics = createContainerMetrics();
 
     final AtomicInteger icrReceived = new AtomicInteger(0);
 
@@ -610,7 +625,7 @@ public class TestKeyValueHandler {
 
       assertEquals(1, hddsVolumeList.size());
 
-      final ContainerMetrics metrics = ContainerMetrics.create(conf);
+      final ContainerMetrics metrics = createContainerMetrics();
 
       final AtomicInteger icrReceived = new AtomicInteger(0);
 
@@ -716,7 +731,7 @@ public class TestKeyValueHandler {
     when(hddsVolume.getDeletedContainerDir()).thenReturn(new File(""));
 
     conf = new OzoneConfiguration();
-    final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    final ContainerMetrics metrics = createContainerMetrics();
     final AtomicInteger icrReceived = new AtomicInteger(0);
     final long containerBytesUsed = 1024 * 1024;
 
@@ -951,7 +966,7 @@ public class TestKeyValueHandler {
 
     assertEquals(1, hddsVolumeList.size());
 
-    final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    final ContainerMetrics metrics = createContainerMetrics();
 
     final AtomicInteger icrReceived = new AtomicInteger(0);
 
@@ -1009,7 +1024,7 @@ public class TestKeyValueHandler {
     IncrementalReportSender<Container> mockIcrSender = mock(IncrementalReportSender.class);
 
     KeyValueHandler kvHandler = new KeyValueHandler(conf,
-        DATANODE_UUID, containerSet, volumeSet, ContainerMetrics.create(conf),
+        DATANODE_UUID, containerSet, volumeSet, createContainerMetrics(),
         mockIcrSender, new ContainerChecksumTreeManager(conf));
     kvHandler.setClusterID(CLUSTER_ID);
 
@@ -1119,12 +1134,12 @@ public class TestKeyValueHandler {
     hddsVolume.createTmpDirs(CLUSTER_ID);
     when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
     final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
-        DATANODE_UUID, containerSet, volumeSet);
+        DATANODE_UUID, containerSet, volumeSet, createContainerMetrics());
     kvHandler.setClusterID(CLUSTER_ID);
     // Clean up metrics for next tests.
     hddsVolume.getVolumeInfoStats().unregister();
     hddsVolume.getVolumeIOStats().unregister();
-    ContainerMetrics.remove();
+    cleanupMetrics();
 
     // Register the on-demand container scanner with the container set used by the KeyValueHandler.
     ContainerController controller = new ContainerController(containerSet,
@@ -1256,10 +1271,10 @@ public class TestKeyValueHandler {
 
   private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path, OzoneContainer ozoneContainer)
       throws IOException {
-    ContainerMetrics.remove();
+    cleanupMetrics();
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-    final ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
+    final ContainerMetrics containerMetrics = createContainerMetrics();
 
     HddsVolume hddsVolume = new HddsVolume.Builder(path.toString()).conf(conf)
         .clusterID(CLUSTER_ID).datanodeUuid(DATANODE_UUID)
@@ -1372,7 +1387,6 @@ public class TestKeyValueHandler {
       assertCounter("localBytesGetBlock", blockMetadataBytes, containerMetrics);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      ContainerMetrics.remove();
     }
   }
 
@@ -1420,7 +1434,6 @@ public class TestKeyValueHandler {
       }
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      ContainerMetrics.remove();
     }
   }
 
@@ -1505,7 +1518,6 @@ public class TestKeyValueHandler {
         blockFile.close();
       }
       FileUtils.deleteDirectory(testDir.toFile());
-      ContainerMetrics.remove();
     }
   }
 
@@ -1777,7 +1789,6 @@ public class TestKeyValueHandler {
     public void close() throws IOException {
       blockFile.close();
       FileUtils.deleteDirectory(testDir.toFile());
-      ContainerMetrics.remove();
     }
   }
 
@@ -1900,7 +1911,6 @@ public class TestKeyValueHandler {
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2, 2, 2, 2);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      ContainerMetrics.remove();
     }
   }
 
@@ -1928,7 +1938,6 @@ public class TestKeyValueHandler {
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2048, 2048, 1044, 3072);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      ContainerMetrics.remove();
     }
   }
 
@@ -1960,7 +1969,6 @@ public class TestKeyValueHandler {
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 20, (1 << 20) + 20, 0, (1 << 20) + 30 + 1024);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
-      ContainerMetrics.remove();
     }
 
   }

@@ -293,6 +293,10 @@ public class NodeDecommissionManager {
         TimeUnit.MILLISECONDS);
   }
 
+  public String getMetricsSourceName() {
+    return metrics.getSourceName();
+  }
+
   public Map<String, List<ContainerID>> getContainersPendingReplication(DatanodeDetails dn)
       throws NodeNotFoundException {
     return getMonitor().getContainersPendingReplication(dn);

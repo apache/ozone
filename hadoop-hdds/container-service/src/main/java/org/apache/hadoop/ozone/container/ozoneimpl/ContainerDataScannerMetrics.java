@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class captures the container data scanner metrics on the data-node.
@@ -65,6 +66,7 @@ public final class ContainerDataScannerMetrics
         ? "UndefinedDataNodeVolume" + ThreadLocalRandom.current().nextInt()
         : volumeName.replace(':', '-'));
 
+    name = MetricUtil.getMetricsSourceName(name);
     return ms.register(name, null, new ContainerDataScannerMetrics(name, ms));
   }
 

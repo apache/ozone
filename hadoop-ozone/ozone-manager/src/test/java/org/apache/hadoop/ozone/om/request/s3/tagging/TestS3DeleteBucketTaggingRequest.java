@@ -80,7 +80,7 @@ public class TestS3DeleteBucketTaggingRequest extends BucketRequestTests {
 
   @AfterEach
   public void teardown() {
-    OMPerformanceMetrics.unregister();
+    ozoneManager.getPerfMetrics().unregister();
   }
 
   @Test

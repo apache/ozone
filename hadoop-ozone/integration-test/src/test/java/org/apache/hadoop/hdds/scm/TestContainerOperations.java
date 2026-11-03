@@ -88,7 +88,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
   @AfterAll
   void cleanup() {
-    IOUtils.closeQuietly(xceiverClientManager);
+    IOUtils.closeQuietly(xceiverClientManager, storageClient);
   }
 
   @Test

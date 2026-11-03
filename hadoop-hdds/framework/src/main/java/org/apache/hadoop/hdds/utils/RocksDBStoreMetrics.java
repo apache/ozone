@@ -32,6 +32,7 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.rocksdb.HistogramData;
 import org.rocksdb.HistogramType;
 import org.rocksdb.LiveFileMetaData;
@@ -52,6 +53,7 @@ public class RocksDBStoreMetrics implements MetricsSource {
   private Set<String> histogramAttributes = new HashSet<>();
 
   private String contextName;
+  private final String sourceName;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBStoreMetrics.class);
@@ -108,6 +110,7 @@ public class RocksDBStoreMetrics implements MetricsSource {
   public RocksDBStoreMetrics(Statistics statistics, RocksDatabase db,
       String dbName) {
     this.contextName = ROCKSDB_CONTEXT_PREFIX + dbName;
+    this.sourceName = MetricUtil.getMetricsSourceName(contextName);
     this.statistics = statistics;
     this.rocksDB = db;
     histogramAttributes.add("Average");
@@ -128,17 +131,17 @@ public class RocksDBStoreMetrics implements MetricsSource {
     RocksDBStoreMetrics metrics = new RocksDBStoreMetrics(
         statistics, db, contextName);
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    MetricsSource metricsSource = ms.getSource(metrics.contextName);
+    MetricsSource metricsSource = ms.getSource(metrics.sourceName);
     if (metricsSource != null) {
       return (RocksDBStoreMetrics) metricsSource;
     } else {
-      return ms.register(metrics.contextName, "RocksDB Metrics", metrics);
+      return ms.register(metrics.sourceName, "RocksDB Metrics", metrics);
     }
   }
 
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(this.contextName);
+    ms.unregisterSource(sourceName);
   }
 
   @Override

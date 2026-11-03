@@ -23,14 +23,19 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.time.Instant;
@@ -39,6 +44,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import javax.management.ObjectName;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,16 +59,20 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
+import org.apache.hadoop.hdds.scm.node.NodeDecommissionMetrics;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,6 +118,49 @@ public class TestSCMClientProtocolServer {
     if (scm != null) {
       scm.stop();
       scm.join();
+    }
+  }
+
+  @Test
+  public void testDecommissionMetricsQuerySelectsOwningScm() throws Exception {
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    NodeDecommissionMetrics first = NodeDecommissionMetrics.create();
+    NodeDecommissionMetrics second = NodeDecommissionMetrics.create();
+    try {
+      first.setDecommissioningMaintenanceNodesTotal(1);
+      second.setDecommissioningMaintenanceNodesTotal(2);
+      StorageContainerManager owner = mock(StorageContainerManager.class);
+      NodeDecommissionManager manager = mock(NodeDecommissionManager.class);
+      when(owner.getScmDecommissionManager()).thenReturn(manager);
+      SCMClientProtocolServer queryServer = mock(SCMClientProtocolServer.class, CALLS_REAL_METHODS);
+      when(queryServer.getScm()).thenReturn(owner);
+      ObjectMapper mapper = new ObjectMapper();
+      String query = "Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics";
+      for (NodeDecommissionMetrics source : Arrays.asList(first, second)) {
+        Field sourceNameField = NodeDecommissionMetrics.class.getDeclaredField("sourceName");
+        sourceNameField.setAccessible(true);
+        String sourceName = (String) sourceNameField.get(source);
+        when(manager.getMetricsSourceName()).thenReturn(sourceName);
+        String result = queryServer.getMetrics(query);
+        JsonNode beans = mapper.readTree(result).get("beans");
+        assertEquals(1, beans.size());
+        assertEquals(sourceName, new ObjectName(beans.get(0).get("name").asText()).getKeyProperty("name"));
+        long expected = source == first ? 1 : 2;
+        // Registration populates the JMX cache before the gauges are updated.
+        GenericTestUtils.waitFor(() -> {
+          try {
+            JsonNode bean = mapper.readTree(queryServer.getMetrics(query)).get("beans").get(0);
+            return bean.get("DecommissioningMaintenanceNodesTotal").asLong() == expected;
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+        }, 100, 15_000);
+      }
+    } finally {
+      first.unRegister();
+      second.unRegister();
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
     }
   }
 

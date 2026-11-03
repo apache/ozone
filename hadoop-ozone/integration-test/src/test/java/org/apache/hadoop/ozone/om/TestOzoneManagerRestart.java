@@ -27,16 +27,22 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -101,7 +107,26 @@ public class TestOzoneManagerRestart {
     // Get Volume.
     ozoneVolume = objectStore.getVolume(volumeName);
     assertEquals(volumeName, ozoneVolume.getName());
+    ozoneVolume.setQuota(OzoneQuota.parseNameSpaceQuota("17"));
+    String bucketName = uniqueObjectName("bucket");
+    ozoneVolume.createBucket(bucketName, BucketArgs.newBuilder().setQuotaInNamespace(23).build());
+    OzoneManager om = cluster.getOzoneManager();
+    assertUtilizationGauge(om, "volumeUtilizationMetrics", "VolumeName", volumeName, "VolumeQuotaNamespace", 17L);
+    assertUtilizationGauge(om, "bucketUtilizationMetrics", "BucketName", bucketName, "BucketQuotaNamespace", 23L);
+  }
 
+  private static void assertUtilizationGauge(OzoneManager om, String fieldName, String tagName, String tagValue,
+      String gaugeName, long expected) throws ReflectiveOperationException {
+    Field field = OzoneManager.class.getDeclaredField(fieldName);
+    field.setAccessible(true);
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    ((MetricsSource) field.get(om)).getMetrics(collector, true);
+    assertThat(collector.getRecords())
+        .filteredOn(record -> record.tags().stream()
+            .anyMatch(tag -> tagName.equals(tag.name()) && tagValue.equals(tag.value())))
+        .singleElement()
+        .satisfies(record -> assertThat(record.metrics()).filteredOn(metric -> gaugeName.equals(metric.name()))
+            .singleElement().extracting(metric -> metric.value().longValue()).isEqualTo(expected));
   }
 
   @Test

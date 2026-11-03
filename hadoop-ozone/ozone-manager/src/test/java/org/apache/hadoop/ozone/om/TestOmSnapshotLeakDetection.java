@@ -76,6 +76,9 @@ class TestOmSnapshotLeakDetection {
     KeyManager keyManager = mock(KeyManager.class);
     when(keyManager.getMetadataManager()).thenReturn(metadataManager);
     OzoneManager ozoneManager = mock(OzoneManager.class);
+    OMMetrics metrics = mock(OMMetrics.class);
+    when(ozoneManager.getMetrics()).thenReturn(metrics);
+    when(metrics.getSnapshotMetrics()).thenReturn(mock(OmSnapshotMetrics.class));
     IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
     when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
     when(authorizer.isNative()).thenReturn(false);

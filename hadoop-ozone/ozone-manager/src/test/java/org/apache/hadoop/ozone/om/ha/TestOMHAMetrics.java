@@ -34,14 +34,18 @@ public class TestOMHAMetrics {
   private static final String NODE_ID =
       "om" + RandomStringUtils.secure().nextNumeric(5);
 
+  private OMHAMetrics omhaMetrics;
+
   @AfterEach
   public void cleanUp() {
-    OMHAMetrics.unRegister();
+    if (omhaMetrics != null) {
+      omhaMetrics.unRegister();
+    }
   }
 
   @Test
   public void testGetMetricsWithLeader() {
-    OMHAMetrics omhaMetrics = OMHAMetrics.create(NODE_ID, NODE_ID);
+    omhaMetrics = OMHAMetrics.create(NODE_ID, NODE_ID);
 
     omhaMetrics.getMetrics(METRICS_COLLECTOR, true);
     assertEquals(1, omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
@@ -50,7 +54,7 @@ public class TestOMHAMetrics {
   @Test
   public void testGetMetricsWithFollower() {
     String leaderId = "om" + RandomStringUtils.secure().nextNumeric(5);
-    OMHAMetrics omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
+    omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
 
     omhaMetrics.getMetrics(METRICS_COLLECTOR, true);
     assertEquals(0, omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());

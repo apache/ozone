@@ -17,31 +17,28 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.ratis.util.MemoizedSupplier;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is for maintaining Snapshot Manager statistics.
  */
 @InterfaceAudience.Private
 @Metrics(about = "Snapshot Manager Metrics", context = "dfs")
-public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
+public final class OmSnapshotMetrics implements OmMetadataReaderMetrics, MetricsSource {
   private static final String SOURCE_NAME =
       OmSnapshotMetrics.class.getSimpleName();
 
-  private static final Supplier<OmSnapshotMetrics> SUPPLIER =
-      MemoizedSupplier.valueOf(() -> {
-        MetricsSystem ms = DefaultMetricsSystem.instance();
-        return ms.register(SOURCE_NAME,
-            "Snapshot Manager Metrics",
-            new OmSnapshotMetrics());
-      });
+  private final String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME);
+  private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
   private @Metric MutableCounterLong numKeyLookup;
   private @Metric MutableCounterLong numKeyLookupFails;
@@ -66,8 +63,19 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
   private OmSnapshotMetrics() {
   }
 
-  public static OmSnapshotMetrics getInstance() {
-    return SUPPLIER.get();
+  public static OmSnapshotMetrics create() {
+    OmSnapshotMetrics metrics = new OmSnapshotMetrics();
+    metrics.register();
+    return metrics;
+  }
+
+  public void register() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.register(sourceName, "Snapshot Manager Metrics", this);
+  }
+
+  public void unregister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   @Override
@@ -163,5 +171,11 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
   public void incNumGetBucketTaggingFails() {
     numGetBucketTaggingFails.incr();
   }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    registry.snapshot(collector.addRecord(registry.info()), all);
+  }
+
 }
 

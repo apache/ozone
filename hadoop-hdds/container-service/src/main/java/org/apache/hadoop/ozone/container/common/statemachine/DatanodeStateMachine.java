@@ -122,6 +122,7 @@ public class DatanodeStateMachine implements Closeable {
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
   private final NettyMetrics nettyMetrics;
   private final ECReconstructionMetrics ecReconstructionMetrics;
+  private final DNContainerOperationClient dnClient;
   // This is an instance variable as mockito needs to access it in a test
   @SuppressWarnings("FieldCanBeLocal")
   private final ReconstructECContainersCommandHandler
@@ -224,7 +225,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // TODO HDDS-11218 combine the clients used for reconstruction and reconciliation so they share the same cache of
     //  datanode clients.
-    DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
+    dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
 
     // Create separate bounded executors for pipeline command handlers
     ThreadFactory closePipelineThreadFactory = new ThreadFactoryBuilder()
@@ -445,7 +446,8 @@ public class DatanodeStateMachine implements Closeable {
    */
   @Override
   public void close() throws IOException {
-    IOUtils.close(LOG, ecReconstructionCoordinator);
+    supervisor.stop();
+    IOUtils.close(LOG, pushReplicatorWithMetrics, ecReconstructionCoordinator, dnClient);
     if (stateMachineThread != null) {
       stateMachineThread.interrupt();
     }
@@ -650,8 +652,6 @@ public class DatanodeStateMachine implements Closeable {
    */
   public synchronized void stopDaemon() {
     try {
-      IOUtils.close(LOG, pushReplicatorWithMetrics);
-      supervisor.stop();
       context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);
       reportManager.shutdown();

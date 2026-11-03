@@ -32,6 +32,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -181,7 +182,7 @@ public class TestOzoneSnapshotRestore {
           throws Exception {
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
-    try {
+    try (FileSystem fs = FileSystem.get(clientConf)) {
       // Copy key from source to destination path
       int res = ToolRunner.run(shell,
               new String[]{"-cp", sourcePath, destPath});

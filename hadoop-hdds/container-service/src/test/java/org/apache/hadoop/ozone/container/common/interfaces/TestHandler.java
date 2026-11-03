@@ -47,6 +47,7 @@ import org.junit.jupiter.api.Test;
 public class TestHandler {
 
   private HddsDispatcher dispatcher;
+  private ContainerMetrics metrics;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -57,7 +58,7 @@ public class TestHandler {
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     StateContext context = ContainerTestUtils.getMockContext(
         datanodeDetails, conf);
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    metrics = ContainerMetrics.create(conf);
     Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerProtos.ContainerType containerType :
         ContainerProtos.ContainerType.values()) {
@@ -75,7 +76,7 @@ public class TestHandler {
 
   @AfterEach
   public void tearDown() {
-    ContainerMetrics.remove();
+    metrics.close();
   }
 
   @Test

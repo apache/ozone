@@ -111,7 +111,7 @@ class TestTrashOzoneFileSystem {
 
       long getFileStatusBefore = om.getMetrics().getNumGetFileStatus();
       long trashGetFileStatusBefore = getLongCounter("NumTrashGetFileStatus",
-          getMetrics(OMMetrics.class.getSimpleName()));
+          getMetrics(om.getMetrics()));
       try (FileSystem fs = SecurityUtil.doAsLoginUser(
           (PrivilegedExceptionAction<FileSystem>) () -> new TrashOzoneFileSystem(om))) {
         fs.getFileStatus(new Path("/" + volumeName + "/" + bucketName + "/" + TRASH_PREFIX));
@@ -119,7 +119,7 @@ class TestTrashOzoneFileSystem {
 
       assertEquals(getFileStatusBefore, om.getMetrics().getNumGetFileStatus());
       assertEquals(trashGetFileStatusBefore + 1,
-          getLongCounter("NumTrashGetFileStatus", getMetrics(OMMetrics.class.getSimpleName())));
+          getLongCounter("NumTrashGetFileStatus", getMetrics(om.getMetrics())));
     } finally {
       omTestManagers.stop();
     }
