@@ -452,6 +452,8 @@ message ReplicateContainerCommandProto {
   optional DatanodeDetailsProto target = 5;
   optional ReplicationCommandPriority priority = 6 [default = NORMAL];
   optional uint32 apparentVersion = 7;
+  // Requested destination volume type. Absent commands use the destination's default selection.
+  optional StorageTypeProto volumeStorageType = 8;
 }
 
 /**

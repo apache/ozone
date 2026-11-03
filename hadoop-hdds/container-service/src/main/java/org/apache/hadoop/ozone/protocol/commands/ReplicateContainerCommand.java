@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
+import jakarta.annotation.Nullable;
 import java.util.Objects;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto.Builder;
@@ -40,6 +43,7 @@ public final class ReplicateContainerCommand
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
   private ComponentVersion apparentVersion = HDDSVersion.DEFAULT_VERSION;
+  private StorageType targetVolumeStorageType;
 
   public static ReplicateContainerCommand toTarget(long containerID,
       DatanodeDetails target, ComponentVersion apparentVersion) {
@@ -70,6 +74,15 @@ public final class ReplicateContainerCommand
     this.priority = priority;
   }
 
+  public void setTargetVolumeStorageType(@Nullable StorageType storageType) {
+    targetVolumeStorageType = storageType;
+  }
+
+  @Nullable
+  public StorageType getTargetVolumeStorageType() {
+    return targetVolumeStorageType;
+  }
+
   /**
    * @return the apparent version that should be used to carry out this
    *     replication. SCM computes this as the lowest apparent version among the
@@ -98,6 +111,9 @@ public final class ReplicateContainerCommand
         .setTarget(targetDatanode.getProtoBufMessage())
         .setPriority(priority)
         .setApparentVersion(apparentVersion.serialize());
+    if (targetVolumeStorageType != null) {
+      builder.setVolumeStorageType(StorageTypeUtils.getStorageTypeProto(targetVolumeStorageType));
+    }
     return builder.build();
   }
 
@@ -120,6 +136,9 @@ public final class ReplicateContainerCommand
     if (protoMessage.hasApparentVersion()) {
       cmd.apparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
           protoMessage.getApparentVersion());
+    }
+    if (protoMessage.hasVolumeStorageType()) {
+      cmd.setTargetVolumeStorageType(StorageTypeUtils.getFromProtobuf(protoMessage.getVolumeStorageType()));
     }
     return cmd;
   }
@@ -151,6 +170,7 @@ public final class ReplicateContainerCommand
         + ", replicaIndex=" + getReplicaIndex()
         + ", targetNode=" + targetDatanode
         + ", priority=" + priority
-        + ", apparentVersion=" + apparentVersion;
+        + ", apparentVersion=" + apparentVersion
+        + ", targetVolumeStorageType=" + targetVolumeStorageType;
   }
 }

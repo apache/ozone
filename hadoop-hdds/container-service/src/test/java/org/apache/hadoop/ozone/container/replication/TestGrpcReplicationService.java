@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DEFAULT_STORAGE_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,24 +43,32 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests {@link GrpcReplicationService}.
@@ -145,7 +155,7 @@ class TestGrpcReplicationService {
     }).when(importer).importContainer(anyLong(), any(), any(), any());
     doReturn(true).when(importer).isAllowedContainerImport(eq(
         CONTAINER_ID));
-    when(importer.chooseNextVolume(anyLong())).thenReturn(new HddsVolume.Builder(
+    when(importer.chooseNextVolume(anyLong(), any())).thenReturn(new HddsVolume.Builder(
         Files.createDirectory(tempDir.resolve("ImporterDir")).toString()).conf(
         conf).build());
 
@@ -177,6 +187,64 @@ class TestGrpcReplicationService {
     assertEquals(pushContainerId.get(), CONTAINER_ID);
   }
 
+  @ParameterizedTest
+  @CsvSource({"SSD,DISK,SSD", "DISK,SSD,DISK", ",SSD,SSD"})
+  void testUploadStoresRequestedVolumeType(StorageType requestedType, StorageType defaultType,
+      StorageType expectedType) throws Exception {
+    OzoneConfiguration targetConf = new OzoneConfiguration(conf);
+    targetConf.set(HDDS_DATANODE_DEFAULT_STORAGE_TYPE, defaultType.name());
+    targetConf.setStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        "[SSD]" + tempDir.resolve("target-ssd"), "[DISK]" + tempDir.resolve("target-disk"));
+    DatanodeDetails target = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .setHostName("localhost").setIpAddress("127.0.0.1").build();
+    MutableVolumeSet targetVolumes = new MutableVolumeSet(target.getUuidString(), targetConf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    ReplicationServer targetServer = null;
+    try {
+      for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(targetVolumes.getVolumesList())) {
+        volume.format("test-replication");
+        volume.setDbParentDir(volume.getStorageDir());
+      }
+      ContainerSet targetContainers = newContainerSet();
+      Handler handler = ContainerTestUtils.getKeyValueHandler(
+          targetConf, target.getUuidString(), targetContainers, targetVolumes);
+      handler.setClusterID("test-replication");
+      ContainerController targetController = new ContainerController(targetContainers,
+          Collections.singletonMap(ContainerProtos.ContainerType.KeyValueContainer, handler));
+      ContainerImporter targetImporter = new ContainerImporter(targetConf, targetContainers, targetController,
+          targetVolumes, VolumeChoosingPolicyFactory.getPolicy(targetConf));
+      ReplicationServer.ReplicationConfig serverConf =
+          targetConf.getObject(ReplicationServer.ReplicationConfig.class).setPort(0);
+      targetServer = new ReplicationServer(serverConf, new SecurityConfig(targetConf), null, targetImporter,
+          target.threadNamePrefix());
+      targetServer.start();
+      target.setPort(DatanodeDetails.Port.Name.REPLICATION, targetServer.getPort());
+      ReplicateContainerCommand command = ContainerTestUtils.getReplicateContainerCommand(CONTAINER_ID, target);
+      command.setTargetVolumeStorageType(requestedType);
+      PushReplicator replicator = new PushReplicator(conf,
+          new OnDemandContainerReplicationSource(containerController),
+          new GrpcContainerUploader(conf, null, containerController));
+      ReplicationTask task = new ReplicationTask(command, replicator);
+
+      replicator.replicate(task);
+
+      assertEquals(Status.DONE, task.getStatus());
+      Container<?> imported = targetContainers.getContainer(CONTAINER_ID);
+      assertNotNull(imported);
+      assertEquals(expectedType, imported.getContainerData().getVolume().getStorageType());
+      assertEquals(expectedType, imported.getContainerData().getStorageType());
+      assertEquals(expectedType, ContainerDataYaml.readContainerFile(imported.getContainerFile()).getStorageType());
+      for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(targetVolumes.getVolumesList())) {
+        assertEquals(0, volume.getCommittedBytes());
+      }
+    } finally {
+      if (targetServer != null) {
+        targetServer.stop();
+      }
+      targetVolumes.shutdown();
+    }
+  }
+
   @Test
   void closesStreamOnError() throws Exception {
     // GIVEN: a source whose copyData always fails
@@ -195,7 +263,7 @@ class TestGrpcReplicationService {
 
     OutputStream uploadStream = mock(OutputStream.class);
     ContainerUploader uploader = mock(ContainerUploader.class);
-    when(uploader.startUpload(anyLong(), any(), any(), any()))
+    when(uploader.startUpload(anyLong(), any(), any(), any(), any()))
         .thenReturn(uploadStream);
 
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);

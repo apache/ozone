@@ -329,7 +329,7 @@ public class TestReplicationSupervisor {
     ContainerUploader uploader = mock(ContainerUploader.class);
     // Have the uploader's startUpload immediately complete the future exceptionally,
     // simulating the target returning an error before any data is transferred.
-    when(uploader.startUpload(anyLong(), any(), any(), any()))
+    when(uploader.startUpload(anyLong(), any(), any(), any(), any()))
         .thenAnswer(invocation -> {
           CompletableFuture<Void> fut = invocation.getArgument(2);
           fut.completeExceptionally(

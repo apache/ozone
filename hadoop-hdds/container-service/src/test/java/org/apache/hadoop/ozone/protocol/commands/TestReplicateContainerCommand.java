@@ -19,14 +19,19 @@ package org.apache.hadoop.ozone.protocol.commands;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Test cases to verify {@link ReplicateContainerCommand} serialization.
@@ -96,5 +101,73 @@ public class TestReplicateContainerCommand {
 
     String str = cmd.toString();
     assertTrue(str.contains("apparentVersion=" + HDDSVersion.SOFTWARE_VERSION));
+  }
+
+  @Test
+  void testStorageTypeDoesNotReuseApparentVersionField() {
+    assertEquals(7, ReplicateContainerCommandProto.getDescriptor().findFieldByName("apparentVersion").getNumber());
+    assertEquals(8, ReplicateContainerCommandProto.getDescriptor().findFieldByName("volumeStorageType").getNumber());
+  }
+
+  @ParameterizedTest
+  @EnumSource(StorageType.class)
+  public void targetVolumeStorageTypeSurvivesRoundTrip(StorageType storageType) {
+    ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+        1L, MockDatanodeDetails.randomDatanodeDetails(), HDDSVersion.ZDU);
+    command.setTargetVolumeStorageType(storageType);
+
+    ReplicateContainerCommandProto proto = command.getProto();
+    assertEquals(HDDSVersion.ZDU, ReplicateContainerCommand.getFromProtobuf(proto).getApparentVersion());
+    assertEquals(storageType,
+        ReplicateContainerCommand.getFromProtobuf(proto)
+            .getTargetVolumeStorageType());
+  }
+
+  /**
+   * A command without a storage type must not claim one on the wire, so the
+   * importing datanode keeps its configured-default behaviour.
+   */
+  @Test
+  public void unsetStorageTypeIsAbsentFromProto() {
+    ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+        1L, MockDatanodeDetails.randomDatanodeDetails(), HDDSVersion.ZDU);
+
+    assertNull(command.getTargetVolumeStorageType());
+    assertFalse(command.getProto().hasVolumeStorageType());
+    assertNull(ReplicateContainerCommand
+        .getFromProtobuf(command.getProto()).getTargetVolumeStorageType());
+  }
+
+  /**
+   * Guards the upgrade path: a command from an SCM without storage type support
+   * deserializes with no storage type rather than defaulting to one.
+   */
+  @Test
+  public void protoWithoutStorageTypeDeserializesAsNull() {
+    ReplicateContainerCommandProto proto = ReplicateContainerCommandProto
+        .newBuilder()
+        .setCmdId(1L)
+        .setContainerID(2L)
+        .setTarget(MockDatanodeDetails.randomDatanodeDetails()
+            .getProtoBufMessage())
+        .build();
+
+    assertNull(ReplicateContainerCommand.getFromProtobuf(proto)
+        .getTargetVolumeStorageType());
+  }
+
+  /**
+   * Setting null explicitly clears the type rather than being ignored, so a
+   * caller can opt out after the fact.
+   */
+  @Test
+  public void settingNullClearsStorageType() {
+    ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+        1L, MockDatanodeDetails.randomDatanodeDetails(), HDDSVersion.ZDU);
+    command.setTargetVolumeStorageType(StorageType.SSD);
+    command.setTargetVolumeStorageType(null);
+
+    assertNull(command.getTargetVolumeStorageType());
+    assertFalse(command.getProto().hasVolumeStorageType());
   }
 }

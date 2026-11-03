@@ -27,12 +27,16 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -58,6 +62,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Test for {@link SendContainerRequestHandler}.
@@ -114,7 +119,7 @@ public class TestSendContainerRequestHandler {
     // import the incoming container by having the volume chooser throw.
     DiskOutOfSpaceException noSpace =
         new DiskOutOfSpaceException("No volumes have enough space for a new container");
-    doThrow(noSpace).when(importer).chooseNextVolume(anyLong());
+    doThrow(noSpace).when(importer).chooseNextVolume(anyLong(), any());
 
     doAnswer(invocation -> {
       Object arg = invocation.getArgument(0);
@@ -126,6 +131,32 @@ public class TestSendContainerRequestHandler {
         ByteString.copyFromUtf8("test"), 0, null));
 
     // No volume was reserved, so no committed bytes should change on any volume.
+    HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
+    assertEquals(0, volume.getCommittedBytes());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 999})
+  void testInvalidStorageTypeDoesNotReserveSpace(int storageTypeId) throws Exception {
+    sendContainerRequestHandler.onNext(createRequest(1, ByteString.EMPTY, 0, 1L).toBuilder()
+        .setStorageTypeID(storageTypeId).build());
+
+    ArgumentCaptor<Throwable> error = ArgumentCaptor.forClass(Throwable.class);
+    verify(responseObserver).onError(error.capture());
+    assertInstanceOf(IllegalArgumentException.class, error.getValue());
+    verify(importer, never()).chooseNextVolume(anyLong(), any());
+    HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
+    assertEquals(0, volume.getCommittedBytes());
+  }
+
+  @Test
+  void testRequestedStorageTypeMustHaveMatchingVolume() {
+    sendContainerRequestHandler.onNext(createRequest(1, ByteString.EMPTY, 0, 1L).toBuilder()
+        .setStorageTypeID(StorageTypeUtils.getID(StorageType.SSD)).build());
+
+    ArgumentCaptor<Throwable> error = ArgumentCaptor.forClass(Throwable.class);
+    verify(responseObserver).onError(error.capture());
+    assertInstanceOf(DiskOutOfSpaceException.class, error.getValue());
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     assertEquals(0, volume.getCommittedBytes());
   }
