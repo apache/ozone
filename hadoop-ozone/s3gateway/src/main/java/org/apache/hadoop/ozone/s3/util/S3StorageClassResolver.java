@@ -151,7 +151,7 @@ public final class S3StorageClassResolver {
    *         {@code storageConfigHeader} is not a valid EC layout
    */
   @Nonnull
-  public static ReplicationConfig toReplicationConfig(S3StorageClassSpec spec,
+  static ReplicationConfig toReplicationConfig(S3StorageClassSpec spec,
       @Nullable String storageConfigHeader, @Nullable ReplicationConfig bucketReplicationConfig) {
     ReplicationType type = spec.getReplicationType();
     if (type == ReplicationType.EC) {

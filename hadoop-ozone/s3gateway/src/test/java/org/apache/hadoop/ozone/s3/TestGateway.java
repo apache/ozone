@@ -141,7 +141,8 @@ public class TestGateway {
     assertSame(conf, OzoneConfigurationHolder.configuration());
     assertSame(resolver, OzoneConfigurationHolder.storageClassResolver());
     ReplicationConfig clientConfig = new ECReplicationConfig("rs-6-3-512k");
-    assertEquals(clientConfig, resolver.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null));
+    assertThat(resolver.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null))
+        .isEqualTo(clientConfig);
     assertEquals(OzoneStoragePolicy.HOT, resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_REDUCED_REDUNDANCY).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.HOT, resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
@@ -168,9 +169,10 @@ public class TestGateway {
     assertSame(next, OzoneConfigurationHolder.configuration());
     assertNotSame(previous, resolver);
     ReplicationConfig clientConfig = new ECReplicationConfig("rs-6-3-512k");
-    assertEquals(clientConfig, previous.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null));
-    assertEquals(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
-        resolver.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null));
+    assertThat(previous.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null))
+        .isEqualTo(clientConfig);
+    assertThat(resolver.resolveReplicationConfig(S3_STORAGE_CLASS_STANDARD, null, clientConfig, null))
+        .isEqualTo(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_STANDARD).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.HOT, previous.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
     assertEquals(OzoneStoragePolicy.WARM, resolver.toSpec(S3_STORAGE_CLASS_STANDARD_IA).getStoragePolicy());
