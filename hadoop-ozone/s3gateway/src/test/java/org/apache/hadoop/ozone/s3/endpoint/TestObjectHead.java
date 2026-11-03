@@ -137,6 +137,18 @@ public class TestObjectHead {
   }
 
   @Test
+  public void testHeadWithZeroPartNumber() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    keyEndpoint.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 0);
+
+    try (Response response = keyEndpoint.head(bucketName, RANGE_KEY)) {
+      assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+      assertThat(response.getHeaderString(HttpHeaders.CONTENT_LENGTH))
+          .isEqualTo(String.valueOf(RANGE_CONTENT.length()));
+    }
+  }
+
+  @Test
   public void testHeadWithNegativePartNumber() throws Exception {
     keyEndpoint.queryParamsForTest()
         .setInt(S3Consts.QueryParams.PART_NUMBER, -1);

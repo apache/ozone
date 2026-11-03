@@ -47,6 +47,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -55,6 +56,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -118,6 +120,19 @@ public class TestObjectGet {
     // Create a key with object tags
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
+  }
+
+  @Test
+  public void testGetWithZeroPartNumber() throws Exception {
+    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 0);
+
+    try (Response response = get(rest, BUCKET_NAME, KEY_NAME);
+         ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+      assertThat(response.getStatus()).isEqualTo(Response.Status.OK.getStatusCode());
+      assertThat(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)).isEqualTo(String.valueOf(CONTENT.length()));
+      ((StreamingOutput) response.getEntity()).write(output);
+      assertThat(output.toByteArray()).isEqualTo(CONTENT.getBytes(UTF_8));
+    }
   }
 
   @Test
