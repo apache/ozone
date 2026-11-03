@@ -834,6 +834,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     } catch (OMException ex) {
       auditWriteFailure(context.getAction(), ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
+      if (ex.getResult() == ResultCodes.NOT_A_FILE) {
+        // FSO rejects a multipart file whose key is an existing directory.
+        // Match PutObject: this is a client path error, not an internal failure.
+        OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
+        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+            "when calling the PutObject/MPU PartUpload operation: " +
+            OmConfig.Keys.ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
+            " considered as Unix Paths. Path has Violated FS Semantics " +
+            "which caused put operation to fail.");
+        throw os3Exception;
+      }
       throw newError(bucket, key, ex);
     } catch (Exception ex) {
       auditWriteFailure(context.getAction(), ex);
