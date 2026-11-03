@@ -64,13 +64,15 @@ public class RewriteTablePathCommand extends AbstractSubcommand implements Calla
 
   @Option(
       names = {"--start-version"},
-      description = "Start version metadata file name (optional, e.g., v1.metadata.json)"
+      description = "Start version metadata file name (optional, e.g., v1.metadata.json). " +
+          "Must be chronologically older than --end-version when both are set."
   )
   private String startVersion;
 
   @Option(
       names = {"--end-version"},
-      description = "End version metadata file name (optional, defaults to current)"
+      description = "End version metadata file name (optional, defaults to current). " +
+          "Must be chronologically newer than --start-version when both are set."
   )
   private String endVersion;
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.iceberg;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -179,6 +180,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     TableMetadata tableMetadata = ((HasTableOperations) table).operations().current();
     validateAndSetEndVersion(tableMetadata);
     validateAndSetStartVersion(tableMetadata);
+    validateStartBeforeEndVersion(tableMetadata);
 
     if (stagingDir == null) {
       stagingDir =
@@ -205,6 +207,46 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     if (startVersionName != null) {
       this.startVersionName = validateVersion(tableMetadata, startVersionName);
     }
+  }
+
+  private void validateStartBeforeEndVersion(TableMetadata tableMetadata) {
+    if (startVersionName == null) {
+      return;
+    }
+
+    List<String> metadataPaths = metadataPathsInOrder(tableMetadata);
+    int startIdx = -1;
+    int endIdx = -1;
+    for (int i = 0; i < metadataPaths.size(); i++) {
+      String path = metadataPaths.get(i);
+      if (path.equals(startVersionName)) {
+        startIdx = i;
+      }
+      if (path.equals(endVersionName)) {
+        endIdx = i;
+      }
+    }
+
+    if (startIdx < 0 || endIdx < 0) {
+      // Should not happen after validateVersion; optional defensive check
+      throw new IllegalArgumentException("Start or end version not found in metadata log.");
+    }
+    if (startIdx >= endIdx) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Start version (%s) must be chronologically older than end version (%s).",
+              RewriteTablePathUtil.fileName(startVersionName),
+              RewriteTablePathUtil.fileName(endVersionName)));
+    }
+  }
+
+  private static List<String> metadataPathsInOrder(TableMetadata tableMetadata) {
+    List<String> metadataPaths = new ArrayList<>();
+    for (MetadataLogEntry entry : tableMetadata.previousFiles()) {
+      metadataPaths.add(entry.file());
+    }
+    metadataPaths.add(tableMetadata.metadataFileLocation());
+    return metadataPaths;
   }
 
   private String validateVersion(TableMetadata tableMetadata, String versionFileName) {
