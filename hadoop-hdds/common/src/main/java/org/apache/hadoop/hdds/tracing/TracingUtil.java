@@ -519,7 +519,6 @@ public final class TracingUtil {
     try (Scope ignored = span.makeCurrent()) {
       return supplier.get();
     } catch (Exception ex) {
-      span.addEvent("Failed with exception: " + ex.getMessage());
       recordException(span, ex);
       throw ex;
     } finally {
@@ -535,7 +534,6 @@ public final class TracingUtil {
     try (Scope ignored = span.makeCurrent()) {
       runnable.run();
     } catch (Exception ex) {
-      span.addEvent("Failed with exception: " + ex.getMessage());
       recordException(span, ex);
       throw ex;
     } finally {
