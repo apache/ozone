@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.server;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -48,6 +51,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -63,6 +67,7 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -143,6 +148,24 @@ public class TestSCMClientProtocolServer {
       // write operator
       assertThrows(AccessControlException.class,
           () -> server.getScm().checkAdminAccess(testUser, false));
+    } finally {
+      UserGroupInformation.reset();
+    }
+  }
+
+  @Test
+  public void testGetContainerTokenRequiresFullAdmin() throws Exception {
+    ContainerID containerID = ContainerID.valueOf(1L);
+    UserGroupInformation readOnlyAdmin =
+        UserGroupInformation.createUserForTesting("testUser", new String[] {"testGroup"});
+
+    try {
+      // the SCM starter user is a full admin
+      assertThat(server.getContainerToken(containerID)).isNotNull();
+      assertThatThrownBy(() -> readOnlyAdmin.doAs(
+          (PrivilegedExceptionAction<Token<?>>) () -> server.getContainerToken(containerID)))
+          .isInstanceOf(AccessControlException.class)
+          .hasMessageContaining("SCM superuser privilege is required");
     } finally {
       UserGroupInformation.reset();
     }
