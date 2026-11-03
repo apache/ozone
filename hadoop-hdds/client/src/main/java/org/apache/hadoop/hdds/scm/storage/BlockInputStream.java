@@ -72,6 +72,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientShortCircuit xceiverClientShortCircuit;
   private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
   private volatile FileInputStream blockFileInputStream;
+  // Set when blockFileInputStream is owned by the short-circuit block cache instead of this stream.
+  private ShortCircuitStreamCache.Replica cachedReplica;
   private volatile boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
@@ -212,11 +214,47 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * @return BlockData.
    */
   protected BlockData getBlockData() throws IOException {
+    releaseCachedReplica();
+    final ShortCircuitStreamCache cache = getShortCircuitStreamCache();
+    if (cache != null) {
+      final ShortCircuitStreamCache.Replica replica = cache.acquire(blockID, length);
+      if (replica != null) {
+        cachedReplica = replica;
+        blockFileInputStream = replica.getStream();
+        return replica.getBlockData();
+      }
+    }
     acquireClient();
     try {
-      return getBlockDataUsingClient();
+      final BlockData data = getBlockDataUsingClient();
+      if (cache != null && blockFileInputStream != null && data.getSize() >= length) {
+        cachedReplica = cache.put(blockID, data, blockFileInputStream);
+      }
+      return data;
     } finally {
       releaseClient();
+    }
+  }
+
+  /** @return the short-circuit stream cache if this block may be served from or added to it, otherwise null. */
+  private ShortCircuitStreamCache getShortCircuitStreamCache() {
+    if (xceiverClientFactory == null || fallbackToGrpc.get() || blockInfo == null) {
+      return null;
+    }
+    return xceiverClientFactory.getShortCircuitStreamCache();
+  }
+
+  private synchronized void invalidateCachedReplica() {
+    if (cachedReplica != null && xceiverClientFactory != null) {
+      xceiverClientFactory.getShortCircuitStreamCache().invalidate(cachedReplica);
+    }
+  }
+
+  private synchronized void releaseCachedReplica() {
+    if (cachedReplica != null) {
+      xceiverClientFactory.getShortCircuitStreamCache().release(cachedReplica);
+      cachedReplica = null;
+      blockFileInputStream = null;
     }
   }
 
@@ -287,7 +325,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private void acquireClient() throws IOException {
     final Pipeline pipeline = pipelineRef.get();
     // xceiverClientGrpc not-null indicates there is fall back to GRPC reads
-    if (xceiverClientFactory != null && xceiverClientFactory.isShortCircuitEnabled() && !fallbackToGrpc.get()
+    if (xceiverClientFactory != null && xceiverClientFactory.isShortCircuitReady() && !fallbackToGrpc.get()
         && xceiverClientShortCircuit == null) {
       try {
         XceiverClientSpi newClient = xceiverClientFactory.acquireClientForReadData(pipeline, true);
@@ -373,6 +411,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
+        invalidateCachedReplica();
         if (shouldRetryRead(e, retryPolicy, ++retries)) {
           handleReadError(e);
           continue;
@@ -380,6 +419,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
           throw e;
         }
       } catch (IOException ex) {
+        invalidateCachedReplica();
         if (shouldRetryRead(ex, retryPolicy, ++retries)) {
           if (isConnectivityIssue(ex)) {
             handleReadError(ex);
@@ -477,12 +517,14 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
+        invalidateCachedReplica();
         if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
           throw ex;
         }
         refreshBlockInfo(ex);
         continue;
       } catch (IOException ex) {
+        invalidateCachedReplica();
         if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
           throw ex;
         }
@@ -591,6 +633,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void close() {
     releaseClient();
+    releaseCachedReplica();
     xceiverClientFactory = null;
 
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
