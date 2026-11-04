@@ -1672,6 +1672,8 @@ Expired STS temporary credentials must return ExpiredToken on S3 APIs
     Execute S3api Expect Expired Token                          get-object-attributes --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} --object-attributes ETag
 
 Revoking Permanent User Must Revoke Existing Session Token
+    [Teardown]    Run Keywords    Kinit test user    ${ICEBERG_SVC_CATALOG_USER}    ${ICEBERG_SVC_CATALOG_USER}.keytab
+    ...    AND    Execute    ozone s3 revokesecret -y -u ${PERMANENT_ACCESS_KEY_ID} ${OM_HA_PARAM}
     # Create session tokens for both buckets, verify they work, then revoke permanent user secret and verify both fail.
     Assume Role And Get Temporary Credentials                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
     Set Test Variable             ${OBS_STS_ACCESS_KEY_ID}      ${STS_ACCESS_KEY_ID}
