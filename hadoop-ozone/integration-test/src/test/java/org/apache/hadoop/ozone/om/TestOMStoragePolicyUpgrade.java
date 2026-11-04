@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DEFAULT_STORAGE_POLICY_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,7 +55,8 @@ import org.junit.jupiter.api.function.Executable;
  * <p>
  * 2. Post-Finalize: CreateBucket honors the requested storage policy fields
  *    and SetBucketProperty requests carrying them succeed; in both cases the
- *    policy is persisted.
+ *    policy is persisted. A CreateBucket without the fields stores the OM's
+ *    configured default policy, with fallback allowed.
  * <p>
  * The cluster starts with the apparent version set to the version immediately below
  * {@link OzoneManagerVersion#STORAGE_POLICY_SUPPORT} so that only this
@@ -82,6 +84,8 @@ public class TestOMStoragePolicyUpgrade {
   public void init() throws Exception {
     conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY,
         OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.serialize());
+    // Not WARM, so the test fails if the client sends WARM instead of leaving the default to the OM.
+    conf.set(OZONE_OM_DEFAULT_STORAGE_POLICY_KEY, OzoneStoragePolicy.COLD.name());
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
@@ -124,6 +128,10 @@ public class TestOMStoragePolicyUpgrade {
 
     // Controls: the gate must not reject requests that carry no storage policy field
     createBucket(null, null);
+    // The client API must not add a policy field on its own, or the gate rejects this request.
+    String clientCreated = "buck-" + UUID.randomUUID();
+    client.getObjectStore().getVolume(VOLUME_NAME).createBucket(clientCreated);
+    assertThat(omClient.getBucketInfo(VOLUME_NAME, clientCreated).getStoragePolicy()).isNull();
     omClient.setBucketProperty(OmBucketArgs.newBuilder()
         .setVolumeName(VOLUME_NAME)
         .setBucketName(bucketName)
@@ -142,6 +150,13 @@ public class TestOMStoragePolicyUpgrade {
   private void postFinalizationChecks() throws Exception {
     assertThat(cluster.getOzoneManager().getVersionManager().getApparentVersion())
         .isEqualTo(OzoneManagerVersion.SOFTWARE_VERSION);
+
+    // CreateBucket through the client API without storage policy options: the OM applies its configured default.
+    String defaultPolicyBucket = "buck-" + UUID.randomUUID();
+    client.getObjectStore().getVolume(VOLUME_NAME).createBucket(defaultPolicyBucket);
+    OmBucketInfo defaultedPolicyBucketInfo = omClient.getBucketInfo(VOLUME_NAME, defaultPolicyBucket);
+    assertThat(defaultedPolicyBucketInfo.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertThat(defaultedPolicyBucketInfo.getAllowFallbackStoragePolicy()).isTrue();
 
     String created = createBucket(OzoneStoragePolicy.HOT, true);
     OmBucketInfo createdInfo = omClient.getBucketInfo(VOLUME_NAME, created);
@@ -167,10 +182,7 @@ public class TestOMStoragePolicyUpgrade {
   }
 
   /**
-   * Creates a bucket through {@link OzoneManagerProtocol} rather than the
-   * {@code OzoneBucket} API, because {@code RpcClient#createBucket} substitutes
-   * the default storage policy for null and so cannot express a request without
-   * the field.
+   * Creates a bucket through {@link OzoneManagerProtocol}.
    *
    * @return the name of the bucket created.
    */
