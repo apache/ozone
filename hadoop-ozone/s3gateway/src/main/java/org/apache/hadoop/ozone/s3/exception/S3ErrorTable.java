@@ -290,6 +290,7 @@ public enum S3ErrorTable {
     case INVALID_PART_ORDER:
       return INVALID_PART_ORDER;
     case INVALID_REQUEST:
+    case NOT_A_FILE:
       return INVALID_REQUEST;
     case KEY_NOT_FOUND:
       return NO_SUCH_KEY;
