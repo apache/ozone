@@ -1008,7 +1008,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           length = sourceKeyDetails.getDataSize();
         }
         S3ConditionalRequest.evaluatePreconditions(getHeaders(), sourceBucket + "/" + sourceKey,
-            sourceKeyDetails, S3ConditionalRequest.PreconditionContext.UPLOAD_PART_COPY_SOURCE);
+            sourceKeyDetails, S3ConditionalRequest.PreconditionContext.COPY_SOURCE);
 
         final MessageDigest md5Digest = getMD5DigestInstance();
         try (OzoneInputStream sourceObject = sourceKeyDetails.getContent();

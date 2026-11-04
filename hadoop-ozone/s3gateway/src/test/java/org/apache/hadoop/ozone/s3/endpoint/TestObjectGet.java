@@ -195,7 +195,7 @@ public class TestObjectGet {
       throws IOException, OS3Exception {
     when(headers.getHeaderString(IF_MODIFIED_SINCE_HEADER))
         .thenReturn(formatHttpDate(bucket.getKey(KEY_NAME)
-            .getModificationTime().plusSeconds(60)));
+            .getModificationTime()));
 
     Response response = get(rest, BUCKET_NAME, KEY_NAME);
     assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(),
