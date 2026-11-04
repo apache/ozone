@@ -486,9 +486,6 @@ Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Up
     Kinit test user               hdfs                          hdfs.keytab
     Setup Test Data
 
-    # Switch back to the service catalog principal for running S3/STS requests.
-    Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
-
 Assume Role for Limited-Scope Token
     # All access role is limited to read-only via session policy
     FOR    ${bucket}    ${role_arn}    IN
