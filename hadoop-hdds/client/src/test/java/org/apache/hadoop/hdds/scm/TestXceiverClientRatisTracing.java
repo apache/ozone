@@ -71,6 +71,23 @@ class TestXceiverClientRatisTracing {
     }
   }
 
+  @Test
+  void requestAttributesAreRecordedOnSpan() throws Exception {
+    CompletableFuture<RaftClientReply> reply = new CompletableFuture<>();
+    try (TestSpanCollector collector = TestSpanCollector.install("client")) {
+      XceiverClientRatis client = clientReturning(reply);
+      client.sendCommandAsync(writeChunkRequest());
+      reply.complete(mock(RaftClientReply.class));
+
+      String span = "XceiverClientRatis.WriteChunk";
+      collector.assertAttribute(span, ClientTracingAttributes.HDDS_CONTAINER_ID, 1L);
+      collector.assertAttribute(span, ClientTracingAttributes.PIPELINE_ID, client.getPipeline().getId().toString());
+      collector.assertAttribute(span, ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID, 2L);
+      collector.assertAttribute(span, ClientTracingAttributes.HDDS_CHUNK_OFFSET, 8L);
+      collector.assertAttribute(span, ClientTracingAttributes.HDDS_CHUNK_LENGTH, 4L);
+    }
+  }
+
   @SuppressWarnings("unchecked")
   private static XceiverClientRatis clientReturning(CompletableFuture<RaftClientReply> reply) throws Exception {
     AsyncApi async = mock(AsyncApi.class);
@@ -93,6 +110,23 @@ class TestXceiverClientRatisTracing {
         .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
             .setBlockData(ContainerProtos.BlockData.newBuilder()
                 .setBlockID(ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1L).setLocalID(1L))))
+        .build();
+  }
+
+  private static ContainerCommandRequestProto writeChunkRequest() {
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.WriteChunk)
+        .setContainerID(1L)
+        .setDatanodeUuid("dn")
+        .setWriteChunk(ContainerProtos.WriteChunkRequestProto.newBuilder()
+            .setBlockID(ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1L).setLocalID(2L))
+            .setChunkData(ContainerProtos.ChunkInfo.newBuilder()
+                .setChunkName("chunk")
+                .setOffset(8)
+                .setLen(4)
+                .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+                    .setType(ContainerProtos.ChecksumType.NONE)
+                    .setBytesPerChecksum(4))))
         .build();
   }
 }

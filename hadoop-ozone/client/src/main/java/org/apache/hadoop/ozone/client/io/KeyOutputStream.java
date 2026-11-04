@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ClientTracingAttributes;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -398,6 +400,8 @@ public class KeyOutputStream extends OutputStream
     } else {
       excludeList.addPipeline(pipelineId);
     }
+    TracingUtil.addEventToCurrentSpan(ClientTracingAttributes.CLIENT_WRITE_RETRY,
+        ClientTracingAttributes.PIPELINE_ID, pipelineId.toString());
     // just clean up the current stream.
     streamEntry.cleanup(retryFailure);
 
@@ -652,6 +656,9 @@ public class KeyOutputStream extends OutputStream
       for (CheckedRunnable<IOException> preCommit : preCommits) {
         preCommit.run();
       }
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.CLIENT_BYTES_WRITTEN, offset);
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.CLIENT_BLOCKS_WRITTEN,
+          blockOutputStreamEntryPool.getLocationInfoList().size());
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();

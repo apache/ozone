@@ -30,6 +30,26 @@ public final class ClientTracingAttributes {
   /** Event added when a container command failed on one datanode and the client moves on to the next one. */
   public static final String HDDS_DATANODE_FAILED = "hdds.datanode.failed";
 
+  /** Bytes a key output stream wrote and committed. */
+  public static final String CLIENT_BYTES_WRITTEN = "client.bytes_written";
+
+  /** Blocks a key output stream wrote and committed. */
+  public static final String CLIENT_BLOCKS_WRITTEN = "client.blocks_written";
+
+  /** Event added when a key write failed on a pipeline and the client retries on another one. */
+  public static final String CLIENT_WRITE_RETRY = "client.write.retry";
+
+  /** ID of the pipeline a failed key write was excluded from. */
+  public static final String PIPELINE_ID = "pipeline.id";
+
+  public static final String HDDS_CONTAINER_ID = "hdds.container.id";
+
+  public static final String HDDS_BLOCK_LOCAL_ID = "hdds.block.local_id";
+
+  public static final String HDDS_CHUNK_OFFSET = "hdds.chunk.offset";
+
+  public static final String HDDS_CHUNK_LENGTH = "hdds.chunk.length";
+
   private ClientTracingAttributes() {
   }
 }

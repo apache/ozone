@@ -259,6 +259,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     Span span = TracingUtil.createSpan("XceiverClientRatis." + request.getCmdType().name(), SpanKind.CLIENT);
     CompletableFuture<RaftClientReply> reply;
     try (Scope ignored = span.makeCurrent()) {
+      addRequestAttributesToCurrentSpan(request);
       final ContainerCommandRequestMessage message
           = ContainerCommandRequestMessage.toMessage(
           request, TracingUtil.exportCurrentSpan());
@@ -282,6 +283,23 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       TracingUtil.recordException(span, e);
       span.end();
     });
+  }
+
+  private void addRequestAttributesToCurrentSpan(ContainerCommandRequestProto request) {
+    TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_CONTAINER_ID, request.getContainerID());
+    TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.PIPELINE_ID, getPipeline().getId().toString());
+    if (request.hasWriteChunk()) {
+      ContainerProtos.WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          writeChunk.getBlockID().getLocalID());
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_CHUNK_OFFSET,
+          writeChunk.getChunkData().getOffset());
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_CHUNK_LENGTH,
+          writeChunk.getChunkData().getLen());
+    } else if (request.hasPutBlock()) {
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          request.getPutBlock().getBlockData().getBlockID().getLocalID());
+    }
   }
 
   // gets the minimum log index replicated to all servers
