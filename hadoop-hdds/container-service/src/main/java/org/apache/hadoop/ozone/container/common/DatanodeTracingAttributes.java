@@ -28,6 +28,27 @@ public final class DatanodeTracingAttributes {
   /** {@code Type} of a container command, for example {@code WriteChunk}. */
   public static final String DN_CMD_TYPE = "dn.cmd_type";
 
+  /** ID of the container a command runs on. */
+  public static final String HDDS_CONTAINER_ID = "hdds.container.id";
+
+  public static final String HDDS_BLOCK_LOCAL_ID = "hdds.block.local_id";
+
+  public static final String HDDS_BLOCK_BCS_ID = "hdds.block.bcs_id";
+
+  public static final String HDDS_CHUNK_OFFSET = "hdds.chunk.offset";
+
+  public static final String HDDS_CHUNK_LENGTH = "hdds.chunk.length";
+
+  public static final String HDDS_DATANODE_HOSTNAME = "hdds.datanode.hostname";
+
+  public static final String HDDS_DATANODE_UUID = "hdds.datanode.uuid";
+
+  /** WriteChunk stage of a command that came through Ratis, for example {@code WRITE_DATA}. */
+  public static final String DN_STAGE = "dn.stage";
+
+  /** State of the container when a write on it failed, for example {@code OPEN}. */
+  public static final String DN_CONTAINER_STATE = "dn.container.state";
+
   private DatanodeTracingAttributes() {
   }
 }
