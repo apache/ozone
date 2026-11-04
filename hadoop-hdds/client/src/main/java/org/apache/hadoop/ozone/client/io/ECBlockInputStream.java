@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -354,6 +355,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     final int bufferStart = buffer.position();
 
     final Map<Integer, DatanodeDetails> locations = new TreeMap<>();
+    final Map<Integer, BlockExtendedInputStream> streams = new TreeMap<>();
     final List<FutureTask<IndexReadResult>> tasks = new ArrayList<>();
     for (Map.Entry<Integer, List<CellRead>> entry : splitCells(offset, length, new ArrayList<>()).entrySet()) {
       int index = entry.getKey();
@@ -369,6 +371,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
         } catch (IOException e) {
           throw new BadDataLocationException(dataLocations[index], index, e);
         }
+        streams.put(index, stream);
       }
       List<CellRead> indexCells = entry.getValue();
       tasks.add(new FutureTask<>(() -> readCells(stream, indexCells, buffer, bufferStart, false, true)));
@@ -382,9 +385,18 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       Throwables.throwIfUnchecked(unexpected);
       throw new IOException(unexpected);
     }
+    // Another reader may have closed an index stream while this read used it, for example a sequential read that
+    // switched the index to a spare. That fails the read, although the location is not bad, so it must not be reported.
+    final IOException closedStreamFailure = removeFailuresOfClosedStreams(results, streams);
     BadDataLocationException failure = readFailure(results, locations::get);
     if (failure != null) {
+      if (closedStreamFailure != null) {
+        failure.addSuppressed(closedStreamFailure);
+      }
       throw failure;
+    }
+    if (closedStreamFailure != null) {
+      throw closedStreamFailure;
     }
     buffer.position(bufferStart + length);
     LOG.trace("{}: positioned read of {} bytes at {} from {} indexes", this, length, offset, tasks.size());
@@ -607,6 +619,31 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       }
     }
     return unexpected;
+  }
+
+  /**
+   * Removes the failed reads of the streams that are no longer the stream of their index, because another reader
+   * closed them while they were read, and returns their failure, or null if there is none.
+   * @param streams the stream that was read for each index
+   */
+  private IOException removeFailuresOfClosedStreams(Map<Integer, IndexReadResult> results,
+      Map<Integer, BlockExtendedInputStream> streams) {
+    IOException failure = null;
+    synchronized (streamLock) {
+      for (Iterator<IndexReadResult> i = results.values().iterator(); i.hasNext();) {
+        final IndexReadResult result = i.next();
+        // a closed stream is either gone or replaced by a stream opened after it was closed
+        if (result.error != null && blockStreams[result.index] != streams.get(result.index)) {
+          i.remove();
+          if (failure == null) {
+            failure = result.error;
+          } else {
+            failure.addSuppressed(result.error);
+          }
+        }
+      }
+    }
+    return failure;
   }
 
   /**

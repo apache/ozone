@@ -896,6 +896,44 @@ public class TestECBlockInputStream {
     }
   }
 
+  /**
+   * Another reader closes an index stream while a positioned read uses it, for example a sequential read that switches
+   * the index to a spare, and the index may be reopened before the positioned read checks it.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPositionedReadFailingOnConcurrentIndexCloseDoesNotReportLocations(boolean reopen) throws Exception {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300;
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    // the positioned read waits in the index stream until the test has closed the stream
+    CountDownLatch barrier = new CountDownLatch(2);
+    dataStreamFactory.setReadBarrier(barrier);
+
+    ExecutorService reader = Executors.newSingleThreadExecutor();
+    try (ECBlockInputStream ecb = createStream(keyInfo, dataStreamFactory, conf.getObject(OzoneClientConfig.class))) {
+      // the read only covers the first cell, of index 0
+      Future<Integer> pread = reader.submit(() -> ecb.read(10, ByteBuffer.allocate(50)));
+      GenericTestUtils.waitFor(() -> barrier.getCount() == 1, 10, 10_000);
+      ECStreamTestUtil.TestBlockInputStream readStream = dataStreamFactory.getBlockStream(1);
+      ecb.closeStream(0);
+      if (reopen) {
+        ecb.getOrOpenStream(0);
+      }
+      // the index stream was closed, so the read in progress fails
+      readStream.setShouldError(true);
+      barrier.countDown();
+
+      ExecutionException e = assertThrows(ExecutionException.class, () -> pread.get(10, TimeUnit.SECONDS));
+      // the location is not bad, so it must not be reported as failed
+      assertThat(e.getCause()).isInstanceOf(IOException.class).isNotInstanceOf(BadDataLocationException.class);
+    } finally {
+      reader.shutdownNow();
+    }
+  }
+
   @Test
   public void testPositionedReadFailingOnConcurrentCloseDoesNotReportLocations() throws Exception {
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
