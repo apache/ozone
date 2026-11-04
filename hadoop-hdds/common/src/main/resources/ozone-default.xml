@@ -2147,8 +2147,7 @@
       ozone.replication.type, if ozone.replication is set, instead of RATIS/THREE.
       Other storage classes and storage policies are unaffected.
       The ozone local runtime sets it to true.
-      S3StorageClassResolver reads this setting at gateway startup; restart
-      S3 Gateway for resolver changes to take effect.
+      S3 Gateway reads this setting when it starts. Restart S3 Gateway after changing it.
     </description>
   </property>
 

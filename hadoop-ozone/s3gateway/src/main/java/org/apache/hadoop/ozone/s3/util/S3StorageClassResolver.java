@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_IA_STORAGE_POLICY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_STORAGE_CLASS;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /**
  * Maps between S3 storage class names and Ozone replication and storage policy.
@@ -116,20 +119,24 @@ public final class S3StorageClassResolver {
    * @param clientReplicationConfig replication from the gateway's ozone.replication settings, or null
    * @param bucketReplicationConfig the bucket's default replication, or null
    * @return the resolved replication, or null to use the server default
-   * @throws IllegalArgumentException if the class is unknown or its EC layout header is invalid
+   * @throws OS3Exception with {@code INVALID_STORAGE_CLASS} if the class is unknown or its EC layout header is invalid
    */
   @Nullable
   public ReplicationConfig resolveReplicationConfig(@Nullable String s3StorageClass,
       @Nullable String storageConfigHeader, @Nullable ReplicationConfig clientReplicationConfig,
       @Nullable ReplicationConfig bucketReplicationConfig) {
-    if (StringUtils.isEmpty(s3StorageClass)) {
-      return clientReplicationConfig != null ? clientReplicationConfig : bucketReplicationConfig;
+    try {
+      if (StringUtils.isEmpty(s3StorageClass)) {
+        return clientReplicationConfig != null ? clientReplicationConfig : bucketReplicationConfig;
+      }
+      S3StorageClass storageClass = S3StorageClass.fromS3StorageClass(s3StorageClass);
+      if (standardUsesClientDefault && storageClass == S3StorageClass.STANDARD && clientReplicationConfig != null) {
+        return clientReplicationConfig;
+      }
+      return toReplicationConfig(toSpec(s3StorageClass), storageConfigHeader, bucketReplicationConfig);
+    } catch (IllegalArgumentException e) {
+      throw newError(INVALID_STORAGE_CLASS, s3StorageClass, e);
     }
-    S3StorageClass storageClass = S3StorageClass.fromS3StorageClass(s3StorageClass);
-    if (standardUsesClientDefault && storageClass == S3StorageClass.STANDARD && clientReplicationConfig != null) {
-      return clientReplicationConfig;
-    }
-    return toReplicationConfig(toSpec(s3StorageClass), storageConfigHeader, bucketReplicationConfig);
   }
 
   /**

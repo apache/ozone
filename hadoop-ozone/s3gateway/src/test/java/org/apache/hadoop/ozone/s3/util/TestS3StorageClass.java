@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_REDUCED_
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD_IA;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -47,6 +46,8 @@ import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -419,12 +420,16 @@ class TestS3StorageClass {
     conf.setBoolean(OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY, enabled);
     S3StorageClassResolver resolver = new S3StorageClassResolver(conf);
     for (String header : Arrays.asList("INVALID", "standard", " \t ")) {
-      assertThatThrownBy(() -> resolver.resolveReplicationConfig(header, null, EC_6_3, RATIS_ONE))
-          .isInstanceOf(IllegalArgumentException.class);
+      OS3Exception exception = assertThrows(OS3Exception.class,
+          () -> resolver.resolveReplicationConfig(header, null, EC_6_3, RATIS_ONE));
+      assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
+      assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getHttpCode(), exception.getHttpCode());
     }
     for (String storageClass : Arrays.asList(S3_STORAGE_CLASS_STANDARD_IA, S3_STORAGE_CLASS_DEEP_ARCHIVE)) {
-      assertThatThrownBy(() -> resolver.resolveReplicationConfig(storageClass, "INVALID", EC_6_3, EC_3_2))
-          .isInstanceOf(IllegalArgumentException.class);
+      OS3Exception exception = assertThrows(OS3Exception.class,
+          () -> resolver.resolveReplicationConfig(storageClass, "INVALID", EC_6_3, EC_3_2));
+      assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
+      assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getHttpCode(), exception.getHttpCode());
     }
   }
 
