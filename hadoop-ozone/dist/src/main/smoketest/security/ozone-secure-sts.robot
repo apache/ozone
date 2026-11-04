@@ -103,7 +103,6 @@ Populate Iceberg Bucket
     Ozone Shell Batch
     ...    bucket create --layout ${layout} /s3v/${bucket}
     ...    key put /s3v/${bucket}/file1.txt ${local_path}
-    ...    key put /s3v/${bucket}/file1.txt ${local_path}
     ...    key put /s3v/${bucket}/file1again.txt ${local_path}
     ...    key put /s3v/${bucket}/folder/pepper.txt ${local_path}
     ...    key put /s3v/${bucket}/folder/salt.txt ${local_path}
@@ -128,12 +127,12 @@ Setup Test Data
     ...    key put /s3v/${STS_LINK_BUCKET_SOURCE}/${STS_LINK_BUCKET_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}
     ...    bucket link /s3v/${STS_LINK_BUCKET_SOURCE} /s3v/${STS_LINK_BUCKET_LINKED}
     # Create source <- intermediate <- final chained links in s3v.
-    ...   bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}
-    ...   key put /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}/${STS_LINK_BUCKET_CHAIN_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}
-    ...   bucket link /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE} /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}
-    ...   bucket link /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE} /s3v/${STS_LINK_BUCKET_CHAIN_FINAL}
+    ...    bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}
+    ...    key put /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}/${STS_LINK_BUCKET_CHAIN_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}
+    ...    bucket link /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE} /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}
+    ...    bucket link /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE} /s3v/${STS_LINK_BUCKET_CHAIN_FINAL}
     # Create bucket for DeleteBucket scenario
-    ...   bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_BUCKET_TO_DELETE}
+    ...    bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_BUCKET_TO_DELETE}
 
 Head Bucket Should Succeed
     [Arguments]                   ${bucket}  ${profile}=sts
