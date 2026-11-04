@@ -147,6 +147,8 @@ env:
   OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_VOLUME_OWNER: 1000
+  RANGER_IMAGE: ghcr.io/apache/ranger
+  SPARK_SQL_IMAGE: ghcr.io/apache/spark-docker/spark
   DISPLAY_NAME: ${{ inputs.display-name }}
   SCRIPT: ${{ inputs.script }}
   SPLIT: ${{ inputs.split }}

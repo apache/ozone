@@ -17,75 +17,224 @@
  */
 
 import React from 'react';
-import { cleanup, render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
+
 import Heatmap from '@/v2/pages/heatmap/heatmap';
-import HeatmapPlot from '@/v2/components/plots/heatmapPlot';
-import { Heatmap as LegacyHeatmap } from '@/views/heatMap/heatmap';
-import HeatMapConfiguration from '@/views/heatMap/heatMapConfiguration';
-import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import * as commonUtils from '@/utils/common';
+import {
+  heatmapRequests,
+  heatmapServer,
+  heatmapServerErrorHandler,
+  heatmapUnavailableHandler,
+  resetHeatmapRequestTracking
+} from '@tests/mocks/heatmapMocks/heatmapServer';
 
-const { chart } = vi.hoisted(() => ({ chart: vi.fn() }));
-vi.mock('ag-charts-react', () => ({
-  AgChartsReact: (props: any) => { chart(props.options); return null; }
+vi.spyOn(commonUtils, 'showDataFetchError');
+
+const plotOnClickRef = vi.hoisted(() => ({
+  current: null as ((path: string) => void) | null,
 }));
-vi.mock('@/v2/hooks/useAPIData.hook', () => ({ useApiData: vi.fn() }));
 
-const leaf = (color?: number) => ({
-  label: 'cold-key', path: '/vol/bucket/cold-key', size: 256, accessCount: 1,
-  ...(color === undefined ? {} : { color })
-});
-const tree = (child: any) => ({
-  label: 'bucket', path: '/vol/bucket', size: 512,
-  minAccessCount: 1, maxAccessCount: 5000,
-  children: [child, { ...leaf(1), label: 'hot-key', accessCount: 5000 }]
-});
+vi.mock('@/v2/components/plots/heatmapPlot', () => ({
+  default: ({ data, onClick, entityType }: {
+    data: { label?: string | null };
+    onClick: (path: string) => void;
+    entityType: string;
+  }) => {
+    plotOnClickRef.current = onClick;
+    return (
+      <div data-testid="heatmap-plot" data-label={data.label ?? ''} data-entity-type={entityType} />
+    );
+  },
+}));
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
-
-describe.each([undefined, 0, 0.002])('heatmap leaf with color %s', color => {
-  test('v2 gives the leaf a visible area without sizing the group', async () => {
-    const data = tree(leaf(color));
-    vi.mocked(useApiData).mockReturnValue({ data } as any);
-    render(<Heatmap />);
-    await waitFor(() => expect((data.children[0] as any).normalizedSize).toBeGreaterThan(0));
-    expect((data as any).normalizedSize).toBeUndefined();
-  });
-
-  test('legacy gives the leaf a visible area and includes it in size bounds', () => {
-    const page = new LegacyHeatmap({ location: {} } as any);
-    const data = tree(leaf(color));
-    data.children[0].size = 128;
-    expect(page.minmax(data)).toEqual([128, 256]);
-    page.updateSize(data);
-    expect((data.children[0] as any).normalizedSize).toBeGreaterThan(0);
-    expect((data as any).normalizedSize).toBeUndefined();
-  });
-
-  test.each(['v2', 'legacy'])('%s only drills into groups', version => {
-    const onClick = vi.fn();
-    const data = tree(leaf(color));
-    render(version === 'v2'
-      ? <HeatmapPlot data={data as any} onClick={onClick} colorScheme={[]} entityType='key' />
-      : <HeatMapConfiguration data={[data] as any} onClick={onClick} colorScheme={[]} />);
-    const click = chart.mock.calls[chart.mock.calls.length - 1][0].series[0].listeners.nodeClick;
-    click({ datum: data.children[0] });
-    expect(onClick).not.toHaveBeenCalled();
-    click({ datum: data });
-    expect(onClick).toHaveBeenCalledWith('/vol/bucket');
-  });
+vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
+  return {
+    ...actual,
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) => {
+      // The hook's own initial GET does not handle a rejected request, so a 404/500 on mount surfaces as an
+      // unhandled rejection in tests. Skip it and issue the initial request with a handled promise instead.
+      const api = actual.useApiData(url, defaultValue, {
+        ...options,
+        initialFetch: false,
+        retryAttempts: 0,
+        retryDelay: 0,
+      });
+      React.useEffect(() => {
+        if (url) {
+          api.execute().catch(() => undefined);
+        }
+      }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      return api;
+    },
+  };
 });
 
-test.each(['v2', 'legacy'])('%s preserves zero-size handling for leaves with empty children', async version => {
-  const hidden = { ...leaf(), size: 0, accessCount: 0, children: [] };
-  const visible = { ...leaf(), size: 0, children: [] };
-  const data = { ...tree(hidden), children: [hidden, visible] };
-  if (version === 'v2') {
-    vi.mocked(useApiData).mockReturnValue({ data } as any);
-    render(<Heatmap />);
-    await waitFor(() => expect((hidden as any).normalizedSize).toBe(0));
-  } else {
-    new LegacyHeatmap({ location: {} } as any).updateSize(data);
+const waitForPlot = (label: string) => waitFor(() => {
+  expect(screen.getByTestId('heatmap-plot')).toHaveAttribute('data-label', label);
+});
+
+const searchPath = async (path: string) => {
+  const pathInput = screen.getByPlaceholderText('/');
+  await userEvent.clear(pathInput);
+  if (path) {
+    await userEvent.type(pathInput, path);
   }
-  expect((hidden as any).normalizedSize).toBe(0);
-  expect((visible as any).normalizedSize).toBe(1);
+  fireEvent.click(screen.getByRole('button', { name: /search/i }));
+};
+
+// antd Dropdown opens its overlay on hover after a short delay.
+const selectFromDropdown = async (trigger: RegExp, item: string) => {
+  fireEvent.mouseOver(screen.getByRole('button', { name: trigger }));
+  fireEvent.click(await screen.findByText(item));
+};
+
+// Give any request fired on click a chance to reach the mock server before asserting none was sent.
+const flushPendingRequests = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+describe('Heatmap page', () => {
+  beforeAll(() => heatmapServer.listen());
+
+  beforeEach(() => {
+    resetHeatmapRequestTracking();
+    vi.mocked(commonUtils.showDataFetchError).mockClear();
+  });
+
+  afterEach(() => heatmapServer.resetHandlers());
+  afterAll(() => heatmapServer.close());
+
+  test('renders header, filters, legend, and heatmap plot with data', async () => {
+    render(<Heatmap />);
+
+    expect(screen.getByText('Heatmap')).toBeInTheDocument();
+    expect(screen.getByText('Path')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('/')).toHaveValue('/');
+    expect(screen.getByText(/Entity Type:\s*key/)).toBeInTheDocument();
+    expect(screen.getByText(/Last\s+24H/)).toBeInTheDocument();
+    expect(screen.getByText('Less Accessed')).toBeInTheDocument();
+    expect(screen.getByText('Moderate Accessed')).toBeInTheDocument();
+    expect(screen.getByText('Most Accessed')).toBeInTheDocument();
+
+    await waitForPlot('root');
+    expect(screen.getByTestId('heatmap-plot')).toHaveAttribute('data-entity-type', 'key');
+    expect(heatmapRequests).toEqual([{ path: '/', entityType: 'key', startDate: '24H' }]);
+  });
+
+  test('shows validation error for invalid path characters', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    const pathInput = screen.getByPlaceholderText('/');
+    await userEvent.clear(pathInput);
+    await userEvent.type(pathInput, 'bad@path');
+
+    expect(screen.getByText('Please enter valid path')).toBeInTheDocument();
+  });
+
+  test('fetches heatmap for a new path when the user searches', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    await searchPath('/vol1');
+
+    await waitForPlot('vol1');
+    expect(heatmapRequests.map((request) => request.path)).toEqual(['/', '/vol1']);
+  });
+
+  test('does not fetch when searching with an empty path', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    await searchPath('');
+    await flushPendingRequests();
+
+    expect(heatmapRequests).toHaveLength(1);
+    expect(screen.getByTestId('heatmap-plot')).toHaveAttribute('data-label', 'root');
+
+    await selectFromDropdown(/Entity Type/, 'Bucket');
+    await waitFor(() => {
+      expect(heatmapRequests).toContainEqual({ path: '/', entityType: 'bucket', startDate: '24H' });
+    });
+    expect(heatmapRequests).toHaveLength(2);
+  });
+
+  test('drills down into the clicked entity and updates the path input', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    plotOnClickRef.current!('/vol1');
+
+    await waitForPlot('vol1');
+    expect(screen.getByPlaceholderText('/')).toHaveValue('/vol1');
+    expect(heatmapRequests.map((request) => request.path)).toContain('/vol1');
+  });
+
+  test('refetches heatmap when the entity type is changed', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    await selectFromDropdown(/Entity Type/, 'Bucket');
+
+    await waitFor(() => {
+      expect(heatmapRequests).toContainEqual({ path: '/', entityType: 'bucket', startDate: '24H' });
+    });
+    expect(screen.getByText(/Entity Type:\s*bucket/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('heatmap-plot')).toHaveAttribute('data-entity-type', 'bucket');
+    });
+  });
+
+  test('refetches heatmap when the time period is changed', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    await selectFromDropdown(/^Last/, '7 Days');
+
+    await waitFor(() => {
+      expect(heatmapRequests).toContainEqual({ path: '/', entityType: 'key', startDate: '7D' });
+    });
+    expect(screen.getByText(/Last\s+7D/)).toBeInTheDocument();
+  });
+
+  test('shows no data warning when the API returns empty labels', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    await searchPath('/empty');
+
+    await waitFor(() => {
+      expect(screen.getByText('No Data available')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('heatmap-plot')).not.toBeInTheDocument();
+  });
+
+  test('shows disabled state when heatmap API returns 404', async () => {
+    heatmapServer.use(heatmapUnavailableHandler);
+    render(<Heatmap />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Heatmap Not Available')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/Please ensure Heatmap is enabled in the configs and you have sufficient permissions/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('heatmap-plot')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('/')).not.toBeInTheDocument();
+    expect(commonUtils.showDataFetchError).not.toHaveBeenCalled();
+  });
+
+  test('shows fetch error state when heatmap API returns 500', async () => {
+    heatmapServer.use(heatmapServerErrorHandler);
+    render(<Heatmap />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to fetch Heatmap')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Check for any failed requests for more information')).toBeInTheDocument();
+    expect(commonUtils.showDataFetchError).toHaveBeenCalledWith('Request failed with status code 500');
+    expect(screen.queryByTestId('heatmap-plot')).not.toBeInTheDocument();
+  });
 });

@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
@@ -103,7 +104,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
-import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -260,11 +260,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           StringUtils.endsWith(keyPath, "/")
       ) {
         context.setAction(S3GAction.CREATE_DIRECTORY);
-        if (STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(getHeaders().getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256))) {
-          S3ChunkInputStreamInfo info = getS3ChunkInputStreamInfo(body, length, amzDecodedLength, keyPath);
+        if (STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(amzContentSha256)
+            || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256)) {
+          // No key is opened for a directory: verify trailer framing and checksum without a chunk signing key.
+          S3ChunkInputStreamInfo info = getS3ChunkInputStreamInfo(body, length, amzDecodedLength, keyPath, false);
           multiDigestInputStream = info.getMultiDigestInputStream();
           validateContentLength(info.getEffectiveLength(), 0, keyPath).run();
-          ((UnsignedChunksInputStream) multiDigestInputStream.getWrappedStream()).verifyComplete();
+          S3ObjectWriteGuard.verifyChunksComplete(multiDigestInputStream);
         }
         getClientProtocol()
             .createDirectory(volume.getName(), bucketName, keyPath);
@@ -834,6 +836,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     } catch (OMException ex) {
       auditWriteFailure(context.getAction(), ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
+      if (ex.getResult() == ResultCodes.NOT_A_FILE) {
+        // FSO rejects a multipart file whose key is an existing directory.
+        // Match PutObject: this is a client path error, not an internal failure.
+        OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
+        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+            "when calling the PutObject/MPU PartUpload operation: " +
+            OmConfig.Keys.ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
+            " considered as Unix Paths. Path has Violated FS Semantics " +
+            "which caused put operation to fail.");
+        throw os3Exception;
+      }
       throw newError(bucket, key, ex);
     } catch (Exception ex) {
       auditWriteFailure(context.getAction(), ex);
