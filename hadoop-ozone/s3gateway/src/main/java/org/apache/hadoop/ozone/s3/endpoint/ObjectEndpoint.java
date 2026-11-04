@@ -929,8 +929,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: " +
             OmConfig.Keys.ENABLE_FILESYSTEM_PATHS + " is enabled Keys are " +
-            "considered as Unix Paths. A directory already exists with a " +
-            "given KeyName caused failure for MPU");
+            "considered as Unix Paths. Path has Violated FS Semantics " +
+            "which caused failure for MPU");
         throw os3Exception;
       } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
           || ex.getResult() == ResultCodes.ETAG_MISMATCH
