@@ -2684,10 +2684,12 @@ message RevokeSTSTokenResponse {
 
 /**
  This will contain a list of originalAccessKeyIds whose revocation entries should be removed from
- the s3RevokedStsTokenTable.
+ the s3RevokedStsTokenTable. An entry is deleted only if its current cutoff is older than
+ purgeBeforeMillis. Requests without purgeBeforeMillis delete all listed entries.
 */
 message DeleteRevokedSTSTokensRequest {
   repeated string originalAccessKeyId = 1;
+  optional uint64 purgeBeforeMillis = 2;
 }
 
 message DeleteRevokedSTSTokensResponse {
