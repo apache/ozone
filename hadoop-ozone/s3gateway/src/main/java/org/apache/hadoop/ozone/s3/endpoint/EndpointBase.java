@@ -511,8 +511,10 @@ public abstract class EndpointBase {
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
       String metadataKey = entry.getKey();
-      // System ETag / Content-Type are returned via their own response header.
-      if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
+      // System metadata is not user metadata; only remapped user values are rebuilt below.
+      if (RESERVED_METADATA_KEYS.containsKey(metadataKey)
+          || (metadataKey.startsWith(RESERVED_USER_METADATA_KEY_PREFIX)
+              && !REBUILT_RESERVED_KEYS.containsKey(metadataKey))) {
         continue;
       }
       // Rebuild a remapped user value (e.g. ozone-s3-internal-content-type -> content-type).
