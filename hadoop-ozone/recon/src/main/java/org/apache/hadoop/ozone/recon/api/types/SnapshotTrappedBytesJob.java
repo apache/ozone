@@ -27,16 +27,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
  */
 public class SnapshotTrappedBytesJob {
 
-  /**
-   * Status of a snapshot-trapped bytes job.
-   */
-  public enum JobStatus {
-    QUEUED,
-    RUNNING,
-    COMPLETED,
-    FAILED
-  }
-
   @JsonProperty("jobId")
   private final String jobId;
   @JsonProperty("volumeName")
@@ -120,6 +110,16 @@ public class SnapshotTrappedBytesJob {
     errorMessage = message;
     completedAt = System.currentTimeMillis();
     status = JobStatus.FAILED;
+  }
+
+  /**
+   * Status of a snapshot-trapped bytes job.
+   */
+  public enum JobStatus {
+    QUEUED,
+    RUNNING,
+    COMPLETED,
+    FAILED
   }
 
   /**
