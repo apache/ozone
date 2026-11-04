@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -26,10 +27,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor.IQueueMetrics;
@@ -47,9 +50,12 @@ public class ContainerReportQueue
   /* ordering queue provides ordering of execution in fair manner
    * i.e. report execution from multiple datanode will be executed in same
    * order as added to queue.
+   * Guarded by lock, like dataMap: a concurrent queue would only add its own locking to every operation.
+   * take() and poll(timeout) wait on notEmpty, and adding to the ordering queue signals it.
    */
-  private final LinkedBlockingQueue<String> orderingQueue
-      = new LinkedBlockingQueue<>();
+  private final Queue<String> orderingQueue = new ArrayDeque<>();
+  private final ReentrantLock lock = new ReentrantLock();
+  private final Condition notEmpty = lock.newCondition();
   private final Map<String, List<ContainerReport>> dataMap = new HashMap<>();
 
   private int capacity = 0;
@@ -66,7 +72,8 @@ public class ContainerReportQueue
 
   private boolean addContainerReport(ContainerReport val) {
     String uuidString = val.getDatanodeDetails().getUuidString();
-    synchronized (this) {
+    lock.lock();
+    try {
       // 1. check if no previous report available, else add the report
       if (!dataMap.containsKey(uuidString)) {
         addReport(val, uuidString);
@@ -95,15 +102,18 @@ public class ContainerReportQueue
       dataList.add(val);
       ++capacity;
       if (!isReportRemoved) {
-        orderingQueue.add(uuidString);
+        addToOrderingQueue(uuidString);
       }
+    } finally {
+      lock.unlock();
     }
     return true;
   }
 
   private boolean addIncrementalReport(ContainerReport val) {
     String uuidString = val.getDatanodeDetails().getUuidString();
-    synchronized (this) {
+    lock.lock();
+    try {
       // 1. check if no previous report available, else add the report
       if (!dataMap.containsKey(uuidString)) {
         addReport(val, uuidString);
@@ -117,7 +127,9 @@ public class ContainerReportQueue
       }
       dataList.add(val);
       ++capacity;
-      orderingQueue.add(uuidString);
+      addToOrderingQueue(uuidString);
+    } finally {
+      lock.unlock();
     }
     return true;
   }
@@ -127,7 +139,13 @@ public class ContainerReportQueue
     dataList.add(val);
     ++capacity;
     dataMap.put(uuidString, dataList);
+    addToOrderingQueue(uuidString);
+  }
+
+  private void addToOrderingQueue(String uuidString) {
     orderingQueue.add(uuidString);
+    // one more report is available, for one waiting take() or poll(timeout)
+    notEmpty.signal();
   }
 
   private ContainerReport removeAndGet(String uuid) {
@@ -160,7 +178,8 @@ public class ContainerReportQueue
   }
 
   public boolean addValue(@Nonnull ContainerReport value) {
-    synchronized (this) {
+    lock.lock();
+    try {
       if (remainingCapacity() == 0) {
         return false;
       }
@@ -173,58 +192,78 @@ public class ContainerReportQueue
         return addIncrementalReport(value);
       }
       return false;
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public boolean add(@Nonnull ContainerReport value) {
     Objects.requireNonNull(value);
-    synchronized (this) {
+    lock.lock();
+    try {
       if (remainingCapacity() == 0) {
         throw new IllegalStateException("capacity not available");
       }
 
       return addValue(value);
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public boolean offer(@Nonnull ContainerReport value) {
     Objects.requireNonNull(value);
-    synchronized (this) {
+    lock.lock();
+    try {
       return addValue(value);
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public ContainerReport remove() {
-    synchronized (this) {
+    lock.lock();
+    try {
       String uuid = orderingQueue.remove();
       return removeAndGet(uuid);
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public ContainerReport poll() {
-    synchronized (this) {
+    lock.lock();
+    try {
       String uuid = orderingQueue.poll();
       return removeAndGet(uuid);
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public ContainerReport element() {
-    synchronized (this) {
+    lock.lock();
+    try {
       String uuid = orderingQueue.element();
       return getReport(uuid);
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public ContainerReport peek() {
-    synchronized (this) {
+    lock.lock();
+    try {
       String uuid = orderingQueue.peek();
       return getReport(uuid);
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -256,9 +295,14 @@ public class ContainerReportQueue
   @Nullable
   @Override
   public ContainerReport take() throws InterruptedException {
-    String uuid = orderingQueue.take();
-    synchronized (this) {
-      return removeAndGet(uuid);
+    lock.lockInterruptibly();
+    try {
+      while (orderingQueue.isEmpty()) {
+        notEmpty.await();
+      }
+      return removeAndGet(orderingQueue.poll());
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -266,16 +310,28 @@ public class ContainerReportQueue
   @Override
   public ContainerReport poll(long timeout, @Nonnull TimeUnit unit)
       throws InterruptedException {
-    String uuid = orderingQueue.poll(timeout, unit);
-    synchronized (this) {
-      return removeAndGet(uuid);
+    long remaining = unit.toNanos(timeout);
+    lock.lockInterruptibly();
+    try {
+      while (orderingQueue.isEmpty()) {
+        if (remaining <= 0) {
+          return null;
+        }
+        remaining = notEmpty.awaitNanos(remaining);
+      }
+      return removeAndGet(orderingQueue.poll());
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public int remainingCapacity() {
-    synchronized (this) {
+    lock.lock();
+    try {
       return maxCapacity - capacity;
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -311,23 +367,34 @@ public class ContainerReportQueue
 
   @Override
   public void clear() {
-    synchronized (this) {
+    lock.lock();
+    try {
       orderingQueue.clear();
       dataMap.clear();
       capacity = 0;
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public int size() {
-    synchronized (this) {
+    lock.lock();
+    try {
       return capacity;
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
   public boolean isEmpty() {
-    return orderingQueue.isEmpty();
+    lock.lock();
+    try {
+      return orderingQueue.isEmpty();
+    } finally {
+      lock.unlock();
+    }
   }
 
   @Override
