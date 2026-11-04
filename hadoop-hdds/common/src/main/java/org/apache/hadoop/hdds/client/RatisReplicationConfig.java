@@ -17,54 +17,25 @@
 
 package org.apache.hadoop.hdds.client;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Objects;
+import java.util.Map;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
 /**
- * Replication configuration for Ratis replication.
+ * {@link ReplicationConfig} for {@link ReplicationType#RATIS}.
  */
 @Immutable
-public final class RatisReplicationConfig
-    implements ReplicatedReplicationConfig {
+public final class RatisReplicationConfig extends NCopyReplicationConfig {
+  private static final Map<ReplicationFactor, RatisReplicationConfig> CONFIGS = newMap(RatisReplicationConfig::new);
 
-  private final ReplicationFactor replicationFactor;
-  private static final ReplicationType REPLICATION_TYPE = ReplicationType.RATIS;
-
-  private static final RatisReplicationConfig RATIS_ONE_CONFIG =
-      new RatisReplicationConfig(ONE);
-
-  private static final RatisReplicationConfig RATIS_THREE_CONFIG =
-      new RatisReplicationConfig(THREE);
-
-  /**
-   * Get an instance of Ratis Replication Config with the requested factor.
-   * The same static instance will be returned for all requests for the same
-   * factor.
-   * @param factor Replication Factor requested
-   * @return RatisReplicationConfig object of the requested factor
-   */
+  /** @return the conf with the given factor. */
   public static RatisReplicationConfig getInstance(ReplicationFactor factor) {
-    if (factor == ONE) {
-      return RATIS_ONE_CONFIG;
-    } else if (factor == THREE) {
-      return RATIS_THREE_CONFIG;
-    }
-    return new RatisReplicationConfig(factor);
+    return CONFIGS.get(factor);
   }
 
-  /**
-   * Use the static getInstance method rather than the private constructor.
-   * @param replicationFactor
-   */
   private RatisReplicationConfig(ReplicationFactor replicationFactor) {
-    this.replicationFactor = replicationFactor;
+    super(ReplicationType.RATIS, replicationFactor);
   }
 
   public static boolean hasFactor(ReplicationConfig replicationConfig,
@@ -74,59 +45,5 @@ public final class RatisReplicationConfig
           .equals(factor);
     }
     return false;
-  }
-
-  @Override
-  @JsonProperty("replicationType")
-  public ReplicationType getReplicationType() {
-    return REPLICATION_TYPE;
-  }
-
-  @Override
-  public int getRequiredNodes() {
-    return replicationFactor.getNumber();
-  }
-
-  @Override
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
-  }
-
-  @Override
-  @JsonIgnore
-  public String getReplication() {
-    return String.valueOf(replicationFactor);
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-    RatisReplicationConfig that = (RatisReplicationConfig) o;
-    return replicationFactor == that.replicationFactor;
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(replicationFactor);
-  }
-
-  @Override
-  public String toString() {
-    return REPLICATION_TYPE.name() + "/" + replicationFactor;
-  }
-
-  @Override
-  public String configFormat() {
-    return toString();
-  }
-
-  @Override
-  public int getMinimumNodes() {
-    return 1;
   }
 }
