@@ -50,6 +50,19 @@ public class ReplicationConfigValidator {
 
   private Pattern compiledValidationPattern;
 
+  /** For {@link ConfigurationSource#getObject}, which injects the pattern and then calls {@link #init()}. */
+  public ReplicationConfigValidator() {
+  }
+
+  /**
+   * A validator for the given pattern, for {@link #get}. It is shared once published, so it must never be changed:
+   * nothing calls {@link #setValidationPattern} or {@link #disableValidation} on it.
+   */
+  private ReplicationConfigValidator(String pattern) {
+    this.validationPattern = pattern;
+    compilePattern();
+  }
+
   /**
    * Returns a validator for the pattern configured in {@code conf}. {@code conf.getObject(...)} creates a validator
    * by reflection and compiles its pattern on every call; this reuses the one built for the same pattern, and still
@@ -60,8 +73,7 @@ public class ReplicationConfigValidator {
     final String pattern = conf.get(ALLOWED_CONFIGS_KEY, ALLOWED_CONFIGS_DEFAULT);
     ReplicationConfigValidator validator = cached;
     if (validator == null || !Objects.equals(validator.validationPattern, pattern)) {
-      validator = new ReplicationConfigValidator();
-      validator.setValidationPattern(pattern);
+      validator = new ReplicationConfigValidator(pattern);
       cached = validator;
     }
     return validator;
