@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static org.apache.hadoop.hdds.security.exception.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -40,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ipc_.Server.Call;
@@ -311,6 +313,34 @@ public class TestS3GetSecretRequest {
     // they should not be the same.
     assertNotEquals(originalS3Secret,
         s3GetSecretResponse.getS3SecretValue().getAwsSecret());
+  }
+
+  @Test
+  public void testGetSecretStringOfRevokedSecret() throws IOException {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    S3Secret secret = processSuccessSecretRequest(USER_ALICE, 1, true);
+    S3SecretManager secretManager = ozoneManager.getS3SecretManager();
+    assertEquals(secret.getAwsSecret(), secretManager.getSecretString(USER_ALICE));
+    // Keep the persisted secret until the revoke is flushed.
+    omMetadataManager.storeSecret(USER_ALICE, S3SecretValue.of(USER_ALICE, secret.getAwsSecret()));
+
+    OMRequest revokeRequest = OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeS3Secret)
+        .setRevokeS3SecretRequest(OzoneManagerProtocolProtos.RevokeS3SecretRequest.newBuilder()
+            .setKerberosID(USER_ALICE))
+        .build();
+    OMClientRequest request = new S3RevokeSecretRequest(revokeRequest);
+    request = new S3RevokeSecretRequest(request.preExecute(ozoneManager));
+    OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 2);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+
+    assertTrue(secretManager.cache().get(USER_ALICE).isDeleted());
+    assertNotNull(omMetadataManager.getSecret(USER_ALICE));
+    assertNull(secretManager.getSecret(USER_ALICE));
+    OzoneSecurityException exception = assertThrows(OzoneSecurityException.class,
+        () -> secretManager.getSecretString(USER_ALICE));
+    assertEquals(S3_SECRET_NOT_FOUND, exception.getResult());
   }
 
   @Test
