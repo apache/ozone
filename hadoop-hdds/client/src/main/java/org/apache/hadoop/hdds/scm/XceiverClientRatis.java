@@ -339,6 +339,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         replyFuture.completeExceptionally(e);
       }
       return null;
+    }).exceptionally(t -> {
+      // anything thrown by the handler above would otherwise leave replyFuture incomplete
+      replyFuture.completeExceptionally(t);
+      return null;
     });
     return replyFuture;
   }

@@ -44,6 +44,7 @@ import org.apache.ratis.client.api.AsyncApi;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
+import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.rpc.RpcType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,8 +92,20 @@ class TestXceiverClientRatis {
     CompletableFuture<XceiverClientReply> reply = client.watchForCommit(INDEX);
     allCommitted.completeExceptionally(new AlreadyClosedException("client is closed"));
 
-    assertThrows(ExecutionException.class, () -> reply.get(10, TimeUnit.SECONDS));
+    ExecutionException e = assertThrows(ExecutionException.class, () -> reply.get(10, TimeUnit.SECONDS));
+    assertThat(e.getCause()).isInstanceOf(AlreadyClosedException.class);
     verify(async, never()).watch(anyLong(), eq(ReplicationLevel.MAJORITY_COMMITTED));
+  }
+
+  /** The future completes even when handling the failed ALL_COMMITTED watch throws. */
+  @Test
+  void watchCompletesWhenFailureHandlingThrows() {
+    CompletableFuture<XceiverClientReply> reply = client.watchForCommit(INDEX);
+    // no commit infos: handleFailedAllCommit throws NullPointerException
+    allCommitted.completeExceptionally(new NotReplicatedException(1, ReplicationLevel.ALL_COMMITTED, INDEX));
+
+    ExecutionException e = assertThrows(ExecutionException.class, () -> reply.get(10, TimeUnit.SECONDS));
+    assertThat(e.getCause()).isInstanceOf(NullPointerException.class);
   }
 
   /** Unchanged: when ALL_COMMITTED fails on an open client, a MAJORITY_COMMITTED watch is used instead. */
