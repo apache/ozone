@@ -209,6 +209,38 @@ export type DeletedDirReponse = {
   status: string;
 }
 
+//Bucket level pending deletion
+export type BucketPendingDeletion = {
+  volumeName: string;
+  bucketName: string;
+  pendingDeletionKeys: number;
+  pendingDeletionKeyBytes: number;
+  pendingDeletionDirs: number;
+  pendingDeletionDirBytes: number;
+  totalPendingDeletionBytes: number;
+}
+
+export type SnapshotTrappedBytesJobStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export type SnapshotTrappedBytesJob = {
+  jobId: string;
+  volumeName: string;
+  bucketName: string;
+  status: SnapshotTrappedBytesJobStatus;
+  submittedAt: number;
+  startedAt: number;
+  completedAt: number;
+  errorMessage: string | null;
+  result: {
+    snapshotTrappedBytes: number;
+    purgeableBytes: number;
+    snapshotTrappedKeys: number;
+    purgeableKeys: number;
+    snapshotTrappedDirs: number;
+    purgeableDirs: number;
+  } | null;
+}
+
 export type ExpandedRow = {
   [key: number]: ExpandedRowState;
 }
