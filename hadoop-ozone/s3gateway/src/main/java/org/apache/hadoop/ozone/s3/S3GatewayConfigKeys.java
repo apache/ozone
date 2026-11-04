@@ -104,7 +104,7 @@ public final class S3GatewayConfigKeys {
 
   /**
    * Configuration key that makes an explicit {@code x-amz-storage-class: STANDARD} use the {@code ozone.replication}
-   * setting, when set, instead of {@link org.apache.hadoop.ozone.s3.util.S3StorageType#STANDARD}.
+   * setting, when set, instead of RATIS/THREE.
    */
   public static final String OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY =
       "ozone.s3g.standard.storage-class.use-client-default";

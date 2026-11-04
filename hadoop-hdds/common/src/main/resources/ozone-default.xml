@@ -2145,7 +2145,9 @@
     <description>
       When true, a request with x-amz-storage-class STANDARD uses ozone.replication and
       ozone.replication.type, if ozone.replication is set, instead of RATIS/THREE.
+      Other storage classes and storage policies are unaffected.
       The ozone local runtime sets it to true.
+      S3 Gateway reads this setting when it starts. Restart S3 Gateway after changing it.
     </description>
   </property>
 
