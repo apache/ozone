@@ -407,6 +407,9 @@ public final class TracingUtil {
     if (!tracingEnabled && !applicationAware) {
       return delegate;
     }
+    if (!hasUsableTracer()) {
+      return delegate;
+    }
     return newProxy(delegate, itf, delegate.getClass().getSimpleName(), spanKind);
   }
 

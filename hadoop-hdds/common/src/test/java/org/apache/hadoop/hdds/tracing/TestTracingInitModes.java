@@ -194,6 +194,18 @@ public class TestTracingInitModes {
     }
   }
 
+  /** Failed init leaves the flags set but no tracer: skip the proxy instead of emitting noop spans. */
+  @Test
+  public void testSpanKindProxySkippedWhenInitFailed() {
+    MutableConfigurationSource conf = config(false, true);
+    conf.set("ozone.tracing.endpoint", "not a valid endpoint");
+    TracingUtil.initTracing("init-failure", conf);
+    assertFalse(TracingUtil.isTracingActive(conf), "Failed init must not report tracing as active");
+
+    ServiceImpl delegate = new ServiceImpl();
+    assertSame(delegate, TracingUtil.createProxy(delegate, Service.class, SpanKind.INTERNAL));
+  }
+
   /** Both flags false: tracing is off. */
   @Test
   public void testOffModeIsInactive() {
