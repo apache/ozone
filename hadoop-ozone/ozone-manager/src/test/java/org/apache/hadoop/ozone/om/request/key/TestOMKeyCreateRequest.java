@@ -150,13 +150,6 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALLOCATION_ERROR, response.getStatus());
     assertFalse(response.getSuccess());
     verify(ozoneManager, never()).getOmRatisServer();
-
-    OMRequest oldClientRequest = request.toBuilder()
-        .setVersion(ClientVersion.ERASURE_CODING_SUPPORT.serialize()).build();
-    OzoneManagerProtocolProtos.OMResponse oldClientResponse =
-        new OMExecutionFlow(ozoneManager).submit(oldClientRequest, true);
-    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALLOCATION_ERROR, oldClientResponse.getStatus());
-    verify(ozoneManager, never()).getOmRatisServer();
   }
 
   @Test

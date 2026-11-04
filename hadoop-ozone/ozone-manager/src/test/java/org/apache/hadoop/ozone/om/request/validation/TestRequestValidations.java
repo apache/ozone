@@ -87,7 +87,7 @@ public class TestRequestValidations {
 
   @ParameterizedTest
   @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
-  public void testVersionThreeCreateKeyUsesActualBucketLayoutValidation(BucketLayout layout) throws Exception {
+  public void testCreateKeyBucketLayoutValidationForCurrentAndUnsupportedClients(BucketLayout layout) throws Exception {
     ValidationContext ctx = mock(ValidationContext.class);
     OMVersionManager versionManager = aFinalizedVersionManager();
     when(ctx.versionManager()).thenReturn(versionManager);
@@ -97,14 +97,13 @@ public class TestRequestValidations {
         .withinContext(ctx)
         .load();
     OMRequest request = OMRequest.newBuilder()
-        .setVersion(ClientVersion.BUCKET_LAYOUT_SUPPORT.serialize())
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setCmdType(CreateKey)
         .setClientId("TestClient")
         .setCreateKeyRequest(CreateKeyRequest.newBuilder()
             .setKeyArgs(KeyArgs.newBuilder().setVolumeName("vol").setBucketName("bucket").setKeyName("key")))
         .build();
 
-    assertEquals(3, ClientVersion.CURRENT.serialize());
     assertSame(request, validations.validateRequest(request));
 
     OMException error = assertThrows(OMException.class,
