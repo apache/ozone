@@ -487,6 +487,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             // Track task delta processing failure
             taskMetrics.incrTaskDeltaProcessingFailures(taskName);
 
+            // Retry it like a task that returned a failed result.
+            failedTasks.add(new ReconOmTask.TaskResult.Builder().setTaskName(taskName).build());
             ReconTaskStatusUpdater taskStatusUpdater =
                 taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
             taskStatusUpdater.setLastTaskRunStatus(-1);
@@ -554,7 +556,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     }
 
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
-    List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
+    List<ReconOmTask.TaskResult> failedTasks = Collections.synchronizedList(new ArrayList<>());
 
     for (Map.Entry<String, ReconOmTask> taskEntry : reconOmTasks.entrySet()) {
       ReconOmTask task = taskEntry.getValue();
@@ -566,7 +568,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     processTasks(tasks, events, failedTasks);
 
     // Handle failed tasks with retry logic
-    List<ReconOmTask.TaskResult> retryFailedTasks = new ArrayList<>();
+    List<ReconOmTask.TaskResult> retryFailedTasks = Collections.synchronizedList(new ArrayList<>());
     if (!failedTasks.isEmpty()) {
       LOG.warn("Some tasks failed while processing buffered events, retrying...");
       tasks.clear();
