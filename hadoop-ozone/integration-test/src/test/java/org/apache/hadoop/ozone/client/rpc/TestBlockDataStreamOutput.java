@@ -188,7 +188,7 @@ public class TestBlockDataStreamOutput {
   /** Whether PutBlock is committed through the data stream for this test cluster (config plus DN version). */
   private static boolean isStreamPutBlockWithoutRaftActive(OzoneClientConfig config) {
     return config.isDatastreamPutBlockWithoutRaftEnabled()
-        && HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT.isSupportedBy(DN_OLD_VERSION);
+        && HDDSVersion.CHAINED_REPLICATION.isSupportedBy(DN_OLD_VERSION);
   }
 
   static OzoneClient newClient(OzoneConfiguration conf,

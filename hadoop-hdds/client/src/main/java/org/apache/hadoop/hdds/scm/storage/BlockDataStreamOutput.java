@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import static org.apache.hadoop.hdds.HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT;
+import static org.apache.hadoop.hdds.HDDSVersion.CHAINED_REPLICATION;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
 import com.google.common.base.Preconditions;
@@ -207,9 +207,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   private static boolean allDatanodesSupportStreamPutBlock(Pipeline pipeline) {
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (!STREAM_PUTBLOCK_WITHOUT_RAFT.isSupportedBy(dn.getCurrentVersion())) {
+      if (!CHAINED_REPLICATION.isSupportedBy(dn.getCurrentVersion())) {
         LOG.debug("Datanode {} at version {} does not support {}; PutBlock goes through Raft for pipeline {}",
-            dn, dn.getCurrentVersion(), STREAM_PUTBLOCK_WITHOUT_RAFT, pipeline.getId());
+            dn, dn.getCurrentVersion(), CHAINED_REPLICATION, pipeline.getId());
         return false;
       }
     }
