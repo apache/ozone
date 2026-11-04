@@ -52,7 +52,7 @@ import org.junit.jupiter.api.io.TempDir;
  * that is larger than the software version, and that it finalizes on startup
  * when the DB records a higher apparent version than the VERSION file.
  */
-public class TestScmStartupInvalidApparentVersion {
+public class TestScmStartupWithDifferentApparentVersions {
 
   @TempDir
   private Path folder;
@@ -99,7 +99,7 @@ public class TestScmStartupInvalidApparentVersion {
   /**
    * The VERSION file is ahead of the DB. This can happen if finalization wrote the VERSION file (inside Ratis
    * applyTransaction) but the process crashed before the Ratis transaction buffer was flushed to RocksDB.
-   * Ratis log replay should correct this, but finalizeFromSnapshotIfRequired also updates the DB as a safety net.
+   * Ratis log replay should correct this, but finalizeFromDBIfRequired also updates the DB as a safety net.
    */
   @Test
   public void testStartupUpdatesDBWhenVersionFileAheadOfDB() throws Exception {
@@ -111,7 +111,7 @@ public class TestScmStartupInvalidApparentVersion {
       scm.stop();
       scm.join();
 
-      // On restart, finalizeFromSnapshotIfRequired should detect VERSION file > DB and update the DB.
+      // On restart, finalizeFromDBIfRequired should detect VERSION file > DB and update the DB.
       scm = HddsTestUtils.getScm(scm.getConfiguration(), new SCMConfigurator());
       // finalizeFromDBIfRequired is called by scm.start(), but calling that here makes the tests slow and we would
       // need more setup for safemode etc. As this test is unit testing finalizeFromDBIfRequired we call it directly
