@@ -422,14 +422,14 @@ class TestS3StorageClass {
     for (String header : Arrays.asList("INVALID", "standard", " \t ")) {
       OS3Exception exception = assertThrows(OS3Exception.class,
           () -> resolver.resolveReplicationConfig(header, null, EC_6_3, RATIS_ONE));
-      assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
-      assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getHttpCode(), exception.getHttpCode());
+      assertThat(exception.getCode()).isEqualTo(S3ErrorTable.INVALID_STORAGE_CLASS.getCode());
+      assertThat(exception.getHttpCode()).isEqualTo(S3ErrorTable.INVALID_STORAGE_CLASS.getHttpCode());
     }
     for (String storageClass : Arrays.asList(S3_STORAGE_CLASS_STANDARD_IA, S3_STORAGE_CLASS_DEEP_ARCHIVE)) {
       OS3Exception exception = assertThrows(OS3Exception.class,
           () -> resolver.resolveReplicationConfig(storageClass, "INVALID", EC_6_3, EC_3_2));
-      assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
-      assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getHttpCode(), exception.getHttpCode());
+      assertThat(exception.getCode()).isEqualTo(S3ErrorTable.INVALID_STORAGE_CLASS.getCode());
+      assertThat(exception.getHttpCode()).isEqualTo(S3ErrorTable.INVALID_STORAGE_CLASS.getHttpCode());
     }
   }
 
