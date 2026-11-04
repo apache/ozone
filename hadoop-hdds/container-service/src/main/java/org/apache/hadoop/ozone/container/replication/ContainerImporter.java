@@ -125,10 +125,11 @@ public class ContainerImporter {
       }
       ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
-      // The descriptor carries the source volume's storage type. Record the
-      // type of the volume actually chosen here, so the replica reports where
-      // it really lives rather than where its source lived.
-      containerData.setStorageType(targetVolume.getStorageType());
+      // Preserve the replica's recorded type, which can differ from a relabelled volume's type.
+      // Initialise missing legacy metadata from the destination volume; reports also expose the volume type separately.
+      if (containerData.getStorageType() == null) {
+        containerData.setStorageType(targetVolume.getStorageType());
+      }
       // lastDataScanTime should be cleared for an imported container
       containerData.setDataScanTimestamp(null);
 
@@ -157,10 +158,6 @@ public class ContainerImporter {
       LOG.error("Got exception while deleting temporary container file: "
           + tarFilePath.toAbsolutePath(), ex);
     }
-  }
-
-  HddsVolume chooseNextVolume(long spaceToReserve) throws IOException {
-    return chooseNextVolume(spaceToReserve, null);
   }
 
   /**

@@ -188,9 +188,20 @@ class TestGrpcReplicationService {
   }
 
   @ParameterizedTest
-  @CsvSource({"SSD,DISK,SSD", "DISK,SSD,DISK", ",SSD,SSD"})
-  void testUploadStoresRequestedVolumeType(StorageType requestedType, StorageType defaultType,
-      StorageType expectedType) throws Exception {
+  @CsvSource({
+      "SSD, SSD, DISK, SSD, SSD",
+      "DISK, DISK, SSD, DISK, DISK",
+      ", SSD, DISK, SSD, SSD",
+      ", , SSD, SSD, SSD",
+      "SSD, , DISK, DISK, SSD",
+      "SSD, DISK, SSD, DISK, SSD"
+  })
+  void testUploadPreservesRecordedTypeOrInitializesLegacyType(StorageType recordedType, StorageType requestedType,
+      StorageType defaultType, StorageType expectedVolumeType, StorageType expectedRecordedType) throws Exception {
+    // Emulate a legacy descriptor or a recorded type that can differ from the volume's current label.
+    Container<?> sourceContainer = containerController.getContainer(CONTAINER_ID);
+    sourceContainer.getContainerData().setStorageType(recordedType);
+    ContainerDataYaml.createContainerFile(sourceContainer.getContainerData(), sourceContainer.getContainerFile());
     OzoneConfiguration targetConf = new OzoneConfiguration(conf);
     targetConf.set(HDDS_DATANODE_DEFAULT_STORAGE_TYPE, defaultType.name());
     targetConf.setStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
@@ -231,9 +242,10 @@ class TestGrpcReplicationService {
       assertEquals(Status.DONE, task.getStatus());
       Container<?> imported = targetContainers.getContainer(CONTAINER_ID);
       assertNotNull(imported);
-      assertEquals(expectedType, imported.getContainerData().getVolume().getStorageType());
-      assertEquals(expectedType, imported.getContainerData().getStorageType());
-      assertEquals(expectedType, ContainerDataYaml.readContainerFile(imported.getContainerFile()).getStorageType());
+      assertEquals(expectedVolumeType, imported.getContainerData().getVolume().getStorageType());
+      assertEquals(expectedRecordedType, imported.getContainerData().getStorageType());
+      assertEquals(expectedRecordedType,
+          ContainerDataYaml.readContainerFile(imported.getContainerFile()).getStorageType());
       for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(targetVolumes.getVolumesList())) {
         assertEquals(0, volume.getCommittedBytes());
       }

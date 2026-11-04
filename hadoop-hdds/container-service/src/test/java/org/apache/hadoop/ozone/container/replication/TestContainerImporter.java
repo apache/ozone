@@ -78,6 +78,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.MockedStatic;
 
 /**
@@ -259,7 +261,7 @@ class TestContainerImporter {
     ContainerImporter importer = new ContainerImporter(conf, containerSet,
         controllerMock, volumeSet, policy);
 
-    assertEquals(expectedVolume, importer.chooseNextVolume(spaceToReserve));
+    assertEquals(expectedVolume, importer.chooseNextVolume(spaceToReserve, null));
   }
 
   /**
@@ -280,6 +282,23 @@ class TestContainerImporter {
         importer.chooseNextVolume(spaceToReserve, StorageType.SSD));
     verify(policy).chooseVolume(anyList(), eq(spaceToReserve),
         eq(StorageType.SSD));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"SSD, SSD, SSD", "SSD, DISK, SSD", "DISK, SSD, DISK", ", SSD, SSD", ", DISK, DISK"})
+  void testImportPreservesRecordedTypeOrInitializesLegacyType(StorageType recordedType, StorageType volumeType,
+      StorageType expectedType) throws Exception {
+    containerData.setStorageType(recordedType);
+    HddsVolume targetVolume = mock(HddsVolume.class);
+    when(targetVolume.getStorageType()).thenReturn(volumeType);
+    File tarFile = containerTarFile(containerId, containerData);
+
+    containerImporter.importContainer(containerId, tarFile.toPath(), targetVolume, NO_COMPRESSION);
+
+    assertEquals(expectedType, containerData.getStorageType());
+    assertEquals(targetVolume, containerData.getVolume());
+    assertThat(tarFile).doesNotExist();
+    assertThat(containerImporter.getImportContainerProgress()).isEmpty();
   }
 
   private File containerTarFile(long id, ContainerData data) throws IOException {
