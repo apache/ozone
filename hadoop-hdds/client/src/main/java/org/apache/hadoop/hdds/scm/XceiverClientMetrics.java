@@ -22,6 +22,7 @@ import java.util.EnumMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -80,10 +81,11 @@ public class XceiverClientMetrics implements MetricsSource {
   }
 
   public static XceiverClientMetrics create() {
-    DefaultMetricsSystem.initialize(SOURCE_NAME);
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "Storage Container Client Metrics",
-        new XceiverClientMetrics());
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("XceiverClientMetrics.create")) {
+      DefaultMetricsSystem.initialize(SOURCE_NAME);
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      return ms.register(SOURCE_NAME, "Storage Container Client Metrics", new XceiverClientMetrics());
+    }
   }
 
   public void incrPendingContainerOpsMetrics(ContainerProtos.Type type) {

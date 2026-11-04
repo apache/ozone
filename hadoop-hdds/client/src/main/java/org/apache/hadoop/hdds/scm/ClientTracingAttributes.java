@@ -50,6 +50,8 @@ public final class ClientTracingAttributes {
 
   public static final String HDDS_CHUNK_LENGTH = "hdds.chunk.length";
 
+  public static final String CLIENT_BLOCK_BYTES_WRITTEN = "client.block.bytes_written";
+
   private ClientTracingAttributes() {
   }
 }

@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.AsyncApi;
@@ -85,6 +86,27 @@ class TestXceiverClientRatisTracing {
       collector.assertAttribute(span, ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID, 2L);
       collector.assertAttribute(span, ClientTracingAttributes.HDDS_CHUNK_OFFSET, 8L);
       collector.assertAttribute(span, ClientTracingAttributes.HDDS_CHUNK_LENGTH, 4L);
+    }
+  }
+
+  @Test
+  void connectSpanRecordsPipeline() throws Exception {
+    Pipeline pipeline = MockPipeline.createRatisPipeline();
+    try (TestSpanCollector collector = TestSpanCollector.install("client");
+         XceiverClientCreator creator = new XceiverClientCreator(new OzoneConfiguration())) {
+      creator.releaseClient(creator.acquireClient(pipeline), false);
+
+      collector.assertAttribute("XceiverClientRatis.connect", ClientTracingAttributes.PIPELINE_ID,
+          pipeline.getId().toString());
+    }
+  }
+
+  @Test
+  void securityConfigInitIsTraced() throws Exception {
+    try (TestSpanCollector collector = TestSpanCollector.install("client")) {
+      XceiverClientRatis.newXceiverClientRatis(MockPipeline.createRatisPipeline(), new OzoneConfiguration());
+
+      collector.assertKind("SecurityConfig.init", SpanKind.INTERNAL);
     }
   }
 

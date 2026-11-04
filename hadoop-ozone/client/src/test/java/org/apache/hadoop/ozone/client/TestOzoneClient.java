@@ -177,15 +177,24 @@ public class TestOzoneClient {
   public void testKeyWriteRecordsBytesAndBlocksOnCurrentSpan() throws IOException {
     byte[] value = "sample value".getBytes(UTF_8);
     OzoneBucket bucket = getOzoneBucket();
+    String keyName = UUID.randomUUID().toString();
 
     try (TestSpanCollector collector = TestSpanCollector.install("client")) {
       TracingUtil.executeInNewSpan("put", () -> {
-        try (OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(), value.length, ReplicationType.RATIS,
-            ONE, new HashMap<>())) {
+        try (OzoneOutputStream out = bucket.createKey(keyName, value.length, ReplicationType.RATIS, ONE,
+            new HashMap<>())) {
           out.write(value);
         }
       });
 
+      OzoneKeyLocation location = bucket.getKey(keyName).getOzoneKeyLocations().get(0);
+      collector.assertParent("BlockOutputStream.flush", "put");
+      collector.assertAttribute("BlockOutputStream.flush", ClientTracingAttributes.HDDS_CONTAINER_ID,
+          location.getContainerID());
+      collector.assertAttribute("BlockOutputStream.flush", ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          location.getLocalID());
+      collector.assertAttribute("BlockOutputStream.flush", ClientTracingAttributes.CLIENT_BLOCK_BYTES_WRITTEN,
+          value.length);
       collector.assertAttribute("put", ClientTracingAttributes.CLIENT_BYTES_WRITTEN, value.length);
       collector.assertAttribute("put", ClientTracingAttributes.CLIENT_BLOCKS_WRITTEN, 1L);
     }
