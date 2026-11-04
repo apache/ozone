@@ -98,8 +98,8 @@ public class DirectoryEntityHandler extends EntityHandler {
 
     Set<Long> subdirs = dirNSSummary.getChildDir();
 
-    duResponse.setKeySize(dirNSSummary.getSizeOfFiles());
-    long dirDataSize = duResponse.getKeySize();
+    long dirDataSize = dirNSSummary.getSizeOfFiles();
+    long directKeySize = dirDataSize;
     if (withReplica) {
       duResponse.setSizeWithReplica(dirNSSummary.getReplicatedSizeOfFiles());
     }
@@ -108,6 +108,7 @@ public class DirectoryEntityHandler extends EntityHandler {
     for (long subdirObjectId: subdirs) {
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
+      directKeySize -= subdirNSSummary.getSizeOfFiles();
       // for the subdirName we need the subdir filename, not the key name
       // Eg. /vol/bucket1/dir1/dir2,
       // key name is /dir1/dir2
@@ -138,6 +139,7 @@ public class DirectoryEntityHandler extends EntityHandler {
       diskUsage.setSize(subdirNSSummary.getSizeOfFiles());
       subdirDUData.add(diskUsage);
     }
+    duResponse.setKeySize(directKeySize);
     if (listFile || withReplica) {
       getBucketHandler().handleDirectKeys(dirObjectId, withReplica,
               listFile, subdirDUData, getNormalizedPath());

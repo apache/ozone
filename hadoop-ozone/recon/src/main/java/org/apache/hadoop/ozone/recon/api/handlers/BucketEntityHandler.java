@@ -106,15 +106,16 @@ public class BucketEntityHandler extends EntityHandler {
 
     // get object IDs for all its subdirectories
     Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
-    duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
     List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
     long bucketDataSize = bucketNSSummary.getSizeOfFiles();
+    long directKeySize = bucketDataSize;
     if (withReplica) {
       duResponse.setSizeWithReplica(bucketNSSummary.getReplicatedSizeOfFiles());
     }
     for (long subdirObjectId: bucketSubdirs) {
       NSSummary subdirNSSummary = getReconNamespaceSummaryManager()
               .getNSSummary(subdirObjectId);
+      directKeySize -= subdirNSSummary.getSizeOfFiles();
 
       // get directory's name and generate the next-level subpath.
       String dirName = subdirNSSummary.getDirName();
@@ -130,6 +131,7 @@ public class BucketEntityHandler extends EntityHandler {
       diskUsage.setSize(subdirNSSummary.getSizeOfFiles());
       dirDUData.add(diskUsage);
     }
+    duResponse.setKeySize(directKeySize);
     if (listFile || withReplica) {
       getBucketHandler().handleDirectKeys(bucketObjectId, withReplica,
           listFile, dirDUData, getNormalizedPath());
