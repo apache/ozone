@@ -35,6 +35,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -78,6 +79,7 @@ public class PutKeyHandler extends KeyHandler {
     String keyName = address.getKeyName();
 
     File dataFile = new File(fileName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.DATA_SIZE, dataFile.length());
 
     if (isVerbose()) {
       try (InputStream stream = Files.newInputStream(dataFile.toPath())) {
@@ -88,6 +90,9 @@ public class PutKeyHandler extends KeyHandler {
 
     ReplicationConfig replicationConfig =
         replication.fromParamsOrConfig(getConf());
+    if (replicationConfig != null) {
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_CONFIG, replicationConfig.toString());
+    }
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);

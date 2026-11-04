@@ -24,6 +24,8 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
@@ -67,6 +69,9 @@ public abstract class Handler extends AbstractSubcommand implements Callable<Voi
     }
 
     OzoneAddress address = getAddress();
+    addAttributeIfPresent(OzoneConsts.VOLUME, address.getVolumeName());
+    addAttributeIfPresent(OzoneConsts.BUCKET, address.getBucketName());
+    addAttributeIfPresent(OzoneConsts.KEY, address.getKeyName());
     try (OzoneClient client = createClient(address)) {
       execute(client, address);
     }
@@ -116,4 +121,9 @@ public abstract class Handler extends AbstractSubcommand implements Callable<Voi
     return conf;
   }
 
+  private static void addAttributeIfPresent(String key, String value) {
+    if (value != null && !value.isEmpty()) {
+      TracingUtil.addAttributesToCurrentSpan(key, value);
+    }
+  }
 }
