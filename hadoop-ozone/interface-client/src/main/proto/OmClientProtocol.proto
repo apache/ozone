@@ -992,6 +992,7 @@ message SnapshotDiffJobProto {
   optional SnapshotDiffResponse.SubStatus subStatus = 12;
   optional double keysProcessedPct = 13;
   optional string largestEntryKey = 14;
+  optional bool ordered = 15;
 }
 
 message OzoneObj {
@@ -2242,6 +2243,7 @@ message SubmitSnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional bool forceFullDiff = 7;
   optional bool disableNativeDiff = 8;
+  optional bool ordered = 9;
 }
 
 message CancelSnapshotDiffRequest {
@@ -2682,10 +2684,12 @@ message RevokeSTSTokenResponse {
 
 /**
  This will contain a list of originalAccessKeyIds whose revocation entries should be removed from
- the s3RevokedStsTokenTable.
+ the s3RevokedStsTokenTable. An entry is deleted only if its current cutoff is older than
+ purgeBeforeMillis. Requests without purgeBeforeMillis delete all listed entries.
 */
 message DeleteRevokedSTSTokensRequest {
   repeated string originalAccessKeyId = 1;
+  optional uint64 purgeBeforeMillis = 2;
 }
 
 message DeleteRevokedSTSTokensResponse {

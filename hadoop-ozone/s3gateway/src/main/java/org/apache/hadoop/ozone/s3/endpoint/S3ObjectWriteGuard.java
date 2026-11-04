@@ -99,7 +99,7 @@ class S3ObjectWriteGuard implements AutoCloseable {
     if (sha256Digest != null) {
       final String actualSha256 = DatatypeConverter.printHexBinary(sha256Digest.digest()).toLowerCase();
       addPreCommit(() -> {
-        if (!expectedSha256.equals(actualSha256)) {
+        if (!expectedSha256.equalsIgnoreCase(actualSha256)) {
           throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
         }
       });
@@ -147,7 +147,7 @@ class S3ObjectWriteGuard implements AutoCloseable {
     return writtenLength;
   }
 
-  private static void verifyChunksComplete(InputStream body) throws IOException {
+  static void verifyChunksComplete(InputStream body) throws IOException {
     InputStream chunks = body instanceof MultiDigestInputStream
         ? ((MultiDigestInputStream) body).getWrappedStream() : body;
     if (chunks instanceof SignedChunksInputStream) {

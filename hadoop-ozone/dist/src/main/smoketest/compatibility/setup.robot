@@ -22,5 +22,7 @@ Resource            ../ozone-lib/shell.robot
 ${EC_VERSION}         1.3.0
 ${FSO_VERSION}        1.3.0
 ${SNAPSHOT_VERSION}   1.4.0
+${SNAPSHOT_DIFF_SUBMIT_VERSION}   2.2.0
+${SNAPSHOT_DIFF_ORDERED_VERSION}   2.3.0
 ${HSYNC_VERSION}      2.0.0
 ${TESTFILE}           ${TEST_DATA_DIR}/small
