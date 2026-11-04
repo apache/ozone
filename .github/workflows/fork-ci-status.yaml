@@ -38,7 +38,8 @@ jobs:
       - uses: apache/infrastructure-actions/fork-ci@fork-ci/v1
         with:
           workflow: post-commit.yml
-          base-branches: master
+          base-branches: |
+            master
           check-name: build-branch (fork)
           recent-hours: 6
           sweep-minutes: '15'

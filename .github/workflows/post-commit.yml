@@ -14,8 +14,15 @@
 # limitations under the License.
 name: build-branch
 on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+    branches-ignore:
+      # ignore pull requests targeted at these branches,
+      # the list must match base-branches in fork-ci-status.yaml
+      - master
   push:
     branches-ignore:
+      # only master, builds on schedule
       - master
     paths-ignore:
       # ignore files/dirs irrelevant for CI
@@ -42,8 +49,8 @@ on:
       - '!.github/workflows/update-ozone-site-config-doc.yml'
   workflow_dispatch:
 concurrency:
-  group: ci-${{ case(github.repository_owner == 'apache', github.sha, github.ref_name) }}
-  cancel-in-progress: ${{ github.repository_owner != 'apache' }}
+  group: ci-${{ github.event.pull_request.number || case(github.repository == 'apache/ozone', github.sha, github.ref_name) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.repository != 'apache/ozone' }}
 permissions:
   contents: read
 jobs:
