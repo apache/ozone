@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -1626,7 +1625,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   /**
    * Get the merged and paginated list of multipart upload keys from cache and DB.
-   * Only return at most maxUploads + 1 keys (lexicographical order).
+   * Only return at most maxUploads + 1 keys, in the order of their DB keys (/volume/bucket/key/uploadId).
+   * <p>
+   * This differs from S3, which lists uploads in the order of key names. "/" joins the key name and the
+   * upload ID, but sorts after characters like "." and "-", so e.g. key "a.txt" is listed before key "a".
+   * key-marker and upload-id-marker are positions in this order as well, see below.
    */
   @Override
   public List<OmMultipartUpload> getMultipartUploadKeys(
@@ -1639,19 +1642,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
+    String seekKey = prefixKey;
+    boolean shouldSkip = false, hasUploadIdMarker = false;
     if (StringUtils.isNotBlank(keyMarker)) {
-      prefix = keyMarker;
+      // The markers are positions in the DB key order, which differs from S3:
+      // - If upload-id-marker is not specified, the uploads after the uploads of key-marker are listed.
+      // Seek to "key-marker/" and skip the uploads of key-marker itself. Unlike S3, keys like "a.txt" are not
+      // listed for key-marker "a", and keys like "a" are listed for key-marker "a.txt".
+      // - If upload-id-marker is specified, the uploads after the marker upload are listed, which include
+      // the uploads of key-marker with upload IDs lexicographically greater than upload-id-marker, as in S3.
+      // Seek to the DB key of the markers and skip only that upload.
+      shouldSkip = true;
+      seekKey = OmMultipartUpload.getDbKey(volumeName, bucketName, keyMarker) + OM_KEY_PREFIX;
       if (StringUtils.isNotBlank(uploadIdMarker)) {
-        prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
+        seekKey = OmMultipartUpload.getDbKey(volumeName, bucketName, keyMarker, uploadIdMarker);
+        hasUploadIdMarker = true;
       }
-      // - If upload-id-marker is not specified,
-      // only the keys lexicographically greater than the specified key-marker will be included in the list.
-      // - If upload-id-marker is specified,
-      // any multipart uploads for a key equal to the key-marker might also be included,
-      // provided those multipart uploads have upload IDs lexicographically greater than the specified upload-id-marker.
-      prefix = getLexicographicallyHigherString(prefix);
     }
-    String seekKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
         cacheIterator = getMultipartInfoTable().cacheIterator();
@@ -1661,10 +1668,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           cacheIterator.next();
       String cacheKey = cacheEntry.getKey().getCacheKey();
       if (cacheKey.startsWith(prefixKey)) {
+        if (cacheKey.compareTo(seekKey) < 0) {
+          // Not listed, and the DB iteration below never reaches keys before seekKey either.
+          continue;
+        }
         // Check if it is marked for delete, due to abort mpu
         OmMultipartKeyInfo multipartKeyInfo = cacheEntry.getValue().getCacheValue();
-        if (multipartKeyInfo != null &&
-            cacheKey.compareTo(seekKey) >= 0) {
+        if (multipartKeyInfo != null) {
+          if (shouldSkip && isNotAfterMarker(cacheKey, seekKey, keyMarker, hasUploadIdMarker)) {
+            continue;
+          }
           responseKeys.put(cacheKey, multipartKeyInfo);
         } else {
           aborted.add(cacheKey);
@@ -1677,11 +1690,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // so we don't need to check if the key is started with prefixKey again
     try (TableIterator<String, Table.KeyValue<String, OmMultipartKeyInfo>>
         iterator = getMultipartInfoTable().iterator(prefixKey)) {
-      iterator.seek(seekKey);
+      // The prefix iterator already starts at prefixKey, and key-marker may sort before it.
+      if (seekKey.compareTo(prefixKey) > 0) {
+        iterator.seek(seekKey);
+      }
 
       // Try to get maxUploads + 1 keys to check if the list is truncated.
       while (iterator.hasNext() && (noPagination || dbKeysCount < maxUploads + 1)) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
+        if (shouldSkip && isNotAfterMarker(entry.getKey(), seekKey, keyMarker, hasUploadIdMarker)) {
+          continue;
+        }
         // If it is marked for abort, skip it.
         if (!aborted.contains(entry.getKey())) {
           responseKeys.put(entry.getKey(), entry.getValue());
@@ -1704,6 +1723,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return noPagination || result.size() <= maxUploads ? result : result.subList(0, maxUploads + 1);
+  }
+
+  /**
+   * @return true if the given multipart upload DB key is not after the key-marker and upload-id-marker,
+   *         where seekKey is the DB key of the markers.
+   */
+  private static boolean isNotAfterMarker(String multipartDbKey, String seekKey, String keyMarker,
+      boolean hasUploadIdMarker) {
+    if (hasUploadIdMarker) {
+      // If both key-marker and upload-id-marker are specified, skip only the marker upload itself.
+      return multipartDbKey.equals(seekKey);
+    }
+    // If only key-marker is specified, skip the uploads of key-marker itself.
+    // The DB key also contains the upload ID, so compare the key names.
+    return OmMultipartUpload.from(multipartDbKey).getKeyName().equals(keyMarker);
   }
 
   @Override
