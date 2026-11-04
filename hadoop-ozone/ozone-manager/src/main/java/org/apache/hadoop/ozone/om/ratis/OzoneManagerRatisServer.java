@@ -414,6 +414,8 @@ public final class OzoneManagerRatisServer {
         // Allow bootstrap to retry after leadership loss.
         NotLeaderException ex = raftClientReply.getNotLeaderException();
         if (ex != null) {
+          LOG.info("Failed to {} OM {} in Ratis group {}: {}",
+              operation.toLowerCase(), nodeId, raftGroupId, ex.getMessage());
           throw OMNotLeaderException.convertToOMNotLeaderException(
               ex, getRaftPeerId()
           );
@@ -428,6 +430,8 @@ public final class OzoneManagerRatisServer {
 
       LOG.info("{} OM {} in Ratis group {}.", operation, nodeId, raftGroupId);
     }  catch (ReconfigurationInProgressException ex) {
+      LOG.info("Failed to {} OM {} in Ratis group {}: {}",
+          operation.toLowerCase(), nodeId, raftGroupId, ex.getMessage());
       throw new OMLeaderNotReadyException(ex.getMessage());
     }
   }
