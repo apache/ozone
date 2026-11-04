@@ -77,9 +77,9 @@ ${STS_LINK_BUCKET_CHAIN_SOURCE}         sts-chain-source
 ${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}   s3v-sts-chain-intermediate
 ${STS_LINK_BUCKET_CHAIN_FINAL}          s3v-sts-chain-final
 ${STS_LINK_BUCKET_CHAIN_TESTFILE}       chain-link-testfile.txt
+${STS_BUCKET_TO_DELETE}                 sts-bucket-to-delete
 ${TEST_USER_ADMIN}                      testuser
 ${TEST_USER_NON_ADMIN}                  testuser2
-@{ICEBERG_OBJECT_KEYS}                  file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt
 @{ICEBERG_LISTABLE_OBJECT_KEYS_OBS}     file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt    zeroByteFile    zeroByteFolder/
 @{ICEBERG_LISTABLE_OBJECT_KEYS_FSO}     file1.txt    file1again.txt    folder/    folder/pepper.txt    folder/salt.txt    userA/    userA/userA.txt    userAfile.txt    userB/    userB/userB.txt    zeroByteFile    zeroByteFolder
 @{ICEBERG_PREFIX_USERA_OBS}             userA/userA.txt
@@ -93,36 +93,46 @@ ${STS_LIFECYCLE_JSON}                   {"Rules":[{"ID":"sts-lifecycle-rule","Pr
 
 *** Keywords ***
 Populate Iceberg Bucket
-    [Arguments]                   ${bucket}
-    FOR    ${key}    IN    @{ICEBERG_OBJECT_KEYS}
-        ${parent} =               Evaluate                      __import__('os').path.dirname($key)
-        Run Keyword If            '${parent}' != ''             Execute    mkdir -p ${TEMP_DIR}/${parent}
-        ${local_path} =           Set Variable                  ${TEMP_DIR}/${key}
-        Create File               ${local_path}                 iceberg test content
-        Execute                   ozone sh key put /s3v/${bucket}/${key} ${local_path}
-    END
-    Create File                   ${TEMP_DIR}/zeroByteFile
-    Execute                       ozone sh key put /s3v/${bucket}/zeroByteFile ${TEMP_DIR}/zeroByteFile
+    [Arguments]    ${bucket}    ${layout}
+
+    ${local_path} =    Set Variable    ${TEMP_DIR}/iceberg-test-content
+
+    Create File    ${local_path}    iceberg test content
+    Create File    ${TEMP_DIR}/zeroByteFile
+
+    Ozone Shell Batch
+    ...    bucket create --layout ${layout} /s3v/${bucket}
+    ...    key put /s3v/${bucket}/file1.txt ${local_path}
+    ...    key put /s3v/${bucket}/file1again.txt ${local_path}
+    ...    key put /s3v/${bucket}/folder/pepper.txt ${local_path}
+    ...    key put /s3v/${bucket}/folder/salt.txt ${local_path}
+    ...    key put /s3v/${bucket}/userA/userA.txt ${local_path}
+    ...    key put /s3v/${bucket}/userB/userB.txt ${local_path}
+    ...    key put /s3v/${bucket}/userAfile.txt ${local_path}
+    ...    key put /s3v/${bucket}/zeroByteFile ${TEMP_DIR}/zeroByteFile
     # Upload an explicit folder marker object to match AWS semantics.
-    Create File                   ${TEMP_DIR}/zero-byte-marker
-    Execute                       ozone sh key put /s3v/${bucket}/zeroByteFolder/ ${TEMP_DIR}/zero-byte-marker
+    ...    key put /s3v/${bucket}/zeroByteFolder/ ${TEMP_DIR}/zeroByteFile
 
-Setup Same Volume Link Bucket
-    # Create a source bucket and a same-volume linked bucket (s3v/source -> s3v/s3v-source).
-    Kinit test user               hdfs                          hdfs.keytab
-    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_SOURCE}
+Setup Test Data
+
+    Populate Iceberg Bucket       ${ICEBERG_BUCKET_OBS}    ${ICEBERG_LAYOUT_OBS}
+    Populate Iceberg Bucket       ${ICEBERG_BUCKET_FSO}    ${ICEBERG_LAYOUT_FSO}
+
     Create File                   ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}    link bucket test content
-    Execute                       ozone sh key put /s3v/${STS_LINK_BUCKET_SOURCE}/${STS_LINK_BUCKET_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}
-    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_SOURCE} /s3v/${STS_LINK_BUCKET_LINKED}
-
-Setup Chained Same Volume Link Buckets
-    # Create source <- intermediate <- final chained links in s3v.
-    Kinit test user               hdfs                          hdfs.keytab
-    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}
     Create File                   ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}    chained link test content
-    Execute                       ozone sh key put /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}/${STS_LINK_BUCKET_CHAIN_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}
-    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE} /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}
-    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE} /s3v/${STS_LINK_BUCKET_CHAIN_FINAL}
+
+    Ozone Shell Batch
+    # Create a source bucket and a same-volume linked bucket (s3v/source -> s3v/s3v-source).
+    ...    bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_SOURCE}
+    ...    key put /s3v/${STS_LINK_BUCKET_SOURCE}/${STS_LINK_BUCKET_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}
+    ...    bucket link /s3v/${STS_LINK_BUCKET_SOURCE} /s3v/${STS_LINK_BUCKET_LINKED}
+    # Create source <- intermediate <- final chained links in s3v.
+    ...    bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}
+    ...    key put /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}/${STS_LINK_BUCKET_CHAIN_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}
+    ...    bucket link /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE} /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}
+    ...    bucket link /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE} /s3v/${STS_LINK_BUCKET_CHAIN_FINAL}
+    # Create bucket for DeleteBucket scenario
+    ...    bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_BUCKET_TO_DELETE}
 
 Head Bucket Should Succeed
     [Arguments]                   ${bucket}  ${profile}=sts
@@ -457,7 +467,7 @@ Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Up
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
 
     # Waiting for Ranger policy cache refresh - ${ICEBERG_SVC_CATALOG_USER} needs to be able to read s3v volume
-    Wait Until Keyword Succeeds    30s    5s                    Execute    ozone sh volume info s3v
+    Wait Until Keyword Succeeds    30s    1s                    Execute    ozone sh volume info s3v
 
     ${output} =                   Execute                       ozone s3 getsecret
     ${accessKeyId} =              Get Regexp Matches            ${output}     (?<=awsAccessKey=).*
@@ -467,22 +477,14 @@ Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Up
     Set Global Variable           ${PERMANENT_ACCESS_KEY_ID}    ${accessKeyId}
     Set Global Variable           ${PERMANENT_SECRET_KEY}       ${secretKey}
 
+    # Long-lived 15-minute STS credential to test STS token expiration and proper error message
+    Assume Role And Store Expired STS Token Credentials         perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+
     # Create buckets as a different user so the permanent credential principal isn't the bucket owner.
     # Otherwise Ranger's default owner privileges can mask missing READ/LIST permissions in STS tests.
     # Populate the buckets as this user as well.
     Kinit test user               hdfs                          hdfs.keytab
-    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${ICEBERG_BUCKET_OBS}
-    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_FSO} /s3v/${ICEBERG_BUCKET_FSO}
-    Populate Iceberg Bucket       ${ICEBERG_BUCKET_OBS}
-    Populate Iceberg Bucket       ${ICEBERG_BUCKET_FSO}
-    Setup Same Volume Link Bucket
-    Setup Chained Same Volume Link Buckets
-
-    # Switch back to the service catalog principal for running S3/STS requests.
-    Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
-
-    # Long-lived 15-minute STS credential to test STS token expiration and proper error message
-    Assume Role And Store Expired STS Token Credentials         perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    Setup Test Data
 
 Assume Role for Limited-Scope Token
     # All access role is limited to read-only via session policy
@@ -952,24 +954,20 @@ STS session policy CreateBucket must require bucket CREATE
     Should Not Contain            ${output}                     AccessDenied
 
 STS session policy DeleteBucket must require bucket DELETE
-    ${bucket_suffix} =            Generate Random String        8   [LOWER]
-    ${bucket} =                   Set Variable                  sts-bucket-${bucket_suffix}
-    ${delete_policy} =            Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:DeleteBucket","Resource":"arn:aws:s3:::${bucket}"}]}
+    ${delete_policy} =            Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:DeleteBucket","Resource":"arn:aws:s3:::${STS_BUCKET_TO_DELETE}"}]}
 
-    # Prepare the bucket as a different principal so bucket-owner privileges
+    # Bucket was created as a different principal so bucket-owner privileges
     # do not mask missing DELETE permissions in the negative case.
-    Kinit test user               hdfs                          hdfs.keytab
-    ${output} =                   Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${bucket}
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   svc-iceberg-rest-catalog.keytab
 
     # Negative: missing DELETE
     Assume Role And Configure STS Profile                       policy_json=${delete_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${READ_ONLY_ROLE_OBS_ARN} 
-    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${STS_BUCKET_TO_DELETE} --profile sts
     Should Contain                ${output}                     AccessDenied
 
     # Positive control
     Assume Role And Configure STS Profile                       policy_json=${delete_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_TEMP_BUCKET_ROLE_ARN}
-    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${STS_BUCKET_TO_DELETE} --profile sts
     Should Not Contain            ${output}                     AccessDenied
 
 STS session policy PutBucketAcl must require bucket WRITE_ACL

@@ -193,6 +193,9 @@ public class ContainerBalancerTask implements Runnable {
         Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
       }
       balance();
+    } catch (InterruptedException e) {
+      LOG.info("Container Balancer was interrupted during the delayed start.");
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
       recordStopReason(ContainerBalancerStopReason.ERROR,
