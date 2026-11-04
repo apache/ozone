@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -74,6 +75,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -229,6 +231,20 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     Type cmdType = msg.getCmdType();
     TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.DN_CMD_TYPE, cmdType.name());
     long containerID = msg.getContainerID();
+    TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_CONTAINER_ID, containerID);
+    addDatanodeToCurrentSpan();
+    if (cmdType == Type.WriteChunk) {
+      ContainerProtos.WriteChunkRequestProto writeChunk = msg.getWriteChunk();
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          writeChunk.getBlockID().getLocalID());
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_CHUNK_OFFSET,
+          writeChunk.getChunkData().getOffset());
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_CHUNK_LENGTH,
+          writeChunk.getChunkData().getLen());
+    } else if (cmdType == Type.PutBlock) {
+      ContainerProtos.DatanodeBlockID blockID = msg.getPutBlock().getBlockData().getBlockID();
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID, blockID.getLocalID());
+    }
     Container container = getContainer(containerID);
     boolean isWriteStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
@@ -240,6 +256,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
             == DispatcherContext.WriteChunkStage.COMMIT_DATA);
+    Optional.ofNullable(dispatcherContext).filter(ctx -> cmdType == Type.WriteChunk)
+        .ifPresent(ctx -> TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.DN_STAGE,
+            ctx.getStage().name()));
 
     if (dispatcherContext == null) {
       // increase all op not through ratis
@@ -426,6 +445,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // For container to be moved to unhealthy state here, the container can
         // only be in open, closing, or recovering state.
         State containerState = container.getContainerData().getState();
+        TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.DN_CONTAINER_STATE, containerState.name());
         Preconditions.checkState(
             containerState == State.OPEN
                 || containerState == State.CLOSING
@@ -618,6 +638,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       InvalidContainerStateException iex = new InvalidContainerStateException(log);
       audit(action, eventType, msg, null, AuditEventStatus.FAILURE, iex);
       throw iex;
+    }
+  }
+
+  private void addDatanodeToCurrentSpan() {
+    DatanodeStateMachine parent = context != null ? context.getParent() : null;
+    DatanodeDetails dn = parent != null ? parent.getDatanodeDetails() : null;
+    if (dn != null) {
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_DATANODE_HOSTNAME, dn.getHostName());
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_DATANODE_UUID, dn.getUuidString());
     }
   }
 
@@ -899,6 +928,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       PerformanceStringBuilder perf = new PerformanceStringBuilder();
       ContainerCommandResponseProto responseProto = null;
       long containerID = msg.getContainerID();
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_CONTAINER_ID, containerID);
+      addDatanodeToCurrentSpan();
+      if (msg.hasReadBlock()) {
+        TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+            msg.getReadBlock().getBlockID().getLocalID());
+      }
       Container container = getContainer(containerID);
       long startTime = Time.monotonicNow();
 

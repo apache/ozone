@@ -140,6 +140,7 @@ import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerDiffReport;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
+import org.apache.hadoop.ozone.container.common.DatanodeTracingAttributes;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -706,6 +707,7 @@ public class KeyValueHandler extends Handler {
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_BLOCK_BCS_ID, bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
       if (request.getPutBlock().getSync()) {
         kvContainer.flushAndSyncDB();
