@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { vi } from 'vitest';
@@ -103,18 +103,18 @@ describe('BucketPendingDeletionTable', () => {
     expect(await screen.findByText('bucket1')).toBeInTheDocument();
     expect(screen.getByText('vol1')).toBeInTheDocument();
     expect(screen.getByText('3 KB')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show snapshot trapped bytes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Calculate' })).toBeInTheDocument();
   });
 
   test('warns before calculating, then polls the job until the result is shown', async () => {
     renderTable();
-    fireEvent.click(await screen.findByRole('button', { name: 'Show snapshot trapped bytes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Calculate' }));
 
     // Nothing is submitted until the user confirms the warning
     expect(await screen.findByText(/This is an expensive operation/)).toBeInTheDocument();
     expect(submittedRequests).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Calculate' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Calculate' }));
     await waitFor(() => expect(submittedRequests).toEqual(['?volume=vol1&bucket=bucket1']));
     expect(await screen.findByText('Queued')).toBeInTheDocument();
 
@@ -124,13 +124,13 @@ describe('BucketPendingDeletionTable', () => {
 
   test('does not submit when the warning is cancelled', async () => {
     renderTable();
-    fireEvent.click(await screen.findByRole('button', { name: 'Show snapshot trapped bytes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Calculate' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
 
     // Give a submission, if any, the chance to happen before asserting there was none
     await new Promise(resolve => setTimeout(resolve, 200));
     expect(submittedRequests).toHaveLength(0);
-    expect(screen.getByRole('button', { name: 'Show snapshot trapped bytes' })).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByRole('button', { name: 'Calculate' })).toBeInTheDocument();
   });
 
   test('shows the result of a recent calculation without recalculating', async () => {
@@ -139,7 +139,12 @@ describe('BucketPendingDeletionTable', () => {
 
     const result = await screen.findByTestId('snapshot-trapped-bytes-vol1/bucket1');
     expect(result).toHaveTextContent('2 KB');
-    expect(screen.queryByRole('button', { name: 'Show snapshot trapped bytes' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('snapshotTrappedKeys-vol1/bucket1')).toHaveTextContent('6');
+    expect(screen.getByTestId('snapshotTrappedDirs-vol1/bucket1')).toHaveTextContent('0');
+    expect(screen.getByTestId('purgeableBytes-vol1/bucket1')).toHaveTextContent('1 KB');
+    expect(screen.getByTestId('purgeableKeys-vol1/bucket1')).toHaveTextContent('4');
+    expect(screen.getByTestId('purgeableDirs-vol1/bucket1')).toHaveTextContent('1');
+    expect(within(screen.getByRole('table')).queryByRole('button', { name: 'Calculate' })).not.toBeInTheDocument();
     expect(submittedRequests).toHaveLength(0);
   });
 });

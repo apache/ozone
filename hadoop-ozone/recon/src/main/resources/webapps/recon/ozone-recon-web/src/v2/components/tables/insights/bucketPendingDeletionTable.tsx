@@ -53,6 +53,8 @@ type BucketPendingDeletionTableProps = {
 // Latest snapshot trapped bytes job of each bucket, keyed by volume/bucket
 type JobsByBucket = Record<string, SnapshotTrappedBytesJob>;
 
+type SnapshotTrappedBytesResult = NonNullable<SnapshotTrappedBytesJob['result']>;
+
 //-----Constants------
 const SNAPSHOT_TRAPPED_BYTES_API = '/api/v1/snapshotTrappedBytes';
 const POLL_INTERVAL_MS = 3000;
@@ -226,7 +228,7 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
     );
 
     if (!job) {
-      return calculateButton('Show snapshot trapped bytes');
+      return calculateButton('Calculate');
     }
     if (isActive(job)) {
       return (
@@ -245,20 +247,11 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
         </>
       );
     }
-    const result = job.result;
     return (
       <>
-        <Tooltip title={
-          <>
-            <div>Snapshot trapped: {byteToSize(result.snapshotTrappedBytes, 1)} ({result.snapshotTrappedKeys} keys,
-              {' '}{result.snapshotTrappedDirs} directories)</div>
-            <div>Purgeable: {byteToSize(result.purgeableBytes, 1)} ({result.purgeableKeys} keys,
-              {' '}{result.purgeableDirs} directories)</div>
-            <div>Calculated by OM at {getFormattedTime(job.completedAt, 'll LTS')}</div>
-          </>
-        }>
+        <Tooltip title={`Calculated by OM at ${getFormattedTime(job.completedAt, 'll LTS')}`}>
           <span data-testid={`snapshot-trapped-bytes-${bucketKey(record)}`}>
-            {byteToSize(result.snapshotTrappedBytes, 1)}
+            {byteToSize(job.result.snapshotTrappedBytes, 1)}
           </span>
         </Tooltip>
         <Tooltip title='Recalculate'>
@@ -316,7 +309,38 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
     ),
     key: 'snapshotTrappedBytes',
     render: (_: unknown, record: BucketPendingDeletion) => renderSnapshotTrappedBytes(record)
-  }];
+  },
+  calculatedColumn('Snapshot Trapped Keys', 'snapshotTrappedKeys',
+    'Deleted keys that cannot be reclaimed because snapshots still reference them'),
+  calculatedColumn('Snapshot Trapped Directories', 'snapshotTrappedDirs',
+    'Deleted directories that cannot be reclaimed because snapshots still reference them'),
+  calculatedColumn('Purgeable Bytes', 'purgeableBytes',
+    'Replicated size of deleted data that is not referenced by any snapshot and can be reclaimed', true),
+  calculatedColumn('Purgeable Keys', 'purgeableKeys',
+    'Deleted keys that are not referenced by any snapshot and can be reclaimed'),
+  calculatedColumn('Purgeable Directories', 'purgeableDirs',
+    'Deleted directories that are not referenced by any snapshot and can be reclaimed')];
+
+  // Column for a value of the snapshot trapped bytes calculation, shown once the calculation has completed
+  function calculatedColumn(title: string, field: keyof SnapshotTrappedBytesResult, description: string,
+    isBytes = false) {
+    return {
+      title: <Tooltip title={description}>{title}</Tooltip>,
+      key: field,
+      render: (_: unknown, record: BucketPendingDeletion) => {
+        const job = jobs[bucketKey(record)];
+        if (job?.status !== 'COMPLETED' || !job.result) {
+          return '-';
+        }
+        const value = job.result[field];
+        return (
+          <span data-testid={`${field}-${bucketKey(record)}`}>
+            {isBytes ? byteToSize(value, 1) : value}
+          </span>
+        );
+      }
+    };
+  }
 
   function filterData(data: BucketPendingDeletion[] | undefined) {
     return data?.filter(
