@@ -106,7 +106,7 @@ abstract class StreamDataChannelBase
 
   public boolean link() {
     if (isPutBlockCommittedOnClose()) {
-      // The PutBlock should be commited when the steam is closed
+      // The PutBlock should be committed when the steam is closed
       return linked.get();
     } else {
       setLinked();
