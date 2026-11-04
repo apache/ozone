@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -105,7 +106,9 @@ public class XceiverClientCreator implements XceiverClientFactory {
     default:
       throw new IOException("not implemented " + pipeline.getType());
     }
-    try {
+    try (TracingUtil.TraceCloseable ignored =
+             TracingUtil.createActivatedSpan(client.getClass().getSimpleName() + ".connect")) {
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.PIPELINE_ID, pipeline.getId().toString());
       client.connect();
     } catch (Exception e) {
       throw new IOException(e);

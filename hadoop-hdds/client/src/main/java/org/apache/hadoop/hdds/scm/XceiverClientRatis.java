@@ -140,8 +140,11 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         .get(ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
-    final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(new
-        SecurityConfig(ozoneConf), trustManager);
+    final SecurityConfig securityConfig;
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("SecurityConfig.init")) {
+      securityConfig = new SecurityConfig(ozoneConf);
+    }
+    final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(securityConfig, trustManager);
     return new XceiverClientRatis(pipeline,
         SupportedRpcType.valueOfIgnoreCase(rpcType),
         retryPolicy, tlsConfig, ozoneConf, errorInjector);
