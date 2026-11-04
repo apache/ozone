@@ -342,7 +342,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         }
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
-        responseProto = createContainer(msg);
+        responseProto = TracingUtil.executeInNewSpan("HddsDispatcher.createContainer", () -> createContainer(msg));
         metrics.incContainerOpsMetrics(Type.CreateContainer);
         metrics.incContainerOpsLatencies(Type.CreateContainer,
                 Time.monotonicNowNanos() - startTime);
