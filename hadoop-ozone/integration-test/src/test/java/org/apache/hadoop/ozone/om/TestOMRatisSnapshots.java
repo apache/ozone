@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -695,7 +696,9 @@ public class TestOMRatisSnapshots {
       GenericTestUtils.waitFor(
           () -> followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex() >= leaderIndex, 100, 30_000);
       followerOM.setCheckpointBackupInjector(new ThrowOnNthPauseFaultInjector(1, "Simulated backup move failure"));
-      assertNull(followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation, aheadTrxnInfo));
+      IOException exception = assertThrows(IOException.class,
+          () -> followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation, aheadTrxnInfo));
+      assertThat(exception).hasMessageContaining("Cannot replace DB");
       assertThat(exitManager.messages).isEmpty();
 
       followerOM.setCheckpointBackupInjector(injector);
@@ -712,7 +715,9 @@ public class TestOMRatisSnapshots {
       GenericTestUtils.waitFor(() -> Arrays.stream(updaterLog.getOutput().split("\n"))
           .anyMatch(line -> line.contains(follower) && line.contains(index)), 100, 30_000);
       injector.resume();
-      assertNull(install.get(60, TimeUnit.SECONDS));
+      ExecutionException installException = assertThrows(ExecutionException.class,
+          () -> install.get(60, TimeUnit.SECONDS));
+      assertThat(installException.getCause()).isInstanceOf(IOException.class).hasMessageContaining("Cannot replace DB");
 
       assertThat(exitManager.messages)
           .as("follower resumed applies on its old DB after the entry at index %d was skipped", keyIndex)
