@@ -1306,6 +1306,25 @@ public class TestHddsDispatcher {
   }
 
   @Test
+  public void testContainerAutoCreateIsTraced() throws IOException {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null).getResult());
+
+      collector.assertParent("HddsDispatcher.createContainer", "WriteChunk");
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
   public void testFailedReadBlockRecordsExceptionOnSpan() throws IOException {
     String testDirPath = testDir.getPath();
     OzoneConfiguration conf = new OzoneConfiguration();
