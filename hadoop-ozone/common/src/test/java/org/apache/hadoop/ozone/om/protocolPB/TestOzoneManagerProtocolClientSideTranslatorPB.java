@@ -27,10 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -62,6 +59,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQu
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -96,21 +94,16 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
     when(omTransport.submitRequest(any(OMRequest.class)))
         .thenReturn(errorResponse(operation, Status.KEY_ALLOCATION_ERROR));
 
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-    PrintStream originalErr = System.err;
     OMException error;
-    try {
-      System.setErr(new PrintStream(stderr, false, StandardCharsets.UTF_8.name()));
+    try (GenericTestUtils.SystemErrCapturer capture = new GenericTestUtils.SystemErrCapturer()) {
       error = assertThrows(OMException.class, () -> retryingClient().openKey(keyArgs()));
-    } finally {
-      System.setErr(originalErr);
+      assertThat(capture.getOutput())
+          .contains("KEY_ALLOCATION_ERROR", "2 retries left", "1 retries left")
+          .doesNotContain("0 retries left");
     }
 
     assertThat(error.getResult()).isEqualTo(ResultCodes.KEY_ALLOCATION_ERROR);
     assertThat(error).hasMessage("allocation failed");
-    assertThat(stderr.toString(StandardCharsets.UTF_8.name()))
-        .contains("KEY_ALLOCATION_ERROR", "2 retries left", "1 retries left")
-        .doesNotContain("0 retries left");
     verify(omTransport, times(3)).submitRequest(any(OMRequest.class));
   }
 
@@ -132,16 +125,11 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
     when(omTransport.submitRequest(any(OMRequest.class)))
         .thenReturn(errorResponse(Type.CreateKey, Status.SCM_IN_SAFE_MODE), successResponse(Type.CreateKey));
 
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-    PrintStream originalErr = System.err;
-    try {
-      System.setErr(new PrintStream(stderr, false, StandardCharsets.UTF_8.name()));
+    try (GenericTestUtils.SystemErrCapturer capture = new GenericTestUtils.SystemErrCapturer()) {
       retryingClient().openKey(keyArgs());
-    } finally {
-      System.setErr(originalErr);
+      assertThat(capture.getOutput()).contains("SCM_IN_SAFE_MODE", "retrying");
     }
 
-    assertThat(stderr.toString(StandardCharsets.UTF_8.name())).contains("SCM_IN_SAFE_MODE", "retrying");
     verify(omTransport, times(2)).submitRequest(any(OMRequest.class));
   }
 

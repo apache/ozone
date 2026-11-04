@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -80,14 +82,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   @Test
   public void testMissingPipelineMapsToRetryableError() throws Exception {
     String message = "Waited pipeline disappeared";
-    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), anyString()))
-        .thenThrow(new SCMException(message, SCMException.ResultCodes.PIPELINE_NOT_FOUND));
-
-    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
-    OMException error = assertThrows(OMException.class,
-        () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
-            UserInfo.newBuilder().build(), ozoneManager));
+    SCMException cause = new SCMException(message, SCMException.ResultCodes.PIPELINE_NOT_FOUND);
+    OMException error = assertInstanceOf(OMException.class, allocateBlockWithScmFailure(cause));
 
     assertEquals(OMException.ResultCodes.KEY_ALLOCATION_ERROR, error.getResult());
     assertEquals(message, error.getMessage());
@@ -95,14 +91,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   @Test
   public void testScmSafeModeMappingIsPreserved() throws Exception {
-    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), anyString()))
-        .thenThrow(new SCMException("SCM is in safe mode", SCMException.ResultCodes.SAFE_MODE_EXCEPTION));
-
-    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
-    OMException error = assertThrows(OMException.class,
-        () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
-            UserInfo.newBuilder().build(), ozoneManager));
+    SCMException cause = new SCMException("SCM is in safe mode", SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
+    OMException error = assertInstanceOf(OMException.class, allocateBlockWithScmFailure(cause));
 
     assertEquals(OMException.ResultCodes.SCM_IN_SAFE_MODE, error.getResult());
   }
@@ -111,15 +101,19 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   public void testOtherScmAllocationFailureIsNotReclassified() throws Exception {
     SCMException cause = new SCMException("No suitable datanode",
         SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    SCMException error = assertInstanceOf(SCMException.class, allocateBlockWithScmFailure(cause));
+
+    assertSame(cause, error);
+  }
+
+  private IOException allocateBlockWithScmFailure(SCMException cause) throws Exception {
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
         anyString(), any(ExcludeList.class), anyString())).thenThrow(cause);
 
     OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
-    SCMException error = assertThrows(SCMException.class,
+    return assertThrows(IOException.class,
         () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
             UserInfo.newBuilder().build(), ozoneManager));
-
-    assertSame(cause, error);
   }
 
   @Test
