@@ -1539,7 +1539,8 @@ public class SCMClientProtocolServer implements
     auditMap.put("containerID", String.valueOf(containerID));
     try {
       UserGroupInformation remoteUser = getRemoteUser();
-      getScm().checkAdminAccess(getRemoteUser(), true);
+      // a container token is not limited to read operations, so only a full admin may obtain one
+      getScm().checkAdminAccess(getRemoteUser(), false);
 
       Token<?> token = scm.getContainerTokenGenerator()
           .generateToken(remoteUser.getUserName(), containerID);
