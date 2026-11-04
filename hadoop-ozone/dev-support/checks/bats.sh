@@ -31,7 +31,7 @@ source "${DIR}/install/bats.sh"
 rm -f "${REPORT_DIR}/output.log"
 
 # accept specific tests as argument
-if [[ "$#" -ge 1 ]]; then
+if [[ "${CI:-}" != "true" ]] && [[ "$#" -ge 1 ]]; then
   echo "$@" \
     | xargs -n1 bats --formatter tap
 # or run all tests
