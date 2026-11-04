@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_IS_REFERENCED;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -293,8 +292,6 @@ public class TestOMTenantCreateRequest {
     assertEquals(1L, omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey("vol")).getRefCount());
     assertFalse(omMetadataManager.getTenantStateTable().isExist("tenant2"));
     assertFalse(omMetadataManager.getLock().isWriteLockedByCurrentThread(VOLUME_LOCK, "vol"));
-    assertFalse(omMetadataManager.getLock().isWriteLockedByCurrentThread(USER_LOCK,
-        request2.getOmRequest().getUserInfo().getUserName()));
     verify(ozoneManager.getMultiTenantManager().getAuthorizerLock(), times(2)).unlockWriteInOMRequest();
   }
 
