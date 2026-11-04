@@ -17,26 +17,29 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import com.amazonaws.Request;
-import com.amazonaws.handlers.RequestHandler2;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
-import io.opentelemetry.context.Context;
+import software.amazon.awssdk.core.interceptor.Context;
+import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
+import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
+import software.amazon.awssdk.http.SdkHttpRequest;
 
 /**
  * Adds W3C trace context headers to each outgoing S3 request so the S3 Gateway
  * can attach its spans to the Freon task span, using {@link W3CTraceContextPropagator}.
  */
-public final class FreonS3TraceContextRequestHandler extends RequestHandler2 {
+public final class FreonS3TraceContextInterceptor implements ExecutionInterceptor {
 
   @Override
-  public void beforeRequest(Request<?> request) {
+  public SdkHttpRequest modifyHttpRequest(Context.ModifyHttpRequest context, ExecutionAttributes executionAttributes) {
     if (!Span.current().getSpanContext().isValid()) {
-      return;
+      return context.httpRequest();
     }
+    final SdkHttpRequest.Builder request = context.httpRequest().toBuilder();
     W3CTraceContextPropagator.getInstance().inject(
-        Context.current(),
+        io.opentelemetry.context.Context.current(),
         request,
-        (carrier, key, value) -> carrier.addHeader(key, value));
+        (carrier, key, value) -> carrier.putHeader(key, value));
+    return request.build();
   }
 }

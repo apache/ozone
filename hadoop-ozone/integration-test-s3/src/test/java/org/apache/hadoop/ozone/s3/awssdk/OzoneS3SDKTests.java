@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
-import org.apache.hadoop.ozone.s3.awssdk.v1.AbstractS3SDKV1Tests;
 import org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests;
 import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Nested;
@@ -46,14 +45,6 @@ abstract class OzoneS3SDKTests extends ClusterForTests<MiniOzoneCluster> {
         .addService(new S3GatewayService(conf -> conf.setBoolean("ozone.client.ec.parallel.read.enabled", true),
             AbstractS3SDKV2Tests.EC_PARALLEL_READ_S3G_HTTP_ADDRESS_KEY))
         .build();
-  }
-
-  @Nested
-  class V1 extends AbstractS3SDKV1Tests {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
   }
 
   @Nested

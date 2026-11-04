@@ -17,12 +17,15 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
-import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import java.net.URI;
 import picocli.CommandLine;
+import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 
 /**
  * Initiliazing common aspects of S3BucketGenerator and S3KeyGenerator.
@@ -33,33 +36,36 @@ public class S3EntityGenerator extends BaseFreonGenerator {
           defaultValue = "http://localhost:9878")
   private String endpoint;
 
-  private AmazonS3 s3;
+  private S3Client s3;
 
   protected void s3ClientInit() {
     init();
 
-    AmazonS3ClientBuilder amazonS3ClientBuilder =
-        AmazonS3ClientBuilder.standard()
-            .withCredentials(new EnvironmentVariableCredentialsProvider());
+    S3ClientBuilder s3ClientBuilder = S3Client.builder()
+        .httpClientBuilder(ApacheHttpClient.builder())
+        .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+        // checksums only where S3 requires them: a load generator should not spend its time computing them
+        .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+        .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
+        .overrideConfiguration(c -> c.addExecutionInterceptor(new FreonS3TraceContextInterceptor()));
 
     if (!endpoint.isEmpty()) {
-      amazonS3ClientBuilder
-          .withPathStyleAccessEnabled(true)
-          .withEndpointConfiguration(
-                  new EndpointConfiguration(endpoint, "us-east-1"));
+      s3ClientBuilder
+          .forcePathStyle(true)
+          .endpointOverride(URI.create(endpoint))
+          .region(Region.US_EAST_1);
     } else {
-      amazonS3ClientBuilder.withRegion(Regions.DEFAULT_REGION);
+      s3ClientBuilder.region(Region.US_WEST_2);
     }
 
-    amazonS3ClientBuilder.withRequestHandlers(new FreonS3TraceContextRequestHandler());
-    s3 = amazonS3ClientBuilder.build();
+    s3 = s3ClientBuilder.build();
   }
 
   public String getEndpoint() {
     return endpoint;
   }
 
-  public AmazonS3 getS3() {
+  public S3Client getS3() {
     return s3;
   }
 }

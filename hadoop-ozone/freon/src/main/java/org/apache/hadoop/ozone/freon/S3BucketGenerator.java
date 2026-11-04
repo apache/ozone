@@ -68,7 +68,7 @@ public class S3BucketGenerator extends S3EntityGenerator
   private void createBucket(long bucketNum) throws Exception {
     String bName = getPrefix() + bucketNum;
     timer.time(() -> {
-      getS3().createBucket(bName);
+      getS3().createBucket(r -> r.bucket(bName));
       return null;
     });
   }
