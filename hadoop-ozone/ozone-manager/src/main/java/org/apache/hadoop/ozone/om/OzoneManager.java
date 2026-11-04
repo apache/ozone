@@ -4702,6 +4702,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRatisServer.getOmStateMachine().awaitApplied(committedIndex);
       termIndex = installCheckpoint(leaderId, checkpointLocation);
     } catch (Exception ex) {
+      LOG.error("Failed to install snapshot from Leader OM.", ex);
       throw new IOException("Failed to install snapshot from Leader " + leaderId, ex);
     } finally {
       cleanupCheckpoint(omDBCheckpoint);
