@@ -329,7 +329,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         OmKeyInfo omKeyInfo =
             getOmKeyInfo(trxnLogIndex, keyArgs, volumeName,
                 bucketName, keyName, dbMultipartOpenKey, omMetadataManager,
-                dbOzoneKey, partKeyInfoMap, partLocationInfos, dataSize);
+                dbOzoneKey, partKeyInfoMap, partsList, partLocationInfos, dataSize);
 
         long usedBytesDiff = 0;
         //Find all unused parts.
@@ -502,6 +502,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       KeyArgs keyArgs, String volumeName, String bucketName, String keyName,
       String multipartOpenKey, OMMetadataManager omMetadataManager,
       String ozoneKey, OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap,
+      List<OzoneManagerProtocolProtos.Part> partsList,
       List<OmKeyLocationInfo> partLocationInfos, long dataSize)
           throws IOException {
     OzoneManagerProtocolProtos.KeyInfo partKeyInfo =
@@ -532,7 +533,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .setOmKeyLocationInfos(
               Collections.singletonList(keyLocationInfoGroup))
           .addMetadata(OzoneConsts.ETAG,
-              multipartUploadedKeyHash(partKeyInfoMap))
+              multipartUploadedKeyHash(partKeyInfoMap, partsList))
           .setOwnerName(keyArgs.getOwnerName());
     } else {
       OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
@@ -554,7 +555,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
-      final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
+      final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap, partsList);
       builder = omKeyInfo.toBuilder();
       if (dbOpenKeyInfo.getMetadata() != null) {
         // make modifiable because ETAG needs to be added
@@ -812,9 +813,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   private String multipartUploadedKeyHash(
-      OmMultipartKeyInfo.PartKeyInfoMap partsList) {
+      OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap, List<OzoneManagerProtocolProtos.Part> partsList) {
     StringBuffer keysConcatenated = new StringBuffer();
-    for (PartKeyInfo partKeyInfo: partsList) {
+    for (OzoneManagerProtocolProtos.Part part : partsList) {
+      PartKeyInfo partKeyInfo = partKeyInfoMap.get(part.getPartNumber());
       String partPropertyToComputeHash = KeyValueUtil.getFromProtobuf(partKeyInfo.getPartKeyInfo().getMetadataList())
           .get(OzoneConsts.ETAG);
       if (partPropertyToComputeHash == null) {
