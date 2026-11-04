@@ -111,13 +111,19 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final AtomicReference<IOException> ioException;
   private final ExecutorService responseExecutor;
 
+  // the effective length of data flushed so far
+  private long totalDataFlushedLength;
+
+  // effective data write attempted so far for the block
+  private long writtenDataLength;
+
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will
   // be released from the buffer pool.
   private final StreamCommitWatcher commitWatcher;
 
   // Futures of the PutBlock(s) sent through the Ratis write API, i.e. committed by the Raft log.
-  private final Queue<CompletableFuture<ContainerCommandResponseProto>>
+  private Queue<CompletableFuture<ContainerCommandResponseProto>>
       putBlockFutures = new LinkedList<>();
 
   // Futures of the PutBlock(s) sent as data stream commands, i.e. committed without the Raft log.
@@ -136,7 +142,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private StreamBuffer currentBuffer;
   private XceiverClientMetrics metrics;
   private boolean isDatastreamPipelineMode;
-  private final PendingFlush pendingFlush = new PendingFlush();
+  private PendingFlush pendingFlush = new PendingFlush();
   // Whether PutBlock is committed through the data stream instead of the Raft log; fixed for the stream lifetime.
   private final boolean putBlockWithoutRaft;
 
@@ -188,6 +194,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     responseExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
         .setNameFormat("BlockDataStreamOutput-response-%d").setDaemon(true).build());
     commitWatcher = new StreamCommitWatcher(xceiverClient, bufferList);
+    totalDataFlushedLength = 0;
+    writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
@@ -256,7 +264,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   public long getWrittenDataLength() {
-    return pendingFlush.getWrittenLength();
+    return writtenDataLength;
   }
 
   public List<DatanodeDetails> getFailedServers() {
@@ -283,7 +291,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       currentBuffer.put(buf);
       writeChunkIfNeeded();
       off += writeLen;
-      pendingFlush.addToWrittenDataLength(writeLen);
+      writtenDataLength += writeLen;
       len -= writeLen;
       doFlushIfNeeded();
     }
@@ -298,11 +306,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   private void writeChunk(StreamBuffer sb) throws IOException {
     bufferList.add(sb);
+    pendingFlush.addBuffer(sb);
     ByteBuffer dup = sb.duplicate();
     dup.position(0);
     dup.limit(sb.position());
-    CompletableFuture<DataStreamReply> future = writeChunkToContainer(dup);
-    pendingFlush.addChunk(sb, future);
+    writeChunkToContainer(dup);
   }
 
   private void allocateNewBufferIfNeeded() {
@@ -324,8 +332,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         .getDataStreamMinPacketSize();
     if (!bufferList.isEmpty() && bufferList.size() % boundary == 0 &&
         pendingFlush.hasBuffersForPutBlock()) {
-      PendingFlush.FlushBatch batch = pendingFlush.seal();
-      executePutBlock(batch, false, false);
+      updateFlushLength();
+      executePutBlock(false, false);
     }
     if (bufferList.size() == streamWindow) {
       try {
@@ -346,6 +354,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
+  private void updateFlushLength() {
+    totalDataFlushedLength = writtenDataLength;
+  }
+
   /**
    * Will be called on the retryPath in case closedContainerException/
    * TimeoutException.
@@ -364,14 +376,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     while (len > 0) {
       final StreamBuffer buf = bufferList.get(count);
       final long writeLen = Math.min(buf.position(), len);
+      pendingFlush.addBuffer(buf);
       final ByteBuffer duplicated = buf.duplicate();
       duplicated.position(0);
       duplicated.limit(buf.position());
-      CompletableFuture<DataStreamReply> future = writeChunkToContainer(duplicated);
-      pendingFlush.addChunk(buf, future);
+      writeChunkToContainer(duplicated);
       len -= writeLen;
       count++;
-      pendingFlush.addToWrittenDataLength(writeLen);
+      writtenDataLength += writeLen;
     }
 
 
@@ -413,36 +425,20 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @param close whether putBlock is happening as part of closing the stream
    */
   public void executePutBlock(boolean sync, boolean close) throws IOException {
-    if (!pendingFlush.hasBuffersForPutBlock()) {
-      if (!close && !(sync && putBlockWithoutRaft)) {
-        return;
-      }
-      executePutBlock(null, sync, close);
-      return;
-    }
-    executePutBlock(pendingFlush.seal(), sync, close);
-  }
-
-  /**
-   * @param batch the batch of buffers to be flushed, or null if no data was written since the most recent PutBlock
-   * @param sync  whether the datanodes sync the data and the PutBlock to disk before replying;
-   *              it applies only to a PutBlock committed in the middle of the stream without Raft
-   * @param close whether putBlock is happening as part of closing the stream
-   */
-  public void executePutBlock(PendingFlush.FlushBatch batch, boolean sync,
-      boolean close) throws IOException {
     checkOpen();
-    long flushPos = batch != null ? batch.getTotalDataFlushedLength() : pendingFlush.getTotalDataFlushedLength();
+    long flushPos = totalDataFlushedLength;
+    final PendingFlush flush = pendingFlush;
+    pendingFlush = new PendingFlush();
     final List<StreamBuffer> byteBufferList;
-    if (batch != null) {
+    if (flush.hasBuffersForPutBlock()) {
       Objects.requireNonNull(bufferList, "bufferList == null");
-      byteBufferList = batch.getBuffersForPutBlock();
+      byteBufferList = flush.consumeBuffersForPutBlock();
       Objects.requireNonNull(byteBufferList, "byteBufferList == null");
     } else {
       // no data was written since the most recent putBlock
       byteBufferList = null;
     }
-    waitFuturesComplete(batch != null ? batch.getChunkFutures() : pendingFlush.getChunkFutures());
+    waitFuturesComplete(flush);
     if (close && putBlockWithoutRaft) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
       waitPutBlockCommandFuturesComplete();
@@ -608,7 +604,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   public void flush() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null
         && !config.isStreamBufferFlushDelay()) {
-      waitFuturesComplete(pendingFlush.getChunkFutures());
+      waitFuturesComplete(pendingFlush);
     }
   }
 
@@ -635,9 +631,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
-  public void waitFuturesComplete(List<CompletableFuture<DataStreamReply>> futures) throws IOException {
+  public void waitFuturesComplete(PendingFlush flush) throws IOException {
     try {
-      CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
+      flush.waitForChunkFutures();
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
       throw new IOException(e);
@@ -665,7 +661,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
-    if (pendingFlush.hasUnflushedData()) {
+    if (totalDataFlushedLength < writtenDataLength) {
       // This can be a partially filled chunk. Since we are flushing the buffer
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
@@ -674,8 +670,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         writeChunk(currentBuffer);
         currentBuffer = null;
       }
-      PendingFlush.FlushBatch batch = pendingFlush.seal();
-      executePutBlock(batch, sync, close);
+      updateFlushLength();
+      executePutBlock(sync, close);
     } else if (close) {
       // forcing an "empty" putBlock if stream is being closed without new
       // data since latest flush - we need to send the "EOF" flag
@@ -791,7 +787,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
    */
-  private CompletableFuture<DataStreamReply> writeChunkToContainer(ByteBuffer buf)
+  private void writeChunkToContainer(ByteBuffer buf)
       throws IOException {
     final int effectiveChunkSize = buf.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
@@ -832,8 +828,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               }
             }, responseExecutor);
 
+    pendingFlush.addChunkFuture(future);
     containerBlockData.addChunks(chunkInfo);
-    return future;
   }
 
   /**

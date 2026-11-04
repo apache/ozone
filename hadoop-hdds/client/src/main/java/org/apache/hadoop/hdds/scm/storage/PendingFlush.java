@@ -23,97 +23,40 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.ratis.protocol.DataStreamReply;
 
 /**
- * Represents the state of data written since the last flush boundary.
- * Single-owner: created when data is written, consumed when flush completes.
+ * Represents chunks written since the most recent PutBlock.
  */
 class PendingFlush {
+  private static final CompletableFuture[] EMPTY_FUTURE_ARRAY = {};
+
   // buffers for which putBlock is yet to be executed
   private List<StreamBuffer> buffersForPutBlock;
-  private List<CompletableFuture<DataStreamReply>> chunkFutures;
+  private final List<CompletableFuture<DataStreamReply>> chunkFutures = new ArrayList<>();
 
-  // the effective length of data flushed so far
-  private long totalDataFlushedLength;
-
-  // effective data write attempted so far for the block
-  private long writtenDataLength;
-
-  /** Add a chunk that was written to the DataStream. */
-  void addChunk(StreamBuffer buffer, CompletableFuture<DataStreamReply> future) {
+  /** Add a buffer for which PutBlock is yet to be executed. */
+  void addBuffer(StreamBuffer buffer) {
     if (buffersForPutBlock == null) {
       buffersForPutBlock = new ArrayList<>();
     }
     buffersForPutBlock.add(buffer);
+  }
+
+  /** Add a future for a chunk write sent to the DataStream. */
+  void addChunkFuture(CompletableFuture<DataStreamReply> future) {
     chunkFutures.add(future);
-  }
-
-  /** Called at flush boundary: returns buffers and resets for next flush cycle. */
-  FlushBatch seal() {
-    totalDataFlushedLength = writtenDataLength;
-    FlushBatch batch = new FlushBatch(
-        buffersForPutBlock,
-        chunkFutures,
-        writtenDataLength);
-    buffersForPutBlock = null;
-    chunkFutures = new ArrayList<>();
-    return batch;
-  }
-
-  boolean hasUnflushedData() {
-    return totalDataFlushedLength < writtenDataLength;
-  }
-
-  PendingFlush() {
-    this.chunkFutures = new ArrayList<>();
-    this.writtenDataLength = 0;
-    this.totalDataFlushedLength = 0;
-  }
-
-  long getWrittenLength() {
-    return writtenDataLength;
-  }
-
-  long getTotalDataFlushedLength() {
-    return totalDataFlushedLength;
-  }
-
-  void addToWrittenDataLength(long len) {
-    writtenDataLength += len;
   }
 
   boolean hasBuffersForPutBlock() {
     return buffersForPutBlock != null && !buffersForPutBlock.isEmpty();
   }
 
-  List<CompletableFuture<DataStreamReply>> getChunkFutures() {
-    return chunkFutures;
+  List<StreamBuffer> consumeBuffersForPutBlock() {
+    List<StreamBuffer> buffers = buffersForPutBlock;
+    buffersForPutBlock = null;
+    return buffers;
   }
 
-  /** The sealed batch, ready for putBlock. */
-  static class FlushBatch {
-    private final List<StreamBuffer> buffersForPutBlock;
-    private final List<CompletableFuture<DataStreamReply>> chunkFutures;
-    private final long totalDataFlushedLength;
-
-    FlushBatch(
-        List<StreamBuffer> buffersForPutBlock,
-        List<CompletableFuture<DataStreamReply>> chunkFutures,
-        long totalDataFlushedLength
-    ) {
-      this.buffersForPutBlock = buffersForPutBlock;
-      this.chunkFutures = chunkFutures;
-      this.totalDataFlushedLength = totalDataFlushedLength;
-    }
-
-    List<StreamBuffer> getBuffersForPutBlock() {
-      return buffersForPutBlock;
-    }
-
-    List<CompletableFuture<DataStreamReply>> getChunkFutures() {
-      return chunkFutures;
-    }
-
-    long getTotalDataFlushedLength() {
-      return totalDataFlushedLength;
-    }
+  void waitForChunkFutures() throws Exception {
+    CompletableFuture.allOf(chunkFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
+    chunkFutures.clear();
   }
 }
