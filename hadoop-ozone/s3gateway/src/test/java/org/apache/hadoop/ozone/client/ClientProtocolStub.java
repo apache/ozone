@@ -221,7 +221,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteBucket(String volumeName, String bucketName)
       throws IOException {
-
+    objectStoreStub.getVolume(volumeName).deleteBucket(bucketName);
   }
 
   @Override

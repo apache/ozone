@@ -149,7 +149,7 @@ public class TestPermissionCheck {
 
   @Test
   public void testDeleteBucket() throws IOException {
-    doThrow(exception).when(volume).deleteBucket(anyString());
+    doThrow(exception).when(clientProtocol).deleteBucket("s3Volume", "bucketName");
     when(objectStore.getS3Volume()).thenReturn(volume);
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)

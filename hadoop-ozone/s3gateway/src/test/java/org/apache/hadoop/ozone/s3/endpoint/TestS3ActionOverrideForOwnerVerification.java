@@ -216,7 +216,7 @@ public class TestS3ActionOverrideForOwnerVerification {
       actionAtSourceBucketOwnerLookup.set(s3Auth.getS3Action());
       return SOURCE_OWNER;
     });
-    when(clientProtocol.getBucketDetails(null, SOURCE_BUCKET)).thenReturn(sourceBucket);
+    when(clientProtocol.getBucketDetails("s3Volume", SOURCE_BUCKET)).thenReturn(sourceBucket);
 
     // Stop the request after the source-bucket owner check, without needing to set up full copy behavior.
     when(clientProtocol.getKeyDetails(anyString(), eq(SOURCE_BUCKET), eq(SOURCE_KEY)))
