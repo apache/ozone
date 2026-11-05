@@ -5391,7 +5391,8 @@
     <tag>OZONE, OM, PERFORMANCE, SECURITY</tag>
     <description>
       A background service that periodically scans the s3RevokedStsTokenTable and deletes
-      revocation entries whose cutoff is older than the maximum STS token lifetime (12 hours).
+      revocation entries whose cutoff is older than the maximum STS token lifetime (12 hours) plus a 30 minute
+      margin for clock differences between OMs.
       This property controls how often the cleanup service runs. Unit could be defined with
       postfix (ns,ms,s,m,h,d).
     </description>
