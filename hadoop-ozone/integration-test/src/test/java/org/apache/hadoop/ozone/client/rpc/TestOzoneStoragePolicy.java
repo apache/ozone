@@ -30,6 +30,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
@@ -42,9 +44,13 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.cli.storagepolicy.CheckStoragePolicySubCommand;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -57,6 +63,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -65,6 +72,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -314,6 +322,76 @@ public class TestOzoneStoragePolicy {
     // The recorded policy and the tier the data actually sits on must agree.
     assertEquals(OzoneStoragePolicy.COLD, overwritten.getStoragePolicy());
     assertAllBlocksOnTier(overwritten, OzoneStoragePolicy.COLD.getCreationTier());
+  }
+
+  /**
+   * {@code storagepolicy check} must report YES for a key whose replicas sit on the policy's creation
+   * tier, using the real OM key locations and the real SCM replica reports.
+   */
+  @Test
+  public void testCheckReportsMatchForEveryPolicy() throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    try (ScmClient scmClient = new ContainerOperationClient(cluster.getConf())) {
+      for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
+        OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
+        String keyName = UUID.randomUUID().toString();
+        writeKey(bucket, keyName, storagePolicy);
+        OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+        waitForReplicaReports(scmClient, keyDetails);
+
+        String report = new CheckStoragePolicySubCommand().buildReport(keyDetails, scmClient, true);
+
+        assertThat(report).as("report for %s", storagePolicy)
+            .contains("  Key Match Storage Policy: YES")
+            .doesNotContain("Replica Match: NO");
+        assertThat(StringUtils.countMatches(report, "Replica Match: YES"))
+            .isEqualTo(RATIS_THREE.getRequiredNodes());
+      }
+    }
+  }
+
+  /**
+   * A HOT key on a cluster without SSD volumes falls back to DISK (the bucket allows fallback by
+   * default). The strict rule must report that as NO and name the volume type.
+   */
+  @Test
+  public void testCheckReportsMismatchWhenKeyFellBackToFallbackTier() throws Exception {
+    startCluster(Collections.nCopies(RATIS_THREE.getRequiredNodes(),
+        Arrays.asList(StorageType.DISK, StorageType.ARCHIVE)));
+
+    try (ScmClient scmClient = new ContainerOperationClient(cluster.getConf())) {
+      OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
+      String keyName = UUID.randomUUID().toString();
+      writeKey(bucket, keyName, OzoneStoragePolicy.HOT);
+      OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+      waitForReplicaReports(scmClient, keyDetails);
+
+      String report = new CheckStoragePolicySubCommand().buildReport(keyDetails, scmClient, true);
+
+      assertThat(report)
+          .contains("  Key Match Storage Policy: NO")
+          .contains("volumeStorageType DISK != expected SSD")
+          .doesNotContain("Replica Match: YES");
+    }
+  }
+
+  /**
+   * Waits until SCM knows every replica of every container of the key, including the storage types
+   * the datanodes report in their heartbeats.
+   */
+  private void waitForReplicaReports(ScmClient scmClient, OzoneKeyDetails keyDetails) throws Exception {
+    for (OzoneKeyLocation location : keyDetails.getOzoneKeyLocations()) {
+      GenericTestUtils.waitFor((BooleanSupplier) () -> {
+        try {
+          List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(location.getContainerID());
+          return replicas.size() == RATIS_THREE.getRequiredNodes()
+              && replicas.stream().allMatch(r -> r.getStorageType() != null && r.getVolumeStorageType() != null);
+        } catch (IOException e) {
+          return false;
+        }
+      }, 500, 30000);
+    }
   }
 
   /**
