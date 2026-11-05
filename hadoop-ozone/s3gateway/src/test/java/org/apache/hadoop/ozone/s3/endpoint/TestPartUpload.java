@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA25
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.parseETag;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -50,6 +51,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -59,6 +61,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Stream;
 import javax.ws.rs.HttpMethod;
@@ -145,6 +148,19 @@ public class TestPartUpload {
       assertNotNull(newETag);
       assertNotEquals(eTag, newETag);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 32, 64})
+  void testContentSha256(int uppercaseLength) throws Exception {
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+    String content = "Multipart Upload";
+    String hash = DigestUtils.sha256Hex(content);
+    hash = hash.substring(0, uppercaseLength).toUpperCase(Locale.ROOT) + hash.substring(uppercaseLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+
+    assertSucceeds(() -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
+    assertContentLength(uploadID, OzoneConsts.KEY, content.length());
   }
 
   @Test
@@ -255,7 +271,7 @@ public class TestPartUpload {
     String keyName = UUID.randomUUID().toString();
     String content = "1234567890abcde";
     String chunkedContent = signedChunkedBodyWithTrailer(
-        content, "x-amz-checksum-crc32c", "sOO8/Q==");
+        content, "x-amz-checksum-crc32c", "qYszzw==");
     configureSignedChunksWithTrailer(content.length());
 
     String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
@@ -375,6 +391,72 @@ public class TestPartUpload {
     assertNoParts(uploadID, keyName);
   }
 
+  static Stream<Arguments> checksumTrailers() {
+    // Independent checksums of "123456789", computed with AWS CRT and Python hashlib.
+    return Stream.of(
+        Arguments.of("crc32", "y/Q5Jg=="),
+        Arguments.of("crc32c", "4waSgw=="),
+        Arguments.of("crc64nvme", "rosUhgp5mIg="),
+        Arguments.of("sha1", "98O8HYCOBHMq32eZZczDTKeuNEE="),
+        Arguments.of("sha256", "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="))
+        .flatMap(args -> Stream.of(false, true)
+            .map(signed -> Arguments.of(args.get()[0], args.get()[1], signed)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("checksumTrailers")
+  void testPartUploadRejectsWrongTrailerChecksum(String algorithm, String checksum, boolean signed) throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+    String content = "1234567890abcde";
+    String header = "x-amz-checksum-" + algorithm;
+    configureUnsignedTrailer(content.length());
+    if (signed) {
+      configureSignedChunksWithTrailer(content.length());
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn(header);
+    String body = signed ? signedChunkedBodyWithTrailer(content, header, checksum)
+        : "f\r\n" + content + "\r\n0\r\n" + header + ":" + checksum + "\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST,
+        () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, body));
+    assertNoParts(uploadID, keyName);
+
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("9");
+    String validBody = signed ? signedChunkedBodyWithTrailer("123456789", header, checksum)
+        : "9\r\n123456789\r\n0\r\n" + header + ":" + checksum + "\r\n\r\n";
+    String eTag;
+    try (Response response = put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, validBody)) {
+      assertThat(response.getStatus()).isEqualTo(200);
+      eTag = parseETag(response.getHeaderString(OzoneConsts.ETAG));
+    }
+    assertContentLength(uploadID, keyName, 9);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(content.length()));
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST,
+        () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, body));
+    assertContentLength(uploadID, keyName, 9);
+    assertThat(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).listParts(keyName, uploadID, 0, 100)
+        .getPartInfoList().get(0).getETag()).isEqualTo(eTag);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testEmptyPartRejectsWrongTrailerChecksum(boolean signed) throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+    configureUnsignedTrailer(0);
+    if (signed) {
+      configureSignedChunksWithTrailer(0);
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    String body = signed ? signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "y/Q5Jg==")
+        : "0\r\nx-amz-checksum-crc32:y/Q5Jg==\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST,
+        () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, body));
+    assertNoParts(uploadID, keyName);
+  }
+
   private void configureUnsignedTrailer(int contentLength) {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_UNSIGNED_PAYLOAD_TRAILER);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(contentLength));
@@ -386,6 +468,20 @@ public class TestPartUpload {
         .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
         .thenReturn(String.valueOf(contentLength));
+  }
+
+  @Test
+  public void testRejectMalformedContentSha256BeforeReadingBody() throws Exception {
+    String key = OzoneConsts.KEY;
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, key);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("invalid");
+    InputStream body = spy(new ByteArrayInputStream(new byte[] {1}));
+
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
+        () -> putPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, 1, body));
+
+    verifyNoInteractions(body);
+    assertNoParts(uploadID, key);
   }
 
   @Test

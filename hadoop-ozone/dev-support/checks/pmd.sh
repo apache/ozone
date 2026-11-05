@@ -29,7 +29,7 @@ mkdir -p "$REPORT_DIR"
 
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-B -fae --no-transfer-progress -Dpmd.failOnViolation=false -Dpmd.printFailingErrors -DskipDocs -DskipRecon -DskipShade'
+MAVEN_OPTIONS='-B -fae --no-transfer-progress -Dpmd.failOnViolation=false -Dpmd.printFailingErrors -DskipRecon -DskipShade'
 MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 declare -i rc
