@@ -45,6 +45,8 @@
     <bouncycastle.version>1.86</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.2</build-helper-maven-plugin.version>
     <byte-buddy.version>1.18.15</byte-buddy.version>
+    <!-- 2.x: the last line that runs on Java 8, which the client modules target -->
+    <caffeine.version>2.9.3</caffeine.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
@@ -389,6 +391,18 @@
         <groupId>com.fasterxml.woodstox</groupId>
         <artifactId>woodstox-core</artifactId>
         <version>${woodstox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- annotations only, not shipped -->
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -2188,6 +2202,17 @@
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
                       <bannedImport>org.apache.hadoop.hdfs.DFSConfigKeys</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use Caffeine (com.github.benmanes.caffeine.cache), as Guava recommends</reason>
+                    <bannedImports>
+                      <bannedImport>com.google.common.cache.**</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
