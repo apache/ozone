@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script installs bats with bats-support and bats-assert libraries..
+# This script installs bats with bats-support and bats-assert libraries.
 # Requires _install_tool from _lib.sh.  Use `source` for both scripts, because it modifies $PATH.
 
 : ${BATS_VERSION:="1.14.0"}
