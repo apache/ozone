@@ -432,7 +432,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private OmConfig config;
-  private final KeyLifecycleServiceConfig keyLifecycleServiceConfig;
+  private KeyLifecycleServiceConfig keyLifecycleServiceConfig;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
@@ -578,7 +578,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omStorage = new OMStorage(conf);
     omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
-    keyLifecycleServiceConfig = conf.getObject(KeyLifecycleServiceConfig.class);
     reconfigurationHandler =
         new ReconfigurationHandler("OM", conf, this::checkAdminUserPrivilege)
             .register(config)
@@ -5150,6 +5149,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void setConfiguration(OzoneConfiguration conf) {
     this.configuration = conf;
     config = conf.getObject(OmConfig.class);
+    keyLifecycleServiceConfig = conf.getObject(KeyLifecycleServiceConfig.class);
   }
 
   public OzoneConfiguration reloadConfiguration() {

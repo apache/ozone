@@ -470,7 +470,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
         String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
 
-        if (stateSaveInternal == 1) {
+        if (maxKeysProcessedPerState == 1) {
           // With 5 keys and maxKeysProcessedPerState = 1, it should save on every key iteration.
           // It will save at least 5 times (one for each key).
           verify(spyTable, atLeast(5))
@@ -939,7 +939,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         }, WAIT_CHECK_INTERVAL, 10000);
 
         OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
-        if (stateSaveInternal != 1) {
+        if (maxKeysProcessedPerState != 1) {
           if (maxSize == 2) {
             if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
               assertEquals("dir3/dir6/dir9", scanState.getLastScannedDir());
@@ -2187,7 +2187,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
     void testKeyUpdatedShouldNotGetDeleted(BucketLayout bucketLayout)
         throws IOException, InterruptedException, TimeoutException {
-      assumeTrue(stateSaveInternal != 1);
+      assumeTrue(maxKeysProcessedPerState != 1);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       GenericTestUtils.LogCapturer log =
@@ -2462,7 +2462,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
             (getDeletedKeyCount() - initialDeletedKeyCount) == keyCount, WAIT_CHECK_INTERVAL, 5000);
         assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
       }
-      if (stateSaveInternal != 1) {
+      if (maxKeysProcessedPerState != 1) {
         GenericTestUtils.waitFor(() ->
                 log.getOutput().contains("LimitedSizeList has reached maximum size " + maxListSize),
             WAIT_CHECK_INTERVAL, 5000);
@@ -3330,7 +3330,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @MethodSource("parameters1")
     void testKeyDeletedOrRenamed(BucketLayout bucketLayout, boolean deleted)
         throws IOException, InterruptedException, TimeoutException {
-      assumeTrue(stateSaveInternal != 1);
+      assumeTrue(maxKeysProcessedPerState != 1);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       GenericTestUtils.LogCapturer log =
