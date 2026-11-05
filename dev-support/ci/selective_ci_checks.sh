@@ -205,6 +205,7 @@ function run_all_tests_if_environment_files_changed() {
         "^hadoop-ozone/dev-support/checks/_lib.sh"
     )
     local ignore_array=(
+        "^dev-support/ci/*.bats"
         "^dev-support/ci/pr_title_check"
         "^dev-support/ci/find_test_class_project"
         "^dev-support/ci/pr_body_config_doc.sh"
