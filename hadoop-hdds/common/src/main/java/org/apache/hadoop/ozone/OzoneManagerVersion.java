@@ -72,6 +72,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
       "OzoneManager version that rejects lookupFile on OBJECT_STORE buckets "
           + "server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check for getFileChecksum"),
+  // Derived keys predate ZDU and are available before finalization.
+  S3_DERIVED_KEY(16, "OzoneManager version that returns derived S3 signing keys for chunk verification"),
   ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
   LIST_STATUS_REJECTS_OBS(101,
       "OzoneManager version that rejects listStatus on OBJECT_STORE buckets "

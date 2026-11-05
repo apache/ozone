@@ -555,6 +555,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotDeleted.incr();
   }
 
+  public void decNumSnapshotDeleted(long num) {
+    numSnapshotDeleted.decr(num);
+  }
+
   public int getNumSnapshotCacheSize() {
     return numSnapshotCacheSize.value();
   }

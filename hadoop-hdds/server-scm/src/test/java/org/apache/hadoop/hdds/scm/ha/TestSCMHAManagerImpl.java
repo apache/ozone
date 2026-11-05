@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -236,6 +237,7 @@ class TestSCMHAManagerImpl {
     when(scm.getFinalizationManager()).thenReturn(finalizationManager);
     when(scm.getScmSafeModeManager()).thenReturn(safeModeManager);
     when(scm.getDatanodeProtocolServer()).thenReturn(datanodeProtocolServer);
+    when(scm.getPerfMetrics()).thenReturn(mock(SCMPerformanceMetrics.class));
     when(metadataStore.getStore()).thenReturn(dbStore);
     when(metadataStore.getTransactionInfoTable()).thenReturn(txnInfoTable);
     when(scmHANodeDetails.getLocalNodeDetails()).thenReturn(nodeDetails);

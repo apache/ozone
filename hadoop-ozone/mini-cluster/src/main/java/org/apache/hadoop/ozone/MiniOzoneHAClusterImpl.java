@@ -1000,8 +1000,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     OzoneManager targetOM = omList.get(0);
     String targetNodeId = targetOM.getOMNodeId();
 
-    // Transfer leadership
-    currentLeader.transferLeadership(targetNodeId);
+    // Transfer leadership over RPC, so the admin check sees the caller
+    try (OzoneClient client = createClient()) {
+      client.getProxy().getOzoneManagerClient().transferLeadership(targetNodeId);
+    }
 
     // Wait for leadership transfer to complete
     GenericTestUtils.waitFor(() -> {

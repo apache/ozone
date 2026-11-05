@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -38,6 +39,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,6 +49,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -61,6 +64,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -81,6 +85,30 @@ public class TestS3ActionOverrideForOwnerVerification {
   @BeforeAll
   public static void setUp() {
     S3GatewayMetrics.create(new OzoneConfiguration());
+  }
+
+  @Test
+  public void testListObjectVersionsUsesListBucketVersionsAction() throws Exception {
+    assertEquals("ListBucketVersions", listBucketAction(true, true));
+  }
+
+  @Test
+  public void testListObjectsUsesListBucketAction() throws Exception {
+    assertEquals("ListBucket", listBucketAction(false, true));
+  }
+
+  @Test
+  public void testListObjectVersionsDoesNotSetActionWhenStsDisabled() throws Exception {
+    assertNull(listBucketAction(true, false));
+  }
+
+  @Test
+  public void testListObjectVersionsUsesListObjectVersionsAuditAction() throws Exception {
+    final AtomicReference<S3GAction> auditAction = new AtomicReference<>();
+    final BucketEndpoint endpoint = newBucketEndpoint(new AtomicReference<>(), true, auditAction);
+    endpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    endpoint.get("bucket");
+    assertEquals(S3GAction.LIST_OBJECT_VERSIONS, auditAction.get());
   }
 
   @Test
@@ -294,6 +322,65 @@ public class TestS3ActionOverrideForOwnerVerification {
         .setConfig(conf)
         .setHeaders(headers)
         .setSignatureInfo(signatureInfo)
+        .build();
+  }
+
+  private static String listBucketAction(boolean listObjectVersions, boolean isStsEnabled) throws Exception {
+    final AtomicReference<String> actionAtBucketLookup = new AtomicReference<>();
+    final BucketEndpoint endpoint = newBucketEndpoint(actionAtBucketLookup, isStsEnabled);
+    if (listObjectVersions) {
+      endpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    }
+    endpoint.get("bucket");
+    return actionAtBucketLookup.get();
+  }
+
+  private static BucketEndpoint newBucketEndpoint(AtomicReference<String> actionAtBucketLookup,
+      boolean isStsEnabled) throws Exception {
+    return newBucketEndpoint(actionAtBucketLookup, isStsEnabled, null);
+  }
+
+  private static BucketEndpoint newBucketEndpoint(AtomicReference<String> actionAtBucketLookup,
+      boolean isStsEnabled, AtomicReference<S3GAction> auditActionAtList) throws Exception {
+    final OzoneClient client = mock(OzoneClient.class);
+    final ObjectStore objectStore = mock(ObjectStore.class);
+    final ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    final OzoneVolume volume = mock(OzoneVolume.class);
+    final OzoneBucket bucket = mock(OzoneBucket.class);
+    final AtomicReference<S3Auth> s3AuthRef = new AtomicReference<>();
+
+    doAnswer(invocationOnMock -> {
+      s3AuthRef.set(invocationOnMock.getArgument(0));
+      return null;
+    }).when(clientProtocol).setThreadLocalS3Auth(any(S3Auth.class));
+
+    when(client.getObjectStore()).thenReturn(objectStore);
+    when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket("bucket")).thenAnswer(invocationOnMock -> {
+      final S3Auth s3Auth = s3AuthRef.get();
+      actionAtBucketLookup.set(s3Auth == null ? null : s3Auth.getS3Action());
+      return bucket;
+    });
+    when(bucket.listKeys(anyString(), any(), anyBoolean())).thenReturn(Collections.emptyIterator());
+
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, isStsEnabled);
+    final BucketEndpoint base = new BucketEndpoint() {
+      @Override
+      Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
+        final Response response = super.handleGetRequest(context, bucketName);
+        if (auditActionAtList != null) {
+          auditActionAtList.set(context.getAction());
+        }
+        return response;
+      }
+    };
+    return EndpointBuilder.newBucketEndpointBuilder()
+        .setBase(base)
+        .setClient(client)
+        .setConfig(conf)
         .build();
   }
 

@@ -18,9 +18,14 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test encode/decode of the continue token.
@@ -65,6 +70,19 @@ public class TestContinueToken {
         ContinueToken.decodeFromString(ct.encodeToString());
 
     assertEquals(ct, parsedToken);
+  }
+
+  /**
+   * Tokens with a valid digest whose declared key size is larger than the token, negative, or missing.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"7fffffff", "ffffffff", "00000005aa", "0000", ""})
+  public void decodeRejectsInvalidKeySize(String hex) {
+    String token = hex + "-" + DigestUtils.sha256Hex(hex);
+
+    OS3Exception ex = assertThrows(OS3Exception.class, () -> ContinueToken.decodeFromString(token));
+
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), ex.getCode());
   }
 
 }

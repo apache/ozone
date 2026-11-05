@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.export;
 
+import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_BATCH_SIZE;
+import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_PART_SIZE;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -58,8 +61,6 @@ public class ContainerExportManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerExportManager.class);
 
-  private static final int DEFAULT_BATCH_SIZE = 100_000;
-  private static final int DEFAULT_PART_SIZE = 500_000;
   private static final long SHUTDOWN_TIMEOUT_MS = 5_000;
 
   private final Map<ExportJob.Id, ExportJob> jobMap = new ConcurrentHashMap<>();
@@ -68,8 +69,7 @@ public class ContainerExportManager {
   private final ContainerManager containerManager;
   private final ExportFileManager fileManager;
   private final BooleanSupplier isLeaderReady;
-  private final int partSize;
-  private final int batchSize;
+  private final ExportSizing defaultSizing;
 
   public ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
       OzoneConfiguration conf) {
@@ -79,15 +79,10 @@ public class ContainerExportManager {
 
   ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
       String exportDirectory, int partSize, int batchSize) {
-    if (partSize <= 0 || batchSize <= 0) {
-      throw new IllegalArgumentException("partSize and batchSize must be positive: partSize=" + partSize
-          + ", batchSize=" + batchSize);
-    }
+    this.defaultSizing = new ExportSizing(0, 0, 0, batchSize, partSize);
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
     this.fileManager = new ExportFileManager(exportDirectory);
-    this.partSize = partSize;
-    this.batchSize = batchSize;
     this.workerPool = newWorkerPool(scmId);
   }
 
@@ -110,25 +105,32 @@ public class ContainerExportManager {
   public void start() throws IOException {
     fileManager.start();
     LOG.info("ContainerExportManager started (dir={}, partSize={}, batchSize={})",
-        fileManager.getExportDirectory(), partSize, batchSize);
+        fileManager.getExportDirectory(), defaultSizing.getPartSize(), defaultSizing.getBatchSize());
   }
 
   /**
    * Submit a container ID export job on the SCM leader.
    *
+   * @param maxRows upper bound on exported container IDs; {@code 0} means no limit
+   * @param requestBatchSize container IDs per listing query; {@code 0} means the manager default
+   * @param requestPartSize container IDs per part file; {@code 0} means the manager default
    * @return the submitted job
+   * @throws IllegalArgumentException if a size is negative or above its {@link ExportLimits} maximum
    * @throws SCMException with {@link SCMException.ResultCodes#SCM_NOT_LEADER} if this SCM is not the ready leader
    * @throws IOException if another export is already running or the export worker is shut down
    */
-  public ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState, ContainerHealthState healthState)
-      throws IOException {
+  public ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState, ContainerHealthState healthState,
+      long maxRows, int requestBatchSize, int requestPartSize) throws IOException {
+    final ExportSizing sizing = new ExportSizing(maxRows, requestBatchSize, requestPartSize,
+        defaultSizing.getBatchSize(), defaultSizing.getPartSize());
+
     if (!isLeaderReady.getAsBoolean()) {
       throw new SCMException("Container ID export can only be submitted on the SCM leader",
           SCMException.ResultCodes.SCM_NOT_LEADER);
     }
 
     final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
-    final ExportJob job = new ExportJob(scope, start, batchSize, partSize);
+    final ExportJob job = new ExportJob(scope, start, sizing);
     if (!runningJob.compareAndSet(null, job)) {
       throw new IOException("Another container ID export is already running");
     }
@@ -141,8 +143,8 @@ public class ContainerExportManager {
       runningJob.compareAndSet(job, null);
       throw new IOException("Container ID export worker is shut down", e);
     }
-    LOG.info("Submitted container ID export job {} (scope={}, start={}, batchSize={}, partSize={})",
-        job, scope, start, batchSize, partSize);
+    LOG.info("Submitted container ID export job {} (scope={}, start={}, maxRows={}, batchSize={}, partSize={})",
+        job, scope, start, job.getMaxRows(), job.getBatchSize(), job.getPartSize());
     return job;
   }
 
@@ -237,7 +239,7 @@ public class ContainerExportManager {
       }
 
       if (batchIndex >= batch.size()) {
-        batch = fetchContainerIds(job, cursor);
+        batch = fetchContainerIds(job, cursor, idsWritten);
         batchIndex = 0;
         if (batch.isEmpty()) {
           break;
@@ -255,7 +257,7 @@ public class ContainerExportManager {
         while (idsInCurrentPart < job.getPartSize()
             && (batchIndex < batch.size() || cursor != null)) {
           if (batchIndex >= batch.size()) {
-            batch = fetchContainerIds(job, cursor);
+            batch = fetchContainerIds(job, cursor, idsWritten);
             batchIndex = 0;
             if (batch.isEmpty()) {
               cursor = null;
@@ -289,11 +291,18 @@ public class ContainerExportManager {
     return ContainerID.valueOf(batch.get(batch.size() - 1).getProtobuf().getId() + 1);
   }
 
-  private List<ContainerID> fetchContainerIds(ExportJob job, ContainerID cursor) throws IOException {
+  private List<ContainerID> fetchContainerIds(ExportJob job, ContainerID cursor, long idsWritten) throws IOException {
     if (!isLeaderReady.getAsBoolean()) {
       throw new IOException("SCM lost leadership during " + job);
     }
-    return containerManager.getContainerIDs(
-        cursor, job.getBatchSize(), job.getLifeCycleState(), job.getHealthState());
+    int count = job.getBatchSize();
+    if (job.getMaxRows() > 0) {
+      final long remaining = job.getMaxRows() - idsWritten;
+      if (remaining <= 0) {
+        return Collections.emptyList();
+      }
+      count = (int) Math.min(count, remaining);
+    }
+    return containerManager.getContainerIDs(cursor, count, job.getLifeCycleState(), job.getHealthState());
   }
 }

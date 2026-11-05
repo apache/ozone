@@ -45,13 +45,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout project
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Restore cache for Maven dependencies
         id: restore-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -60,7 +60,7 @@ jobs:
 
       - name: Setup Java
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
@@ -73,7 +73,7 @@ jobs:
       - name: Restore NodeJS tarballs
         id: restore-nodejs
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository/com/github/eirslett/node
           key: nodejs-${{ steps.nodejs-version.outputs.nodejs-version }}
@@ -98,7 +98,7 @@ jobs:
 
       - name: Save cache for Maven dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/.m2/repository/*/*/*

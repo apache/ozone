@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.grpc.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Descriptors;
 import io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener;
@@ -24,23 +25,30 @@ import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
+import java.util.function.LongSupplier;
 
 /**
  * Interceptor to gather metrics based on grpc server request.
+ *
+ * <p>One instance serves every call on the server, so the timestamps of a call are kept on that call's listener.
+ * Queue and processing times are recorded in nanoseconds.
  */
 public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
 
   private static final String CMD_TYPE_FIELD = "cmdType";
 
   private final GrpcMetrics grpcMetrics;
-  private long receivedTime;
-  private long startTime;
-  private long endTime;
+  private final LongSupplier nanoClock;
 
   public GrpcMetricsServerRequestInterceptor(
       GrpcMetrics grpcMetrics) {
-    super();
+    this(grpcMetrics, System::nanoTime);
+  }
+
+  @VisibleForTesting
+  GrpcMetricsServerRequestInterceptor(GrpcMetrics grpcMetrics, LongSupplier nanoClock) {
     this.grpcMetrics = grpcMetrics;
+    this.nanoClock = nanoClock;
   }
 
   @Override
@@ -49,15 +57,20 @@ public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
       ServerCallHandler<ReqT, RespT> serverCallHandler) {
 
     // received time
-    receivedTime = System.nanoTime();
+    final long receivedTime = nanoClock.getAsLong();
 
     return new SimpleForwardingServerCallListener<ReqT>(
         serverCallHandler.startCall(serverCall, headers)) {
 
+      // gRPC calls the listener of one call serially, so these need no synchronization
+      private long startTime;
+      private boolean messageReceived;
+
       @Override
       public void onMessage(ReqT message) {
         // start time
-        startTime = System.nanoTime();
+        startTime = nanoClock.getAsLong();
+        messageReceived = true;
 
         long messageSize = 0;
         if (message instanceof AbstractMessage) {
@@ -81,17 +94,18 @@ public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
       @Override
       public void onComplete() {
         super.onComplete();
+        // a call that completes without a request has no start time
+        if (!messageReceived) {
+          return;
+        }
         // end time
-        endTime = System.nanoTime();
-
-        int queueTime = (int) (startTime - receivedTime);
-        int processingTime = (int) (endTime - startTime);
+        long endTime = nanoClock.getAsLong();
 
         // set metrics queue time
-        grpcMetrics.addGrpcQueueTime(queueTime);
+        grpcMetrics.addGrpcQueueTime(startTime - receivedTime);
 
         // set metrics processing time
-        grpcMetrics.addGrpcProcessingTime(processingTime);
+        grpcMetrics.addGrpcProcessingTime(endTime - startTime);
       }
     };
   }

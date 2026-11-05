@@ -31,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -51,6 +54,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -74,6 +78,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedConstruction;
 
 /**
  * Tests the Default CA Server.
@@ -306,7 +311,8 @@ public class TestDefaultCAServer {
     ExecutionException execution = assertThrows(ExecutionException.class,
         () -> testCA.requestCertificate(caCsr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM,
             String.valueOf(System.nanoTime())).get());
-    assertThat(execution.getCause().getMessage()).contains("allowed for the SCM role only, not for OM");
+    // The leaf profile used for other roles rejects the CA constraint before the role check.
+    assertThat(execution.getCause().getMessage()).contains("Failed to verify the CSR");
     assertThat(caStore.getStoredCertificates()).isEmpty();
 
     X509Certificate scmCert = CertificateCodec.firstCertificateFrom(testCA.requestCertificate(caCsr,
@@ -323,6 +329,34 @@ public class TestDefaultCAServer {
             String.valueOf(System.nanoTime())).get());
     assertThat(execution.getCause().getMessage()).contains("Failed to verify the CSR");
     assertThat(caStore.getStoredCertificates()).containsExactly(scmCert);
+  }
+
+  @Test
+  public void testRequestCertificateRejectsUnfinishedInspection() throws Exception {
+    KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID("ClusterID")
+        .setScmID("SCMID")
+        .setSubject("Ozone Cluster")
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+
+    try (MockedConstruction<DefaultApprover> ignored = mockConstruction(DefaultApprover.class,
+        (approver, context) -> when(approver.inspectCSR(any())).thenReturn(new CompletableFuture<>()))) {
+      CertificateServer testCA = new DefaultCAServer("testCA", "ClusterID", "SCMID", caStore, new DefaultProfile(),
+          Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+      testCA.init(securityConfig, CAType.ROOT);
+
+      ExecutionException execution = assertThrows(ExecutionException.class,
+          () -> testCA.requestCertificate(csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM,
+              String.valueOf(System.nanoTime())).get());
+      assertThat(execution.getCause().getMessage()).contains("CSR inspection did not complete");
+    }
+    assertThat(caStore.getStoredCertificates()).isEmpty();
   }
 
   @Test

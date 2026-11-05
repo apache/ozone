@@ -1386,10 +1386,14 @@ message ListStatusRequest {
 
 message ListStatusResponse {
     repeated OzoneFileStatusProto statuses = 1;
+    // Set by OM: false means no entries follow this page. Absent from older OMs.
+    optional bool isTruncated = 2;
 }
 
 message ListStatusLightResponse {
     repeated OzoneFileStatusProtoLight statuses = 1;
+    // Set by OM: false means no entries follow this page. Absent from older OMs.
+    optional bool isTruncated = 2;
 }
 
 message CreateKeyRequest {
