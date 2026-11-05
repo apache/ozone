@@ -349,6 +349,26 @@ public class PipelineManagerImpl implements PipelineManager {
         .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
   }
 
+  @Override
+  public List<Pipeline> getWritablePipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state) {
+    return withRegisteredNodes(stateManager.getPipelines(replicationConfig, state));
+  }
+
+  @Override
+  public List<Pipeline> getWritablePipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state,
+      Collection<DatanodeDetails> excludeDns, Collection<PipelineID> excludePipelines) {
+    return withRegisteredNodes(stateManager.getPipelines(replicationConfig, state, excludeDns, excludePipelines));
+  }
+
+  /**
+   * Callers may remove entries from the returned list, so it must be mutable.
+   */
+  private List<Pipeline> withRegisteredNodes(List<Pipeline> pipelines) {
+    return pipelines.stream()
+        .filter(p -> !hasUnregisteredNodes(p))
+        .collect(Collectors.toCollection(ArrayList::new));
+  }
+
   /**
    * Returns the count of pipelines meeting the given ReplicationConfig and
    * state.
@@ -643,7 +663,7 @@ public class PipelineManagerImpl implements PipelineManager {
       // happen, as the DNs are not aware of the pipeline. Therefore we should
       // close any pipelines in the scrubber if they have nodes which are not
       // registered
-      if (isOpenWithUnregisteredNodes(p)) {
+      if (p.isOpen() && hasUnregisteredNodes(p)) {
         LOG.info("Scrubbing pipeline: id: {} as it has unregistered nodes",
             p.getId());
         closePipeline(id);
@@ -653,15 +673,12 @@ public class PipelineManagerImpl implements PipelineManager {
 
   /**
    * @param pipeline The pipeline to check
-   * @return True if the pipeline is open and contains unregistered nodes. False
-   *         otherwise.
+   * @return True if the pipeline contains nodes which are not registered with
+   *         SCM. False otherwise.
    */
-  private boolean isOpenWithUnregisteredNodes(Pipeline pipeline) {
-    if (!pipeline.isOpen()) {
-      return false;
-    }
+  private boolean hasUnregisteredNodes(Pipeline pipeline) {
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (nodeManager.getNode(dn.getID()) == null) {
+      if (!nodeManager.isNodeRegistered(dn)) {
         return true;
       }
     }

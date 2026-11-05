@@ -180,7 +180,7 @@ public class ContainerManagerImpl implements ContainerManager {
     ContainerInfo containerInfo = null;
     try {
       pipelines = pipelineManager
-          .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+          .getWritablePipelines(replicationConfig, Pipeline.PipelineState.OPEN);
       if (!pipelines.isEmpty()) {
         pipeline = pipelines.get(random.nextInt(pipelines.size()));
         containerInfo = createContainer(pipeline, owner);
@@ -207,7 +207,7 @@ public class ContainerManagerImpl implements ContainerManager {
       lock.lock();
       try {
         pipelines = pipelineManager
-            .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+            .getWritablePipelines(replicationConfig, Pipeline.PipelineState.OPEN);
         if (!pipelines.isEmpty()) {
           pipeline = pipelines.get(random.nextInt(pipelines.size()));
           containerInfo = createContainer(pipeline, owner);

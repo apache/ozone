@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -251,6 +252,30 @@ public class TestWritableECContainerProvider {
     ContainerInfo c = provider.getContainer(1, repConfig, OWNER, exclude);
     assertNotEquals(excludedID, c.getPipelineID());
     assertThat(allocatedContainers).contains(c);
+  }
+
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testPipelinesWithUnregisteredNodesNotUsedForWrites(
+      PipelineChoosePolicy policy) throws IOException {
+    PipelineManager pipelineManagerSpy = spy(pipelineManager);
+    provider = createSubject(pipelineManagerSpy, policy);
+    int minimumPipelines = providerConf.getMinimumPipelines();
+    Set<ContainerInfo> allocated = assertDistinctContainers(minimumPipelines);
+
+    // Only one pipeline has all of its nodes registered, so it is the only
+    // writable one.
+    ContainerInfo writable = allocated.iterator().next();
+    Pipeline writablePipeline = pipelineManager.getPipeline(writable.getPipelineID());
+    doAnswer(call -> new ArrayList<>(Collections.singletonList(writablePipeline)))
+        .when(pipelineManagerSpy).getWritablePipelines(repConfig, OPEN);
+
+    for (int i = 0; i < 3 * minimumPipelines; i++) {
+      assertEquals(writable, provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
+    }
+    // Pipelines with unregistered nodes still count towards the limit, so no
+    // new pipelines were created, and they were left open for the scrubber.
+    assertEquals(minimumPipelines, pipelineManager.getPipelineCount(repConfig, OPEN));
   }
 
   @ParameterizedTest

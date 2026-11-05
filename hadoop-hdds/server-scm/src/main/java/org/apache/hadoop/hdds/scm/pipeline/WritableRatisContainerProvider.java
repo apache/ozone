@@ -161,13 +161,13 @@ public class WritableRatisContainerProvider
           final ReplicationConfig repConfig,
           final ExcludeList excludeList,
           final Pipeline.PipelineState pipelineState) {
-    List<Pipeline> pipelines = pipelineManager.getPipelines(repConfig,
+    List<Pipeline> pipelines = pipelineManager.getWritablePipelines(repConfig,
             pipelineState, excludeList.getDatanodes(),
             excludeList.getPipelineIds());
     if (pipelines.isEmpty() && !excludeList.isEmpty()) {
       // if no pipelines can be found, try finding pipeline without
       // exclusion
-      pipelines = pipelineManager.getPipelines(repConfig, pipelineState);
+      pipelines = pipelineManager.getWritablePipelines(repConfig, pipelineState);
     }
     return pipelines;
   }

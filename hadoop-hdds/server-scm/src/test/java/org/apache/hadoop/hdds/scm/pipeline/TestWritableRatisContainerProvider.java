@@ -123,7 +123,7 @@ class TestWritableRatisContainerProvider {
   }
 
   private void existingPipelines(List<Pipeline> pipelines) {
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
+    when(pipelineManager.getWritablePipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(pipelines);
   }
 
@@ -144,7 +144,7 @@ class TestWritableRatisContainerProvider {
     when(pipelineManager.createPipeline(REPLICATION_CONFIG))
         .thenReturn(newPipeline);
 
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
+    when(pipelineManager.getWritablePipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(emptyList())
         .thenReturn(new ArrayList<>(singletonList(newPipeline)));
 
@@ -163,14 +163,14 @@ class TestWritableRatisContainerProvider {
 
   private void verifyPipelineCreated() throws IOException {
     verify(pipelineManager, times(2))
-        .getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
+        .getWritablePipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
     verify(pipelineManager)
         .createPipeline(REPLICATION_CONFIG);
   }
 
   private void verifyPipelineNotCreated() throws IOException {
     verify(pipelineManager, times(1))
-        .getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
+        .getWritablePipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
     verify(pipelineManager, never())
         .createPipeline(REPLICATION_CONFIG);
   }

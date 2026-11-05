@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -587,12 +588,57 @@ public class TestPipelineManagerImpl {
 
     // Now, "unregister" one of the nodes in the pipeline
     DatanodeDetails firstDN = nodeManager.getNode(pipeline.getNodes().get(0).getID());
-    nodeManager.getClusterNetworkTopologyMap().remove(firstDN);
+    nodeManager.unregister(firstDN);
 
     pipelineManager.scrubPipelines();
     pipeline = pipelineManager.getPipeline(pipeline.getId());
     assertEquals(Pipeline.PipelineState.CLOSED,
         pipeline.getPipelineState());
+  }
+
+  @Test
+  public void testGetWritablePipelinesExcludesUnregisteredNodes() throws Exception {
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      ReplicationConfig ratisConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+      ReplicationConfig ecConfig = new ECReplicationConfig(3, 2);
+      Pipeline ratisPipeline = pipelineManager.createPipeline(ratisConfig);
+      Pipeline ecPipeline = pipelineManager.createPipeline(ecConfig);
+      pipelineManager.openPipeline(ratisPipeline.getId());
+      pipelineManager.openPipeline(ecPipeline.getId());
+
+      assertThat(pipelineManager.getWritablePipelines(ratisConfig, OPEN)).containsExactly(ratisPipeline);
+      assertThat(pipelineManager.getWritablePipelines(ecConfig, OPEN)).containsExactly(ecPipeline);
+      assertThat(pipelineManager.getWritablePipelines(ratisConfig, OPEN, Collections.emptySet(),
+          Collections.emptySet())).containsExactly(ratisPipeline);
+
+      // "Unregister" one node from each pipeline.
+      DatanodeDetails ratisDN = nodeManager.getNode(ratisPipeline.getNodes().get(0).getID());
+      DatanodeDetails ecDN = nodeManager.getNode(ecPipeline.getNodes().get(0).getID());
+      nodeManager.unregister(ratisDN);
+      nodeManager.unregister(ecDN);
+
+      // Hidden from the write path.
+      assertThat(pipelineManager.getWritablePipelines(ratisConfig, OPEN)).isEmpty();
+      assertThat(pipelineManager.getWritablePipelines(ecConfig, OPEN)).isEmpty();
+      assertThat(pipelineManager.getWritablePipelines(ratisConfig, OPEN, Collections.emptySet(),
+          Collections.emptySet())).isEmpty();
+
+      // Still visible to all other getters, and still counted.
+      assertThat(pipelineManager.getPipelines(ratisConfig, OPEN)).containsExactly(ratisPipeline);
+      assertThat(pipelineManager.getPipelines(ecConfig, OPEN)).containsExactly(ecPipeline);
+      assertEquals(ratisPipeline, pipelineManager.getPipeline(ratisPipeline.getId()));
+      assertTrue(pipelineManager.containsPipeline(ecPipeline.getId()));
+      assertEquals(1, pipelineManager.getPipelineCount(ratisConfig, OPEN));
+      assertEquals(1, pipelineManager.getPipelineCount(ecConfig, OPEN));
+
+      // Visible again once the nodes register.
+      for (DatanodeDetails dn : Arrays.asList(ratisDN, ecDN)) {
+        nodeManager.setNodeState(dn, HddsProtos.NodeState.HEALTHY);
+        nodeManager.getClusterNetworkTopologyMap().add(dn);
+      }
+      assertThat(pipelineManager.getWritablePipelines(ratisConfig, OPEN)).containsExactly(ratisPipeline);
+      assertThat(pipelineManager.getWritablePipelines(ecConfig, OPEN)).containsExactly(ecPipeline);
+    }
   }
 
   @Test

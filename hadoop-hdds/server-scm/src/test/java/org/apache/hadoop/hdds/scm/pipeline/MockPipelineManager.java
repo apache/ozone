@@ -187,6 +187,17 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public List<Pipeline> getWritablePipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state) {
+    return stateManager.getPipelines(replicationConfig, state);
+  }
+
+  @Override
+  public List<Pipeline> getWritablePipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state,
+      Collection<DatanodeDetails> excludeDns, Collection<PipelineID> excludePipelines) {
+    return stateManager.getPipelines(replicationConfig, state, excludeDns, excludePipelines);
+  }
+
+  @Override
   /**
    * Returns the count of pipelines meeting the given ReplicationConfig and
    * state.
