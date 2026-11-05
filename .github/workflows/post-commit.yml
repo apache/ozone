@@ -43,7 +43,6 @@ on:
       # ignore .github except this workflow and the ones used transitively
       - '.github/**'
       - '!.github/actions/check/action.yaml'
-      - '!.github/workflows/check.yml'
       - '!.github/workflows/ci.yml'
       - '!.github/workflows/post-commit.yml'
       - '!.github/workflows/generate-config-doc.yml'
