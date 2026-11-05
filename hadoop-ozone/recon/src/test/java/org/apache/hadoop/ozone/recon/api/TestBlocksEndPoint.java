@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerBlocksInfoWrapper;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -142,21 +143,8 @@ public class TestBlocksEndPoint {
 
   @AfterEach
   public void tearDown() throws Exception {
-    if (reconStorageContainerManager != null) {
-      reconStorageContainerManager.stop();
-    }
-    if (reconReplicaHistoryDBProvider != null) {
-      reconReplicaHistoryDBProvider.close();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    ReconTestUtils.closeReconResources(reconStorageContainerManager, reconDBProvider, reconReplicaHistoryDBProvider,
+        reconOMMetadataManager, omMetadataManager);
   }
 
   @Test

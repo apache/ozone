@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStorageReport;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -145,21 +146,8 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
 
   @AfterEach
   public void tearDown() throws Exception {
-    if (reconScm != null) {
-      reconScm.stop();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (replicaHistoryDBProvider != null) {
-      replicaHistoryDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    ReconTestUtils.closeReconResources(reconScm, reconDBProvider, replicaHistoryDBProvider, reconOMMetadataManager,
+        omMetadataManager);
   }
 
   @Test

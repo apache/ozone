@@ -99,6 +99,7 @@ import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -236,21 +237,8 @@ public class TestContainerEndpoint {
 
   @AfterEach
   public void tearDown() throws Exception {
-    if (reconScm != null) {
-      reconScm.stop();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (replicaHistoryDBProvider != null) {
-      replicaHistoryDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    ReconTestUtils.closeReconResources(reconScm, reconDBProvider, replicaHistoryDBProvider, reconOMMetadataManager,
+        omMetadataManager);
   }
 
   @BeforeEach
