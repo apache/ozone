@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createContainerForTesting;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.runTestOzoneContainerViaDataNode;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.writeChunkForContainer;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -313,75 +316,6 @@ public class TestOzoneContainer {
     }
   }
 
-  public static void runTestOzoneContainerViaDataNode(
-      long testContainerID, XceiverClientSpi client) throws Exception {
-    ContainerProtos.ContainerCommandRequestProto
-        request, writeChunkRequest, putBlockRequest,
-        updateRequest1, updateRequest2;
-    ContainerProtos.ContainerCommandResponseProto response,
-        updateResponse1, updateResponse2;
-    try {
-      client.connect();
-
-      Pipeline pipeline = client.getPipeline();
-      createContainerForTesting(client, testContainerID);
-      writeChunkRequest = writeChunkForContainer(client, testContainerID,
-          1024);
-
-      // Read Chunk
-      request = ContainerTestHelper.getReadChunkRequest(
-          pipeline, writeChunkRequest.getWriteChunk());
-
-      response = client.sendCommand(request);
-      assertNotNull(response);
-      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-
-      // Put Block
-      putBlockRequest = ContainerTestHelper.getPutBlockRequest(
-          pipeline, writeChunkRequest.getWriteChunk());
-
-
-      response = client.sendCommand(putBlockRequest);
-      assertNotNull(response);
-      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-
-      // Get Block
-      request = ContainerTestHelper.
-          getBlockRequest(pipeline, putBlockRequest.getPutBlock());
-      response = client.sendCommand(request);
-      int chunksCount = putBlockRequest.getPutBlock().getBlockData().
-          getChunksCount();
-      ContainerTestHelper.verifyGetBlock(response, chunksCount);
-
-      // Delete Block and Delete Chunk are handled by BlockDeletingService
-      // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
-      // are deprecated
-
-      //Update an existing container
-      Map<String, String> containerUpdate = new HashMap<String, String>();
-      containerUpdate.put("container_updated_key", "container_updated_value");
-      updateRequest1 = ContainerTestHelper.getUpdateContainerRequest(
-          testContainerID, containerUpdate);
-      updateResponse1 = client.sendCommand(updateRequest1);
-      assertNotNull(updateResponse1);
-      assertEquals(ContainerProtos.Result.SUCCESS,
-          response.getResult());
-
-      //Update an non-existing container
-      long nonExistingContinerID =
-          ContainerTestHelper.getTestContainerID();
-      updateRequest2 = ContainerTestHelper.getUpdateContainerRequest(
-          nonExistingContinerID, containerUpdate);
-      updateResponse2 = client.sendCommand(updateRequest2);
-      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND,
-          updateResponse2.getResult());
-    } finally {
-      if (client != null) {
-        client.close();
-      }
-    }
-  }
-
   @Test
   public void testBothGetandPutSmallFile(
       @TempDir File ozoneMetaDir, @TempDir File hddsNodeDir) throws Exception {
@@ -661,32 +595,5 @@ public class TestOzoneContainer {
 
   private static XceiverClientGrpc createClientForTesting(Pipeline pipeline, MiniOzoneCluster cluster) {
     return new XceiverClientGrpc(pipeline, cluster.getConf());
-  }
-
-  public static ContainerProtos.ContainerCommandResponseProto createContainerForTesting(XceiverClientSpi client,
-      long containerID) throws Exception {
-    // Create container
-    ContainerProtos.ContainerCommandRequestProto request =
-        ContainerTestHelper.getCreateContainerRequest(
-            containerID, client.getPipeline());
-    ContainerProtos.ContainerCommandResponseProto response =
-        client.sendCommand(request);
-    assertNotNull(response);
-    return response;
-  }
-
-  public static ContainerProtos.ContainerCommandRequestProto
-      writeChunkForContainer(XceiverClientSpi client,
-      long containerID, int dataLen) throws Exception {
-    // Write Chunk
-    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
-    ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
-        ContainerTestHelper.getWriteChunkRequest(client.getPipeline(),
-            blockID, dataLen);
-    ContainerProtos.ContainerCommandResponseProto response =
-        client.sendCommand(writeChunkRequest);
-    assertNotNull(response);
-    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-    return writeChunkRequest;
   }
 }
