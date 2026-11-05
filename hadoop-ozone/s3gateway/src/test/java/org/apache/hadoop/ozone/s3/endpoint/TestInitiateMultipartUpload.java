@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMult
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -39,13 +40,16 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -127,6 +131,33 @@ public class TestInitiateMultipartUpload {
 
     assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
         () -> EndpointTestUtils.put(rest, bucket, key, 1, "upload-id", "content"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"dir1", "dir1/"})
+  public void testInitiateMultipartUploadRejectsExistingDirectory(String key) throws Exception {
+    String bucket = OzoneConsts.S3_BUCKET;
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket(bucket);
+    ObjectEndpoint rest = spy(getObjectEndpoint(client, mock(HttpHeaders.class)));
+    OzoneVolume volume = spy(rest.getVolume());
+    OzoneBucket ozoneBucket = spy(volume.getBucket(bucket));
+    doReturn(volume).when(rest).getVolume();
+    doReturn(ozoneBucket).when(volume).getBucket(bucket);
+    doThrow(new OMException("Can not write to directory: " + key, OMException.ResultCodes.NOT_A_FILE))
+        .when(ozoneBucket).initiateMultipartUpload(eq(key), any(ReplicationConfig.class), anyMap(), anyMap());
+
+    long failureBefore = rest.getMetrics().getInitMultiPartUploadFailure();
+    OS3Exception exception = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> rest.initializeMultipartUpload(bucket, key));
+
+    assertEquals("An error occurred (InvalidRequest) " +
+        "when calling the PutObject/MPU PartUpload operation: " +
+        OmConfig.Keys.ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
+        " considered as Unix Paths. Path has Violated FS Semantics " +
+        "which caused put operation to fail.", exception.getErrorMessage());
+    assertEquals(400, exception.getHttpCode());
+    assertEquals(1, rest.getMetrics().getInitMultiPartUploadFailure() - failureBefore);
   }
 
   @Nonnull
