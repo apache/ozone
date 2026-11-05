@@ -72,19 +72,24 @@ public final class OMGrpcError {
   }
 
   public static OMGrpcError getFromProtobuf(OMGrpcErrorProto proto) {
-    final String message = proto.hasMessage() ? proto.getMessage() : null;
     switch (proto.getErrorCase()) {
     case NOTLEADER:
-      return new OMGrpcError(Kind.NOT_LEADER, message, proto.getNotLeader().hasSuggestedLeaderNodeId()
-          ? proto.getNotLeader().getSuggestedLeaderNodeId() : null);
+      final OMGrpcErrorProto.NotLeader notLeader = proto.getNotLeader();
+      return new OMGrpcError(Kind.NOT_LEADER, notLeader.hasMessage() ? notLeader.getMessage() : null,
+          notLeader.hasSuggestedLeaderNodeId() ? notLeader.getSuggestedLeaderNodeId() : null);
     case LEADERNOTREADY:
-      return new OMGrpcError(Kind.LEADER_NOT_READY, message, null);
+      final OMGrpcErrorProto.LeaderNotReady leaderNotReady = proto.getLeaderNotReady();
+      return new OMGrpcError(Kind.LEADER_NOT_READY,
+          leaderNotReady.hasMessage() ? leaderNotReady.getMessage() : null, null);
     case READINDEXFAILED:
-      return new OMGrpcError(Kind.READ_INDEX_FAILED, message, null);
+      final OMGrpcErrorProto.ReadIndexFailed readIndexFailed = proto.getReadIndexFailed();
+      return new OMGrpcError(Kind.READ_INDEX_FAILED,
+          readIndexFailed.hasMessage() ? readIndexFailed.getMessage() : null, null);
     case READFAILED:
-      return new OMGrpcError(Kind.READ_FAILED, message, null);
+      final OMGrpcErrorProto.ReadFailed readFailed = proto.getReadFailed();
+      return new OMGrpcError(Kind.READ_FAILED, readFailed.hasMessage() ? readFailed.getMessage() : null, null);
     default:
-      return new OMGrpcError(Kind.INTERNAL, message, null);
+      return new OMGrpcError(Kind.INTERNAL, null, null);
     }
   }
 
@@ -110,33 +115,45 @@ public final class OMGrpcError {
   }
 
   /**
-   * @return the protobuf of this error. The message of an {@link Kind#INTERNAL} error is left out,
-   *         since the gRPC status description already has it.
+   * @return the protobuf of this error. An {@link Kind#INTERNAL} error is empty,
+   *         since the gRPC status description already has its message.
    */
   public OMGrpcErrorProto getProtobuf() {
     final OMGrpcErrorProto.Builder proto = OMGrpcErrorProto.newBuilder();
     switch (kind) {
     case NOT_LEADER:
       final OMGrpcErrorProto.NotLeader.Builder notLeader = OMGrpcErrorProto.NotLeader.newBuilder();
+      if (message != null) {
+        notLeader.setMessage(message);
+      }
       if (suggestedLeaderNodeId != null) {
         notLeader.setSuggestedLeaderNodeId(suggestedLeaderNodeId);
       }
       proto.setNotLeader(notLeader);
       break;
     case LEADER_NOT_READY:
-      proto.setLeaderNotReady(OMGrpcErrorProto.LeaderNotReady.getDefaultInstance());
+      final OMGrpcErrorProto.LeaderNotReady.Builder leaderNotReady = OMGrpcErrorProto.LeaderNotReady.newBuilder();
+      if (message != null) {
+        leaderNotReady.setMessage(message);
+      }
+      proto.setLeaderNotReady(leaderNotReady);
       break;
     case READ_INDEX_FAILED:
-      proto.setReadIndexFailed(OMGrpcErrorProto.ReadIndexFailed.getDefaultInstance());
+      final OMGrpcErrorProto.ReadIndexFailed.Builder readIndexFailed = OMGrpcErrorProto.ReadIndexFailed.newBuilder();
+      if (message != null) {
+        readIndexFailed.setMessage(message);
+      }
+      proto.setReadIndexFailed(readIndexFailed);
       break;
     case READ_FAILED:
-      proto.setReadFailed(OMGrpcErrorProto.ReadFailed.getDefaultInstance());
+      final OMGrpcErrorProto.ReadFailed.Builder readFailed = OMGrpcErrorProto.ReadFailed.newBuilder();
+      if (message != null) {
+        readFailed.setMessage(message);
+      }
+      proto.setReadFailed(readFailed);
       break;
     default:
-      return proto.build();
-    }
-    if (message != null) {
-      proto.setMessage(message);
+      break;
     }
     return proto.build();
   }

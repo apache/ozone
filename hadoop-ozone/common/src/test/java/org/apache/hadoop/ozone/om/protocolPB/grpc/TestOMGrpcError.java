@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.protocolPB.grpc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.grpc.Status;
@@ -29,6 +28,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError.Kind;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMGrpcErrorProto;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.ReadException;
 import org.apache.ratis.protocol.exceptions.ReadIndexException;
@@ -59,8 +59,15 @@ public class TestOMGrpcError {
     final OMGrpcError notLeader = OMGrpcError.fromException(NOT_LEADER);
     assertError(OMGrpcError.getFromProtobuf(notLeader.getProtobuf()), Kind.NOT_LEADER, NOT_LEADER.getMessage(), "om2");
 
+    for (IOException omException : new IOException[] {new OMLeaderNotReadyException("om1 is not ready"),
+        new ReadIndexException("read index failed"), new ReadException("read failed")}) {
+      final OMGrpcError error = OMGrpcError.fromException(omException);
+      assertError(OMGrpcError.getFromProtobuf(error.getProtobuf()), error.getKind(), omException.getMessage(), null);
+    }
+
     // The message of any other error is only in the gRPC status description.
-    assertFalse(OMGrpcError.fromException(new IllegalStateException("unexpected")).getProtobuf().hasMessage());
+    assertEquals(OMGrpcErrorProto.getDefaultInstance(),
+        OMGrpcError.fromException(new IllegalStateException("unexpected")).getProtobuf());
   }
 
   @Test

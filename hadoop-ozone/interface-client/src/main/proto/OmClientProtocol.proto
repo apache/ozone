@@ -2867,20 +2867,26 @@ service OzoneManagerService {
 */
 message OMGrpcErrorProto {
   message NotLeader {
+    optional string message = 1;
     // The OM node ID of the suggested leader, if known.
-    optional string suggestedLeaderNodeId = 1;
+    optional string suggestedLeaderNodeId = 2;
   }
-  message LeaderNotReady {}
-  message ReadIndexFailed {}
-  message ReadFailed {}
+  message LeaderNotReady {
+    optional string message = 1;
+  }
+  message ReadIndexFailed {
+    optional string message = 1;
+  }
+  message ReadFailed {
+    optional string message = 1;
+  }
 
-  optional string message = 1;
   // Not set for any other error.
   oneof error {
-    NotLeader notLeader = 2;
-    LeaderNotReady leaderNotReady = 3;
-    ReadIndexFailed readIndexFailed = 4;
-    ReadFailed readFailed = 5;
+    NotLeader notLeader = 1;
+    LeaderNotReady leaderNotReady = 2;
+    ReadIndexFailed readIndexFailed = 3;
+    ReadFailed readFailed = 4;
   }
 }
 
