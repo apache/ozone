@@ -30,8 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -82,11 +80,8 @@ public class TestQueryNode {
 
   @Test
   public void testStaleNodesCount() throws Exception {
-    ExecutorService executor = Executors.newFixedThreadPool(1);
-    executor.execute(() -> {
-      cluster.shutdownHddsDatanode(0);
-      cluster.shutdownHddsDatanode(1);
-    });
+    cluster.shutdownHddsDatanode(0);
+    cluster.shutdownHddsDatanode(1);
     GenericTestUtils.waitFor(() -> {
       try {
         return
@@ -101,7 +96,7 @@ public class TestQueryNode {
 
     GenericTestUtils.waitFor(() ->
             cluster.getStorageContainerManager().getNodeCount(DEAD) == 2,
-        100, 4 * 1000);
+        100, 10 * 1000);
 
     // Assert that we don't find any stale nodes.
     int nodeCount = scmClient.queryNode(null, STALE,

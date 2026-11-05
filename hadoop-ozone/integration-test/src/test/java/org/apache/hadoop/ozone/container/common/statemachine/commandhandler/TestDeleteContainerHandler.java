@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -74,6 +76,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -112,11 +115,26 @@ public class TestDeleteContainerHandler {
         .setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ONE, 30000);
+    // SCM can open the pipeline before its Ratis leader is ready. A WriteChunk rejected with
+    // LeaderNotReadyException can be followed by a PutBlock the leader accepts, which marks the container UNHEALTHY.
+    Pipeline openPipeline = cluster.getStorageContainerManager().getPipelineManager()
+        .getPipelines(RatisReplicationConfig.getInstance(ONE), Pipeline.PipelineState.OPEN).get(0);
+    XceiverServerRatis ratisServer = (XceiverServerRatis) cluster.getHddsDatanodes().get(0)
+        .getDatanodeStateMachine().getContainer().getWriteChannel();
+    GenericTestUtils.waitFor(() -> isLeaderReady(ratisServer, openPipeline), 100, 30000);
 
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
+  }
+
+  private static boolean isLeaderReady(XceiverServerRatis server, Pipeline pipeline) {
+    try {
+      return server.getServerDivision(RaftGroupId.valueOf(pipeline.getId().getId())).getInfo().isLeaderReady();
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   @AfterAll

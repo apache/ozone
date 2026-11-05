@@ -81,7 +81,7 @@ public class NodeStateMap {
   }
 
   /**
-   * Update the given datanode.
+   * Update the given datanode. The datanode keeps its containers.
    *
    * @return the existing {@link DatanodeInfo}.
    */
@@ -90,11 +90,9 @@ public class NodeStateMap {
     final DatanodeInfo oldInfo;
     lock.writeLock().lock();
     try {
-      oldInfo = getNodeInfo(id);
-      if (oldInfo == null) {
-        throw new NodeNotFoundException(id);
-      }
-      nodeMap.put(id, new DatanodeEntry(datanode));
+      final DatanodeEntry oldEntry = getExisting(id);
+      oldInfo = oldEntry.getInfo();
+      nodeMap.put(id, new DatanodeEntry(datanode, oldEntry));
     } finally {
       lock.writeLock().unlock();
     }

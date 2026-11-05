@@ -495,6 +495,12 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Deprecated
+  @Override
+  public void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID containerID) throws IOException {
+    transitionDeletingOrDeletedToTargetState(containerID, CLOSED);
+  }
+
   @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id) {
     try (AutoCloseableLock ignored = readLock(id)) {

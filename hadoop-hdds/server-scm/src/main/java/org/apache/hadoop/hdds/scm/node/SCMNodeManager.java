@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -550,7 +551,8 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   private synchronized void addToDnsToDnIdMap(DatanodeID datanodeID, String... addresses) {
     for (String addr : addresses) {
       if (!Strings.isNullOrEmpty(addr)) {
-        dnsToDnIdMap.computeIfAbsent(addr, k -> ConcurrentHashMap.newKeySet())
+        dnsToDnIdMap.computeIfAbsent(HddsUtils.normalizeIpAddress(addr),
+            k -> ConcurrentHashMap.newKeySet())
             .add(datanodeID);
       }
     }
@@ -558,9 +560,10 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
 
   private synchronized void removeFromDnsToDnIdMap(DatanodeID datanodeID, String address) {
     if (address != null) {
-      Set<DatanodeID> dnSet = dnsToDnIdMap.get(address);
+      String key = HddsUtils.normalizeIpAddress(address);
+      Set<DatanodeID> dnSet = dnsToDnIdMap.get(key);
       if (dnSet != null && dnSet.remove(datanodeID) && dnSet.isEmpty()) {
-        dnsToDnIdMap.remove(address);
+        dnsToDnIdMap.remove(key);
       }
     }
   }
@@ -2027,7 +2030,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     if (Strings.isNullOrEmpty(address)) {
       return Collections.emptyList();
     }
-    Set<DatanodeID> datanodeIDS = dnsToDnIdMap.get(address);
+    Set<DatanodeID> datanodeIDS = dnsToDnIdMap.get(HddsUtils.normalizeIpAddress(address));
     if (datanodeIDS == null) {
       return Collections.emptyList();
     }
@@ -2131,7 +2134,8 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     }
   }
 
-  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
+  @Override
+  public boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
     if (versionReport == null || !versionReport.hasSoftwareVersion() || !versionReport.hasApparentVersion()) {
       LOG.error("Datanode {} did not report its version. Not allowing it to join the cluster.", dnDetails);
       return true;

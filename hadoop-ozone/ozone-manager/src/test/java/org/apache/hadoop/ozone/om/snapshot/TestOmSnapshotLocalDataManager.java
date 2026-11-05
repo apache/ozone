@@ -34,24 +34,21 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -68,6 +65,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -114,7 +112,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
-import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.MockitoAnnotations;
 import org.rocksdb.LiveFileMetaData;
@@ -987,16 +984,15 @@ public class TestOmSnapshotLocalDataManager {
     
     // Initialize - should load existing files
     AtomicInteger yamlLoads = new AtomicInteger();
-    try (MockedConstruction<OmSnapshotLocalDataYaml.YamlFactory> ignored = mockConstruction(
-        OmSnapshotLocalDataYaml.YamlFactory.class, withSettings().defaultAnswer(CALLS_REAL_METHODS),
-        (factory, context) -> doAnswer(create -> {
-          Yaml yaml = spy((Yaml) create.callRealMethod());
-          doAnswer(load -> {
-            yamlLoads.incrementAndGet();
-            return load.callRealMethod();
-          }).when(yaml).load(any(InputStream.class));
-          return yaml;
-        }).when(factory).create())) {
+    // Static mocks are thread-local, so run the loader tasks on this thread while counting actual parses.
+    try (MockedStatic<Executors> executors = mockStatic(Executors.class);
+         MockedStatic<OmSnapshotLocalDataYaml> yaml = mockStatic(OmSnapshotLocalDataYaml.class, CALLS_REAL_METHODS)) {
+      executors.when(() -> Executors.newFixedThreadPool(anyInt(), any()))
+          .thenReturn(MoreExecutors.newDirectExecutorService());
+      yaml.when(() -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(any(File.class))).thenAnswer(load -> {
+        yamlLoads.incrementAndGet();
+        return load.callRealMethod();
+      });
       localDataManager = getNewOmSnapshotLocalDataManager();
     }
     // snapshotId sorts first and depends on previousSnapshotId, but each YAML must still be parsed only once.
@@ -1137,6 +1133,26 @@ public class TestOmSnapshotLocalDataManager {
       assertNotNull(provider.getMeta(),
           "getMeta() returned null. Calling getVersion() on it throws NullPointerException");
     }
+  }
+
+  @Test
+  public void testCheckOrphanSnapshotVersionsContinuesAfterLoadFailure() throws IOException {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    Map<UUID, Integer> orphanCheckMap = localDataManager.getSnapshotToBeCheckedForOrphans();
+    orphanCheckMap.clear();
+    orphanCheckMap.put(firstSnapId, 1);
+    orphanCheckMap.put(secondSnapId, 1);
+    // Corrupt the second snapshot's YAML after it has been loaded into the version graph.
+    Files.write(Paths.get(localDataManager.getSnapshotLocalPropertyYamlPath(secondSnapId)),
+        "not: [valid".getBytes(StandardCharsets.UTF_8));
+
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null);
+
+    // The first snapshot is still processed and the failed one stays queued for the next run.
+    assertThat(orphanCheckMap).containsOnlyKeys(secondSnapId).containsEntry(secondSnapId, 1);
   }
 
   @Test

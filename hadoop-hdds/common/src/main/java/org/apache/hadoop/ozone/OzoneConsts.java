@@ -198,11 +198,6 @@ public final class OzoneConsts {
   public static final long OLD_QUOTA_DEFAULT = -2;
 
   /**
-   * Object ID to identify reclaimable uncommitted blocks.
-   */
-  public static final long OBJECT_ID_RECLAIM_BLOCKS = 0L;
-
-  /**
    * Default SCM Datanode ID file name.
    */
   public static final String OZONE_SCM_DATANODE_ID_FILE_DEFAULT = "datanode.id";
@@ -338,6 +333,7 @@ public final class OzoneConsts {
   public static final String FORCE_FULL_DIFF = "forceFullDiff";
   public static final String DISABLE_NATIVE_DIFF = "disableNativeDiff";
   public static final String JOB_STATUS = "jobStatus";
+  public static final String ORDERED_REPORT = "orderedReport";
 
   // For multi-tenancy
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";
