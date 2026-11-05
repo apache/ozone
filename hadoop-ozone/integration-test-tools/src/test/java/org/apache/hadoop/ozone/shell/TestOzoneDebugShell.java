@@ -57,8 +57,8 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
@@ -71,7 +71,7 @@ import picocli.CommandLine;
  * Test Ozone Debug shell.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
+public abstract class TestOzoneDebugShell implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   private OzoneDebug ozoneDebugShell;

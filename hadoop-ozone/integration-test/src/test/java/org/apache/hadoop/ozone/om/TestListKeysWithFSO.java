@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -56,7 +56,7 @@ import org.junit.jupiter.api.TestInstance;
  * in a FSO bucket layout type.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
+public abstract class TestListKeysWithFSO implements ClusterForTests.TestCase {
 
   private OzoneBucket legacyOzoneBucket;
   private OzoneBucket fsoOzoneBucket;

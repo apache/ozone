@@ -562,6 +562,37 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   @Test
+  void testSpareLocationReadsCurrentStripe() throws IOException {
+    int chunkSize = repConfig.getEcChunkSize();
+    int blockLength = stripeSize() * 3;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 3 * chunkSize);
+    ECStreamTestUtil.randomFill(dataBufs, chunkSize, dataGen, blockLength);
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+    addDataStreamsToFactory(dataBufs, parity);
+
+    // Index 1 has a spare replica, index 3 is missing and recovered from parity.
+    Map<DatanodeDetails, Integer> dnMap = ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
+    dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
+    streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+    ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+    try (ECBlockReconstructedStripeInputStream ecb = createInputStream(keyInfo)) {
+      for (int i = 0; i < 3; i++) {
+        if (i == 1) {
+          // The first replica of index 1 fails in the second stripe, so the rest of the block is read from the spare.
+          streamFactory.getBlockStream(1).setShouldError(true, chunkSize, null);
+        }
+        assertEquals(stripeSize(), ecb.read(bufs));
+        for (int j = 0; j < bufs.length; j++) {
+          validateContents(dataBufs[j], bufs[j], i * chunkSize, chunkSize);
+        }
+        clearBuffers(bufs);
+      }
+    }
+  }
+
+  @Test
   public void testSeek() throws IOException {
     // Generate the input data for 3 full stripes and generate the parity
     // and a partial stripe
