@@ -44,7 +44,7 @@ env:
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
-  OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
+  OZONE_WITH_COVERAGE: ${{ github.event_name != 'pull_request' }}
 
 permissions: { }
 
@@ -73,25 +73,25 @@ jobs:
       java-version: ${{ env.TEST_JAVA_VERSION }}
       with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
-      - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
+      - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (${{ github.event_name }})"
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-        if: github.event_name  == 'push'
+        if: github.event_name != 'pull_request' && inputs.ref == ''
       - name: "Checkout ${{ github.sha }} with its parent (pull request)"
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
-        if: github.event_name  == 'pull_request'
-      - name: "Checkout ${{ inputs.ref }} given in workflow input (manual dispatch)"
+        if: github.event_name == 'pull_request'
+      - name: "Checkout ${{ inputs.ref }} given in workflow input (${{ github.event_name }})"
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-        if: github.event_name  == 'workflow_dispatch'
-      - name: Get SHA of ${{ inputs.ref || github.ref }}
+        if: github.event_name != 'pull_request' && inputs.ref != ''
+      - name: Get SHA
         id: get-sha
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
@@ -152,10 +152,6 @@ jobs:
     needs:
       - build-info
       - build
-    if: |
-      needs.build-info.outputs.needs-build == 'true' &&
-      (github.repository != 'apache/ozone' || github.event_name == 'pull_request' ||
-       (github.event_name == 'push' && github.ref_name == 'master'))
     uses: $/.github/workflows/generate-config-doc.yml
     with:
       sha: ${{ needs.build-info.outputs.sha }}
@@ -164,7 +160,7 @@ jobs:
     needs:
       - generate-config-doc
     if: |
-      github.event_name == 'push' &&
+      github.event_name != 'pull_request' &&
       github.repository == 'apache/ozone' &&
       github.ref_name == 'master'
     uses: $/.github/workflows/update-ozone-site-config-doc.yml
@@ -477,7 +473,7 @@ jobs:
   coverage:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     needs:
       - build-info
       - acceptance

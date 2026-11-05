@@ -107,6 +107,9 @@ public class SnapshotDiffResponse {
     StringBuilder str = new StringBuilder();
     switch (jobStatus) {
     case DONE:
+      if (StringUtils.isNotEmpty(reason)) {
+        str.append(reason).append(System.lineSeparator());
+      }
       str.append(snapshotDiffReport.toString());
       break;
     case FAILED:

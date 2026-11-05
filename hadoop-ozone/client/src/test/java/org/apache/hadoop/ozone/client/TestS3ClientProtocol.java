@@ -26,6 +26,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,12 +37,16 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedConstruction;
@@ -90,6 +95,27 @@ class TestS3ClientProtocol {
       } else {
         assertSame(args[i], forwarded[i]);
       }
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
+  void resolvesS3ContextVolumeForObjectTagging(OzoneManagerVersion version)
+      throws Exception {
+    when(delegate.getOmVersion()).thenReturn(version);
+    when(delegate.getS3VolumeContext()).thenReturn(new S3VolumeContext(
+        OmVolumeArgs.newBuilder().setVolume("tenant-volume")
+            .setOwnerName("owner").setAdminName("admin").build(), "owner"));
+
+    client.getObjectTagging(null, "bucket", "key");
+
+    if (version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION) {
+      verify(delegate).getObjectTagging(null, "bucket", "key");
+      verify(delegate, never()).getS3VolumeContext();
+    } else {
+      verify(delegate).getObjectTagging("tenant-volume", "bucket", "key");
+      verify(delegate).getS3VolumeContext();
     }
   }
 

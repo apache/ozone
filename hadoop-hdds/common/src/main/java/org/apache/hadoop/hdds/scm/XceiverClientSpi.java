@@ -159,6 +159,37 @@ public abstract class XceiverClientSpi implements Closeable {
     }
   }
 
+  /**
+   * Sends a given command to the given datanode only, without failing over
+   * to the other datanodes in the pipeline.
+   * Implementations which cannot target a specific datanode fall back to
+   * {@link #sendCommand(ContainerCommandRequestProto, List)}.
+   * @param request Request
+   * @param validators functions to validate the response
+   * @param datanode the datanode to send the command to
+   * @return Response to the command
+   */
+  public ContainerCommandResponseProto sendCommand(
+      ContainerCommandRequestProto request,
+      List<Validator> validators,
+      DatanodeDetails datanode)
+      throws IOException {
+    return sendCommand(request, validators);
+  }
+
+  /**
+   * Returns the datanodes of the pipeline in the order they should be tried
+   * for a command on the given block.
+   * @param blockID the block the command operates on
+   * @param cmdType type of the command
+   * @return datanodes of the pipeline, in the order to try
+   */
+  public List<DatanodeDetails> getDatanodesInOrder(
+      ContainerProtos.DatanodeBlockID blockID, ContainerProtos.Type cmdType)
+      throws IOException {
+    return getPipeline().getNodesInOrder();
+  }
+
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
     throw new UnsupportedOperationException("Stream read is not supported");
   }
