@@ -31,68 +31,141 @@ import org.apache.ratis.protocol.exceptions.ReadIndexException;
 
 /**
  * The Java form of {@link OMGrpcErrorProto}, the error that the OM gRPC server sends in the gRPC trailers.
- * It converts between this error and the exception thrown by OM.
  */
 public final class OMGrpcError {
   private static final Metadata.Key<OMGrpcErrorProto> ERROR_KEY = Metadata.Key.of("om-grpc-error-bin",
       ProtoUtils.metadataMarshaller(OMGrpcErrorProto.getDefaultInstance()));
 
-  private OMGrpcError() {
+  private final Kind kind;
+  private final String message;
+  /** The OM node ID of the suggested leader, for {@link Kind#NOT_LEADER}. */
+  private final String suggestedLeaderNodeId;
+
+  /** A kind for each error in {@link OMGrpcErrorProto}, and {@link #INTERNAL} for any other error. */
+  public enum Kind {
+    NOT_LEADER,
+    LEADER_NOT_READY,
+    READ_INDEX_FAILED,
+    READ_FAILED,
+    INTERNAL
+  }
+
+  private OMGrpcError(Kind kind, String message, String suggestedLeaderNodeId) {
+    this.kind = kind;
+    this.message = message;
+    this.suggestedLeaderNodeId = suggestedLeaderNodeId;
+  }
+
+  /** @return the error for the given exception thrown by OM. */
+  public static OMGrpcError fromException(Throwable omException) {
+    if (omException instanceof OMNotLeaderException) {
+      return new OMGrpcError(Kind.NOT_LEADER, omException.getMessage(),
+          ((OMNotLeaderException) omException).getSuggestedLeaderNodeId());
+    } else if (omException instanceof OMLeaderNotReadyException) {
+      return new OMGrpcError(Kind.LEADER_NOT_READY, omException.getMessage(), null);
+    } else if (omException instanceof ReadIndexException) {
+      return new OMGrpcError(Kind.READ_INDEX_FAILED, omException.getMessage(), null);
+    } else if (omException instanceof ReadException) {
+      return new OMGrpcError(Kind.READ_FAILED, omException.getMessage(), null);
+    }
+    return new OMGrpcError(Kind.INTERNAL, omException.toString(), null);
+  }
+
+  public static OMGrpcError getFromProtobuf(OMGrpcErrorProto proto) {
+    final String message = proto.hasMessage() ? proto.getMessage() : null;
+    switch (proto.getErrorCase()) {
+    case NOTLEADER:
+      return new OMGrpcError(Kind.NOT_LEADER, message, proto.getNotLeader().hasSuggestedLeaderNodeId()
+          ? proto.getNotLeader().getSuggestedLeaderNodeId() : null);
+    case LEADERNOTREADY:
+      return new OMGrpcError(Kind.LEADER_NOT_READY, message, null);
+    case READINDEXFAILED:
+      return new OMGrpcError(Kind.READ_INDEX_FAILED, message, null);
+    case READFAILED:
+      return new OMGrpcError(Kind.READ_FAILED, message, null);
+    default:
+      return new OMGrpcError(Kind.INTERNAL, message, null);
+    }
+  }
+
+  /**
+   * @return the error that the gRPC error carries, or null if the gRPC error does not come from OM.
+   */
+  public static OMGrpcError fromStatusRuntimeException(StatusRuntimeException e) {
+    final Metadata trailers = e.getTrailers();
+    final OMGrpcErrorProto proto = trailers == null ? null : trailers.get(ERROR_KEY);
+    if (proto == null) {
+      return null;
+    }
+    final OMGrpcError error = getFromProtobuf(proto);
+    return error.kind == Kind.INTERNAL ? new OMGrpcError(Kind.INTERNAL, e.getStatus().getDescription(), null) : error;
   }
 
   /** @return the gRPC error for the given exception thrown by OM. */
   public static StatusRuntimeException toStatusRuntimeException(Throwable omException) {
     final Metadata trailers = new Metadata();
-    trailers.put(ERROR_KEY, toProto(omException));
+    trailers.put(ERROR_KEY, fromException(omException).getProtobuf());
     // NOTE: gRPC clients of old versions read the exception class and message from the description.
     return Status.INTERNAL.withDescription(omException.toString()).asRuntimeException(trailers);
   }
 
   /**
-   * @return the exception thrown by OM that the gRPC error carries,
-   *         or null if the error does not come from OM.
+   * @return the protobuf of this error. The message of an {@link Kind#INTERNAL} error is left out,
+   *         since the gRPC status description already has it.
    */
-  public static IOException toOMException(StatusRuntimeException e) {
-    final Metadata trailers = e.getTrailers();
-    final OMGrpcErrorProto error = trailers == null ? null : trailers.get(ERROR_KEY);
-    if (error == null) {
-      return null;
+  public OMGrpcErrorProto getProtobuf() {
+    final OMGrpcErrorProto.Builder proto = OMGrpcErrorProto.newBuilder();
+    switch (kind) {
+    case NOT_LEADER:
+      final OMGrpcErrorProto.NotLeader.Builder notLeader = OMGrpcErrorProto.NotLeader.newBuilder();
+      if (suggestedLeaderNodeId != null) {
+        notLeader.setSuggestedLeaderNodeId(suggestedLeaderNodeId);
+      }
+      proto.setNotLeader(notLeader);
+      break;
+    case LEADER_NOT_READY:
+      proto.setLeaderNotReady(OMGrpcErrorProto.LeaderNotReady.getDefaultInstance());
+      break;
+    case READ_INDEX_FAILED:
+      proto.setReadIndexFailed(OMGrpcErrorProto.ReadIndexFailed.getDefaultInstance());
+      break;
+    case READ_FAILED:
+      proto.setReadFailed(OMGrpcErrorProto.ReadFailed.getDefaultInstance());
+      break;
+    default:
+      return proto.build();
     }
-    final String message = error.hasMessage() ? error.getMessage() : null;
-    switch (error.getErrorCase()) {
-    case NOTLEADER:
-      return new OMNotLeaderException(message, error.getNotLeader().hasSuggestedLeaderNodeId()
-          ? error.getNotLeader().getSuggestedLeaderNodeId() : null);
-    case LEADERNOTREADY:
+    if (message != null) {
+      proto.setMessage(message);
+    }
+    return proto.build();
+  }
+
+  /** @return the exception thrown by OM. */
+  public IOException toException() {
+    switch (kind) {
+    case NOT_LEADER:
+      return new OMNotLeaderException(message, suggestedLeaderNodeId);
+    case LEADER_NOT_READY:
       return new OMLeaderNotReadyException(message);
-    case READINDEXFAILED:
+    case READ_INDEX_FAILED:
       return new ReadIndexException(message);
-    case READFAILED:
+    case READ_FAILED:
       return new ReadException(message);
     default:
-      return new OMException(e.getStatus().getDescription(), OMException.ResultCodes.INTERNAL_ERROR);
+      return new OMException(message, OMException.ResultCodes.INTERNAL_ERROR);
     }
   }
 
-  private static OMGrpcErrorProto toProto(Throwable omException) {
-    final OMGrpcErrorProto.Builder error = OMGrpcErrorProto.newBuilder();
-    if (omException instanceof OMNotLeaderException) {
-      final OMGrpcErrorProto.NotLeader.Builder notLeader = OMGrpcErrorProto.NotLeader.newBuilder();
-      final String suggestedLeader = ((OMNotLeaderException) omException).getSuggestedLeaderNodeId();
-      if (suggestedLeader != null) {
-        notLeader.setSuggestedLeaderNodeId(suggestedLeader);
-      }
-      error.setNotLeader(notLeader);
-    } else if (omException instanceof OMLeaderNotReadyException) {
-      error.setLeaderNotReady(OMGrpcErrorProto.LeaderNotReady.getDefaultInstance());
-    } else if (omException instanceof ReadIndexException) {
-      error.setReadIndexFailed(OMGrpcErrorProto.ReadIndexFailed.getDefaultInstance());
-    } else if (omException instanceof ReadException) {
-      error.setReadFailed(OMGrpcErrorProto.ReadFailed.getDefaultInstance());
-    }
-    if (error.getErrorCase() != OMGrpcErrorProto.ErrorCase.ERROR_NOT_SET && omException.getMessage() != null) {
-      error.setMessage(omException.getMessage());
-    }
-    return error.build();
+  public Kind getKind() {
+    return kind;
+  }
+
+  public String getMessage() {
+    return message;
+  }
+
+  public String getSuggestedLeaderNodeId() {
+    return suggestedLeaderNodeId;
   }
 }

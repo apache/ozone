@@ -153,9 +153,9 @@ public class TestGrpcOzoneManagerServer {
     ArgumentCaptor<Throwable> error = ArgumentCaptor.forClass(Throwable.class);
     verify(observer).onError(error.capture());
     verify(observer, never()).onCompleted();
-    OMNotLeaderException omException =
-        (OMNotLeaderException) OMGrpcError.toOMException((StatusRuntimeException) error.getValue());
-    assertEquals("om2", omException.getSuggestedLeaderNodeId());
+    OMGrpcError omError = OMGrpcError.fromStatusRuntimeException((StatusRuntimeException) error.getValue());
+    assertEquals(OMGrpcError.Kind.NOT_LEADER, omError.getKind());
+    assertEquals("om2", omError.getSuggestedLeaderNodeId());
   }
 
   /**

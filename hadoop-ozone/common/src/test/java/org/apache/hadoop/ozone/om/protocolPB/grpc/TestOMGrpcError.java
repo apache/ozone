@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.protocolPB.grpc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.grpc.Status;
@@ -27,6 +28,7 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError.Kind;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.ReadException;
 import org.apache.ratis.protocol.exceptions.ReadIndexException;
@@ -36,59 +38,74 @@ import org.junit.jupiter.api.Test;
  * Tests for {@link OMGrpcError}.
  */
 public class TestOMGrpcError {
+  private static final OMNotLeaderException NOT_LEADER =
+      new OMNotLeaderException(RaftPeerId.valueOf("om1"), RaftPeerId.valueOf("om2"), "host2/10.0.0.2");
 
   @Test
-  void testNotLeaderExceptionKeepsSuggestedLeader() {
-    final OMNotLeaderException omException =
-        new OMNotLeaderException(RaftPeerId.valueOf("om1"), RaftPeerId.valueOf("om2"), "host2/10.0.0.2");
+  void testFromException() {
+    assertError(OMGrpcError.fromException(NOT_LEADER), Kind.NOT_LEADER, NOT_LEADER.getMessage(), "om2");
+    assertError(OMGrpcError.fromException(new OMLeaderNotReadyException("om1 is not ready")),
+        Kind.LEADER_NOT_READY, "om1 is not ready", null);
+    assertError(OMGrpcError.fromException(new ReadIndexException("read index failed")),
+        Kind.READ_INDEX_FAILED, "read index failed", null);
+    assertError(OMGrpcError.fromException(new ReadException("read failed")), Kind.READ_FAILED, "read failed", null);
 
-    final IOException e = roundTrip(omException);
-
-    assertThat(e).isInstanceOf(OMNotLeaderException.class).hasMessage(omException.getMessage());
-    assertEquals("om2", ((OMNotLeaderException) e).getSuggestedLeaderNodeId());
+    final IllegalStateException other = new IllegalStateException("unexpected");
+    assertError(OMGrpcError.fromException(other), Kind.INTERNAL, other.toString(), null);
   }
 
   @Test
-  void testOmExceptionRoundTrip() {
-    assertRoundTrip(new OMNotLeaderException(RaftPeerId.valueOf("om1")));
-    assertRoundTrip(new OMLeaderNotReadyException("om1 is Leader but not ready to process request yet."));
-    assertRoundTrip(new ReadIndexException("read index failed"));
-    assertRoundTrip(new ReadException("read failed"));
+  void testProtobuf() {
+    final OMGrpcError notLeader = OMGrpcError.fromException(NOT_LEADER);
+    assertError(OMGrpcError.getFromProtobuf(notLeader.getProtobuf()), Kind.NOT_LEADER, NOT_LEADER.getMessage(), "om2");
+
+    // The message of any other error is only in the gRPC status description.
+    assertFalse(OMGrpcError.fromException(new IllegalStateException("unexpected")).getProtobuf().hasMessage());
   }
 
   @Test
-  void testOtherExceptionIsInternalError() {
-    final IllegalStateException omException = new IllegalStateException("unexpected");
+  void testStatusRuntimeException() {
+    final StatusRuntimeException notLeader = OMGrpcError.toStatusRuntimeException(NOT_LEADER);
+    assertEquals(Status.Code.INTERNAL, notLeader.getStatus().getCode());
+    assertEquals(NOT_LEADER.toString(), notLeader.getStatus().getDescription());
+    assertError(OMGrpcError.fromStatusRuntimeException(notLeader), Kind.NOT_LEADER, NOT_LEADER.getMessage(), "om2");
 
-    final IOException e = roundTrip(omException);
-
-    assertThat(e).isInstanceOf(OMException.class).hasMessage(omException.toString());
-    assertEquals(OMException.ResultCodes.INTERNAL_ERROR, ((OMException) e).getResult());
-  }
-
-  @Test
-  void testDescriptionKeepsExceptionClassAndMessage() {
-    final OMLeaderNotReadyException omException = new OMLeaderNotReadyException("om1 is not ready");
-
-    final StatusRuntimeException e = OMGrpcError.toStatusRuntimeException(omException);
-
-    assertEquals(Status.Code.INTERNAL, e.getStatus().getCode());
-    assertEquals(omException.toString(), e.getStatus().getDescription());
+    final IllegalStateException other = new IllegalStateException("unexpected");
+    assertError(OMGrpcError.fromStatusRuntimeException(OMGrpcError.toStatusRuntimeException(other)),
+        Kind.INTERNAL, other.toString(), null);
   }
 
   @Test
   void testErrorWithoutOmError() {
-    assertNull(OMGrpcError.toOMException(Status.INTERNAL.withDescription("a: b").asRuntimeException()));
-    assertNull(OMGrpcError.toOMException(Status.UNAVAILABLE.asRuntimeException()));
+    assertNull(OMGrpcError.fromStatusRuntimeException(Status.INTERNAL.withDescription("a: b").asRuntimeException()));
+    assertNull(OMGrpcError.fromStatusRuntimeException(Status.UNAVAILABLE.asRuntimeException()));
   }
 
-  private static void assertRoundTrip(IOException omException) {
-    final IOException e = roundTrip(omException);
+  @Test
+  void testToException() {
+    final IOException notLeader = OMGrpcError.fromException(NOT_LEADER).toException();
+    assertThat(notLeader).isInstanceOf(OMNotLeaderException.class).hasMessage(NOT_LEADER.getMessage());
+    assertEquals("om2", ((OMNotLeaderException) notLeader).getSuggestedLeaderNodeId());
+
+    assertToException(new OMLeaderNotReadyException("om1 is not ready"));
+    assertToException(new ReadIndexException("read index failed"));
+    assertToException(new ReadException("read failed"));
+
+    final IllegalStateException other = new IllegalStateException("unexpected");
+    final IOException internal = OMGrpcError.fromException(other).toException();
+    assertThat(internal).isInstanceOf(OMException.class).hasMessage(other.toString());
+    assertEquals(OMException.ResultCodes.INTERNAL_ERROR, ((OMException) internal).getResult());
+  }
+
+  private static void assertError(OMGrpcError error, Kind kind, String message, String suggestedLeaderNodeId) {
+    assertEquals(kind, error.getKind());
+    assertEquals(message, error.getMessage());
+    assertEquals(suggestedLeaderNodeId, error.getSuggestedLeaderNodeId());
+  }
+
+  private static void assertToException(IOException omException) {
+    final IOException e = OMGrpcError.fromException(omException).toException();
     assertEquals(omException.getClass(), e.getClass());
     assertEquals(omException.getMessage(), e.getMessage());
-  }
-
-  private static IOException roundTrip(Throwable omException) {
-    return OMGrpcError.toOMException(OMGrpcError.toStatusRuntimeException(omException));
   }
 }
