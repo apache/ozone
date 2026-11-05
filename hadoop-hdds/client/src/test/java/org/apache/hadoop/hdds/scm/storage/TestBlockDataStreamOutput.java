@@ -314,6 +314,21 @@ class TestBlockDataStreamOutput {
         .hasRootCauseMessage("chunk write failed due to injected failure");
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void failedStreamCloseIsNotRetried(boolean putBlockWithoutRaft) throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline().failStreamClose();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
+    BlockDataStreamOutput stream = createStream(pipeline, config);
+    byte[] data = randomBytes(50);
+    stream.write(ByteBuffer.wrap(data), 0, data.length);
+
+    IOException e = assertThrows(IOException.class, stream::close);
+    assertThat(e).hasStackTraceContaining("Failed to close the data stream");
+    assertEquals(1, pipeline.getStreamCloseCount(), "A failed stream close must not be retried");
+  }
+
   @Test
   void writeAfterCloseThrows() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
