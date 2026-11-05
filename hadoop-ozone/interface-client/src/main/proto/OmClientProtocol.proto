@@ -2868,7 +2868,6 @@ service OzoneManagerService {
 message OMGrpcErrorProto {
   message NotLeader {
     optional string message = 1;
-    // The OM node ID of the suggested leader, if known.
     optional string suggestedLeaderNodeId = 2;
   }
   message LeaderNotReady {
