@@ -380,18 +380,19 @@ jobs:
       - dependency
       - license
     if: needs.build-info.outputs.needs-compose-tests == 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      needs-ozone-binary-tarball: true
-      ratis-args: ${{ inputs.ratis_args }}
-      script: acceptance
-      script-args: xcompat/test-old.sh ${{ matrix.version }}
-      sha: ${{ needs.build-info.outputs.sha }}
-      split: compat-old-${{ matrix.version }}
-      timeout-minutes: 30
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          needs-ozone-binary-tarball: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: acceptance
+          script-args: xcompat/test-old.sh ${{ matrix.version }}
+          split: compat-old-${{ matrix.version }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         version: ${{ fromJson(needs.build-info.outputs.acceptance-versions) }}
