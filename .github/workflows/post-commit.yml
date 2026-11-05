@@ -16,10 +16,11 @@ name: build-branch
 on:
   pull_request:
     types: [opened, ready_for_review, synchronize]
-    branches-ignore:
+    # unignore `master` until Fork CI Status workflow is refined
+    # branches-ignore:
       # ignore pull requests targeted at these branches,
       # the list must match base-branches in fork-ci-status.yaml
-      - master
+      # - master
   push:
     branches-ignore:
       # only master, builds on schedule
