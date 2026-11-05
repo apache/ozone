@@ -466,21 +466,23 @@ jobs:
       - dependency
       - license
     if: needs.build-info.outputs.needs-integration-tests == 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      display-name: junit
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: true
-      pre-script: sudo hostname localhost
-      ratis-args: ${{ inputs.ratis_args }}
-      script: integration
-      script-args: -pl :${{ matrix.module }} -Pmodule-test -Phadoop-native-lib -Drocks_tools_native
-      sha: ${{ needs.build-info.outputs.sha }}
-      split: ${{ matrix.module }}
-      timeout-minutes: 60
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Execute pre-test steps
+        run: |
+          sudo hostname localhost
+      - name: Perform check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-ozone-repo: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: integration
+          script-args: -pl :${{ matrix.module }} -Pmodule-test -Phadoop-native-lib -Drocks_tools_native
+          split: ${{ matrix.module }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         module: ${{ fromJson(needs.build-info.outputs.junit-modules) }}
