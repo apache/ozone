@@ -38,6 +38,10 @@ on:
         required: false
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || case(github.repository == 'apache/ozone', github.sha, github.ref_name) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.repository != 'apache/ozone' }}
+
 env:
   # BUILD_ARGS and TEST_JAVA_VERSION are duplicated in populate-cache.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
