@@ -841,10 +841,23 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     S3Exception exception = assertThrows(S3Exception.class,
         () -> s3Client.getObjectAsBytes(
             b -> b.bucket(bucketName).key(keyName)
-                .ifModifiedSince(headObjectResponse.lastModified()
-                    .plusSeconds(60))));
+                .ifModifiedSince(headObjectResponse.lastModified())));
 
     assertEquals(304, exception.statusCode());
+  }
+
+  @Test
+  public void testGetObjectIfModifiedSinceFutureDateIsIgnored() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName).ifModifiedSince(Instant.now().plusSeconds(86400)));
+
+    assertEquals(content, response.asUtf8String());
   }
 
   /**
