@@ -46,33 +46,40 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
     }
   }
 
-  public void finalizeFromDBIfRequired(Table<String, String> finalizationStore)
-      throws IOException {
-    ComponentVersion apparentVersionInNewDB = getApparentVersionInDB(finalizationStore);
-    if (apparentVersionInNewDB == null) {
-      LOG.info("Component has apparent version {} but no apparent version was found in the DB. That is expected if " +
+  public void finalizeFromDBIfRequired(Table<String, String> finalizationStore) throws IOException {
+    // This call is expected to throw and crash the process if the apparent version in the DB is larger than our
+    // software version, which we cannot support.
+    ComponentVersion apparentVersionInDB = getApparentVersionInDB(finalizationStore);
+    if (apparentVersionInDB == null) {
+      LOG.debug("Component has apparent version {} but no apparent version was found in the DB. That is expected if " +
           "this component has never been finalized to a newer version.", getApparentVersion());
-    } else if (!isAllowed(apparentVersionInNewDB)) {
-      // The DB is ahead of the VERSION file. This can happen if the leader finalized and this follower received the
-      // update through a snapshot. It can also happen if the component was finalizing from a snapshot, failed
-      // partway through, and restarted.
-      if (apparentVersionInNewDB != getSoftwareVersion()) {
-        LOG.warn("Received apparent version {} in DB which does not match the current apparent version {} or " +
-                "software version {}. User may have incorrectly run finalization before all components were " +
-                "upgraded. Finalizing this component to its software version.",
-            apparentVersionInNewDB, getApparentVersion(), getSoftwareVersion());
-      } else if (getApparentVersion().serialize() < apparentVersionInNewDB.serialize()) {
-        LOG.info("Version file has lower apparent version ({}) than DB ({}). Finalizing to the DB version.",
-            getApparentVersion(), apparentVersionInNewDB);
+    } else if (!apparentVersionInDB.equals(getApparentVersion())) {
+      // We only need to take potential action if DB version != apparent version.
+      if (isAllowed(apparentVersionInDB)) {
+        // DB version < apparent version.
+        LOG.debug("Received apparent version {} in DB which is less than the current apparent version {}. " +
+            "Component likely previously crashed during finalization. Ratis log replay should correct this issue " +
+            "after startup.",
+            apparentVersionInDB, getApparentVersion());
+      } else {
+        // DB version > apparent version. We must finalize to this version.
+        if (apparentVersionInDB.isSupportedBy(getSoftwareVersion()) &&
+            !apparentVersionInDB.equals(getSoftwareVersion())) {
+          // DB version < software version.
+          // This should never happen. When restarting after failed finalization, the DB should not have been updated
+          // until all versions up to the software version were finalized. On the snapshot installation path all
+          // components should be running the same software version when finalization is run.
+          LOG.warn("Received apparent version {} in DB which is between the current apparent version {} " +
+              "and the software version {}. User may have incorrectly run finalization in a mixed version " +
+              "cluster.", apparentVersionInDB, getApparentVersion(), getSoftwareVersion());
+        } else {
+          // DB version == software version. This is expected when we receive finalization from a Ratis snapshot.
+          // The previous attempt to finalize from a snapshot may have failed, so we will resume it here.
+          LOG.info("Version file has lower apparent version ({}) than DB ({}). Finalizing to the DB version.",
+              getApparentVersion(), apparentVersionInDB);
+        }
+        finalizeUpgrade(apparentVersionInDB);
       }
-      finalizeUpgrade();
-    } else if (!apparentVersionInNewDB.equals(getApparentVersion())) {
-      // The DB is behind the VERSION file. This should not happen: finalization writes the VERSION file inside
-      // applyTransaction, so the Ratis log entry was committed and should be replayed on restart, which would
-      // update the DB. This is a defensive branch to catch any potential bugs.
-      LOG.warn("DB has lower apparent version ({}) than VERSION file ({}). Updating DB to match VERSION file.",
-          apparentVersionInNewDB, getApparentVersion());
-      finalizationStore.put(APPARENT_VERSION_KEY, String.valueOf(getApparentVersion().serialize()));
     }
   }
 

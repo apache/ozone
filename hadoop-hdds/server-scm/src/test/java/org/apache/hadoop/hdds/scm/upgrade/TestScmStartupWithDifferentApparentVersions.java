@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_HA;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -99,10 +100,11 @@ public class TestScmStartupWithDifferentApparentVersions {
   /**
    * The VERSION file is ahead of the DB. This can happen if finalization wrote the VERSION file (inside Ratis
    * applyTransaction) but the process crashed before the Ratis transaction buffer was flushed to RocksDB.
-   * Ratis log replay should correct this, but finalizeFromDBIfRequired also updates the DB as a safety net.
+   * Ratis log replay is async and may not have finished when this method runs, so this is treated as an expected
+   * case and no action is taken — log replay will correct the DB after startup.
    */
   @Test
-  public void testStartupUpdatesDBWhenVersionFileAheadOfDB() throws Exception {
+  public void testFinalizeFromDBNoOpWhenVersionFileAheadOfDB() throws Exception {
     OzoneConfiguration conf = createScmStorage(SOFTWARE_VERSION.serialize());
     StorageContainerManager scm = HddsTestUtils.getScm(conf, new SCMConfigurator());
     try {
@@ -111,13 +113,89 @@ public class TestScmStartupWithDifferentApparentVersions {
       scm.stop();
       scm.join();
 
-      // On restart, finalizeFromDBIfRequired should detect VERSION file > DB and update the DB.
-      scm = HddsTestUtils.getScm(scm.getConfiguration(), new SCMConfigurator());
+      // On restart, finalizeFromDBIfRequired detects DB version < VERSION file version but takes no action.
       // finalizeFromDBIfRequired is called by scm.start(), but calling that here makes the tests slow and we would
       // need more setup for safemode etc. As this test is unit testing finalizeFromDBIfRequired we call it directly
       // to keep the tests simple.
+      scm = HddsTestUtils.getScm(scm.getConfiguration(), new SCMConfigurator());
+      scm.getVersionManager().finalizeFromDBIfRequired(scm.getScmMetadataStore().getMetaTable());
+      // Apparent version unchanged; DB version also unchanged (left for Ratis log replay to correct).
+      assertVersions(scm, SOFTWARE_VERSION, ZDU);
+    } finally {
+      scm.stop();
+      scm.join();
+    }
+  }
+
+  /**
+   * When the DB has no apparent version, the component was never finalized. finalizeFromDBIfRequired takes no action.
+   */
+  @Test
+  public void testFinalizeFromDBNoOpWhenDBNull() throws Exception {
+    OzoneConfiguration conf = createScmStorage(INITIAL_VERSION.serialize());
+    StorageContainerManager scm = HddsTestUtils.getScm(conf, new SCMConfigurator());
+    try {
+      assertThat(scm.getScmMetadataStore().getMetaTable().get(APPARENT_VERSION_KEY)).isNull();
+      scm.getVersionManager().finalizeFromDBIfRequired(scm.getScmMetadataStore().getMetaTable());
+      assertThat(scm.getVersionManager().getApparentVersion()).isEqualTo(INITIAL_VERSION);
+      assertThat(scm.getScmMetadataStore().getMetaTable().get(APPARENT_VERSION_KEY)).isNull();
+    } finally {
+      scm.stop();
+      scm.join();
+    }
+  }
+
+  /**
+   * When the DB matches the apparent version, no finalization or update is needed.
+   */
+  @Test
+  public void testFinalizeFromDBNoOpWhenDBEqualsApparent() throws Exception {
+    OzoneConfiguration conf = createScmStorage(SOFTWARE_VERSION.serialize());
+    StorageContainerManager scm = HddsTestUtils.getScm(conf, new SCMConfigurator());
+    try {
+      scm.getScmMetadataStore().getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(SOFTWARE_VERSION.serialize()));
       scm.getVersionManager().finalizeFromDBIfRequired(scm.getScmMetadataStore().getMetaTable());
       assertVersions(scm, SOFTWARE_VERSION, SOFTWARE_VERSION);
+      assertFalse(scm.getVersionManager().needsFinalization());
+    } finally {
+      scm.stop();
+      scm.join();
+    }
+  }
+
+  /**
+   * The DB version is between the apparent version and the software version. This should not happen in practice,
+   * but if it does the safest recovery is to partially finalize up to the DB version to avoid mixed apparent versions
+   * in the quorum.
+   */
+  @Test
+  public void testFinalizeFromDBFinalizesToIntermediateDBVersion() throws Exception {
+    OzoneConfiguration conf = createScmStorage(INITIAL_VERSION.serialize());
+    StorageContainerManager scm = HddsTestUtils.getScm(conf, new SCMConfigurator());
+    try {
+      scm.getScmMetadataStore().getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(ZDU.serialize()));
+      scm.getVersionManager().finalizeFromDBIfRequired(scm.getScmMetadataStore().getMetaTable());
+      assertVersions(scm, ZDU, ZDU);
+      // Component is not fully finalized: ZDU < SOFTWARE_VERSION.
+      assertTrue(scm.getVersionManager().needsFinalization());
+    } finally {
+      scm.stop();
+      scm.join();
+    }
+  }
+
+  /**
+   * The DB version exceeds the software version. This cannot be supported and the process must crash.
+   */
+  @Test
+  public void testFinalizeFromDBThrowsWhenDBVersionExceedsSoftwareVersion() throws Exception {
+    OzoneConfiguration conf = createScmStorage(INITIAL_VERSION.serialize());
+    StorageContainerManager scm = HddsTestUtils.getScm(conf, new SCMConfigurator());
+    try {
+      scm.getScmMetadataStore().getMetaTable().put(APPARENT_VERSION_KEY,
+          String.valueOf(SOFTWARE_VERSION.serialize() + 1));
+      assertThrows(IOException.class,
+          () -> scm.getVersionManager().finalizeFromDBIfRequired(scm.getScmMetadataStore().getMetaTable()));
     } finally {
       scm.stop();
       scm.join();
