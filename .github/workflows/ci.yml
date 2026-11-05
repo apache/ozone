@@ -12,8 +12,41 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: full-ci
+name: CI
 on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+    branches-ignore:
+      # ignore pull requests targeted at these branches,
+      # the list must match base-branches in fork-ci-status.yaml
+      - master
+  push:
+    branches-ignore:
+      # only master, builds on schedule
+      - master
+    paths-ignore:
+      # ignore files/dirs irrelevant for CI
+      - '.asf.yaml'
+      - '.devcontainer/**'
+      - '.editorconfig'
+      - '.gitattributes'
+      - '.gitignore'
+      - '.idea/**'
+      - '.run/**'
+      - '**.md'
+      - '**.txt'
+      - '!**/CMakeLists.txt'
+      - '!**/src/main/resources/**'
+      - '!**/src/test/resources/**'
+      - '!dev-support/rat/rat-exclusions.txt'
+      - '!hadoop-ozone/dist/src/main/license/jar-report.txt'
+      # ignore .github except this workflow and the ones used transitively
+      - '.github/**'
+      - '!.github/workflows/check.yml'
+      - '!.github/workflows/ci.yml'
+      - '!.github/workflows/post-commit.yml'
+      - '!.github/workflows/generate-config-doc.yml'
+      - '!.github/workflows/update-ozone-site-config-doc.yml'
   workflow_call:
     inputs:
       ratis_args:
