@@ -32,14 +32,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test for the Node2Pipeline map.
  */
-public abstract class TestNode2PipelineMap implements NonHATests.TestCase {
+public abstract class TestNode2PipelineMap implements ClusterForTests.TestCase {
 
   private StorageContainerManager scm;
   private ContainerWithPipeline ratisContainer;
