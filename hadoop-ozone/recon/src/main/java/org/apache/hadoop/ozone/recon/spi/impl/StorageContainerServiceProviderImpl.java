@@ -24,6 +24,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_BIND_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.ratisSnapshotComplete;
@@ -161,7 +163,7 @@ public class StorageContainerServiceProviderImpl
           if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
             SecurityConfig secConf = new SecurityConfig(configuration);
             if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
-              downloadSCMDBCheckpoint(getSCMDBCheckpointUrl(role[0]), targetFile);
+              downloadSCMDBCheckpoint(getSCMDBCheckpointUrl(role[0], Integer.parseInt(role[1])), targetFile);
             } else {
               downloadSCMDBCheckpointOverGrpc(role[4].trim(), targetFile, secConf);
             }
@@ -235,10 +237,10 @@ public class StorageContainerServiceProviderImpl
   }
 
   /**
-   * Returns the DB checkpoint URL of the SCM at {@code host}. The HTTP(S) port is taken from the address configured
-   * for the SCM node with that host, else from the common SCM HTTP(S) address.
+   * Returns the DB checkpoint URL of the SCM with Ratis address {@code host:ratisPort}. The HTTP(S) port is taken from
+   * the address configured for that SCM node, else from the common SCM HTTP(S) address.
    */
-  private String getSCMDBCheckpointUrl(String host) {
+  private String getSCMDBCheckpointUrl(String host, int ratisPort) {
     boolean httpsEnabled = HttpConfig.getHttpPolicy(configuration).isHttpsEnabled();
     if (!httpsEnabled) {
       LOG.warn("Downloading the SCM DB unencrypted over HTTP although {} is true. Set {} to HTTPS_ONLY or "
@@ -249,7 +251,13 @@ public class StorageContainerServiceProviderImpl
     String serviceId = HddsUtils.getScmServiceId(configuration);
     if (serviceId != null) {
       for (String nodeId : HddsUtils.getSCMNodeIds(configuration, serviceId)) {
-        if (host.equals(configuration.getTrimmed(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, serviceId, nodeId)))) {
+        // Match the node's Ratis address the way SCMHANodeDetails builds it, since SCMs may share a host.
+        String scmAddress =
+            configuration.getTrimmed(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, serviceId, nodeId));
+        int nodeRatisPort = HddsUtils.getHostPort(scmAddress).orElse(configuration.getInt(
+            ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY, serviceId, nodeId),
+            configuration.getInt(OZONE_SCM_RATIS_PORT_KEY, OZONE_SCM_RATIS_PORT_DEFAULT)));
+        if (HddsUtils.getHostName(scmAddress).filter(host::equals).isPresent() && nodeRatisPort == ratisPort) {
           addressKeys.add(ConfUtils.addKeySuffixes(addressKey, serviceId, nodeId));
         }
       }

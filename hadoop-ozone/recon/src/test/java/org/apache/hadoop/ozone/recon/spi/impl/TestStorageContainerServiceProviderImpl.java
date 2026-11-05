@@ -194,23 +194,24 @@ public class TestStorageContainerServiceProviderImpl {
 
   /**
    * With SCM HA, Recon uses the HTTP address of the leader SCM node, and SPNEGO when SCM requires Kerberos.
+   * The leader node is matched by host and Ratis port, since SCMs may share a host.
    */
   @Test
   public void testGetSCMDBSnapshotUsesLeaderHttpAddress() throws Exception {
     OzoneConfiguration conf = injector.getInstance(OzoneConfiguration.class);
     conf.set(OZONE_SCM_SERVICE_IDS_KEY, "scmservice");
     conf.set(OZONE_SCM_NODES_KEY + ".scmservice", "scm1,scm2");
-    conf.set(OZONE_SCM_ADDRESS_KEY + ".scmservice.scm1", "scm1.example.com");
-    conf.set(OZONE_SCM_ADDRESS_KEY + ".scmservice.scm2", "scm2.example.com");
-    conf.set(OZONE_SCM_HTTP_ADDRESS_KEY + ".scmservice.scm1", "scm1.example.com:9998");
-    conf.set(OZONE_SCM_HTTP_ADDRESS_KEY + ".scmservice.scm2", "scm2.example.com:9999");
+    conf.set(OZONE_SCM_ADDRESS_KEY + ".scmservice.scm1", "scm.example.com");
+    conf.set(OZONE_SCM_ADDRESS_KEY + ".scmservice.scm2", "scm.example.com:9895");
+    conf.set(OZONE_SCM_HTTP_ADDRESS_KEY + ".scmservice.scm1", "scm.example.com:9998");
+    conf.set(OZONE_SCM_HTTP_ADDRESS_KEY + ".scmservice.scm2", "scm.example.com:9999");
     conf.set(HDDS_SCM_HTTP_AUTH_TYPE, "kerberos");
 
     String url = getSCMDBSnapshot(true,
-        "scm1.example.com:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:10.0.0.1",
-        "scm2.example.com:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:10.0.0.2");
+        "scm.example.com:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:10.0.0.1",
+        "scm.example.com:9895:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:10.0.0.1");
 
-    assertEquals("http://scm2.example.com:9999/dbCheckpoint?flushBeforeCheckpoint=true", url);
+    assertEquals("http://scm.example.com:9999/dbCheckpoint?flushBeforeCheckpoint=true", url);
   }
 
   /**
