@@ -249,9 +249,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
               OMException.ResultCodes.INVALID_REQUEST);
         }
         multipartPartInfo = OmMultipartPartInfo.from(partName, partNumber, omKeyInfo);
-        omMetadataManager.getMultipartPartsTable().addCacheEntry(
-            new CacheKey<>(multipartPartKey),
-            CacheValue.get(trxnLogIndex, multipartPartInfo));
       }
 
       // Set the UpdateID to current transactionLogIndex
@@ -262,19 +259,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // OldPartKeyInfo will be deleted. Its updateID will be set in
       // S3MultipartUploadCommitPartResponse before being added to
       // DeletedKeyTable.
-
-      // Add to cache.
-
-      // Delete from open key table and add it to multipart info table.
-      // No need to add cache entries to delete table, as no
-      // read/write requests that info for validation.
-      omMetadataManager.getMultipartInfoTable().addCacheEntry(
-          new CacheKey<>(multipartKey),
-          CacheValue.get(trxnLogIndex, multipartKeyInfo));
-
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(openKey),
-          CacheValue.get(trxnLogIndex));
 
       omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
@@ -330,6 +314,24 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       }
       commitResponseBuilder.setModificationTime(keyArgs.getModificationTime());
       omResponse.setCommitMultiPartUploadResponse(commitResponseBuilder);
+
+      // Add to cache after the quota check.
+      if (multipartPartInfo != null) {
+        omMetadataManager.getMultipartPartsTable().addCacheEntry(
+            new CacheKey<>(multipartPartKey),
+            CacheValue.get(trxnLogIndex, multipartPartInfo));
+      }
+
+      // Delete from open key table and add it to multipart info table.
+      // No need to add cache entries to delete table, as no
+      // read/write requests that info for validation.
+      omMetadataManager.getMultipartInfoTable().addCacheEntry(
+          new CacheKey<>(multipartKey),
+          CacheValue.get(trxnLogIndex, multipartKeyInfo));
+
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+          new CacheKey<>(openKey),
+          CacheValue.get(trxnLogIndex));
 
       omMetadataManager.getBucketTable().addCacheEntry(
           omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);

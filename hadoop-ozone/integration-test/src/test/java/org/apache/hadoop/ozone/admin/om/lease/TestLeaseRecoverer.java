@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -50,7 +50,7 @@ import picocli.CommandLine;
  * Test cases for LeaseRecoverer.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestLeaseRecoverer implements NonHATests.TestCase {
+public abstract class TestLeaseRecoverer implements ClusterForTests.TestCase {
   private OzoneBucket fsoOzoneBucket;
   private OzoneClient client;
 
