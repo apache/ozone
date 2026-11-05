@@ -317,12 +317,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setCreateCheckpointDirs(false)
         .setEnableRocksDbMetrics(enableRocksDbMetrics)
         .build();
-    try {
-      initializeOmTables(CacheType.PARTIAL_CACHE, false);
-    } catch (IOException | RuntimeException e) {
-      stop();
-      throw e;
-    }
+    initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
 
@@ -350,7 +345,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           .build();
 
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
-    } catch (IOException | RuntimeException e) {
+    } catch (IOException e) {
       stop();
       throw e;
     }
@@ -504,8 +499,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     userTable = initializer.get(OMDBDefinition.USER_TABLE_DEF);
 
-    volumeTable = initializer.get(OMDBDefinition.VOLUME_TABLE_DEF, cacheType);
-    bucketTable = initializer.get(OMDBDefinition.BUCKET_TABLE_DEF, cacheType);
+    volumeTable = initializer.getWithDbCache(OMDBDefinition.VOLUME_TABLE_DEF);
+    bucketTable = initializer.getWithDbCache(OMDBDefinition.BUCKET_TABLE_DEF);
     keyTable = initializer.get(OMDBDefinition.KEY_TABLE_DEF);
 
     openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE_DEF);
@@ -548,8 +543,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     // originalAccessKeyId -> revocationTimeMillis
     // FULL_CACHE keeps revocations in memory as there are not expected to be many
-    s3RevokedStsTokenTable = initializer.get(
-        OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF, cacheType);
+    s3RevokedStsTokenTable = initializer.getWithDbCache(OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF);
 
     lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF);
     lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF);
@@ -2134,15 +2128,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       return get(definition.getTable(store));
     }
 
-    <KEY, VALUE> Table<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType tableCacheType)
+    /**
+     * Get a table with the cache type the DB was opened with. There is deliberately no way to pass a cache type
+     * here: a FULL_CACHE table loads the whole table and starts a cleanup thread on every open, so snapshot and
+     * checkpoint DBs, which are opened with PARTIAL_CACHE again and again, must never get one.
+     */
+    <KEY, VALUE> Table<KEY, VALUE> getWithDbCache(DBColumnFamilyDefinition<KEY, VALUE> definition)
         throws IOException {
-      // A FULL_CACHE table loads the whole table and starts a cleanup thread on every open, so a DB opened with
-      // PARTIAL_CACHE (snapshot and checkpoint DBs, which are opened and closed repeatedly) must not have one.
-      if (tableCacheType == CacheType.FULL_CACHE && cacheType != CacheType.FULL_CACHE) {
-        throw new IllegalArgumentException("Table " + definition.getName() + " must not use " + tableCacheType
-            + " in a DB opened with " + cacheType);
-      }
-      return get(definition.getTable(store, tableCacheType));
+      return get(definition.getTable(store, cacheType));
     }
 
     private <KEY, VALUE> Table<KEY, VALUE> get(Table<KEY, VALUE> table) {

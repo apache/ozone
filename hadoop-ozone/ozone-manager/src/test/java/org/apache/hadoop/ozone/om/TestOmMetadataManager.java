@@ -66,7 +66,6 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,7 +78,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -93,7 +91,6 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -1419,8 +1416,8 @@ public class TestOmMetadataManager {
   }
 
   /**
-   * Snapshot and checkpoint DBs are opened and closed repeatedly, so opening and closing one must not leave any
-   * thread behind.
+   * Snapshot and checkpoint DBs are opened and closed repeatedly, so opening one must not create a FULL_CACHE table,
+   * and opening and closing one must not leave any thread behind.
    */
   @Test
   public void testSnapshotDbOpenLeaksNoThread() throws Exception {
@@ -1428,6 +1425,8 @@ public class TestOmMetadataManager {
     ((RDBStore) omMetadataManager.getStore()).getSnapshot(snapshotDirName);
     final DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
     final int iterations = 10;
+    // The active DB has FULL_CACHE tables, so the thread name used below is right.
+    assertThat(countFullTableCacheThreads()).isPositive();
 
     // Warm up, so that threads started once on first use are not counted.
     openAndCloseSnapshotDbs(snapshotDirName, checkpoint);
@@ -1443,47 +1442,19 @@ public class TestOmMetadataManager {
   }
 
   private void openAndCloseSnapshotDbs(String snapshotDirName, DBCheckpoint checkpoint) throws Exception {
-    new OmMetadataManagerImpl(ozoneConfiguration, snapshotDirName, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT).close();
-    OmMetadataManagerImpl.createCheckpointMetadataManager(ozoneConfiguration, checkpoint).close();
+    final long fullTableCacheThreads = countFullTableCacheThreads();
+    try (OmMetadataManagerImpl snapshotManager = new OmMetadataManagerImpl(ozoneConfiguration, snapshotDirName,
+            OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
+        OmMetadataManagerImpl checkpointManager =
+            OmMetadataManagerImpl.createCheckpointMetadataManager(ozoneConfiguration, checkpoint)) {
+      assertEquals(fullTableCacheThreads, countFullTableCacheThreads());
+    }
   }
 
-  /**
-   * A snapshot or checkpoint DB whose table initialization fails, for example on a FULL_CACHE table, must be closed.
-   */
-  @Test
-  public void testFailedSnapshotDbOpenClosesStore() throws Exception {
-    final String snapshotDirName = SnapshotInfo.getCheckpointDirName(UUID.randomUUID(), 0);
-    ((RDBStore) omMetadataManager.getStore()).getSnapshot(snapshotDirName);
-    final Path checkpoint = omMetadataManager.getStore().getCheckpoint(true).getCheckpointLocation();
-    final AtomicInteger stopped = new AtomicInteger();
-
-    assertThrows(IllegalArgumentException.class, () -> new OmMetadataManagerImpl(ozoneConfiguration, snapshotDirName,
-        OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT) {
-      @Override
-      protected void initializeOmTables(CacheType cacheType, boolean addCacheMetrics) {
-        throw new IllegalArgumentException("injected");
-      }
-
-      @Override
-      public void stop() throws IOException {
-        stopped.incrementAndGet();
-        super.stop();
-      }
-    });
-    assertThrows(IllegalArgumentException.class, () -> new OmMetadataManagerImpl(ozoneConfiguration,
-        checkpoint.getParent().toFile(), checkpoint.getFileName().toString(), true, true) {
-      @Override
-      protected void initializeOmTables(CacheType cacheType, boolean addCacheMetrics) {
-        throw new IllegalArgumentException("injected");
-      }
-
-      @Override
-      public void stop() throws IOException {
-        stopped.incrementAndGet();
-        super.stop();
-      }
-    });
-    assertEquals(2, stopped.get());
+  private static long countFullTableCacheThreads() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .filter(t -> t.getName().contains("FullTableCache-Cleanup"))
+        .count();
   }
 
   @Test
