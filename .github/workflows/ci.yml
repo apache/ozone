@@ -36,6 +36,7 @@ on:
       SONARCLOUD_TOKEN:
         description: 'Token for submitting coverage data to SonarCloud'
         required: false
+  workflow_dispatch:
 
 env:
   # BUILD_ARGS and TEST_JAVA_VERSION are duplicated in populate-cache.yml, please keep in sync
