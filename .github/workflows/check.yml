@@ -336,33 +336,3 @@ jobs:
         run: python3 dev-support/ci/junit_summary.py >> "$GITHUB_STEP_SUMMARY"
         env:
           JUNIT_REPORT_URL: ${{ steps.archive.outputs.artifact-url }}
-
-      # The following steps are hard-coded to be run only for 'build' check,
-      # to avoid the need for 3 more inputs.
-      - name: Store binaries for tests
-        if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: ozone-bin
-          path: |
-            hadoop-ozone/dist/target/ozone-*.tar.gz
-            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
-          retention-days: 1
-
-      - name: Store source tarball for compilation
-        if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: ozone-src
-          path: |
-            hadoop-ozone/dist/target/ozone-*-src.tar.gz
-          retention-days: 1
-
-      - name: Store Maven repo for tests
-        if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: ozone-repo
-          path: |
-            ~/.m2/repository/org/apache/ozone
-          retention-days: 1
