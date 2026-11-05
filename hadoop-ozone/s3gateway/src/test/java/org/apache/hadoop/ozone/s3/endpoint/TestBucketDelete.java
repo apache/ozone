@@ -17,11 +17,22 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -60,6 +71,25 @@ public class TestBucketDelete {
     Response response = bucketEndpoint.delete(bucketName);
     assertEquals(HttpStatus.SC_NO_CONTENT, response.getStatus());
 
+  }
+
+  @Test
+  public void testDeleteWithExpectedOwnerReusesBucketVolume() throws Exception {
+    OzoneClient client = spy(new OzoneClientStub());
+    ObjectStore store = spy(client.getObjectStore());
+    doReturn(store).when(client).getObjectStore();
+    store.createVolume(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+    store.getS3Volume().createBucket(bucketName, BucketArgs.newBuilder().setOwner("owner").build());
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
+    BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+    clearInvocations(store);
+
+    assertEquals(HttpStatus.SC_NO_CONTENT, endpoint.delete(bucketName).getStatus());
+    verify(store, never()).getS3Volume();
   }
 
   @Test
