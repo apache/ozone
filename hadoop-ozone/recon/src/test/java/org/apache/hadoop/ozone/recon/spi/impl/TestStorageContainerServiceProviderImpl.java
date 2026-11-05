@@ -39,6 +39,9 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -54,22 +57,29 @@ import java.net.HttpURLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 
 /**
  * Class to test StorageContainerServiceProviderImpl APIs.
@@ -133,10 +143,46 @@ public class TestStorageContainerServiceProviderImpl {
 
   /**
    * Recon downloads the SCM snapshot from whichever peer reports itself as
-   * LEADER, over HTTP from the SCM DB checkpoint endpoint.
+   * LEADER, using the resolved address carried in the encoded role string.
    */
   @Test
   public void testGetSCMDBSnapshotConnectsToLeader() throws Exception {
+    StorageContainerServiceProvider scmProvider =
+        injector.getInstance(StorageContainerServiceProvider.class);
+    StorageContainerLocationInternalInterface scmClient =
+        injector.getInstance(StorageContainerLocationInternalInterface.class);
+
+    setPeerRoles(scmClient,
+        "[2001:db8::2]:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:[2001:db8:0:0:0:0:0:2]",
+        "[2001:db8::1]:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:[2001:db8:0:0:0:0:0:1]");
+
+    AtomicReference<String> downloadHost = new AtomicReference<>();
+    try (MockedStatic<HddsServerUtil> stubbedServerUtil = mockStatic(HddsServerUtil.class);
+         MockedConstruction<ReconCertificateClient> stubbedCertClient =
+             mockConstruction(ReconCertificateClient.class);
+         MockedConstruction<InterSCMGrpcClient> downloaders =
+             mockConstruction(InterSCMGrpcClient.class, (downloader, context) -> {
+               downloadHost.set((String) context.arguments().get(0));
+               when(downloader.download(any()))
+                   .thenReturn(CompletableFuture.completedFuture(null));
+             })) {
+      scmProvider.getSCMDBSnapshot();
+
+      assertEquals(1, downloaders.constructed().size());
+    }
+
+    // The follower is listed first, so this also pins that the LEADER entry is
+    // the one selected. The resolved literal is handed over verbatim, unbracketed.
+    assertEquals("2001:db8:0:0:0:0:0:1", downloadHost.get());
+    // Without gRPC TLS, the inter-SCM gRPC server accepts Recon, so HTTP is not used.
+    verify(injector.getInstance(ReconUtils.class), never()).makeHttpCall(any(), anyString(), anyBoolean());
+  }
+
+  /**
+   * With gRPC TLS, Recon downloads the SCM snapshot from the leader over HTTP from the SCM DB checkpoint endpoint.
+   */
+  @Test
+  public void testGetSCMDBSnapshotOverHttpConnectsToLeader() throws Exception {
     String url = getSCMDBSnapshot(false,
         "[2001:db8::2]:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:[2001:db8:0:0:0:0:0:2]",
         "[2001:db8::1]:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:[2001:db8:0:0:0:0:0:1]");
@@ -173,9 +219,6 @@ public class TestStorageContainerServiceProviderImpl {
    */
   @Test
   public void testGetSCMDBSnapshotWarnsOverHttpWithGrpcTls() throws Exception {
-    OzoneConfiguration conf = injector.getInstance(OzoneConfiguration.class);
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    conf.setBoolean(HDDS_GRPC_TLS_ENABLED, true);
     try (LogCapturer logs = LogCapturer.captureLogs(StorageContainerServiceProviderImpl.class)) {
       assertEquals("http://scm1.example.com:9876/dbCheckpoint?flushBeforeCheckpoint=true",
           getSCMDBSnapshot(false, LEADER));
@@ -189,8 +232,6 @@ public class TestStorageContainerServiceProviderImpl {
   @Test
   public void testGetSCMDBSnapshotOverHttps() throws Exception {
     OzoneConfiguration conf = injector.getInstance(OzoneConfiguration.class);
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    conf.setBoolean(HDDS_GRPC_TLS_ENABLED, true);
     conf.set(OZONE_HTTP_POLICY_KEY, HttpConfig.Policy.HTTPS_ONLY.name());
     try (LogCapturer logs = LogCapturer.captureLogs(StorageContainerServiceProviderImpl.class)) {
       assertEquals("https://scm1.example.com:9877/dbCheckpoint?flushBeforeCheckpoint=true",
@@ -204,6 +245,7 @@ public class TestStorageContainerServiceProviderImpl {
    */
   @Test
   public void testGetSCMDBSnapshotRejectsIncompleteCheckpoint() throws Exception {
+    enableGrpcTls();
     ReconUtils reconUtils = injector.getInstance(ReconUtils.class);
     setPeerRoles(injector.getInstance(StorageContainerLocationInternalInterface.class), LEADER);
     HttpURLConnection connection = mock(HttpURLConnection.class);
@@ -217,7 +259,7 @@ public class TestStorageContainerServiceProviderImpl {
   }
 
   /**
-   * Gets the SCM DB snapshot from SCM peers with {@code peerRoles}.
+   * Gets the SCM DB snapshot from SCM peers with {@code peerRoles}, in secure mode with gRPC TLS enabled.
    *
    * @return the URL the snapshot was downloaded from
    */
@@ -228,6 +270,7 @@ public class TestStorageContainerServiceProviderImpl {
         injector.getInstance(StorageContainerLocationInternalInterface.class);
     ReconUtils reconUtils = injector.getInstance(ReconUtils.class);
 
+    enableGrpcTls();
     setPeerRoles(scmClient, peerRoles);
     HttpURLConnection connection = mock(HttpURLConnection.class);
     when(connection.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
@@ -244,6 +287,12 @@ public class TestStorageContainerServiceProviderImpl {
     ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
     verify(reconUtils).makeHttpCall(any(), url.capture(), eq(spnegoEnabled));
     return url.getValue();
+  }
+
+  private void enableGrpcTls() {
+    OzoneConfiguration conf = injector.getInstance(OzoneConfiguration.class);
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+    conf.setBoolean(HDDS_GRPC_TLS_ENABLED, true);
   }
 
   private static void setPeerRoles(StorageContainerLocationInternalInterface scmClient, String... peerRoles)
