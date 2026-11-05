@@ -65,8 +65,7 @@ public class NodeDecommissionManager {
   private ContainerManager containerManager;
   private final SCMContext scmContext;
   private final boolean useHostnames;
-  private Integer maintenanceReplicaMinimum;
-  private Integer maintenanceRemainingRedundancy;
+  private final ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   // Decommissioning and Maintenance mode progress related metrics.
   private final NodeDecommissionMetrics metrics;
@@ -281,9 +280,7 @@ public class NodeDecommissionManager {
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    ReplicationManager.ReplicationManagerConfiguration rmConf = rm.getConfig();
-    setMaintenanceConfigs(rmConf.getMaintenanceReplicaMinimum(),
-        rmConf.getMaintenanceRemainingRedundancy());
+    this.rmConf = rm.getConfig();
 
     monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
         rm);
@@ -540,6 +537,8 @@ public class NodeDecommissionManager {
     int healthyNodesEnteringMaintenance = 0;
     List<DatanodeDetails> validDns = new ArrayList<>(dns);
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
+    final int maintenanceReplicaMinimum = rmConf.getMaintenanceReplicaMinimum();
+    final int maintenanceRemainingRedundancy = rmConf.getMaintenanceRemainingRedundancy();
     for (DatanodeDetails dn : dns) {
       try {
         NodeStatus nodeStatus = getNodeStatus(dn);
@@ -640,20 +639,18 @@ public class NodeDecommissionManager {
   }
 
   @VisibleForTesting
-  public void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
-    synchronized (this) {
-      maintenanceRemainingRedundancy = remainingRedundancy;
-      maintenanceReplicaMinimum = replicaMinimum;
-    }
+  public synchronized void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
+    rmConf.setMaintenanceReplicaMinimum(replicaMinimum);
+    rmConf.setMaintenanceRemainingRedundancy(remainingRedundancy);
   }
 
   @VisibleForTesting
   public synchronized int getMaintenanceReplicaMinimum() {
-    return maintenanceReplicaMinimum;
+    return rmConf.getMaintenanceReplicaMinimum();
   }
 
   @VisibleForTesting
   public synchronized int getMaintenanceRemainingRedundancy() {
-    return maintenanceRemainingRedundancy;
+    return rmConf.getMaintenanceRemainingRedundancy();
   }
 }

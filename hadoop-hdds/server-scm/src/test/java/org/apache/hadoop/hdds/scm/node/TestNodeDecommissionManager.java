@@ -1191,5 +1191,16 @@ public class TestNodeDecommissionManager {
     // Constructor must read these from ReplicationManagerConfiguration, not hardcoded defaults.
     assertEquals(5, manager.getMaintenanceReplicaMinimum());
     assertEquals(3, manager.getMaintenanceRemainingRedundancy());
+
+    // A reconfiguration updates the shared ReplicationManagerConfiguration after construction.
+    rmConf.setMaintenanceReplicaMinimum(4);
+    rmConf.setMaintenanceRemainingRedundancy(2);
+    assertEquals(4, manager.getMaintenanceReplicaMinimum());
+    assertEquals(2, manager.getMaintenanceRemainingRedundancy());
+
+    // The test-only setter writes through to the same configuration object.
+    manager.setMaintenanceConfigs(3, 1);
+    assertEquals(3, rmConf.getMaintenanceReplicaMinimum());
+    assertEquals(1, rmConf.getMaintenanceRemainingRedundancy());
   }
 }
