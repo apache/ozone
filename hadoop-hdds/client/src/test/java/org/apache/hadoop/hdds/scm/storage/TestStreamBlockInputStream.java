@@ -377,7 +377,7 @@ public class TestStreamBlockInputStream {
         executor.shutdownNow();
       }
     }
-    verify(client, times(underConstruction ? 1 : 0)).sendCommand(any(ContainerCommandRequestProto.class), any());
+    verify(client, times(underConstruction ? 1 : 0)).sendCommand(any(ContainerCommandRequestProto.class), any(), any());
   }
 
   @Test
