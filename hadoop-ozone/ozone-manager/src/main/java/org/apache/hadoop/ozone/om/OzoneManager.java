@@ -4770,7 +4770,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Pause the State Machine. It flushes the transactions already applied and rejects new ones until unpause.
       omRatisServer.getOmStateMachine().pause();
     } catch (Exception e) {
-      LOG.error("Failed to stop/pause the services. Cannot proceed with installing the new checkpoint.", e);
       // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
       startSecretManagerIfNecessary();
