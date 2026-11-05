@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -209,6 +210,22 @@ public interface OzoneManagerProtocol
    */
   OmBucketInfo getBucketInfo(String volumeName, String bucketName)
       throws IOException;
+
+  /**
+   * Gets bucket information.
+   * The default implementation ignores {@code assumeS3Context}. Only the OM server resolves the S3 volume;
+   * the client-side translator forwards the flag to OM.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @param assumeS3Context if true OM will automatically lookup the S3
+   *                        volume context info.
+   * @return BucketInfoWithS3Context or exception is thrown.
+   * @throws IOException
+   */
+  default BucketInfoWithS3Context getBucketInfo(String volumeName, String bucketName,
+                                     boolean assumeS3Context) throws IOException {
+    return BucketInfoWithS3Context.newBuilder().setBucketInfo(getBucketInfo(volumeName, bucketName)).build();
+  }
 
   /**
    * Sets bucket property from args.
@@ -922,6 +939,7 @@ public interface OzoneManagerProtocol
    * @param toSnapshot The name of the ending snapshot
    * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @param orderedReport when true, FSO diff reports apply dependency ordering
    * @return the result of submitting snapshot diff job.
    * @throws IOException in case of any exception while generating snapshot diff
    */
@@ -930,7 +948,8 @@ public interface OzoneManagerProtocol
                                                 String fromSnapshot,
                                                 String toSnapshot,
                                                 boolean forceFullDiff,
-                                                boolean disableNativeDiff)
+                                                boolean disableNativeDiff,
+                                                boolean orderedReport)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

@@ -200,7 +200,7 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public OzoneBucket getBucketDetails(String volumeName, String bucketName) throws IOException {
-    return delegate.getBucketDetails(volumeName, bucketName);
+    return delegate.getBucketDetails(resolveVolumeName(volumeName), bucketName);
   }
 
   @Override
@@ -848,9 +848,10 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName, String bucketName, String fromSnapshot,
-      String toSnapshot, boolean forceFullDiff, boolean disableNativeDiff) throws IOException {
+      String toSnapshot, boolean forceFullDiff, boolean disableNativeDiff, boolean orderedReport)
+      throws IOException {
     return delegate.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot, forceFullDiff,
-        disableNativeDiff);
+        disableNativeDiff, orderedReport);
   }
 
   @Override

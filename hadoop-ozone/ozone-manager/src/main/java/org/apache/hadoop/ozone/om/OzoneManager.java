@@ -270,6 +270,7 @@ import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -3298,19 +3299,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmBucketInfo getBucketInfo(String volume, String bucket)
       throws IOException {
+    return getBucketInfo(volume, bucket, false).getBucketInfo();
+  }
+
+  @Override
+  public BucketInfoWithS3Context getBucketInfo(String volume, String bucket, boolean assumeS3Context)
+      throws IOException {
+    String resolvedVolumeName = volume;
+    BucketInfoWithS3Context.Builder builder = BucketInfoWithS3Context.newBuilder();
+    if (assumeS3Context) {
+      S3VolumeContext context = getS3VolumeContext(true);
+      resolvedVolumeName = context.getOmVolumeArgs().getVolume();
+      builder.setUserPrincipal(context.getUserPrincipal());
+    }
+
     boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(volume);
+    Map<String, String> auditMap = buildAuditMap(resolvedVolumeName);
     auditMap.put(OzoneConsts.BUCKET, bucket);
     try {
       if (getAclsEnabled()) {
         omMetadataReader.checkAcls(ResourceType.BUCKET,
-            StoreType.OZONE, ACLType.READ, volume,
+            StoreType.OZONE, ACLType.READ, resolvedVolumeName,
             bucket, null);
       }
       metrics.incNumBucketInfos();
 
-      return enrichLinkBucketInfo(
-          bucketManager.getBucketInfo(volume, bucket));
+      builder.setBucketInfo(enrichLinkBucketInfo(bucketManager.getBucketInfo(resolvedVolumeName, bucket)));
+      return builder.build();
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;
@@ -6027,7 +6042,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -6037,6 +6053,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
     auditMap.put(OzoneConsts.FORCE_FULL_DIFF, String.valueOf(forceFullDiff));
     auditMap.put(OzoneConsts.DISABLE_NATIVE_DIFF, String.valueOf(disableNativeDiff));
+    auditMap.put(OzoneConsts.ORDERED_REPORT, String.valueOf(orderedReport));
 
     try {
       // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
@@ -6048,7 +6065,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // do not increment snapshot diff job metrics here, since it is not
       // a job, but a request.
       return omSnapshotManager.submitSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-          fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+          fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff, orderedReport);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.SUBMIT_SNAPSHOT_DIFF_JOB,

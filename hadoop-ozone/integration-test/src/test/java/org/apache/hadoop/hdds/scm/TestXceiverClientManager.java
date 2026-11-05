@@ -40,8 +40,8 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -54,7 +54,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test for XceiverClientManager caching and eviction.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestXceiverClientManager implements NonHATests.TestCase {
+public abstract class TestXceiverClientManager implements ClusterForTests.TestCase {
 
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;

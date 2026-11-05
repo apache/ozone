@@ -174,6 +174,41 @@ class TestBlockDataStreamOutput {
   }
 
   @Test
+  void hflushPutBlockCommandIsNotSynced() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      stream.write(ByteBuffer.wrap(randomBytes(400)), 0, 400);
+      stream.hflush();
+      stream.write(ByteBuffer.wrap(randomBytes(50)), 0, 50);
+      stream.hflush();
+    }
+    assertThat(pipeline.getReceivedCommands()).extracting(c -> c.getPutBlock().getSync())
+        .containsExactly(false, false);
+  }
+
+  @Test
+  void onlyHsyncPutBlockCommandIsSynced() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    BlockDataStreamOutput stream = createStream(pipeline, config);
+    // The flush boundary PutBlock is not synced.
+    stream.write(ByteBuffer.wrap(randomBytes(400)), 0, 400);
+    // hsync without new data sends a PutBlock only to sync the data committed by the boundary PutBlock.
+    stream.hsync();
+    // hsync with new data syncs its own PutBlock.
+    stream.write(ByteBuffer.wrap(randomBytes(50)), 0, 50);
+    stream.hsync();
+    stream.close();
+
+    assertThat(pipeline.getReceivedCommands()).extracting(c -> c.getPutBlock().getSync())
+        .containsExactly(false, true, true);
+    assertEquals(450, stream.getTotalAckDataLength(), "The buffers of a synced PutBlock should be acknowledged");
+  }
+
+  @Test
   void midStreamPutBlockCommandReleasesBuffers() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     OzoneClientConfig config = createConfig();
@@ -277,6 +312,21 @@ class TestBlockDataStreamOutput {
     assertThat(e)
         .hasRootCauseInstanceOf(IOException.class)
         .hasRootCauseMessage("chunk write failed due to injected failure");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void failedStreamCloseIsNotRetried(boolean putBlockWithoutRaft) throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline().failStreamClose();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
+    BlockDataStreamOutput stream = createStream(pipeline, config);
+    byte[] data = randomBytes(50);
+    stream.write(ByteBuffer.wrap(data), 0, data.length);
+
+    IOException e = assertThrows(IOException.class, stream::close);
+    assertThat(e).hasStackTraceContaining("Failed to close the data stream");
+    assertEquals(1, pipeline.getStreamCloseCount(), "A failed stream close must not be retried");
   }
 
   @Test
