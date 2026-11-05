@@ -2185,7 +2185,6 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     multipartUpload(bucketName, keyName, multipartUploadFile, 5 * MB, null, null, null);
 
     GetObjectRequest getObjectRequestAll = new GetObjectRequest(bucketName, keyName);
-    getObjectRequestAll.setPartNumber(0);
     S3Object s3ObjectAll = s3Client.getObject(getObjectRequestAll);
     long allPartContentLength = s3ObjectAll.getObjectMetadata().getContentLength();
 
@@ -2208,6 +2207,25 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(allPartContentLength / 3, partThreeContentLength);
 
     assertEquals(allPartContentLength, (partOneContentLength + partTwoContentLength + partThreeContentLength));
+  }
+
+  @Test
+  public void testGetAndHeadObjectWithZeroPartNumber() throws Exception {
+    String bucketName = getBucketName();
+    String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "content");
+
+    GetObjectRequest getRequest = new GetObjectRequest(bucketName, keyName).withPartNumber(0);
+    AmazonServiceException getException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(getRequest).close());
+    assertThat(getException.getStatusCode()).isEqualTo(400);
+    assertThat(getException.getErrorCode()).isEqualTo(S3ErrorTable.INVALID_ARGUMENT.getCode());
+
+    GetObjectMetadataRequest headRequest = new GetObjectMetadataRequest(bucketName, keyName).withPartNumber(0);
+    AmazonServiceException headException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObjectMetadata(headRequest));
+    assertThat(headException.getStatusCode()).isEqualTo(400);
   }
 
   @ParameterizedTest

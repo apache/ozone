@@ -122,24 +122,15 @@ public class TestObjectGet {
     assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
   }
 
-  @Test
-  public void testGetWithZeroPartNumber() throws Exception {
-    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 0);
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 0})
+  public void testGetWithNonPositivePartNumber(int partNumber) {
+    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    long failureBefore = rest.getMetrics().getGetKeyFailure();
 
-    try (Response response = get(rest, BUCKET_NAME, KEY_NAME);
-         ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-      assertThat(response.getStatus()).isEqualTo(Response.Status.OK.getStatusCode());
-      assertThat(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)).isEqualTo(String.valueOf(CONTENT.length()));
-      ((StreamingOutput) response.getEntity()).write(output);
-      assertThat(output.toByteArray()).isEqualTo(CONTENT.getBytes(UTF_8));
-    }
-  }
+    assertErrorResponse(INVALID_ARGUMENT, () -> get(rest, BUCKET_NAME, KEY_NAME));
 
-  @Test
-  public void testGetWithNegativePartNumber() throws Exception {
-    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, -1);
-    assertErrorResponse(INVALID_ARGUMENT,
-        () -> get(rest, BUCKET_NAME, KEY_NAME));
+    assertThat(rest.getMetrics().getGetKeyFailure() - failureBefore).isEqualTo(1);
   }
 
   @ParameterizedTest
@@ -188,8 +179,14 @@ public class TestObjectGet {
 
     //THEN
     OzoneClientTestUtils.assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertThat(response.getStatus()).isEqualTo(Response.Status.OK.getStatusCode());
     assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
+
+    try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+      ((StreamingOutput) response.getEntity()).write(output);
+      assertThat(output.toByteArray()).isEqualTo(CONTENT.getBytes(UTF_8));
+    }
 
     DateTimeFormatter.RFC_1123_DATE_TIME
         .parse(response.getHeaderString("Last-Modified"));

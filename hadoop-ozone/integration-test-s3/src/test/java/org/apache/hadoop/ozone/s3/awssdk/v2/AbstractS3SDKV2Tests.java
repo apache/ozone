@@ -2490,6 +2490,23 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(userMetadata, headObjectResponse.metadata());
   }
 
+  @Test
+  public void testGetAndHeadObjectWithZeroPartNumber() {
+    String bucketName = getBucketName();
+    String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("content"));
+
+    S3Exception getException = assertThrows(S3Exception.class, () -> s3Client.getObjectAsBytes(b -> b
+        .bucket(bucketName).key(keyName).partNumber(0)));
+    assertThat(getException.statusCode()).isEqualTo(SC_BAD_REQUEST);
+    assertThat(getException.awsErrorDetails().errorCode()).isEqualTo(S3ErrorTable.INVALID_ARGUMENT.getCode());
+
+    S3Exception headException = assertThrows(S3Exception.class, () -> s3Client.headObject(b -> b
+        .bucket(bucketName).key(keyName).partNumber(0)));
+    assertThat(headException.statusCode()).isEqualTo(SC_BAD_REQUEST);
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {-1, 0, 1, 2})
   public void testGetAndHeadObjectWithPartNumberAndRange(int partNumber, @TempDir Path tempDir) throws Exception {

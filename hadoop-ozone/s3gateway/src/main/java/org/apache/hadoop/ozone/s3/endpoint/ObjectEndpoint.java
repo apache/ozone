@@ -394,12 +394,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       context.setAction(S3GAction.GET_KEY);
 
       String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
-      validatePartNumberAndRange(queryParams().containsKey(QueryParams.PART_NUMBER), rangeHeaderVal, keyPath);
-      final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
-      // A negative part number is not a valid part; reject it as InvalidArgument.
-      if (partNumber < 0) {
-        throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
-      }
+      final int partNumber = parsePartNumber(rangeHeaderVal, keyPath);
 
       OzoneKeyDetails keyDetails = (partNumber != 0) ?
           getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
@@ -510,11 +505,21 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
-  private static void validatePartNumberAndRange(boolean hasPartNumber, String rangeHeaderVal, String keyPath) {
-    if (hasPartNumber && rangeHeaderVal != null) {
+  private int parsePartNumber(String rangeHeaderVal, String keyPath) {
+    if (!queryParams().containsKey(QueryParams.PART_NUMBER)) {
+      return 0;
+    }
+
+    if (rangeHeaderVal != null) {
       throw newError(INVALID_REQUEST, keyPath)
           .withMessage("Cannot specify both Range header and partNumber query parameter");
     }
+
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    if (partNumber <= 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
+    return partNumber;
   }
 
   static void addLastModifiedDate(
@@ -654,12 +659,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
       String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
-      validatePartNumberAndRange(queryParams().containsKey(QueryParams.PART_NUMBER), rangeHeaderVal, keyPath);
-      final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
-      // A negative part number is not a valid part; reject it as InvalidArgument.
-      if (partNumber < 0) {
-        throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
-      }
+      final int partNumber = parsePartNumber(rangeHeaderVal, keyPath);
 
       // A partNumber is validated against the object's parts and yields the
       // metadata of that part; an out-of-range part throws InvalidPart.
