@@ -427,18 +427,17 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   public void executePutBlock(boolean sync, boolean close) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
-    final PendingFlush flush = pendingFlush;
-    pendingFlush = new PendingFlush();
     final List<StreamBuffer> byteBufferList;
-    if (flush.hasBuffersForPutBlock()) {
+    if (pendingFlush.hasBuffersForPutBlock()) {
       Objects.requireNonNull(bufferList, "bufferList == null");
-      byteBufferList = flush.consumeBuffersForPutBlock();
+      byteBufferList = pendingFlush.consumeBuffersForPutBlock();
       Objects.requireNonNull(byteBufferList, "byteBufferList == null");
     } else {
       // no data was written since the most recent putBlock
       byteBufferList = null;
     }
-    waitFuturesComplete(flush);
+    waitFuturesComplete(pendingFlush);
+    pendingFlush = new PendingFlush();
     if (close && putBlockWithoutRaft) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
       waitPutBlockCommandFuturesComplete();

@@ -150,6 +150,16 @@ class TestBlockDataStreamOutput {
   }
 
   @Test
+  void flushAfterFailedPutBlockBoundaryStillThrows() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    byte[] data = randomBytes(400);
+    pipeline.failChunkAfter(3, () -> new IOException("injected"));
+    BlockDataStreamOutput stream = createStream(pipeline);
+    assertThrows(IOException.class, () -> stream.write(ByteBuffer.wrap(data), 0, data.length));
+    assertThrows(IOException.class, stream::flush);
+  }
+
+  @Test
   void midStreamPutBlockUsesStreamCommandWhenEnabled() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     OzoneClientConfig config = createConfig();
