@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -209,11 +210,49 @@ public class TestStreamRead {
     }
   }
 
-  void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
+  /**
+   * The client chooses the size of the ReadBlock responses. A response must fit in the client's gRPC inbound message
+   * limit, so the datanode caps the size instead of failing the read.
+   */
+  @Test
+  void testResponseDataSizeAboveGrpcMessageLimit() throws Exception {
+    final SizeInBytes keySize = SizeInBytes.valueOf("40M");
+    final SizeInBytes bufferSize = SizeInBytes.ONE_MB;
+
+    final OzoneConfiguration conf = new OzoneConfiguration(cluster.getConf());
+    final OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setStreamReadBlock(true);
+    clientConfig.setStreamReadResponseDataSize(2 * OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+    conf.setFromObject(clientConfig);
+
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      final BucketForTesting testBucket = BucketForTesting.newBuilder(client).build();
+      final String keyName = "keyResponseDataSize";
+      createKey(testBucket.delegate(), keyName, keySize, bufferSize);
+
+      final File blockFile = getBlockFile(client, testBucket.delegate(), keyName);
+      final String expectedMd5 = generateMd5(keySize, bufferSize, blockFile);
+      streamRead(keySize, bufferSize, expectedMd5, testBucket, keyName);
+    }
+  }
+
+  private File getBlockFile(OzoneClient client, OzoneBucket bucket, String keyName) throws Exception {
     final List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
     assertEquals(1, datanodes.size());
     final HddsDatanodeService datanode = datanodes.get(0);
 
+    final OmKeyInfo info = client.getProxy().getKeyInfo(bucket.getVolumeName(), bucket.getName(), keyName, false);
+    final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
+    assertEquals(1, locations.size());
+    final BlockID blockId = locations.get(0).getBlockID();
+    final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
+        .getContainer(blockId.getContainerID()).getContainerData();
+    final File blockFile = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(containerData, blockId, null);
+    assertTrue(blockFile.exists());
+    return blockFile;
+  }
+
+  void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
     OzoneConfiguration conf = cluster.getConf();
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setBytesPerChecksum(bytesPerChecksum.getSizeInt());
@@ -252,14 +291,7 @@ public class TestStreamRead {
         createKey(testBucket.delegate(), keyName, keySize, bufferSize);
 
         // get block file and generate md5
-        final OmKeyInfo info = nonStreamReadClient.getProxy().getKeyInfo(volume, bucket, keyName, false);
-        final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
-        assertEquals(1, locations.size());
-        final BlockID blockId = locations.get(0).getBlockID();
-        final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
-            .getContainer(blockId.getContainerID()).getContainerData();
-        final File blockFile = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(containerData, blockId, null);
-        assertTrue(blockFile.exists());
+        final File blockFile = getBlockFile(nonStreamReadClient, testBucket.delegate(), keyName);
         assertEquals(BLOCK_SIZE, blockFile.length());
         final String expectedMd5 = generateMd5(keySize, SizeInBytes.ONE_MB, blockFile);
 

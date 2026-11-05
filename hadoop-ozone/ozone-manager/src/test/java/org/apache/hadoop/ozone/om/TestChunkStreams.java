@@ -29,6 +29,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.junit.jupiter.api.Test;
 
@@ -97,8 +98,8 @@ public class TestChunkStreams {
   private BlockInputStream createStream(byte[] buf, int offset) throws IOException {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    return new BlockInputStream(null, 100L, null, null, null,
-        clientConfig) {
+    return new BlockInputStream(new BlockLocationInfo.Builder().setLength(100L).build(),
+        null, null, null, null, clientConfig) {
       private long pos;
       private final ByteArrayInputStream in =
           new ByteArrayInputStream(buf, offset, 100);

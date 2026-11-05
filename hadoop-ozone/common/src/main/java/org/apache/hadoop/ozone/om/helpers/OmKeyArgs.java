@@ -52,6 +52,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   private final boolean latestVersionLocation;
   private final boolean recursive;
   private final boolean headOp;
+  private final boolean assumeS3Context;
   private final boolean forceUpdateContainerCacheFromSCM;
   private final ImmutableMap<String, String> tags;
   // expectedDataGeneration, when used in key creation indicates that a
@@ -87,6 +88,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.latestVersionLocation = b.latestVersionLocation;
     this.recursive = b.recursive;
     this.headOp = b.headOp;
+    this.assumeS3Context = b.assumeS3Context;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
@@ -164,6 +166,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
   public boolean isHeadOp() {
     return headOp;
+  }
+
+  public boolean isAssumeS3Context() {
+    return assumeS3Context;
   }
 
   public boolean isForceUpdateContainerCacheFromSCM() {
@@ -279,6 +285,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private final AclListBuilder acls;
     private boolean recursive;
     private boolean headOp;
+    private boolean assumeS3Context;
     private boolean forceUpdateContainerCacheFromSCM;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
@@ -329,6 +336,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.latestVersionLocation = obj.latestVersionLocation;
       this.recursive = obj.recursive;
       this.headOp = obj.headOp;
+      this.assumeS3Context = obj.assumeS3Context;
       this.forceUpdateContainerCacheFromSCM =
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
@@ -459,6 +467,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setHeadOp(boolean isHeadOp) {
       this.headOp = isHeadOp;
+      return this;
+    }
+
+    public Builder setAssumeS3Context(boolean assumeS3Context) {
+      this.assumeS3Context = assumeS3Context;
       return this;
     }
 
