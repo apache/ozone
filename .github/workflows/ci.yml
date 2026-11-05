@@ -45,6 +45,11 @@ env:
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_WITH_COVERAGE: ${{ github.event_name != 'pull_request' }}
+  OZONE_IMAGE: ghcr.io/apache/ozone
+  OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
+  OZONE_VOLUME_OWNER: 1000
+  RANGER_IMAGE: ghcr.io/apache/ranger
+  SPARK_SQL_IMAGE: ghcr.io/apache/spark-docker/spark
 
 permissions: { }
 
