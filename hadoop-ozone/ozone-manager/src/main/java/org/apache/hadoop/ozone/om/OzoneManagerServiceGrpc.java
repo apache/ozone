@@ -23,6 +23,7 @@ import io.grpc.Status;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
@@ -109,7 +110,8 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
       responseObserver.onNext(omResponse);
     } catch (Throwable e) {
       LOG.error("Failed to submit request", e);
-      Throwable omException = e instanceof ServiceException ? e.getCause() : e;
+      Throwable omException =
+          e instanceof ServiceException ? ProtobufHelper.getRemoteException((ServiceException) e) : e;
       responseObserver.onError(OMGrpcError.toStatusRuntimeException(omException));
       return;
     }

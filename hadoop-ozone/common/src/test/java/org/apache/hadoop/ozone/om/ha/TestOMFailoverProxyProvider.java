@@ -33,8 +33,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.StringJoiner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -143,6 +145,28 @@ public class TestOMFailoverProxyProvider {
 
     assertEquals(RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY, action.action);
     assertEquals(suggestedLeader, provider.getNextProxyOMNodeId());
+  }
+
+  @Test
+  public void testDownSuggestedLeaderFallsBackToRoundRobin() throws Exception {
+    final List<String> nodeIds = new ArrayList<>(provider.getOMProxyMap().getNodeIds());
+    final String suggestedLeader = nodeIds.get((nodeIds.indexOf(provider.getCurrentProxyOMNodeId()) + 2) % numNodes);
+    final RetryPolicy retryPolicy = provider.getRetryPolicy(10);
+
+    final Set<String> triedNodes = new HashSet<>();
+    long waitTime = 0;
+    for (int failovers = 0; failovers < 2 * numNodes && waitTime == 0; failovers++) {
+      final String nodeId = provider.getCurrentProxyOMNodeId();
+      triedNodes.add(nodeId);
+      final Exception failure = nodeId.equals(suggestedLeader)
+          ? new IOException("connection refused")
+          : new ServiceException(new OMNotLeaderException("not the leader", suggestedLeader));
+      waitTime = retryPolicy.shouldRetry(failure, 0, failovers, true).delayMillis;
+      provider.performFailover(null);
+    }
+
+    assertEquals(numNodes, triedNodes.size());
+    assertEquals(waitBetweenRetries, waitTime);
   }
 
   /**

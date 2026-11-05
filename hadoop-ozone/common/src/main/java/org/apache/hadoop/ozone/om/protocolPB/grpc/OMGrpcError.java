@@ -70,15 +70,12 @@ public final class OMGrpcError {
     case READFAILED:
       return new ReadException(message);
     default:
-      return new OMException(message, OMException.ResultCodes.INTERNAL_ERROR);
+      return new OMException(e.getStatus().getDescription(), OMException.ResultCodes.INTERNAL_ERROR);
     }
   }
 
   private static OMGrpcErrorProto toProto(Throwable omException) {
     final OMGrpcErrorProto.Builder error = OMGrpcErrorProto.newBuilder();
-    if (omException.getMessage() != null) {
-      error.setMessage(omException.getMessage());
-    }
     if (omException instanceof OMNotLeaderException) {
       final OMGrpcErrorProto.NotLeader.Builder notLeader = OMGrpcErrorProto.NotLeader.newBuilder();
       final String suggestedLeader = ((OMNotLeaderException) omException).getSuggestedLeaderNodeId();
@@ -92,6 +89,9 @@ public final class OMGrpcError {
       error.setReadIndexFailed(OMGrpcErrorProto.ReadIndexFailed.getDefaultInstance());
     } else if (omException instanceof ReadException) {
       error.setReadFailed(OMGrpcErrorProto.ReadFailed.getDefaultInstance());
+    }
+    if (error.getErrorCase() != OMGrpcErrorProto.ErrorCase.ERROR_NOT_SET && omException.getMessage() != null) {
+      error.setMessage(omException.getMessage());
     }
     return error.build();
   }

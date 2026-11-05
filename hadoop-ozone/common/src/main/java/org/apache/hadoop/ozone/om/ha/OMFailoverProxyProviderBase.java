@@ -228,7 +228,8 @@ public abstract class OMFailoverProxyProviderBase<T> implements
             // of the wait times needed get creating the retryAction.
             String suggestedNodeId =
                 notLeaderException.getSuggestedLeaderNodeId();
-            if (suggestedNodeId != null && omProxies.get(suggestedNodeId) != null) {
+            if (suggestedNodeId != null && omProxies.get(suggestedNodeId) != null
+                && !isAttempted(suggestedNodeId)) {
               setNextOmProxy(suggestedNodeId);
               return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
                   failovers);
@@ -354,6 +355,10 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * Update the proxy index to the next proxy in the list.
    * @return the new proxy index
    */
+  private synchronized boolean isAttempted(String nodeId) {
+    return attemptedOMs.contains(nodeId);
+  }
+
   private synchronized int incrementNextProxyIndex() {
     // Before failing over to next proxy, add the proxy OM (which has
     // returned an exception) to the list of attemptedOMs.

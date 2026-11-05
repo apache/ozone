@@ -58,9 +58,11 @@ public class TestOMGrpcError {
 
   @Test
   void testOtherExceptionIsInternalError() {
-    final IOException e = roundTrip(new IllegalStateException("unexpected"));
+    final IllegalStateException omException = new IllegalStateException("unexpected");
 
-    assertThat(e).isInstanceOf(OMException.class).hasMessage("unexpected");
+    final IOException e = roundTrip(omException);
+
+    assertThat(e).isInstanceOf(OMException.class).hasMessage(omException.toString());
     assertEquals(OMException.ResultCodes.INTERNAL_ERROR, ((OMException) e).getResult());
   }
 

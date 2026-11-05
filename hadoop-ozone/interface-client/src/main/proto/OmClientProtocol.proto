@@ -2874,6 +2874,7 @@ message OMGrpcErrorProto {
   message ReadIndexFailed {}
   message ReadFailed {}
 
+  // Only set with one of the errors below. Any other error has its message in the gRPC status description.
   optional string message = 1;
   // Not set for any other error.
   oneof error {
