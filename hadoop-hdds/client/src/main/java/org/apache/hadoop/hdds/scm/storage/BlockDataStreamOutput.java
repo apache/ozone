@@ -459,18 +459,16 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
               xceiverClient.getPipeline(), blockData, false, true, tokenString);
-      dataStreamCloseReply = executePutBlockClose(putBlockRequest,
-          PUT_BLOCK_REQUEST_LENGTH_MAX, out);
-      dataStreamCloseReply.whenComplete((reply, e) -> {
-        if (e != null || reply == null || !reply.isSuccess()) {
-          LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
-          try {
-            executePutBlock(false, true);
-          } catch (IOException ex) {
-            throw new CompletionException(ex);
-          }
-        }
-      });
+      dataStreamCloseReply = executePutBlockClose(putBlockRequest, PUT_BLOCK_REQUEST_LENGTH_MAX, out)
+          .whenComplete((reply, e) -> {
+            if (e != null || reply == null || !reply.isSuccess()) {
+              LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
+              final IOException ioe = new IOException("Failed to close the data stream for blockID " + blockID
+                  + ", reply=" + reply, e);
+              setIoException(ioe);
+              throw new CompletionException(ioe);
+            }
+          });
       if (putBlockWithoutRaft) {
         // PutBlock is supposed to be committed after the data stream close so there
         // is no need to continue.
