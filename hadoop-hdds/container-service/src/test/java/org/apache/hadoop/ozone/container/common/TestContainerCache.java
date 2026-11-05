@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -184,6 +185,44 @@ public class TestContainerCache {
     assertEquals(1, cache.size());
     db.cleanup();
     FileUtils.deleteDirectory(root);
+  }
+
+  @Test
+  void testShutdownCacheKeepsDBInUseOpen() throws Exception {
+    File root = new File(testRoot);
+    assertTrue(root.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
+    ContainerCache cache = ContainerCache.getInstance(conf);
+    cache.clear();
+    File containerDir1 = new File(root, "cont1");
+    File containerDir2 = new File(root, "cont2");
+    createContainerDB(conf, containerDir1);
+    createContainerDB(conf, containerDir2);
+    String schemaVersion = VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion();
+
+    try {
+      // A DB still in use comes first in the cache, followed by an idle one.
+      ReferenceCountedDB inUse = cache.getDB(1, "RocksDB", containerDir1.getPath(), schemaVersion, conf);
+      ReferenceCountedDB idle = cache.getDB(2, "RocksDB", containerDir2.getPath(), schemaVersion, conf);
+      idle.close();
+
+      cache.shutdownCache();
+      assertThat(idle.isClosed()).isTrue();
+      assertThat(inUse.isClosed()).isFalse();
+      assertThat(cache).containsOnlyKeys(containerDir1.getPath());
+
+      // Once released, the next shutdown closes it.
+      inUse.close();
+      cache.shutdownCache();
+      assertThat(inUse.isClosed()).isTrue();
+      assertThat(cache).isEmpty();
+    } finally {
+      cache.values().forEach(db -> ((ReferenceCountedDB) db).getStore().stop());
+      cache.clear();
+      FileUtils.deleteDirectory(root);
+    }
   }
 
   @Test

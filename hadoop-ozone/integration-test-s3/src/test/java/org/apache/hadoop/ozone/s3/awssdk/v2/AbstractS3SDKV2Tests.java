@@ -121,6 +121,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.async.AsyncRequestBody;
+import software.amazon.awssdk.core.interceptor.Context;
+import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
+import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.HttpExecuteRequest;
 import software.amazon.awssdk.http.HttpExecuteResponse;
@@ -135,6 +139,7 @@ import software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.Bucket;
 import software.amazon.awssdk.services.s3.model.BucketLifecycleConfiguration;
+import software.amazon.awssdk.services.s3.model.ChecksumAlgorithm;
 import software.amazon.awssdk.services.s3.model.CommonPrefix;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
@@ -330,6 +335,71 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     assertEquals(content, objectBytes.asUtf8String());
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutDirectoryWithTrailingChecksum() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName() + "/";
+    createFsoBucket(bucketName);
+    try {
+      List<String> payloadModes = new ArrayList<>();
+      ExecutionInterceptor interceptor = new ExecutionInterceptor() {
+        @Override
+        public void beforeTransmission(Context.BeforeTransmission context, ExecutionAttributes executionAttributes) {
+          payloadModes.add(context.httpRequest().firstMatchingHeader(S3Consts.X_AMZ_CONTENT_SHA256).orElse(null));
+          assertThat(context.httpRequest().firstMatchingHeader(S3Consts.X_AMZ_TRAILER))
+              .contains("x-amz-checksum-crc32c");
+        }
+      };
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName).checksumAlgorithm(ChecksumAlgorithm.CRC32_C)
+          .overrideConfiguration(o -> o.addPlugin(c -> c.overrideConfiguration(
+              overrides -> overrides.addExecutionInterceptor(interceptor)))), RequestBody.empty());
+
+      assertThat(payloadModes).isNotEmpty().containsOnly(S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
+      try (OzoneClient ozoneClient = cluster.newClient()) {
+        OzoneBucket bucket = ozoneClient.getObjectStore().getS3Bucket(bucketName);
+        assertThat(bucket.getFileStatus(keyName).isDirectory()).isTrue();
+      }
+    } finally {
+      s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName));
+      deleteFsoBucket(bucketName);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "bar"})
+  public void testPutObjectAsyncWithTrailingChecksum(String content) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse response = s3AsyncClient.putObject(b -> b.bucket(bucketName).key(keyName)
+            .checksumAlgorithm(ChecksumAlgorithm.CRC32_C), AsyncRequestBody.fromString(content))
+        .get(30, TimeUnit.SECONDS);
+
+    assertThat(response.eTag()).isNotEmpty();
+    assertThat(s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String()).isEqualTo(content);
+  }
+
+  @Test
+  public void testUploadPartAsyncWithTrailingChecksum() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "part1data";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    String uploadId = s3Client.createMultipartUpload(b -> b.bucket(bucketName).key(keyName)).uploadId();
+
+    UploadPartResponse response = s3AsyncClient.uploadPart(b -> b.bucket(bucketName).key(keyName).uploadId(uploadId)
+            .partNumber(1).checksumAlgorithm(ChecksumAlgorithm.CRC32_C), AsyncRequestBody.fromString(content))
+        .get(30, TimeUnit.SECONDS);
+
+    CompletedPart part = CompletedPart.builder().partNumber(1).eTag(response.eTag()).build();
+    s3Client.completeMultipartUpload(b -> b.bucket(bucketName).key(keyName).uploadId(uploadId)
+        .multipartUpload(CompletedMultipartUpload.builder().parts(part).build()));
+
+    assertThat(s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String()).isEqualTo(content);
   }
 
   @ParameterizedTest
@@ -753,6 +823,23 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
     assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
         b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testAbortMultipartUploadWithEmptyUploadIdKeepsObject() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    PutObjectResponse putResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("bar"));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.abortMultipartUpload(b -> b.bucket(bucketName).key(keyName).uploadId("")));
+
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchUpload", exception.awsErrorDetails().errorCode());
+    HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals(putResponse.eTag(), headObjectResponse.eTag());
   }
 
   @Test
