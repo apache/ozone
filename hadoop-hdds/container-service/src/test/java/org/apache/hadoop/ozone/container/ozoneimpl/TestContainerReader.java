@@ -750,6 +750,7 @@ public class TestContainerReader {
       new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true).run();
       assertNotNull(containerSet.getContainer(0));
       assertThat(logs.getOutput()).contains("Failed to remove leftover container import files");
+      assertThat(logs.getOutput()).contains(copyDir.toString());
     } finally {
       logs.stopCapturing();
     }

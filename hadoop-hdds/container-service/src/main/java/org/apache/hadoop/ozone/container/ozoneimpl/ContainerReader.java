@@ -116,7 +116,8 @@ public class ContainerReader implements Runnable {
         FileUtils.cleanDirectory(copyDir);
       }
     } catch (IOException | RuntimeException e) {
-      LOG.warn("Failed to remove leftover container import files under {}", hddsVolume.getVolumeRootDir(), e);
+      LOG.warn("Failed to remove leftover container import files under {}: {}",
+          hddsVolume.getVolumeRootDir(), e.getMessage(), e);
     }
   }
 
