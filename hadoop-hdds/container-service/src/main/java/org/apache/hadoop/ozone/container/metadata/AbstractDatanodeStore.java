@@ -157,14 +157,14 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
   @Override
   public BlockIterator<BlockData> getBlockIterator(long containerID)
       throws IOException {
-    return new KeyValueBlockIterator(containerID,
+    return new KeyValueBlockIterator(this, containerID,
         blockDataTableWithIterator.iterator());
   }
 
   @Override
   public BlockIterator<BlockData> getBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException {
-    return new KeyValueBlockIterator(containerID,
+    return new KeyValueBlockIterator(this, containerID,
         blockDataTableWithIterator.iterator(), filter);
   }
 
@@ -196,6 +196,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
    * Block Iterator for KeyValue Container. This block iterator returns blocks
    * which match with the {@link KeyPrefixFilter}.
    * The default filter is {@link #DEFAULT_BLOCK_FILTER}.
+   * Like {@link DatanodeStore#getBlockByID}, each block includes the last chunk of an incremental chunk list.
    */
   @InterfaceAudience.Public
   public static class KeyValueBlockIterator implements
@@ -204,6 +205,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
     private static final Logger LOG = LoggerFactory.getLogger(
             KeyValueBlockIterator.class);
 
+    private final DatanodeStore store;
     private final Table.KeyValueIterator<String, BlockData> blockIterator;
     private static final KeyPrefixFilter DEFAULT_BLOCK_FILTER =
             MetadataKeyFilters.getUnprefixedKeyFilter();
@@ -215,7 +217,8 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
      * KeyValueBlockIterator to iterate unprefixed blocks in a container.
      * @param iterator - The underlying iterator to apply the block filter to.
      */
-    KeyValueBlockIterator(long containerID, Table.KeyValueIterator<String, BlockData> iterator) {
+    KeyValueBlockIterator(DatanodeStore store, long containerID, Table.KeyValueIterator<String, BlockData> iterator) {
+      this.store = store;
       this.containerID = containerID;
       this.blockIterator = iterator;
       this.blockFilter = DEFAULT_BLOCK_FILTER;
@@ -226,8 +229,9 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
      * @param iterator - The underlying iterator to apply the block filter to.
      * @param filter - Block filter, filter to be applied for blocks
      */
-    KeyValueBlockIterator(long containerID,
+    KeyValueBlockIterator(DatanodeStore store, long containerID,
         Table.KeyValueIterator<String, BlockData> iterator, KeyPrefixFilter filter) {
+      this.store = store;
       this.containerID = containerID;
       this.blockIterator = iterator;
       this.blockFilter = filter;
@@ -261,7 +265,8 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
         Table.KeyValue<String, BlockData> keyValue = blockIterator.next();
         byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
         if (blockFilter.filterKey(keyBytes)) {
-          nextBlock = keyValue.getValue();
+          BlockData blockData = keyValue.getValue();
+          nextBlock = store.getCompleteBlockData(blockData, blockData.getBlockID(), keyValue.getKey());
           if (LOG.isTraceEnabled()) {
             LOG.trace("Block matching with filter found: blockID is : {} for " +
                     "containerID {}", nextBlock.getLocalID(), containerID);

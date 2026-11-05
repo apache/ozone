@@ -71,3 +71,6 @@ OM_SERVICE_ID=omservice
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 # Does not take effect on Ozone versions < 1.4.0
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+
+# Revert when HDDS-17350 is merged. (lazy client tracing init)
+OZONE-SITE.XML_ozone.tracing.client.application-aware=false

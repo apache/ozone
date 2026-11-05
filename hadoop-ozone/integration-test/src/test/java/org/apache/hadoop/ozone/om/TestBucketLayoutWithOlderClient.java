@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ import org.junit.jupiter.api.TestInstance;
  * Tests to verify bucket ops with older version client.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestBucketLayoutWithOlderClient implements NonHATests.TestCase {
+public abstract class TestBucketLayoutWithOlderClient implements ClusterForTests.TestCase {
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;

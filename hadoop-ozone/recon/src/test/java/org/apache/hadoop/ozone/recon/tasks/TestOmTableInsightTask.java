@@ -78,9 +78,11 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.util.Time;
 import org.jooq.DSLContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -101,6 +103,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   private boolean isSetupDone = false;
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
+  private OMMetadataManager testOmMetadataManager;
+  private ReconDBProvider reconDBProvider;
 
   // Object names in FSO-enabled format
   private static final String VOL = "volume1";
@@ -141,9 +145,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   private void initializeInjector() throws IOException {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    testOmMetadataManager =
+        initializeNewOmMetadataManager(Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(testOmMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
 
     ReconTestInjector reconTestInjector =
@@ -154,6 +158,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
             .build();
     ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager = reconTestInjector.getInstance(
         ReconNamespaceSummaryManagerImpl.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
 
     reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     omTableInsightTask = new OmTableInsightTask(
@@ -178,6 +183,19 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     MockitoAnnotations.openMocks(this);
     // Truncate table before running each test
     dslContext.truncate(GLOBAL_STATS).execute();
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (testOmMetadataManager != null) {
+      testOmMetadataManager.stop();
+    }
   }
 
   /**

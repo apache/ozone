@@ -47,6 +47,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.parseETag;
@@ -71,17 +72,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.HttpMethod;
@@ -108,6 +112,9 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
@@ -195,6 +202,51 @@ class TestObjectPut {
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
     assertThat(keyDetails.getTags()).isEmpty();
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {"abc", "99999999999999999999", "0", "37"})
+  void testNonStreamingPutIgnoresDecodedContentLength(String decodedLength) throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(decodedLength);
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    assertThat(assertKeyContent(bucket, KEY_NAME, CONTENT).getDataSize()).isEqualTo(CONTENT.length());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRejectMalformedContentSha256BeforeReadingBody(boolean streaming) throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("invalid");
+    doReturn(streaming).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    InputStream body = spy(new ByteArrayInputStream(CONTENT.getBytes(StandardCharsets.UTF_8)));
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn(String.valueOf(CONTENT.length()));
+
+    assertErrorResponse(INVALID_ARGUMENT, () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, body));
+
+    verifyNoInteractions(body);
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, 0", "false, 32", "false, 64", "true, 0", "true, 32", "true, 64"})
+  void testContentSha256(boolean streaming, int uppercaseLength) throws Exception {
+    doReturn(streaming).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    String hash = DatatypeConverter.printHexBinary(
+        MessageDigest.getInstance("SHA-256").digest(CONTENT.getBytes(StandardCharsets.UTF_8))).toLowerCase();
+    hash = hash.substring(0, uppercaseLength).toUpperCase(Locale.ROOT) + hash.substring(uppercaseLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+    assertSucceeds(() -> putObject(CONTENT));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(StringUtils.repeat('0', 64));
+    assertErrorResponse(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, () -> putObject(CONTENT));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
   }
 
   @Test
@@ -291,9 +343,8 @@ class TestObjectPut {
   void testPutObjectWithValidSignedChunksAndTrailer(String content) throws Exception {
     configureSignedChunksWithTrailer(content.length());
 
-    // The trailer value is covered by the HMAC; checksum calculation is outside this test.
     assertSucceeds(() -> putObject(signedChunkedBodyWithTrailer(
-        content, "x-amz-checksum-crc32c", "sOO8/Q==")));
+        content, "x-amz-checksum-crc32c", content.isEmpty() ? "AAAAAA==" : "KAwGng==")));
 
     assertThat(assertKeyContent(bucket, KEY_NAME, content).getDataSize()).isEqualTo(content.length());
   }
@@ -468,43 +519,100 @@ class TestObjectPut {
     assertKeyWasNotCommitted();
   }
 
-  static Stream<Arguments> chunkSignatureVerificationCases() {
+  static Stream<Arguments> payloadClassificationCases() {
     return Stream.of(
-        Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD, true),
-        Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, true),
-        Arguments.of(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD, false),
-        Arguments.of(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER, false),
-        Arguments.of(STREAMING_UNSIGNED_PAYLOAD_TRAILER, false));
+        Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD, SignedChunksInputStream.class, false, true),
+        Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, SignedChunksInputStream.class, false, true),
+        Arguments.of(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD, SignedChunksInputStream.class, false, false),
+        Arguments.of(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER, SignedChunksInputStream.class, false, false),
+        Arguments.of(STREAMING_UNSIGNED_PAYLOAD_TRAILER, UnsignedChunksInputStream.class, false, false),
+        Arguments.of("STREAMING-FUTURE-PAYLOAD", SignedChunksInputStream.class, false, false),
+        Arguments.of("STREAMING", SignedChunksInputStream.class, false, false),
+        Arguments.of("STREAMING-AWS4-HMAC-SHA256-PAYLOAD ", SignedChunksInputStream.class, false, false),
+        Arguments.of(UNSIGNED_PAYLOAD, ByteArrayInputStream.class, false, false),
+        Arguments.of("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ByteArrayInputStream.class, true, false));
   }
 
   @ParameterizedTest
-  @MethodSource("chunkSignatureVerificationCases")
-  void testChunkSignatureVerificationSelection(String algorithm, boolean expected) throws Exception {
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(algorithm);
-    if (STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(algorithm)) {
+  @ValueSource(strings = {"", "not-a-hash", "streaming-AWS4-HMAC-SHA256-PAYLOAD",
+      " STREAMING-AWS4-HMAC-SHA256-PAYLOAD"})
+  void testPayloadClassificationRejectsMalformedHash(String header) {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(header);
+    for (boolean headerAuth : new boolean[]{true, false}) {
+      objectEndpoint.setSignatureInfo(signatureInfo(headerAuth));
+      ByteArrayInputStream body = new ByteArrayInputStream(new byte[0]);
+      assertErrorResponse(INVALID_ARGUMENT,
+          () -> objectEndpoint.getS3ChunkInputStreamInfo(body, 99, "37", KEY_NAME));
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("payloadClassificationCases")
+  void testPayloadClassification(String header, Class<? extends InputStream> streamType, boolean sha256,
+      boolean hmacSignedStreaming) throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(header);
+    // ECDSA trailer mode keeps its existing behavior without a trailer declaration.
+    if (STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(header)
+        || STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(header)) {
       when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
     }
+    for (boolean headerAuth : new boolean[]{true, false}) {
+      objectEndpoint.setSignatureInfo(signatureInfo(headerAuth));
+      try (ByteArrayInputStream body = new ByteArrayInputStream(new byte[0])) {
+        EndpointBase.S3ChunkInputStreamInfo info = objectEndpoint.getS3ChunkInputStreamInfo(body, 99, "37", KEY_NAME);
+        try (MultiDigestInputStream stream = info.getMultiDigestInputStream()) {
+          assertThat(stream.getWrappedStream()).isInstanceOf(streamType);
+          if (streamType == ByteArrayInputStream.class) {
+            assertThat(stream.getWrappedStream()).isSameAs(body);
+            assertThat(info.getEffectiveLength()).isEqualTo(99);
+          } else {
+            assertThat(info.getEffectiveLength()).isEqualTo(37);
+          }
+          assertThat(stream.getMessageDigest(OzoneConsts.MD5_HASH)).isNotNull();
+          assertThat(stream.getMessageDigest(OzoneConsts.FILE_HASH) != null).isEqualTo(sha256);
+          assertThat(info.isChunkSignatureVerificationRequired()).isEqualTo(headerAuth && hmacSignedStreaming);
+        }
+      }
+    }
+  }
 
-    EndpointBase.S3ChunkInputStreamInfo info = objectEndpoint.getS3ChunkInputStreamInfo(
-        new ByteArrayInputStream(new byte[0]), 0, "0", KEY_NAME);
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testHmacTrailerValidationOrder(boolean headerAuth) {
+    objectEndpoint.setSignatureInfo(signatureInfo(headerAuth));
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
+    ByteArrayInputStream body = new ByteArrayInputStream(new byte[0]);
 
-    assertThat(info.isChunkSignatureVerificationRequired()).isEqualTo(expected);
+    OS3Exception missingLength = assertErrorResponse(INVALID_ARGUMENT,
+        () -> objectEndpoint.getS3ChunkInputStreamInfo(body, 0, null, KEY_NAME));
+    assertThat(missingLength.getErrorMessage()).contains(DECODED_CONTENT_LENGTH_HEADER);
+
+    OS3Exception missingTrailer = assertErrorResponse(INVALID_ARGUMENT,
+        () -> objectEndpoint.getS3ChunkInputStreamInfo(body, 0, "0", KEY_NAME));
+    assertThat(missingTrailer.getErrorMessage()).contains(X_AMZ_TRAILER);
+
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("unsupported-checksum");
+    assertErrorResponse(INVALID_REQUEST, () -> objectEndpoint.getS3ChunkInputStreamInfo(body, 0, "0", KEY_NAME));
   }
 
   @Test
-  void testPresignedRequestDoesNotVerifyChunkSignatures() throws Exception {
-    // A presigned (query auth) request does not sign the payload hash, so its seed signature cannot
-    // start the chunk signature chain and the chunks must not be verified against it.
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
-    ObjectEndpoint presigned = EndpointBuilder.newObjectEndpointBuilder()
-        .setHeaders(headers)
-        .setSignatureInfo(signatureInfo(false))
-        .build();
+  void testMissingPayloadHeader() throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(null);
+    try (ByteArrayInputStream body = new ByteArrayInputStream(new byte[0])) {
+      OS3Exception missingHeader = assertErrorResponse(INVALID_ARGUMENT,
+          () -> objectEndpoint.getS3ChunkInputStreamInfo(body, 99, null, KEY_NAME));
+      assertThat(missingHeader.getErrorMessage()).contains(X_AMZ_CONTENT_SHA256);
 
-    EndpointBase.S3ChunkInputStreamInfo info = presigned.getS3ChunkInputStreamInfo(
-        new ByteArrayInputStream(new byte[0]), 0, "0", KEY_NAME);
-
-    assertThat(info.isChunkSignatureVerificationRequired()).isFalse();
+      objectEndpoint.setSignatureInfo(signatureInfo(false));
+      EndpointBase.S3ChunkInputStreamInfo info = objectEndpoint.getS3ChunkInputStreamInfo(body, 99, null, KEY_NAME);
+      try (MultiDigestInputStream stream = info.getMultiDigestInputStream()) {
+        assertThat(stream.getWrappedStream()).isSameAs(body);
+        assertThat(info.getEffectiveLength()).isEqualTo(99);
+        assertThat(stream.getAllDigests()).containsOnlyKeys(OzoneConsts.MD5_HASH);
+        assertThat(info.isChunkSignatureVerificationRequired()).isFalse();
+      }
+    }
   }
 
   @Test
@@ -802,8 +910,8 @@ class TestObjectPut {
   void testStreamingCopyReusesDestinationBucket() throws Exception {
     assertSucceeds(() -> putObject(CONTENT));
     objectEndpoint.init();
-    OzoneVolume volume = spy(objectEndpoint.getVolume());
-    doReturn(volume).when(objectEndpoint).getVolume();
+    ClientProtocol protocol = spy(objectEndpoint.getClientProtocol());
+    doReturn(protocol).when(objectEndpoint).getClientProtocol();
     doReturn(true).when(objectEndpoint).isDatastreamEnabled();
     doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
@@ -814,7 +922,7 @@ class TestObjectPut {
     }
     assertKeyContent(destBucket, DEST_KEY, CONTENT);
     assertThat(destBucket.getKey(DEST_KEY).getMetadata().get(OzoneConsts.ETAG)).isEqualTo(contentMd5Hex());
-    verify(volume).getBucket(DEST_BUCKET_NAME);
+    verify(protocol).getBucketDetails(null, DEST_BUCKET_NAME);
   }
 
   @Test
@@ -1016,6 +1124,22 @@ class TestObjectPut {
   }
 
   @Test
+  void testCopyObjectWithDestinationIfNoneMatchETag() throws Exception {
+    String etag = putObject(CONTENT).getHeaderString(HttpHeaders.ETAG);
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn(etag);
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+
+    when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn("\"different-etag\"");
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+  }
+
+  @Test
   void testCopyObjectWithDestinationIfMatchSuccess() throws Exception {
     assertSucceeds(() -> putObject(CONTENT));
 
@@ -1043,16 +1167,18 @@ class TestObjectPut {
         () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
   }
 
-  @Test
-  void testCopyObjectWithDestinationIfMatchKeyNotFound() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  void testCopyObjectWithDestinationIfMatchKeyNotFound(String ifMatch) throws Exception {
     assertSucceeds(() -> putObject(CONTENT));
 
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME + "/" + urlEncode(KEY_NAME));
-    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn("\"some-etag\"");
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
 
-    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
         () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertEquals(DEST_KEY, ex.getResource());
   }
 
   @Test
@@ -1086,6 +1212,134 @@ class TestObjectPut {
     // THEN
     OzoneKeyDetails key = fsoBucket.getKey(path);
     assertThat(key.isFile()).as("directory").isFalse();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void testDirectoryCreationWithTrailer(boolean signed, boolean hasContentLength) throws Exception {
+    String body;
+    if (signed) {
+      configureSignedChunksWithTrailer(0);
+      when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+      body = signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "AAAAAA==");
+    } else {
+      configureUnsignedTrailer(0, false);
+      body = "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n";
+    }
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(hasContentLength ? String.valueOf(body.length()) : null);
+
+    try (InputStream input = new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))) {
+      assertSucceeds(() -> objectEndpoint.put(FSO_BUCKET_NAME, "dir/", input));
+    }
+    assertThat(fsoBucket.getKey("dir/").isFile()).isFalse();
+  }
+
+  @Test
+  void testDirectoryCreationWithSignedTrailerOnOmWithoutDerivedKey() throws Exception {
+    objectEndpoint.getOzoneConfiguration().setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
+    configureSignedChunksWithTrailer(0);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    OzoneClient client = spy(objectEndpoint.getClient());
+    ClientProtocol protocol = spy(client.getProxy());
+    when(protocol.getOmVersion()).thenReturn(OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS);
+    when(client.getProxy()).thenReturn(protocol);
+    objectEndpoint.setClient(client);
+    // Rebuild the handler chain to use the spied endpoint and client.
+    objectEndpoint.init();
+
+    assertSucceeds(() -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/",
+        signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "AAAAAA==")));
+    assertThat(fsoBucket.getKey("dir/").isFile()).isFalse();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutNonEmptyObjectWithTrailingSlashWithoutContentLength(boolean signed) throws Exception {
+    String content = "hello";
+    String body;
+    if (signed) {
+      configureSignedChunksWithTrailer(content.length());
+      ((OzoneBucketStub) fsoBucket).setDerivedKey(signingKey());
+      when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+      body = signedChunkedBodyWithTrailer(content, "x-amz-checksum-crc32", "NhCmhg==");
+    } else {
+      configureUnsignedTrailer(content.length(), false);
+      body = "5\r\nhello\r\n0\r\nx-amz-checksum-crc32:NhCmhg==\r\n\r\n";
+    }
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn(null);
+
+    try (InputStream input = new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))) {
+      assertSucceeds(() -> objectEndpoint.put(FSO_BUCKET_NAME, "dir/", input));
+    }
+
+    OzoneKeyDetails key = fsoBucket.getKey("dir/");
+    assertThat(key.isFile()).isTrue();
+    assertThat(key.getDataSize()).isEqualTo(content.length());
+    assertKeyContent(fsoBucket, "dir/", content);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"'',5", "hello,0"})
+  void testPutWithTrailingSlashUsesContentLengthForNonStreamingPayload(String content, String decodedLength)
+      throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(decodedLength);
+
+    assertSucceeds(() -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", content));
+
+    OzoneKeyDetails key = fsoBucket.getKey("dir/");
+    assertThat(key.isFile()).isEqualTo(!content.isEmpty());
+    assertThat(key.getDataSize()).isEqualTo(content.length());
+    if (!content.isEmpty()) {
+      assertKeyContent(fsoBucket, "dir/", content);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "0\r\n", "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n"})
+  void testDirectoryCreationRejectsIncompleteUnsignedTrailer(String body) {
+    configureUnsignedTrailer(0, false);
+
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", body));
+    assertThatThrownBy(() -> fsoBucket.getKey("dir/")).isInstanceOf(IOException.class);
+  }
+
+  @Test
+  void testDirectoryCreationRequiresUnsignedTrailerDeclaration() {
+    configureUnsignedTrailer(0, false);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn(null);
+
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
+        () -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n"));
+    assertThatThrownBy(() -> fsoBucket.getKey("dir/")).isInstanceOf(IOException.class);
+  }
+
+  @Test
+  void testDirectoryCreationRejectsUnsignedDecodedLengthMismatch() {
+    configureUnsignedTrailer(5, false);
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn(null);
+    byte[] body = "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n".getBytes(StandardCharsets.UTF_8);
+
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> objectEndpoint.put(FSO_BUCKET_NAME, "dir/", new ByteArrayInputStream(body)));
+    assertThatThrownBy(() -> fsoBucket.getKey("dir/")).isInstanceOf(IOException.class);
+  }
+
+  @Test
+  void testNonStreamingPutWithDecodedLengthZeroDoesNotCreateDirectory() throws Exception {
+    String path = "dir/";
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("0");
+
+    assertSucceeds(() -> putObject(FSO_BUCKET_NAME, path));
+
+    OzoneKeyDetails key = assertKeyContent(fsoBucket, path, CONTENT);
+    assertThat(key.isFile()).isTrue();
   }
 
   @Test
@@ -1172,6 +1426,132 @@ class TestObjectPut {
     when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutObjectWithUnsignedTrailer(boolean datastream) throws Exception {
+    configureUnsignedTrailer(15, datastream);
+    // Generated by botocore's AwsChunkedWrapper with CRC32 and a 10-byte chunk size.
+    String body = "a\r\n1234567890\r\n5\r\nabcde\r\n0\r\nx-amz-checksum-crc32:HydN+w==\r\n\r\n";
+
+    assertSucceeds(() -> putObject(body));
+    assertKeyContent(bucket, KEY_NAME, "1234567890abcde");
+  }
+
+  @Test
+  void testPutEmptyObjectWithUnsignedTrailer() throws Exception {
+    configureUnsignedTrailer(0, false);
+
+    assertSucceeds(() -> putObject("0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n"));
+    assertKeyContent(bucket, KEY_NAME, "");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutObjectRejectsIncompleteUnsignedTrailer(boolean datastream) {
+    configureUnsignedTrailer(CONTENT.length(), datastream);
+
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> putObject("a\r\n" + CONTENT + "\r\n0\r\nx-amz-checksum-crc32:AAAAAA==\r\n"));
+    assertKeyWasNotCommitted();
+  }
+
+  @Test
+  void testPutEmptyObjectRejectsMissingUnsignedTrailer() {
+    configureUnsignedTrailer(0, false);
+
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST, () -> putObject("0\r\n"));
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" "})
+  void testPutObjectRequiresUnsignedTrailerDeclaration(String declaration) {
+    configureUnsignedTrailer(0, false);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn(declaration);
+
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
+        () -> putObject("0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n"));
+    assertKeyWasNotCommitted();
+  }
+
+  static Stream<Arguments> checksumTrailers() {
+    // Independent checksums of "123456789", computed with AWS CRT and Python hashlib.
+    return Stream.of(
+        Arguments.of("crc32", "y/Q5Jg=="),
+        Arguments.of("crc32c", "4waSgw=="),
+        Arguments.of("crc64nvme", "rosUhgp5mIg="),
+        Arguments.of("sha1", "98O8HYCOBHMq32eZZczDTKeuNEE="),
+        Arguments.of("sha256", "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="))
+        .flatMap(args -> Stream.of(false, true).flatMap(signed -> Stream.of(false, true)
+            .map(datastream -> Arguments.of(args.get()[0], args.get()[1], signed, datastream))));
+  }
+
+  @ParameterizedTest
+  @MethodSource("checksumTrailers")
+  void testPutObjectRejectsWrongTrailerChecksum(String algorithm, String checksum, boolean signed, boolean datastream)
+      throws Exception {
+    String header = "x-amz-checksum-" + algorithm;
+    configureUnsignedTrailer(CONTENT.length(), datastream);
+    if (signed) {
+      configureSignedChunksWithTrailer(CONTENT.length());
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn(header);
+    String body = signed ? signedChunkedBodyWithTrailer(CONTENT, header, checksum)
+        : "a\r\n" + CONTENT + "\r\n0\r\n" + header + ":" + checksum + "\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(body));
+    assertKeyWasNotCommitted();
+
+    // A valid upload still succeeds, and a rejected overwrite preserves it.
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("9");
+    String validBody = signed ? signedChunkedBodyWithTrailer("123456789", header, checksum)
+        : "9\r\n123456789\r\n0\r\n" + header + ":" + checksum + "\r\n\r\n";
+    assertSucceeds(() -> putObject(validBody));
+    assertKeyContent(bucket, KEY_NAME, "123456789");
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(CONTENT.length()));
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(body));
+    assertKeyContent(bucket, KEY_NAME, "123456789");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutEmptyObjectRejectsWrongTrailerChecksum(boolean signed) {
+    configureUnsignedTrailer(0, false);
+    if (signed) {
+      configureSignedChunksWithTrailer(0);
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    String body = signed ? signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "y/Q5Jg==")
+        : "0\r\nx-amz-checksum-crc32:y/Q5Jg==\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(body));
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDirectoryCreationRejectsWrongTrailerChecksum(boolean signed) {
+    configureUnsignedTrailer(0, false);
+    if (signed) {
+      configureSignedChunksWithTrailer(0);
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    String body = signed ? signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "y/Q5Jg==")
+        : "0\r\nx-amz-checksum-crc32:y/Q5Jg==\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", body));
+    assertThatThrownBy(() -> fsoBucket.getKey("dir/")).isInstanceOf(IOException.class);
+  }
+
+  private void configureUnsignedTrailer(long decodedLength, boolean datastream) {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_UNSIGNED_PAYLOAD_TRAILER);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(decodedLength));
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    doReturn(datastream).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+  }
+
   private void configureSignedChunkHeaders(long decodedLength) {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(decodedLength));
@@ -1239,14 +1619,25 @@ class TestObjectPut {
     assertNotNull(ex);
   }
 
-  @Test
-  void testIfMatchKeyNotFoundPreconditionFailed() throws Exception {
-    // Try If-Match on a non-existent key
-    when(headers.getHeaderString("If-Match")).thenReturn("\"some-etag\"");
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  void testIfMatchKeyNotFound(String ifMatch) throws Exception {
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
 
-    OS3Exception ex = assertErrorResponse(
-        S3ErrorTable.PRECOND_FAILED, () -> putObject(CONTENT));
-    assertNotNull(ex);
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NO_SUCH_KEY, () -> putObject(CONTENT));
+    assertEquals(KEY_NAME, ex.getResource());
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  void testCopyObjectWithIfMatchSourceKeyNotFound(String ifMatch) throws Exception {
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
+
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertEquals(KEY_NAME, ex.getResource());
   }
 
   @Test
@@ -1280,14 +1671,40 @@ class TestObjectPut {
     assertThat(ex.getErrorMessage()).contains("If-Match header cannot be empty");
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testIfNoneMatchETagMatchesPreconditionFailed(boolean quoted) throws Exception {
+    String etag = putObject(CONTENT).getHeaderString(HttpHeaders.ETAG);
+    when(headers.getHeaderString("If-None-Match")).thenReturn(quoted ? etag : parseETag(etag));
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED, () -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
   @Test
-  void testIfNoneMatchNotStarInvalidRequest() throws Exception {
+  void testIfNoneMatchETagMismatchSuccess() throws Exception {
+    putObject(CONTENT);
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+
+    assertSucceeds(() -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, "new-content");
+  }
+
+  @Test
+  void testIfNoneMatchETagKeyAbsentSuccess() throws Exception {
     when(headers.getHeaderString("If-None-Match")).thenReturn("\"etag\"");
 
-    OS3Exception ex = assertErrorResponse(
-        INVALID_REQUEST, () -> putObject(CONTENT));
-    assertThat(ex.getErrorMessage()).contains(
-        "Only If-None-Match: * is supported");
+    assertSucceeds(() -> putObject(CONTENT));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
+  @Test
+  void testIfNoneMatchETagKeyWithoutETagSuccess() throws Exception {
+    createSourceKeyWithETag(KEY_NAME, null);
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"etag\"");
+
+    assertSucceeds(() -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, "new-content");
   }
 
   @Test

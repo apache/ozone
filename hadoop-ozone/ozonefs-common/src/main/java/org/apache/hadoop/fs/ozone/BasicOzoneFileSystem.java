@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
@@ -888,10 +889,26 @@ public class BasicOzoneFileSystem extends FileSystem {
                                                long start, long len)
       throws IOException {
     if (fileStatus instanceof LocatedFileStatus) {
-      return ((LocatedFileStatus) fileStatus).getBlockLocations();
+      return getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
     } else {
       return super.getFileBlockLocations(fileStatus, start, len);
     }
+  }
+
+  /**
+   * Like HDFS, return only the blocks that overlap [start, start + len), or the block containing start if len is 0.
+   */
+  static BlockLocation[] getBlockLocationsInRange(LocatedFileStatus fileStatus, long start, long len) {
+    if (start < 0 || len < 0) {
+      throw new IllegalArgumentException("Invalid start or len parameter");
+    }
+    BlockLocation[] blocks = fileStatus.getBlockLocations();
+    if (blocks == null) {
+      return null;
+    }
+    return Arrays.stream(blocks)
+        .filter(b -> b.getOffset() + b.getLength() > start && b.getOffset() - start < Math.max(len, 1))
+        .toArray(BlockLocation[]::new);
   }
 
   @Override

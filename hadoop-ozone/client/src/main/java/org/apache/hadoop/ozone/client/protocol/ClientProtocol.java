@@ -334,7 +334,7 @@ public interface ClientProtocol {
 
   /**
    * Returns {@link OzoneBucket}.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
    * @param bucketName Name of the Bucket
    * @return {@link OzoneBucket}
    * @throws IOException
@@ -359,6 +359,18 @@ public interface ClientProtocol {
                                 String prevBucket, int maxListResult,
                                 boolean hasSnapshot)
       throws IOException;
+
+  /** Creates a key if its current ETag differs, or if the key is absent. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException;
+
+  /** Creates a stream key if its current ETag differs, or if the key is absent. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneDataStreamOutput createStreamKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException;
 
   /**
    * Writes a key in an existing bucket.
@@ -873,6 +885,12 @@ public interface ClientProtocol {
       String bucketName, String keyName, String uploadID,
       Map<Integer, String> partsMap,
       Long expectedDataGeneration, String expectedETag) throws IOException;
+
+  /** Completes a multipart upload with an additional If-None-Match entity ETag condition. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag) throws IOException;
 
   /**
    * Abort Multipart upload request for the given key with given uploadID.
@@ -1629,12 +1647,14 @@ public interface ClientProtocol {
    * @param toSnapshot The name of the ending snapshot
    * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @param orderedReport when true, FSO diff reports apply dependency ordering
    * @return the result of submitting snapshot diff job.
    * @throws IOException in case of any exception while generating snapshot diff
    */
   SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName, String bucketName,
                                                 String fromSnapshot, String toSnapshot,
-                                                boolean forceFullDiff, boolean disableNativeDiff)
+                                                boolean forceFullDiff, boolean disableNativeDiff,
+                                                boolean orderedReport)
       throws IOException;
 
   /**
@@ -1716,7 +1736,7 @@ public interface ClientProtocol {
 
   /**
    * Gets the tags for an existing key.
-   * @param volumeName Volume name.
+   * @param volumeName Volume name, or null to resolve it from the S3 request context.
    * @param bucketName Bucket name.
    * @param keyName Key name.
    * @return tags for the specified key.

@@ -57,6 +57,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OpenKeyDBKey;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -1190,7 +1191,7 @@ public class OMDBInsightEndpoint {
    * open key belongs to, or zero if the upload can no longer be found.
    */
   private Pair<Long, Long> getMultipartUploadSize(String dbKey, OmKeyInfo keyInfo) throws IOException {
-    String uploadId = OMMultipartUploadUtils.getUploadIdFromDbKey(dbKey);
+    String uploadId = new OpenKeyDBKey(dbKey).getUploadId();
     if (uploadId == null) {
       return Pair.of(0L, 0L);
     }
