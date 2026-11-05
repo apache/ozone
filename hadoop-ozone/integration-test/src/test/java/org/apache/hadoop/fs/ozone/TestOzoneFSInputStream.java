@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -67,7 +67,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test OzoneFSInputStream by reading through multiple interfaces.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
+public abstract class TestOzoneFSInputStream implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   // EC bucket filesystems reading the cells one at a time and in parallel
