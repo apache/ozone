@@ -16,10 +16,14 @@ name: build-branch
 on:
   pull_request:
     types: [opened, ready_for_review, synchronize]
+    branches-ignore:
+      # ignore pull requests targeted at these branches,
+      # the list must match base-branches in fork-ci-status.yaml
+      - master
   push:
     branches-ignore:
+      # only master, builds on schedule
       - master
-      - 'dependabot**'
     paths-ignore:
       # ignore files/dirs irrelevant for CI
       - '.asf.yaml'
@@ -43,6 +47,7 @@ on:
       - '!.github/workflows/post-commit.yml'
       - '!.github/workflows/generate-config-doc.yml'
       - '!.github/workflows/update-ozone-site-config-doc.yml'
+  workflow_dispatch:
 concurrency:
   group: ci-${{ github.event.pull_request.number || case(github.repository == 'apache/ozone', github.sha, github.ref_name) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.repository != 'apache/ozone' }}
