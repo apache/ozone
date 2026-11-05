@@ -39,8 +39,8 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * Test Container calls.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests.TestCase {
+public abstract class TestGetCommittedBlockLengthAndPutKey implements ClusterForTests.TestCase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGetCommittedBlockLengthAndPutKey.class);
   private OzoneConfiguration ozoneConfig;

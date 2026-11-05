@@ -30,20 +30,30 @@ import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteFileOps;
 import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteKeyOps;
 import org.apache.hadoop.ozone.freon.TestOzoneClientPositionedReader;
 import org.apache.hadoop.ozone.freon.TestRandomKeyGenerator;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
 /**
- * Group tests that write more data than usual (e.g. Freon tests).  These are
- * separated from {@link NonHATests}, because they tend to take a bit longer.
- * This keeps {@link NonHATests} leaner.
+ * Group Freon tests to run on a single cluster.
  * <p/>
  * Specific tests are implemented in separate classes, and they are subclasses
  * here as {@link Nested} inner classes.  This allows running all tests in the
  * same cluster.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
+abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
 
   @Override
   protected OzoneConfiguration createOzoneConfig() {

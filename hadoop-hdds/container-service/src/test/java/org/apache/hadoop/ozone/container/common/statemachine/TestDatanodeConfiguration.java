@@ -37,6 +37,7 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -313,11 +314,15 @@ public class TestDatanodeConfiguration {
         DatanodeRatisServerConfig.class);
     assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
+    assertFalse(ratisConf.isAppendEntriesComposeEnabled(), "isAppendEntriesComposeEnabled");
 
     assertWaitTimeMin(TimeDuration.ZERO, conf);
+    assertAppendEntriesComposeEnabled(false, conf);
     ratisConf.setLogAppenderWaitTimeMin(1);
+    ratisConf.setAppendEntriesComposeEnabled(true);
     conf.setFromObject(ratisConf);
     assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
+    assertAppendEntriesComposeEnabled(true, conf);
   }
 
   static void assertWaitTimeMin(TimeDuration expected,
@@ -358,5 +363,12 @@ public class TestDatanodeConfiguration {
     subject.setGrpcSoBacklog(512);
 
     assertEquals(512, subject.getGrpcSoBacklog());
+  }
+
+  static void assertAppendEntriesComposeEnabled(boolean expected, OzoneConfiguration conf) throws Exception {
+    final DatanodeDetails dn = MockPipeline.createPipeline(1).getFirstNode();
+    final RaftProperties p = ContainerTestUtils.newXceiverServerRatis(dn, conf).newRaftProperties();
+    assertEquals(expected, RaftServerConfigKeys.Log.appendEntriesComposeEnabled(p),
+        RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
   }
 }
