@@ -32,6 +32,21 @@ public final class S3Consts {
   public static final String STORAGE_CLASS_HEADER = "x-amz-storage-class";
   public static final String ENCODING_TYPE = "url";
 
+  // Server-side encryption
+  // https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html
+  public static final String SSE_HEADER = "x-amz-server-side-encryption";
+  public static final String SSE_KMS_KEY_ID_HEADER = SSE_HEADER + "-aws-kms-key-id";
+  public static final String SSE_CONTEXT_HEADER = SSE_HEADER + "-context";
+  public static final String SSE_CUSTOMER_ALGORITHM_HEADER = SSE_HEADER + "-customer-algorithm";
+  public static final String SSE_CUSTOMER_KEY_HEADER = SSE_HEADER + "-customer-key";
+  public static final String SSE_CUSTOMER_KEY_MD5_HEADER = SSE_HEADER + "-customer-key-MD5";
+  public static final String COPY_SOURCE_SSE_CUSTOMER_ALGORITHM_HEADER =
+      "x-amz-copy-source-server-side-encryption-customer-algorithm";
+  public static final String COPY_SOURCE_SSE_CUSTOMER_KEY_HEADER =
+      "x-amz-copy-source-server-side-encryption-customer-key";
+  public static final String COPY_SOURCE_SSE_CUSTOMER_KEY_MD5_HEADER =
+      "x-amz-copy-source-server-side-encryption-customer-key-MD5";
+
   // Constants related to AWS Signature Version V4 calculation
   // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
   public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
