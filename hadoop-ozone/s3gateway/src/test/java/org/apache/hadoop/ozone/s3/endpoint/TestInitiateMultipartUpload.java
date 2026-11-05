@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -104,10 +105,12 @@ public class TestInitiateMultipartUpload {
     OzoneBucket ozoneBucket = spy(protocol.getBucketDetails(null, bucket));
     doReturn(protocol).when(rest).getClientProtocol();
     doReturn(ozoneBucket).when(protocol).getBucketDetails(null, bucket);
-    doThrow(new OMException("File exists in path", OMException.ResultCodes.NOT_A_FILE))
-        .when(ozoneBucket).initiateMultipartUpload(eq(key), any(), anyMap(), anyMap());
+    OMException failure = new OMException("File exists in path", OMException.ResultCodes.NOT_A_FILE);
+    doThrow(failure).when(ozoneBucket).initiateMultipartUpload(eq(key), any(), anyMap(), anyMap());
 
-    assertErrorResponse(S3ErrorTable.INVALID_REQUEST, () -> rest.initializeMultipartUpload(bucket, key));
+    OS3Exception exception = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> rest.initializeMultipartUpload(bucket, key));
+    assertSame(failure, exception.getCause());
   }
 
   @ParameterizedTest
@@ -143,8 +146,9 @@ public class TestInitiateMultipartUpload {
     OzoneBucket ozoneBucket = spy(protocol.getBucketDetails(null, bucket));
     doReturn(protocol).when(rest).getClientProtocol();
     doReturn(ozoneBucket).when(protocol).getBucketDetails(null, bucket);
-    doThrow(new OMException("Can not write to directory: " + key, OMException.ResultCodes.NOT_A_FILE))
-        .when(ozoneBucket).initiateMultipartUpload(eq(key), any(ReplicationConfig.class), anyMap(), anyMap());
+    OMException failure = new OMException("Can not write to directory: " + key, OMException.ResultCodes.NOT_A_FILE);
+    doThrow(failure).when(ozoneBucket)
+        .initiateMultipartUpload(eq(key), any(ReplicationConfig.class), anyMap(), anyMap());
 
     long failureBefore = rest.getMetrics().getInitMultiPartUploadFailure();
     OS3Exception exception = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
@@ -156,6 +160,7 @@ public class TestInitiateMultipartUpload {
         " considered as Unix Paths. Path has Violated FS Semantics " +
         "which caused put operation to fail.", exception.getErrorMessage());
     assertEquals(400, exception.getHttpCode());
+    assertSame(failure, exception.getCause());
     assertEquals(1, rest.getMetrics().getInitMultiPartUploadFailure() - failureBefore);
   }
 
