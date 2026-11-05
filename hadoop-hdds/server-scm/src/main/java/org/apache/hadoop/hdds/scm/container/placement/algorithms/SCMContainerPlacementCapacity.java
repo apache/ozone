@@ -150,19 +150,27 @@ public final class SCMContainerPlacementCapacity
     if (firstNodeNdx == secondNodeNdx) {
       datanodeDetails = healthyNodes.get(firstNodeNdx);
     } else {
-      DatanodeDetails firstNodeDetails = healthyNodes.get(firstNodeNdx);
-      DatanodeDetails secondNodeDetails = healthyNodes.get(secondNodeNdx);
-      SCMNodeMetric firstNodeMetric =
-          getNodeManager().getNodeStat(firstNodeDetails);
-      SCMNodeMetric secondNodeMetric =
-          getNodeManager().getNodeStat(secondNodeDetails);
-      boolean firstIsFuller = storageType == null
-          ? firstNodeMetric.isGreater(secondNodeMetric.get())
-          : firstNodeMetric.isGreater(secondNodeMetric.get(), storageType);
-      datanodeDetails = !firstIsFuller ? firstNodeDetails : secondNodeDetails;
+      datanodeDetails = chooseNodeByCapacity(
+          healthyNodes.get(firstNodeNdx), healthyNodes.get(secondNodeNdx), storageType);
     }
     healthyNodes.remove(datanodeDetails);
     metrics.incrDatanodeChooseSuccessCount();
     return datanodeDetails;
+  }
+
+  /**
+   * Chooses the less utilized of the two randomly sampled candidates. Compare usage on the requested storage type,
+   * or overall usage when no type is supplied. The existing metric comparison breaks similar utilization ratios
+   * by used bytes; keep the first candidate when neither is greater. Comparing a random pair favors less utilized
+   * nodes without directing every allocation to the least utilized node in the cluster.
+   */
+  private DatanodeDetails chooseNodeByCapacity(DatanodeDetails firstNode, DatanodeDetails secondNode,
+      StorageType storageType) {
+    SCMNodeMetric firstNodeMetric = getNodeManager().getNodeStat(firstNode);
+    SCMNodeMetric secondNodeMetric = getNodeManager().getNodeStat(secondNode);
+    boolean firstIsFuller = storageType == null
+        ? firstNodeMetric.isGreater(secondNodeMetric.get())
+        : firstNodeMetric.isGreater(secondNodeMetric.get(), storageType);
+    return firstIsFuller ? secondNode : firstNode;
   }
 }
