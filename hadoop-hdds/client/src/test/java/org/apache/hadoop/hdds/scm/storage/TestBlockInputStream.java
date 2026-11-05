@@ -554,12 +554,13 @@ public class TestBlockInputStream {
   }
 
   @Test
-  public void testPositionedReadOnBlockWithNoChunks() throws Exception {
+  public void testReadOnBlockWithNoChunks() throws Exception {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     try (BlockInputStream subject = new DummyBlockInputStream(blockID, CHUNK_SIZE, pipeline, null, null,
         refreshFunction, new ArrayList<>(), new HashMap<>(), clientConfig)) {
       assertEquals(-1, subject.readPositioned(0, ByteBuffer.allocate(1)));
+      assertEquals(-1, subject.read(new byte[1], 0, 1));
     }
   }
 
