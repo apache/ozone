@@ -122,7 +122,8 @@ public class S3KeyGenerator extends S3EntityGenerator
             .multipartUpload(m -> m.parts(parts)));
 
       } else {
-        getS3().putObject(r -> r.bucket(bucketName).key(generateObjectName(counter)),
+        // the content type that AWS SDK v1 set for the String content freon uploaded before
+        getS3().putObject(r -> r.bucket(bucketName).key(generateObjectName(counter)).contentType("text/plain"),
             RequestBody.fromBytes(content));
       }
 

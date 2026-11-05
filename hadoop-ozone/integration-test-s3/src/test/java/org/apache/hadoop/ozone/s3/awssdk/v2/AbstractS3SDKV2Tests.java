@@ -3159,6 +3159,31 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       sdkHttpClient.close();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"annotation", "torrent"})
+    public void testPresignedUrlGetObjectSubresourceNotImplemented(String subresource) throws Exception {
+      final String keyName = getKeyName();
+      s3Client.putObject(b -> b.bucket(BUCKET_NAME).key(keyName), RequestBody.fromString(CONTENT));
+
+      // a presigned GetObject with the subresource query parameter, as clients without the typed API send it
+      final GetObjectRequest objectRequest = GetObjectRequest.builder().bucket(BUCKET_NAME).key(keyName)
+          .overrideConfiguration(o -> o.putRawQueryParameter(subresource, ""))
+          .build();
+      final URL presignedUrl = presigner.presignGetObject(b -> b.signatureDuration(duration)
+          .getObjectRequest(objectRequest)).url();
+      assertThat(presignedUrl.getQuery()).contains(subresource);
+
+      final HttpURLConnection connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "GET", null, null);
+      try {
+        assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, connection.getResponseCode());
+      } finally {
+        connection.disconnect();
+      }
+
+      // the object must be untouched
+      assertEquals(CONTENT.length(), s3Client.headObject(b -> b.bucket(BUCKET_NAME).key(keyName)).contentLength());
+    }
+
     @Test
     public void testPresignedUrlGetWithCustomQueryParameter() throws Exception {
       final String keyName = getKeyName();
@@ -4424,6 +4449,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     final long allPartsLength = s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName))
         .response().contentLength();
+    // part number 0 is not a part: the whole object is returned
+    assertEquals(allPartsLength, s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName).partNumber(0))
+        .response().contentLength());
     long partsLength = 0;
     for (int part = 1; part <= 3; part++) {
       final int partNumber = part;

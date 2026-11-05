@@ -52,6 +52,9 @@ Run Freon S3BG
 Run Freon S3KG
     [Setup]    Setup aws credentials
     Freon S3KG   s3kg-${BUCKET}
+    # the content type that freon set for its keys with AWS SDK v1
+    ${result} =        Execute AWSS3APICli    head-object --bucket ${BUCKET} --key s3kg-${BUCKET}/0
+                       Should contain    ${result}    "ContentType": "text/plain"
 
 Run Freon S3KG MPU
     [Setup]    Setup aws credentials

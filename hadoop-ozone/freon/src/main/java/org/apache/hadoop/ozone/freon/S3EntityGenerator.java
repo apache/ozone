@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.freon;
 
 import java.net.URI;
 import picocli.CommandLine;
-import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
@@ -43,7 +42,7 @@ public class S3EntityGenerator extends BaseFreonGenerator {
 
     S3ClientBuilder s3ClientBuilder = S3Client.builder()
         .httpClientBuilder(ApacheHttpClient.builder())
-        .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+        .credentialsProvider(new FreonEnvironmentCredentialsProvider())
         // checksums only where S3 requires them: a load generator should not spend its time computing them
         .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
         .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
