@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -101,10 +100,10 @@ public class TestInitiateMultipartUpload {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(bucket);
     ObjectEndpoint rest = spy(getObjectEndpoint(client, mock(HttpHeaders.class)));
-    OzoneVolume volume = spy(rest.getVolume());
-    OzoneBucket ozoneBucket = spy(volume.getBucket(bucket));
-    doReturn(volume).when(rest).getVolume();
-    doReturn(ozoneBucket).when(volume).getBucket(bucket);
+    ClientProtocol protocol = spy(rest.getClientProtocol());
+    OzoneBucket ozoneBucket = spy(protocol.getBucketDetails(null, bucket));
+    doReturn(protocol).when(rest).getClientProtocol();
+    doReturn(ozoneBucket).when(protocol).getBucketDetails(null, bucket);
     doThrow(new OMException("File exists in path", OMException.ResultCodes.NOT_A_FILE))
         .when(ozoneBucket).initiateMultipartUpload(eq(key), any(), anyMap(), anyMap());
 
@@ -140,10 +139,10 @@ public class TestInitiateMultipartUpload {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(bucket);
     ObjectEndpoint rest = spy(getObjectEndpoint(client, mock(HttpHeaders.class)));
-    OzoneVolume volume = spy(rest.getVolume());
-    OzoneBucket ozoneBucket = spy(volume.getBucket(bucket));
-    doReturn(volume).when(rest).getVolume();
-    doReturn(ozoneBucket).when(volume).getBucket(bucket);
+    ClientProtocol protocol = spy(rest.getClientProtocol());
+    OzoneBucket ozoneBucket = spy(protocol.getBucketDetails(null, bucket));
+    doReturn(protocol).when(rest).getClientProtocol();
+    doReturn(ozoneBucket).when(protocol).getBucketDetails(null, bucket);
     doThrow(new OMException("Can not write to directory: " + key, OMException.ResultCodes.NOT_A_FILE))
         .when(ozoneBucket).initiateMultipartUpload(eq(key), any(ReplicationConfig.class), anyMap(), anyMap());
 
