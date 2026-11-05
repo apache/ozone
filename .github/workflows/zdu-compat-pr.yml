@@ -1,0 +1,66 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow scans recently updated open PRs for changes that may be incompatible with
+# Zero Downtime Upgrade (ZDU) and comments on them to ask reviewers to take a closer look.
+# A new comment is posted when the PR is updated and its findings differ from the last comment. Old comments
+# are left in place.
+#
+# It runs in the context of the base repository, like label-pr.yml, so it can comment on PRs from forks.
+# Code from PRs is never built or executed: only the diff is read as data by
+# dev-support/ci/zdu_compat_check.sh, which comes from the branch this workflow runs on.
+
+name: zdu-compat-pull-requests
+
+on:
+  workflow_call:
+    inputs:
+      all:
+        type: boolean
+        default: false
+  # allow running the workflow manually from GitHub UI
+  workflow_dispatch:
+    inputs:
+      all:
+        description: 'Scan all open PRs instead of only recently updated ones'
+        type: boolean
+        default: false
+
+# a slow run must not overlap the next one
+concurrency:
+  group: zdu-compat-pull-requests
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-slim
+    steps:
+      - name: "Checkout project" # provides the check script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            dev-support/ci
+      - name: "Check pull requests"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCAN_ALL: ${{ inputs.all }}
+          # The schedule runs every 30 minutes. Looking further back means a skipped or delayed run
+          # does not lose PRs, and PRs whose comment is already up to date are skipped cheaply.
+          WINDOW: 2 hours ago
+        run: dev-support/ci/zdu_compat_scan_prs.sh

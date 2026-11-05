@@ -37,6 +37,7 @@ find * \( \
     -or -path dev-support/ci/pr_title_check.bats \
     -or -path dev-support/ci/find_test_class_project.bats \
     -or -path dev-support/ci/junit_summary.bats \
+    -or -path dev-support/ci/zdu_compat_check.bats \
     \) -print0 \
   | xargs -0 -n1 bats --formatter tap \
   | tee -a "${REPORT_DIR}/output.log"
