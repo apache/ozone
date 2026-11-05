@@ -63,9 +63,9 @@ jobs:
     needs: pre-check
     # no scheduled run in forks
     if: needs.pre-check.outputs.hit != 'true' || github.event_name == 'workflow_dispatch'
-    uses: $/.github/workflows/ci.yml
+    uses: $/.github/workflows/post-commit.yml
     secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
+      OZONE_DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
 

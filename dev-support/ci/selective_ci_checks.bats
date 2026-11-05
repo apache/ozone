@@ -376,8 +376,8 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
-@test "CI workflow change (ci.yaml)" {
-  run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
+@test "CI workflow change (post-commit.yml)" {
+  run dev-support/ci/selective_ci_checks.sh 5c2069b9e05abfafd01d7c14c52dfad28eb9b03b
 
   assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
