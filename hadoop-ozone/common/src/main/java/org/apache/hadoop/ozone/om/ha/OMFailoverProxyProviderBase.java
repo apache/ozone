@@ -351,14 +351,14 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     }
   }
 
-  /**
-   * Update the proxy index to the next proxy in the list.
-   * @return the new proxy index
-   */
   private synchronized boolean isAttempted(String nodeId) {
     return attemptedOMs.contains(nodeId);
   }
 
+  /**
+   * Update the proxy index to the next proxy in the list.
+   * @return the new proxy index
+   */
   private synchronized int incrementNextProxyIndex() {
     // Before failing over to next proxy, add the proxy OM (which has
     // returned an exception) to the list of attemptedOMs.
