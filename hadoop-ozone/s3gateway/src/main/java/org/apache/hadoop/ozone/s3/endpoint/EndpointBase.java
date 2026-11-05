@@ -24,8 +24,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
@@ -214,7 +212,6 @@ public abstract class EndpointBase {
   private int chunkSize;
   private boolean datastreamEnabled;
   private long datastreamMinLength;
-  private boolean s3StsEnabled;
 
   @Context
   private ContainerRequestContext context;
@@ -279,10 +276,6 @@ public abstract class EndpointBase {
         OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
         OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT, StorageUnit.BYTES);
 
-    s3StsEnabled = getOzoneConfiguration().getBoolean(
-        OZONE_S3G_STS_HTTP_ENABLED_KEY,
-        OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
-
     init();
   }
 
@@ -312,11 +305,12 @@ public abstract class EndpointBase {
   }
 
   /**
-   * Sets the IAM S3 action on thread-local {@link S3Auth} for fine-grained STS authorization.
-   * Called when the handler resolves the {@link S3GAction}.
+   * Sets the IAM S3 action on thread-local {@link S3Auth} for authorization (STS session policies and
+   * S3 action-based authorizer policies such as Ranger). Called when the handler resolves the
+   * {@link S3GAction}.
    */
   protected void applyS3Action(S3GAction action) {
-    if (s3Auth != null && s3StsEnabled) {
+    if (s3Auth != null) {
       s3Auth.setS3Action(S3GActionIamMapper.toS3ActionString(action));
     }
   }
@@ -332,7 +326,7 @@ public abstract class EndpointBase {
    */
   protected <T, E extends Exception> T runWithS3ActionString(String s3Action, CheckedSupplier<T, E> checkedSupplier)
       throws E {
-    if (s3Auth == null || !s3StsEnabled) {
+    if (s3Auth == null) {
       return checkedSupplier.get();
     }
     final String originalS3Action = s3Auth.getS3Action();
@@ -354,7 +348,7 @@ public abstract class EndpointBase {
    */
   protected OS3Exception newDuplicateBucketError(String bucketName, OMException cause) {
     try {
-      OzoneBucket existingBucket = getVolume().getBucket(bucketName);
+      OzoneBucket existingBucket = getClientProtocol().getBucketDetails(null, bucketName);
       if (isSameBucketOwner(existingBucket.getOwner())) {
         return newError(BUCKET_ALREADY_OWNED_BY_YOU, bucketName, cause);
       }
@@ -717,7 +711,6 @@ public abstract class EndpointBase {
     }
     target.queryParams = queryParams;
     target.s3Auth = s3Auth;
-    target.s3StsEnabled = s3StsEnabled;
     target.setClient(this.client);
     target.setOzoneConfiguration(this.ozoneConfiguration);
     target.setContext(this.context);
@@ -886,6 +879,15 @@ public abstract class EndpointBase {
    */
   protected S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
       InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
+    return getS3ChunkInputStreamInfo(body, contentLength, amzDecodedLength, keyPath, true);
+  }
+
+  /**
+   * Same as {@link #getS3ChunkInputStreamInfo(InputStream, long, String, String)}. Pass {@code opensKey = false}
+   * when no key is opened for the payload, which then needs no derived key from OM.
+   */
+  protected S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(InputStream body, long contentLength,
+      String amzDecodedLength, String keyPath, boolean opensKey) throws OS3Exception {
     final String amzContentSha256Header = validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
     final S3ContentSha256Type payloadType = S3ContentSha256Type.fromHeaderValue(amzContentSha256Header);
     final InputStream chunkInputStream;
@@ -922,7 +924,7 @@ public abstract class EndpointBase {
     // Header auth only: for a presigned (query) request the payload hash is not part of the signed
     // canonical request, so its seed signature cannot start the chunk signature chain.
     boolean verifyChunkSignature = signatureInfo.isSignPayload() && payloadType.isHmacSignedStreaming();
-    if (verifyChunkSignature && OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())
+    if (opensKey && verifyChunkSignature && OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())
         && !OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(getClientProtocol().getOmVersion())) {
       OS3Exception ex = newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
       ex.setErrorMessage("The connected Ozone Manager does not support signed chunk verification.");

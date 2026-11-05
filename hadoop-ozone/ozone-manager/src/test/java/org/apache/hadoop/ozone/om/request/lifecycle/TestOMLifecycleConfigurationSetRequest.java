@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.lifecycle;
 
 import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,10 +37,13 @@ import static org.mockito.Mockito.when;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -85,6 +89,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
         .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), 
             Pair.of(resolvedVolumeName, resolvedBucketName),
             "owner", BucketLayout.OBJECT_STORE));
+    OMRequestTestUtils.addBucketToDB(resolvedVolumeName, resolvedBucketName, omMetadataManager);
     OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName, bucketName, "ownername");
     OMLifecycleConfigurationSetRequest request = new OMLifecycleConfigurationSetRequest(originalRequest);
     OMRequest modifiedRequest = request.preExecute(ozoneManager);
@@ -169,10 +174,17 @@ public class TestOMLifecycleConfigurationSetRequest extends
     OMLifecycleConfigurationSetRequest request =
         new OMLifecycleConfigurationSetRequest(originalRequest);
 
+    OMException ex = assertThrows(OMException.class,
+        () -> new OMLifecycleConfigurationSetRequest(originalRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND, ex.getResult());
+
+    // The bucket exists when the request is validated, but is deleted before it is applied.
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
     OMRequest modifiedRequest = request.preExecute(ozoneManager);
 
     String lifecycleKey = omMetadataManager.getBucketKey(volumeName,
         bucketName);
+    omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(lifecycleKey), CacheValue.get(1L));
 
     assertNull(omMetadataManager.getLifecycleConfigurationTable().get(
         lifecycleKey));
@@ -185,6 +197,36 @@ public class TestOMLifecycleConfigurationSetRequest extends
 
     assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omResponse.getStatus());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheRejectsRecreatedBucket() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String lifecycleKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OMRequestTestUtils.addVolumeToDB(volumeName, "ownerName", omMetadataManager);
+    OMRequestTestUtils.addBucketToOM(omMetadataManager, OmBucketInfo.newBuilder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setOwner("ownerName").setObjectID(1000L).build());
+
+    OMRequest modifiedRequest = new OMLifecycleConfigurationSetRequest(
+        setLifecycleConfigurationRequest(volumeName, bucketName, "ownerName")).preExecute(ozoneManager);
+
+    // The bucket is deleted and another bucket is created with the same name before the request is applied.
+    OMRequestTestUtils.addBucketToOM(omMetadataManager, OmBucketInfo.newBuilder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setOwner("ownerName").setObjectID(2000L).build());
+    OMResponse omResponse = new OMLifecycleConfigurationSetRequest(modifiedRequest)
+        .validateAndUpdateCache(ozoneManager, 2L).getOMResponse();
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND, omResponse.getStatus());
+    assertThat(omResponse.getMessage()).contains("deleted and recreated");
+    assertNull(omMetadataManager.getLifecycleConfigurationTable().get(lifecycleKey));
+
+    // A request validated against the new bucket is applied to it.
+    OMRequest newRequest = new OMLifecycleConfigurationSetRequest(
+        setLifecycleConfigurationRequest(volumeName, bucketName, "ownerName")).preExecute(ozoneManager);
+    omResponse = new OMLifecycleConfigurationSetRequest(newRequest).validateAndUpdateCache(ozoneManager, 3L)
+        .getOMResponse();
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
+    assertEquals(2000L, omMetadataManager.getLifecycleConfigurationTable().get(lifecycleKey).getBucketObjectID());
   }
 
   @Test
@@ -223,6 +265,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   private void doPreExecute(String volumeName, String bucketName)
       throws Exception {
 
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
     OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName,
         bucketName, "ownername");
 
@@ -261,6 +304,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   public void testPreExecuteNonNativeAuthorizerChecksWriteAcl() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
 
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
     IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
@@ -287,6 +331,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   public void testPreExecuteNativeAuthorizerDeniesNonAdminNonOwner() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
 
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
     IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
@@ -313,6 +358,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   public void testPreExecuteNativeAuthorizerAllowsAdmin() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
 
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
     IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
@@ -333,6 +379,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   public void testPreExecuteNativeAuthorizerAllowsOwner() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
 
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
     IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
@@ -390,6 +437,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   public void testPreExecuteRejectsAbortMpuDaysEqualToExpireThreshold() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
     // Default threshold is 30d; requesting daysAfterInitiation == 30 must be rejected.
     long thresholdDays = TimeUnit.MILLISECONDS.toDays(
         ozoneConfiguration.getTimeDuration(
@@ -410,6 +458,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   public void testPreExecuteRejectsAbortMpuDaysGreaterThanExpireThreshold() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
     // Default threshold is 30d; requesting daysAfterInitiation == 60 must be rejected.
     OMRequest request = setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, 60);
     OMLifecycleConfigurationSetRequest setRequest =
@@ -423,6 +472,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   public void testPreExecuteAcceptsAbortMpuDaysLessThanExpireThreshold() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
     // Default threshold is 30d; requesting daysAfterInitiation == 7 must be accepted.
     OMRequest request = setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, 7);
     OMLifecycleConfigurationSetRequest setRequest =
@@ -437,6 +487,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
   public void testPreExecuteSkipsDisabledAbortMpuRule() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
     // daysAfterInitiation == 60 would normally be rejected, but the rule is disabled.
     OMRequest request = setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, 60, false);
     OMLifecycleConfigurationSetRequest setRequest =

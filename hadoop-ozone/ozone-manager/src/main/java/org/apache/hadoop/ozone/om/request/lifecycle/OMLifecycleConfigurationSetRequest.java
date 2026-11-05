@@ -103,6 +103,13 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
 
     validateAbortMpuDaysAgainstCleanupThreshold(ozoneManager, lifecycleConfiguration);
 
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    OmBucketInfo bucketInfo = metadataManager.getBucketTable().get(
+        metadataManager.getBucketKey(resolvedBucket.realVolume(), resolvedBucket.realBucket()));
+    if (bucketInfo == null) {
+      throw new OMException("Bucket doesn't exist", BUCKET_NOT_FOUND);
+    }
+
     SetLifecycleConfigurationRequest.Builder newCreateRequest =
         request.toBuilder();
 
@@ -110,6 +117,8 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
         lifecycleConfiguration.toBuilder()
             .setVolume(resolvedBucket.realVolume())
             .setBucket(resolvedBucket.realBucket());
+    // Bind the request to the bucket validated above, see validateAndUpdateCache.
+    newLifecycleConfiguration.setBucketObjectID(bucketInfo.getObjectID());
 
     newLifecycleConfiguration.setCreationTime(System.currentTimeMillis());
     newCreateRequest.setLifecycleConfiguration(newLifecycleConfiguration);
@@ -154,6 +163,12 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
         LOG.debug("bucket: {} in volume: {} doesn't exist", bucketName,
             volumeName);
         throw new OMException("Bucket doesn't exist", BUCKET_NOT_FOUND);
+      }
+      // Reject the request if the bucket it was validated against has been replaced by another one.
+      if (lifecycleConfiguration.hasBucketObjectID() &&
+          lifecycleConfiguration.getBucketObjectID() != bucketInfo.getObjectID()) {
+        throw new OMException("Bucket " + volumeName + "/" + bucketName + " was deleted and recreated after the " +
+            "lifecycle configuration was validated", BUCKET_NOT_FOUND);
       }
 
       OmLifecycleConfiguration.Builder lcBuilder =
