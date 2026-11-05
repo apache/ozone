@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
@@ -72,6 +74,17 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
       OMRequest modifiedOmRequest) {
     return new OMKeyDeleteRequestWithFSO(modifiedOmRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Override
+  protected OMKeyDeleteRequest createDeniedDeleteRequest() {
+    return new OMKeyDeleteRequestWithFSO(createDeleteKeyRequest(), getBucketLayout()) {
+      @Override
+      protected void checkACLsWithFSO(OzoneManager ozoneManager, String volumeName,
+          String bucketName, String keyName, IAccessAuthorizer.ACLType aclType) throws IOException {
+        throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
   }
 
   @Override

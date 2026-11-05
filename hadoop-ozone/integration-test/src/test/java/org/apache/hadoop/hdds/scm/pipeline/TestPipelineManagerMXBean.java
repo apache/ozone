@@ -25,15 +25,15 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager via MXBean.
  */
-public abstract class TestPipelineManagerMXBean implements NonHATests.TestCase {
+public abstract class TestPipelineManagerMXBean implements ClusterForTests.TestCase {
 
   private MBeanServer mbs;
 

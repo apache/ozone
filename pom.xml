@@ -95,7 +95,7 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <io.grpc.version>1.77.1</io.grpc.version>
+    <io.grpc.version>1.82.4</io.grpc.version>
     <jackson2-bom.version>2.21.8</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
@@ -188,10 +188,10 @@
     <protobuf.version>3.25.9</protobuf.version>
     <ranger.version>2.9.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
-    <ratis-thirdparty.grpc.version>1.82.1</ratis-thirdparty.grpc.version>
-    <ratis-thirdparty.netty.version>4.1.136.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.grpc.version>1.82.4</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.139.Final</ratis-thirdparty.netty.version>
     <ratis-thirdparty.protobuf.version>3.25.9</ratis-thirdparty.protobuf.version>
-    <ratis.thirdparty.version>1.1.0</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.1.1</ratis.thirdparty.version>
     <ratis.version>3.3.1</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
@@ -1398,6 +1398,11 @@
         <artifactId>ozone-integration-test</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-integration-test-utils</artifactId>
+        <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
