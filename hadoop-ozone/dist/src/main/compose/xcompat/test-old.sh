@@ -15,24 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:compat-old
-
 set -u -o pipefail
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-# shellcheck source=hadoop-ozone/dist/src/main/compose/xcompat/lib.sh
-source "${COMPOSE_DIR}/lib.sh"
+# shellcheck source=hadoop-ozone/dist/src/main/compose/xcompat/init.sh
+source "${COMPOSE_DIR}/init.sh"
 
-# test specific version(s)
-if [[ -n "${OZONE_OLD_VERSIONS:-}" ]]; then
-  old_versions="${OZONE_OLD_VERSIONS}"
-fi
+# test specific cluster versions if specified
+cluster_versions="${OZONE_CLUSTER_VERSIONS:-"${old_versions}"}"
 
-# old cluster with clients: same version and current version
-for cluster_version in ${old_versions}; do
+for cluster_version in ${cluster_versions}; do
   export OZONE_VERSION=${cluster_version}
   export COMPOSE_FILE=old-cluster.yaml:clients.yaml
-  test_cross_compatibility ${cluster_version} ${current_version}
+  test_cross_compatibility
 done

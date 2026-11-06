@@ -23,7 +23,7 @@ cd hadoop-ozone/dist/src/main/compose
 SUITES=$(find . -mindepth 2 -maxdepth 2 -name 'test*.sh' | cut -c3- \
   | grep -Fv -e 'testlib.sh' -e 'test-failures' \
   | sort)
-VERSIONS=$(grep '^old_versions=' xcompat/lib.sh \
+VERSIONS=$(grep '^old_versions=' xcompat/init.sh \
   | cut -f2 -d'"')
 
 initialization::ga_output suites \

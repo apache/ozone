@@ -15,22 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
-basename=$(basename ${COMPOSE_DIR})
-
-# shellcheck source=hadoop-ozone/dist/src/main/compose/testlib.sh
-source "${COMPOSE_DIR}/../testlib.sh"
-
-current_version="${OZONE_CURRENT_VERSION}"
-# TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
-old_versions="1.1.0 1.2.1 1.3.0 1.4.1 2.0.0 2.1.2 2.2.2" # container is needed for each version in clients.yaml
-
-export SECURITY_ENABLED=true
-: ${OZONE_BUCKET_KEY_NAME:=key1}
-
-echo 'Compatibility Test' > "${TEST_DATA_DIR}"/small
-
 client() {
   if [[ "${client_version}" == "${current_version}" ]]; then
     OZONE_DIR=/opt/hadoop
@@ -64,7 +48,6 @@ _write() {
 
 _read() {
   _kinit
-  local data_version="$1"
   execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${data_version}" \
     -v CLIENT_VERSION:${client_version} \
     -v CLUSTER_VERSION:${cluster_version} \
@@ -82,7 +65,39 @@ _test_checkpoint_compatibility() {
     compatibility/checkpoint.robot
 }
 
+# Generates version combinations for read tests in the form of
+#   reader=writer
+# printing to stdout.
+#
+# A combination is tested if it is related to the current version in any way:
+# - cluster running
+# - client who wrote the data
+# - client to read the data
+get_read_version_combinations() {
+  [[ -n "${cluster_version}" ]] || return 1
+  [[ -n "${current_version}" ]] || return 2
+  [[ -n "${old_versions}" ]] || return 3
+
+  local all_versions="$old_versions $current_version"
+  local reader writer
+  for reader in ${all_versions}; do
+    for writer in ${all_versions}; do
+      if [[ "${cluster_version}" == "${current_version}" ]] \
+          || [[ "${reader}" == "${current_version}" ]] \
+          || [[ "${writer}" == "${current_version}" ]]; then
+        echo "$reader=$writer"
+      fi
+    done
+  done | sort --reverse --unique
+}
+
 test_cross_compatibility() {
+  local read_combinations=$(get_read_version_combinations)
+  if [[ -z "$read_combinations" ]]; then
+    echo "No read test combinations found" >&2
+    return 1
+  fi
+
   echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
 
   OZONE_KEEP_RESULTS=true start_docker_env 5
@@ -94,7 +109,7 @@ test_cross_compatibility() {
   # first write with client matching cluster version
   client_version="${cluster_version}" client _write
 
-  for client_version in "$@"; do
+  for client_version in ${old_versions} ${current_version}; do
     # skip write, since already done
     if [[ "${client_version}" == "${cluster_version}" ]]; then
       continue
@@ -102,18 +117,10 @@ test_cross_compatibility() {
     client _write
   done
 
-  for client_version in "$@"; do
-    for data_version in $(echo "$client_version" "$cluster_version" "$current_version" | xargs -n1 | sort -u); do
-
-      # do not test old-only scenario
-      if [[ "${cluster_version}" != "${current_version}" ]] \
-        && [[ "${client_version}" != "${current_version}" ]] \
-        && [[ "${data_version}" != "${current_version}" ]]; then
-        continue
-      fi
-
-      client _read ${data_version}
-    done
+  for line in $read_combinations; do
+    data_version="${line##*=}"
+    client_version="${line%%=*}"
+    client _read
   done
 
   # Add checkpoint compatibility tests (only for clusters that support checkpoint endpoints)
@@ -127,25 +134,17 @@ test_cross_compatibility() {
     echo "=========================================="
     
     # Test 2.0.0 client (if available)
-    for client_version in "$@"; do
-      if [[ "${client_version}" == "2.0.0" ]]; then
-        echo "Testing 2.0.0 client against ${cluster_version} cluster"
-        client _test_checkpoint_compatibility
-        break  # Only test 2.0 once
-      fi
-    done
+    client_version="2.0.0"
+    if [[ " $old_versions " =~ " $client_version " ]]; then
+      echo "Testing ${client_version} client against ${cluster_version} cluster"
+      client _test_checkpoint_compatibility
+    fi
     
-    # Test current client (if different from 2.0.0 and available)
-    for client_version in "$@"; do
-      if [[ "${client_version}" == "${current_version}" ]]; then
-        echo "Testing ${current_version} client against ${cluster_version} cluster"
-        client _test_checkpoint_compatibility
-        break  # Only test current version once
-      fi
-    done
+    # Test current client
+    client_version="${current_version}"
+    echo "Testing ${current_version} client against ${cluster_version} cluster"
+    client _test_checkpoint_compatibility
   fi
 
   KEEP_RUNNING=false stop_docker_env
 }
-
-create_results_dir
