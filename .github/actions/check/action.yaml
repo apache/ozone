@@ -1,0 +1,190 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Executes a single check from `hadoop-ozone/dev-support/checks/`.
+# Before and after the check, it performs various steps based on inputs.
+
+name: check
+
+inputs:
+  # REQUIRED
+  script:
+    required: true
+    description: "Test script to run from hadoop-ozone/dev-support/checks, without .sh extension"
+
+  # OPTIONAL (ordered alphabetically)
+  checkout-fetch-depth:
+    description: "Fetch depth for checking out the repo (default: no history)"
+    default: 1
+
+  java-version:
+    description: "Java version to set up (default: none)"
+    default: ''
+
+  needs-maven-cache:
+    description: "Whether to restore Maven cache before run (default: yes)"
+    default: true
+
+  needs-npm-cache:
+    description: "Whether to restore NPM cache before run (default: no)"
+    default: false
+
+  needs-ozone-binary-tarball:
+    description: "Whether to download Ozone binary tarball created by build (default: no)"
+    default: false
+
+  needs-ozone-repo:
+    description: "Whether to download Ozone jars created by build (default: no)"
+    default: false
+
+  needs-ozone-source-tarball:
+    description: "Whether to download Ozone source tarball created by build (default: no)"
+    default: false
+
+  ratis-args:
+    description: "Version overrides from custom Ratis build (default: none)"
+    default: ''
+
+  script-args:
+    description: "Arguments for the test script, ratis-args are appended"
+    default: ''
+
+  split:
+    description: "Name of split for matrix jobs, only used in display name"
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout project
+      if: ${{ inputs.needs-ozone-source-tarball != 'true' }}
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+        ref: ${{ env.SHA }}
+        fetch-depth: ${{ inputs.checkout-fetch-depth }}
+
+    - name: Delete .git to omit commit SHA in build artifacts
+      if: ${{ inputs.needs-ozone-source-tarball != 'true' && inputs.checkout-fetch-depth == '1' }}
+      shell: bash
+      run: |
+        rm -fr .git
+
+    - name: Download Ozone source tarball
+      if: ${{ inputs.needs-ozone-source-tarball == 'true' }}
+      uses: actions/download-artifact@v8
+      with:
+        name: ozone-src
+
+    - name: Extract source tarball
+      if: ${{ inputs.needs-ozone-source-tarball == 'true' }}
+      shell: bash
+      run: |
+        tar --strip-components 1 -xzvf ozone*-src.tar.gz
+
+    - name: Cache for NPM dependencies
+      if: ${{ inputs.needs-npm-cache == 'true' }}
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.pnpm-store
+        key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-
+
+    - name: Cache for Maven dependencies
+      if: ${{ inputs.needs-maven-cache == 'true' }}
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/.m2/repository/*/*/*
+          !~/.m2/repository/org/apache/ozone
+        key: maven-repo-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          maven-repo-
+
+    - name: Download Ozone repo
+      id: download-ozone-repo
+      if: ${{ inputs.needs-ozone-repo == 'true' }}
+      uses: actions/download-artifact@v8
+      with:
+        name: ozone-repo
+        path: |
+          ~/.m2/repository/org/apache/ozone
+
+    - name: Download Ratis repo
+      if: ${{ inputs.ratis-args != '' }}
+      uses: actions/download-artifact@v8
+      with:
+        name: ratis-jars
+        path: |
+          ~/.m2/repository/org/apache/ratis
+
+    - name: Download Ozone binary tarball
+      if: ${{ inputs.needs-ozone-binary-tarball == 'true' }}
+      uses: actions/download-artifact@v8
+      with:
+        name: ozone-bin
+
+    - name: Extract binary tarball
+      if: ${{ inputs.needs-ozone-binary-tarball == 'true' }}
+      shell: bash
+      run: |
+        mkdir -p hadoop-ozone/dist/target
+        tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+        rm ozone*.tar.gz
+
+    - name: Setup java ${{ inputs.java-version }}
+      if: ${{ inputs.java-version != '' }}
+      uses: actions/setup-java@v6
+      with:
+        distribution: 'temurin'
+        java-version: ${{ inputs.java-version }}
+
+    - name: Execute tests
+      shell: bash
+      run: |
+        $COMMAND
+      env:
+        COMMAND: hadoop-ozone/dev-support/checks/${{ inputs.script }}.sh ${{ inputs.script-args }} ${{ inputs.ratis-args }}
+
+    - name: Summary of failures
+      if: ${{ failure() }}
+      shell: bash
+      run: |
+        if [[ -s "target/$SCRIPT/summary.md" ]]; then
+          cat target/$SCRIPT/summary.md >> $GITHUB_STEP_SUMMARY
+        fi
+        hadoop-ozone/dev-support/checks/_summary.sh target/$SCRIPT/summary.txt
+      env:
+        SCRIPT: ${{ inputs.script }}
+
+    - name: Archive build results
+      id: archive
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ (inputs.split && format('{0}-{1}', inputs.script, inputs.split)) || inputs.script }}
+        # please keep path as a single item; move to that directory all files needed in the artifact
+        path: target/${{ inputs.script }}
+      continue-on-error: true
+
+    - name: Test summary
+      if: ${{ !cancelled() }}
+      continue-on-error: true
+      shell: bash
+      run: python3 dev-support/ci/junit_summary.py >> "$GITHUB_STEP_SUMMARY"
+      env:
+        JUNIT_REPORT_URL: ${{ steps.archive.outputs.artifact-url }}
