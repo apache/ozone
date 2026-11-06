@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
@@ -190,6 +191,27 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
     assertThat(transport.getLastRequest().getReadConsistencyHint()
         .getReadConsistency())
         .isEqualTo(ReadConsistency.LINEARIZABLE_LEADER_ONLY.toProto());
+  }
+
+  @Test
+  void getObjectTaggingSendsS3ContextFlag() throws IOException {
+    when(omTransport.submitRequest(any(OMRequest.class))).thenReturn(
+        OMResponse.newBuilder()
+            .setCmdType(Type.GetObjectTagging)
+            .setStatus(Status.OK)
+            .setGetObjectTaggingResponse(GetObjectTaggingResponse.newBuilder())
+            .build());
+
+    ArgumentCaptor<OMRequest> captor = ArgumentCaptor.forClass(OMRequest.class);
+    pb.getObjectTagging(new OmKeyArgs.Builder()
+        .setVolumeName(null)
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setAssumeS3Context(true)
+        .build());
+
+    verify(omTransport).submitRequest(captor.capture());
+    assertThat(captor.getValue().getAssumeS3Context()).isTrue();
   }
 
   @Test

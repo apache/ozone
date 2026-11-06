@@ -139,15 +139,21 @@ public final class SignatureTestUtils {
   /** Build a one-data-chunk SigV4 body with one trailing header and its signature. */
   public static String signedChunkedBodyWithTrailer(String content, String trailerName,
       String trailerValue) {
-    byte[] payload = content.getBytes(UTF_8);
+    return signedChunkedBodyWithTrailer(new String[]{content}, trailerName, trailerValue);
+  }
+
+  /** Build a multi-data-chunk SigV4 body with one trailing header and its signature. */
+  public static String signedChunkedBodyWithTrailer(String[] chunks, String trailerName, String trailerValue) {
     String previousSignature = SEED_SIGNATURE;
     StringBuilder body = new StringBuilder();
-    if (payload.length > 0) {
-      previousSignature = chunkSignature(SIGNING_KEY, DATE_TIME, CREDENTIAL_SCOPE,
-          SEED_SIGNATURE, payload);
-      body.append(Integer.toHexString(payload.length))
-          .append(";chunk-signature=").append(previousSignature).append("\r\n")
-          .append(content).append("\r\n");
+    for (String chunk : chunks) {
+      byte[] payload = chunk.getBytes(UTF_8);
+      if (payload.length > 0) {
+        previousSignature = chunkSignature(SIGNING_KEY, DATE_TIME, CREDENTIAL_SCOPE, previousSignature, payload);
+        body.append(Integer.toHexString(payload.length))
+            .append(";chunk-signature=").append(previousSignature).append("\r\n")
+            .append(chunk).append("\r\n");
+      }
     }
     String finalSignature = chunkSignature(SIGNING_KEY, DATE_TIME, CREDENTIAL_SCOPE,
         previousSignature, new byte[0]);

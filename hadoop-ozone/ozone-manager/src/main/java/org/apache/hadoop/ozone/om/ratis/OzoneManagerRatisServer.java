@@ -798,6 +798,9 @@ public final class OzoneManagerRatisServer {
     // Set the number of maximum cached segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
+    RaftServerConfigKeys.Log.setAppendEntriesComposeEnabled(properties,
+        conf.getObject(OzoneManagerRatisServerConfig.class).isAppendEntriesComposeEnabled());
+
     RaftServerConfigKeys.Write.setElementLimit(properties, conf.getInt(
         OMConfigKeys.OZONE_OM_RATIS_PENDING_WRITE_ELEMENT_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_PENDING_WRITE_NUM_LIMIT_DEFAULT));
