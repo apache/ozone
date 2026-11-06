@@ -84,6 +84,8 @@ public class KeyOutputStream extends OutputStream
   private final ReplicationConfig replication;
 
   private boolean closed;
+  // whether close() has committed the key, guarded by the write lock
+  private boolean committed;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
   // how much of data is actually written yet to underlying stream
@@ -238,6 +240,8 @@ public class KeyOutputStream extends OutputStream
       }
 
       doInWriteLock(() -> {
+        // The stream may have failed while this call was waiting for the lock.
+        checkNotFailed();
         handleWrite(b, off, len, false);
         writeOffset += len;
       });
@@ -328,7 +332,14 @@ public class KeyOutputStream extends OutputStream
   private void handleException(BlockOutputStreamEntry entry, IOException exception, boolean fromRetry)
       throws IOException {
     doInWriteLock(() -> {
-      handleExceptionInternal(entry, exception);
+      try {
+        handleExceptionInternal(entry, exception);
+      } catch (Exception e) {
+        // Fail the stream before the write lock is released, so that a call waiting for the lock cannot go on with a
+        // stream that has lost its buffered data.
+        markStreamClosed();
+        throw e;
+      }
       BlockOutputStreamEntry current = blockOutputStreamEntryPool.getCurrentStreamEntry();
       if (!fromRetry && entry.registerCallFinished()) {
         // When the faulty block finishes handling all its pending call, the current block can exit retry
@@ -508,6 +519,8 @@ public class KeyOutputStream extends OutputStream
       getRequestSemaphore().acquire();
       checkNotClosed();
       handleFlushOrClose(StreamAction.FLUSH);
+      // Another call may have failed and closed the stream in the meantime. The data was not flushed then.
+      doInWriteLock(this::checkNotFailed);
     } finally {
       getRequestSemaphore().release();
     }
@@ -542,6 +555,8 @@ public class KeyOutputStream extends OutputStream
       handleFlushOrClose(StreamAction.HSYNC);
 
       doInWriteLock(() -> {
+        // Another call may have failed and closed the stream in the meantime. The data was not synced then.
+        checkNotFailed();
         Preconditions.checkState(offset >= hsyncPos,
             "offset = %s < hsyncPos = %s", offset, hsyncPos);
         MetricUtil.captureLatencyNs(clientMetrics::addHsyncLatency,
@@ -593,7 +608,8 @@ public class KeyOutputStream extends OutputStream
         } catch (InterruptedException e) {
           throw new InterruptedIOException();
         } catch (Exception e) {
-          markStreamClosed();
+          // With the write lock, so that no other call takes the closed stream for a healthy one.
+          doInWriteLock(this::markStreamClosed);
           throw e;
         }
       }
@@ -653,6 +669,7 @@ public class KeyOutputStream extends OutputStream
         preCommit.run();
       }
       blockOutputStreamEntryPool.commitKey(offset);
+      committed = true;
     } finally {
       blockOutputStreamEntryPool.cleanup();
     }
@@ -834,6 +851,17 @@ public class KeyOutputStream extends OutputStream
       throw new IOException(
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
               + blockOutputStreamEntryPool.getKeyName());
+    }
+  }
+
+  /**
+   * Verify, with the write lock held, that the stream has not failed while the call was in progress. A stream that
+   * was closed has failed, unless close() has committed the key.
+   * @throws IOException if the stream has failed.
+   */
+  private void checkNotFailed() throws IOException {
+    if (!committed) {
+      checkNotClosed();
     }
   }
 
