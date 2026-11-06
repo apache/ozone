@@ -24,7 +24,7 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -289,8 +289,23 @@ public class TestBucketAcl {
 
     OS3Exception os3 = assertInstanceOf(OS3Exception.class, wae.getCause());
 
-    assertEquals(INVALID_REQUEST.getCode(), os3.getCode());
+    assertEquals(MALFORMED_XML.getCode(), os3.getCode());
     assertEquals(HTTP_BAD_REQUEST, os3.getHttpCode());
+  }
+
+  /** A grant's Permission is one value; an element holding text inside it is refused, not read as another value. */
+  @Test
+  public void testPutAclWithElementHoldingTextInPermission() {
+    InputStream body = new ByteArrayInputStream(("<AccessControlPolicy><AccessControlList><Grant>"
+        + "<Grantee xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"CanonicalUser\"><ID>root</ID>"
+        + "</Grantee><Permission><a>FULL_CONTROL</a>READ</Permission></Grant></AccessControlList>"
+        + "</AccessControlPolicy>").getBytes(StandardCharsets.UTF_8));
+
+    WebApplicationException wae = assertThrows(WebApplicationException.class,
+        () -> bucketEndpoint.put(BUCKET_NAME, body));
+
+    OS3Exception os3 = assertInstanceOf(OS3Exception.class, wae.getCause());
+    assertEquals(MALFORMED_XML.getCode(), os3.getCode());
   }
 
   @Test

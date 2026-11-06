@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
@@ -45,6 +45,7 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
 
   private final JAXBContext context;
   private final SAXParserFactory saxParserFactory;
+  private final XmlElementModel model;
   private final Class<T> cls;
 
   public MessageUnmarshaller(Class<T> cls) {
@@ -53,6 +54,7 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
     try {
       context = JAXBContext.newInstance(cls);
       saxParserFactory = XMLUtils.newSecureSAXParserFactory();
+      model = XmlElementModel.document(cls);
     } catch (Exception ex) {
       throw new AssertionError("Can not instantiate XML parser for " + cls.getSimpleName(), ex);
     }
@@ -76,18 +78,18 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
       UnmarshallerHandler unmarshallerHandler =
           context.createUnmarshaller().getUnmarshallerHandler();
       XmlNamespaceFilter filter =
-          createNamespaceFilter();
+          createNamespaceFilter(model);
       filter.setContentHandler(unmarshallerHandler);
       filter.setParent(xmlReader);
       filter.parse(new InputSource(inputStream));
       return cls.cast(unmarshallerHandler.getResult());
     } catch (Exception e) {
-      throw wrapOS3Exception(newError(INVALID_REQUEST, e).withMessage(e.getMessage()));
+      throw wrapOS3Exception(newError(MALFORMED_XML, e).withMessage(e.getMessage()));
     }
   }
 
-  protected XmlNamespaceFilter createNamespaceFilter() {
-    return new XmlNamespaceFilter(S3_XML_NAMESPACE);
+  XmlNamespaceFilter createNamespaceFilter(XmlElementModel requestModel) {
+    return new XmlNamespaceFilter(S3_XML_NAMESPACE, requestModel);
   }
 
   /** Convenience method for programmatic invocation. */

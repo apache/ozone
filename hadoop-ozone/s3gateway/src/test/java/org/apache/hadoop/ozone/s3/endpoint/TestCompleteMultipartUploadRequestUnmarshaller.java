@@ -119,6 +119,35 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
     assertTrue(request.getPartList().isEmpty());
   }
 
+  /** An ETag split by an empty element is one ETag; AWS S3 completed an upload with it on 2026-10-31 (case C10). */
+  @Test
+  public void etagSplitByAnEmptyElementIsJoined() throws IOException {
+    CompleteMultipartUploadRequest request = unmarshall(new ByteArrayInputStream(
+        ("<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>" + part1.substring(0, 8) + "<a/>"
+            + part1.substring(8) + "</ETag></Part></CompleteMultipartUpload>").getBytes(UTF_8)));
+    assertEquals(part1, request.getPartList().get(0).getETag());
+  }
+
+  /** An ETag holding an element with text is refused; AWS S3 answered 400 MalformedXML on 2026-10-31 (case C09). */
+  @Test
+  public void etagHoldingAnElementWithTextIsRefused() {
+    assertMalformedXml("<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag><a>" + part1
+        + "</a> </ETag></Part></CompleteMultipartUpload>");
+  }
+
+  @Test
+  public void bodyThatIsNotWellFormedIsMalformedXml() {
+    assertMalformedXml("<CompleteMultipartUpload><Part><PartNumber>1</PartNumber></Part>");
+  }
+
+  private static void assertMalformedXml(String xml) {
+    WebApplicationException ex = assertThrows(WebApplicationException.class,
+        () -> new CompleteMultipartUploadRequestUnmarshaller()
+            .readFrom(null, null, null, null, null, new ByteArrayInputStream(xml.getBytes(UTF_8))));
+    OS3Exception cause = assertInstanceOf(OS3Exception.class, ex.getCause());
+    assertEquals(S3ErrorTable.MALFORMED_XML.getCode(), cause.getCode());
+  }
+
   @Test
   public void fromStreamWithoutNamespace() throws IOException {
     //GIVEN
