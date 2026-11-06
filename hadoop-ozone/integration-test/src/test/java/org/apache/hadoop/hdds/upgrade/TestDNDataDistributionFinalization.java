@@ -31,7 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -58,7 +58,7 @@ import org.junit.jupiter.api.Test;
  * Tests upgrade finalization failure scenarios and corner cases specific to DN data distribution feature.
  */
 public class TestDNDataDistributionFinalization {
-  private ScmBlockLocationProtocol scmBlockClient;
+  private ScmBlockLocationInternalInterface scmBlockClient;
   private MiniOzoneHAClusterImpl cluster;
 
   private static final int NUM_DATANODES = 3;

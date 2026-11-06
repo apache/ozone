@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
@@ -118,8 +118,8 @@ public class TestFailoverWithSCMHA {
     GenericTestUtils
         .setLogLevel(SCMBlockLocationFailoverProxyProvider.class, Level.DEBUG);
     LogCapturer logCapture = LogCapturer.captureLogs(SCMBlockLocationFailoverProxyProvider.class);
-    ScmBlockLocationProtocol scmBlockLocationProtocol = TracingUtil
-        .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
+    ScmBlockLocationInternalInterface scmBlockLocationProtocol = TracingUtil
+        .createProxy(scmBlockLocationClient, ScmBlockLocationInternalInterface.class,
             conf);
     scmBlockLocationProtocol.getScmInfo();
     assertThat(logCapture.getOutput())

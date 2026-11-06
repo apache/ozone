@@ -49,7 +49,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
@@ -129,7 +129,7 @@ public final class HAUtils {
   /**
    * Create a scm block client.
    */
-  public static ScmBlockLocationProtocol getScmBlockClient(
+  public static ScmBlockLocationInternalInterface getScmBlockClient(
       OzoneConfiguration conf) {
     return getScmBlockClient(conf,
         new SCMBlockLocationFailoverProxyProvider(conf));
@@ -139,13 +139,13 @@ public final class HAUtils {
    * Creates an SCM block client using the provided proxy provider.
    * Retains the provider reference to support dynamic SCM node updates.
    */
-  public static ScmBlockLocationProtocol getScmBlockClient(
+  public static ScmBlockLocationInternalInterface getScmBlockClient(
       OzoneConfiguration conf,
       SCMBlockLocationFailoverProxyProvider proxyProvider) {
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
         new ScmBlockLocationProtocolClientSideTranslatorPB(proxyProvider, conf);
     return TracingUtil
-        .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
+        .createProxy(scmBlockLocationClient, ScmBlockLocationInternalInterface.class,
             conf);
   }
 

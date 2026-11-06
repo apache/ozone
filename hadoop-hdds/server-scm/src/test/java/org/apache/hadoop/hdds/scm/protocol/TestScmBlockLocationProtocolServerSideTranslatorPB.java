@@ -78,7 +78,7 @@ import org.junit.jupiter.api.Test;
  */
 class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
-  private ScmBlockLocationProtocol impl;
+  private ScmBlockLocationInternalInterface impl;
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private Map<DatanodeID, DatanodeInfo> registry;
   private List<DatanodeDetails> nodes;
@@ -86,7 +86,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
   @BeforeEach
   void setUp() throws Exception {
-    impl = mock(ScmBlockLocationProtocol.class);
+    impl = mock(ScmBlockLocationInternalInterface.class);
     StorageContainerManager scm = mock(StorageContainerManager.class);
 
     registry = new HashMap<>();
