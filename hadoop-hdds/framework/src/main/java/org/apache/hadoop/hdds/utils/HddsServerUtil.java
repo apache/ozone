@@ -654,7 +654,7 @@ public final class HddsServerUtil {
     includeFile(file, OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME, archiveOutput);
   }
 
-  static boolean ratisSnapshotComplete(Path dir) {
+  public static boolean ratisSnapshotComplete(Path dir) {
     return new File(dir.toString(),
         OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME).exists();
   }

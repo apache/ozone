@@ -3490,6 +3490,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.scm.snapshot.connection.timeout</name>
+    <value>60s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Connection timeout for the HTTP(S) call made by Recon to download the SCM DB checkpoint,
+      used when hdds.grpc.tls.enabled is true.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.snapshot.read.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Read timeout for the HTTP(S) call made by Recon to download the SCM DB checkpoint,
+      used when hdds.grpc.tls.enabled is true. SCM creates the checkpoint before it sends
+      any data, so this should cover the checkpoint creation time.
+    </description>
+  </property>
+  <property>
     <name>hdds.tracing.enabled</name>
     <value>false</value>
     <tag>OZONE, HDDS</tag>
