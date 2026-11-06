@@ -71,13 +71,16 @@ public class MetricsProxyEndpoint {
       HttpURLConnection connection = metricsServiceProvider.getMetricsResponse(
           api, uriInfo.getRequestUri().getQuery());
       InputStream inputStream;
-      if (Response.Status.fromStatusCode(connection.getResponseCode())
-          .getFamily() == Response.Status.Family.SUCCESSFUL) {
+      if (Response.Status.Family.familyOf(connection.getResponseCode()) == Response.Status.Family.SUCCESSFUL) {
         inputStream = connection.getInputStream();
       } else {
         // Throw a bad gateway error if HttpResponseCode is not 2xx
         httpServletResponse.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
         inputStream = connection.getErrorStream();
+        if (inputStream == null) {
+          // The metrics endpoint sent no error body
+          return;
+        }
       }
       try (
           OutputStream outputStream =

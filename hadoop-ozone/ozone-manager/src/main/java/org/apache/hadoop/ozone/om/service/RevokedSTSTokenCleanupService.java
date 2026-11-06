@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -62,7 +61,6 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
   private static final long CLEANUP_THRESHOLD = TimeUnit.SECONDS.toMillis(S3STSUtils.MAX_DURATION_SECONDS); // 12 hours
 
   private final OzoneManager ozoneManager;
-  private final OMMetadataManager metadataManager;
   private final AtomicBoolean suspended;
   private final AtomicLong runCount;
   private final AtomicLong submittedDeletedEntryCount;
@@ -85,7 +83,6 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
         "RevokedSTSTokenCleanupService", interval, unit, REVOKED_STS_TOKEN_CLEANER_CORE_POOL_SIZE,
         serviceTimeout, ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
-    this.metadataManager = ozoneManager.getMetadataManager();
     this.suspended = new AtomicBoolean(false);
     this.runCount = new AtomicLong(0);
     this.submittedDeletedEntryCount = new AtomicLong(0);
@@ -136,7 +133,8 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
 
       final long startTime = Time.monotonicNow();
       runCount.incrementAndGet();
-      final Table<String, Long> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
+      // Read the metadata manager on every run, since installing a checkpoint replaces it
+      final Table<String, Long> revokedStsTokenTable = ozoneManager.getMetadataManager().getS3RevokedStsTokenTable();
 
       long deletedInRun = 0;
       final List<String> batch = new ArrayList<>();
@@ -243,7 +241,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
           .setCmdType(Type.DeleteRevokedSTSTokens)
           .setDeleteRevokedSTSTokensRequest(request)
           .setClientId(clientId.toString())
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .build();
 
       try {

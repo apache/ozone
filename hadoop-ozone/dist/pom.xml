@@ -89,6 +89,16 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-local</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-other</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-repair</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -150,11 +160,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-s3gateway</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-tools</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -406,6 +411,7 @@
                     <argument>${basedir}/dev-support/bin/dist-tar-stitching</argument>
                     <argument>${hdds.version}</argument>
                     <argument>${project.build.directory}</argument>
+                    <argument>${project.build.outputTimestamp}</argument>
                   </arguments>
                 </configuration>
               </execution>

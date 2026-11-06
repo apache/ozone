@@ -43,9 +43,11 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 /**
@@ -55,13 +57,17 @@ import org.junit.jupiter.api.Timeout;
  * covered by {@link org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase}
  * unit tests; this verifies the OM-side registration and callbacks end to end.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
 public class TestOmSCMNodesReconfiguration {
 
-  private MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster;
   private String scmServiceId;
+  private String scmNodesKey;
+  private String initialScmNodes;
+  private final Map<String, String> initialScmAddresses = new HashMap<>();
 
-  @BeforeEach
+  @BeforeAll
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     scmServiceId = "scm-service-test1";
@@ -72,9 +78,29 @@ public class TestOmSCMNodesReconfiguration {
         .setNumOfOzoneManagers(1)
         .build();
     cluster.waitForClusterToBeReady();
+
+    scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+    OzoneConfiguration omConf = cluster.getOzoneManager().getConfiguration();
+    initialScmNodes = omConf.get(scmNodesKey);
+    for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
+      String scmAddrKey = ConfUtils.addKeySuffixes(
+          OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
+      initialScmAddresses.put(scmAddrKey, omConf.get(scmAddrKey));
+    }
   }
 
-  @AfterEach
+  @BeforeEach
+  public void resetScmConfiguration() throws ReconfigurationException {
+    ReconfigurationHandler handler = cluster.getOzoneManager().getReconfigurationHandler();
+
+    for (Map.Entry<String, String> scmAddress : initialScmAddresses.entrySet()) {
+      handler.reconfigureProperty(scmAddress.getKey(), scmAddress.getValue());
+    }
+
+    handler.reconfigureProperty(scmNodesKey, initialScmNodes);
+  }
+
+  @AfterAll
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -88,9 +114,6 @@ public class TestOmSCMNodesReconfiguration {
   void testScmNodesAndAddressReconfigurableOnOm() throws Exception {
     ReconfigurationHandler handler =
         cluster.getOzoneManager().getReconfigurationHandler();
-    String scmNodesKey =
-        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
-
     assertTrue(handler.isPropertyReconfigurable(scmNodesKey));
     assertTrue(handler.listReconfigureProperties().contains(scmNodesKey));
 
@@ -109,9 +132,6 @@ public class TestOmSCMNodesReconfiguration {
   void testReconfigureScmNodesToBlankThrows() {
     ReconfigurationHandler handler =
         cluster.getOzoneManager().getReconfigurationHandler();
-    String scmNodesKey =
-        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
-
     assertThrows(ReconfigurationException.class,
         () -> handler.reconfigureProperty(scmNodesKey, ""));
   }
@@ -124,9 +144,6 @@ public class TestOmSCMNodesReconfiguration {
     OzoneManager om = cluster.getOzoneManager();
     ReconfigurationHandler handler = om.getReconfigurationHandler();
     ScmClient scmClient = om.getScmClient();
-    String scmNodesKey =
-        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
-
     List<String> before =
         new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
     assertEquals(3, before.size());
@@ -247,9 +264,6 @@ public class TestOmSCMNodesReconfiguration {
     ReconfigurationHandler handler = om.getReconfigurationHandler();
     ScmClient scmClient = om.getScmClient();
     OzoneConfiguration conf = om.getConfiguration();
-    String scmNodesKey =
-        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
-
     List<String> before =
         new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
     String originalValue = conf.get(scmNodesKey);
@@ -277,8 +291,6 @@ public class TestOmSCMNodesReconfiguration {
     ReconfigurationHandler handler = om.getReconfigurationHandler();
     ScmClient scmClient = om.getScmClient();
     OzoneConfiguration conf = om.getConfiguration();
-    String scmNodesKey =
-        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
     String newNodeId = "scm-bad-address";
     String newAddrKey =
         ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, newNodeId);
@@ -313,9 +325,6 @@ public class TestOmSCMNodesReconfiguration {
     OzoneManager om = cluster.getOzoneManager();
     ReconfigurationHandler handler = om.getReconfigurationHandler();
     ScmClient scmClient = om.getScmClient();
-    String scmNodesKey =
-        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
-
     List<String> before =
         new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
     String newNodeId = "scm-added";

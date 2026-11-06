@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { HTMLAttributes } from 'react';
 import filesize from 'filesize';
 
 import { Button, Popover, Select, Space, Table } from 'antd';
@@ -285,6 +285,9 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
         pagination={false}
         scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
         locale={{ filterTitle: '' }}
+        onRow={(record: Container) => ({
+          'data-testid': `containerstable-${record.containerID}`,
+        } as HTMLAttributes<HTMLElement>)}
         expandable={{
           expandRowByClick: true,
           expandedRowRender: expandedRowRender,

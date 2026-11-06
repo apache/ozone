@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
@@ -105,7 +106,10 @@ public class TestOmSnapshotDefragSpaceSavings {
   private static final int DEFRAG_WAIT_MS = 600_000;
   private static final int KEY_DELETE_WAIT_MS = 60_000;
   private static final long FOOTPRINT_TOLERANCE_BYTES = 8192;
-  private static final long REPEATED_DEFRAG_FOOTPRINT_TOLERANCE_BYTES = 16_384;
+  // Re-triggering defrag reopens each snapshot checkpoint, and RocksDB rewrites per-table metadata
+  // (OPTIONS, MANIFEST, LOG) on open, so the allowed growth scales with the number of OM tables.
+  private static final long REPEATED_DEFRAG_FOOTPRINT_TOLERANCE_BYTES =
+      1024L * OMDBDefinition.get().getColumnFamilyNames().size();
   private static final DefaultReplicationConfig REPLICATION_CONFIG_ONE =
       new DefaultReplicationConfig(
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE));

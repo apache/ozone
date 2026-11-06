@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SplittableRandom;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -224,6 +226,7 @@ public final class ECStreamTestUtil {
     private List<ByteBuffer> blockStreamData;
     // List of EC indexes that should fail immediately on read
     private final List<Integer> failIndexes = new ArrayList<>();
+    private CountDownLatch readBarrier;
 
     private Pipeline currentPipeline;
 
@@ -254,6 +257,11 @@ public final class ECStreamTestUtil {
       failIndexes.addAll(Arrays.asList(fail));
     }
 
+    // every read of the streams created after this waits until the barrier has been reached by count reads
+    public synchronized void setReadBarrier(CountDownLatch barrier) {
+      this.readBarrier = barrier;
+    }
+
     @Override
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig,
@@ -266,10 +274,11 @@ public final class ECStreamTestUtil {
       int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
-          blockStreamData.get(repInd - 1), repInd);
+          blockStreamData.get(repInd - 1).duplicate(), repInd);
       if (failIndexes.remove(Integer.valueOf(repInd))) {
         stream.setShouldError(true);
       }
+      stream.setReadBarrier(readBarrier);
       blockStreams.put(repInd, stream);
       return stream;
     }
@@ -289,6 +298,7 @@ public final class ECStreamTestUtil {
     private boolean shouldErrorOnSeek = false;
     private IOException errorToThrow = null;
     private int ecReplicaIndex = 0;
+    private CountDownLatch readBarrier;
     private static final byte EOF = -1;
 
     TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data) {
@@ -320,8 +330,25 @@ public final class ECStreamTestUtil {
       this.errorToThrow = errorThrowable;
     }
 
+    public void setReadBarrier(CountDownLatch barrier) {
+      this.readBarrier = barrier;
+    }
+
     public int getEcReplicaIndex() {
       return ecReplicaIndex;
+    }
+
+    @Override
+    protected int readPositioned(long position, ByteBuffer buffer) {
+      if (position >= length) {
+        return EOF;
+      }
+      ByteBuffer source = data.duplicate();
+      source.position((int) position);
+      int n = (int) Math.min(buffer.remaining(), length - position);
+      source.limit(source.position() + n);
+      buffer.put(source);
+      return n;
     }
 
     @Override
@@ -344,6 +371,17 @@ public final class ECStreamTestUtil {
     public int read(ByteBuffer buf) throws IOException {
       if (shouldError && data.position() >= shouldErrorPosition) {
         throwError();
+      }
+      if (readBarrier != null) {
+        readBarrier.countDown();
+        try {
+          if (!readBarrier.await(10, TimeUnit.SECONDS)) {
+            throw new IOException("Timed out waiting for " + readBarrier.getCount() + " concurrent reads");
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException(e);
+        }
       }
       if (getRemaining() == 0) {
         return EOF;

@@ -29,11 +29,13 @@ import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.BekInfoUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -90,6 +92,10 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     BucketArgs bucketArgs =
         omRequest.getSetBucketPropertyRequest().getBucketArgs();
 
+    if (bucketArgs.hasDefaultReplicationConfig()) {
+      OzoneConfigUtil.toDefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig());
+    }
+
     if (bucketArgs.hasBekInfo()) {
       KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
       BucketArgs.Builder bucketArgsBuilder =
@@ -118,7 +124,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     omMetrics.incNumBucketUpdates();
 
     BucketArgs bucketArgs = setBucketPropertyRequest.getBucketArgs();
-    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+    OmBucketArgs omBucketArgs = null;
 
     String volumeName = bucketArgs.getVolumeName();
     String bucketName = bucketArgs.getBucketName();
@@ -133,6 +139,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
+      // Parse here, so that an invalid replication config fails the request
+      if (bucketArgs.hasDefaultReplicationConfig()) {
+        OzoneConfigUtil.toDefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig());
+      }
+      omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
         checkAclPermission(ozoneManager, volumeName, bucketName);
@@ -255,7 +267,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     // Performing audit logging outside of the lock.
     markForAudit(auditLogger, buildAuditMessage(OMAction.UPDATE_BUCKET,
-        omBucketArgs.toAuditMap(), exception, userInfo));
+        omBucketArgs == null ? null : omBucketArgs.toAuditMap(), exception, userInfo));
 
     // return response.
     if (success) {
@@ -407,14 +419,14 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   public static OMRequest disallowSetBucketPropertyWithStoragePolicy(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.STORAGE_POLICY_SUPPORT)) {
+        .isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
       SetBucketPropertyRequest propReq = req.getSetBucketPropertyRequest();
       if (propReq.hasBucketArgs()
           && (propReq.getBucketArgs().hasStoragePolicy()
           || propReq.getBucketArgs().hasAllowFallbackStoragePolicy()
           || propReq.getBucketArgs().hasUnsetStoragePolicy())) {
-        throw new OMException("Cluster does not have the bucket storage policy"
-            + " support feature finalized yet, but the request contains storage"
+        throw new OMException("Cluster does not have the storage policy"
+            + " feature finalized yet, but the request contains storage"
             + " policy arguments. Rejecting the request, please finalize the"
             + " cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);

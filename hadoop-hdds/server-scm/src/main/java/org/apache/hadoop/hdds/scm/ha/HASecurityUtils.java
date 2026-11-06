@@ -25,9 +25,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.X509TrustManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -154,9 +156,59 @@ public final class  HASecurityUtils {
       CertificateClient certificateClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       return new GrpcTlsConfig(certificateClient.getKeyManager(),
-          certificateClient.getTrustManager(), true);
+          new ScmPeerTrustManager(certificateClient.getTrustManager()), true);
     }
     return null;
+  }
+
+  /**
+   * {@link X509TrustManager} that accepts only SCM peers on SCM to SCM connections (SCM Ratis and inter-SCM gRPC).
+   * <p>
+   * After the delegate validates the chain against the cluster trust store, the peer certificate
+   * ({@code chain[0]}) must be a CA certificate. {@link X509Certificate#getBasicConstraints()} returns {@code -1}
+   * for a certificate that is not a CA (no basic constraints extension, or CA false), and the path length
+   * constraint ({@code 0} or more) for a CA certificate.
+   * <p>
+   * SCM certificates are CA certificates: an SCM uses either its sub-CA certificate ({@code SCMCertificateClient}
+   * requests {@code setCA(true)}) or the self-signed root CA certificate.
+   * Datanode, OM and Recon certificates are leaf certificates, so they are not accepted here.
+   */
+  static final class ScmPeerTrustManager implements X509TrustManager {
+    private final X509TrustManager delegate;
+
+    ScmPeerTrustManager(X509TrustManager delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+      delegate.checkClientTrusted(chain, authType);
+      // The peer must be an SCM (CA certificate), not a Datanode, OM or Recon (leaf certificate).
+      checkScmCertificate(chain[0]);
+    }
+
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+      delegate.checkServerTrusted(chain, authType);
+      // The peer must be an SCM (CA certificate), not a Datanode, OM or Recon (leaf certificate).
+      checkScmCertificate(chain[0]);
+    }
+
+    @Override
+    public X509Certificate[] getAcceptedIssuers() {
+      return delegate.getAcceptedIssuers();
+    }
+
+    /**
+     * Requires {@code cert} to be a CA certificate, as SCM certificates are.
+     *
+     * @throws CertificateException unless {@link HASecurityUtils#isCACertificate} accepts {@code cert}
+     */
+    private static void checkScmCertificate(X509Certificate cert) throws CertificateException {
+      if (!isCACertificate(cert)) {
+        throw new CertificateException("Not an SCM certificate: " + cert.getSubjectX500Principal());
+      }
+    }
   }
 
   /**

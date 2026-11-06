@@ -70,6 +70,8 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
  */
 public abstract class MisReplicationHandlerTests {
 
+  private static final String TARGET_RACK = "/target-rack";
+
   private ContainerInfo container;
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
@@ -126,8 +128,14 @@ public abstract class MisReplicationHandlerTests {
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus = mock(ContainerPlacementStatus.class);
     when(mockedContainerPlacementStatus.isPolicySatisfied()).thenReturn(false);
-    when(placementPolicy.validateContainerPlacement(anyList(),
-        anyInt())).thenReturn(mockedContainerPlacementStatus);
+    // testMisReplication puts the targets on a rack of their own, and moving a replica there fixes the placement.
+    ContainerPlacementStatus placementAfterCopy = mock(ContainerPlacementStatus.class);
+    when(placementAfterCopy.isPolicySatisfied()).thenReturn(true);
+    when(placementPolicy.validateContainerPlacement(anyList(), anyInt())).thenAnswer(invocation -> {
+      List<DatanodeDetails> dns = invocation.getArgument(0);
+      return dns.stream().anyMatch(dn -> TARGET_RACK.equals(dn.getNetworkLocation()))
+          ? placementAfterCopy : mockedContainerPlacementStatus;
+    });
     return placementPolicy;
   }
 
@@ -200,7 +208,7 @@ public abstract class MisReplicationHandlerTests {
                     .collect(Collectors.toSet());
     List<DatanodeDetails> targetNodes =
             IntStream.range(0, expectedNumberOfNodes)
-                    .mapToObj(i -> MockDatanodeDetails.randomDatanodeDetails())
+                    .mapToObj(i -> MockDatanodeDetails.createDatanodeDetails("target" + i, TARGET_RACK))
                     .collect(Collectors.toList());
     if (expectedNumberOfNodes > 0) {
       when(mockedPlacementPolicy.chooseDatanodes(

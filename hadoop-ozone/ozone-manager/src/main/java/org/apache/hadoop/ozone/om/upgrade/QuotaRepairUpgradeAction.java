@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Quota repair for usages action to be triggered after upgrade.
  */
-@UpgradeActionOm(feature = QUOTA)
+@OmUpgradeActionForLayoutFeature(feature = QUOTA)
 public class QuotaRepairUpgradeAction implements OmUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(QuotaRepairUpgradeAction.class);
 

@@ -175,7 +175,7 @@ public final class TestContainerBalancerClusterAnalyzer {
         .setUuid(UUID.randomUUID())
         .build();
     DatanodeUsageInfoProto node = DatanodeUsageInfoProto.newBuilder()
-        .setNode(datanode.toProto(DEFAULT_VERSION.toProtoValue()))
+        .setNode(datanode.toProto(DEFAULT_VERSION))
         .setCapacity(100)
         .setRemaining(10)
         .setUsed(90)
@@ -187,6 +187,20 @@ public final class TestContainerBalancerClusterAnalyzer {
             Collections.emptySet(), Collections.singleton("10.0.0.5"));
 
     assertEquals(0, snapshot.getTotalEligibleDatanodes());
+  }
+
+  @Test
+  void testIncludeAndExcludeByEquivalentIpv6Address() {
+    DatanodeDetails datanode = DatanodeDetails.newBuilder()
+        .setHostName("dn-host")
+        .setIpAddress("2001:db8:0:0:0:0:0:1")
+        .setUuid(UUID.randomUUID())
+        .build();
+
+    assertTrue(ContainerBalancerClusterAnalyzer.shouldExcludeDatanode(
+        datanode, Collections.singleton("2001:db8::1"), Collections.emptySet()));
+    assertFalse(ContainerBalancerClusterAnalyzer.shouldExcludeDatanode(
+        datanode, Collections.emptySet(), Collections.singleton("2001:db8::1")));
   }
 
   @Test
@@ -287,7 +301,7 @@ public final class TestContainerBalancerClusterAnalyzer {
         .build();
     long used = capacity - remaining;
     return DatanodeUsageInfoProto.newBuilder()
-        .setNode(datanode.toProto(DEFAULT_VERSION.toProtoValue()))
+        .setNode(datanode.toProto(DEFAULT_VERSION))
         .setCapacity(capacity)
         .setRemaining(remaining)
         .setUsed(used)

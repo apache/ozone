@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +54,8 @@ public class TestNodeStateMap {
   }
 
   void addNode(DatanodeDetails datanode, NodeStatus status) throws NodeAlreadyExistsException {
-    map.addNode(new DatanodeInfo(datanode, status, null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
+    map.addNode(new DatanodeInfo(datanode, status, UpgradeUtils.defaultVersionProto(),
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
   }
 
   @BeforeEach
@@ -150,6 +152,19 @@ public class TestNodeStateMap {
     assertEquals(5, map.getNodeCount(null, NodeState.HEALTHY));
     assertEquals(4,
         map.getNodeCount(NodeOperationalState.DECOMMISSIONING, null));
+  }
+
+  @Test
+  public void testToString() throws NodeAlreadyExistsException {
+    assertEquals("Total number of nodes: 0, HEALTHY: 0, STALE: 0, DEAD: 0, HEALTHY_READONLY: 0", map.toString());
+
+    addRandomNodeWithState(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY, 0);
+    addRandomNodeWithState(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY, 0);
+    addRandomNodeWithState(NodeOperationalState.DECOMMISSIONING, NodeState.HEALTHY, 0);
+    addRandomNodeWithState(NodeOperationalState.IN_SERVICE, NodeState.STALE, 0);
+    addRandomNodeWithState(NodeOperationalState.IN_MAINTENANCE, NodeState.DEAD, 0);
+
+    assertEquals("Total number of nodes: 5, HEALTHY: 3, STALE: 1, DEAD: 1, HEALTHY_READONLY: 0", map.toString());
   }
 
   /**

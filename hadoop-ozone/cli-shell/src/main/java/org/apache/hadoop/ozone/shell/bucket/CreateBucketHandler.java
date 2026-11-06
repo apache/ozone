@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
 
 /**
@@ -71,17 +70,16 @@ public class CreateBucketHandler extends BucketHandler {
   private SetSpaceQuotaOptions quotaOptions;
 
   @Option(names = {"--storage-policy", "-s"},
-      description = "Bucket StoragePolicy. Allowed values: HOT, WARM, COLD, null.",
-      defaultValue = "WARM",
-      showDefaultValue = Visibility.ALWAYS)
+      description = "Bucket StoragePolicy. Allowed values: HOT, WARM, COLD, null. "
+          + "If not specified, the Ozone Manager applies its default policy.")
   private String storagePolicyStr;
 
   @Option(names = {"--allow-fallback-storage-policy", "-a"},
       description = "When true, allocation may fall back to the StoragePolicy's " +
-          "fallback tier if the creation tier is unavailable.",
-      defaultValue = "true", arity = "1",
-      showDefaultValue = Visibility.ALWAYS)
-  private boolean allowFallBackStoragePolicy;
+          "fallback tier if the creation tier is unavailable. " +
+          "If not specified, the Ozone Manager applies its default.",
+      arity = "1")
+  private Boolean allowFallBackStoragePolicy;
 
   private static final String NULL_STORAGE_POLICY = "null";
 
@@ -153,7 +151,7 @@ public class CreateBucketHandler extends BucketHandler {
    * Parse a user-supplied {@code --storage-policy} value into a
    * {@link StoragePolicy}. Returns {@code null} when the caller passed
    * "null" (any case) or an empty value, to leave the bucket without an
-   * explicit StoragePolicy (the server defaults it to WARM on create).
+   * explicit StoragePolicy (the Ozone Manager applies its default on create).
    *
    * @throws IllegalArgumentException if the value is not one of HOT, WARM,
    *   COLD, or "null".

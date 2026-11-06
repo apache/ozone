@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -81,7 +82,7 @@ public class TestNodeDecommissionManager {
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     containerManager = mock(ContainerManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
-        SCMContext.emptyContext(), new EventQueue(), null);
+        SCMContext.emptyContext(), new EventQueue(), mockReplicationManager(conf));
     when(containerManager.allocateContainer(any(ReplicationConfig.class), anyString(), any(StorageTier.class)))
         .thenAnswer(invocation -> createMockContainer((ReplicationConfig)invocation.getArguments()[0],
             (String) invocation.getArguments()[1]));
@@ -110,6 +111,13 @@ public class TestNodeDecommissionManager {
         .setState(OPEN)
         .setOwner("admin");
     return builder.build();
+  }
+
+  private ReplicationManager mockReplicationManager(OzoneConfiguration config) {
+    ReplicationManager rm = mock(ReplicationManager.class);
+    when(rm.getConfig()).thenReturn(
+        config.getObject(ReplicationManager.ReplicationManagerConfiguration.class));
+    return rm;
   }
 
   @Test
@@ -623,7 +631,7 @@ public class TestNodeDecommissionManager {
 
     nodeManager = mock(SCMNodeManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
-        SCMContext.emptyContext(), new EventQueue(), null);
+        SCMContext.emptyContext(), new EventQueue(), mockReplicationManager(conf));
     when(containerManager.getContainer(any(ContainerID.class)))
         .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
@@ -991,7 +999,7 @@ public class TestNodeDecommissionManager {
 
     nodeManager = mock(SCMNodeManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
-        SCMContext.emptyContext(), new EventQueue(), null);
+        SCMContext.emptyContext(), new EventQueue(), mockReplicationManager(conf));
     when(containerManager.getContainer(any(ContainerID.class)))
         .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
@@ -1121,5 +1129,27 @@ public class TestNodeDecommissionManager {
     nodeManager.register(dn, null, null);
 
     return dns;
+  }
+
+  @Test
+  public void testMaintenanceConfigsReadFromReplicationManagerConfiguration() {
+    // NodeDecommissionManager built in setup() uses the ReplicationManagerConfiguration defaults (2, 1).
+    assertEquals(2, decom.getMaintenanceReplicaMinimum());
+    assertEquals(1, decom.getMaintenanceRemainingRedundancy());
+
+    // Build a ReplicationManagerConfiguration with non-default maintenance values.
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        new OzoneConfiguration().getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    rmConf.setMaintenanceReplicaMinimum(5);
+    rmConf.setMaintenanceRemainingRedundancy(3);
+    ReplicationManager rm = mock(ReplicationManager.class);
+    when(rm.getConfig()).thenReturn(rmConf);
+
+    NodeDecommissionManager manager = new NodeDecommissionManager(conf, nodeManager,
+        containerManager, SCMContext.emptyContext(), new EventQueue(), rm);
+
+    // Constructor must read these from ReplicationManagerConfiguration, not hardcoded defaults.
+    assertEquals(5, manager.getMaintenanceReplicaMinimum());
+    assertEquals(3, manager.getMaintenanceRemainingRedundancy());
   }
 }

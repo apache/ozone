@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -49,6 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -79,6 +81,7 @@ public class TestSCMHADBTransactionBufferImpl {
   private Table<String, ByteString> serviceConfigTable;
   private Table<String, TransactionInfo> transactionInfoTable;
   private DeletedBlockLogImpl deletedBlockLog;
+  private SCMPerformanceMetrics metrics;
   private final List<SCMHADBTransactionBufferImpl> buffers = new ArrayList<>();
 
   @BeforeEach
@@ -87,6 +90,7 @@ public class TestSCMHADBTransactionBufferImpl {
     serviceConfigTable = metadataStore.getStatefulServiceConfigTable();
     transactionInfoTable = metadataStore.getTransactionInfoTable();
     deletedBlockLog = mock(DeletedBlockLogImpl.class);
+    metrics = mock(SCMPerformanceMetrics.class);
   }
 
   @AfterEach
@@ -299,6 +303,26 @@ public class TestSCMHADBTransactionBufferImpl {
     assertDurable("key");
     assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
   }
+  
+  @Test
+  public void testFlushLatencyRecordedForEveryFlushPath() throws Exception {
+    SCMHADBTransactionBufferImpl buffer = newBuffer(3);
+    buffer.updateLatestTrxInfo(TRX_INFO_T4);
+    buffer.flush(); // takeSnapshot / leader change path
+    verify(metrics, times(1)).updateFlushTransactionBufferLatencyNs(anyLong());
+    
+    put(buffer, "a0");
+    buffer.flushIfNeeded(-1); // periodic monitor path
+    verify(metrics, times(2)).updateFlushTransactionBufferLatencyNs(anyLong());
+    
+    put(buffer, "b0");
+    put(buffer, "b1");
+    assertFalse(buffer.flushIfPendingLimitReached()); // below the limit: skipped
+    verify(metrics, times(2)).updateFlushTransactionBufferLatencyNs(anyLong());
+    put(buffer, "b2");
+    assertTrue(buffer.flushIfPendingLimitReached()); // applyTransaction pending-limit path
+    verify(metrics, times(3)).updateFlushTransactionBufferLatencyNs(anyLong());
+  }
 
   private SCMHADBTransactionBufferImpl newBuffer(OzoneConfiguration conf) throws Exception {
     StorageContainerManager scm = mock(StorageContainerManager.class);
@@ -308,6 +332,7 @@ public class TestSCMHADBTransactionBufferImpl {
     when(scm.getSystemClock()).thenReturn(Clock.systemUTC());
     when(scm.getScmBlockManager()).thenReturn(blockManager);
     when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
+    when(scm.getPerfMetrics()).thenReturn(metrics);
     SCMHADBTransactionBufferImpl buffer = new SCMHADBTransactionBufferImpl(scm);
     buffers.add(buffer);
     return buffer;

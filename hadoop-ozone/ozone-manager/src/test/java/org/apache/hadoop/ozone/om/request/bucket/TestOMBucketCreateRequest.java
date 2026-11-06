@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
+import static org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils.mockFinalizedOmVersionManager;
+import static org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -28,13 +31,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StoragePolicyProto;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -48,13 +51,13 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
@@ -129,6 +132,26 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
 
+  }
+
+  @Test
+  public void testNewBucketIgnoresUsageCountersFromRequest() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(newBucketInfoBuilder(bucketName, volumeName)
+        .setUsedBytes(1000L)
+        .setUsedNamespace(10L)
+        .setSnapshotUsedBytes(100L)
+        .setSnapshotUsedNamespace(1L));
+    doValidateAndUpdateCache(volumeName, bucketName, omBucketCreateRequest.getOmRequest());
+
+    OmBucketInfo bucketInfo =
+        omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertEquals(0, bucketInfo.getUsedBytes());
+    assertEquals(0, bucketInfo.getUsedNamespace());
+    assertEquals(0, bucketInfo.getSnapshotUsedBytes());
+    assertEquals(0, bucketInfo.getSnapshotUsedNamespace());
   }
 
   @Test
@@ -419,21 +442,81 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
   }
 
   @Test
-  public void testStripStoragePolicyBeforeFinalization() throws Exception {
-    OMRequest request = newCreateBucketRequest(
-        newBucketInfoBuilder(UUID.randomUUID().toString(),
-            UUID.randomUUID().toString())
+  public void testPreExecuteDefaultsStoragePolicyAfterFinalization() throws Exception {
+    BucketInfo result = preExecuteBucketInfo(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+            .clearStoragePolicy().clearAllowFallbackStoragePolicy());
+
+    assertThat(result.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.getDefaultPolicy().toProto());
+    assertThat(result.hasAllowFallbackStoragePolicy()).isTrue();
+    assertThat(result.getAllowFallbackStoragePolicy()).isTrue();
+  }
+
+  @Test
+  public void testPreExecuteKeepsExplicitStoragePolicyAfterFinalization() throws Exception {
+    BucketInfo result = preExecuteBucketInfo(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+            .setStoragePolicy(StoragePolicyProto.COLD)
+            .setAllowFallbackStoragePolicy(false));
+
+    assertThat(result.getStoragePolicy()).isEqualTo(StoragePolicyProto.COLD);
+    assertThat(result.getAllowFallbackStoragePolicy()).isFalse();
+  }
+
+  /**
+   * Before finalization no storage policy metadata may enter the replicated request.
+   */
+  @Test
+  public void testPreExecuteDoesNotDefaultStoragePolicyBeforeFinalization() throws Exception {
+    OMVersionManager preFinalized = mockPreFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(preFinalized);
+
+    BucketInfo result = preExecuteBucketInfo(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+            .clearStoragePolicy().clearAllowFallbackStoragePolicy());
+
+    assertThat(result.hasStoragePolicy()).isFalse();
+    assertThat(result.hasAllowFallbackStoragePolicy()).isFalse();
+  }
+
+  private BucketInfo preExecuteBucketInfo(BucketInfo.Builder bucketInfo) throws Exception {
+    addCreateVolumeToTable(bucketInfo.getVolumeName(), omMetadataManager);
+    OMRequest request = newCreateBucketRequest(bucketInfo).build();
+    return new OMBucketCreateRequest(request).preExecute(ozoneManager)
+        .getCreateBucketRequest().getBucketInfo();
+  }
+
+  @Test
+  public void testRejectStoragePolicyBeforeFinalization() {
+    assertStoragePolicyRejectedBeforeFinalization(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
             .setStoragePolicy(StoragePolicyProto.HOT)
-            .setAllowFallbackStoragePolicy(true)).build();
+            .clearAllowFallbackStoragePolicy());
+  }
 
-    OMRequest result = OMBucketCreateRequest.disallowCreateBucketWithStoragePolicy(
-        request, preFinalizedContext());
+  @Test
+  public void testRejectFallbackStoragePolicyBeforeFinalization() {
+    assertStoragePolicyRejectedBeforeFinalization(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+            .clearStoragePolicy()
+            .setAllowFallbackStoragePolicy(true));
+  }
 
-    assertThat(result).isNotEqualTo(request);
-    assertThat(result.getCreateBucketRequest().getBucketInfo()
-        .hasStoragePolicy()).isFalse();
-    assertThat(result.getCreateBucketRequest().getBucketInfo()
-        .hasAllowFallbackStoragePolicy()).isFalse();
+  @Test
+  public void testRejectStoragePolicyAndFallbackBeforeFinalization() {
+    assertStoragePolicyRejectedBeforeFinalization(
+        newBucketInfoBuilder(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+            .setStoragePolicy(StoragePolicyProto.HOT)
+            .setAllowFallbackStoragePolicy(true));
+  }
+
+  private void assertStoragePolicyRejectedBeforeFinalization(BucketInfo.Builder bucketInfo) {
+    OMRequest request = newCreateBucketRequest(bucketInfo).build();
+
+    assertThatThrownBy(() ->
+        OMBucketCreateRequest.disallowCreateBucketWithStoragePolicy(request, preFinalizedContext()))
+        .isInstanceOfSatisfying(OMException.class, ex -> assertThat(ex.getResult())
+            .isEqualTo(OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION));
   }
 
   /**
@@ -462,19 +545,16 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
             .setStoragePolicy(StoragePolicyProto.COLD)
             .setAllowFallbackStoragePolicy(true)).build();
 
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
-    when(versionManager.isAllowed(
-        OMLayoutFeature.STORAGE_POLICY_SUPPORT)).thenReturn(true);
-
     assertThat(OMBucketCreateRequest.disallowCreateBucketWithStoragePolicy(
-        request, of(versionManager, omMetadataManager))).isEqualTo(request);
+        request, postFinalizedContext())).isEqualTo(request);
+  }
+
+  private ValidationContext postFinalizedContext() {
+    return of(mockFinalizedOmVersionManager(), omMetadataManager);
   }
 
   private ValidationContext preFinalizedContext() {
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
-    when(versionManager.isAllowed(
-        OMLayoutFeature.STORAGE_POLICY_SUPPORT)).thenReturn(false);
-    return of(versionManager, omMetadataManager);
+    return of(mockPreFinalizedOmVersionManager(), omMetadataManager);
   }
 
   private void acceptBucketCreationHelper(String volumeName, String bucketName)
@@ -573,8 +653,10 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     assertEquals(original.getVolumeName(), updated.getVolumeName());
     assertEquals(original.getIsVersionEnabled(), updated.getIsVersionEnabled());
     assertEquals(original.getStoragePolicy(), updated.getStoragePolicy());
-    assertEquals(original.getAllowFallbackStoragePolicy(),
-        updated.getAllowFallbackStoragePolicy());
+    // A finalized OM defaults the fallback flag to true when the request does not carry it.
+    boolean expectedFallback = original.hasAllowFallbackStoragePolicy() ?
+        original.getAllowFallbackStoragePolicy() : true;
+    assertThat(updated.getAllowFallbackStoragePolicy()).isEqualTo(expectedFallback);
     assertEquals(original.getMetadataList(), updated.getMetadataList());
     assertNotEquals(original.getCreationTime(), updated.getCreationTime());
   }

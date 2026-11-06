@@ -298,7 +298,7 @@ public class TestPipelinePlacementPolicy {
             .setNodes(nodes)
             .build();
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-            ClientVersion.CURRENT_VERSION);
+            ClientVersion.CURRENT);
         nodeManager.addPipeline(pipeline);
         stateManager.addPipeline(pipelineProto);
       } catch (SCMException e) {
@@ -655,7 +655,7 @@ public class TestPipelinePlacementPolicy {
               .build();
 
           pipelineProto = pipeline.getProtobufMessage(
-              ClientVersion.CURRENT_VERSION);
+              ClientVersion.CURRENT);
           nodeManager.addPipeline(pipeline);
           stateManager.addPipeline(pipelineProto);
           pipelineCount++;
@@ -745,7 +745,7 @@ public class TestPipelinePlacementPolicy {
 
     nodeManager.addPipeline(legacyPipeline);
     stateManager.addPipeline(legacyPipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT));
 
     assertEquals(0, PipelinePlacementPolicy.currentRatisThreePipelineCount(
         nodeManager, stateManager, pipelineNodes.get(0),
@@ -822,7 +822,7 @@ public class TestPipelinePlacementPolicy {
         .build();
 
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
   }

@@ -574,8 +574,8 @@ public class TestOmMetrics {
     long initialNumSnapshotInfos = getLongCounter("NumSnapshotInfos", omMetrics);
     long initialNumSnapshotListFails = getLongCounter("NumSnapshotListFails", omMetrics);
     long initialNumSnapshotLists = getLongCounter("NumSnapshotLists", omMetrics);
-    long initialNumSnapshotActive = getLongCounter("NumSnapshotActive", omMetrics);
-    long initialNumSnapshotDeleted = getLongCounter("NumSnapshotDeleted", omMetrics);
+    long initialNumSnapshotActive = getLongGauge("NumSnapshotActive", omMetrics);
+    long initialNumSnapshotDeleted = getLongGauge("NumSnapshotDeleted", omMetrics);
     long initialNumSnapshotDeletes = getLongCounter("NumSnapshotDeletes", omMetrics);
     long initialNumSnapshotDeleteFails = getLongCounter("NumSnapshotDeleteFails", omMetrics);
     long initialNumSnapshotDiffJobs = getLongCounter("NumSnapshotDiffJobs", omMetrics);
@@ -611,8 +611,8 @@ public class TestOmMetrics {
     assertEquals(initialNumSnapshotCreates + 1, getLongCounter("NumSnapshotCreates", omMetrics));
     assertEquals(initialNumSnapshotListFails, getLongCounter("NumSnapshotListFails", omMetrics));
     assertEquals(initialNumSnapshotLists, getLongCounter("NumSnapshotLists", omMetrics));
-    assertEquals(initialNumSnapshotActive + 1, getLongCounter("NumSnapshotActive", omMetrics));
-    assertEquals(initialNumSnapshotDeleted, getLongCounter("NumSnapshotDeleted", omMetrics));
+    assertEquals(initialNumSnapshotActive + 1, getLongGauge("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotDeleted, getLongGauge("NumSnapshotDeleted", omMetrics));
     assertEquals(initialNumSnapshotDiffJobs, getLongCounter("NumSnapshotDiffJobs", omMetrics));
     assertEquals(initialNumSnapshotDiffJobFails, getLongCounter("NumSnapshotDiffJobFails", omMetrics));
 
@@ -688,7 +688,7 @@ public class TestOmMetrics {
         volumeName, bucketName, null, null, Integer.MAX_VALUE);
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumSnapshotActive + 2, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotActive + 2, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotCreates + 2, getLongCounter("NumSnapshotCreates", omMetrics));
     assertEquals(initialNumSnapshotListFails, getLongCounter("NumSnapshotListFails", omMetrics));
     assertEquals(initialNumSnapshotLists + 1, getLongCounter("NumSnapshotLists", omMetrics));
@@ -704,7 +704,7 @@ public class TestOmMetrics {
     writeClient.renameSnapshot(volumeName, bucketName, snapshot2, snapshot3);
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumSnapshotActive + 2, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotActive + 2, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotRenames + 1, getLongCounter("NumSnapshotRenames", omMetrics));
     assertEquals(initialNumSnapshotRenameFails, getLongCounter("NumSnapshotRenameFails", omMetrics));
 
@@ -712,7 +712,7 @@ public class TestOmMetrics {
     assertThrows(OMException.class, () -> writeClient.renameSnapshot(volumeName,
         bucketName, snapshot2, snapshot3));
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumSnapshotActive + 2, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotActive + 2, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotRenames + 2, getLongCounter("NumSnapshotRenames", omMetrics));
     assertEquals(initialNumSnapshotRenameFails + 1, getLongCounter("NumSnapshotRenameFails", omMetrics));
 
@@ -720,18 +720,18 @@ public class TestOmMetrics {
     writeClient.deleteSnapshot(volumeName, bucketName, snapshot3);
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumSnapshotActive + 1, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotActive + 1, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotDeletes + 1, getLongCounter("NumSnapshotDeletes", omMetrics));
-    assertEquals(initialNumSnapshotDeleted + 1, getLongCounter("NumSnapshotDeleted", omMetrics));
+    assertEquals(initialNumSnapshotDeleted + 1, getLongGauge("NumSnapshotDeleted", omMetrics));
     assertEquals(initialNumSnapshotDeleteFails, getLongCounter("NumSnapshotDeleteFails", omMetrics));
 
     // Delete snapshot: invalid snapshot case.
     assertThrows(OMException.class, () -> writeClient.deleteSnapshot(volumeName,
         bucketName, snapshot3));
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumSnapshotActive + 1, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotActive + 1, getLongGauge("NumSnapshotActive", omMetrics));
     assertEquals(initialNumSnapshotDeletes + 2, getLongCounter("NumSnapshotDeletes", omMetrics));
-    assertEquals(initialNumSnapshotDeleted + 1, getLongCounter("NumSnapshotDeleted", omMetrics));
+    assertEquals(initialNumSnapshotDeleted + 1, getLongGauge("NumSnapshotDeleted", omMetrics));
     assertEquals(initialNumSnapshotDeleteFails + 1, getLongCounter("NumSnapshotDeleteFails", omMetrics));
   }
 

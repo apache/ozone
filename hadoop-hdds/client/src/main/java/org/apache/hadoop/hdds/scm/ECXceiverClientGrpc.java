@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -55,9 +54,8 @@ public class ECXceiverClientGrpc extends XceiverClientGrpc {
     super(pipeline, config, trustManager);
     this.enableRetries = config.getBoolean(OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED,
         OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT);
-    setTimeout(config.getTimeDuration(OzoneConfigKeys.
-        OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT, OzoneConfigKeys
-        .OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
+    setTimeout(getTimeoutMillis(config, OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT,
+        OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT));
   }
 
   /**

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -31,17 +30,18 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.util.UUID;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.junit.jupiter.api.Test;
 
@@ -108,23 +108,26 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
     when(dsm.getConnectionManager()).thenReturn(connectionManager);
     when(dsm.getQueuedCommandCount())
         .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
-    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, dsm, "");
-
-    HDDSLayoutVersionManager lvm = mock(HDDSLayoutVersionManager.class);
-    when(lvm.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
-    when(lvm.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
 
     DatanodeDetails dn = DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
+        .setCurrentVersion(HDDSVersion.SOFTWARE_VERSION)
         .build();
+    when(dsm.getDatanodeDetails()).thenReturn(dn);
+
+    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    when(versionManager.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getVersionForClient()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(dsm.getVersionManager()).thenReturn(versionManager);
+
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, dsm, "");
 
     HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
-        .setDatanodeDetails(dn)
         .setContext(context)
-        .setLayoutVersionManager(lvm)
         .setEndpointStateMachine(endpoint)
         .build()
         .call();

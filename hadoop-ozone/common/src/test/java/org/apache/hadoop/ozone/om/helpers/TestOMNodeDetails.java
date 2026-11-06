@@ -93,6 +93,19 @@ public class TestOMNodeDetails {
     assertEquals(RATIS_PORT, nodeDetails.getRatisPort());
   }
 
+  @Test
+  public void testIpv6HostAddress() {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setHostAddress("2001:db8::10")
+        .setRpcPort(RPC_PORT)
+        .setRatisPort(RATIS_PORT)
+        .build();
+
+    assertEquals(new InetSocketAddress("2001:db8::10", RPC_PORT), nodeDetails.getRpcAddress());
+  }
+
   /**
    * Test isRatisListener flag.
    */
@@ -449,5 +462,24 @@ public class TestOMNodeDetails {
 
     assertEquals("192.168.1.100", nodeDetails.getHostAddress());
     assertEquals(9873, nodeDetails.getRatisPort());
+  }
+
+  /**
+   * An advertised peer identity has to bracket an IPv6 literal, or a reader
+   * takes the last group of the address for the port.
+   */
+  @Test
+  public void testRpcAddressStringBracketsIPv6Literal() {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setRpcAddress(InetSocketAddress.createUnresolved("2001:db8::1", RPC_PORT))
+        .setRatisPort(RATIS_PORT)
+        .setHttpAddress(HTTP_ADDRESS)
+        .setHttpsAddress(HTTPS_ADDRESS)
+        .setIsListener(false)
+        .build();
+
+    assertEquals("[2001:db8::1]:" + RPC_PORT, nodeDetails.getRpcAddressString());
   }
 }
