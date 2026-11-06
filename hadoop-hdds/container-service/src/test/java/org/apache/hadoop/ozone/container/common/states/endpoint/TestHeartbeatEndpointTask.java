@@ -414,7 +414,7 @@ public class TestHeartbeatEndpointTask {
   }
 
   @Test
-  public void testHeartbeatCapsReportsWithoutImmediateFollowup()
+  public void testHeartbeatCapsReports()
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT, 2);
