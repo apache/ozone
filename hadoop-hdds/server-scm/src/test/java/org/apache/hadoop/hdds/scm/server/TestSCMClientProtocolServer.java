@@ -120,6 +120,13 @@ public class TestSCMClientProtocolServer {
         .hasMessage("Datanode " + uuid + " not found");
   }
 
+  @Test
+  void testGetDatanodeUsageInfoWithoutAddressOrUuid() {
+    assertThatThrownBy(() -> server.getDatanodeUsageInfo("", "", ClientVersion.CURRENT))
+        .isInstanceOf(NonRetriableException.class)
+        .hasMessage("Could not get datanode with the specified parameters.");
+  }
+
   @AfterAll
   public static void tearDown() throws Exception {
     if (scm != null) {

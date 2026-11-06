@@ -1450,7 +1450,7 @@ public class SCMClientProtocolServer implements
       } else if (!Strings.isNullOrEmpty(address)) {
         nodes = scm.getScmNodeManager().getNodesByAddress(address);
       } else {
-        throw new IOException(
+        throw new NonRetriableException(
             "Could not get datanode with the specified parameters."
         );
       }
