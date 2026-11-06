@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.text.WordUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
@@ -60,6 +61,16 @@ public final class DatanodeQueueMetrics implements MetricsSource {
       "ContainerActionQueue";
   public static final String PIPELINE_ACTION_QUEUE_PREFIX =
       "PipelineActionQueue";
+  public static final String COMMAND_STATUS_REPORT_QUEUE_PREFIX =
+      "CommandStatusReportQueue";
+  public static final String COMMAND_STATUS_REPORT_SENT_PREFIX =
+      "CommandStatusReportSent";
+  public static final String COMMAND_STATUS_REPORT_DEFERRED_PREFIX =
+      "CommandStatusReportDeferred";
+  public static final String COMMAND_STATUS_REPORT_REQUEUED_PREFIX =
+      "CommandStatusReportRequeued";
+  public static final String COMMAND_STATUS_REPORT_OVERSIZED_PREFIX =
+      "CommandStatusReportOversized";
 
   private MetricsRegistry registry;
 
@@ -71,6 +82,15 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   private Map<HostAndPort, MetricsInfo> incrementalReportsQueueMap;
   private Map<HostAndPort, MetricsInfo> containerActionQueueMap;
   private Map<HostAndPort, MetricsInfo> pipelineActionQueueMap;
+  private Map<HostAndPort, MetricsInfo> commandStatusReportQueueBytesMap;
+  private Map<HostAndPort, MetricsInfo> commandStatusReportSentBytesMap;
+  private Map<HostAndPort, MetricsInfo> commandStatusReportDeferredBytesMap;
+  private Map<HostAndPort, MetricsInfo> commandStatusReportRequeuedBytesMap;
+  private Map<HostAndPort, MetricsInfo> oversizedCommandStatusReportBytesMap;
+  private Map<HostAndPort, AtomicLong> commandStatusReportSentBytes;
+  private Map<HostAndPort, AtomicLong> commandStatusReportDeferredBytes;
+  private Map<HostAndPort, AtomicLong> commandStatusReportRequeuedBytes;
+  private Map<HostAndPort, AtomicLong> oversizedCommandStatusReportBytes;
 
   public DatanodeQueueMetrics(DatanodeStateMachine datanodeStateMachine) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -110,6 +130,15 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     incrementalReportsQueueMap = new HashMap<>();
     containerActionQueueMap = new HashMap<>();
     pipelineActionQueueMap = new HashMap<>();
+    commandStatusReportQueueBytesMap = new HashMap<>();
+    commandStatusReportSentBytesMap = new HashMap<>();
+    commandStatusReportDeferredBytesMap = new HashMap<>();
+    commandStatusReportRequeuedBytesMap = new HashMap<>();
+    oversizedCommandStatusReportBytesMap = new HashMap<>();
+    commandStatusReportSentBytes = new HashMap<>();
+    commandStatusReportDeferredBytes = new HashMap<>();
+    commandStatusReportRequeuedBytes = new HashMap<>();
+    oversizedCommandStatusReportBytes = new HashMap<>();
   }
 
   @Override
@@ -150,6 +179,33 @@ public final class DatanodeQueueMetrics implements MetricsSource {
           datanodeStateMachine.getContext().getPipelineActionQueueSize()
               .getOrDefault(entry.getKey(), 0));
     }
+    Map<HostAndPort, Long> queuedCommandStatusReportBytes =
+        datanodeStateMachine.getContext().getCommandStatusReportQueueBytes();
+    for (Map.Entry<HostAndPort, MetricsInfo> entry:
+        commandStatusReportQueueBytesMap.entrySet()) {
+      builder.addGauge(entry.getValue(),
+          queuedCommandStatusReportBytes.getOrDefault(entry.getKey(), 0L));
+    }
+    for (Map.Entry<HostAndPort, MetricsInfo> entry:
+        commandStatusReportSentBytesMap.entrySet()) {
+      builder.addCounter(entry.getValue(),
+          commandStatusReportSentBytes.get(entry.getKey()).get());
+    }
+    for (Map.Entry<HostAndPort, MetricsInfo> entry:
+        commandStatusReportDeferredBytesMap.entrySet()) {
+      builder.addGauge(entry.getValue(),
+          commandStatusReportDeferredBytes.get(entry.getKey()).get());
+    }
+    for (Map.Entry<HostAndPort, MetricsInfo> entry:
+        commandStatusReportRequeuedBytesMap.entrySet()) {
+      builder.addCounter(entry.getValue(),
+          commandStatusReportRequeuedBytes.get(entry.getKey()).get());
+    }
+    for (Map.Entry<HostAndPort, MetricsInfo> entry:
+        oversizedCommandStatusReportBytesMap.entrySet()) {
+      builder.addGauge(entry.getValue(),
+          oversizedCommandStatusReportBytes.get(entry.getKey()).get());
+    }
   }
 
   public static synchronized void unRegister() {
@@ -158,24 +214,79 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   }
 
   public void addEndpoint(HostAndPort endpoint) {
+    String endpointName = CaseFormat.UPPER_UNDERSCORE
+        .to(CaseFormat.UPPER_CAMEL, endpoint.getHostName());
     incrementalReportsQueueMap.computeIfAbsent(endpoint,
         k -> getMetricsInfo(INCREMENTAL_REPORT_QUEUE_PREFIX,
-            CaseFormat.UPPER_UNDERSCORE
-                .to(CaseFormat.UPPER_CAMEL, k.getHostName())));
+            endpointName));
     containerActionQueueMap.computeIfAbsent(endpoint,
         k -> getMetricsInfo(CONTAINER_ACTION_QUEUE_PREFIX,
-            CaseFormat.UPPER_UNDERSCORE
-                .to(CaseFormat.UPPER_CAMEL, k.getHostName())));
+            endpointName));
     pipelineActionQueueMap.computeIfAbsent(endpoint,
         k -> getMetricsInfo(PIPELINE_ACTION_QUEUE_PREFIX,
-            CaseFormat.UPPER_UNDERSCORE
-                .to(CaseFormat.UPPER_CAMEL, k.getHostName())));
+            endpointName));
+    commandStatusReportQueueBytesMap.computeIfAbsent(endpoint,
+        k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_QUEUE_PREFIX,
+            endpointName, "Queued command status report bytes for "));
+    commandStatusReportSentBytesMap.computeIfAbsent(endpoint,
+        k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_SENT_PREFIX,
+            endpointName, "Command status report bytes sent to "));
+    commandStatusReportDeferredBytesMap.computeIfAbsent(endpoint,
+        k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_DEFERRED_PREFIX,
+            endpointName, "Command status report bytes deferred for "));
+    commandStatusReportRequeuedBytesMap.computeIfAbsent(endpoint,
+        k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_REQUEUED_PREFIX,
+            endpointName, "Command status report bytes requeued for "));
+    oversizedCommandStatusReportBytesMap.computeIfAbsent(endpoint,
+        k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_OVERSIZED_PREFIX,
+            endpointName, "Oversized command status report bytes for "));
+    commandStatusReportSentBytes.computeIfAbsent(endpoint,
+        k -> new AtomicLong());
+    commandStatusReportDeferredBytes.computeIfAbsent(endpoint,
+        k -> new AtomicLong());
+    commandStatusReportRequeuedBytes.computeIfAbsent(endpoint,
+        k -> new AtomicLong());
+    oversizedCommandStatusReportBytes.computeIfAbsent(endpoint,
+        k -> new AtomicLong());
   }
 
   public void removeEndpoint(HostAndPort endpoint) {
     incrementalReportsQueueMap.remove(endpoint);
     containerActionQueueMap.remove(endpoint);
     pipelineActionQueueMap.remove(endpoint);
+    commandStatusReportQueueBytesMap.remove(endpoint);
+    commandStatusReportSentBytesMap.remove(endpoint);
+    commandStatusReportDeferredBytesMap.remove(endpoint);
+    commandStatusReportRequeuedBytesMap.remove(endpoint);
+    oversizedCommandStatusReportBytesMap.remove(endpoint);
+    commandStatusReportSentBytes.remove(endpoint);
+    commandStatusReportDeferredBytes.remove(endpoint);
+    commandStatusReportRequeuedBytes.remove(endpoint);
+    oversizedCommandStatusReportBytes.remove(endpoint);
+  }
+
+  public void incrCommandStatusReportBytesSent(
+      HostAndPort endpoint, long bytes) {
+    commandStatusReportSentBytes.computeIfAbsent(endpoint,
+        k -> new AtomicLong()).addAndGet(bytes);
+  }
+
+  public void setCommandStatusReportBytesDeferred(
+      HostAndPort endpoint, long bytes) {
+    commandStatusReportDeferredBytes.computeIfAbsent(endpoint,
+        k -> new AtomicLong()).set(bytes);
+  }
+
+  public void incrCommandStatusReportBytesRequeued(
+      HostAndPort endpoint, long bytes) {
+    commandStatusReportRequeuedBytes.computeIfAbsent(endpoint,
+        k -> new AtomicLong()).addAndGet(bytes);
+  }
+
+  public void setOversizedCommandStatusReportBytes(
+      HostAndPort endpoint, long bytes) {
+    oversizedCommandStatusReportBytes.computeIfAbsent(endpoint,
+        k -> new AtomicLong()).set(bytes);
   }
 
   @VisibleForTesting
@@ -197,5 +308,11 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     String metric = prefix + WordUtils.capitalize(metricName) + "Size";
     String description = "Queue size of " + metricName + " from " + prefix;
     return info(metric, description);
+  }
+
+  private MetricsInfo getByteMetricsInfo(String prefix, String metricName,
+      String description) {
+    String metric = prefix + WordUtils.capitalize(metricName) + "Bytes";
+    return info(metric, description + metricName);
   }
 }

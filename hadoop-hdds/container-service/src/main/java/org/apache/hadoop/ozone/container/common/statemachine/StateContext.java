@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterva
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmInitialHeartbeatInterval;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Message;
 import java.io.IOException;
@@ -36,6 +37,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -59,6 +61,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -69,6 +72,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
@@ -381,15 +385,79 @@ public class StateContext {
   /**
    * Returns up to {@code maxLimit} available reports for the endpoint,
    * removing them from the queue. Any reports beyond the limit stay queued
-   * and are returned by a later call; callers can use {@link
-   * #hasPendingReports(HostAndPort)} to detect that case and schedule a
-   * follow-up heartbeat.
+   * and are returned by a later call; callers can use
+   * {@link #hasPendingReports(HostAndPort)} to detect that case.
    *
    * @return List of reports
    */
   public List<Message> getAllAvailableReports(
       HostAndPort endpoint, int maxLimit) {
     return getAllAvailableReportsUpToLimit(endpoint, maxLimit);
+  }
+
+  /**
+   * Returns available reports other than command status reports. Full reports
+   * are selected before incremental reports, and the total number returned is
+   * capped by {@code maxLimit}.
+   */
+  public List<Message> getAvailableNonCommandStatusReports(
+      HostAndPort endpoint, int maxLimit) {
+    List<Message> reports = getFullReports(endpoint, maxLimit);
+    reports.addAll(getIncrementalReportsExcludingCommandStatus(
+        endpoint, maxLimit - reports.size()));
+    return reports;
+  }
+
+  /**
+   * Selects command status reports within both the report count and serialized
+   * byte limits. An aggregate report may be split between complete command
+   * statuses, but an individual command status is never split.
+   */
+  public CommandStatusReportSelection getCommandStatusReports(
+      HostAndPort endpoint, int maxLimit, long maxBytes,
+      long maxConfiguredBytes) {
+    List<CommandStatusReportsProto> selected = new LinkedList<>();
+    long selectedBytes = 0;
+    long oversizedBytes = 0;
+    synchronized (incrementalReportsQueue) {
+      List<Message> reportsForEndpoint =
+          incrementalReportsQueue.get(endpoint);
+      if (reportsForEndpoint != null) {
+        ListIterator<Message> iterator = reportsForEndpoint.listIterator();
+        while (iterator.hasNext() && selected.size() < maxLimit) {
+          Message message = iterator.next();
+          if (!(message instanceof CommandStatusReportsProto)) {
+            continue;
+          }
+
+          CommandStatusReportsProto report =
+              (CommandStatusReportsProto) message;
+          long remainingBytes = maxBytes - selectedBytes;
+          long reportBytes = getCommandStatusReportWireSize(report);
+          if (reportBytes <= remainingBytes) {
+            selected.add(report);
+            selectedBytes += reportBytes;
+            iterator.remove();
+            continue;
+          }
+
+          CommandStatusReportSplit split =
+              splitCommandStatusReport(report, remainingBytes);
+          if (split.getSelected() != null) {
+            selected.add(split.getSelected());
+            selectedBytes +=
+                getCommandStatusReportWireSize(split.getSelected());
+            iterator.set(split.getRemainder());
+          } else if (getFirstCommandStatusWireSize(report)
+              > maxConfiguredBytes) {
+            oversizedBytes = getFirstCommandStatusWireSize(report);
+          }
+          break;
+        }
+      }
+      return new CommandStatusReportSelection(selected, selectedBytes,
+          getCommandStatusReportQueueBytes(endpoint), oversizedBytes);
+    }
   }
 
   /**
@@ -464,6 +532,148 @@ public class StateContext {
       }
     }
     return reportsToReturn;
+  }
+
+  private List<Message> getIncrementalReportsExcludingCommandStatus(
+      HostAndPort endpoint, int maxLimit) {
+    List<Message> reportsToReturn = new LinkedList<>();
+    synchronized (incrementalReportsQueue) {
+      List<Message> reportsForEndpoint =
+          incrementalReportsQueue.get(endpoint);
+      if (reportsForEndpoint != null) {
+        Iterator<Message> iterator = reportsForEndpoint.iterator();
+        while (iterator.hasNext() && reportsToReturn.size() < maxLimit) {
+          Message report = iterator.next();
+          if (!(report instanceof CommandStatusReportsProto)) {
+            reportsToReturn.add(report);
+            iterator.remove();
+          }
+        }
+      }
+    }
+    return reportsToReturn;
+  }
+
+  private CommandStatusReportSplit splitCommandStatusReport(
+      CommandStatusReportsProto report, long maxBytes) {
+    CommandStatusReportsProto.Builder selected =
+        CommandStatusReportsProto.newBuilder();
+    CommandStatusReportsProto.Builder remainder =
+        CommandStatusReportsProto.newBuilder();
+    long selectedReportBytes = 0;
+    boolean limitReached = false;
+    for (StorageContainerDatanodeProtocolProtos.CommandStatus status :
+        report.getCmdStatusList()) {
+      int statusBytes = CodedOutputStream.computeMessageSize(
+          CommandStatusReportsProto.CMDSTATUS_FIELD_NUMBER, status);
+      long candidateReportBytes = selectedReportBytes + statusBytes;
+      if (!limitReached &&
+          getCommandStatusReportWireSize(candidateReportBytes) <= maxBytes) {
+        selected.addCmdStatus(status);
+        selectedReportBytes = candidateReportBytes;
+      } else {
+        limitReached = true;
+        remainder.addCmdStatus(status);
+      }
+    }
+    return new CommandStatusReportSplit(
+        selected.getCmdStatusCount() == 0 ? null : selected.build(),
+        remainder.build());
+  }
+
+  private long getFirstCommandStatusWireSize(
+      CommandStatusReportsProto report) {
+    if (report.getCmdStatusCount() == 0) {
+      return getCommandStatusReportWireSize(report);
+    }
+    int statusBytes = CodedOutputStream.computeMessageSize(
+        CommandStatusReportsProto.CMDSTATUS_FIELD_NUMBER,
+        report.getCmdStatus(0));
+    return getCommandStatusReportWireSize(statusBytes);
+  }
+
+  private static long getCommandStatusReportWireSize(
+      CommandStatusReportsProto report) {
+    return getCommandStatusReportWireSize(report.getSerializedSize());
+  }
+
+  private static long getCommandStatusReportWireSize(
+      long reportBytes) {
+    return CodedOutputStream.computeTagSize(
+        SCMHeartbeatRequestProto.COMMANDSTATUSREPORTS_FIELD_NUMBER)
+        + CodedOutputStream.computeUInt64SizeNoTag(reportBytes)
+        + reportBytes;
+  }
+
+  public long getCommandStatusReportQueueBytes(HostAndPort endpoint) {
+    synchronized (incrementalReportsQueue) {
+      List<Message> reports = incrementalReportsQueue.get(endpoint);
+      return reports == null ? 0 : reports.stream()
+          .filter(CommandStatusReportsProto.class::isInstance)
+          .map(CommandStatusReportsProto.class::cast)
+          .mapToLong(StateContext::getCommandStatusReportWireSize)
+          .sum();
+    }
+  }
+
+  public Map<HostAndPort, Long> getCommandStatusReportQueueBytes() {
+    synchronized (incrementalReportsQueue) {
+      return incrementalReportsQueue.keySet().stream()
+          .collect(Collectors.toMap(
+              endpoint -> endpoint,
+              this::getCommandStatusReportQueueBytes));
+    }
+  }
+
+  public static final class CommandStatusReportSelection {
+    private final List<CommandStatusReportsProto> reports;
+    private final long selectedBytes;
+    private final long deferredBytes;
+    private final long oversizedBytes;
+
+    private CommandStatusReportSelection(
+        List<CommandStatusReportsProto> reports, long selectedBytes,
+        long deferredBytes, long oversizedBytes) {
+      this.reports = reports;
+      this.selectedBytes = selectedBytes;
+      this.deferredBytes = deferredBytes;
+      this.oversizedBytes = oversizedBytes;
+    }
+
+    public List<CommandStatusReportsProto> getReports() {
+      return reports;
+    }
+
+    public long getSelectedBytes() {
+      return selectedBytes;
+    }
+
+    public long getDeferredBytes() {
+      return deferredBytes;
+    }
+
+    public long getOversizedBytes() {
+      return oversizedBytes;
+    }
+  }
+
+  private static final class CommandStatusReportSplit {
+    private final CommandStatusReportsProto selected;
+    private final CommandStatusReportsProto remainder;
+
+    private CommandStatusReportSplit(CommandStatusReportsProto selected,
+        CommandStatusReportsProto remainder) {
+      this.selected = selected;
+      this.remainder = remainder;
+    }
+
+    private CommandStatusReportsProto getSelected() {
+      return selected;
+    }
+
+    private CommandStatusReportsProto getRemainder() {
+      return remainder;
+    }
   }
 
   List<Message> getFullReports(
