@@ -715,6 +715,21 @@ public class NetworkTopologyImpl implements NetworkTopology {
    */
   @Override
   public int getDistanceCost(Node node1, Node node2) {
+    netlock.readLock().lock();
+    try {
+      return getDistanceCostWithoutLock(node1, node2);
+    } finally {
+      netlock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Same as {@link #getDistanceCost(Node, Node)} without taking {@link #netlock}, like HDFS
+   * {@code NetworkTopology#getWeight}. Tree nodes are compared by path, like HDFS {@code NodeBase#equals},
+   * so no child maps are read. A concurrent topology change can only make the result stale or
+   * {@link Integer#MAX_VALUE}, which is acceptable for ordering replicas.
+   */
+  private int getDistanceCostWithoutLock(Node node1, Node node2) {
     if (Objects.equals(node1, node2)) {
       return 0;
     }
@@ -734,35 +749,42 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
 
     int cost = 0;
-    netlock.readLock().lock();
-    try {
-      Node ancestor1 = node1.getAncestor(level1 - 1);
-      Node ancestor2 = node2.getAncestor(level2 - 1);
-      if (!Objects.equals(ancestor1, clusterTree) ||
-          !Objects.equals(ancestor2, clusterTree)) {
-        LOG.debug("One of the nodes is outside of network topology");
+    Node ancestor1 = node1.getAncestor(level1 - 1);
+    Node ancestor2 = node2.getAncestor(level2 - 1);
+    if (!isSamePath(ancestor1, clusterTree) || !isSamePath(ancestor2, clusterTree)) {
+      LOG.debug("One of the nodes is outside of network topology");
+      return Integer.MAX_VALUE;
+    }
+    // A null parent means the node was removed after the ancestor check.
+    while (level1 > level2) {
+      node1 = node1.getParent();
+      if (node1 == null) {
         return Integer.MAX_VALUE;
       }
-      while (level1 > level2 && node1 != null) {
-        node1 = node1.getParent();
-        level1--;
-        cost += node1 == null ? 0 : node1.getCost();
-      }
-      while (level2 > level1 && node2 != null) {
-        node2 = node2.getParent();
-        level2--;
-        cost += node2 == null ? 0 : node2.getCost();
-      }
-      while (node1 != null && node2 != null && !Objects.equals(node1, node2)) {
-        node1 = node1.getParent();
-        node2 = node2.getParent();
-        cost += node1 == null ? 0 : node1.getCost();
-        cost += node2 == null ? 0 : node2.getCost();
-      }
-      return cost;
-    } finally {
-      netlock.readLock().unlock();
+      level1--;
+      cost += node1.getCost();
     }
+    while (level2 > level1) {
+      node2 = node2.getParent();
+      if (node2 == null) {
+        return Integer.MAX_VALUE;
+      }
+      level2--;
+      cost += node2.getCost();
+    }
+    while (!isSamePath(node1, node2)) {
+      node1 = node1.getParent();
+      node2 = node2.getParent();
+      if (node1 == null || node2 == null) {
+        return Integer.MAX_VALUE;
+      }
+      cost += node1.getCost() + node2.getCost();
+    }
+    return cost;
+  }
+
+  private static boolean isSamePath(Node node1, Node node2) {
+    return node1 != null && node1.getNetworkFullPath().equals(node2.getNetworkFullPath());
   }
 
   /**
@@ -796,7 +818,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     // Sort weights for the nodes array
     int[] costs = new int[activeLen];
     for (int i = 0; i < activeLen; i++) {
-      costs[i] = getDistanceCost(reader, nodes.get(i));
+      costs[i] = getDistanceCostWithoutLock(reader, nodes.get(i));
     }
     // Add cost/node pairs to a TreeMap to sort
     NavigableMap<Integer, List<N>> tree = new TreeMap<>();
