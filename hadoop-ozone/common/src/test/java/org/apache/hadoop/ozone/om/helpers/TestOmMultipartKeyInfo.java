@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,6 +28,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -66,6 +68,7 @@ public class TestOmMultipartKeyInfo {
     assertNotSame(subject, copy);
     assertEquals(subject, copy);
     assertEquals(replicationConfig, copy.getReplicationConfig());
+    assertThat(copy.getStoragePolicy()).isEqualTo(subject.getStoragePolicy());
   }
 
   @Test
@@ -92,6 +95,22 @@ public class TestOmMultipartKeyInfo {
     assertEquals(replicationConfig, fromProto.getReplicationConfig());
     assertEquals(subject.getOwnerName(), fromProto.getOwnerName());
     assertEquals(subject.getAcls(), fromProto.getAcls());
+    assertThat(proto.hasStoragePolicy()).isTrue();
+    assertThat(fromProto.getStoragePolicy()).isEqualTo(subject.getStoragePolicy());
+  }
+
+  @Test
+  public void absentStoragePolicyStaysNull() {
+    OmMultipartKeyInfo subject = createSubject()
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setStoragePolicy(null)
+        .build();
+
+    OzoneManagerProtocolProtos.MultipartKeyInfo proto = subject.getProto();
+    assertThat(proto.hasStoragePolicy()).isFalse();
+    assertThat(OmMultipartKeyInfo.getFromProto(proto).getStoragePolicy()).isNull();
+    assertThat(subject.copyObject().getStoragePolicy()).isNull();
+    assertThat(subject.toBuilder().build().getStoragePolicy()).isNull();
   }
 
   private static Stream<ReplicationConfig> replicationConfigs() {
@@ -165,6 +184,7 @@ public class TestOmMultipartKeyInfo {
     return new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
         .setOwnerName("mpu-owner")
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
         .setAcls(Collections.singletonList(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             "mpu-owner",

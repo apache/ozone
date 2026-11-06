@@ -458,6 +458,14 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName, String bucketName, String keyName,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      StoragePolicy storagePolicy) throws IOException {
+    return delegate.initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig, metadata,
+        tags, storagePolicy);
+  }
+
+  @Override
   public OzoneOutputStream createMultipartKey(String volumeName, String bucketName, String keyName, long size,
       int partNumber, String uploadID) throws IOException {
     return delegate.createMultipartKey(volumeName, bucketName, keyName, size, partNumber, uploadID);

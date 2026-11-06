@@ -26,10 +26,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -98,8 +101,19 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
-        ozoneManager, ACLType.CREATE);
+    final KeyArgs.Builder resolvedArgsBuilder = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+        ozoneManager, ACLType.CREATE).toBuilder();
+
+    // Stamp the policy only once finalized: an OM without storage policy support does not persist the field,
+    // so stamping it earlier would make old and new OMs apply this request differently.
+    if (ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
+      // Read the bucket the link resolves to straight from the metadata manager. ozoneManager.getBucketInfo would
+      // also require READ on the bucket, which creating an upload does not need.
+      final OmBucketInfo bucketInfo = getBucketInfo(ozoneManager.getMetadataManager(),
+          resolvedArgsBuilder.getVolumeName(), resolvedArgsBuilder.getBucketName());
+      resolvedArgsBuilder.setStoragePolicy(OzoneStoragePolicy.toProto(getStoragePolicy(bucketInfo, keyArgs)));
+    }
+    final KeyArgs resolvedArgs = resolvedArgsBuilder.build();
     int schemaVersion = resolveMultipartSchemaVersion(ozoneManager);
     MultipartInfoInitiateRequest.Builder requestBuilder =
         multipartInfoInitiateRequest.toBuilder()
@@ -192,11 +206,17 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                   bucketInfo.getDefaultReplicationConfig() :
                   null, ozoneManager);
 
+      // Absent when the request was logged before STORAGE_POLICY_SUPPORT was finalized, or by an OM that did not
+      // set it; stays null then.
+      final StoragePolicy storagePolicy = keyArgs.hasStoragePolicy()
+          ? OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()) : null;
+
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
           .setCreationTime(keyArgs.getModificationTime())
           .setReplicationConfig(
               replicationConfig)
+          .setStoragePolicy(storagePolicy)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           // Source of truth is the value stamped onto the proto in preExecute
@@ -222,6 +242,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
           .setOwnerName(keyArgs.getOwnerName())
           .addAllTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setStoragePolicy(storagePolicy)
           .build();
 
       // Add to cache
@@ -335,6 +356,26 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.InitiateMultiPartUpload
+  )
+  public static OMRequest disallowInitiateMultiPartUploadWithStoragePolicy(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
+      if (req.getInitiateMultiPartUploadRequest().getKeyArgs().hasStoragePolicy()) {
+        throw new OMException("Cluster does not have the storage policy"
+            + " feature finalized yet, but the request contains storage"
+            + " policy arguments. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }

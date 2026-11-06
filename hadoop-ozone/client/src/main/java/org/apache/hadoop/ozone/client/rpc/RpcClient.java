@@ -2209,6 +2209,19 @@ public class RpcClient implements ClientProtocol {
       Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
+    return initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig,
+        metadata, tags, null);
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+      String bucketName,
+      String keyName,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata,
+      Map<String, String> tags,
+      StoragePolicy storagePolicy)
+      throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName);
@@ -2228,6 +2241,10 @@ public class RpcClient implements ClientProtocol {
       }
     }
 
+    if (storagePolicy != null && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
+    }
+
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -2236,6 +2253,7 @@ public class RpcClient implements ClientProtocol {
         .addAllMetadataGdpr(metadata)
         .setOwnerName(ownerName)
         .addAllTags(tags)
+        .setStoragePolicy(storagePolicy)
         .build();
     OmMultipartInfo multipartInfo = ozoneManagerClient
         .initiateMultipartUpload(keyArgs);

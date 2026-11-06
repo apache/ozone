@@ -749,6 +749,53 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * A storage policy is sent only to an OM that supports it, and a request without one is never rejected.
+   */
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testInitiateMultipartUploadWithStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
+      throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == Type.InitiateMultiPartUpload) {
+          requests.add(request.getInitiateMultiPartUploadRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      IOException withoutPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
+          "vol", "bucket", "key", replication, Collections.emptyMap(), Collections.emptyMap(), null));
+      IOException withPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
+          "vol", "bucket", "key", replication, Collections.emptyMap(), Collections.emptyMap(),
+          OzoneStoragePolicy.COLD));
+
+      assertThat(withoutPolicyError).hasMessage("captured");
+      assertThat(requests.get(0).hasStoragePolicy()).isFalse();
+      if (OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(version)) {
+        assertThat(withPolicyError).hasMessage("captured");
+        assertThat(requests).hasSize(2);
+        assertThat(requests.get(1).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+      } else {
+        assertThat(withPolicyError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(requests).hasSize(1);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   private static ServiceInfo om(OzoneManagerVersion version) {
     return new ServiceInfo.Builder()
         .setNodeType(HddsProtos.NodeType.OM)
