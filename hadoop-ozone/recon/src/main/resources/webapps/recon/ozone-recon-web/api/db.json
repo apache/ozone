@@ -8845,6 +8845,46 @@
       }
     ]
   },
+  "bucketdeletePending": [
+    {
+      "volumeName": "vol1",
+      "bucketName": "bucket1",
+      "pendingDeletionKeys": 1200,
+      "pendingDeletionKeyBytes": 32212254720,
+      "pendingDeletionDirs": 4,
+      "pendingDeletionDirBytes": 3221225472,
+      "totalPendingDeletionBytes": 35433480192
+    },
+    {
+      "volumeName": "vol1",
+      "bucketName": "bucket2",
+      "pendingDeletionKeys": 35,
+      "pendingDeletionKeyBytes": 1073741824,
+      "pendingDeletionDirs": 0,
+      "pendingDeletionDirBytes": 0,
+      "totalPendingDeletionBytes": 1073741824
+    }
+  ],
+  "snapshotTrappedBytesJobs": [
+    {
+      "jobId": "4a0d6c3e-2f3c-4b8e-9b1a-7f3f7a1c2d10",
+      "volumeName": "vol1",
+      "bucketName": "bucket1",
+      "status": "COMPLETED",
+      "submittedAt": 1730000000000,
+      "startedAt": 1730000001000,
+      "completedAt": 1730000065000,
+      "errorMessage": null,
+      "result": {
+        "snapshotTrappedBytes": 21474836480,
+        "purgeableBytes": 13958643712,
+        "snapshotTrappedKeys": 800,
+        "purgeableKeys": 400,
+        "snapshotTrappedDirs": 1,
+        "purgeableDirs": 3
+      }
+    }
+  ],
   "dirdeletePending": {
     "replicatedDataSize": 0,
     "unreplicatedDataSize": 0,
