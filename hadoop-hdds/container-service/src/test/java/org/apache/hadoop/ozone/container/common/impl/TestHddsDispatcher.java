@@ -28,11 +28,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -43,8 +45,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -640,6 +644,104 @@ public class TestHddsDispatcher {
   }
 
   /**
+   * HDDS-17643: a write over Ratis must not recreate a container that was created over the pipeline and deleted since,
+   * in any stage, and must fail with a result that does not fail the pipeline.
+   */
+  @Test
+  public void testRatisWriteDoesNotRecreateDeletedContainer() throws IOException {
+    try {
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDir.getPath());
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
+      DatanodeDetails dd = randomDatanodeDetails();
+      ContainerSet containerSet = newContainerSet();
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf, null,
+          ContainerTestUtils.getMockContext(dd, conf), containerSet);
+      Map<Long, Long> container2BCSIDMap = new HashMap<>();
+
+      // the first write over the pipeline creates the container and records it in the map
+      ContainerCommandRequestProto writeChunk = getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+      assertEquals(ContainerProtos.Result.SUCCESS, hddsDispatcher.dispatch(writeChunk,
+          newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA, container2BCSIDMap)).getResult());
+      assertNotNull(hddsDispatcher.getContainer(1L));
+      assertThat(container2BCSIDMap).containsKey(1L);
+
+      // a forced delete, as SCM sends to the source of a balancer move, removes the container from the set
+      assertTrue(containerSet.removeContainer(1L));
+      assertNull(hddsDispatcher.getContainer(1L));
+      assertThat(container2BCSIDMap).containsKey(1L);
+
+      ContainerCommandRequestProto newBlockWriteChunk = getWriteChunkRequest(dd.getUuidString(), 1L, 2L);
+      List<ContainerCommandRequestProto> writes = new ArrayList<>();
+      List<DispatcherContext> contexts = new ArrayList<>();
+      writes.add(newBlockWriteChunk);
+      contexts.add(newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA, container2BCSIDMap));
+      writes.add(ContainerCommandRequestProto.newBuilder(newBlockWriteChunk)
+          .setWriteChunk(newBlockWriteChunk.getWriteChunk().toBuilder().clearData()).build());
+      contexts.add(newContext(Op.APPLY_TRANSACTION, WriteChunkStage.COMMIT_DATA, container2BCSIDMap));
+      writes.add(ContainerTestHelper.getPutBlockRequest(newBlockWriteChunk));
+      contexts.add(newContext(Op.APPLY_TRANSACTION, WriteChunkStage.COMBINED, container2BCSIDMap));
+      writes.add(newPutSmallFile(1L, 3L));
+      contexts.add(newContext(Op.APPLY_TRANSACTION, WriteChunkStage.COMBINED, container2BCSIDMap));
+      writes.add(ContainerCommandRequestProto.newBuilder(newBlockWriteChunk)
+          .setCmdType(ContainerProtos.Type.StreamInit).build());
+      contexts.add(newContext(Op.STREAM_INIT, WriteChunkStage.WRITE_DATA, container2BCSIDMap));
+      writes.add(ContainerTestHelper.getPutBlockRequest(newBlockWriteChunk));
+      contexts.add(newContext(Op.STREAM_COMMAND, WriteChunkStage.COMBINED, container2BCSIDMap));
+      for (int i = 0; i < writes.size(); i++) {
+        ContainerCommandResponseProto response = hddsDispatcher.dispatch(writes.get(i), contexts.get(i));
+        // CONTAINER_NOT_OPEN is ignored by ContainerStateMachine in writeStateMachineData and applyTransaction
+        assertEquals(ContainerProtos.Result.CONTAINER_NOT_OPEN, response.getResult(),
+            writes.get(i).getCmdType() + " in " + contexts.get(i));
+        assertNull(hddsDispatcher.getContainer(1L));
+      }
+      assertEquals(Collections.singletonMap(1L, 0L), container2BCSIDMap);
+
+      // a container that was never created over the pipeline is still created on the first write
+      assertEquals(ContainerProtos.Result.SUCCESS, hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(),
+          2L, 1L), newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA, container2BCSIDMap))
+          .getResult());
+      assertNotNull(hddsDispatcher.getContainer(2L));
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
+   * A write that does not find the container, but finds it in the map because a concurrent write over the pipeline
+   * has just created it, must use the container instead of failing or creating it again.
+   */
+  @Test
+  public void testRatisWriteRacingWithContainerCreateSucceeds() throws IOException {
+    try {
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDir.getPath());
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
+      DatanodeDetails dd = randomDatanodeDetails();
+      HddsDispatcher dispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+      Map<Long, Long> container2BCSIDMap = new HashMap<>();
+      assertEquals(ContainerProtos.Result.SUCCESS, dispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(),
+          1L, 1L), newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA, container2BCSIDMap))
+          .getResult());
+      Container<?> container = dispatcher.getContainer(1L);
+      assertNotNull(container);
+
+      HddsDispatcher hddsDispatcher = spy(dispatcher);
+
+      // the first lookup misses the container, the concurrent create completes before the map is read
+      doReturn(null).doCallRealMethod().when(hddsDispatcher).getContainer(1L);
+      ContainerCommandRequestProto writeChunk = getWriteChunkRequest(dd.getUuidString(), 1L, 2L);
+      assertEquals(ContainerProtos.Result.SUCCESS, hddsDispatcher.dispatch(writeChunk,
+          newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA, container2BCSIDMap)).getResult());
+      verify(hddsDispatcher, never()).createContainer(any());
+      assertSame(container, hddsDispatcher.getContainer(1L));
+      assertTrue(container.getContainerData().isOpen());
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
    * Creates HddsDispatcher instance with given infos.
    * @param dd datanode detail info.
    * @param scmId UUID of scm id.
@@ -659,7 +761,11 @@ public class TestHddsDispatcher {
 
   static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier, StateContext context) throws IOException {
-    ContainerSet containerSet = newContainerSet();
+    return createDispatcher(dd, scmId, conf, tokenVerifier, context, newContainerSet());
+  }
+
+  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId, OzoneConfiguration conf,
+      TokenVerifier tokenVerifier, StateContext context, ContainerSet containerSet) throws IOException {
     MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     volumeSet.getVolumesList().stream().forEach(v -> {
@@ -1147,11 +1253,15 @@ public class TestHddsDispatcher {
   }
 
   static DispatcherContext newContext(Op op, WriteChunkStage stage) {
+    return newContext(op, stage, new HashMap<>());
+  }
+
+  static DispatcherContext newContext(Op op, WriteChunkStage stage, Map<Long, Long> container2BCSIDMap) {
     return DispatcherContext.newBuilder(op)
         .setTerm(1)
         .setLogIndex(1)
         .setStage(stage)
-        .setContainer2BCSIDMap(new HashMap<>())
+        .setContainer2BCSIDMap(container2BCSIDMap)
         .build();
   }
 }
