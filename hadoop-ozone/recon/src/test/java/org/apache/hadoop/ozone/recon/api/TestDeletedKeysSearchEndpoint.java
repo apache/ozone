@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -116,21 +117,8 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
   @AfterEach
   public void tearDown() throws Exception {
-    if (reconScm != null) {
-      reconScm.stop();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (replicaHistoryDBProvider != null) {
-      replicaHistoryDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    ReconTestUtils.closeReconResources(reconScm, reconDBProvider, replicaHistoryDBProvider, reconOMMetadataManager,
+        omMetadataManager);
   }
 
   private static OMMetadataManager initializeNewOmMetadataManager(File omDbDir) throws IOException {

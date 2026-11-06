@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -750,21 +751,8 @@ public class TestHeatMapInfo {
 
   @AfterEach
   public void tearDown() throws Exception {
-    if (reconScm != null) {
-      reconScm.stop();
-    }
-    if (replicaHistoryDBProvider != null) {
-      replicaHistoryDBProvider.close();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    ReconTestUtils.closeReconResources(reconScm, reconDBProvider, replicaHistoryDBProvider, reconOMMetadataManager,
+        omMetadataManager);
   }
 
   @Test

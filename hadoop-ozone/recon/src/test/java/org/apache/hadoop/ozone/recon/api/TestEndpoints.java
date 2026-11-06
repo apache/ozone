@@ -598,21 +598,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @AfterEach
   public void tearDown() throws Exception {
-    if (reconScm != null) {
-      reconScm.stop();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (reconReplicaHistoryDBProvider != null) {
-      reconReplicaHistoryDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (testOmMetadataManager != null) {
-      testOmMetadataManager.stop();
-    }
+    ReconTestUtils.closeReconResources(reconScm, reconDBProvider, reconReplicaHistoryDBProvider, reconOMMetadataManager,
+        testOmMetadataManager);
   }
 
   private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)

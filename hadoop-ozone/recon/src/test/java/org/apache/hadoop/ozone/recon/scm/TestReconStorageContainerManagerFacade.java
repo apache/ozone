@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -73,21 +74,8 @@ class TestReconStorageContainerManagerFacade {
   void tearDown() throws Exception {
     metricsToUnregister.forEach(ReconScmContainerSyncMetrics::unRegister);
     metricsToUnregister.clear();
-    if (reconScmFacade != null) {
-      reconScmFacade.stop();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (replicaHistoryDBProvider != null) {
-      replicaHistoryDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    ReconTestUtils.closeReconResources(reconScmFacade, reconDBProvider, replicaHistoryDBProvider,
+        reconOMMetadataManager, omMetadataManager);
   }
 
   @Test

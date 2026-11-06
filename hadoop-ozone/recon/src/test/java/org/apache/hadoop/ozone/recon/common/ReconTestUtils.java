@@ -19,6 +19,11 @@ package org.apache.hadoop.ozone.recon.common;
 
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 
 /**
  * This is a utility class for common code for test cases.
@@ -31,6 +36,27 @@ public final class ReconTestUtils {
     builder.setDatanodeProtocolServerAddress(
         InetSocketAddress.createUnresolved("127.0.0.1", 9888));
     return builder.build();
+  }
+
+  public static void closeReconResources(OzoneStorageContainerManager reconScm, ReconDBProvider reconDBProvider,
+      ReconReplicaHistoryDBProvider replicaHistoryDBProvider, ReconOMMetadataManager reconOMMetadataManager,
+      OMMetadataManager omMetadataManager) throws Exception {
+    // Stop SCM before closing the providers; stop() flushes replica history to the replica history DB.
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (replicaHistoryDBProvider != null) {
+      replicaHistoryDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   private ReconTestUtils() {

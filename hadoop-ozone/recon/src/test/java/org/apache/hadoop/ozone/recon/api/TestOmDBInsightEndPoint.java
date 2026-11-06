@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -349,21 +350,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
    */
   @AfterEach
   public void tearDown() throws Exception {
-    if (reconScm != null) {
-      reconScm.stop();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (replicaHistoryDBProvider != null) {
-      replicaHistoryDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    ReconTestUtils.closeReconResources(reconScm, reconDBProvider, replicaHistoryDBProvider, reconOMMetadataManager,
+        omMetadataManager);
   }
 
   @SuppressWarnings("methodlength")
