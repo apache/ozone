@@ -21,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
@@ -36,7 +39,10 @@ import java.io.RandomAccessFile;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -141,6 +147,51 @@ class TestRandomAccessFileChannel {
     try (Closeable c = closeable) {
       assertNotNull(c);
     }
+  }
+
+  @Test
+  void blockDataIsCachedPerBlockAndClearedOnClose() throws Exception {
+    final RandomAccessFileChannel c = new RandomAccessFileChannel();
+    c.open(Files.createFile(tempDir.resolve("cached-block")).toFile());
+
+    final BlockID blockID = new BlockID(1, 2);
+    final BlockData blockData = new BlockData(blockID);
+    assertNull(c.getCachedBlockData(blockID));
+
+    c.cacheBlockData(blockID, blockData);
+    assertSame(blockData, c.getCachedBlockData(blockID));
+    assertNull(c.getCachedBlockData(new BlockID(1, 3)));
+    final BlockID grown = new BlockID(1, 2);
+    grown.setBlockCommitSequenceId(7);
+    assertNull(c.getCachedBlockData(grown));
+
+    c.close();
+    assertNull(c.getCachedBlockData(blockID));
+  }
+
+  @Test
+  void readBufferIsReusedGrownAndDroppedOnClose() throws Exception {
+    final RandomAccessFileChannel c = new RandomAccessFileChannel();
+    c.open(Files.createFile(tempDir.resolve("read-buffer")).toFile());
+
+    final ByteBuffer first = c.getReadBuffer(64);
+    assertEquals(64, first.capacity());
+    first.position(10).limit(20);
+
+    assertSame(first, c.getReadBuffer(64), "same capacity reuses the buffer");
+    assertEquals(0, first.position());
+    assertEquals(64, first.limit());
+    assertSame(first, c.getReadBuffer(16), "smaller capacity reuses the buffer");
+
+    final ByteBuffer grown = c.getReadBuffer(128);
+    assertNotSame(first, grown, "larger capacity reallocates");
+    assertEquals(128, grown.capacity());
+    assertSame(grown, c.getReadBuffer(64));
+
+    c.close();
+    c.open(Files.createFile(tempDir.resolve("read-buffer-2")).toFile());
+    assertNotSame(grown, c.getReadBuffer(64), "buffer dropped on close");
+    c.close();
   }
 
   private static void setField(Object target, String name, Object value)
