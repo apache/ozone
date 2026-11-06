@@ -393,9 +393,9 @@ public class OzoneManagerServiceProviderImpl
   @Override
   public void stop() throws Exception {
     LOG.info("Stopping Ozone Manager Service Provider.");
+    stopSyncDataFromOMThread();
     reconTaskController.stop();
     omMetadataManager.stop();
-    scheduler.shutdownNow();
     reconSnapshotProvider.close();
     metrics.unRegister();
     reconSyncMetrics.unRegister();
