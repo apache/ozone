@@ -18,10 +18,19 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.EnumMap;
+import java.util.Properties;
+import java.util.function.Function;
+import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig.MetricsMode;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -34,6 +43,9 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.util.PerformanceMetrics;
+import org.apache.hadoop.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The client metrics for the Storage Container protocol.
@@ -43,6 +55,12 @@ import org.apache.hadoop.ozone.util.PerformanceMetrics;
 public class XceiverClientMetrics implements MetricsSource {
   public static final String SOURCE_NAME = XceiverClientMetrics.class
       .getSimpleName();
+
+  private static final Logger LOG = LoggerFactory.getLogger(XceiverClientMetrics.class);
+  /** [instance].[option] after "[prefix].sink.", as Hadoop's MetricsConfig matches sink instances. */
+  private static final Pattern SINK_INSTANCE_OPTION = Pattern.compile("[^.*]+\\..+");
+
+  private static volatile MetricsMode metricsMode = MetricsMode.AUTO;
 
   private @Metric MutableCounterLong pendingOps;
   private @Metric MutableCounterLong totalOps;
@@ -79,11 +97,99 @@ public class XceiverClientMetrics implements MetricsSource {
     }
   }
 
+  /**
+   * Set by each {@link XceiverClientCreator} from its configuration; read when the metrics are created.
+   */
+  public static void setMetricsMode(MetricsMode mode) {
+    metricsMode = mode;
+  }
+
   public static XceiverClientMetrics create() {
-    DefaultMetricsSystem.initialize(SOURCE_NAME);
+    if (startsMetricsSystem(metricsMode, metricsConfigLocator(null, new File(System.getProperty("user.home")),
+        XceiverClientMetrics::classpathResource))) {
+      DefaultMetricsSystem.initialize(SOURCE_NAME);
+    }
+    // Registering is cheap without a started metrics system: the source goes live if the system starts later.
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME, "Storage Container Client Metrics",
         new XceiverClientMetrics());
+  }
+
+  static boolean startsMetricsSystem(MetricsMode mode, Function<String, URL> locator) {
+    switch (mode) {
+    case ALWAYS:
+      return true;
+    case NEVER:
+      return false;
+    default:
+      return isSinkConfigured(SOURCE_NAME, locator);
+    }
+  }
+
+  /**
+   * Whether the metrics system would configure a sink for the prefix. Same lookup as Hadoop's MetricsConfig:
+   * the first of hadoop-metrics2-[prefix].properties and hadoop-metrics2.properties that the locator finds, with
+   * [prefix].sink.[instance].[option] keys; "*.sink" keys only supply defaults. Uses java.util.Properties to avoid
+   * loading Commons Configuration.
+   */
+  static boolean isSinkConfigured(String prefix, Function<String, URL> locator) {
+    final String lowerPrefix = StringUtils.toLowerCase(prefix);
+    for (String name : new String[] {"hadoop-metrics2-" + lowerPrefix + ".properties", "hadoop-metrics2.properties"}) {
+      final URL url = locator.apply(name);
+      if (url == null) {
+        continue;
+      }
+      final Properties properties = new Properties();
+      try (InputStream in = url.openStream()) {
+        properties.load(in);
+      } catch (IOException | IllegalArgumentException e) {
+        LOG.warn("Failed to read {}, starting the metrics system", url, e);
+        return true;
+      }
+      // Hadoop's parser follows include and includeoptional into other files, which may configure the sink
+      if (properties.stringPropertyNames().stream()
+          .anyMatch(key -> key.equalsIgnoreCase("include") || key.equalsIgnoreCase("includeoptional"))) {
+        LOG.debug("{} includes other files, starting the metrics system", url);
+        return true;
+      }
+      final String sinkPrefix = lowerPrefix + ".sink.";
+      return properties.stringPropertyNames().stream()
+          .anyMatch(key -> key.startsWith(sinkPrefix)
+              && SINK_INSTANCE_OPTION.matcher(key.substring(sinkPrefix.length())).matches());
+    }
+    return false;
+  }
+
+  /**
+   * Finds a metrics configuration file by name where Hadoop's MetricsConfig would, through Commons Configuration's
+   * default location strategy for a relative file name: in the working directory, in the user's home directory, then
+   * on the classpath.
+   *
+   * @param workingDir where to look first, or null for the working directory itself
+   * @param homeDir where to look next
+   * @param classpath where to look last
+   */
+  static Function<String, URL> metricsConfigLocator(File workingDir, File homeDir, Function<String, URL> classpath) {
+    return name -> {
+      for (File file : new File[] {workingDir == null ? new File(name) : new File(workingDir, name),
+          new File(homeDir, name)}) {
+        if (file.isFile()) {
+          try {
+            return file.toURI().toURL();
+          } catch (MalformedURLException e) {
+            LOG.debug("Skipping {}", file, e);
+          }
+        }
+      }
+      return classpath.apply(name);
+    };
+  }
+
+  /** The classpath resource, from the thread's context class loader, then the system class loader. */
+  private static URL classpathResource(String name) {
+    final ClassLoader loader = Thread.currentThread().getContextClassLoader();
+    final URL url = loader == null ? null : loader.getResource(name);
+    return url != null ? url : ClassLoader.getSystemResource(name);
   }
 
   public void incrPendingContainerOpsMetrics(ContainerProtos.Type type) {
