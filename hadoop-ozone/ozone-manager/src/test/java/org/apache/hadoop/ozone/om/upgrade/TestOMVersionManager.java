@@ -229,7 +229,7 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
   public void testGetVersionForClientWhenPreZdu() throws Exception {
     // A pre-ZDU apparent version clamps to the last pre-ZDU client version.
     try (OMVersionManager versionManager = createManager(INITIAL_VERSION.serialize())) {
-      assertEquals(OzoneManagerVersion.S3_DERIVED_KEY, versionManager.getVersionForClient());
+      assertEquals(OzoneManagerVersion.CONDITIONAL_DELETE, versionManager.getVersionForClient());
     }
   }
 

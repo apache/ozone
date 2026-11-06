@@ -37,8 +37,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -95,21 +93,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
-    if (keyArgs.hasExcludedETag()) {
-      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
-    }
+    checkConditionalWriteEnabled(ozoneManager, keyArgs);
 
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
-
-    if (keyArgs.hasExpectedDataGeneration()) {
-      if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
-        ozoneManager.checkFeatureEnabled(
-            OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
-      } else {
-        ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
-      }
-    }
 
     OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
     if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
