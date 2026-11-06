@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.InetSocketAddress;
 import java.util.Locale;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
@@ -50,7 +49,7 @@ public class TestCliTokenServiceUseIp {
   @Test
   public void useIpFalseBuildsHostnameTokenService() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(CommonConfigurationKeys.HADOOP_SECURITY_TOKEN_SERVICE_USE_IP, false);
+    conf.setBoolean("hadoop.security.token.service.use_ip", false);
     // Same call SecurityUtil's static initializer makes when core-site.xml
     // sets hadoop.security.token.service.use_ip=false. Surefire may already
     // have initialized SecurityUtil with the default true.
@@ -59,8 +58,9 @@ public class TestCliTokenServiceUseIp {
     InetSocketAddress addr = NetUtils.createSocketAddr(OM_ADDRESS);
     Text service = SecurityUtil.buildTokenService(addr);
     String expected = addr.getHostName().toLowerCase(Locale.ROOT) + ":9862";
-    assertThat(service.toString()).isEqualTo(expected);
-    assertThat(service.toString().matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+")).isFalse();
+    assertThat(service.toString())
+        .isEqualTo(expected)
+        .doesNotMatch("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+");
 
     OMProxyInfo<?> info = OMProxyInfo.newInstance(null, null, "om1", OM_ADDRESS);
     assertThat(service).isEqualTo(info.getDelegationTokenService());
