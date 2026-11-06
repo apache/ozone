@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -86,7 +87,7 @@ public class TestObjectTaggingGet {
 
     verify(volume, never()).getName();
     verify(volume, never()).getBucket(anyString());
-    verify(protocol, never()).getBucketDetails(anyString(), anyString());
+    verify(protocol, never()).getBucketDetails(any(), anyString());
     verify(protocol).getObjectTagging(null, BUCKET_NAME, KEY_WITH_TAG);
   }
 

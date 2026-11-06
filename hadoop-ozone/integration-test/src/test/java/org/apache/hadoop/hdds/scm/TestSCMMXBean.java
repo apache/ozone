@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * This class is to test JMX management interface for scm information.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestSCMMXBean implements NonHATests.TestCase {
+public abstract class TestSCMMXBean implements ClusterForTests.TestCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
   private StorageContainerManager scm;
