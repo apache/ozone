@@ -268,6 +268,9 @@ public class StorageContainerServiceProviderImpl
           connection.disconnect();
         }
         connectionFactory.destroy();
+        if (cancelled.get()) {
+          FileUtils.deleteQuietly(targetFile);
+        }
       }
       return null;
     }));

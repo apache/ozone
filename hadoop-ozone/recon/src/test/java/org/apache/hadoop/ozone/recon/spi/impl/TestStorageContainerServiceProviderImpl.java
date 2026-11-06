@@ -91,6 +91,8 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
@@ -276,19 +278,27 @@ public class TestStorageContainerServiceProviderImpl {
   }
 
   /**
-   * Cancelling the SCM DB sync returns without waiting for a download that SCM stalls, and removes the partial
-   * checkpoint.
+   * Cancelling the SCM DB sync returns without waiting for a download that SCM stalls, either after sending part of
+   * the checkpoint or before responding, and the partial checkpoint is removed.
    */
-  @Test
-  public void testGetSCMDBSnapshotCancelDoesNotWaitForStalledDownload() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testGetSCMDBSnapshotCancelDoesNotWaitForStalledDownload(boolean stallMidBody) throws Exception {
     enableGrpcTls();
+    CountDownLatch responding = new CountDownLatch(1);
     CountDownLatch stall = new CountDownLatch(1);
     HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT, exchange -> {
-      exchange.sendResponseHeaders(200, 1 << 20);
-      exchange.getResponseBody().write(new byte[1024]);
-      exchange.getResponseBody().flush();
+      if (stallMidBody) {
+        exchange.sendResponseHeaders(200, 1 << 20);
+        exchange.getResponseBody().write(new byte[1024]);
+        exchange.getResponseBody().flush();
+      }
+      responding.countDown();
       Uninterruptibles.awaitUninterruptibly(stall);
+      if (!stallMidBody) {
+        exchange.sendResponseHeaders(200, -1);
+      }
       exchange.close();
     });
     server.start();
@@ -300,16 +310,25 @@ public class TestStorageContainerServiceProviderImpl {
           "127.0.0.1:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:127.0.0.1");
       Future<DBCheckpoint> sync =
           executor.submit(() -> injector.getInstance(StorageContainerServiceProvider.class).getSCMDBSnapshot());
-      GenericTestUtils.waitFor(() -> listTarFiles().stream().anyMatch(f -> f.length() > 0), 100, 10000);
+      assertTrue(responding.await(10, TimeUnit.SECONDS));
+      if (stallMidBody) {
+        GenericTestUtils.waitFor(() -> listTarFiles().stream().anyMatch(f -> f.length() > 0), 100, 10000);
+      }
 
       // Like ReconStorageContainerManagerFacade#cancelScmDbSnapshotSync
       sync.cancel(true);
       executor.shutdown();
       assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
-      assertThat(listTarFiles()).isEmpty();
     } finally {
       executor.shutdownNow();
       stall.countDown();
+    }
+    try {
+      // The download thread cleans up when it stops.
+      GenericTestUtils.waitFor(() -> Thread.getAllStackTraces().keySet().stream()
+          .noneMatch(thread -> thread.getName().startsWith("ReconSCMDBDownload")), 100, 10000);
+      assertThat(listTarFiles()).isEmpty();
+    } finally {
       server.stop(0);
     }
   }
