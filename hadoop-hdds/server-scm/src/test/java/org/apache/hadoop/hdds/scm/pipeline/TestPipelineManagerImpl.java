@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTRO
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED;
+import static org.apache.ozone.test.MetricsAsserts.getIntGauge;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
@@ -610,6 +611,7 @@ public class TestPipelineManagerImpl {
       assertThat(pipelineManager.getWritablePipelines(ecConfig, OPEN)).containsExactly(ecPipeline);
       assertThat(pipelineManager.getWritablePipelines(ratisConfig, OPEN, Collections.emptySet(),
           Collections.emptySet())).containsExactly(ratisPipeline);
+      assertEquals(0, getNumOpenPipelinesWithUnregisteredNodes());
 
       // "Unregister" one node from each pipeline.
       DatanodeDetails ratisDN = nodeManager.getNode(ratisPipeline.getNodes().get(0).getID());
@@ -630,15 +632,22 @@ public class TestPipelineManagerImpl {
       assertTrue(pipelineManager.containsPipeline(ecPipeline.getId()));
       assertEquals(1, pipelineManager.getPipelineCount(ratisConfig, OPEN));
       assertEquals(1, pipelineManager.getPipelineCount(ecConfig, OPEN));
+      assertEquals(2, getNumOpenPipelinesWithUnregisteredNodes());
 
       // Visible again once the nodes register.
-      for (DatanodeDetails dn : Arrays.asList(ratisDN, ecDN)) {
+      // The pipelines may share a node, so register each node once.
+      for (DatanodeDetails dn : new HashSet<>(Arrays.asList(ratisDN, ecDN))) {
         nodeManager.setNodeState(dn, HddsProtos.NodeState.HEALTHY);
         nodeManager.getClusterNetworkTopologyMap().add(dn);
       }
       assertThat(pipelineManager.getWritablePipelines(ratisConfig, OPEN)).containsExactly(ratisPipeline);
       assertThat(pipelineManager.getWritablePipelines(ecConfig, OPEN)).containsExactly(ecPipeline);
+      assertEquals(0, getNumOpenPipelinesWithUnregisteredNodes());
     }
+  }
+
+  private static int getNumOpenPipelinesWithUnregisteredNodes() {
+    return getIntGauge("NumOpenPipelinesWithUnregisteredNodes", getMetrics(SCMPipelineMetrics.class.getSimpleName()));
   }
 
   @Test

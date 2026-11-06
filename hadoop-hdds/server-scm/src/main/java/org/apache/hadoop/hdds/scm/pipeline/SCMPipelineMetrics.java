@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntSupplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -44,6 +46,9 @@ public final class SCMPipelineMetrics implements MetricsSource {
 
   private static final String SOURCE_NAME =
       SCMPipelineMetrics.class.getSimpleName();
+  private static final MetricsInfo NUM_OPEN_PIPELINES_WITH_UNREGISTERED_NODES = Interns.info(
+      "NumOpenPipelinesWithUnregisteredNodes",
+      "Number of open pipelines with datanodes that are not registered with SCM");
 
   private MetricsRegistry registry;
   private static SCMPipelineMetrics instance;
@@ -58,6 +63,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
   private @Metric MutableCounterLong numPipelineContainSameDatanodes;
   private @Metric MutableRate pipelineCreationLatencyNs;
   private final Map<PipelineID, MutableCounterLong> numBlocksAllocated;
+  private volatile IntSupplier numOpenPipelinesWithUnregisteredNodes = () -> 0;
 
   /** Private constructor. */
   private SCMPipelineMetrics() {
@@ -68,15 +74,17 @@ public final class SCMPipelineMetrics implements MetricsSource {
   /**
    * Create and returns SCMPipelineMetrics instance.
    *
+   * @param numOpenPipelinesWithUnregisteredNodes computes the number of open
+   *     pipelines with unregistered datanodes each time metrics are collected.
    * @return SCMPipelineMetrics
    */
-  public static synchronized SCMPipelineMetrics create() {
-    if (instance != null) {
-      return instance;
+  public static synchronized SCMPipelineMetrics create(IntSupplier numOpenPipelinesWithUnregisteredNodes) {
+    if (instance == null) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      instance = ms.register(SOURCE_NAME, "SCM PipelineManager Metrics",
+          new SCMPipelineMetrics());
     }
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    instance = ms.register(SOURCE_NAME, "SCM PipelineManager Metrics",
-        new SCMPipelineMetrics());
+    instance.numOpenPipelinesWithUnregisteredNodes = numOpenPipelinesWithUnregisteredNodes;
     return instance;
   }
 
@@ -102,6 +110,8 @@ public final class SCMPipelineMetrics implements MetricsSource {
     numPipelineReportProcessingFailed.snapshot(recordBuilder, true);
     numPipelineContainSameDatanodes.snapshot(recordBuilder, true);
     pipelineCreationLatencyNs.snapshot(recordBuilder, true);
+    recordBuilder.addGauge(NUM_OPEN_PIPELINES_WITH_UNREGISTERED_NODES,
+        numOpenPipelinesWithUnregisteredNodes.getAsInt());
     numBlocksAllocated
         .forEach((pid, metric) -> metric.snapshot(recordBuilder, true));
   }

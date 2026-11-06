@@ -747,7 +747,7 @@ public class MockNodeManager implements NodeManager {
     healthyNodes.remove(dn);
     staleNodes.remove(dn);
     deadNodes.remove(dn);
-    if (clusterMap != null) {
+    if (clusterMap != null && clusterMap.contains(dn)) {
       clusterMap.remove(dn);
     }
   }

@@ -113,7 +113,7 @@ public class PipelineManagerImpl implements PipelineManager {
     this.clock = clock;
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
-    this.metrics = SCMPipelineMetrics.create();
+    this.metrics = SCMPipelineMetrics.create(this::getNumOpenPipelinesWithUnregisteredNodes);
     this.pipelineWaitDefaultTimeout = conf.getTimeDuration(
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
@@ -669,6 +669,17 @@ public class PipelineManagerImpl implements PipelineManager {
         closePipeline(id);
       }
     }
+  }
+
+  /**
+   * @return The number of open pipelines with nodes which are not registered
+   *         with SCM. These are not used for writes, and are closed by the
+   *         pipeline scrubber.
+   */
+  private int getNumOpenPipelinesWithUnregisteredNodes() {
+    return (int) stateManager.getPipelines().stream()
+        .filter(p -> p.isOpen() && hasUnregisteredNodes(p))
+        .count();
   }
 
   /**
