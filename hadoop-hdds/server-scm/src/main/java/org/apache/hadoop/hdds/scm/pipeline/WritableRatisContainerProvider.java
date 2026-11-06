@@ -19,9 +19,12 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import jakarta.annotation.Nullable;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -57,6 +60,13 @@ public class WritableRatisContainerProvider
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
+    return getContainer(size, repConfig, owner, excludeList, null);
+  }
+
+  @Override
+  public ContainerInfo getContainer(final long size,
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      DatanodeDetails client) throws IOException {
     /*
       Here is the high level logic.
 
@@ -80,7 +90,7 @@ public class WritableRatisContainerProvider
         PipelineRequestInformation.Builder.getBuilder().setSize(size).build();
 
     ContainerInfo containerInfo =
-        getContainer(repConfig, owner, excludeList, req);
+        getContainer(repConfig, owner, excludeList, req, client);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -126,7 +136,7 @@ public class WritableRatisContainerProvider
 
     // If Exception occurred or successful creation of pipeline do one
     // final try to fetch pipelines.
-    containerInfo = getContainer(repConfig, owner, excludeList, req);
+    containerInfo = getContainer(repConfig, owner, excludeList, req, client);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -143,7 +153,7 @@ public class WritableRatisContainerProvider
 
   @Nullable
   private ContainerInfo getContainer(ReplicationConfig repConfig, String owner,
-      ExcludeList excludeList, PipelineRequestInformation req) {
+      ExcludeList excludeList, PipelineRequestInformation req, DatanodeDetails client) {
     // Acquire pipeline manager lock, to avoid any updates to pipeline
     // while allocate container happens. This is to avoid scenario like
     // mentioned in HDDS-5655.
@@ -151,6 +161,27 @@ public class WritableRatisContainerProvider
     try {
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
           excludeList, Pipeline.PipelineState.OPEN);
+      if (client != null) {
+        // Try pipelines with a replica on the writer's datanode first, like the HDFS first replica.
+        // Among those, prefer pipelines led by that datanode, since Ratis writes go through the leader.
+        List<Pipeline> leaderPipelines = new ArrayList<>();
+        List<Pipeline> localPipelines = new ArrayList<>();
+        for (Pipeline pipeline : availablePipelines) {
+          if (client.getID().equals(pipeline.getLeaderId())) {
+            leaderPipelines.add(pipeline);
+          } else if (pipeline.getNodes().contains(client)) {
+            localPipelines.add(pipeline);
+          }
+        }
+        availablePipelines.removeAll(leaderPipelines);
+        availablePipelines.removeAll(localPipelines);
+        for (List<Pipeline> preferred : Arrays.asList(leaderPipelines, localPipelines)) {
+          ContainerInfo containerInfo = selectContainer(preferred, req, owner, excludeList);
+          if (containerInfo != null) {
+            return containerInfo;
+          }
+        }
+      }
       return selectContainer(availablePipelines, req, owner, excludeList);
     } finally {
       pipelineManager.releaseReadLock();
