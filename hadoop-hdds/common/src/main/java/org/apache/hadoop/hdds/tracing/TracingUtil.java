@@ -26,6 +26,7 @@ import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.api.trace.TracerProvider;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.ContextStorage;
@@ -65,6 +66,10 @@ public final class TracingUtil {
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
   private static volatile SdkTracerProvider sdkTracerProvider;
   private static BatchSpanProcessor batchSpanProcessor;
+  // Application-aware mode without an application GlobalOpenTelemetry: the SDK is built for the first span with a
+  // valid parent (initPendingSdk), not at start-up. Set together under the class lock; written before being cleared.
+  private static volatile TracingConfig pendingSdkConfig;
+  private static String pendingSdkServiceName;
   private static boolean mdcContextStorageInstalled;
   public static final String GLOBAL_TRACER_NAME = "ozone";
 
@@ -184,6 +189,8 @@ public final class TracingUtil {
     } finally {
       sdkTracerProvider = null;
       batchSpanProcessor = null;
+      pendingSdkConfig = null;
+      pendingSdkServiceName = null;
       tracer = OpenTelemetry.noop().getTracer("noop");
       tracingEnabled = false;
       applicationAware = false;
@@ -214,9 +221,47 @@ public final class TracingUtil {
       return;
     }
 
+    if (!tracingEnabled) {
+      // Application-aware only: spans are created only under a valid parent, which most client processes never have.
+      // Build Ozone's SDK (exporter, export thread, global registration) when the first such span needs it.
+      pendingSdkServiceName = serviceName;
+      pendingSdkConfig = cfg;
+      return;
+    }
+
     // No app-supplied global — build Ozone's SDK and always register it as the JVM global,
     // so any co-resident library observes the same tracer whenever tracing is valid.
     initOzoneSdk(serviceName, cfg, true);
+  }
+
+  /**
+   * Completes application-aware initialization left pending by {@link #initialize}: adopts an application
+   * GlobalOpenTelemetry registered since then, or builds Ozone's SDK. Called before creating a span with a parent.
+   */
+  private static void initPendingSdk() {
+    if (pendingSdkConfig == null) {
+      return;
+    }
+    synchronized (TracingUtil.class) {
+      final TracingConfig cfg = pendingSdkConfig;
+      if (cfg == null) {
+        return;
+      }
+      try {
+        if (GlobalOpenTelemetry.isSet() && isRealGlobal(GlobalOpenTelemetry.get())) {
+          tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
+          LOG.info("Tracing: adopted application GlobalOpenTelemetry");
+        } else {
+          initOzoneSdk(pendingSdkServiceName, cfg, true);
+          LOG.info("Tracing: built Ozone's OpenTelemetry SDK for {}", pendingSdkServiceName);
+        }
+      } catch (RuntimeException e) {
+        LOG.error("Failed to initialize tracing", e);
+      } finally {
+        pendingSdkServiceName = null;
+        pendingSdkConfig = null;
+      }
+    }
   }
 
   private static void initOzoneSdk(String serviceName, TracingConfig cfg, boolean registerGlobal) {
@@ -228,10 +273,16 @@ public final class TracingUtil {
             .setTracerProvider(tracerProvider)
             .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
             .build();
-        if (!GlobalOpenTelemetry.isSet() || !isRealGlobal(GlobalOpenTelemetry.get())) {
-          GlobalOpenTelemetry.set(sdk);
+        if (!GlobalOpenTelemetry.isSet() && trySetGlobal(sdk)) {
+          tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
+        } else if (isRealGlobal(GlobalOpenTelemetry.get())) {
+          tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
+        } else {
+          // A global was set already, e.g. OpenTelemetry's default after an early GlobalOpenTelemetry.get(); it can't
+          // be replaced, so Ozone uses its SDK without registering it.
+          LOG.info("Tracing: GlobalOpenTelemetry is already set to a no-op, using Ozone's SDK without registering it");
+          tracer = sdk.getTracer(GLOBAL_TRACER_NAME);
         }
-        tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
       } else {
         sdk = OpenTelemetrySdk.builder()
             .setTracerProvider(tracerProvider)
@@ -246,12 +297,25 @@ public final class TracingUtil {
     }
   }
 
+  /** Sets the global, unless another thread has set one first. */
+  private static boolean trySetGlobal(OpenTelemetrySdk sdk) {
+    try {
+      GlobalOpenTelemetry.set(sdk);
+      return true;
+    } catch (IllegalStateException e) {
+      return false;
+    }
+  }
+
   /**
    * Distinguish an application-registered GlobalOpenTelemetry from the OTel built-in noop.
-   * OpenTelemetry.noop() returns a singleton, so identity comparison is sufficient.
+   * OpenTelemetry.noop() returns a singleton. GlobalOpenTelemetry.get() without a registered global installs it wrapped
+   * in another object, which delegates to the same no-op tracer provider, so that is compared too.
    */
   private static boolean isRealGlobal(OpenTelemetry global) {
-    return global != null && global != OpenTelemetry.noop();
+    return global != null && global != OpenTelemetry.noop()
+        && global.getTracerProvider() != OpenTelemetry.noop().getTracerProvider()
+        && global.getTracerProvider() != TracerProvider.noop();
   }
 
   /**
@@ -362,6 +426,7 @@ public final class TracingUtil {
           .startSpan();
     }
 
+    initPendingSdk();
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
     return tracer.spanBuilder(name)
@@ -371,11 +436,11 @@ public final class TracingUtil {
   }
 
   /**
-   * True when the current tracer can actually build spans — an Ozone-owned SDK is configured,
+   * True when the current tracer can actually build spans — an Ozone-owned SDK is configured or pending,
    * or an adopted GlobalOpenTelemetry provides a non-noop tracer.
    */
   private static boolean hasUsableTracer() {
-    if (sdkTracerProvider != null) {
+    if (sdkTracerProvider != null || pendingSdkConfig != null) {
       return true;
     }
     return GlobalOpenTelemetry.isSet() && isRealGlobal(GlobalOpenTelemetry.get());
@@ -610,6 +675,7 @@ public final class TracingUtil {
     Span parentSpan = Span.fromContext(currentContext);
 
     if (parentSpan.getSpanContext().isValid()) {
+      initPendingSdk();
       return tracer.spanBuilder(spanName)
           .setParent(currentContext)
           .setSpanKind(spanKind)
@@ -658,6 +724,7 @@ public final class TracingUtil {
       return createActivatedSpan(spanName);
     }
 
+    initPendingSdk();
     Span span = tracer.spanBuilder(spanName)
         .setParent(remote)
         .setSpanKind(SpanKind.SERVER)
