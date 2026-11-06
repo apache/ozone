@@ -23,6 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
@@ -181,6 +186,20 @@ public class TestReplicationConfig {
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
         org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor),
         replicationConfigClass);
+  }
+
+  /** ozone.replication is the fallback, so it is not read when a replication is passed. */
+  @Test
+  void testParseReadsDefaultReplicationOnlyIfNeeded() {
+    OzoneConfiguration conf = spy(new OzoneConfiguration());
+    conf.set(OZONE_REPLICATION, "ONE");
+
+    assertEquals(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        ReplicationConfig.parse(org.apache.hadoop.hdds.client.ReplicationType.RATIS, "3", conf));
+    verify(conf, never()).get(eq(OZONE_REPLICATION), anyString());
+
+    assertEquals(RatisReplicationConfig.getInstance(ReplicationFactor.ONE),
+        ReplicationConfig.parse(org.apache.hadoop.hdds.client.ReplicationType.RATIS, null, conf));
   }
 
   @ParameterizedTest
