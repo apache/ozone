@@ -228,7 +228,9 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
       }
     }, 100, 5000);
     
-    verify(reconOmTaskMock, times(1))
+    // The task is retried once, and failing again it requests reinitialization.
+    GenericTestUtils.waitFor(reconTaskController::hasTasksFailed, 100, 5000);
+    verify(reconOmTaskMock, times(2))
         .process(any(), anyMap());
     long endTime = System.currentTimeMillis();
 
@@ -241,6 +243,27 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // Task failed so seqNumber should not be updated, and last task status should be -1
     assertEquals(0, seqNumber);
     assertEquals(-1, taskStatus);
+  }
+
+  @Test
+  public void testTaskThrowingOnceIsRetried() throws Exception {
+    ReconOmTask reconOmTaskMock = getMockTask("MockTask");
+    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenThrow(new IllegalStateException("Mock Failure"))
+        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(true).build());
+    reconTaskController.registerTask(reconOmTaskMock);
+    OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
+    when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
+    when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
+    when(omUpdateEventBatchMock.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+
+    ((ReconTaskControllerImpl) reconTaskController).processReconEvent(omUpdateEventBatchMock);
+
+    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
+    assertThat(reconTaskStatus.getLastUpdatedSeqNumber()).isEqualTo(100L);
+    assertThat(reconTaskStatus.getLastTaskRunStatus()).isZero();
+    assertThat(reconTaskController.hasTasksFailed()).isFalse();
+    verify(reconOmTaskMock, times(2)).process(any(), anyMap());
   }
 
   @Test
