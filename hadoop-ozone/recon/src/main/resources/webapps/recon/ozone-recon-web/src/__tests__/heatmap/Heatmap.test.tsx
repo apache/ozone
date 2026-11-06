@@ -132,6 +132,12 @@ describe('Heatmap page', () => {
     await userEvent.type(pathInput, 'bad@path');
 
     expect(screen.getByText('Please enter valid path')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await flushPendingRequests();
+
+    expect(heatmapRequests).toHaveLength(1);
+    expect(heatmapRequests[0].path).toBe('/');
   });
 
   test('fetches heatmap for a new path when the user searches', async () => {
