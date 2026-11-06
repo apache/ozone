@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * recommend to use this if the network topology has more layers.
  * <p>
  */
-public final class SCMContainerPlacementRackScatter
+public class SCMContainerPlacementRackScatter
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
   private static final Logger LOG =
@@ -256,7 +256,7 @@ public final class SCMContainerPlacementRackScatter
           mutableFavoredNodes.add(datanodeDetails);
         }
       }
-      Collections.shuffle(mutableFavoredNodes);
+      Collections.shuffle(mutableFavoredNodes, getRand());
     }
     if (excludedNodes != null) {
       mutableFavoredNodes.removeAll(excludedNodes);
@@ -591,7 +591,7 @@ public final class SCMContainerPlacementRackScatter
   private List<Node> getAllRacks() {
     int rackLevel = networkTopology.getMaxLevel() - 1;
     List<Node> racks = networkTopology.getNodes(rackLevel);
-    Collections.shuffle(racks);
+    Collections.shuffle(racks, getRand());
     return racks;
   }
 

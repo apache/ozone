@@ -65,7 +65,7 @@ public class TestSimplePipelineProvider {
         .setNodeManager(nodeManager)
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .build();
-    provider = new SimplePipelineProvider(nodeManager, stateManager);
+    provider = new SimplePipelineProvider(nodeManager, stateManager, PipelineID::randomId);
   }
 
   @AfterEach

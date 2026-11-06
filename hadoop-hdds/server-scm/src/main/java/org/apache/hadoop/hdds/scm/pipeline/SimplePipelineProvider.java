@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -35,8 +36,8 @@ public class SimplePipelineProvider
     extends PipelineProvider<StandaloneReplicationConfig> {
 
   public SimplePipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager) {
-    super(nodeManager, stateManager);
+      PipelineStateManager stateManager, Supplier<PipelineID> pipelineIdGenerator) {
+    super(nodeManager, stateManager, pipelineIdGenerator);
   }
 
   @Override
@@ -62,7 +63,7 @@ public class SimplePipelineProvider
 
     Collections.shuffle(dns);
     return newPipelineBuilder(replicationConfig, dns.subList(0, replicationConfig.getReplicationFactor().getNumber()))
-        .setId(PipelineID.randomId())
+        .setId(newPipelineID())
         .build();
   }
 
@@ -70,7 +71,7 @@ public class SimplePipelineProvider
   public Pipeline create(StandaloneReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
     return newPipelineBuilder(replicationConfig, nodes)
-        .setId(PipelineID.randomId())
+        .setId(newPipelineID())
         .build();
   }
 
