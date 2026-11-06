@@ -67,12 +67,12 @@ public abstract class TestOzoneRpcClientWithKeyLatestVersion implements NonHATes
 
       for (boolean versioning : new boolean[] {false, true}) {
         String bucketName = UUID.randomUUID().toString();
-        volume.createBucket(bucketName,
-            BucketArgs.newBuilder()
-                .setVersioning(versioning)
-                .build());
+        volume.createBucket(bucketName, BucketArgs.newBuilder().build());
 
         OzoneBucket bucket = volume.getBucket(bucketName);
+        if (versioning) {
+          bucket.setVersioning(true);
+        }
         String keyName = UUID.randomUUID().toString();
         byte[] content = RandomUtils.secure().randomBytes(128);
         int versions = RandomUtils.secure().randomInt(2, 5);

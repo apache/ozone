@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.BekInfoUtils;
@@ -39,6 +40,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -186,10 +188,28 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
       //Check Versioning to update
       Boolean versioning = omBucketArgs.getIsVersionEnabled();
+      BucketVersioningStatus newVersioningStatus = omBucketArgs.getVersioningStatus();
       if (versioning != null) {
+        // Overridden below when a status is also being set.
         bucketInfoBuilder.setIsVersionEnabled(versioning);
-        LOG.debug("Updating bucket versioning for bucket: {} in volume: {}",
-            bucketName, volumeName);
+      }
+      if (newVersioningStatus == null && versioning != null
+          && dbBucketInfo.hasVersioningStatus()) {
+        // Legacy flag on a bucket that already has a status: true maps to ENABLED, false to SUSPENDED.
+        // On a bucket without a status, the flag only drives the legacy feature.
+        newVersioningStatus = versioning
+            ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED;
+      }
+      if (newVersioningStatus != null) {
+        if (!dbBucketInfo.getVersioningStatus().canTransitionTo(newVersioningStatus)) {
+          throw new OMException("Bucket versioning cannot be changed from "
+              + dbBucketInfo.getVersioningStatus() + " to " + newVersioningStatus
+              + "; once enabled, versioning can only be suspended.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
+        bucketInfoBuilder.setVersioningStatus(newVersioningStatus);
+        LOG.debug("Updating bucket versioning to {} for bucket: {} in volume: {}",
+            newVersioningStatus, bucketName, volumeName);
       }
 
       //Check quotaInBytes and quotaInNamespace to update
@@ -383,6 +403,28 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.SetBucketProperty
+  )
+  public static OMRequest disallowSetBucketPropertyWithVersioningStatus(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager().isAllowed(OzoneManagerVersion.S3_OBJECT_VERSIONING)) {
+      SetBucketPropertyRequest propReq =
+          req.getSetBucketPropertyRequest();
+      if (propReq.hasBucketArgs()
+          && propReq.getBucketArgs().hasVersioningStatus()) {
+        throw new OMException("Cluster does not have the object versioning"
+            + " feature finalized yet, but the request contains a bucket"
+            + " versioning status. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }
