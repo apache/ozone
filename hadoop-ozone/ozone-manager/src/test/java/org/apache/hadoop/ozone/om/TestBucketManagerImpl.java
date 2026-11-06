@@ -62,7 +62,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -247,7 +246,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
     assertEquals(volumeName, result.getVolumeName());
     assertEquals(bucketName, result.getBucketName());
     assertEquals(StorageType.DISK, result.getStorageType());
-    assertFalse(result.isVersionEnabled());
+    assertFalse(result.getIsVersionEnabled());
   }
 
   private void createBucket(OMMetadataManager metadataManager,
@@ -298,7 +297,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
     writeClient.createBucket(bucketInfo);
     OmBucketInfo result = bucketManager.getBucketInfo(
         volume, "bucket-one");
-    assertFalse(result.isVersionEnabled());
+    assertFalse(result.getIsVersionEnabled());
     OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
         .setVolumeName(volume)
         .setBucketName("bucket-one")
@@ -307,7 +306,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
     writeClient.setBucketProperty(bucketArgs);
     OmBucketInfo updatedResult = bucketManager.getBucketInfo(
         volume, "bucket-one");
-    assertTrue(updatedResult.isVersionEnabled());
+    assertTrue(updatedResult.getIsVersionEnabled());
   }
 
   @Test
@@ -405,14 +404,10 @@ class TestBucketManagerImpl extends OzoneTestBase {
         .setUsedBytes(10 * 1024)
         .setUsedNamespace(5 * 1024)
         .setStorageType(StorageType.SSD)
+        .setIsVersionEnabled(true)
         .addAllMetadata(singletonMap("CustomKey", "CustomValue"))
         .build();
     writeClient.createBucket(bucketInfo);
-    writeClient.setBucketProperty(OmBucketArgs.newBuilder()
-        .setVolumeName(volume)
-        .setBucketName("bucket-one")
-        .setVersioningStatus(BucketVersioningStatus.ENABLED)
-        .build());
 
     OmBucketInfo bucketLinkInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volume)
@@ -479,7 +474,9 @@ class TestBucketManagerImpl extends OzoneTestBase {
     assertEquals(
         bucketInfo.getStorageType(),
         storedLinkBucket.getStorageType());
-    assertTrue(storedLinkBucket.isVersionEnabled());
+    assertEquals(
+        bucketInfo.getIsVersionEnabled(),
+        storedLinkBucket.getIsVersionEnabled());
   }
 
   @Test

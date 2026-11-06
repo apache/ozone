@@ -116,7 +116,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
 
     assertTrue(omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName))
-        .isVersionEnabled());
+        .getIsVersionEnabled());
 
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -490,7 +490,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     assertTrue(response.getOMResponse().getSuccess());
     OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(BucketVersioningStatus.ENABLED, dbBucketInfo.getVersioningStatus());
-    assertTrue(dbBucketInfo.isVersionEnabled());
+    assertTrue(dbBucketInfo.getIsVersionEnabled());
 
     // ENABLED -> SUSPENDED
     response = new OMBucketSetPropertyRequest(
@@ -499,7 +499,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     assertTrue(response.getOMResponse().getSuccess());
     dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(BucketVersioningStatus.SUSPENDED, dbBucketInfo.getVersioningStatus());
-    assertFalse(dbBucketInfo.isVersionEnabled());
+    assertFalse(dbBucketInfo.getIsVersionEnabled());
 
     // SUSPENDED -> UNVERSIONED is rejected
     response = new OMBucketSetPropertyRequest(
@@ -578,31 +578,48 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
   }
 
   @Test
-  public void testDeprecatedVersioningFlagMapsToVersioningStatus()
-      throws Exception {
+  public void testLegacyVersioningFlagMapsToStateMachine() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
-    // true from an older client enables versioning
+    // legacy false on a never-enabled bucket stays UNVERSIONED
     OMClientResponse response = new OMBucketSetPropertyRequest(
-        createSetVersioningFlagRequest(volumeName, bucketName, true))
+        createSetVersioningFlagRequest(volumeName, bucketName, false))
         .validateAndUpdateCache(ozoneManager, 1);
     assertTrue(response.getOMResponse().getSuccess());
-    OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
-    assertEquals(BucketVersioningStatus.ENABLED, dbBucketInfo.getVersioningStatus());
-    assertTrue(dbBucketInfo.isVersionEnabled());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
 
-    // false suspends it rather than going back to UNVERSIONED
+    // legacy true does NOT opt the bucket into S3 versioning: it only sets the
+    // legacy flag, which selects the in-record block version list
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningFlagRequest(volumeName, bucketName, true))
+        .validateAndUpdateCache(ozoneManager, 2);
+    assertTrue(response.getOMResponse().getSuccess());
+    OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertFalse(dbBucketInfo.hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        dbBucketInfo.getVersioningStatus());
+    assertTrue(dbBucketInfo.getIsVersionEnabled());
+
+    // once a status exists, an old client's flag is kept consistent with it:
+    // disabling maps to SUSPENDED rather than back to UNVERSIONED
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED))
+        .validateAndUpdateCache(ozoneManager, 3);
+    assertTrue(response.getOMResponse().getSuccess());
+
     response = new OMBucketSetPropertyRequest(
         createSetVersioningFlagRequest(volumeName, bucketName, false))
-        .validateAndUpdateCache(ozoneManager, 2);
+        .validateAndUpdateCache(ozoneManager, 4);
     assertTrue(response.getOMResponse().getSuccess());
     dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(BucketVersioningStatus.SUSPENDED, dbBucketInfo.getVersioningStatus());
-    assertFalse(dbBucketInfo.isVersionEnabled());
+    assertFalse(dbBucketInfo.getIsVersionEnabled());
   }
 
   @Test
@@ -627,16 +644,12 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
             .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
         omException.getResult());
 
-    // the deprecated flag is read as a versioning status, so it is rejected too
+    // requests without a versioningStatus pass through untouched
     OMRequest legacyRequest = createSetVersioningFlagRequest(
         UUID.randomUUID().toString(), UUID.randomUUID().toString(), true);
-    omException = assertThrows(OMException.class,
-        () -> OMBucketSetPropertyRequest
-            .disallowSetBucketPropertyWithVersioningStatus(
-                legacyRequest, preFinalizedContext));
-    assertEquals(OMException.ResultCodes
-            .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
-        omException.getResult());
+    assertSame(legacyRequest, OMBucketSetPropertyRequest
+        .disallowSetBucketPropertyWithVersioningStatus(
+            legacyRequest, preFinalizedContext));
 
     // after finalization the request passes through untouched
     OMVersionManager finalizedVersionManager =

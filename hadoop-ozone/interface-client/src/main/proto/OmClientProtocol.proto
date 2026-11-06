@@ -829,8 +829,7 @@ message BucketInfo {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated OzoneAclInfo acls = 3;
-    // Deprecated, use versioningStatus. Written for older readers only.
-    required bool isVersionEnabled = 4 [default = false, deprecated = true];
+    required bool isVersionEnabled = 4 [default = false];
     required hadoop.hdds.StorageTypeProto storageType = 5 [default = DISK];
     optional uint64 creationTime = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
@@ -850,7 +849,8 @@ message BucketInfo {
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
     repeated hadoop.hdds.KeyValue tags = 23;
-    // S3-compatible object versioning status; UNVERSIONED when absent.
+    // S3-compatible object versioning status. When absent, the bucket is UNVERSIONED and
+    // isVersionEnabled alone drives the legacy feature. When set, isVersionEnabled follows it.
     optional BucketVersioningStatusProto versioningStatus = 24;
 }
 
@@ -928,8 +928,7 @@ message DataEncryptionKeyProto {
 message BucketArgs {
     required string volumeName = 1;
     required string bucketName = 2;
-    // Deprecated, use versioningStatus. true means ENABLED, false SUSPENDED.
-    optional bool isVersionEnabled = 5 [deprecated = true];
+    optional bool isVersionEnabled = 5;
     optional hadoop.hdds.StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
@@ -938,7 +937,8 @@ message BucketArgs {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
     repeated hadoop.hdds.KeyValue tags = 13;
-    // S3-compatible object versioning status.
+    // S3-compatible object versioning status. Takes precedence over
+    // isVersionEnabled when both are set.
     optional BucketVersioningStatusProto versioningStatus = 14;
 }
 

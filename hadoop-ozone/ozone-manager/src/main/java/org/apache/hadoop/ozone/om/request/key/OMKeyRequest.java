@@ -1032,9 +1032,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // as new versions unless the bucket does not have versioning
       // turned on.
       dbKeyInfo.addNewVersion(locations, false,
-              omBucketInfo.isVersionEnabled());
+              omBucketInfo.getIsVersionEnabled());
       long newSize = size;
-      if (omBucketInfo.isVersionEnabled()) {
+      if (omBucketInfo.getIsVersionEnabled()) {
         newSize += dbKeyInfo.getDataSize();
       }
       // The modification time is set in preExecute. Use the same

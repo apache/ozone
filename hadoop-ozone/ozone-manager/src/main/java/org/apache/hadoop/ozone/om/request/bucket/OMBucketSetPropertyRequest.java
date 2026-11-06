@@ -187,7 +187,19 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
 
       //Check Versioning to update
+      Boolean versioning = omBucketArgs.getIsVersionEnabled();
       BucketVersioningStatus newVersioningStatus = omBucketArgs.getVersioningStatus();
+      if (versioning != null) {
+        // Overridden below when a status is also being set.
+        bucketInfoBuilder.setIsVersionEnabled(versioning);
+      }
+      if (newVersioningStatus == null && versioning != null
+          && dbBucketInfo.hasVersioningStatus()) {
+        // Legacy flag on a bucket that already has a status: true maps to ENABLED, false to SUSPENDED.
+        // On a bucket without a status, the flag only drives the legacy feature.
+        newVersioningStatus = versioning
+            ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED;
+      }
       if (newVersioningStatus != null) {
         if (!dbBucketInfo.getVersioningStatus().canTransitionTo(newVersioningStatus)) {
           throw new OMException("Bucket versioning cannot be changed from "
@@ -407,10 +419,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     if (!ctx.versionManager().isAllowed(OzoneManagerVersion.S3_OBJECT_VERSIONING)) {
       SetBucketPropertyRequest propReq =
           req.getSetBucketPropertyRequest();
-      // The deprecated isVersionEnabled flag also maps to a versioning status.
       if (propReq.hasBucketArgs()
-          && (propReq.getBucketArgs().hasVersioningStatus()
-          || propReq.getBucketArgs().hasIsVersionEnabled())) {
+          && propReq.getBucketArgs().hasVersioningStatus()) {
         throw new OMException("Cluster does not have the object versioning"
             + " feature finalized yet, but the request contains a bucket"
             + " versioning status. Rejecting the request, please finalize the"
