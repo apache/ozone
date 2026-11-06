@@ -937,10 +937,10 @@ public final class OMFileRequest {
           return false;
         }
 
-        // If child found in DB, check if it's marked as deleted in cache
-        CacheValue<OmDirectoryInfo> cacheValue = dirTable.getCacheValue(new CacheKey<>(dbKey));
-        if (cacheValue != null && cacheValue.getCacheValue() == null) {
-          // Entry is in DB but marked for deletion in cache, ignore it and check next entry
+        // The iterator is a point-in-time view of the DB, so the child may have been deleted since it was opened.
+        // isExist first looks in the cache, where an unflushed delete leaves a marker, and then reads the DB again,
+        // which covers a delete that the double buffer has flushed and evicted from the cache in the meantime.
+        if (!dirTable.isExist(dbKey)) {
           continue;
         }
 
@@ -995,10 +995,8 @@ public final class OMFileRequest {
           return false;
         }
 
-        // If child found in DB, check if it's marked as deleted in cache
-        CacheValue<OmKeyInfo> cacheValue = fileTable.getCacheValue(new CacheKey<>(dbKey));
-        if (cacheValue != null && cacheValue.getCacheValue() == null) {
-          // Entry is in DB but marked for deletion in cache, ignore it and check next entry
+        // Same as in checkSubDirectoryExists: the child may have been deleted since the iterator was opened.
+        if (!fileTable.isExist(dbKey)) {
           continue;
         }
 
