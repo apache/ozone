@@ -23,8 +23,11 @@ import static org.apache.hadoop.util.StringUtils.byteDesc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -32,6 +35,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -594,6 +598,98 @@ class TestContainerBalancerSubCommand {
     startCmd.execute(scmClient);
 
     assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
+  }
+
+  @Test
+  void testContainerBalancerStartSubcommandAutoConfigStartsWithRecommendedValues() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+    when(scmClient.startContainerBalancer(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(StorageContainerLocationProtocolProtos
+            .StartContainerBalancerResponseProto.newBuilder()
+            .setStart(true)
+            .build());
+
+    parseSubcommand(startCmd, "--auto-config");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Starting with auto-configured parameters (profile: MEDIUM)")
+        .contains("Container Balancer started successfully.");
+    verify(scmClient).startContainerBalancer(
+        eq(Optional.of(10.0)),
+        any(), eq(Optional.of(20)), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testContainerBalancerStartSubcommandAutoConfigEnteringTargetOverrideUsesRecommendation() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+    when(scmClient.startContainerBalancer(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(StorageContainerLocationProtocolProtos
+            .StartContainerBalancerResponseProto.newBuilder()
+            .setStart(true)
+            .build());
+
+    parseSubcommand(startCmd, "--auto-config", "-e", "6");
+    startCmd.execute(scmClient);
+
+    verify(scmClient).startContainerBalancer(
+        any(), any(), any(), any(), eq(Optional.of(6L)), any(), any(), any(), any(), any(), any(), any(),
+        any(), any());
+  }
+
+  @Test
+  void testContainerBalancerStartSubcommandAutoConfigIterationsOverride() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+    when(scmClient.startContainerBalancer(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(StorageContainerLocationProtocolProtos
+            .StartContainerBalancerResponseProto.newBuilder()
+            .setStart(true)
+            .build());
+
+    parseSubcommand(startCmd, "--auto-config", "-i", "3");
+    startCmd.execute(scmClient);
+
+    verify(scmClient).startContainerBalancer(
+        any(), eq(Optional.of(3)), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+        any());
+  }
+
+  @Test
+  void testContainerBalancerStartSubcommandProfileRequiresAutoConfig() {
+    parseSubcommand(startCmd, "--profile", "medium");
+    ScmClient scmClient = mock(ScmClient.class);
+    IOException ex = assertThrows(IOException.class, () -> startCmd.execute(scmClient));
+    assertThat(ex.getMessage()).contains("--profile requires --auto-config");
+  }
+
+  @Test
+  void testContainerBalancerStartSubcommandAutoConfigWhenClusterBalancedDoesNotStart() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.DatanodeUsageInfoProto> balanced = new ArrayList<>();
+    long capacity = OzoneConsts.TB;
+    balanced.add(datanodeUsageProto("dn-1", capacity, (long) (capacity * 0.70)));
+    balanced.add(datanodeUsageProto("dn-2", capacity, (long) (capacity * 0.70)));
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE)).thenReturn(balanced);
+
+    parseSubcommand(startCmd, "--auto-config");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Cluster is already balanced within the configured threshold.")
+        .contains("No balancing recommended.")
+        .doesNotContain("Starting with auto-configured parameters")
+        .doesNotContain("Container Balancer started successfully.");
+    verify(scmClient, never()).startContainerBalancer(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test

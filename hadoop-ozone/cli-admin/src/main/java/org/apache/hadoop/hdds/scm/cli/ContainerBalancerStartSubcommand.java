@@ -18,10 +18,13 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerRecommendation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -31,13 +34,24 @@ import picocli.CommandLine.Option;
  */
 @Command(
     name = "start",
-    description = "Start ContainerBalancer",
+    description = "Start ContainerBalancer. With --auto-config, recommends configuration from "
+        + "current cluster imbalance (profile MEDIUM by default), applying any explicit balancer "
+        + "flags during recommendation, and starts with the recommended values.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @CommandLine.Mixin
   private ContainerBalancerConfigOptions configOptions;
+
+  @Option(names = {"--auto-config"},
+      description = "Recommend configuration from current cluster imbalance and start with those "
+          + "values. Uses profile MEDIUM by default; override with --profile. Default false.")
+  private boolean autoConfig;
+
+  @Option(names = {"--profile"},
+      description = "Throttling profile for --auto-config: SLOW, MEDIUM, or FAST. Default MEDIUM.")
+  private Optional<String> profileName;
 
   @Option(names = {"-i", "--iterations"},
       description = "Maximum consecutive iterations that " +
@@ -68,16 +82,59 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (!autoConfig && profileName.isPresent()) {
+      throw new IOException("--profile requires --auto-config.");
+    }
+
+    Optional<Double> threshold = configOptions.getThreshold();
+    Optional<Integer> effectiveIterations = iterations;
+    Optional<Integer> maxDatanodesPercentage = configOptions.getMaxDatanodesPercentageToInvolvePerIteration();
+    Optional<Long> maxSizeToMovePerIterationInGB = configOptions.getMaxSizeToMovePerIterationInGB();
+    Optional<Long> maxSizeEnteringTargetInGB = configOptions.getMaxSizeEnteringTargetInGB();
+    Optional<Long> maxSizeLeavingSourceInGB = configOptions.getMaxSizeLeavingSourceInGB();
+    Optional<Integer> balancingIntervalMinutes = configOptions.getBalancingIntervalMinutes();
+    Optional<Integer> moveTimeoutMinutes = configOptions.getMoveTimeoutMinutes();
+    Optional<Integer> moveReplicationTimeoutMinutes = configOptions.getMoveReplicationTimeoutMinutes();
+
+    if (autoConfig) {
+      List<DatanodeUsageInfoProto> nodes = scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE);
+      if (nodes == null || nodes.isEmpty()) {
+        throw new IOException("No datanode usage information available from SCM.");
+      }
+      
+      ContainerBalancerRecommendation recommendation = ContainerBalancerCliHelper.recommendForAutoConfig(
+          getOzoneConf(), nodes, configOptions, profileName);
+      if (recommendation.isClusterBalanced()) {
+        out().println("Cluster is already balanced within the configured threshold. "
+            + "No balancing recommended.");
+        return;
+      }
+      
+      ContainerBalancerCliHelper.EffectiveStartParameters effective =
+          ContainerBalancerCliHelper.startParametersFromRecommendation(recommendation, iterations, configOptions);
+      threshold = effective.getThreshold();
+      effectiveIterations = effective.getIterations();
+      maxDatanodesPercentage = effective.getMaxDatanodesPercentageToInvolvePerIteration();
+      maxSizeToMovePerIterationInGB = effective.getMaxSizeToMovePerIterationInGB();
+      maxSizeEnteringTargetInGB = effective.getMaxSizeEnteringTargetInGB();
+      maxSizeLeavingSourceInGB = effective.getMaxSizeLeavingSourceInGB();
+      balancingIntervalMinutes = effective.getBalancingIntervalMinutes();
+      moveTimeoutMinutes = effective.getMoveTimeoutMinutes();
+      moveReplicationTimeoutMinutes = effective.getMoveReplicationTimeoutMinutes();
+      out().printf("Starting with auto-configured parameters (profile: %s).%n",
+          recommendation.getProfile().name());
+    }
+
     StartContainerBalancerResponseProto response = scmClient.startContainerBalancer(
-        configOptions.getThreshold(),
-        iterations,
-        configOptions.getMaxDatanodesPercentageToInvolvePerIteration(),
-        configOptions.getMaxSizeToMovePerIterationInGB(),
-        configOptions.getMaxSizeEnteringTargetInGB(),
-        configOptions.getMaxSizeLeavingSourceInGB(),
-        configOptions.getBalancingIntervalMinutes(),
-        configOptions.getMoveTimeoutMinutes(),
-        configOptions.getMoveReplicationTimeoutMinutes(),
+        threshold,
+        effectiveIterations,
+        maxDatanodesPercentage,
+        maxSizeToMovePerIterationInGB,
+        maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB,
+        balancingIntervalMinutes,
+        moveTimeoutMinutes,
+        moveReplicationTimeoutMinutes,
         networkTopologyEnable,
         configOptions.getIncludeNodes(),
         configOptions.getExcludeNodes(),

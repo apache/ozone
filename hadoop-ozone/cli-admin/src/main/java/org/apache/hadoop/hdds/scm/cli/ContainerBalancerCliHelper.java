@@ -23,10 +23,14 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerAdvisor;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerEstimation;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerProfile;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerRecommendation;
@@ -129,5 +133,170 @@ public final class ContainerBalancerCliHelper {
       return String.valueOf((long) thresholdPercent);
     }
     return String.valueOf(thresholdPercent);
+  }
+
+  /** Start parameters derived from a recommendation for {@code startContainerBalancer}. */
+  public static final class EffectiveStartParameters {
+    private final Optional<Double> threshold;
+    private final Optional<Integer> iterations;
+    private final Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
+    private final Optional<Long> maxSizeToMovePerIterationInGB;
+    private final Optional<Long> maxSizeEnteringTargetInGB;
+    private final Optional<Long> maxSizeLeavingSourceInGB;
+    private final Optional<Integer> balancingIntervalMinutes;
+    private final Optional<Integer> moveTimeoutMinutes;
+    private final Optional<Integer> moveReplicationTimeoutMinutes;
+
+    private EffectiveStartParameters(Builder b) {
+      this.threshold = b.threshold;
+      this.iterations = b.iterations;
+      this.maxDatanodesPercentageToInvolvePerIteration = b.maxDatanodesPercentageToInvolvePerIteration;
+      this.maxSizeToMovePerIterationInGB = b.maxSizeToMovePerIterationInGB;
+      this.maxSizeEnteringTargetInGB = b.maxSizeEnteringTargetInGB;
+      this.maxSizeLeavingSourceInGB = b.maxSizeLeavingSourceInGB;
+      this.balancingIntervalMinutes = b.balancingIntervalMinutes;
+      this.moveTimeoutMinutes = b.moveTimeoutMinutes;
+      this.moveReplicationTimeoutMinutes = b.moveReplicationTimeoutMinutes;
+    }
+    
+    static Builder builder() {
+      return new Builder();
+    }
+    
+    static final class Builder {
+      private Optional<Double> threshold = Optional.empty();
+      private Optional<Integer> iterations = Optional.empty();
+      private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration = Optional.empty();
+      private Optional<Long> maxSizeToMovePerIterationInGB = Optional.empty();
+      private Optional<Long> maxSizeEnteringTargetInGB = Optional.empty();
+      private Optional<Long> maxSizeLeavingSourceInGB = Optional.empty();
+      private Optional<Integer> balancingIntervalMinutes = Optional.empty();
+      private Optional<Integer> moveTimeoutMinutes = Optional.empty();
+      private Optional<Integer> moveReplicationTimeoutMinutes = Optional.empty();
+      
+      Builder threshold(Optional<Double> v) { 
+        this.threshold = v; return this; 
+      }
+      
+      Builder iterations(Optional<Integer> v) { 
+        this.iterations = v; return this;
+      }
+      
+      Builder maxDatanodesPercentageToInvolvePerIteration(Optional<Integer> v) {
+        this.maxDatanodesPercentageToInvolvePerIteration = v; return this;
+      }
+      
+      Builder maxSizeToMovePerIterationInGB(Optional<Long> v) {
+        this.maxSizeToMovePerIterationInGB = v; return this;
+      }
+      
+      Builder maxSizeEnteringTargetInGB(Optional<Long> v) {
+        this.maxSizeEnteringTargetInGB = v; return this;
+      }
+      
+      Builder maxSizeLeavingSourceInGB(Optional<Long> v) {
+        this.maxSizeLeavingSourceInGB = v; return this;
+      }
+      
+      Builder balancingIntervalMinutes(Optional<Integer> v) {
+        this.balancingIntervalMinutes = v; return this;
+      }
+      
+      Builder moveTimeoutMinutes(Optional<Integer> v) { 
+        this.moveTimeoutMinutes = v; return this;
+      }
+      
+      Builder moveReplicationTimeoutMinutes(Optional<Integer> v) {
+        this.moveReplicationTimeoutMinutes = v; return this;
+      }
+      
+      EffectiveStartParameters build() {
+        return new EffectiveStartParameters(this);
+      }
+    }
+
+    public Optional<Double> getThreshold() {
+      return threshold;
+    }
+
+    public Optional<Integer> getIterations() {
+      return iterations;
+    }
+
+    public Optional<Integer> getMaxDatanodesPercentageToInvolvePerIteration() {
+      return maxDatanodesPercentageToInvolvePerIteration;
+    }
+
+    public Optional<Long> getMaxSizeToMovePerIterationInGB() {
+      return maxSizeToMovePerIterationInGB;
+    }
+
+    public Optional<Long> getMaxSizeEnteringTargetInGB() {
+      return maxSizeEnteringTargetInGB;
+    }
+
+    public Optional<Long> getMaxSizeLeavingSourceInGB() {
+      return maxSizeLeavingSourceInGB;
+    }
+
+    public Optional<Integer> getBalancingIntervalMinutes() {
+      return balancingIntervalMinutes;
+    }
+
+    public Optional<Integer> getMoveTimeoutMinutes() {
+      return moveTimeoutMinutes;
+    }
+
+    public Optional<Integer> getMoveReplicationTimeoutMinutes() {
+      return moveReplicationTimeoutMinutes;
+    }
+  }
+
+  public static ContainerBalancerRecommendation recommendForAutoConfig(
+      OzoneConfiguration conf, List<DatanodeUsageInfoProto> nodes, ContainerBalancerConfigOptions configOptions,
+      Optional<String> profileName) throws IOException {
+    ContainerBalancerAdvisor.AdvisorRequest request = new ContainerBalancerAdvisor.AdvisorRequest().setNodes(nodes);
+    configOptions.applyToEstimateRequest(request);
+    ContainerBalancerProfile profile = profileName.isPresent()
+        ? parseProfile(profileName.get())
+        : ContainerBalancerProfile.MEDIUM;
+    request.setProfile(profile);
+
+    List<ContainerBalancerRecommendation> recommendations;
+    try {
+      recommendations = ContainerBalancerAdvisor.recommend(conf, request);
+    } catch (IllegalArgumentException e) {
+      throw new IOException(e.getMessage(), e);
+    }
+
+    if (recommendations.isEmpty()) {
+      throw new IOException("No container balancer recommendation returned.");
+    }
+
+    ContainerBalancerRecommendation recommendation = recommendations.get(0);
+    if (!recommendation.succeeded()) {
+      throw new IOException(recommendation.getFailureMessage());
+    }
+    return recommendation;
+  }
+
+  /** Maps a recommendation to explicit start optionals, {@code -i} overrides recommended iterations. */
+  public static EffectiveStartParameters startParametersFromRecommendation(
+      ContainerBalancerRecommendation recommendation,
+      Optional<Integer> iterationsOverride, ContainerBalancerConfigOptions configOptions) {
+    Optional<Integer> effectiveIterations = iterationsOverride.isPresent()
+        ? iterationsOverride
+        : Optional.of(recommendation.getRecommendedIterations());
+    return EffectiveStartParameters.builder()
+        .threshold(Optional.of(recommendation.getThresholdPercent()))
+        .iterations(effectiveIterations)
+        .maxDatanodesPercentageToInvolvePerIteration(Optional.of(recommendation.getMaxDatanodesPercentage()))
+        .maxSizeToMovePerIterationInGB(Optional.of(bytesToGb(recommendation.getMaxSizeToMovePerIteration())))
+        .maxSizeEnteringTargetInGB(Optional.of(bytesToGb(recommendation.getMaxSizeEnteringTarget())))
+        .maxSizeLeavingSourceInGB(Optional.of(bytesToGb(recommendation.getMaxSizeLeavingSource())))
+        .balancingIntervalMinutes(configOptions.getBalancingIntervalMinutes())
+        .moveTimeoutMinutes(configOptions.getMoveTimeoutMinutes())
+        .moveReplicationTimeoutMinutes(configOptions.getMoveReplicationTimeoutMinutes())
+        .build();
   }
 }
