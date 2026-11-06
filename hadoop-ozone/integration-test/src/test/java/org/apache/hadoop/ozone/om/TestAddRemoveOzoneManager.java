@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OzoneManagerHATests.createKey;
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
@@ -29,6 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -37,8 +41,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdfs.server.common.Storage;
@@ -60,9 +71,16 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
+import org.apache.ratis.proto.RaftProtos.AppendEntriesRequestProto;
+import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.SetConfigurationRequest;
+import org.apache.ratis.protocol.exceptions.ReconfigurationInProgressException;
+import org.apache.ratis.server.RaftConfiguration;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.leader.FollowerInfo;
+import org.apache.ratis.util.CodeInjectionForTesting;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
@@ -661,4 +679,173 @@ public class TestAddRemoveOzoneManager {
     String key = createKey(bucket);
     assertNotNull(bucket.getKey(key));
   }
+
+  @Test
+  public void testBootstrapSurvivesLeadershipLoss() throws Exception {
+    // Setup cluster with 3 voting OMs
+    setupCluster(3);
+
+    OzoneManager leader = cluster.waitForLeaderOM();
+    List<String> expectedPeers = cluster.getOzoneManagersList().stream()
+        .map(OzoneManager::getOMNodeId).collect(Collectors.toList());
+    String slowFollower = expectedPeers.stream().filter(id -> !id.equals(leader.getOMNodeId())).findFirst().get();
+    String newNodeId = "om-bootstrap-leadership-loss";
+    expectedPeers.add(newNodeId);
+
+    // Keep the new OM alive during the forced election.
+    cluster.getConf().setTimeDuration(OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY, 60, TimeUnit.SECONDS);
+    cluster.getConf().setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
+
+    String appendEntries = "RaftServerImpl.appendEntries";
+    AtomicBoolean newOMWasSentChange = new AtomicBoolean();
+    CountDownLatch releaseAppends = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      // Block one follower while keeping the old quorum available.
+      // Also block the new OM at the membership change, so the new quorum becomes unavailable.
+      CodeInjectionForTesting.put(appendEntries, (localId, remoteId, args) -> {
+        String local = String.valueOf(localId);
+        if (local.equals(newNodeId) && args.length > 1 && args[1] instanceof AppendEntriesRequestProto
+            && ((AppendEntriesRequestProto) args[1]).getEntriesList().stream().anyMatch(
+                entry -> entry.hasConfigurationEntry() && entry.getConfigurationEntry().getPeersList().stream()
+                    .anyMatch(peer -> peer.getId().toStringUtf8().equals(newNodeId)))) {
+          newOMWasSentChange.set(true);
+        }
+        if (local.equals(slowFollower) || (local.equals(newNodeId) && newOMWasSentChange.get())) {
+          try {
+            if (!releaseAppends.await(120, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("Timed out waiting to release AppendEntries");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        }
+        return false;
+      });
+
+      // Resume replication once the old leader steps down.
+      Future<?> release = executor.submit(() -> {
+        try {
+          GenericTestUtils.waitFor(() -> newOMWasSentChange.get() && !leader.isLeaderReady(), 20, 120000);
+        } finally {
+          releaseAppends.countDown();
+        }
+        return null;
+      });
+
+      // Spy on the old leader's RaftServer; keep the real Ratis result.
+      OzoneManagerRatisServer ratisServer = leader.getOmRatisServer();
+      RaftServer server = spy((RaftServer) FieldUtils.readField(ratisServer, "server", true));
+      FieldUtils.writeField(ratisServer, "server", server, true);
+
+      // Delay the failure reply until the new leader has applied the membership change.
+      // This keeps bootstrap retries from racing with the election.
+      AtomicBoolean leadershipLossReply = new AtomicBoolean();
+      doAnswer(invocation -> {
+        RaftClientReply reply = (RaftClientReply) invocation.callRealMethod();
+        if (reply.getNotLeaderException() != null) {
+          leadershipLossReply.set(true);
+          GenericTestUtils.waitFor(() -> {
+            OzoneManager newLeader = cluster.getOMLeader();
+            if (newLeader == null || newLeader == leader) {
+              return false;
+            }
+            OzoneManagerRatisServer newRatisServer = newLeader.getOmRatisServer();
+            RaftConfiguration configuration = newRatisServer.getServerDivision().getRaftConf();
+            return configuration.getPreviousPeers().isEmpty()
+                && getCurrentPeersFromRaftConf(newRatisServer).containsAll(expectedPeers)
+                && newRatisServer.getLastAppliedTermIndex().getIndex() >= configuration.getLogEntryIndex();
+          }, 100, 120000);
+        }
+        return reply;
+      }).when(server).setConfiguration(any(SetConfigurationRequest.class));
+
+      // Bootstrap must recover from the real leadership loss.
+      cluster.bootstrapOzoneManager(newNodeId, true, false);
+      release.get(120, TimeUnit.SECONDS);
+
+      assertTrue(leadershipLossReply.get(), "Ratis must return a real leadership-loss reply");
+      assertTrue(newOMWasSentChange.get(), "New OM must receive the membership change before leadership is lost");
+
+      // All OMs must agree on the four members, with the new OM still running.
+      GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null && cluster.getOzoneManagersList().stream()
+          .allMatch(om -> om.getOmRatisServer().getServerDivision().getRaftConf().getPreviousPeers().isEmpty()
+              && getCurrentPeersFromRaftConf(om.getOmRatisServer()).containsAll(expectedPeers)), 100, 120000);
+      assertTrue(cluster.getOzoneManager(newNodeId).isRunning());
+      assertNewOMExistsInPeerList(newNodeId);
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        assertThat(getCurrentPeersFromRaftConf(om.getOmRatisServer()))
+            .containsExactlyInAnyOrderElementsOf(expectedPeers);
+      }
+    } finally {
+      // Release blocked RPCs even if bootstrap fails.
+      releaseAppends.countDown();
+      CodeInjectionForTesting.remove(appendEntries);
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Leadership watcher did not stop");
+    }
+  }
+
+  @Test
+  public void testBootstrapRetriesAfterRpcTimeout() throws Exception {
+    // Setup cluster with 1 voting OM.
+    setupCluster(1);
+    OzoneManager leader = cluster.waitForLeaderOM();
+
+    // Control the first two replies while letting Ratis perform the actual change.
+    OzoneManagerRatisServer ratisServer = leader.getOmRatisServer();
+    RaftServer server = spy((RaftServer) FieldUtils.readField(ratisServer, "server", true));
+    FieldUtils.writeField(ratisServer, "server", server, true);
+
+    // Shorten the bootstrap client's RPC timeout.
+    cluster.getConf().setTimeDuration("ozone.om.client.rpc.timeout", 3, TimeUnit.SECONDS);
+    cluster.getConf().setBoolean("ipc.client.ping", false);
+
+    String newNodeId = "om-bootstrap-timeout";
+    AtomicInteger attempts = new AtomicInteger();
+    CountDownLatch releaseFirstRequest = new CountDownLatch(1);
+    CountDownLatch firstRequestFinished = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      int attempt = attempts.incrementAndGet();
+      if (attempt == 1) {
+        try {
+          // Hold the real RPC open until its timeout causes a second request.
+          assertTrue(releaseFirstRequest.await(60, TimeUnit.SECONDS), "Client did not retry the timed-out RPC");
+          return invocation.callRealMethod();
+        } finally {
+          firstRequestFinished.countDown();
+        }
+      }
+
+      // The retry sees an in-progress change while the original request resumes.
+      if (attempt == 2) {
+        assertEquals(1L, firstRequestFinished.getCount(), "First request must still be pending at retry");
+        releaseFirstRequest.countDown();
+        throw new ReconfigurationInProgressException("Injected configuration change in progress after RPC timeout");
+      }
+      return invocation.callRealMethod();
+    }).when(server).setConfiguration(any(SetConfigurationRequest.class));
+
+    try {
+      // Bootstrap must retry both failures and finish normally.
+      cluster.bootstrapOzoneManager(newNodeId, true, false);
+
+      // Verify the new OM is running and appears exactly once in the ring.
+      assertTrue(attempts.get() >= 3, "Bootstrap must retry both the timeout and the in-progress response");
+      assertTrue(cluster.getOzoneManager(newNodeId).isRunning());
+      assertNewOMExistsInPeerList(newNodeId);
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        assertThat(getCurrentPeersFromRaftConf(om.getOmRatisServer()))
+            .containsExactlyInAnyOrder(leader.getOMNodeId(), newNodeId);
+      }
+    } finally {
+      // Let the original RPC finish before shutting down the cluster.
+      releaseFirstRequest.countDown();
+      if (attempts.get() > 0) {
+        assertTrue(firstRequestFinished.await(30, TimeUnit.SECONDS), "First request did not finish");
+      }
+    }
+  }
+
 }

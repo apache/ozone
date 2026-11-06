@@ -18,16 +18,19 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
 /**
@@ -206,8 +209,35 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private boolean mpuPartEncryptionIvEnabled = Defaults.MPU_PART_ENCRYPTION_IV_ENABLED;
 
+  @Config(key = "ozone.om.bind.host",
+      defaultValue = "",
+      type = ConfigType.STRING,
+      tags = {ConfigTag.OM, ConfigTag.MANAGEMENT},
+      description = "The hostname or IP address the OM RPC server binds to. If set, it overrides only the " +
+          "hostname portion of ozone.om.address for the listener. OM still advertises ozone.om.address to " +
+          "clients and to the other OMs. If unset, the OM RPC server binds to the host in ozone.om.address. " +
+          "Set it to \"::\" to accept IPv6 connections on all interfaces. Whether the same listener also " +
+          "accepts IPv4 depends on the operating system's dual-stack socket setting. " +
+          "When HA mode is enabled, append the service ID and node ID to the property, " +
+          "for example ozone.om.bind.host.service1.om1."
+  )
+  private String rpcBindHost;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
+  }
+
+  /**
+   * Returns the address the OM RPC server binds to. If {@code ozone.om.bind.host} is set, its host replaces the
+   * host of the given RPC address; the port is always kept. OM keeps advertising the RPC address.
+   *
+   * @param omRpcAddress the OM RPC address from {@code ozone.om.address}
+   * @return the address for the OM RPC listener
+   */
+  public InetSocketAddress getRpcBindAddress(InetSocketAddress omRpcAddress) {
+    return HddsUtils.getHostName(rpcBindHost)
+        .map(host -> NetUtils.createSocketAddr(HddsUtils.getHostPortString(host, omRpcAddress.getPort())))
+        .orElse(omRpcAddress);
   }
 
   public boolean isFileSystemPathEnabled() {
@@ -367,6 +397,7 @@ public class OmConfig extends ReconfigurableConfig {
    * String keys for tests and grep.
    */
   public static final class Keys {
+    public static final String BIND_HOST = "ozone.om.bind.host";
     public static final String ENABLE_FILESYSTEM_PATHS = "ozone.om.enable.filesystem.paths";
     public static final String LIST_ALL_VOLUMES_ALLOWED = "ozone.om.volume.listall.allowed";
     public static final String SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
