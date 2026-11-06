@@ -658,7 +658,7 @@ public final class HddsServerUtil {
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         new SCMSecurityProtocolClientSideTranslatorPB(
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
-    return TracingUtil.createProxy(scmSecurityClient,
+    return TracingUtil.createClientProxy(scmSecurityClient,
         SCMSecurityProtocolClientSideTranslatorPB.class, conf);
   }
 
@@ -678,7 +678,7 @@ public final class HddsServerUtil {
                 UserGroupInformation.getCurrentUser(),
                 SecretKeyProtocolScmPB.class), SecretKeyProtocolScmPB.class);
 
-    return TracingUtil.createProxy(scmSecretClient,
+    return TracingUtil.createClientProxy(scmSecretClient,
         SecretKeyProtocolScm.class, conf);
   }
 
