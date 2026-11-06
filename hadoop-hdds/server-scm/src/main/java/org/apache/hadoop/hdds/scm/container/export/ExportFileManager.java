@@ -204,6 +204,10 @@ final class ExportFileManager {
         .collect(Collectors.toList());
   }
 
+  String getArchivePath(String archiveFileName) {
+    return new File(exportDirectory, archiveFileName).getAbsolutePath();
+  }
+
   void deleteArchive(String archiveFileName) {
     final File archive = new File(exportDirectory, archiveFileName);
     if (archive.isFile() && !FileUtils.deleteQuietly(archive)) {

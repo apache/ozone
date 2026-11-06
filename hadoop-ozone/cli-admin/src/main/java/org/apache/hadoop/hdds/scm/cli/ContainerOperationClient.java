@@ -44,12 +44,14 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.export.ContainerExportStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
@@ -511,5 +513,17 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException {
     return storageContainerLocationClient.suppressContainers(containerIds, suppress);
+  }
+
+  @Override
+  public String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException {
+    return storageContainerLocationClient.submitContainerIdExport(
+        startContainerId, lifeCycleState, healthState, maxRows, batchSize, partSize);
+  }
+
+  @Override
+  public ContainerExportStatus getContainerIdExportStatus(String jobId) throws IOException {
+    return storageContainerLocationClient.getContainerIdExportStatus(jobId);
   }
 }
