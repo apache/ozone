@@ -328,6 +328,12 @@ public class SCMClientProtocolServer implements
       pipeline = null;
     }
 
+    // A pipeline reloaded from the SCM DB can list datanodes that have not registered since SCM started.
+    // Build the pipeline from the replicas instead, which only include datanodes that have reported.
+    if (pipeline != null && hasUnregisteredNodes(pipeline)) {
+      pipeline = null;
+    }
+
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipelineForRead(
           container.getReplicationConfig(),
@@ -335,6 +341,15 @@ public class SCMClientProtocolServer implements
     }
 
     return new ContainerWithPipeline(container, pipeline);
+  }
+
+  private boolean hasUnregisteredNodes(Pipeline pipeline) {
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (!scm.getScmNodeManager().isNodeRegistered(dn)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

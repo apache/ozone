@@ -43,10 +43,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -263,7 +265,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
-        Pipeline pipeline = containerWithPipeline.getPipeline();
+        Pipeline pipeline = getWritePipeline(containerWithPipeline);
         if (pipeline != null) {
           PipelineID pipelineID = pipeline.getId();
           // Check if the pipeline is present in Recon; add it if not.
@@ -299,6 +301,30 @@ public class ReconContainerManager extends ContainerManagerImpl {
             pipelineID, ContainerID.valueOf(containerInfo.getContainerID()));
       }
       throw ex;
+    }
+  }
+
+  /**
+   * For an OPEN container, SCM can return a pipeline built from the replicas that have reported instead of the
+   * container's write pipeline, for example while some of its datanodes have not registered yet. Recon records the
+   * returned pipeline as the one the container is written to, so get the write pipeline by the ID in the
+   * {@link ContainerInfo} when the two differ.
+   *
+   * @return the write pipeline, or null if SCM no longer has it.
+   */
+  private Pipeline getWritePipeline(ContainerWithPipeline containerWithPipeline) throws IOException {
+    final Pipeline pipeline = containerWithPipeline.getPipeline();
+    final PipelineID writePipelineID = containerWithPipeline.getContainerInfo().getPipelineID();
+    if (pipeline == null || writePipelineID == null || pipeline.getId().equals(writePipelineID)) {
+      return pipeline;
+    }
+    try {
+      return scmClient.getPipeline(writePipelineID.getProtobuf());
+    } catch (IOException e) {
+      if (SCMHAUtils.unwrapException(e) instanceof PipelineNotFoundException) {
+        return null;
+      }
+      throw e;
     }
   }
 
