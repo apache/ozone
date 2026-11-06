@@ -38,9 +38,15 @@ class Log4j1Capturer extends GenericTestUtils.LogCapturer {
       defaultAppender = rootLogger.getAppender("console");
     }
 
-    return defaultAppender == null
-        ? new PatternLayout()
-        : defaultAppender.getLayout();
+    if (defaultAppender == null) {
+      return new PatternLayout();
+    }
+
+    // PatternLayout is not thread-safe, so do not share the instance with the default appender
+    Layout layout = defaultAppender.getLayout();
+    return layout instanceof PatternLayout
+        ? new PatternLayout(((PatternLayout) layout).getConversionPattern())
+        : layout;
   }
 
   Log4j1Capturer(Logger logger) {
