@@ -354,20 +354,30 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Update node.
+   * Update node, in the network topology as well. The new {@link DatanodeInfo} itself goes into the topology first,
+   * so it has its parent before it replaces the old one in the node state.
+   * <p>
+   * At the same time, the health check can change the topology for the old {@link DatanodeInfo}. It removes the node
+   * when the node becomes DEAD, and adds it back when the node recovers. This is rare, so the two do not lock each
+   * other out. Instead, each one checks the topology after its own change, and does the update again if the other one
+   * got in between.
    *
    * @param datanodeDetails the datanode details
    * @param versionInfo the datanode version information
    * @throws NodeNotFoundException the node not found exception
    */
-  public void updateNode(DatanodeDetails datanodeDetails,
-                         DatanodeVersionProto versionInfo)
-          throws NodeNotFoundException {
+  public void updateNode(DatanodeDetails datanodeDetails, DatanodeVersionProto versionInfo)
+      throws NodeNotFoundException {
     final DatanodeInfo newInfo = newDatanodeInfo(datanodeDetails, versionInfo);
+    clusterMap.update(getNode(datanodeDetails), newInfo);
     final DatanodeInfo oldInfo = nodeStateMap.updateNode(newInfo);
     LOG.info("Updated datanode {} {} to {} {}",
         oldInfo, oldInfo.getNodeStatus(), newInfo, newInfo.getNodeStatus());
     updateLastKnownVersionInfo(datanodeDetails, versionInfo);
+    if (clusterMap.getNode(newInfo.getNetworkFullPath()) != newInfo || clusterMap.contains(oldInfo)) {
+      LOG.info("The health check changed the network topology for {} during the update, updating it again", newInfo);
+      clusterMap.update(oldInfo, newInfo);
+    }
   }
 
   /**
@@ -847,9 +857,13 @@ public class NodeStateManager implements Runnable, Closeable {
         NodeState newHealthState = nodeHealthSM.
             getNextState(status.getHealth(), lifeCycleEvent);
         NodeStatus newStatus =
-            nodeStateMap.updateNodeHealthState(node.getID(), newHealthState);
-        updateClusterMap(node, status, newStatus);
-        fireHealthStateEvent(newStatus.getHealth(), node);
+            nodeStateMap.updateNodeHealthState(node, status.getHealth(), newHealthState);
+        // null means the node changed after this health check read it, for example it registered again.
+        // The next health check decides again.
+        if (newStatus != null) {
+          updateClusterMap(node, status, newStatus);
+          fireHealthStateEvent(newStatus.getHealth(), node);
+        }
       }
     } catch (InvalidStateTransitionException e) {
       LOG.warn("Invalid state transition of node {}." +
@@ -862,7 +876,8 @@ public class NodeStateManager implements Runnable, Closeable {
    * Removes the node from the network topology when it becomes DEAD, and adds it back when it recovers.
    * Doing it here, not in event handlers, keeps the topology in step with the node's health.
    */
-  private void updateClusterMap(DatanodeInfo node, NodeStatus oldStatus, NodeStatus newStatus) {
+  private void updateClusterMap(DatanodeInfo node, NodeStatus oldStatus, NodeStatus newStatus)
+      throws NodeNotFoundException {
     try {
       if (newStatus.isDead()) {
         // Look up by path, as a re-registered node's DatanodeInfo may have no parent.
@@ -871,6 +886,15 @@ public class NodeStateManager implements Runnable, Closeable {
         }
       } else if (oldStatus.isDead()) {
         clusterMap.add(node);
+      } else {
+        return;
+      }
+      // If the node registered again in the meantime, the change above can undo the topology update of updateNode.
+      final DatanodeInfo current = nodeStateMap.getNodeInfo(node.getID());
+      if (current != node && !current.getNodeStatus().isDead()) {
+        LOG.info("{} registered again while it became {}, updating the network topology again", current,
+            newStatus.getHealth());
+        clusterMap.update(node, current);
       }
     } catch (RuntimeException e) {
       // Don't let this fail the health check.
