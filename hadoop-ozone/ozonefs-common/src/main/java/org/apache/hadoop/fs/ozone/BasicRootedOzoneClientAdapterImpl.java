@@ -538,6 +538,27 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
+   * Whether OM rejects a rename that requires a FILE_SYSTEM_OPTIMIZED bucket on any other layout (HDDS-16951), so a
+   * file system rename can be sent without fetching the bucket to learn its layout.
+   */
+  boolean isRenameRequiringFileSystemOptimizedSupported() {
+    return proxy.getOmVersion().compareTo(OzoneManagerVersion.RENAME_KEY_REJECTS_NON_FSO) >= 0;
+  }
+
+  /**
+   * Like {@link #rename(OzoneBucket, String, String)} without a fetched bucket: one RenameKey that OM accepts only
+   * on a FILE_SYSTEM_OPTIMIZED bucket, and rejects with NOT_SUPPORTED_OPERATION on any other layout.
+   */
+  void renameRequiringFileSystemOptimized(String path, String newPath) throws IOException {
+    OFSPath ofsPath = new OFSPath(path, config);
+    OFSPath ofsNewPath = new OFSPath(newPath, config);
+    // No same-bucket policy check here since this call path is controlled
+    proxy.renameKey(ofsPath.getVolumeName(), ofsPath.getBucketName(), ofsPath.getKeyName(),
+        ofsNewPath.getKeyName(), true);
+    incrementCounter(Statistic.OBJECTS_RENAMED, 1);
+  }
+
+  /**
    * Helper method to create an directory specified by key name in bucket.
    *
    * @param pathStr path to be created as directory

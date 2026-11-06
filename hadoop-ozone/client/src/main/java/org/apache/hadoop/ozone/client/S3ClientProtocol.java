@@ -395,6 +395,12 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName,
+      boolean requireFileSystemOptimized) throws IOException {
+    delegate.renameKey(volumeName, bucketName, fromKeyName, toKeyName, requireFileSystemOptimized);
+  }
+
+  @Override
   @Deprecated
   public void renameKeys(String volumeName, String bucketName, Map<String, String> keyMap) throws IOException {
     delegate.renameKeys(volumeName, bucketName, keyMap);
