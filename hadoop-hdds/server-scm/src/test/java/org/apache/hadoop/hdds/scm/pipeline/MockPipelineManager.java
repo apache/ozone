@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -51,6 +52,7 @@ public class MockPipelineManager implements PipelineManager {
 
   private final PipelineStateManager stateManager;
   private final NodeManager nodeManager;
+  private final Set<DatanodeDetails> unregisteredNodes = new HashSet<>();
 
   public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager, NodeManager nodeManager)
       throws RocksDatabaseException, CodecException, DuplicatedPipelineIdException {
@@ -184,6 +186,31 @@ public class MockPipelineManager implements PipelineManager {
       final Collection<PipelineID> excludePipelines) {
     return stateManager.getPipelines(replicationConfig, state,
         excludeDns, excludePipelines);
+  }
+
+  @Override
+  public List<Pipeline> getWritablePipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state) {
+    return withRegisteredNodes(stateManager.getPipelines(replicationConfig, state));
+  }
+
+  @Override
+  public List<Pipeline> getWritablePipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state,
+      Collection<DatanodeDetails> excludeDns, Collection<PipelineID> excludePipelines) {
+    return withRegisteredNodes(stateManager.getPipelines(replicationConfig, state, excludeDns, excludePipelines));
+  }
+
+  private List<Pipeline> withRegisteredNodes(List<Pipeline> pipelines) {
+    return pipelines.stream()
+        .filter(p -> p.getNodes().stream().noneMatch(unregisteredNodes::contains))
+        .collect(Collectors.toCollection(ArrayList::new));
+  }
+
+  /**
+   * Mock pipelines use generated datanodes that are not registered in the node
+   * manager, so only nodes passed here are treated as unregistered.
+   */
+  public void setNodeUnregistered(DatanodeDetails dn) {
+    unregisteredNodes.add(dn);
   }
 
   @Override

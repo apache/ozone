@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -251,6 +252,52 @@ public class TestWritableECContainerProvider {
     ContainerInfo c = provider.getContainer(1, repConfig, OWNER, exclude);
     assertNotEquals(excludedID, c.getPipelineID());
     assertThat(allocatedContainers).contains(c);
+  }
+
+  /**
+   * A pipeline reloaded from the SCM DB can list a datanode that has not
+   * registered since SCM started. It must not be used for writes, but it still
+   * counts towards the pipeline limit and is left open for the scrubber.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testPipelineWithUnregisteredNodeIsNotReturned(
+      PipelineChoosePolicy policy) throws IOException {
+    provider = createSubject(policy);
+    int minimumPipelines = providerConf.getMinimumPipelines();
+    Set<ContainerInfo> allocated = assertDistinctContainers(minimumPipelines);
+    ContainerInfo unregistered = allocated.iterator().next();
+    Pipeline unregisteredPipeline = pipelineManager.getPipeline(unregistered.getPipelineID());
+    ((MockPipelineManager) pipelineManager).setNodeUnregistered(unregisteredPipeline.getNodes().get(0));
+
+    allocated.remove(unregistered);
+    assertReusesExisting(allocated, minimumPipelines);
+    assertEquals(minimumPipelines, pipelineManager.getPipelineCount(repConfig, OPEN));
+    assertEquals(OPEN, pipelineManager.getPipeline(unregisteredPipeline.getId()).getPipelineState());
+  }
+
+  /**
+   * When pipelines with unregistered datanodes fill the pipeline limit, the
+   * write fails instead of creating more pipelines, and those pipelines are
+   * left open for the scrubber.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testPipelineLimitReachedWithAllPipelinesUnregistered(
+      PipelineChoosePolicy policy) throws IOException {
+    final int nodeCount = nodeManager.getNodeCount(null, null);
+    providerConf.setMinimumPipelines(nodeCount);
+    provider = createSubject(policy);
+    Set<ContainerInfo> allocated = assertDistinctContainers(nodeCount);
+    for (ContainerInfo container : allocated) {
+      Pipeline pipeline = pipelineManager.getPipeline(container.getPipelineID());
+      ((MockPipelineManager) pipelineManager).setNodeUnregistered(pipeline.getNodes().get(0));
+    }
+
+    IOException e = assertThrows(IOException.class,
+        () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
+    assertThat(e.getMessage()).contains("Pipeline limit");
+    assertEquals(nodeCount, pipelineManager.getPipelineCount(repConfig, OPEN));
   }
 
   @ParameterizedTest

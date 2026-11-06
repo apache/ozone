@@ -21,9 +21,12 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -42,8 +45,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy;
-import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -62,7 +63,9 @@ class TestWritableRatisContainerProvider {
   private static final ExcludeList NO_EXCLUSION = new ExcludeList();
 
   private final OzoneConfiguration conf = new OzoneConfiguration();
-  private final PipelineChoosePolicy policy = new RandomPipelineChoosePolicy();
+  // Always choose the first pipeline, so tests control which pipeline is tried
+  // first by the order of the list.
+  private final PipelineChoosePolicy policy = (pipelines, pri) -> pipelines.get(0);
   private final AtomicLong containerID = new AtomicLong(1);
 
   @Mock
@@ -84,7 +87,7 @@ class TestWritableRatisContainerProvider {
     verifyPipelineNotCreated();
   }
 
-  @RepeatedTest(100)
+  @Test
   void skipsPipelineWithoutContainer() throws Exception {
     Pipeline pipeline = MockPipeline.createPipeline(3);
     ContainerInfo existingContainer = pipelineHasContainer(pipeline);
@@ -96,6 +99,46 @@ class TestWritableRatisContainerProvider {
 
     assertSame(existingContainer, container);
     verifyPipelineNotCreated();
+  }
+
+  @Test
+  void skipsPipelineWithUnregisteredNodes() throws Exception {
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    ContainerInfo existingContainer = pipelineHasContainer(pipeline);
+
+    Pipeline pipelineWithUnregisteredNode = MockPipeline.createPipeline(3);
+    pipelineHasContainer(pipelineWithUnregisteredNode);
+    allPipelines(OPEN, pipelineWithUnregisteredNode, pipeline);
+    existingPipelines(pipeline);
+
+    ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
+
+    assertSame(existingContainer, container);
+    verifyPipelineNotCreated();
+  }
+
+  @Test
+  void createsNewContainerIfOnlyPipelineHasUnregisteredNodes() throws Exception {
+    Pipeline pipelineWithUnregisteredNode = MockPipeline.createPipeline(3);
+    pipelineHasContainer(pipelineWithUnregisteredNode);
+    allPipelines(OPEN, pipelineWithUnregisteredNode);
+    ContainerInfo newContainer = createNewContainerOnDemand();
+
+    ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
+
+    assertSame(newContainer, container);
+    verifyPipelineCreated();
+  }
+
+  @Test
+  void doesNotWaitForAllocatedPipelineWithUnregisteredNodes() throws Exception {
+    throwWhenCreatePipeline();
+    allPipelines(ALLOCATED, MockPipeline.createPipeline(3));
+
+    assertThrows(IOException.class,
+        () -> createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
+
+    verify(pipelineManager, never()).waitOnePipelineReady(any(), anyLong());
   }
 
   @Test
@@ -123,8 +166,19 @@ class TestWritableRatisContainerProvider {
   }
 
   private void existingPipelines(List<Pipeline> pipelines) {
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
+    when(pipelineManager.getWritablePipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(pipelines);
+  }
+
+  /**
+   * Stubs the unfiltered view of the pipeline manager, which also includes
+   * pipelines with unregistered nodes. The provider must not use it for writes.
+   */
+  private void allPipelines(Pipeline.PipelineState state, Pipeline... pipelines) {
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, state, emptySet(), emptySet()))
+        .thenReturn(new ArrayList<>(asList(pipelines)));
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, state))
+        .thenReturn(new ArrayList<>(asList(pipelines)));
   }
 
   private ContainerInfo pipelineHasContainer(Pipeline pipeline) {
@@ -144,7 +198,7 @@ class TestWritableRatisContainerProvider {
     when(pipelineManager.createPipeline(REPLICATION_CONFIG))
         .thenReturn(newPipeline);
 
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
+    when(pipelineManager.getWritablePipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(emptyList())
         .thenReturn(new ArrayList<>(singletonList(newPipeline)));
 
@@ -163,14 +217,14 @@ class TestWritableRatisContainerProvider {
 
   private void verifyPipelineCreated() throws IOException {
     verify(pipelineManager, times(2))
-        .getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
+        .getWritablePipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
     verify(pipelineManager)
         .createPipeline(REPLICATION_CONFIG);
   }
 
   private void verifyPipelineNotCreated() throws IOException {
     verify(pipelineManager, times(1))
-        .getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
+        .getWritablePipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
     verify(pipelineManager, never())
         .createPipeline(REPLICATION_CONFIG);
   }
