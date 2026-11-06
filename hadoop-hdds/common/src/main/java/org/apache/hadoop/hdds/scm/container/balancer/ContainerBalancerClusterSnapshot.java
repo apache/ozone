@@ -18,8 +18,13 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 
 /**
  * Point-in-time cluster imbalance view built from datanode usage protos.
@@ -38,12 +43,15 @@ public final class ContainerBalancerClusterSnapshot {
   private final long totalOverUtilizedBytes;
   private final long totalUnderUtilizedBytes;
 
-  // bytesToMove has same value as totalOverUtilizedBytes. The analyzer sets it
-  // once via setTotalOverUtilizedBytes(), bytesToMove is assigned here for assessment output.
+  // Legacy snapshots use totalOverUtilizedBytes. Typed snapshots exclude storage types without a source/target pair.
   private final long bytesToMove;
   private final double imbalance;
   private final List<NodeUtilization> topSourceNodes;
   private final List<NodeUtilization> bottomTargetNodes;
+  private final Map<StorageType, ContainerBalancerClusterSnapshot> storageTypeSnapshots;
+  private final Set<String> sourceDatanodes;
+  private final Set<String> targetDatanodes;
+  private final boolean incompleteStorageTypeUsage;
 
   private ContainerBalancerClusterSnapshot(Builder b) {
     this.totalEligibleDatanodes = b.totalEligibleDatanodes;
@@ -57,12 +65,18 @@ public final class ContainerBalancerClusterSnapshot {
     this.targetCount = b.targetCount;
     this.totalOverUtilizedBytes = b.totalOverUtilizedBytes;
     this.totalUnderUtilizedBytes = b.totalUnderUtilizedBytes;
-    this.bytesToMove = b.totalOverUtilizedBytes;
+    this.bytesToMove = b.bytesToMove == null ? b.totalOverUtilizedBytes : b.bytesToMove;
     this.imbalance = b.imbalance;
     this.topSourceNodes = Collections.unmodifiableList(
         Objects.requireNonNull(b.topSourceNodes));
     this.bottomTargetNodes = Collections.unmodifiableList(
         Objects.requireNonNull(b.bottomTargetNodes));
+    Map<StorageType, ContainerBalancerClusterSnapshot> byType = new EnumMap<>(StorageType.class);
+    byType.putAll(b.storageTypeSnapshots);
+    this.storageTypeSnapshots = Collections.unmodifiableMap(byType);
+    this.sourceDatanodes = Collections.unmodifiableSet(new HashSet<>(b.sourceDatanodes));
+    this.targetDatanodes = Collections.unmodifiableSet(new HashSet<>(b.targetDatanodes));
+    this.incompleteStorageTypeUsage = b.incompleteStorageTypeUsage;
   }
 
   public int getTotalEligibleDatanodes() {
@@ -125,6 +139,22 @@ public final class ContainerBalancerClusterSnapshot {
     return bottomTargetNodes;
   }
 
+  public Map<StorageType, ContainerBalancerClusterSnapshot> getStorageTypeSnapshots() {
+    return storageTypeSnapshots;
+  }
+
+  public Set<String> getSourceDatanodes() {
+    return sourceDatanodes;
+  }
+
+  public Set<String> getTargetDatanodes() {
+    return targetDatanodes;
+  }
+
+  public boolean hasIncompleteStorageTypeUsage() {
+    return incompleteStorageTypeUsage;
+  }
+
   public static Builder newBuilder() {
     return new Builder();
   }
@@ -147,6 +177,11 @@ public final class ContainerBalancerClusterSnapshot {
     private double imbalance;
     private List<NodeUtilization> topSourceNodes = Collections.emptyList();
     private List<NodeUtilization> bottomTargetNodes = Collections.emptyList();
+    private Map<StorageType, ContainerBalancerClusterSnapshot> storageTypeSnapshots = Collections.emptyMap();
+    private Set<String> sourceDatanodes = Collections.emptySet();
+    private Set<String> targetDatanodes = Collections.emptySet();
+    private Long bytesToMove;
+    private boolean incompleteStorageTypeUsage;
 
     private Builder() {
     }
@@ -224,6 +259,31 @@ public final class ContainerBalancerClusterSnapshot {
     public ContainerBalancerClusterSnapshot build() {
       return new ContainerBalancerClusterSnapshot(this);
     }
+
+    public Builder setStorageTypeSnapshots(Map<StorageType, ContainerBalancerClusterSnapshot> snapshots) {
+      this.storageTypeSnapshots = snapshots;
+      return this;
+    }
+
+    public Builder setSourceDatanodes(Set<String> nodes) {
+      this.sourceDatanodes = nodes;
+      return this;
+    }
+
+    public Builder setTargetDatanodes(Set<String> nodes) {
+      this.targetDatanodes = nodes;
+      return this;
+    }
+
+    public Builder setBytesToMove(long bytes) {
+      this.bytesToMove = bytes;
+      return this;
+    }
+
+    public Builder setIncompleteStorageTypeUsage(boolean incomplete) {
+      this.incompleteStorageTypeUsage = incomplete;
+      return this;
+    }
   }
 
   /**
@@ -233,10 +293,18 @@ public final class ContainerBalancerClusterSnapshot {
   public static final class NodeUtilization {
     private final String hostname;
     private final double utilization;
+    private final String datanodeId;
+    private final StorageType storageType;
 
     public NodeUtilization(String hostname, double utilization) {
+      this(hostname, utilization, hostname, null);
+    }
+
+    public NodeUtilization(String hostname, double utilization, String datanodeId, StorageType storageType) {
       this.hostname = hostname;
       this.utilization = utilization;
+      this.datanodeId = datanodeId;
+      this.storageType = storageType;
     }
 
     public String getHostname() {
@@ -245,6 +313,14 @@ public final class ContainerBalancerClusterSnapshot {
 
     public double getUtilization() {
       return utilization;
+    }
+
+    public String getDatanodeId() {
+      return datanodeId;
+    }
+
+    public StorageType getStorageType() {
+      return storageType;
     }
   }
 }
