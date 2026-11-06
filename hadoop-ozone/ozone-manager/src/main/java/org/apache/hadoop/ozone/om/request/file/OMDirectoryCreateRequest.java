@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
@@ -28,6 +29,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -97,10 +99,18 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = createDirectoryRequest.getKeyArgs();
 
-    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
+    String keyName = keyArgs.getKeyName();
+    if (getBucketLayout().shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
+      // Directory names allow characters such as ':' (HDDS-12911), but must not retain dot components.
+      keyName = OmUtils.normalizeKey(keyName, false);
+      if (Arrays.asList(keyName.split(OM_KEY_PREFIX)).contains("..")) {
+        throw new OMException("Invalid KeyPath " + keyName, OMException.ResultCodes.INVALID_KEY_NAME);
+      }
+    }
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyName);
 
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
-        .toBuilder().setModificationTime(Time.now());
+        .toBuilder().setKeyName(keyName).setModificationTime(Time.now());
 
     KeyArgs resolvedKeyArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
         ozoneManager, ACLType.CREATE);
