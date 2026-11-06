@@ -46,7 +46,6 @@ class S3ObjectWriteGuard implements AutoCloseable {
   private final List<CheckedRunnable<IOException>> preCommits =
       new ArrayList<>();
   private long writtenLength;
-  private Throwable transferFailure;
   private boolean transferComplete;
 
   S3ObjectWriteGuard(
@@ -71,22 +70,10 @@ class S3ObjectWriteGuard implements AutoCloseable {
   }
 
   private void validateBeforeCommit() throws IOException {
-    if (transferFailure != null) {
-      throw new IOException(
-          "S3 object transfer failed before commit: " + keyPath,
-          transferFailure);
-    }
-    EndpointBase.validateContentLength(
-        expectedLength, writtenLength, keyPath).run();
     if (!transferComplete) {
       throw new IOException("S3 object transfer did not complete before commit: " + keyPath);
     }
-  }
-
-  private void recordTransferFailure(Throwable failure) {
-    if (transferFailure == null) {
-      transferFailure = failure;
-    }
+    EndpointBase.validateContentLength(expectedLength, writtenLength, keyPath).run();
   }
 
   protected List<CheckedRunnable<IOException>> getPreCommits() {
@@ -118,12 +105,7 @@ class S3ObjectWriteGuard implements AutoCloseable {
   }
 
   void onKeyOpened(Consumer<ByteBuffer> action) {
-    try {
-      action.accept(getDerivedKey());
-    } catch (RuntimeException ex) {
-      recordTransferFailure(ex);
-      throw ex;
-    }
+    action.accept(getDerivedKey());
   }
 
   long copyFrom(InputStream body, int bufferSize) throws IOException {
@@ -131,30 +113,14 @@ class S3ObjectWriteGuard implements AutoCloseable {
     while (writtenLength < expectedLength) {
       int toRead = Math.toIntExact(
           Math.min(bufferSize, expectedLength - writtenLength));
-      final int readLength;
-      try {
-        readLength = body.read(buffer, 0, toRead);
-      } catch (IOException | RuntimeException ex) {
-        recordTransferFailure(ex);
-        throw ex;
-      }
+      int readLength = body.read(buffer, 0, toRead);
       if (readLength == -1) {
         break;
       }
-      try {
-        write(buffer, 0, readLength);
-      } catch (IOException | RuntimeException ex) {
-        recordTransferFailure(ex);
-        throw ex;
-      }
+      write(buffer, 0, readLength);
       writtenLength += readLength;
     }
-    try {
-      verifyChunksComplete(body);
-    } catch (IOException | RuntimeException ex) {
-      recordTransferFailure(ex);
-      throw ex;
-    }
+    verifyChunksComplete(body);
     return writtenLength;
   }
 

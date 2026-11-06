@@ -53,7 +53,7 @@ class TestS3ObjectWriteGuard {
   private static final byte[] CONTENT = "content".getBytes(UTF_8);
 
   @Test
-  void readIOExceptionBlocksCommitWithCause() {
+  void readIOExceptionBlocksCommit() {
     IOException failure = new IOException("read failed");
     S3ObjectWriteGuard guard = newGuard(CONTENT.length);
 
@@ -61,11 +61,11 @@ class TestS3ObjectWriteGuard {
         () -> guard.copyFrom(failingInputStream(failure), 4));
 
     assertSame(failure, thrown);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
-  void readRuntimeExceptionBlocksCommitWithCause() {
+  void readRuntimeExceptionBlocksCommit() {
     RuntimeException failure = new IllegalStateException("read failed");
     S3ObjectWriteGuard guard = newGuard(CONTENT.length);
 
@@ -73,7 +73,7 @@ class TestS3ObjectWriteGuard {
         () -> guard.copyFrom(failingInputStream(failure), 4));
 
     assertSame(failure, thrown);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
@@ -93,7 +93,7 @@ class TestS3ObjectWriteGuard {
     assertSame(failure, thrown);
     assertThat(keyOutputStream.getWriteAttempts()).isEqualTo(1);
     assertThat(writtenLength(guard)).isZero();
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
@@ -104,6 +104,7 @@ class TestS3ObjectWriteGuard {
         4);
 
     assertThat(copied).isEqualTo(2);
+    guard.markTransferComplete();
     OS3Exception failure = assertThrows(OS3Exception.class, guard::close);
     assertThat(failure.getErrorMessage()).contains(
         "Request body length 2 does not match expected length "
@@ -112,7 +113,7 @@ class TestS3ObjectWriteGuard {
   }
 
   @Test
-  void datastreamWriteIOExceptionBlocksCommitWithCause() {
+  void datastreamWriteIOExceptionBlocksCommit() {
     IOException failure = new IOException("datastream write failed");
     FailingKeyMetadataAwareByteBufferStreamOutput keyOutputStream =
         new FailingKeyMetadataAwareByteBufferStreamOutput(failure);
@@ -126,7 +127,7 @@ class TestS3ObjectWriteGuard {
 
     assertSame(failure, thrown);
     assertThat(keyOutputStream.getWriteAttempts()).isEqualTo(1);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
@@ -140,7 +141,7 @@ class TestS3ObjectWriteGuard {
         }));
 
     assertSame(failure, thrown);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
@@ -157,7 +158,7 @@ class TestS3ObjectWriteGuard {
         }));
 
     assertSame(failure, thrown);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @ParameterizedTest
@@ -225,10 +226,10 @@ class TestS3ObjectWriteGuard {
         new ByteArrayInputStream(body), KEY_PATH, TrailerHeader.CRC32);
     MultiDigestInputStream input = new MultiDigestInputStream(chunks, Collections.emptyList());
 
-    OS3Exception failure = assertThrows(OS3Exception.class, () -> guard.copyFrom(input, CONTENT.length));
+    assertThrows(OS3Exception.class, () -> guard.copyFrom(input, CONTENT.length));
 
     assertThat(writtenLength(guard)).isEqualTo(CONTENT.length);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   private static InputStream failingInputStream(Throwable failure) {
@@ -258,12 +259,11 @@ class TestS3ObjectWriteGuard {
     throw new AssertionError(failure);
   }
 
-  private static void assertCommitBlockedBy(
-      S3ObjectWriteGuard guard, Throwable failure) {
+  private static void assertCommitBlocked(S3ObjectWriteGuard guard) {
     IOException commitFailure = assertThrows(IOException.class, guard::close);
     assertThat(commitFailure.getMessage()).isEqualTo(
-        "S3 object transfer failed before commit: " + KEY_PATH);
-    assertSame(failure, commitFailure.getCause());
+        "S3 object transfer did not complete before commit: " + KEY_PATH);
+    assertThat(commitFailure.getCause()).isNull();
   }
 
   private static long writtenLength(S3ObjectWriteGuard guard)
