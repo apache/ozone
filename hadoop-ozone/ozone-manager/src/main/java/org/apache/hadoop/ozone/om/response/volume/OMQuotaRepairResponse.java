@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response.volume;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 public class OMQuotaRepairResponse extends OMClientResponse {
   private Map<String, OmVolumeArgs> volumeArgsMap;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
+  private List<String> bareVolumeNameKeys;
 
   /**
    * for quota failure response update.
@@ -45,10 +47,11 @@ public class OMQuotaRepairResponse extends OMClientResponse {
 
   public OMQuotaRepairResponse(
       @Nonnull OMResponse omResponse, Map<String, OmVolumeArgs> volumeArgsMap,
-      Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap) {
+      Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap, List<String> bareVolumeNameKeys) {
     super(omResponse);
     this.volBucketInfoMap = volBucketInfoMap;
     this.volumeArgsMap = volumeArgsMap;
+    this.bareVolumeNameKeys = bareVolumeNameKeys;
   }
 
   @Override
@@ -62,6 +65,9 @@ public class OMQuotaRepairResponse extends OMClientResponse {
     for (OmVolumeArgs volArgs : volumeArgsMap.values()) {
       metadataManager.getVolumeTable().putWithBatch(batchOp,
           metadataManager.getVolumeKey(volArgs.getVolume()), volArgs);
+    }
+    for (String volumeKey : bareVolumeNameKeys) {
+      metadataManager.getVolumeTable().deleteWithBatch(batchOp, volumeKey);
     }
   }
 }
