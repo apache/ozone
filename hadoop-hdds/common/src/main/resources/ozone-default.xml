@@ -586,6 +586,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.bind.host</name>
+    <value></value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      The hostname or IP address the OM RPC server binds to. If set, it
+      overrides only the hostname portion of ozone.om.address for the
+      listener. OM still advertises ozone.om.address to clients and to the
+      other OMs. If unset, the OM RPC server binds to the host in
+      ozone.om.address.
+
+      Set it to "::" to accept IPv6 connections on all interfaces. Whether
+      the same listener also accepts IPv4 depends on the operating system's
+      dual-stack socket setting.
+
+      When HA mode is enabled, append the service ID and node ID to each OM property. For example:
+      ozone.om.bind.host.service1.om1
+    </description>
+  </property>
+  <property>
     <name>ozone.om.handler.count.key</name>
     <value>100</value>
     <tag>OM, PERFORMANCE</tag>

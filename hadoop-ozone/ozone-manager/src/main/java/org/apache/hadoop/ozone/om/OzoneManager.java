@@ -1586,7 +1586,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(conf, omNodeRpcAddr, omService,
+    return startRpcServer(conf, OmUtils.getOmRpcBindAddress(conf, omNodeRpcAddr), omService,
         omInterService, omAdminService, reconfigureService);
   }
 

@@ -60,6 +60,7 @@ public class OMHANodeDetails {
       OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY,
       OMConfigKeys.OZONE_OM_DB_DIRS,
       OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+      OMConfigKeys.OZONE_OM_BIND_HOST_KEY,
   };
 
   private static final Logger LOG =

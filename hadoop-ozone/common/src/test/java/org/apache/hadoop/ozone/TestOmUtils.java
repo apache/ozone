@@ -22,6 +22,7 @@ import static java.util.stream.Collectors.toSet;
 import static org.apache.hadoop.ozone.OmUtils.getOmHostsFromConfig;
 import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
@@ -63,6 +64,24 @@ public class TestOmUtils {
 
   @TempDir
   private Path folder;
+
+  @Test
+  void testGetOmRpcBindAddress() throws UnknownHostException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    InetSocketAddress rpcAddress = new InetSocketAddress(InetAddress.getByName("2001:db8::10"), OZONE_OM_PORT_DEFAULT);
+
+    assertEquals(rpcAddress, OmUtils.getOmRpcBindAddress(conf, rpcAddress));
+
+    InetSocketAddress ipv6Wildcard = new InetSocketAddress(InetAddress.getByName("::"), OZONE_OM_PORT_DEFAULT);
+    conf.set(OZONE_OM_BIND_HOST_KEY, "::");
+    assertEquals(ipv6Wildcard, OmUtils.getOmRpcBindAddress(conf, rpcAddress));
+    conf.set(OZONE_OM_BIND_HOST_KEY, "[::]");
+    assertEquals(ipv6Wildcard, OmUtils.getOmRpcBindAddress(conf, rpcAddress));
+
+    conf.set(OZONE_OM_BIND_HOST_KEY, "0.0.0.0");
+    assertEquals(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), OZONE_OM_PORT_DEFAULT),
+        OmUtils.getOmRpcBindAddress(conf, rpcAddress));
+  }
 
   @Test
   void createOMDirCreatesDirectoryIfNecessary() {

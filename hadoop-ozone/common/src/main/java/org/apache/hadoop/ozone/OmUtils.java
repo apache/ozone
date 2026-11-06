@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY;
@@ -115,6 +116,21 @@ public final class OmUtils {
    */
   public static InetSocketAddress getOmAddress(ConfigurationSource conf) {
     return NetUtils.createSocketAddr(getOmRpcAddress(conf));
+  }
+
+  /**
+   * Returns the address the OM RPC server binds to. If {@link OMConfigKeys#OZONE_OM_BIND_HOST_KEY} is set, its host
+   * replaces the host of the given RPC address; the port is always kept. OM keeps advertising the RPC address.
+   *
+   * @param conf configuration
+   * @param omRpcAddress the OM RPC address from {@link OMConfigKeys#OZONE_OM_ADDRESS_KEY}
+   * @return the address for the OM RPC listener
+   */
+  public static InetSocketAddress getOmRpcBindAddress(ConfigurationSource conf, InetSocketAddress omRpcAddress) {
+    final Optional<String> bindHost = getHostNameFromConfigKeys(conf, OZONE_OM_BIND_HOST_KEY);
+    return bindHost.isPresent()
+        ? NetUtils.createSocketAddr(getHostPortString(bindHost.get(), omRpcAddress.getPort()))
+        : omRpcAddress;
   }
 
   /**
