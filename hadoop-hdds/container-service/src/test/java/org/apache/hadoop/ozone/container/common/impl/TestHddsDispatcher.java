@@ -31,8 +31,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -99,6 +101,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -1140,6 +1144,36 @@ public class TestHddsDispatcher {
       builder.getPutBlockBuilder().getBlockDataBuilder().getBlockIDBuilder().setReplicaIndex(replicaIndex);
     }
     return builder.build();
+  }
+
+  @Test
+  public void testStreamReadCancellationIsNotAContainerFailure() throws Exception {
+    final long containerId = 100L;
+    ContainerSet containerSet = mock(ContainerSet.class);
+    Container<?> container = mock(Container.class);
+    doReturn(container).when(containerSet).getContainer(containerId);
+    when(containerSet.getMissingContainerSet()).thenReturn(Collections.emptySet());
+    when(container.getContainerType()).thenReturn(ContainerType.KeyValueContainer);
+    Handler handler = mock(Handler.class);
+    when(handler.readBlock(any(), any(), any(), any())).thenThrow(Status.CANCELLED.asRuntimeException());
+    Map<ContainerType, Handler> handlers = Maps.newHashMap();
+    handlers.put(ContainerType.KeyValueContainer, handler);
+    HddsDispatcher dispatcher = new HddsDispatcher(new OzoneConfiguration(), containerSet, null, handlers,
+        null, mock(ContainerMetrics.class), null);
+    @SuppressWarnings("unchecked")
+    StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
+    ContainerCommandRequestProto request = ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.ReadBlock)
+        .setContainerID(containerId)
+        .setDatanodeUuid(UUID.randomUUID().toString())
+        .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+            .setBlockID(new BlockID(containerId, 1L).getDatanodeBlockIDProtobuf()).setOffset(0).setLength(1024))
+        .build();
+
+    dispatcher.streamDataReadOnly(request, streamObserver, null, null);
+
+    verify(streamObserver, never()).onNext(any());
+    verify(containerSet, never()).scanContainer(anyLong(), any());
   }
 
   static DispatcherContext newContext(Op op) {
