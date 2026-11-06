@@ -130,7 +130,7 @@ class TestGrpcContainerUploader {
   private static OutputStream startUpload(GrpcContainerUploader subject,
       CompletableFuture<Void> callback) throws IOException {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-    return subject.startUpload(1, target, callback, NO_COMPRESSION);
+    return subject.startUpload(1, target, callback, NO_COMPRESSION, null);
   }
 
   /**
