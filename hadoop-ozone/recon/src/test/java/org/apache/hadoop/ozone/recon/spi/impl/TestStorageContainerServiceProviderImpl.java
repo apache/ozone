@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_POLICY_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -52,14 +53,16 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -273,45 +276,46 @@ public class TestStorageContainerServiceProviderImpl {
   }
 
   /**
-   * Cancelling the SCM DB sync interrupts the download, which disconnects a blocked HTTP read and removes the partial
+   * Cancelling the SCM DB sync returns without waiting for a download that SCM stalls, and removes the partial
    * checkpoint.
    */
   @Test
-  public void testGetSCMDBSnapshotCancelAbortsDownload() throws Exception {
+  public void testGetSCMDBSnapshotCancelDoesNotWaitForStalledDownload() throws Exception {
     enableGrpcTls();
-    ReconUtils reconUtils = injector.getInstance(ReconUtils.class);
-    setPeerRoles(injector.getInstance(StorageContainerLocationInternalInterface.class), LEADER);
-    CountDownLatch reading = new CountDownLatch(1);
-    CountDownLatch disconnected = new CountDownLatch(1);
-    HttpURLConnection connection = mock(HttpURLConnection.class);
-    // Like a socket read, blocks until the connection is closed, ignoring interrupts.
-    when(connection.getInputStream()).thenReturn(new InputStream() {
-      @Override
-      public int read() throws IOException {
-        reading.countDown();
-        Uninterruptibles.awaitUninterruptibly(disconnected);
-        throw new IOException("Connection closed");
-      }
+    CountDownLatch stall = new CountDownLatch(1);
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT, exchange -> {
+      exchange.sendResponseHeaders(200, 1 << 20);
+      exchange.getResponseBody().write(new byte[1024]);
+      exchange.getResponseBody().flush();
+      Uninterruptibles.awaitUninterruptibly(stall);
+      exchange.close();
     });
-    doAnswer(invocation -> {
-      disconnected.countDown();
-      return null;
-    }).when(connection).disconnect();
-    doReturn(connection).when(reconUtils).makeHttpCall(any(), anyString(), anyBoolean());
-
+    server.start();
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
+      injector.getInstance(OzoneConfiguration.class)
+          .set(OZONE_SCM_HTTP_ADDRESS_KEY, "127.0.0.1:" + server.getAddress().getPort());
+      setPeerRoles(injector.getInstance(StorageContainerLocationInternalInterface.class),
+          "127.0.0.1:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:127.0.0.1");
       Future<DBCheckpoint> sync =
           executor.submit(() -> injector.getInstance(StorageContainerServiceProvider.class).getSCMDBSnapshot());
-      assertTrue(reading.await(10, TimeUnit.SECONDS));
+      GenericTestUtils.waitFor(() -> listTarFiles().stream().anyMatch(f -> f.length() > 0), 100, 10000);
+
       // Like ReconStorageContainerManagerFacade#cancelScmDbSnapshotSync
       sync.cancel(true);
-      assertTrue(disconnected.await(10, TimeUnit.SECONDS));
-    } finally {
       executor.shutdown();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+      assertThat(listTarFiles()).isEmpty();
+    } finally {
+      executor.shutdownNow();
+      stall.countDown();
+      server.stop(0);
     }
-    assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
-    GenericTestUtils.waitFor(() -> FileUtils.listFiles(testDir, new String[] {"tar"}, true).isEmpty(), 100, 10000);
+  }
+
+  private Collection<File> listTarFiles() {
+    return FileUtils.listFiles(testDir, new String[] {"tar"}, true);
   }
 
   /**

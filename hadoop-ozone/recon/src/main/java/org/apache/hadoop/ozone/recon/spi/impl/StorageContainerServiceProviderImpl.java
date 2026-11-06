@@ -45,7 +45,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -53,11 +55,12 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -239,38 +242,47 @@ public class StorageContainerServiceProviderImpl
     URLConnectionFactory connectionFactory =
         URLConnectionFactory.newDefaultURLConnectionFactory(connectTimeout, readTimeout, configuration);
     boolean spnegoEnabled = "kerberos".equals(configuration.get(HDDS_SCM_HTTP_AUTH_TYPE, "simple"));
-    AtomicReference<HttpURLConnection> connection = new AtomicReference<>();
-    // Download in another thread, so that cancelling the sync (an interrupt) can abort a blocked read by disconnecting.
+    AtomicBoolean cancelled = new AtomicBoolean();
+    // Download in another thread, so that the sync can return as soon as it is cancelled (interrupted).
     ExecutorService executor = Executors.newSingleThreadExecutor(
         new ThreadFactoryBuilder().setNameFormat("ReconSCMDBDownload-%d").setDaemon(true).build());
-    try {
-      executor.submit(() -> SecurityUtil.doAsLoginUser(() -> {
-        try {
-          connection.set(reconUtils.makeHttpCall(connectionFactory, url, spnegoEnabled));
-          try (InputStream inputStream = connection.get().getInputStream()) {
-            FileUtils.copyInputStreamToFile(inputStream, targetFile);
+    Future<?> download = executor.submit(() -> SecurityUtil.doAsLoginUser(() -> {
+      HttpURLConnection connection = null;
+      try {
+        connection = reconUtils.makeHttpCall(connectionFactory, url, spnegoEnabled);
+        try (InputStream in = connection.getInputStream();
+             OutputStream out = Files.newOutputStream(targetFile.toPath())) {
+          byte[] buffer = new byte[IOUtils.DEFAULT_BUFFER_SIZE];
+          for (int n; (n = in.read(buffer)) != -1;) {
+            if (cancelled.get()) {
+              throw new InterruptedIOException("SCM DB checkpoint download cancelled");
+            }
+            out.write(buffer, 0, n);
           }
-          if (Thread.currentThread().isInterrupted()) {
-            throw new InterruptedIOException("SCM DB checkpoint download cancelled");
-          }
-        } catch (Exception e) {
-          FileUtils.deleteQuietly(targetFile);
-          throw e;
         }
-        return null;
-      })).get();
+      } catch (Exception e) {
+        FileUtils.deleteQuietly(targetFile);
+        throw e;
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+        connectionFactory.destroy();
+      }
+      return null;
+    }));
+    executor.shutdown();
+    try {
+      download.get();
     } catch (InterruptedException e) {
+      // A blocked HttpURLConnection read cannot be aborted from another thread: closing its stream or disconnecting
+      // waits for the reader. So do not wait for it. The download stops at its next read or its read timeout.
+      cancelled.set(true);
+      FileUtils.deleteQuietly(targetFile);
       Thread.currentThread().interrupt();
       throw new InterruptedIOException("SCM DB checkpoint download cancelled");
     } catch (ExecutionException e) {
       throw e.getCause() instanceof IOException ? (IOException) e.getCause() : new IOException(e.getCause());
-    } finally {
-      HttpURLConnection activeConnection = connection.get();
-      if (activeConnection != null) {
-        activeConnection.disconnect();
-      }
-      executor.shutdownNow();
-      connectionFactory.destroy();
     }
   }
 
