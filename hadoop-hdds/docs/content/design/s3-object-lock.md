@@ -239,7 +239,7 @@ message KeyRetention {
 }
 
 message EventHold {
-  required bool enabled = 1;
+  optional bool enabled = 1 [default = true]; // present only once a hold was set; false after release
   required RetentionDuration duration = 2;
 }
 ```
