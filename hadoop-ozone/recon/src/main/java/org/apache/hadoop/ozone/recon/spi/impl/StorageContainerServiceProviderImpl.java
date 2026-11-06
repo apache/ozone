@@ -33,18 +33,29 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_POLICY_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_READ_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_READ_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.net.HttpURLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -221,17 +232,44 @@ public class StorageContainerServiceProviderImpl
    */
   private void downloadSCMDBCheckpoint(String url, File targetFile) throws IOException {
     LOG.info("Downloading SCM DB checkpoint from {}", url);
-    URLConnectionFactory connectionFactory = URLConnectionFactory.newDefaultURLConnectionFactory(configuration);
+    int connectTimeout = (int) configuration.getTimeDuration(OZONE_RECON_SCM_SNAPSHOT_CONNECTION_TIMEOUT,
+        OZONE_RECON_SCM_SNAPSHOT_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    int readTimeout = (int) configuration.getTimeDuration(OZONE_RECON_SCM_SNAPSHOT_READ_TIMEOUT,
+        OZONE_RECON_SCM_SNAPSHOT_READ_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    URLConnectionFactory connectionFactory =
+        URLConnectionFactory.newDefaultURLConnectionFactory(connectTimeout, readTimeout, configuration);
     boolean spnegoEnabled = "kerberos".equals(configuration.get(HDDS_SCM_HTTP_AUTH_TYPE, "simple"));
+    AtomicReference<HttpURLConnection> connection = new AtomicReference<>();
+    // Download in another thread, so that cancelling the sync (an interrupt) can abort a blocked read by disconnecting.
+    ExecutorService executor = Executors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder().setNameFormat("ReconSCMDBDownload-%d").setDaemon(true).build());
     try {
-      SecurityUtil.doAsLoginUser(() -> {
-        try (InputStream inputStream = reconUtils.makeHttpCall(connectionFactory, url, spnegoEnabled)
-            .getInputStream()) {
-          FileUtils.copyInputStreamToFile(inputStream, targetFile);
+      executor.submit(() -> SecurityUtil.doAsLoginUser(() -> {
+        try {
+          connection.set(reconUtils.makeHttpCall(connectionFactory, url, spnegoEnabled));
+          try (InputStream inputStream = connection.get().getInputStream()) {
+            FileUtils.copyInputStreamToFile(inputStream, targetFile);
+          }
+          if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedIOException("SCM DB checkpoint download cancelled");
+          }
+        } catch (Exception e) {
+          FileUtils.deleteQuietly(targetFile);
+          throw e;
         }
         return null;
-      });
+      })).get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new InterruptedIOException("SCM DB checkpoint download cancelled");
+    } catch (ExecutionException e) {
+      throw e.getCause() instanceof IOException ? (IOException) e.getCause() : new IOException(e.getCause());
     } finally {
+      HttpURLConnection activeConnection = connection.get();
+      if (activeConnection != null) {
+        activeConnection.disconnect();
+      }
+      executor.shutdownNow();
       connectionFactory.destroy();
     }
   }

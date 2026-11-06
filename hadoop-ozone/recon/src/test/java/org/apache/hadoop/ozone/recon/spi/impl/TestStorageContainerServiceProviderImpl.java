@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -47,18 +48,26 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -69,10 +78,12 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,9 +101,11 @@ public class TestStorageContainerServiceProviderImpl {
 
   private Injector injector;
   private HddsProtos.PipelineID pipelineID;
+  private File testDir;
 
   @BeforeEach
-  void setup(@TempDir File testDir) {
+  void setup(@TempDir File tempDir) {
+    testDir = tempDir;
     injector = Guice.createInjector(new AbstractModule() {
       @Override
       protected void configure() {
@@ -257,6 +270,48 @@ public class TestStorageContainerServiceProviderImpl {
     assertNull(injector.getInstance(StorageContainerServiceProvider.class).getSCMDBSnapshot());
     assertThat(injector.getInstance(ReconContext.class).getErrors())
         .contains(ReconContext.ErrorCode.GET_SCM_DB_SNAPSHOT_FAILED);
+  }
+
+  /**
+   * Cancelling the SCM DB sync interrupts the download, which disconnects a blocked HTTP read and removes the partial
+   * checkpoint.
+   */
+  @Test
+  public void testGetSCMDBSnapshotCancelAbortsDownload() throws Exception {
+    enableGrpcTls();
+    ReconUtils reconUtils = injector.getInstance(ReconUtils.class);
+    setPeerRoles(injector.getInstance(StorageContainerLocationInternalInterface.class), LEADER);
+    CountDownLatch reading = new CountDownLatch(1);
+    CountDownLatch disconnected = new CountDownLatch(1);
+    HttpURLConnection connection = mock(HttpURLConnection.class);
+    // Like a socket read, blocks until the connection is closed, ignoring interrupts.
+    when(connection.getInputStream()).thenReturn(new InputStream() {
+      @Override
+      public int read() throws IOException {
+        reading.countDown();
+        Uninterruptibles.awaitUninterruptibly(disconnected);
+        throw new IOException("Connection closed");
+      }
+    });
+    doAnswer(invocation -> {
+      disconnected.countDown();
+      return null;
+    }).when(connection).disconnect();
+    doReturn(connection).when(reconUtils).makeHttpCall(any(), anyString(), anyBoolean());
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<DBCheckpoint> sync =
+          executor.submit(() -> injector.getInstance(StorageContainerServiceProvider.class).getSCMDBSnapshot());
+      assertTrue(reading.await(10, TimeUnit.SECONDS));
+      // Like ReconStorageContainerManagerFacade#cancelScmDbSnapshotSync
+      sync.cancel(true);
+      assertTrue(disconnected.await(10, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdown();
+    }
+    assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    GenericTestUtils.waitFor(() -> FileUtils.listFiles(testDir, new String[] {"tar"}, true).isEmpty(), 100, 10000);
   }
 
   /**
