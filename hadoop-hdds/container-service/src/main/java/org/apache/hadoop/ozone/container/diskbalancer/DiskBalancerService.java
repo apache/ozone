@@ -536,6 +536,12 @@ public class DiskBalancerService extends BackgroundService {
           LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
+        // Reconciliation writes to the replica it started on. Repairs written after the copy would be lost with
+        // the old replica. It cannot start on this replica while the read lock is held.
+        if (container.getContainerData().isBeingReconciled()) {
+          LOG.info("Container {} is being reconciled, skipping move process.", containerId);
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        }
 
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
