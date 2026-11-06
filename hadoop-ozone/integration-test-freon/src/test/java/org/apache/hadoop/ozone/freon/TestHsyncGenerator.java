@@ -26,14 +26,14 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 /**
  * Tests Freon HsyncGenerator with MiniOzoneCluster and validate data.
  */
-public abstract class TestHsyncGenerator implements NonHATests.TestCase {
+public abstract class TestHsyncGenerator implements ClusterForTests.TestCase {
 
   @Test
   public void test() throws IOException {

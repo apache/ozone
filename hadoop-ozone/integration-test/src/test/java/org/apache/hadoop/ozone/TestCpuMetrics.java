@@ -26,7 +26,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
  *  <p>jvm_metrics_cpu_system_load</p>
  *  <p>jvm_metrics_cpu_jvm_load</p>
  */
-public abstract class TestCpuMetrics implements NonHATests.TestCase {
+public abstract class TestCpuMetrics implements ClusterForTests.TestCase {
 
   private final OkHttpClient httpClient = new OkHttpClient();
 
