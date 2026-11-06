@@ -102,6 +102,18 @@ public class ReconGlobalMetricsService {
     return keysSummary;
   }
 
+  /**
+   * Returns {@link #getOpenKeySummary()} with the committed part sizes of incomplete multipart uploads added.
+   * The count is unchanged because each incomplete upload is already counted once through its multipart open key.
+   */
+  public Map<String, Long> getOpenKeySummaryWithMPU() {
+    Map<String, Long> keysSummary = getOpenKeySummary();
+    Map<String, Long> mpuSummary = getMPUKeySummary();
+    keysSummary.merge("totalReplicatedDataSize", mpuSummary.get("totalReplicatedDataSize"), Long::sum);
+    keysSummary.merge("totalUnreplicatedDataSize", mpuSummary.get("totalDataSize"), Long::sum);
+    return keysSummary;
+  }
+
   public Map<String, Long> getDeletedKeySummary() {
     Map<String, Long> keysSummary = new HashMap<>();
     try {

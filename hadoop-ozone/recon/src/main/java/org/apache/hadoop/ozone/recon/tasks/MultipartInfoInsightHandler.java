@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.SortedMap;
 import org.apache.commons.lang3.tuple.MutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -34,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.slf4j.Logger;
@@ -60,9 +63,10 @@ import org.slf4j.LoggerFactory;
  * {@link #handlePartDeleteEvent}, {@link #handlePartUpdateEvent}), each O(1).
  * {@code OmMultipartPartInfo} does not carry a replication config, so the parent
  * MPU's config is cached here, keyed by uploadId, from the {@code multipartInfoTable}
- * PUT/UPDATE events handled below; OM always writes {@code multipartInfoTable}
+ * PUT/UPDATE/DELETE events handled below; OM always writes {@code multipartInfoTable}
  * before the corresponding {@code multipartPartsTable} row in the same batch, so the
- * cache entry is available by the time a part event for that upload is processed.
+ * cache entry is available by the time a part event for that upload is processed,
+ * including the part deletes of an upload that was initiated before a Recon restart.
  * The cache is bounded (LRU) rather than explicitly evicted per upload, since a
  * part-delete event can follow an info-table delete for the same upload within the
  * same batch and still needs the cached config.
@@ -129,6 +133,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count > 0 ? count - 1L : 0L);
       applyLegacyPartSizes(multipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, false);
+      cacheSplitSchemaReplicationConfig(multipartKeyInfo);
     } else {
       LOG.warn("Delete event does not have the Multipart Key Info for {}.", event.getKey());
     }
@@ -330,6 +335,26 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
         "unreplicated");
     updateSize(replicatedSizeMap, getReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE), partReplicatedSize, add,
         "replicated");
+  }
+
+  /**
+   * Returns the (unreplicated, replicated) size of the committed parts of a single MPU, read from the embedded
+   * parts for legacy-schema MPUs and from {@code multipartPartsTable} for split-schema MPUs.
+   */
+  public static Pair<Long, Long> getCommittedPartsSize(OmMultipartKeyInfo multipartKeyInfo,
+      OMMetadataManager omMetadataManager) throws IOException {
+    if (isLegacySchema(multipartKeyInfo)) {
+      final MutablePair<Long, Long> sizes = MutablePair.of(0L, 0L);
+      forEachLegacyPart(multipartKeyInfo, (dataSize, replicatedSize) -> {
+        sizes.setLeft(sizes.getLeft() + dataSize);
+        sizes.setRight(sizes.getRight() + replicatedSize);
+      });
+      return sizes;
+    }
+    SortedMap<Integer, OmMultipartPartInfo> parts =
+        OMMultipartUploadUtils.scanParts(omMetadataManager, multipartKeyInfo.getUploadID());
+    long dataSize = parts.values().stream().mapToLong(OmMultipartPartInfo::getDataSize).sum();
+    return Pair.of(dataSize, OMMultipartUploadUtils.getReplicatedSize(parts, multipartKeyInfo.getReplicationConfig()));
   }
 
   /**
