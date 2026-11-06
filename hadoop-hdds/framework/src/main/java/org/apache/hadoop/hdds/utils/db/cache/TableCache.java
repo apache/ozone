@@ -99,6 +99,12 @@ public interface TableCache<KEY, VALUE> {
   NavigableMap<Long, Set<CacheKey<KEY>>> getEpochEntries();
 
   /**
+   * Stop the background cleanup of this cache, once its table is no longer used. No cleanup may follow.
+   */
+  default void close() {
+  }
+
+  /**
    * Return the stat counters.
    */
   CacheStats getStats();

@@ -564,6 +564,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       LOG.error("Error closing hierarchical lock manager", e);
     }
     tableCacheMetricsMap.values().forEach(TableCacheMetrics::unregister);
+    tableMap.values().forEach(Table::closeCache);
     // OzoneManagerLock cleanup
     lock.cleanup();
   }
@@ -2172,6 +2173,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       final Table<?, ?> previousTable = tableMap.put(name, table);
       if (previousTable != null) {
         LOG.warn("Overwriting an existing table {}: {}", name, previousTable);
+        previousTable.closeCache();
       }
 
       if (addCacheMetrics) {
