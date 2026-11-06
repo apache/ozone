@@ -195,6 +195,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       // parts are validated, so a complete that fails with INVALID_PART must not leak it.
       OmBucketInfo omBucketInfo = getBucketInfoForUpdate(omMetadataManager,
           volumeName, bucketName);
+      // Before the cache updates below, and before getDBOzoneKey, which cannot resolve a path through a file.
+      checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName, omMetadataManager);
 
       List<OmDirectoryInfo> missingParentInfos;
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
@@ -274,11 +276,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       String dbOzoneKey =
           getDBOzoneKey(omMetadataManager, volumeName, bucketName, keyName);
-
-      // Check for directory exists with same name for the LEGACY_FS,
-      // if it exists throw error.
-      checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName,
-          omMetadataManager);
 
       if (multipartKeyInfo == null) {
         throw new OMException(
