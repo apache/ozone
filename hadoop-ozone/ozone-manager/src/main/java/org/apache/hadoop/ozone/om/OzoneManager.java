@@ -1586,7 +1586,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(conf, OmUtils.getOmRpcBindAddress(conf, omNodeRpcAddr), omService,
+    // Read OmConfig from conf: the config field predates loadOMHAConfig, which copies the per-node bind host.
+    InetSocketAddress bindAddr = conf.getObject(OmConfig.class).getRpcBindAddress(omNodeRpcAddr);
+    return startRpcServer(conf, bindAddr, omService,
         omInterService, omAdminService, reconfigureService);
   }
 

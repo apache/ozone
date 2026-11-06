@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODE_ID_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
@@ -30,6 +29,7 @@ import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -48,13 +48,13 @@ class TestOMHANodeDetails {
     conf.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, SERVICE_ID, "om1"), "localhost");
     conf.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, SERVICE_ID, "om2"), "[2001:db8::2]");
     conf.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, SERVICE_ID, "om3"), "[2001:db8::3]");
-    conf.set(ConfUtils.addKeySuffixes(OZONE_OM_BIND_HOST_KEY, SERVICE_ID, "om1"), "::");
+    conf.set(ConfUtils.addKeySuffixes(OmConfig.Keys.BIND_HOST, SERVICE_ID, "om1"), "::");
 
     OMHANodeDetails.loadOMHAConfig(conf);
 
     InetSocketAddress rpcAddress = OmUtils.getOmAddress(conf);
     assertEquals("localhost", rpcAddress.getHostString());
     assertEquals(new InetSocketAddress(InetAddress.getByName("::"), OZONE_OM_PORT_DEFAULT),
-        OmUtils.getOmRpcBindAddress(conf, rpcAddress));
+        conf.getObject(OmConfig.class).getRpcBindAddress(rpcAddress));
   }
 }
