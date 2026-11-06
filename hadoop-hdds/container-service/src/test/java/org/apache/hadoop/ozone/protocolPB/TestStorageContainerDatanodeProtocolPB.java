@@ -20,11 +20,14 @@ package org.apache.hadoop.ozone.protocolPB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ozone.protocol.ReconDatanodeProtocol;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.security.KerberosInfo;
+import org.apache.hadoop.security.SecurityUtil;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -44,5 +47,15 @@ public class TestStorageContainerDatanodeProtocolPB {
     assertNotNull(kerberosInfo);
     assertEquals(ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY, kerberosInfo.serverPrincipal());
     assertEquals(HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY, kerberosInfo.clientPrincipal());
+  }
+
+  @Test
+  public void testServiceAuthorizationClientPrincipal() {
+    Configuration conf = new Configuration(false);
+    conf.set(HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY, "dn/_HOST@EXAMPLE.COM");
+    // Service authorization reads the class named by @ProtocolInfo, not the PB class
+    assertEquals("dn/_HOST@EXAMPLE.COM", SecurityUtil.getClientPrincipal(StorageContainerDatanodeProtocol.class, conf));
+    assertEquals(ReconDatanodeProtocol.class.getName(), RPC.getProtocolName(ReconDatanodeProtocolPB.class));
+    assertEquals("dn/_HOST@EXAMPLE.COM", SecurityUtil.getClientPrincipal(ReconDatanodeProtocol.class, conf));
   }
 }

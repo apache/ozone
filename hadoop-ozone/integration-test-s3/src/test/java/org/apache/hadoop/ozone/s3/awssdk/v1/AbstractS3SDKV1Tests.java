@@ -155,8 +155,8 @@ import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -182,7 +182,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonHATests.TestCase {
+public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements ClusterForTests.TestCase {
 
   // server-side limitation
   private static final int MAX_UPLOADS_LIMIT = 1000;
