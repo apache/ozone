@@ -56,8 +56,8 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * from cblock clients.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestContainerOperations implements NonHATests.TestCase {
+public abstract class TestContainerOperations implements ClusterForTests.TestCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestContainerOperations.class);
   private static final int CONTAINER_LIST_LIMIT = 1;

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -14,4 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:failing
+name: Fork CI ping
+
+on:
+  pull_request:
+    types:
+      - edited
+      - opened
+      - ready_for_review
+      - reopened
+      - synchronize
+    branches:
+      # the list should match base-branches in fork-ci-status.yaml
+      - master
+
+permissions: {}
+
+jobs:
+  ping:
+    if: github.repository_owner == 'apache'
+    runs-on: ubuntu-slim
+    timeout-minutes: 1
+    steps:
+      - name: ping
+        run: |
+          echo 'This job just pings `Fork CI status` workflow that the PR was created or updated.'
