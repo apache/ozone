@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.s3;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
@@ -27,6 +29,7 @@ import java.net.URI;
 import java.util.Arrays;
 import javax.annotation.Priority;
 import javax.inject.Inject;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.PreMatching;
@@ -34,8 +37,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.ext.Provider;
-import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,9 +81,10 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
     String domain = getDomainName(host);
 
     if (domain == null) {
-      throw getException("Invalid S3 Gateway request {" + requestContext
-          .getUriInfo().getRequestUri().toString() + " }: No matching domain " +
-          "{" + Arrays.toString(domains) + "} for the host {" + host  + "}");
+      // The domain list and request URI go to the log only, not to the unauthenticated client.
+      LOG.debug("Invalid S3 Gateway request {}: no matching domain {} for the host {}",
+          requestContext.getUriInfo().getRequestUri(), Arrays.toString(domains), host);
+      throw getException("No matching domain for the host {" + host + "}");
     }
 
     LOG.debug("Http header host name is {}", host);
@@ -94,9 +98,7 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
 
       if (!bucketName.endsWith(".")) {
         //Checking this as the virtual host style pattern is http://bucket.host/
-        throw getException("Invalid S3 Gateway request {" + requestContext
-            .getUriInfo().getRequestUri().toString() + "}:" + " Host: {" + host
-            + " is in invalid format");
+        throw getException("Host {" + host + "} is in invalid format");
       } else {
         bucketName = bucketName.substring(0, bucketName.length() - 1);
       }
@@ -118,8 +120,9 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
     }
   }
 
-  private InvalidRequestException getException(String message) {
-    return new InvalidRequestException(message);
+  private WebApplicationException getException(String message) {
+    // A 400 S3 error, not a 500, so that S3 clients fail fast instead of retrying.
+    return wrapOS3Exception(S3ErrorTable.newError(INVALID_REQUEST).withMessage(message));
   }
 
   @VisibleForTesting
