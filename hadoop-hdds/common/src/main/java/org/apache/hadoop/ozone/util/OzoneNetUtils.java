@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.util;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT;
 
+import com.google.common.net.InetAddresses;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.Security;
@@ -71,7 +72,7 @@ public final class OzoneNetUtils {
       return false;
     }
     final String hostNameWithoutDomain =
-            getHostNameWithoutDomain(addr.getHostName());
+            getHostNameWithoutDomain(getHostName(addr));
     return NetUtils.getLocalHostname().equals(hostNameWithoutDomain);
   }
 
@@ -84,9 +85,22 @@ public final class OzoneNetUtils {
    */
   public static InetSocketAddress getAddressWithHostNameLocal(
           final InetSocketAddress addr) {
-    final String fqdn = addr.getHostName();
+    final String fqdn = getHostName(addr);
     final String hostName = getHostNameWithoutDomain(fqdn);
     return NetUtils.createSocketAddr(hostName, addr.getPort());
+  }
+
+  /**
+   * Same as {@link InetSocketAddress#getHostName()}, but does not cache the reverse DNS name in {@code addr}, which
+   * would make {@link InetSocketAddress#getHostString()} return that name instead of a configured IP literal.
+   */
+  private static String getHostName(InetSocketAddress addr) {
+    final InetAddress inetAddress = addr.getAddress();
+    if (inetAddress != null && InetAddresses.isInetAddress(addr.getHostString())) {
+      // Same name service lookup as getHostName(), kept in a field of its own.
+      return inetAddress.getCanonicalHostName();
+    }
+    return addr.getHostName();
   }
 
   private static String getHostNameWithoutDomain(final String fqdn) {

@@ -45,7 +45,8 @@ public abstract class NodeDetails {
     this.nodeId = nodeId;
     this.rpcAddress = rpcAddress;
     if (rpcAddress != null) {
-      this.hostAddress = rpcAddress.getHostName();
+      // Keep the configured host. getHostName() would replace an IP literal with its reverse DNS name.
+      this.hostAddress = rpcAddress.getHostString();
       this.rpcPort = rpcAddress.getPort();
     }
     this.ratisPort = ratisPort;
@@ -103,7 +104,28 @@ public abstract class NodeDetails {
   }
 
   public String getRatisHostPortStr() {
-    return HddsUtils.getHostPortString(getHostName(), ratisPort);
+    return HddsUtils.getHostPortString(hostAddress, ratisPort);
+  }
+
+  /**
+   * Checks whether a Ratis peer address refers to this node. Besides {@link #getRatisHostPortStr()}, it accepts any
+   * host that resolves to this node's IP address with the Ratis port, such as a host name stored in the Ratis
+   * configuration of an existing cluster.
+   */
+  public boolean isRatisAddress(String address) {
+    if (getRatisHostPortStr().equals(address)) {
+      return true;
+    }
+    final InetAddress inetAddress = getInetAddress();
+    if (inetAddress == null) {
+      return false;
+    }
+    try {
+      final InetSocketAddress other = NetUtils.createSocketAddr(address);
+      return other.getPort() == ratisPort && inetAddress.equals(other.getAddress());
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   public int getRatisPort() {
