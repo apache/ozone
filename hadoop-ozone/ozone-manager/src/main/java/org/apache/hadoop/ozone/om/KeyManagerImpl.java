@@ -663,7 +663,9 @@ public class KeyManagerImpl implements KeyManager {
                 .collect(Collectors.toList());
 
         // A requested part number that has no blocks does not exist in this
-        // object (part numbers may be non-contiguous), so it is out of range.
+        // object, so it is out of range. Since HDDS-17663, parts are
+        // renumbered to 1..N at completion; keys completed before that may
+        // still carry non-contiguous part numbers.
         if (currentLocations.isEmpty()) {
           throw new OMException("Cannot read part " + partNumberParam
               + " of key " + keyName + " because it does not exist",
