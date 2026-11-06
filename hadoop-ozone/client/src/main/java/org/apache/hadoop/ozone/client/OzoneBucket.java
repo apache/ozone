@@ -2157,18 +2157,28 @@ public class OzoneBucket extends WithMetadata {
       // listStatus API expects a not null 'startKey' value
       startKey = startKey == null ? "" : startKey;
 
+      // listPrefix is required for HDDS-17413 (OM widens listing when keyName
+      // matches an existing dir that is the user listKeys prefix). It must only be
+      // set on the first page at that path (startKey blank): otherwise OM would
+      // apply the same widening on every pagination step and sibling listing under
+      // the same keyPrefix string, causing timeouts. Deeper DFS uses other keyPrefix
+      // values or non-empty startKey and omits listPrefix.
+      ListStatusLightOptions.Builder optionsBuilder = ListStatusLightOptions.builder()
+          .setVolumeName(volumeName)
+          .setBucketName(name)
+          .setKeyName(keyPrefix)
+          .setRecursive(false)
+          .setStartKey(startKey)
+          .setNumEntries(listCacheSize)
+          .setAllowPartialPrefixes(true);
+      if (StringUtils.isBlank(startKey)
+          && OmUtils.normalizeKey(keyPrefix, true)
+              .equals(OmUtils.normalizeKey(getKeyPrefix(), true))) {
+        optionsBuilder.setListPrefix(getKeyPrefix());
+      }
+
       // 1. Get immediate children of keyPrefix, starting with startKey
-      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
-          ListStatusLightOptions.builder()
-              .setVolumeName(volumeName)
-              .setBucketName(name)
-              .setKeyName(keyPrefix)
-              .setRecursive(false)
-              .setStartKey(startKey)
-              .setNumEntries(listCacheSize)
-              .setAllowPartialPrefixes(true)
-              .setListPrefix(getKeyPrefix())
-              .build());
+      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(optionsBuilder.build());
 
       // 2. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank

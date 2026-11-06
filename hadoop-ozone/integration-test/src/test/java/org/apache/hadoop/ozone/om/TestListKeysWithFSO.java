@@ -436,15 +436,28 @@ public abstract class TestListKeysWithFSO implements ClusterForTests.TestCase {
     String keyPrefix = "dir1bh";
     List<String> expectedKeys = Arrays.asList("dir1bh/", "dir1bh/file1", "dir1bha/", "dir1bha/file1");
     List<String> expectedShallowKeys = Arrays.asList("dir1bh/", "dir1bha/");
-    // A non-shallow FSO listing of a keyPrefix that is also a directory lists only that directory,
-    // so the FSO result is compared with the listing without startKey.
-    List<String> expectedFsoKeys = getExpectedKeyList(keyPrefix, "", fsoOzoneBucket2);
+    checkFsoKeyListAssertsAllExpected(keyPrefix, "", expectedKeys, fsoOzoneBucket2);
     for (String startKey : Arrays.asList("dir1/dir2/dir3/d11.tx", "dir1/dir2/file1", "a0")) {
       checkKeyList(keyPrefix, startKey, expectedKeys, legacyOzoneBucket2);
-      checkKeyList(keyPrefix, startKey, expectedFsoKeys, fsoOzoneBucket2);
+      checkFsoKeyListAssertsAllExpected(keyPrefix, startKey, expectedKeys, fsoOzoneBucket2);
       checkKeyShallowList(keyPrefix, startKey, expectedShallowKeys, legacyOzoneBucket2);
       checkKeyShallowList(keyPrefix, startKey, expectedShallowKeys, fsoOzoneBucket2);
     }
+  }
+
+   // Same partial-prefix sibling-directory case as {@link #testListKeysWithStartKeyBeforePrefix},
+   // but with the matching prefix under an existing parent directory.
+  @Test
+  public void testListKeysPrefixExistingDirectoryUnderParent() throws Exception {
+    String keyPrefix = "parent/dir1bh";
+    List<String> expectedKeys = Arrays.asList(
+        "parent/dir1bh/", "parent/dir1bh/file1",
+        "parent/dir1bha/", "parent/dir1bha/file1");
+    List<String> expectedShallowKeys = Arrays.asList("parent/dir1bh/", "parent/dir1bha/");
+    checkFsoKeyListAssertsAllExpected(keyPrefix, "", expectedKeys, fsoOzoneBucket2);
+    checkKeyList(keyPrefix, "", expectedKeys, legacyOzoneBucket2);
+    checkKeyShallowList(keyPrefix, "", expectedShallowKeys, legacyOzoneBucket2);
+    checkKeyShallowList(keyPrefix, "", expectedShallowKeys, fsoOzoneBucket2);
   }
 
   @Test
@@ -619,6 +632,8 @@ public abstract class TestListKeysWithFSO implements ClusterForTests.TestCase {
     keys.add("/dir1/dir2/dir3/d11.tx");
     keys.add("/dir1bh/file1");
     keys.add("/dir1bha/file1");
+    keys.add("/parent/dir1bh/file1");
+    keys.add("/parent/dir1bha/file1");
 
     createAndAssertKeys(ozoneBucket, keys);
   }
@@ -678,6 +693,27 @@ public abstract class TestListKeysWithFSO implements ClusterForTests.TestCase {
   private void checkKeyList(String keyPrefix, String startKey,
       List<String> keys, OzoneBucket fsoBucket) throws Exception {
     checkKeyList(keyPrefix, startKey, keys, fsoBucket, false);
+  }
+
+  private void checkFsoKeyListAssertsAllExpected(String keyPrefix, String startKey,
+      List<String> expectedKeys, OzoneBucket fsoBucket) throws Exception {
+    Iterator<? extends OzoneKey> ozoneKeyIterator =
+        fsoBucket.listKeys(keyPrefix, startKey, false);
+    List<String> actualKeys = new ArrayList<>();
+    while (ozoneKeyIterator.hasNext()) {
+      actualKeys.add(ozoneKeyIterator.next().getName());
+    }
+    assertAllExpectedKeysReturned(keyPrefix, expectedKeys, actualKeys);
+  }
+
+  private static void assertAllExpectedKeysReturned(String keyPrefix,
+      List<String> expectedKeys, List<String> actualKeys) {
+    for (String expectedKey : expectedKeys) {
+      assertTrue(actualKeys.contains(expectedKey),
+          () -> "FSO listKeys(prefix='" + keyPrefix + "') missing expected key: "
+              + expectedKey);
+    }
+    assertEquals(expectedKeys, actualKeys);
   }
 
   private void checkKeyShallowList(String keyPrefix, String startKey,
