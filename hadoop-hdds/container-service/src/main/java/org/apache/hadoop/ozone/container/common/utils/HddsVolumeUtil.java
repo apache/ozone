@@ -109,7 +109,7 @@ public final class HddsVolumeUtil {
     try {
       volume.loadDbStore(readOnly);
     } catch (IOException e) {
-      onFailure(volume);
+      onFailure(volume, e);
       if (logger != null) {
         logger.error("Load db store for HddsVolume {} failed",
             volume.getStorageDir().getAbsolutePath(), e);

@@ -108,6 +108,8 @@ public class HddsVolume extends StorageVolume {
   private File deletedContainerDir;
   private final AtomicBoolean dbLoaded = new AtomicBoolean(false);
   private final AtomicBoolean dbLoadFailure = new AtomicBoolean(false);
+  // Time the last data path disk I/O error was logged, to log at most one every disk check min gap.
+  private final AtomicLong lastDataPathIOErrorLogTime = new AtomicLong(Long.MIN_VALUE);
 
   /**
    * Builder for HddsVolume.
@@ -187,6 +189,22 @@ public class HddsVolume extends StorageVolume {
 
   public VolumeInfoMetrics getVolumeInfoStats() {
     return volumeInfoMetrics;
+  }
+
+  /**
+   * Records a disk I/O error, such as EIO, hit while reading or writing container data or metadata on this volume.
+   * The volume state is not changed. The error is counted in {@link VolumeInfoMetrics#getNumDataPathIOErrors()} so
+   * that a disk failing reads of existing data can be identified even while the volume check keeps passing.
+   */
+  public void recordDataPathIOError(Throwable cause) {
+    volumeInfoMetrics.incNumDataPathIOErrors();
+    final long minGap = getDatanodeConfig() == null ? 0 : getDatanodeConfig().getDiskCheckMinGap().toMillis();
+    final long now = Time.monotonicNow();
+    final long last = lastDataPathIOErrorLogTime.get();
+    if ((last == Long.MIN_VALUE || now - last >= minGap) && lastDataPathIOErrorLogTime.compareAndSet(last, now)) {
+      LOG.warn("Volume {} hit a disk I/O error while reading or writing container data: {}. {} disk I/O errors on " +
+          "this volume since the datanode started.", this, cause, volumeInfoMetrics.getNumDataPathIOErrors());
+    }
   }
 
   @Override
