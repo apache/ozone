@@ -17,7 +17,11 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
+import static org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils.mockFinalizedOmVersionManager;
+import static org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -43,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -277,7 +282,8 @@ public class TestS3InitiateMultipartUploadRequest
   }
 
   /**
-   * Before STORAGE_POLICY_SUPPORT is finalized, an old OM ignores the policy field.
+   * Before STORAGE_POLICY_SUPPORT is finalized, an old OM will not persist the storage policy field,
+   * so a request without a policy must be applied without one and not resolved from the bucket.
    */
   @Test
   public void testStoragePolicyNotStampedBeforeFinalization() throws Exception {
@@ -287,7 +293,7 @@ public class TestS3InitiateMultipartUploadRequest
     addVolumeAndBucketWithPolicy(volumeName, bucketName, OzoneStoragePolicy.COLD);
 
     OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName, keyName,
-        Collections.emptyMap(), Collections.emptyMap(), OzoneStoragePolicy.HOT);
+        Collections.emptyMap(), Collections.emptyMap(), null);
 
     OMRequest preExecuted = getS3InitiateMultipartUploadReq(clientRequest).preExecute(ozoneManager);
     OzoneManagerProtocolProtos.KeyArgs keyArgs = preExecuted.getInitiateMultiPartUploadRequest().getKeyArgs();
@@ -302,6 +308,51 @@ public class TestS3InitiateMultipartUploadRequest
     assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(getMultipartOpenKey(volumeName, bucketName, keyName, keyArgs.getMultipartUploadID()))
         .getStoragePolicy()).isNull();
+  }
+
+  @Test
+  public void testRejectStoragePolicyBeforeFinalization() {
+    OMRequest request = initiateRequestWithStoragePolicy(OzoneStoragePolicy.COLD);
+
+    assertThatThrownBy(() -> S3InitiateMultipartUploadRequest.disallowInitiateMultiPartUploadWithStoragePolicy(
+        request, preFinalizedContext()))
+        .isInstanceOfSatisfying(OMException.class, ex -> {
+          assertThat(ex.getResult()).isEqualTo(OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+          assertThat(ex.getMessage()).contains("Cluster does not have the storage policy feature finalized yet");
+        });
+  }
+
+  /**
+   * A request that carries no storage policy must pass the validator untouched, since the validator's return value
+   * is chained into the next validator by the request validation framework.
+   */
+  @Test
+  public void testAllowInitiateWithoutStoragePolicyBeforeFinalization() throws Exception {
+    OMRequest request = initiateRequestWithStoragePolicy(null);
+
+    assertThat(S3InitiateMultipartUploadRequest.disallowInitiateMultiPartUploadWithStoragePolicy(
+        request, preFinalizedContext())).isEqualTo(request);
+  }
+
+  @Test
+  public void testAllowInitiateWithStoragePolicyAfterFinalization() throws Exception {
+    OMRequest request = initiateRequestWithStoragePolicy(OzoneStoragePolicy.COLD);
+
+    assertThat(S3InitiateMultipartUploadRequest.disallowInitiateMultiPartUploadWithStoragePolicy(
+        request, postFinalizedContext())).isEqualTo(request);
+  }
+
+  private OMRequest initiateRequestWithStoragePolicy(StoragePolicy storagePolicy) {
+    return OMRequestTestUtils.createInitiateMPURequest(UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), Collections.emptyMap(), Collections.emptyMap(), storagePolicy);
+  }
+
+  private ValidationContext preFinalizedContext() {
+    return of(mockPreFinalizedOmVersionManager(), omMetadataManager);
+  }
+
+  private ValidationContext postFinalizedContext() {
+    return of(mockFinalizedOmVersionManager(), omMetadataManager);
   }
 
   /**

@@ -72,6 +72,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Verifies that a key honours its storage policy end to end: the policy is
@@ -350,17 +352,20 @@ public class TestOzoneStoragePolicy {
    * The policy of a multipart key is fixed when the upload is initiated, so changing the bucket policy
    * while the upload is open does not move the blocks of the parts uploaded afterwards.
    */
-  @Test
-  public void testMultipartUploadKeepsStoragePolicyOfInitiate() throws Exception {
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
+  public void testMultipartUploadKeepsStoragePolicyOfInitiate(BucketLayout layout) throws Exception {
     startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
 
-    OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, BucketLayout.OBJECT_STORE);
-    String keyName = UUID.randomUUID().toString();
-    String uploadID = initiateMultipartUpload(bucket, keyName, null);
-    bucket.setStoragePolicy(OzoneStoragePolicy.HOT);
-    uploadPartsAndComplete(bucket, keyName, uploadID);
+    for (OzoneStoragePolicy changedPolicy : Arrays.asList(OzoneStoragePolicy.HOT, OzoneStoragePolicy.COLD)) {
+      OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, layout);
+      String keyName = UUID.randomUUID().toString();
+      String uploadID = initiateMultipartUpload(bucket, keyName, null);
+      bucket.setStoragePolicy(changedPolicy);
+      uploadPartsAndComplete(bucket, keyName, uploadID);
 
-    assertMultipartKey(lookupKey(bucket, keyName), OzoneStoragePolicy.WARM);
+      assertMultipartKey(lookupKey(bucket, keyName), OzoneStoragePolicy.WARM);
+    }
   }
 
   /**

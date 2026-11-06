@@ -19,25 +19,29 @@ package org.apache.hadoop.ozone.om;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.junit.jupiter.api.Test;
 
 /**
  * Upgrade testing for the storage policy of a multipart key.
  * <p>
  * Expected behavior:
- * 1. Pre-Finalize: InitiateMultiPartUpload requests succeed, but the storage
- *    policy is not stamped on the request, so the multipart info and the open
- *    key end up with no storage policy. This holds whether or not the client
- *    sent one. An OM without storage policy support ignores the field, so
- *    stamping it would make OMs apply the same request differently.
+ * 1. Pre-Finalize:
+ *    - InitiateMultiPartUpload requests that carry a storage policy are
+ *      rejected, and no upload is created. An OM without storage policy
+ *      support ignores the field, so accepting it would make OMs apply the
+ *      same request differently.
+ *    - Requests that carry none, such as those sent by an older client,
+ *      succeed. No policy is stamped on the request, so the multipart info
+ *      and the open key end up with no storage policy.
  * <p>
  * 2. Post-Finalize: the storage policy sent by the client is persisted. If the
  *    client sent none, the bucket's storage policy, then the cluster default,
@@ -61,9 +65,13 @@ public class TestOMMpuStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgrad
     // The bucket cannot carry a policy yet: CreateBucket strips it while pre-finalized.
     String bucket = createBucket(null, null, BucketLayout.OBJECT_STORE);
 
-    // The policy sent by the client is dropped.
-    assertMultipartKeyStoragePolicy(bucket, OzoneStoragePolicy.COLD, null);
-    // Control: a request that carries no policy, such as one sent by an older client, behaves the same.
+    // A request that carries a policy is rejected and creates no upload.
+    assertRejected(() -> initiateMultipartUpload(bucket, "key-" + UUID.randomUUID(), OzoneStoragePolicy.COLD));
+    OMMetadataManager metadataManager = getCluster().getOzoneManager().getMetadataManager();
+    assertThat(metadataManager.getMultipartInfoTable().isEmpty()).isTrue();
+    assertThat(metadataManager.getOpenKeyTable(BucketLayout.OBJECT_STORE).isEmpty()).isTrue();
+
+    // Control: a request that carries no policy succeeds.
     assertMultipartKeyStoragePolicy(bucket, null, null);
   }
 
@@ -78,12 +86,13 @@ public class TestOMMpuStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgrad
   }
 
   /**
-   * Initiates an upload asking for {@code requestedPolicy} (none if null) and checks that
-   * {@code expectedPolicy} is stored on both the multipart info and the open key.
+   * Sent straight to the OM, bypassing RpcClient, so that the client side version check cannot reject the request
+   * before the OM's validator sees it.
+   *
+   * @return the upload ID.
    */
-  private void assertMultipartKeyStoragePolicy(String bucketName, StoragePolicy requestedPolicy,
-      StoragePolicy expectedPolicy) throws Exception {
-    String keyName = "key-" + UUID.randomUUID();
+  private String initiateMultipartUpload(String bucketName, String keyName, StoragePolicy requestedPolicy)
+      throws IOException {
     OmKeyArgs.Builder keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(VOLUME_NAME)
         .setBucketName(bucketName)
@@ -93,7 +102,17 @@ public class TestOMMpuStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgrad
     if (requestedPolicy != null) {
       keyArgs.setStoragePolicy(requestedPolicy);
     }
-    String uploadID = getOmClient().initiateMultipartUpload(keyArgs.build()).getUploadID();
+    return getOmClient().initiateMultipartUpload(keyArgs.build()).getUploadID();
+  }
+
+  /**
+   * Initiates an upload asking for {@code requestedPolicy} (none if null) and checks that
+   * {@code expectedPolicy} is stored on both the multipart info and the open key.
+   */
+  private void assertMultipartKeyStoragePolicy(String bucketName, StoragePolicy requestedPolicy,
+      StoragePolicy expectedPolicy) throws Exception {
+    String keyName = "key-" + UUID.randomUUID();
+    String uploadID = initiateMultipartUpload(bucketName, keyName, requestedPolicy);
 
     OMMetadataManager metadataManager = getCluster().getOzoneManager().getMetadataManager();
     String multipartKey = metadataManager.getMultipartKey(VOLUME_NAME, bucketName, keyName, uploadID);

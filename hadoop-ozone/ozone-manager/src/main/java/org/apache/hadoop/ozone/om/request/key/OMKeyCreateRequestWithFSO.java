@@ -147,7 +147,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               omMetadataManager.getBucketKey(volumeName, bucketName));
 
       if (!keyArgs.getIsMultipartKey() && !keyArgs.hasStoragePolicy()) {
-        // TODO: preExecute should not set a storage policy always based on S3InitiateMultipartUploadRequest#preExecute.
+        // TODO(HDDS-17530): preExecute should not set a storage policy always based on
+        //  S3InitiateMultipartUploadRequest#preExecute.
         // Update this accordingly.
         // preExecute always sets a storage policy, so a missing one means this request
         // was journaled by an older OM and is being replayed during an upgrade.

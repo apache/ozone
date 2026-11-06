@@ -17,20 +17,17 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DEFAULT_STORAGE_POLICY_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.UUID;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StoragePolicy;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 
 /**
  * Upgrade testing for the bucket storage policy feature.
@@ -56,6 +53,12 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
 
   /** Bucket created before finalization, used by the update assertions. */
   private String bucketName;
+
+  @Override
+  protected void configure(OzoneConfiguration config) {
+    // Not WARM, so the test fails if the OM applies WARM regardless of its configured default.
+    config.set(OZONE_OM_DEFAULT_STORAGE_POLICY_KEY, OzoneStoragePolicy.COLD.name());
+  }
 
   @BeforeEach
   public void createInitialBucket() throws Exception {
@@ -119,15 +122,6 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
     setStoragePolicy(null, null, true);
     assertThat(getOmClient().getBucketInfo(VOLUME_NAME, bucketName)
         .getStoragePolicy()).isNull();
-  }
-
-  private void assertRejected(Executable executable) {
-    OMException ex = assertThrows(OMException.class, executable);
-    assertThat(ex.getResult())
-        .isEqualTo(NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
-    assertThat(ex.getMessage())
-        .contains("Cluster does not have the storage policy"
-            + " feature finalized yet");
   }
 
   private void setStoragePolicy(StoragePolicy storagePolicy,

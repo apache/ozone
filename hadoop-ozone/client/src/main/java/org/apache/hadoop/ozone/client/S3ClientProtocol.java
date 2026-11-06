@@ -72,7 +72,6 @@ import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
-import org.jspecify.annotations.Nullable;
 
 /** Delegates ClientProtocol calls for S3 Gateway clients. */
 final class S3ClientProtocol implements ClientProtocol {

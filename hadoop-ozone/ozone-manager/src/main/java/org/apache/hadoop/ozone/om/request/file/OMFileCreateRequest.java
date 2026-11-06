@@ -139,7 +139,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
         repConfig, new ExcludeList(), requestedSize, keyArgs.getSortDatanodes(), userInfo, ozoneManager,
         storagePolicy, getAllowFallbackStoragePolicy(bucketInfo));
 
-    // TODO: stamp the policy only if STORAGE_POLICY_SUPPORT is finalized (see
+    // TODO(HDDS-17530): stamp the policy only if STORAGE_POLICY_SUPPORT is finalized (see
     //  S3InitiateMultipartUploadRequest#preExecute). Otherwise an old OM ignores the field and applies this request
     //  differently from an upgraded OM.
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()

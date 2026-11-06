@@ -2241,6 +2241,10 @@ public class RpcClient implements ClientProtocol {
       }
     }
 
+    if (storagePolicy != null && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
+    }
+
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)

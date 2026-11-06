@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.StoragePolicy;
@@ -27,12 +29,14 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * Base class for the upgrade tests of the storage policy feature.
@@ -55,6 +59,7 @@ public abstract class AbstractOMStoragePolicyUpgradeTest {
   public void init() throws Exception {
     conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY,
         OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.serialize());
+    configure(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
@@ -68,6 +73,12 @@ public abstract class AbstractOMStoragePolicyUpgradeTest {
         .setOwnerName("user1")
         .setAdminName("user1")
         .build());
+  }
+
+  /**
+   * Lets a subclass add configuration before the cluster is started.
+   */
+  protected void configure(OzoneConfiguration config) {
   }
 
   protected MiniOzoneCluster getCluster() {
@@ -88,12 +99,24 @@ public abstract class AbstractOMStoragePolicyUpgradeTest {
 
   protected void assertStoragePolicyNotFinalized() {
     assertThat(cluster.getOzoneManager().getVersionManager().getApparentVersion())
-        .isEqualTo(OzoneManagerVersion.SOFTWARE_VERSION);
+        .isEqualTo(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
   }
 
   protected void assertStoragePolicyFinalized() {
     assertThat(cluster.getOzoneManager().getVersionManager().getApparentVersion())
         .isEqualTo(OzoneManagerVersion.SOFTWARE_VERSION);
+  }
+
+  /**
+   * Asserts the request is rejected because the storage policy feature is not finalized.
+   */
+  protected void assertRejected(Executable executable) {
+    OMException ex = assertThrows(OMException.class, executable);
+    assertThat(ex.getResult())
+        .isEqualTo(NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+    assertThat(ex.getMessage())
+        .contains("Cluster does not have the storage policy"
+            + " feature finalized yet");
   }
 
   /**
