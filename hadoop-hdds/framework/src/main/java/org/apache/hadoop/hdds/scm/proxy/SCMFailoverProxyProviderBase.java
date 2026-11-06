@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
@@ -568,8 +567,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   }
 
   private T createSCMProxy(InetSocketAddress scmAddress) throws IOException {
-    Configuration hadoopConf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+    Configuration hadoopConf = HddsUtils.getFailoverProxyConfiguration(conf);
     RPC.setProtocolEngine(hadoopConf, protocolClass, ProtobufRpcEngine.class);
     // FailoverOnNetworkException ensures that the IPC layer does not attempt
     // retries on the same SCM in case of connection exception. This retry
