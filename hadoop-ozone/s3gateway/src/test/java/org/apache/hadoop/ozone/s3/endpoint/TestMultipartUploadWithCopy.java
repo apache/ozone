@@ -25,12 +25,15 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MATCH;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -61,6 +64,8 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Class to test Multipart upload where parts are created with copy header.
@@ -113,9 +118,7 @@ public class TestMultipartUploadWithCopy {
         OzoneUtils.formatTime(sourceKeyLastModificationTime +
             1000 * 60 * 24);
 
-    // Make sure DELAY_MS has passed, otherwise
-    //  afterSourceKeyModificationTimeStr will be in the future
-    //  and thus invalid
+    // Make sure afterSourceKeyModificationTimeStr is in the past.
     long currentTime = System.currentTimeMillis();
     long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
     if (sleepMs > 0) {
@@ -287,6 +290,111 @@ public class TestMultipartUploadWithCopy {
           + " Unmodified:" + this.unmodifiedTimestamp
           + " ErrorCode:" + this.errorCode;
     }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "match, true, false", "match, false, true",
+      "none-match, true, true", "none-match, false, false"
+  })
+  public void testMultipartETagHeaders(String condition, boolean matching, boolean rejected) throws Exception {
+    for (String range : new String[]{null, "bytes=0-3"}) {
+      String key = "etag-" + condition + "-" + matching + "-" + (range == null ? "full" : "range");
+      setHeaders();
+      String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, key);
+      Map<String, String> headers = new HashMap<>();
+      headers.put(COPY_SOURCE_HEADER, OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY);
+      headers.put(COPY_SOURCE_IF_PREFIX + condition,
+          "\"" + (matching ? DigestUtils.md5Hex(EXISTING_KEY_CONTENT) : "wrong-etag") + "\"");
+      if (range != null) {
+        headers.put(COPY_SOURCE_HEADER_RANGE, range);
+      }
+      setHeaders(headers);
+      if (rejected) {
+        OS3Exception ex = assertThrows(OS3Exception.class,
+            () -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+        assertEquals(ERROR_CODE, ex.getCode());
+        assertEquals(412, ex.getHttpCode());
+        assertEquals(0, client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
+            .listParts(key, uploadID, 0, 100).getPartInfoList().size());
+      } else {
+        assertSucceeds(() -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"match, false", "none-match, true"})
+  public void testMultipartETagAndTimestampHeaders(String condition, boolean rejected) throws Exception {
+    String key = "etag-timestamp-" + condition;
+    setHeaders();
+    String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, key);
+    Map<String, String> headers = new HashMap<>();
+    headers.put(COPY_SOURCE_HEADER, OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY);
+    headers.put(COPY_SOURCE_IF_PREFIX + condition, "\"" + DigestUtils.md5Hex(EXISTING_KEY_CONTENT) + "\"");
+    headers.put("match".equals(condition) ? COPY_SOURCE_IF_UNMODIFIED_SINCE : COPY_SOURCE_IF_MODIFIED_SINCE,
+        beforeSourceKeyModificationTimeStr);
+    setHeaders(headers);
+    if (rejected) {
+      OS3Exception ex = assertThrows(OS3Exception.class,
+          () -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+      assertEquals(ERROR_CODE, ex.getCode());
+      assertEquals(412, ex.getHttpCode());
+    } else {
+      assertSucceeds(() -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "match, true, false", "match, false, true",
+      "none-match, true, true", "none-match, false, false"
+  })
+  public void testMultipartETagWithFutureDate(String condition, boolean matching, boolean rejected) throws Exception {
+    String key = "etag-future-" + condition + "-" + matching;
+    setHeaders();
+    String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, key);
+    setHeaders(ImmutableMap.of(
+        COPY_SOURCE_HEADER, OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY,
+        COPY_SOURCE_IF_PREFIX + condition,
+        "\"" + (matching ? DigestUtils.md5Hex(EXISTING_KEY_CONTENT) : "wrong-etag") + "\"",
+        COPY_SOURCE_IF_MODIFIED_SINCE, futureTimeStr));
+    if (rejected) {
+      OS3Exception ex = assertThrows(OS3Exception.class,
+          () -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+      assertEquals(ERROR_CODE, ex.getCode());
+      assertEquals(412, ex.getHttpCode());
+    } else {
+      assertSucceeds(() -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+    }
+  }
+
+  @Test
+  public void testMultipartCopyWithStaleETag() throws Exception {
+    setHeaders();
+    String sourceKey = "overwritten-source";
+    String key = "stale-etag-copy";
+    String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, key);
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET);
+    for (String content : new String[]{EXISTING_KEY_CONTENT, "updated content"}) {
+      try (OutputStream stream = bucket.createKey(sourceKey, content.length(),
+          ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE),
+          ImmutableMap.of(OzoneConsts.ETAG, DigestUtils.md5Hex(content)))) {
+        stream.write(content.getBytes(UTF_8));
+      }
+    }
+    String oldETag = DigestUtils.md5Hex(EXISTING_KEY_CONTENT);
+    uploadPart(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, EXISTING_KEY_CONTENT);
+    String partETag = bucket.listParts(key, uploadID, 0, 100).getPartInfoList().get(0).getETag();
+    setHeaders(ImmutableMap.of(COPY_SOURCE_HEADER, OzoneConsts.S3_BUCKET + "/" + sourceKey,
+        COPY_SOURCE_IF_MATCH, "\"" + oldETag + "\""));
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> put(endpoint, OzoneConsts.S3_BUCKET, key, 1, uploadID, ""));
+    assertEquals(ERROR_CODE, ex.getCode());
+    assertEquals(412, ex.getHttpCode());
+    OzoneMultipartUploadPartListParts parts = bucket.listParts(key, uploadID, 0, 100);
+    assertEquals(1, parts.getPartInfoList().size());
+    assertEquals(partETag, parts.getPartInfoList().get(0).getETag());
   }
 
   @Test
