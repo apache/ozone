@@ -1080,10 +1080,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
+  /**
+   * Like HDFS, the status has no block locations: OM skips the pipeline refresh (headOp).
+   * {@link #getFileBlockLocations} fetches the locations when they are asked for.
+   */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {    
     return TracingUtil.executeInNewSpan("ofs getFileStatus",
-        () -> convertFileStatus(getFileStatusAdapter(f)));
+        () -> {
+          FileStatusAdapter status = getFileStatusAdapter(f, true);
+          return new FileStatusWithoutBlockLocations(convertFileStatus(status), status.isErasureCoded());
+        });
   }
 
   public FileStatusAdapter getFileStatusAdapter(Path f) throws IOException {
@@ -1091,10 +1098,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   /**
-   * @param headOp when true, requests a metadata-only (type) check so the OM
-   *               skips the pipeline refresh (SCM round-trip) and datanode
-   *               sorting. Used by {@link #isDirectory(Path)}/{@link #isFile(Path)},
-   *               which only need the entry type.
+   * @param headOp when true, requests a metadata-only check so the OM skips the
+   *               pipeline refresh (SCM round-trip) and datanode sorting, and the
+   *               status has no block locations. Used by {@link #getFileStatus(Path)},
+   *               {@link #isDirectory(Path)} and {@link #isFile(Path)}.
    */
   public FileStatusAdapter getFileStatusAdapter(Path f, boolean headOp)
       throws IOException {
@@ -1131,9 +1138,23 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
     if (fileStatus instanceof LocatedFileStatus) {
       return BasicOzoneFileSystem.getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
-    } else {
-      return super.getFileBlockLocations(fileStatus, start, len);
     }
+    if (BasicOzoneFileSystem.needsBlockLocations(fileStatus, start, len)) {
+      // getFileStatus returns no block locations: fetch them by path, as HDFS does.
+      return getFileBlockLocations(fileStatus.getPath(), start, len);
+    }
+    return super.getFileBlockLocations(fileStatus, start, len);
+  }
+
+  @Override
+  public BlockLocation[] getFileBlockLocations(Path p, long start, long len) throws IOException {
+    // One GetFileStatus with block locations, instead of getFileStatus followed by another for the locations.
+    FileStatus fileStatus = TracingUtil.executeInNewSpan("ofs getFileBlockLocations",
+        () -> convertFileStatus(getFileStatusAdapter(p, false)));
+    if (fileStatus instanceof LocatedFileStatus) {
+      return BasicOzoneFileSystem.getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
+    }
+    return super.getFileBlockLocations(fileStatus, start, len);
   }
 
   @Override

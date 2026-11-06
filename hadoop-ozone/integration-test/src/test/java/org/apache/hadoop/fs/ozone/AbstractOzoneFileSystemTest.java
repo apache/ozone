@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -1859,20 +1860,29 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   }
 
   @Test
-  public void testOzoneManagerLocatedFileStatus() throws IOException {
+  public void testOzoneManagerFileBlockLocations() throws IOException {
     String data = RandomStringUtils.secure().nextAlphanumeric(20);
     String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
     Path path = createPath("/" + filePath);
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);
     }
+    // like HDFS, getFileStatus has no block locations, getFileBlockLocations fetches them
     FileStatus status = fs.getFileStatus(path);
-    LocatedFileStatus locatedFileStatus = assertInstanceOf(LocatedFileStatus.class, status);
-    assertThat(locatedFileStatus.getBlockLocations().length).isGreaterThanOrEqualTo(1);
+    assertFalse(status instanceof LocatedFileStatus);
+    assertEquals(data.length(), status.getLen());
 
-    for (BlockLocation blockLocation : locatedFileStatus.getBlockLocations()) {
-      assertThat(blockLocation.getNames().length).isGreaterThanOrEqualTo(1);
-      assertThat(blockLocation.getHosts().length).isGreaterThanOrEqualTo(1);
+    BlockLocation[] expected = fs.listLocatedStatus(path).next().getBlockLocations();
+    assertThat(expected.length).isGreaterThanOrEqualTo(1);
+    for (BlockLocation[] blockLocations : new BlockLocation[][] {
+        fs.getFileBlockLocations(status, 0, status.getLen()), fs.getFileBlockLocations(path, 0, status.getLen())}) {
+      assertEquals(expected.length, blockLocations.length);
+      for (int i = 0; i < expected.length; i++) {
+        assertThat(blockLocations[i].getNames().length).isGreaterThanOrEqualTo(1);
+        assertArrayEquals(expected[i].getHosts(), blockLocations[i].getHosts());
+        assertEquals(expected[i].getOffset(), blockLocations[i].getOffset());
+        assertEquals(expected[i].getLength(), blockLocations[i].getLength());
+      }
     }
   }
 
@@ -1892,8 +1902,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
       stream.writeBytes(data);
     }
     FileStatus status = fs.getFileStatus(path);
-    LocatedFileStatus locatedFileStatus = assertInstanceOf(LocatedFileStatus.class, status);
-    BlockLocation[] blockLocations = locatedFileStatus.getBlockLocations();
+    BlockLocation[] blockLocations = fs.getFileBlockLocations(status, 0, status.getLen());
 
     assertEquals(0, blockLocations[0].getOffset());
     assertEquals(blockSize, blockLocations[1].getOffset());
