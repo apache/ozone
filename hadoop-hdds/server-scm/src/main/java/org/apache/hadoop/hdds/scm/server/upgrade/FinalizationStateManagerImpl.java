@@ -22,6 +22,7 @@ import java.util.Objects;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.invoker.FinalizationStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -50,6 +51,36 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     versionManager.finalizeUpgrade();
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.APPARENT_VERSION_KEY, String.valueOf(versionManager.getApparentVersion().serialize()));
+  }
+
+  @Deprecated
+  @Override
+  public void addFinalizingMark() {
+    // The pre-ZDU finalizing mark is no longer used, see ClearFinalizingStateScmUpgradeAction.
+  }
+
+  /**
+   * Finalizes up to the given pre-ZDU layout version, but not beyond it, as the SCM that wrote the entry did.
+   */
+  @Deprecated
+  @Override
+  public void finalizeLayoutFeature(Integer layoutVersion) throws IOException {
+    if (layoutVersion == null) {
+      throw new IOException("finalizeLayoutFeature requires a layout version argument");
+    }
+    HDDSLayoutFeature feature = HDDSLayoutFeature.deserialize(layoutVersion);
+    if (feature == null) {
+      throw new IOException("Unknown pre-ZDU layout version " + layoutVersion);
+    }
+    versionManager.finalizeUpgrade(feature);
+    transactionBuffer.addToBuffer(finalizationStore,
+        OzoneConsts.APPARENT_VERSION_KEY, String.valueOf(versionManager.getApparentVersion().serialize()));
+  }
+
+  @Deprecated
+  @Override
+  public void removeFinalizingMark() {
+    // The pre-ZDU finalizing mark is no longer used, see ClearFinalizingStateScmUpgradeAction.
   }
 
   /**
