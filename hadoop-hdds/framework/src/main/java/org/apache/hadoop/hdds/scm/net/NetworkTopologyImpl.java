@@ -794,9 +794,13 @@ public class NetworkTopologyImpl implements NetworkTopology {
       return shuffledNodes;
     }
     // Sort weights for the nodes array
+    final String[] readerPath = getLocationPath(reader);
     int[] costs = new int[activeLen];
     for (int i = 0; i < activeLen; i++) {
-      costs[i] = getDistanceCost(reader, nodes.get(i));
+      final N node = nodes.get(i);
+      costs[i] = reader.getParent() != null && node.getParent() != null
+          ? getDistanceCost(reader, node)
+          : getDistanceCostByLocation(reader, readerPath, node);
     }
     // Add cost/node pairs to a TreeMap to sort
     NavigableMap<Integer, List<N>> tree = new TreeMap<>();
@@ -821,6 +825,51 @@ public class NetworkTopologyImpl implements NetworkTopology {
       LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes, reader, ret);
     }
     return ret;
+  }
+
+  /**
+   * Distance cost for a node that is not linked into the tree, such as a datanode deserialized
+   * from RPC, computed from network locations and the schema's per-level costs, like HDFS
+   * {@code NetworkTopology#getWeightUsingNetworkLocation}. Inner nodes take their level's schema
+   * cost, so this equals {@link #getDistanceCost(Node, Node)} for linked nodes, without the lock.
+   */
+  private int getDistanceCostByLocation(Node reader, String[] readerPath, Node node) {
+    if (Objects.equals(reader, node)) {
+      return 0;
+    }
+    final String[] nodePath = getLocationPath(node);
+    if (readerPath == null || nodePath == null) {
+      return Integer.MAX_VALUE;
+    }
+    int commonDepth = 0;
+    while (commonDepth < readerPath.length && readerPath[commonDepth].equals(nodePath[commonDepth])) {
+      commonDepth++;
+    }
+    // Both sides climb from the leaves' parent level up to the common ancestor, inclusive.
+    int cost = 0;
+    for (int level = NetConstants.ROOT_LEVEL + commonDepth; level < maxLevel; level++) {
+      cost += 2 * schemaManager.getCost(level);
+    }
+    return cost;
+  }
+
+  /**
+   * @return the names of a leaf's ancestors below the root, or null if the node's location does
+   * not fit this topology's depth.
+   */
+  private String[] getLocationPath(Node node) {
+    if (node == null) {
+      return null;
+    }
+    final String location;
+    try {
+      location = NetUtils.normalize(node.getNetworkLocation());
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+    final String[] path = location.length() <= 1 ? new String[0]
+        : location.substring(1).split(NetConstants.PATH_SEPARATOR_STR);
+    return path.length == maxLevel - NetConstants.ROOT_LEVEL - 1 ? path : null;
   }
 
   /**

@@ -938,6 +938,92 @@ class TestNetworkTopologyImpl {
     }
   }
 
+  @ParameterizedTest
+  @MethodSource("topologies")
+  void testSortByDistanceCostOfUnlinkedNodesMatchesLinked(NodeSchema[] schemas, Node[] nodeArray) {
+    assertUnlinkedSortMatchesLinked(schemas, nodeArray);
+  }
+
+  @Test
+  void testSortByDistanceCostOfUnlinkedNodesWithCustomCosts() {
+    NodeSchema[] schemas = {
+        new NodeSchema.Builder().setType(NodeSchema.LayerType.ROOT).setCost(5).build(),
+        new NodeSchema.Builder().setType(NodeSchema.LayerType.INNER_NODE).setCost(3).build(),
+        new NodeSchema.Builder().setType(NodeSchema.LayerType.INNER_NODE).setCost(1).build(),
+        new NodeSchema.Builder().setType(NodeSchema.LayerType.LEAF_NODE).build()};
+    assertUnlinkedSortMatchesLinked(schemas, new Node[] {
+        createDatanode("1.1.1.1", "/r1/ng1"),
+        createDatanode("2.2.2.2", "/r1/ng1"),
+        createDatanode("3.3.3.3", "/r1/ng2"),
+        createDatanode("4.4.4.4", "/r2/ng1"),
+        createDatanode("5.5.5.5", "/r2/ng2")});
+  }
+
+  /**
+   * Nodes deserialized from RPC are not linked into the tree; sorting them must give the same order as
+   * sorting the linked nodes. Shuffling is disabled so that equal-cost nodes keep their input order.
+   */
+  private void assertUnlinkedSortMatchesLinked(NodeSchema[] schemas, Node[] nodeArray) {
+    NodeSchemaManager.getInstance().init(schemas, true);
+    NetworkTopology topology = new NetworkTopologyImpl(NodeSchemaManager.getInstance(), nodes -> { });
+    List<Node> linked = new ArrayList<>(Arrays.asList(nodeArray));
+    linked.forEach(topology::add);
+    Collections.shuffle(linked, new Random(0));
+    List<Node> unlinked = linked.stream()
+        .map(n -> new NodeImpl(n.getNetworkName(), n.getNetworkLocation(), n.getCost()))
+        .collect(Collectors.toList());
+
+    for (int i = 0; i < linked.size(); i++) {
+      Node linkedReader = linked.get(i);
+      Node unlinkedReader = unlinked.get(i);
+      List<String> expected = paths(topology.sortByDistanceCost(linkedReader, linked, linked.size()));
+      assertEquals(expected, paths(topology.sortByDistanceCost(linkedReader, unlinked, unlinked.size())));
+      assertEquals(expected, paths(topology.sortByDistanceCost(unlinkedReader, linked, linked.size())));
+      assertEquals(expected, paths(topology.sortByDistanceCost(unlinkedReader, unlinked, unlinked.size())));
+    }
+  }
+
+  private static List<String> paths(List<? extends Node> nodes) {
+    return nodes.stream().map(Node::getNetworkFullPath).collect(Collectors.toList());
+  }
+
+  @Test
+  void testSortByDistanceCostOrdersUnlinkedNodesByRack() {
+    initNetworkTopology(new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA}, new Node[] {
+        createDatanode("1.1.1.1", "/r1"), createDatanode("2.2.2.2", "/r1"),
+        createDatanode("3.3.3.3", "/r2"), createDatanode("4.4.4.4", "/r2"),
+        createDatanode("5.5.5.5", "/r3"), createDatanode("6.6.6.6", "/r3")});
+    List<Node> pipeline = Arrays.stream(dataNodes)
+        .map(n -> new NodeImpl(n.getNetworkName(), n.getNetworkLocation(), n.getCost()))
+        .collect(Collectors.toList());
+    Collections.reverse(pipeline);
+    InnerNode rack1 = (InnerNode) cluster.getNode("/r1");
+    Node client = new NodeImpl("client", "/r1", rack1, rack1.getLevel() + 1, NODE_COST_DEFAULT);
+    List<String> rack1Paths = Arrays.asList(dataNodes[0].getNetworkFullPath(), dataNodes[1].getNetworkFullPath());
+
+    for (int i = 0; i < 100; i++) {
+      List<String> byClient = paths(cluster.sortByDistanceCost(client, pipeline, pipeline.size()));
+      assertThat(byClient.subList(0, 2)).containsExactlyInAnyOrderElementsOf(rack1Paths);
+      List<String> byDatanode = paths(cluster.sortByDistanceCost(dataNodes[0], pipeline, pipeline.size()));
+      assertEquals(rack1Paths, byDatanode.subList(0, 2));
+    }
+  }
+
+  @Test
+  void testSortByDistanceCostPutsUnlinkedNodeWithUnknownDepthLast() {
+    initNetworkTopology(new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA},
+        new Node[] {createDatanode("1.1.1.1", "/r1"), createDatanode("2.2.2.2", "/r1")});
+    Node wrongDepth = createDatanode("3.3.3.3", "/r1/extra");
+    Node sameRack = createDatanode(dataNodes[1].getNetworkName(), dataNodes[1].getNetworkLocation());
+
+    for (int i = 0; i < 10; i++) {
+      assertEquals(Arrays.asList(sameRack, wrongDepth),
+          cluster.sortByDistanceCost(dataNodes[0], Arrays.asList(wrongDepth, sameRack), 2));
+    }
+    // Only the sort uses locations; getDistanceCost still treats unlinked nodes as outside the topology.
+    assertEquals(Integer.MAX_VALUE, cluster.getDistanceCost(dataNodes[0], sameRack));
+  }
+
   @Test
   void testSingleNodeRackWithAffinityNode() {
     // network topology with default cost
