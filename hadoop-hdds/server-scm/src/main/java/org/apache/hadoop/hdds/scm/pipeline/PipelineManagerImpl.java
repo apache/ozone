@@ -643,7 +643,7 @@ public class PipelineManagerImpl implements PipelineManager {
       // happen, as the DNs are not aware of the pipeline. Therefore we should
       // close any pipelines in the scrubber if they have nodes which are not
       // registered
-      if (p.isOpen() && hasUnregisteredNodes(p)) {
+      if (isOpenWithUnregisteredNodes(p)) {
         LOG.info("Scrubbing pipeline: id: {} as it has unregistered nodes",
             p.getId());
         closePipeline(id);
@@ -651,8 +651,15 @@ public class PipelineManagerImpl implements PipelineManager {
     }
   }
 
-  @Override
-  public boolean hasUnregisteredNodes(Pipeline pipeline) {
+  /**
+   * @param pipeline The pipeline to check
+   * @return True if the pipeline is open and contains unregistered nodes. False
+   *         otherwise.
+   */
+  private boolean isOpenWithUnregisteredNodes(Pipeline pipeline) {
+    if (!pipeline.isOpen()) {
+      return false;
+    }
     for (DatanodeDetails dn : pipeline.getNodes()) {
       if (nodeManager.getNode(dn.getID()) == null) {
         return true;

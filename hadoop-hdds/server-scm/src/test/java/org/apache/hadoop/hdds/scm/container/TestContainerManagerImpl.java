@@ -21,7 +21,6 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -41,7 +40,6 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -121,23 +119,6 @@ public class TestContainerManagerImpl {
     if (dbStore != null) {
       dbStore.close();
     }
-  }
-
-  /**
-   * A pipeline loaded from the SCM DB can list a datanode that has not registered since SCM started. A container
-   * must not be allocated on it, a new pipeline is created instead.
-   */
-  @Test
-  void testAllocateContainerSkipsPipelineWithUnregisteredNodes() throws Exception {
-    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
-    Pipeline unregisteredPipeline = pipelineManager.getPipelines(repConfig).get(0);
-    doReturn(true).when(pipelineManager).hasUnregisteredNodes(unregisteredPipeline);
-
-    ContainerInfo container = containerManager.allocateContainer(repConfig, "admin");
-
-    assertNotNull(container);
-    assertNotEquals(unregisteredPipeline.getId(), container.getPipelineID());
-    assertEquals(2, pipelineManager.getPipelines(repConfig).size());
   }
 
   @Test

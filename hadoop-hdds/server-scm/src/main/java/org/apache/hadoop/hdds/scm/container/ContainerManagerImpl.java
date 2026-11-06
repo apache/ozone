@@ -27,7 +27,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -180,7 +179,8 @@ public class ContainerManagerImpl implements ContainerManager {
     Pipeline pipeline;
     ContainerInfo containerInfo = null;
     try {
-      pipelines = getOpenPipelinesWithRegisteredNodes(replicationConfig);
+      pipelines = pipelineManager
+          .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
       if (!pipelines.isEmpty()) {
         pipeline = pipelines.get(random.nextInt(pipelines.size()));
         containerInfo = createContainer(pipeline, owner);
@@ -206,7 +206,8 @@ public class ContainerManagerImpl implements ContainerManager {
       pipelineManager.acquireReadLock();
       lock.lock();
       try {
-        pipelines = getOpenPipelinesWithRegisteredNodes(replicationConfig);
+        pipelines = pipelineManager
+            .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
         if (!pipelines.isEmpty()) {
           pipeline = pipelines.get(random.nextInt(pipelines.size()));
           containerInfo = createContainer(pipeline, owner);
@@ -221,16 +222,6 @@ public class ContainerManagerImpl implements ContainerManager {
       }
     }
     return containerInfo;
-  }
-
-  /**
-   * A pipeline loaded from the SCM DB can list datanodes that have not registered since SCM started. A container
-   * cannot be allocated on such a pipeline, so do not pick it while a usable one may exist.
-   */
-  private List<Pipeline> getOpenPipelinesWithRegisteredNodes(ReplicationConfig replicationConfig) {
-    return pipelineManager.getPipelines(replicationConfig, Pipeline.PipelineState.OPEN).stream()
-        .filter(p -> !pipelineManager.hasUnregisteredNodes(p))
-        .collect(Collectors.toList());
   }
 
   private ContainerInfo createContainer(Pipeline pipeline, String owner)

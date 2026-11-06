@@ -116,7 +116,6 @@ public class WritableECContainerProvider
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN);
     final int pipelineCount = existingPipelines.size();
-    int unregisteredPipelines = 0;
     LOG.debug("Checking existing pipelines: {}", existingPipelines);
 
     PipelineRequestInformation pri =
@@ -132,13 +131,6 @@ public class WritableECContainerProvider
         break;
       }
       Pipeline pipeline = existingPipelines.get(pipelineIndex);
-      // A pipeline loaded from the SCM DB can list datanodes that have not registered since SCM started.
-      // These are not safe for writes, and are left for the pipeline scrubber to close.
-      if (pipelineManager.hasUnregisteredNodes(pipeline)) {
-        existingPipelines.remove(pipelineIndex);
-        unregisteredPipelines++;
-        continue;
-      }
       synchronized (pipeline.getId()) {
         try {
           ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
@@ -179,11 +171,6 @@ public class WritableECContainerProvider
         synchronized (this) {
           return allocateContainer(repConfig, size, owner, excludeList);
         }
-      }
-      if (unregisteredPipelines > 0 && unregisteredPipelines == pipelineCount) {
-        throw new IOException("Pipeline limit (" + maximumPipelines + ") reached (" + openPipelineCount
-            + ") and all " + unregisteredPipelines + " open pipelines have datanodes that are not registered with SCM"
-            + " yet, none usable for writes");
       }
       throw new IOException("Pipeline limit (" + maximumPipelines
           + ") reached (" + openPipelineCount + "), none closed");
