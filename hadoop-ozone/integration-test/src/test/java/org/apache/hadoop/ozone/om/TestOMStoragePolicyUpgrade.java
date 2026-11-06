@@ -28,9 +28,6 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -89,8 +86,7 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
     // Controls: the gate must not reject requests that carry no storage policy field
     createBucket(null, null);
     // The client API must not add a policy field on its own, or the gate rejects this request.
-    String clientCreated = "buck-" + UUID.randomUUID();
-    getOmClient().getObjectStore().getVolume(VOLUME_NAME).createBucket(clientCreated);
+    String clientCreated = createBucket(null, null);
     assertThat(getOmClient().getBucketInfo(VOLUME_NAME, clientCreated).getStoragePolicy()).isNull();
 
     getOmClient().setBucketProperty(OmBucketArgs.newBuilder()
@@ -103,13 +99,11 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
   }
 
   private void postFinalizationChecks() throws Exception {
-    assertThat(cluster.getOzoneManager().getVersionManager().getApparentVersion())
-        .isEqualTo(OzoneManagerVersion.SOFTWARE_VERSION);
+    assertStoragePolicyFinalized();
 
-    // CreateBucket through the client API without storage policy options: the OM applies its configured default.
-    String defaultPolicyBucket = "buck-" + UUID.randomUUID();
-    client.getObjectStore().getVolume(VOLUME_NAME).createBucket(defaultPolicyBucket);
-    OmBucketInfo defaultedPolicyBucketInfo = omClient.getBucketInfo(VOLUME_NAME, defaultPolicyBucket);
+    // CreateBucket without storage policy options: the OM applies its configured default.
+    String defaultPolicyBucket = createBucket(null, null);
+    OmBucketInfo defaultedPolicyBucketInfo = getOmClient().getBucketInfo(VOLUME_NAME, defaultPolicyBucket);
     assertThat(defaultedPolicyBucketInfo.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
     assertThat(defaultedPolicyBucketInfo.getAllowFallbackStoragePolicy()).isTrue();
 

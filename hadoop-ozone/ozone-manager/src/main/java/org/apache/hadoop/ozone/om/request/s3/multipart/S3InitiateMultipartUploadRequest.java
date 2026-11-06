@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -105,7 +106,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     // Stamp the policy only once finalized: an OM without storage policy support ignores the field, so stamping it
     // earlier would make old and new OMs apply this request differently. Clearing also drops a client-sent value.
-    if (ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.STORAGE_POLICY_SUPPORT)) {
+    if (ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
       // Read the bucket the link resolves to straight from the metadata manager. ozoneManager.getBucketInfo would
       // also require READ on the bucket, which creating an upload does not need.
       final OmBucketInfo bucketInfo = getBucketInfo(ozoneManager.getMetadataManager(),

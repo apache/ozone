@@ -25,12 +25,12 @@ import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -38,7 +38,7 @@ import org.junit.jupiter.api.BeforeEach;
  * Base class for the upgrade tests of the storage policy feature.
  * <p>
  * The cluster starts at the layout version immediately below
- * {@link OMLayoutFeature#STORAGE_POLICY_SUPPORT} so that only this feature is
+ * {@link OzoneManagerVersion#STORAGE_POLICY_SUPPORT} so that only this feature is
  * un-finalized and the assertions cannot be satisfied by an unrelated
  * validator.
  */
@@ -53,8 +53,8 @@ public abstract class AbstractOMStoragePolicyUpgradeTest {
 
   @BeforeEach
   public void init() throws Exception {
-    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY,
-        OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY,
+        OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.serialize());
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
@@ -87,9 +87,13 @@ public abstract class AbstractOMStoragePolicyUpgradeTest {
   }
 
   protected void assertStoragePolicyNotFinalized() {
-    assertThat(cluster.getOzoneManager().getVersionManager()
-        .getMetadataLayoutVersion())
-        .isEqualTo(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
+    assertThat(cluster.getOzoneManager().getVersionManager().getApparentVersion())
+        .isEqualTo(OzoneManagerVersion.SOFTWARE_VERSION);
+  }
+
+  protected void assertStoragePolicyFinalized() {
+    assertThat(cluster.getOzoneManager().getVersionManager().getApparentVersion())
+        .isEqualTo(OzoneManagerVersion.SOFTWARE_VERSION);
   }
 
   /**
@@ -98,7 +102,7 @@ public abstract class AbstractOMStoragePolicyUpgradeTest {
    * with.
    */
   protected void finalizeOMUpgrade() throws Exception {
-    omClient.finalizeUpgrade("finalize-test");
+    omClient.finalizeUpgrade();
     waitForFinalization(omClient);
   }
 

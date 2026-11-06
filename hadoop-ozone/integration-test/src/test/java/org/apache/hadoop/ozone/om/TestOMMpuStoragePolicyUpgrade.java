@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Test;
  *    is persisted.
  * <p>
  * See {@link AbstractOMStoragePolicyUpgradeTest} for the cluster setup, which
- * leaves only {@link OMLayoutFeature#STORAGE_POLICY_SUPPORT} un-finalized.
+ * leaves only {@link OzoneManagerVersion#STORAGE_POLICY_SUPPORT} un-finalized.
  */
 public class TestOMMpuStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTest {
 

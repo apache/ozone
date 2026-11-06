@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
+import org.jspecify.annotations.Nullable;
 
 /** Delegates ClientProtocol calls for S3 Gateway clients. */
 final class S3ClientProtocol implements ClientProtocol {
@@ -455,6 +456,14 @@ final class S3ClientProtocol implements ClientProtocol {
   public OmMultipartInfo initiateMultipartUpload(String volumeName, String bucketName, String keyName,
       ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags) throws IOException {
     return delegate.initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig, metadata, tags);
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName, String bucketName, String keyName,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      StoragePolicy storagePolicy) throws IOException {
+    return delegate.initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig, metadata,
+        tags, storagePolicy);
   }
 
   @Override
