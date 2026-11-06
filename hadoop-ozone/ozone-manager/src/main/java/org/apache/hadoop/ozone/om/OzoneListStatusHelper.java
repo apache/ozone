@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -164,6 +165,20 @@ public class OzoneListStatusHelper {
             }
             throw ome;
           }
+        }
+      } else if (isListKeysPartialPrefixPath(args, keyName, allowPartialPrefixes)) {
+        try {
+          dbPrefixKey = getDbKey(keyName, args, volumeInfo, omBucketInfo);
+          prefixKey = OzoneFSUtils.getParentDir(keyName);
+        } catch (OMException ome) {
+          if (ome.getResult() == FILE_NOT_FOUND) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Parent directory of keyName:{} does not exist." +
+                  "Returns empty list", keyName);
+            }
+            return new ArrayList<>();
+          }
+          throw ome;
         }
       } else {
         // fetch the db key based on parent prefix id.
@@ -315,6 +330,23 @@ public class OzoneListStatusHelper {
       // list root directory.
       return omBucketInfo.getObjectID();
     }
+  }
+
+  /**
+   * True when listStatus is serving FSO listKeys at the user prefix boundary:
+   * keyName equals listPrefix and partial prefixes are allowed.
+   */
+  private static boolean isListKeysPartialPrefixPath(OmKeyArgs args,
+      String keyName, boolean allowPartialPrefixes) {
+    if (!allowPartialPrefixes) {
+      return false;
+    }
+    String listPrefix = args.getListPrefix();
+    if (StringUtils.isBlank(listPrefix)) {
+      return false;
+    }
+    return OmUtils.normalizeKey(keyName, false)
+        .equals(OmUtils.normalizeKey(listPrefix, false));
   }
 
 }
