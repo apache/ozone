@@ -131,10 +131,9 @@ const HeatmapPlot: React.FC<HeatmapPlotProps> = ({
         nodeClick: (event) => {
         var data = event.datum;
         // Leaf level box should not call API
-        if (data.children?.length)
-          if (data.path) {
-            onClick(data.path);
-          }
+        if (data.children?.length && data.path) {
+          onClick(data.path);
+        }
         },
       },
     }
