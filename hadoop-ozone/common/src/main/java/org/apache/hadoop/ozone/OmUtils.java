@@ -119,11 +119,11 @@ public final class OmUtils {
   }
 
   /**
-   * Returns the address the OM RPC server binds to. If {@link OMConfigKeys#OZONE_OM_BIND_HOST_KEY} is set, its host
+   * Returns the address the OM RPC server binds to. If {@code ozone.om.bind.host} is set, its host
    * replaces the host of the given RPC address; the port is always kept. OM keeps advertising the RPC address.
    *
    * @param conf configuration
-   * @param omRpcAddress the OM RPC address from {@link OMConfigKeys#OZONE_OM_ADDRESS_KEY}
+   * @param omRpcAddress the OM RPC address from {@code ozone.om.address}
    * @return the address for the OM RPC listener
    */
   public static InetSocketAddress getOmRpcBindAddress(ConfigurationSource conf, InetSocketAddress omRpcAddress) {
