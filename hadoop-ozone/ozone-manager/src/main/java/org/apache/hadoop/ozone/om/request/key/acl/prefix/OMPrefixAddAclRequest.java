@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -58,6 +60,12 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
     //  single code path for HA and Non-HA
     ozoneObj = OzoneObjInfo.fromProtobuf(addAclRequest.getObj());
     ozoneAcl = OzoneAcl.fromProtobuf(addAclRequest.getAcl());
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    checkAclRights(Collections.singletonList(ozoneAcl));
+    return super.preExecute(ozoneManager);
   }
 
   @Override

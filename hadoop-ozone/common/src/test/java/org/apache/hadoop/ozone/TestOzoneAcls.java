@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ByteString;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,14 @@ import org.junit.jupiter.api.Test;
  * This class is to test acl storage and retrieval in ozone store.
  */
 class TestOzoneAcls {
+
+  @Test
+  void testToStringIgnoresUnknownRights() {
+    OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:r");
+    OzoneAcl withUnknownRights = OzoneAcl.fromProtobuf(OzoneAcl.toProtobuf(acl).toBuilder()
+        .setRights(ByteString.copyFrom(new byte[] {1, 4})).build());
+    assertEquals(acl.toString(), withUnknownRights.toString());
+  }
 
   @Test
   void testAclParse() {

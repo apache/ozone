@@ -20,16 +20,20 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
@@ -286,6 +290,19 @@ public class TestOMPrefixAclRequest extends OMKeyRequestTests {
 
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse1.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testRejectUnknownAclRights() {
+    String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;
+    OzoneAcl acl = OMRequestTestUtils.aclWithUnknownRights();
+
+    for (OMClientRequest request : Arrays.asList(new OMPrefixAddAclRequest(createAddAclPrefixRequest(prefixName, acl)),
+        new OMPrefixRemoveAclRequest(createRemoveAclPrefixRequest(prefixName, acl)),
+        new OMPrefixSetAclRequest(createSetAclPrefixRequest(prefixName, Collections.singletonList(acl))))) {
+      OMException e = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+    }
   }
 
   /**

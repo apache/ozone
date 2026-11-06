@@ -55,6 +55,7 @@ public class OMKeyRemoveAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
+    checkAclRights(ozoneAcls);
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.RemoveAclRequest.Builder
         removeAclRequestBuilder =
