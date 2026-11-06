@@ -113,7 +113,17 @@ public class ContainerReader implements Runnable {
     try {
       File copyDir = ContainerImporter.getUntarDirectory(hddsVolume).toFile();
       if (copyDir.exists()) {
-        FileUtils.cleanDirectory(copyDir);
+        File[] files = copyDir.listFiles();
+        if (files == null) {
+          throw new IOException("Failed to list " + copyDir);
+        }
+        for (File file : files) {
+          try {
+            FileUtils.forceDelete(file);
+          } catch (IOException | RuntimeException e) {
+            LOG.warn("Failed to remove leftover container import file {}", file.getAbsolutePath(), e);
+          }
+        }
       }
     } catch (IOException | RuntimeException e) {
       LOG.warn("Failed to remove leftover container import files under {}: {}",

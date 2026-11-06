@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -89,6 +90,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Test ContainerReader class which loads containers from disks.
@@ -733,6 +735,41 @@ public class TestContainerReader {
     new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true).run();
     assertThat(copyDir).isEmptyDirectory();
     assertNotNull(containerSet.getContainer(0));
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerImportCleanupLogsEachFailedFile(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+    Path copyDir = Files.createDirectories(ContainerImporter.getUntarDirectory(hddsVolume));
+    Path first = Files.createFile(copyDir.resolve("5.tar"));
+    Path second = Files.createFile(copyDir.resolve("6.tar"));
+    Path removable = Files.createDirectories(copyDir.resolve("7").resolve("chunks"));
+    Files.createFile(removable.resolve("7.block"));
+
+    LogCapturer logs = LogCapturer.captureLogs(ContainerReader.class);
+    try (MockedStatic<org.apache.commons.io.FileUtils> mocked =
+        mockStatic(org.apache.commons.io.FileUtils.class, invocation -> {
+          if ("forceDelete".equals(invocation.getMethod().getName())) {
+            File file = invocation.getArgument(0);
+            if (file.equals(first.toFile()) || file.equals(second.toFile())) {
+              throw new IOException("simulated deletion failure");
+            }
+          }
+          return invocation.callRealMethod();
+        })) {
+
+      new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true).run();
+
+      assertThat(first).exists();
+      assertThat(second).exists();
+      assertThat(copyDir.resolve("7")).doesNotExist();
+      assertNotNull(containerSet.getContainer(0));
+      assertThat(logs.getOutput()).contains("Failed to remove leftover container import file " + first);
+      assertThat(logs.getOutput()).contains("Failed to remove leftover container import file " + second);
+    } finally {
+      logs.stopCapturing();
+    }
   }
 
   @ContainerTestVersionInfo.ContainerTest
