@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
@@ -54,6 +55,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
@@ -63,6 +65,7 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
@@ -106,6 +109,22 @@ public class TestSCMClientProtocolServer {
   @BeforeEach
   void setUp() {
     when(mockSafeModeManager.getInSafeMode()).thenReturn(false);
+  }
+
+  @Test
+  void testGetDatanodeUsageInfoForUnknownUuid() {
+    String uuid = DatanodeID.randomID().toString();
+
+    assertThatThrownBy(() -> server.getDatanodeUsageInfo("", uuid, ClientVersion.CURRENT))
+        .isInstanceOf(NonRetriableException.class)
+        .hasMessage("Datanode " + uuid + " not found");
+  }
+
+  @Test
+  void testGetDatanodeUsageInfoWithoutAddressOrUuid() {
+    assertThatThrownBy(() -> server.getDatanodeUsageInfo("", "", ClientVersion.CURRENT))
+        .isInstanceOf(NonRetriableException.class)
+        .hasMessage("Could not get datanode with the specified parameters.");
   }
 
   @AfterAll
