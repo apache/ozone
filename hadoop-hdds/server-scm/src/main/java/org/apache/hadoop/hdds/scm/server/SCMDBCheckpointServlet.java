@@ -86,7 +86,8 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
    */
   @Override
   public DBCheckpoint getCheckpoint(Path ignoredTmpdir, boolean flush) throws IOException {
-    scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+    // Do not flush a partially applied transaction into the checkpoint (HDDS-16452).
+    scm.getScmHAManager().asSCMHADBTransactionBuffer().flushIfNeeded(0);
     return scm.getScmMetadataStore().getStore().getCheckpoint(flush);
   }
 }
