@@ -91,6 +91,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   @Override
+  public void drainStreamBuffers(Container container, BlockID blockID, long length) throws IOException {
+    selectHandler(container).drainStreamBuffers(container, blockID, length);
+  }
+
+  @Override
   public void finishWriteChunks(KeyValueContainer kvContainer,
       BlockData blockData) throws IOException {
 

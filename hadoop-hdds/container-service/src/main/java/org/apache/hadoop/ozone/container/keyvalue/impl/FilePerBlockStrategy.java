@@ -38,10 +38,13 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -73,6 +76,8 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private final boolean doSyncWrite;
   private final OpenFiles files = new OpenFiles();
+  /** The open data streams, see {@link #drainStreamBuffers(Container, BlockID, long)}. */
+  private final Map<ContainerBlockID, KeyValueStreamDataChannel> streams = new ConcurrentHashMap<>();
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
   private final int readMappedBufferMaxCount;
@@ -118,8 +123,19 @@ public class FilePerBlockStrategy implements ChunkManager {
       ContainerMetrics metrics) throws StorageContainerException {
     checkLayoutVersion(container);
     final File chunkFile = getChunkFile(container, blockID);
-    return new KeyValueStreamDataChannel(chunkFile,
-        container.getContainerData(), putBlock, metrics);
+    final ContainerBlockID key = blockID.getContainerBlockID();
+    final KeyValueStreamDataChannel channel = new KeyValueStreamDataChannel(chunkFile,
+        container.getContainerData(), putBlock, metrics, closed -> streams.remove(key, closed));
+    streams.put(key, channel);
+    return channel;
+  }
+
+  @Override
+  public void drainStreamBuffers(Container container, BlockID blockID, long length) throws IOException {
+    final KeyValueStreamDataChannel channel = streams.get(blockID.getContainerBlockID());
+    if (channel != null) {
+      channel.drainBuffers(length);
+    }
   }
 
   @Override
