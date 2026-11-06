@@ -26,8 +26,10 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -317,6 +319,38 @@ public class TestEmptyContainerHandler {
 
     assertAndVerify(readRequest, true, 0, 1);
     assertAndVerify(request, true, 3, 1);
+  }
+
+  @Test
+  public void testEmptyQuasiClosedContainerNotDeletedWhenReplicasAreBehind() throws IOException {
+    long containerSequenceId = 100L;
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, QUASI_CLOSED, containerSequenceId);
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicas(
+        containerInfo.containerID(), ContainerReplicaProto.State.QUASI_CLOSED, 0L, 0L, 0);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(replicas)
+        .build();
+
+    assertTrue(emptyContainerHandler.handle(request));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.EMPTY));
+    assertEquals(containerSequenceId, containerInfo.getSequenceId());
+    // Preserve the empty replicas too: their origins may be needed to force close the container later.
+    verifyNoInteractions(replicationManager);
+
+    ContainerReplica replica = replicas.iterator().next();
+    replicas.add(replica.toBuilder().setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+        .setSequenceId(containerSequenceId).build());
+
+    assertTrue(emptyContainerHandler.handle(request));
+    verify(replicationManager).updateContainerState(containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
+    verify(replicationManager, times(2)).sendDeleteCommand(any(ContainerInfo.class), anyInt(),
+        any(DatanodeDetails.class), eq(false));
+    verify(replicationManager, never()).sendDeleteCommand(any(ContainerInfo.class), anyInt(),
+        any(DatanodeDetails.class), eq(true));
   }
 
   /**
