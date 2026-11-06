@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.apache.ozone.recon.schema.SqlDbUtils.DERBY_DRIVER_CLASS;
+import static org.apache.ozone.recon.schema.SqlDbUtils.SQLITE_DRIVER_CLASS;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.google.inject.AbstractModule;
@@ -66,7 +66,7 @@ public class AbstractReconSqlDBTest {
     try {
       FileSystemUtils.deleteRecursively(temporaryFolder.resolve("Config"));
       configurationProvider =
-          new DerbyDataSourceConfigurationProvider(Files.createDirectory(
+          new SqliteDataSourceConfigurationProvider(Files.createDirectory(
               temporaryFolder.resolve("Config")).toFile());
     } catch (IOException e) {
       fail();
@@ -87,7 +87,7 @@ public class AbstractReconSqlDBTest {
     init(temporaryFolder);
     injector = Guice.createInjector(getReconSqlDBModules());
     dslContext = DSL.using(new DefaultConfiguration().set(
-        injector.getInstance(DataSource.class)));
+        injector.getInstance(DataSource.class)).set(SQLDialect.SQLITE));
     createSchema(injector);
   }
 
@@ -162,14 +162,14 @@ public class AbstractReconSqlDBTest {
   }
 
   /**
-   * Local Derby datasource provider.
+   * Local SQLite datasource provider.
    */
-  public static class DerbyDataSourceConfigurationProvider implements
+  public static class SqliteDataSourceConfigurationProvider implements
       Provider<DataSourceConfiguration> {
 
     private final File tempDir;
 
-    public DerbyDataSourceConfigurationProvider(File tempDir) {
+    public SqliteDataSourceConfigurationProvider(File tempDir) {
       this.tempDir = tempDir;
     }
 
@@ -178,13 +178,13 @@ public class AbstractReconSqlDBTest {
       return new DataSourceConfiguration() {
         @Override
         public String getDriverClass() {
-          return DERBY_DRIVER_CLASS;
+          return SQLITE_DRIVER_CLASS;
         }
 
         @Override
         public String getJdbcUrl() {
-          return "jdbc:derby:" + tempDir.getAbsolutePath() +
-              File.separator + "derby_recon.db";
+          return "jdbc:sqlite:" + tempDir.getAbsolutePath() +
+              File.separator + "recon_sqlite.db";
         }
 
         @Override
@@ -209,7 +209,7 @@ public class AbstractReconSqlDBTest {
 
         @Override
         public String getSqlDialect() {
-          return SQLDialect.DERBY.toString();
+          return SQLDialect.SQLITE.toString();
         }
 
         @Override

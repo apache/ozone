@@ -30,17 +30,23 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "ozone.recon.sql.db")
 public class ReconSqlDbConfig {
 
+  public static final String DEFAULT_DRIVER_CLASS = "org.sqlite.JDBC";
+  public static final String DEFAULT_JDBC_URL = "jdbc:sqlite:${ozone.recon.db.dir}/ozone_recon_sqlite.db";
+  public static final String DEFAULT_SQL_DB_DIALECT = "SQLITE";
+  /** Derby DB written by Recon before the default moved to SQLite. */
+  public static final String LEGACY_DERBY_DB_NAME = "ozone_recon_derby.db";
+
   @Config(key = "ozone.recon.sql.db.driver",
       type = ConfigType.STRING,
-      defaultValue = "org.apache.derby.jdbc.EmbeddedDriver",
+      defaultValue = DEFAULT_DRIVER_CLASS,
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
-      description = "Recon SQL DB driver class. Defaults to Derby."
+      description = "Recon SQL DB driver class. Defaults to SQLite."
   )
   private String driverClass;
 
   @Config(key = "ozone.recon.sql.db.jdbc.url",
       type = ConfigType.STRING,
-      defaultValue = "jdbc:derby:${ozone.recon.db.dir}/ozone_recon_derby.db",
+      defaultValue = DEFAULT_JDBC_URL,
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
       description = "Ozone Recon SQL database jdbc url."
   )
@@ -123,10 +129,10 @@ public class ReconSqlDbConfig {
 
   @Config(key = "ozone.recon.sql.db.jooq.dialect",
       type = ConfigType.STRING,
-      defaultValue = "DERBY",
+      defaultValue = DEFAULT_SQL_DB_DIALECT,
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
       description = "Recon internally uses Jooq to talk to its SQL DB. By " +
-          "default, we support Derby and Sqlite out of the box. Please refer " +
+          "default, we support SQLite out of the box. Please refer " +
           "to https://www.jooq.org/javadoc/latest/org" +
           ".jooq/org/jooq/SQLDialect.html to specify different dialect."
   )

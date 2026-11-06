@@ -384,7 +384,6 @@ Apache License 2.0
    org.apache.commons:commons-text
    org.apache.curator:curator-client
    org.apache.curator:curator-framework
-   org.apache.derby:derby
    org.apache.hadoop:hadoop-annotations
    org.apache.hadoop:hadoop-auth
    org.apache.hadoop:hadoop-common

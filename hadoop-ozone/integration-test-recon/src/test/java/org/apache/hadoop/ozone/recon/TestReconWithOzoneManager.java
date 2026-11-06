@@ -30,7 +30,6 @@ import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProvider
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBDefinition.METADATA;
-import static org.apache.ozone.recon.codegen.JooqCodeGenerator.RECON_SCHEMA_NAME;
 import static org.apache.ozone.recon.schema.SchemaVersionTableDefinition.SCHEMA_VERSION_TABLE_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -532,7 +531,7 @@ public class TestReconWithOzoneManager {
         legacy.flushLog(true);
         history.flushLog(true);
       }
-      try (Connection connection = DriverManager.getConnection(jdbcUrl, RECON_SCHEMA_NAME, "");
+      try (Connection connection = DriverManager.getConnection(jdbcUrl);
            PreparedStatement statement = connection.prepareStatement(
                "UPDATE " + SCHEMA_VERSION_TABLE_NAME + " SET \"version_number\" = ?")) {
         statement.setInt(1, ReconVersion.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX.serialize());
@@ -573,7 +572,7 @@ public class TestReconWithOzoneManager {
   }
 
   private int getReconSchemaVersion(String jdbcUrl) throws SQLException {
-    try (Connection connection = DriverManager.getConnection(jdbcUrl, RECON_SCHEMA_NAME, "");
+    try (Connection connection = DriverManager.getConnection(jdbcUrl);
          PreparedStatement statement = connection.prepareStatement(
              "SELECT \"version_number\" FROM " + SCHEMA_VERSION_TABLE_NAME);
          ResultSet result = statement.executeQuery()) {

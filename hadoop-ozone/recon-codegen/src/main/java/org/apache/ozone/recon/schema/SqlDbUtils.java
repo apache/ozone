@@ -19,15 +19,14 @@ package org.apache.ozone.recon.schema;
 
 import static org.jooq.impl.DSL.count;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.BiPredicate;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
@@ -39,11 +38,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class SqlDbUtils {
 
-  public static final String DERBY_DRIVER_CLASS =
-      "org.apache.derby.jdbc.EmbeddedDriver";
   public static final String SQLITE_DRIVER_CLASS = "org.sqlite.JDBC";
-  public static final String DERBY_DISABLE_LOG_METHOD =
-      SqlDbUtils.class.getName() + ".disableDerbyLogFile";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SqlDbUtils.class);
@@ -67,38 +62,6 @@ public final class SqlDbUtils {
   }
 
   /**
-   * Create new Derby Database with URL and schema name.
-   * @param jdbcUrl JDBC url.
-   * @param schemaName Schema name
-   * @throws ClassNotFoundException on not finding driver class.
-   * @throws SQLException on SQL exception.
-   */
-  public static void createNewDerbyDatabase(String jdbcUrl, String schemaName)
-      throws ClassNotFoundException, SQLException {
-    System.setProperty("derby.stream.error.method",
-        DERBY_DISABLE_LOG_METHOD);
-    Class.forName(DERBY_DRIVER_CLASS);
-    try (Connection connection = DriverManager.getConnection(jdbcUrl
-        + ";user=" + schemaName
-        + ";create=true")) {
-      LOG.info("Created derby database at {}.", jdbcUrl);
-    }
-  }
-
-  /**
-   * Used to suppress embedded derby database logging.
-   * @return No-Op output stream.
-   */
-  public static OutputStream disableDerbyLogFile() {
-    return new OutputStream() {
-      @Override
-      public void write(int b) throws IOException {
-        // Ignore all log messages
-      }
-    };
-  }
-
-  /**
    * Utility method to list all user-defined tables in the database.
    *
    * @param connection The database connection to use.
@@ -118,7 +81,7 @@ public final class SqlDbUtils {
   }
 
   /**
-   * Checks whether a column exists in a Derby table via {@code SYS.SYSCOLUMNS}.
+   * Checks whether a column exists in a table.
    *
    * @param conn the database connection
    * @param tableName the table name (case-insensitive)
@@ -139,7 +102,7 @@ public final class SqlDbUtils {
   }
 
   /**
-   * Checks whether a Derby column allows NULL values.
+   * Checks whether a column allows NULL values.
    *
    * @param conn the database connection
    * @param tableName the table name (case-insensitive)
@@ -163,7 +126,8 @@ public final class SqlDbUtils {
   }
 
   /**
-   * Checks whether a named constraint exists on a Derby table.
+   * Checks whether a named constraint exists on a SQLite table. SQLite keeps
+   * constraints only in the table's CREATE statement in {@code sqlite_master}.
    *
    * @param conn the database connection
    * @param tableName the table name (case-insensitive)
@@ -172,23 +136,15 @@ public final class SqlDbUtils {
    */
   public static boolean constraintExists(Connection conn, String tableName, String constraintName)
       throws SQLException {
-    String sql = "SELECT 1 FROM SYS.SYSCONSTRAINTS c "
-        + "INNER JOIN SYS.SYSTABLES t ON c.TABLEID = t.TABLEID "
-        + "WHERE t.TABLENAME = ? AND c.CONSTRAINTNAME = ?";
-    try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-      ps.setString(1, tableName.toUpperCase());
-      ps.setString(2, constraintName);
+    String sql = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ? COLLATE NOCASE";
+    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setString(1, tableName);
       try (ResultSet rs = ps.executeQuery()) {
-        if (rs.next()) {
-          return true;
+        if (!rs.next()) {
+          return false;
         }
-      }
-    }
-    try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-      ps.setString(1, tableName.toUpperCase());
-      ps.setString(2, constraintName.toUpperCase());
-      try (ResultSet rs = ps.executeQuery()) {
-        return rs.next();
+        String createSql = rs.getString(1).replace("\"", "").replace("`", "").toLowerCase(Locale.ROOT);
+        return createSql.contains("constraint " + constraintName.toLowerCase(Locale.ROOT) + " ");
       }
     }
   }
