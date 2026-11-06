@@ -71,6 +71,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -78,6 +79,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.StreamCapabilities;
@@ -278,6 +280,35 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   void testUserHomeDirectory() {
     assertEquals(new Path(rootPath + "user/" + USER1),
         userOfs.getHomeDirectory());
+  }
+
+  /**
+   * Like HDFS, getFileStatus has no block locations (HDDS-17714): getFileBlockLocations fetches them, for a status
+   * and for a path.
+   */
+  @Test
+  void testGetFileBlockLocations() throws Exception {
+    Path path = new Path(bucketPath, "testGetFileBlockLocations");
+    byte[] data = ContractTestUtils.dataset(1024, 'a', 26);
+    ContractTestUtils.createFile(fs, path, true, data);
+
+    FileStatus status = fs.getFileStatus(path);
+    assertFalse(status instanceof LocatedFileStatus);
+    assertEquals(data.length, status.getLen());
+
+    BlockLocation[] expected = fs.listLocatedStatus(path).next().getBlockLocations();
+    assertThat(expected.length).isGreaterThanOrEqualTo(1);
+    for (BlockLocation[] blockLocations : new BlockLocation[][] {
+        fs.getFileBlockLocations(status, 0, status.getLen()), fs.getFileBlockLocations(path, 0, status.getLen())}) {
+      assertEquals(expected.length, blockLocations.length);
+      for (int i = 0; i < expected.length; i++) {
+        assertThat(blockLocations[i].getNames().length).isGreaterThanOrEqualTo(1);
+        assertArrayEquals(expected[i].getHosts(), blockLocations[i].getHosts());
+        assertEquals(expected[i].getOffset(), blockLocations[i].getOffset());
+        assertEquals(expected[i].getLength(), blockLocations[i].getLength());
+      }
+    }
+    fs.delete(path, false);
   }
 
   @Test
