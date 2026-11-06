@@ -18,12 +18,15 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -36,7 +39,11 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -47,17 +54,23 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -268,6 +281,88 @@ public class TestCloseContainerByPipeline {
       //double check if it's really closed (waitFor also throws an exception)
       assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
     }
+  }
+
+  /**
+   * HDDS-17643: after a forced delete of the CLOSED replica on the pipeline leader, a write to the same container
+   * through the still open pipeline must not recreate the container on the leader, and must not fail the pipeline.
+   */
+  @Test
+  public void testWriteAfterForceDeleteOnLeaderDoesNotRecreateContainer() throws Exception {
+    String keyName = "testWriteAfterForceDeleteOnLeader";
+    try (OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
+        .createKey(keyName, 1024, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
+      key.write(keyName.getBytes(UTF_8));
+    }
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setDataSize(1024)
+        .setKeyName(keyName).build();
+    long containerID = cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
+        .get(0).getBlocksLatestVersionOnly().get(0).getContainerID();
+    ContainerInfo container = cluster.getStorageContainerManager()
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
+    Pipeline pipeline = cluster.getStorageContainerManager()
+        .getPipelineManager().getPipeline(container.getPipelineID());
+
+    HddsDatanodeService leader = null;
+    List<HddsDatanodeService> followers = new ArrayList<>();
+    for (DatanodeDetails details : pipeline.getNodes()) {
+      sendCommand(details, new CloseContainerCommand(containerID, pipeline.getId()));
+      HddsDatanodeService dn = cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(details));
+      XceiverServerRatis ratisServer = (XceiverServerRatis) dn.getDatanodeStateMachine().getContainer()
+          .getWriteChannel();
+      if (ratisServer.getServerDivision(RaftGroupId.valueOf(pipeline.getId().getId())).getInfo().isLeader()) {
+        leader = dn;
+      } else {
+        followers.add(dn);
+      }
+    }
+    assertNotNull(leader);
+    for (DatanodeDetails details : pipeline.getNodes()) {
+      GenericTestUtils.waitFor(() -> isContainerClosed(cluster, containerID, details), 500, 15 * 1000);
+    }
+    ContainerSet leaderContainers = leader.getDatanodeStateMachine().getContainer().getContainerSet();
+    long closedBcsId = leaderContainers.getContainer(containerID).getBlockCommitSequenceId();
+
+    // Same as the source of a balancer move: SCM force deletes the replica on the leader, the pipeline stays open.
+    sendCommand(leader.getDatanodeDetails(), new DeleteContainerCommand(containerID, true));
+    GenericTestUtils.waitFor(() -> leaderContainers.getContainer(containerID) == null, 500, 15 * 1000);
+
+    // A client that allocated a block in this container before the close keeps writing.
+    XceiverClientManager clientManager = new XceiverClientManager(conf);
+    XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);
+    try {
+      ContainerCommandRequestProto writeChunk = ContainerTestHelper.getWriteChunkRequest(
+          pipeline, ContainerTestHelper.getTestBlockID(containerID), 1024);
+      assertEquals(CONTAINER_NOT_OPEN, xceiverClient.sendCommand(writeChunk).getResult());
+      assertEquals(CONTAINER_NOT_OPEN,
+          xceiverClient.sendCommand(ContainerTestHelper.getPutBlockRequest(writeChunk)).getResult());
+    } finally {
+      clientManager.releaseClient(xceiverClient, false);
+      clientManager.close();
+    }
+
+    assertNull(leaderContainers.getContainer(containerID));
+    for (DatanodeDetails details : pipeline.getNodes()) {
+      HddsDatanodeService dn = cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(details));
+      XceiverServerRatis ratisServer = (XceiverServerRatis) dn.getDatanodeStateMachine().getContainer()
+          .getWriteChannel();
+      ContainerStateMachine stateMachine = (ContainerStateMachine) ratisServer
+          .getServerDivision(RaftGroupId.valueOf(pipeline.getId().getId())).getStateMachine();
+      assertTrue(stateMachine.isStateMachineHealthy(), "state machine of " + details);
+    }
+    for (HddsDatanodeService follower : followers) {
+      Container<?> replica = follower.getDatanodeStateMachine().getContainer().getContainerSet()
+          .getContainer(containerID);
+      assertEquals(State.CLOSED, replica.getContainerState());
+      assertEquals(closedBcsId, replica.getBlockCommitSequenceId());
+    }
+  }
+
+  private void sendCommand(DatanodeDetails datanode, SCMCommand<?> command) throws IOException {
+    command.setTerm(cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
+    cluster.getStorageContainerManager().getScmNodeManager().addDatanodeCommand(datanode.getID(), command);
   }
 
   @Unhealthy("Failing with timeout")
