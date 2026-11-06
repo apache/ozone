@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.HATests;
+import org.apache.ozone.test.HACluster;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  * Test client-side URI handling with Ozone Manager HA.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
+public abstract class TestOzoneFsHAURLs implements HACluster.TestCase {
 
   /**
     * Set a timeout for each test.
