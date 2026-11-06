@@ -94,6 +94,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
   S3_IF_NONE_MATCH_ETAG(104,
       "OzoneManager version that supports If-None-Match entity ETags for writes"),
 
+  STORAGE_POLICY_SUPPORT(105,
+      "OzoneManager version that supports storage policy for buckets and keys"),
+
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
 

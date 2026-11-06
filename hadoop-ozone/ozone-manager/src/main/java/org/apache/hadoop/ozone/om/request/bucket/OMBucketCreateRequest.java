@@ -29,12 +29,14 @@ import java.nio.file.InvalidPathException;
 import java.util.List;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.BekInfoUtils;
@@ -164,6 +166,11 @@ public class OMBucketCreateRequest extends OMClientRequest {
       DefaultReplicationConfig drc = OzoneConfigUtil.toDefaultReplicationConfig(
           bucketInfo.getDefaultReplicationConfig());
       ozoneManager.validateReplicationConfig(drc.getReplicationConfig());
+    }
+
+    // Before finalization the storage policy fields must not be persisted.
+    if (ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
+      applyStoragePolicyIfNotPresent(newBucketInfo);
     }
 
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
@@ -417,6 +424,19 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   }
 
+  /**
+   * Fills in the OM default storage policy and the default fallback flag (true)
+   * for the fields the client did not send.
+   */
+  private static void applyStoragePolicyIfNotPresent(BucketInfo.Builder bucketInfo) {
+    if (!bucketInfo.hasStoragePolicy()) {
+      bucketInfo.setStoragePolicy(OzoneStoragePolicy.getDefaultPolicy().toProto());
+    }
+    if (!bucketInfo.hasAllowFallbackStoragePolicy()) {
+      bucketInfo.setAllowFallbackStoragePolicy(true);
+    }
+  }
+
   @RequestFeatureValidator(
       conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
@@ -448,11 +468,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
   public static OMRequest disallowCreateBucketWithStoragePolicy(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)) {
+        .isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
       BucketInfo bucketInfo = req.getCreateBucketRequest().getBucketInfo();
       if (bucketInfo.hasStoragePolicy()
           || bucketInfo.hasAllowFallbackStoragePolicy()) {
-        return stripStoragePolicyFromRequest(req);
+        throw new OMException("Cluster does not have the storage policy"
+            + " feature finalized yet, but the request contains storage"
+            + " policy arguments. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }
     return req;
@@ -522,19 +546,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
         originalRequest.getCreateBucketRequest();
     BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
         .setBucketLayout(newLayout.toProto()).build();
-    CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
-        .setBucketInfo(newBucketInfo).build();
-    return originalRequest.toBuilder()
-        .setCreateBucketRequest(newCreateRequest).build();
-  }
-
-  private static OMRequest stripStoragePolicyFromRequest(OMRequest originalRequest) {
-    CreateBucketRequest createBucketRequest =
-        originalRequest.getCreateBucketRequest();
-    BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
-        .clearStoragePolicy()
-        .clearAllowFallbackStoragePolicy()
-        .build();
     CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
         .setBucketInfo(newBucketInfo).build();
     return originalRequest.toBuilder()

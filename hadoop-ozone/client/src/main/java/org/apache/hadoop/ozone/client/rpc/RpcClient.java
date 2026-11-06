@@ -69,7 +69,6 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
@@ -650,8 +649,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     boolean isVersionEnabled = bucketArgs.getVersioning();
-    StoragePolicy storagePolicy = bucketArgs.getStoragePolicy() == null ?
-        OzoneStoragePolicy.getDefaultPolicy() : bucketArgs.getStoragePolicy();
+    StoragePolicy storagePolicy = bucketArgs.getStoragePolicy();
     Boolean allowFallbackStoragePolicy = bucketArgs.getAllowFallbackStoragePolicy();
     BucketLayout bucketLayout = bucketArgs.getBucketLayout();
     BucketEncryptionKeyInfo bek = null;
@@ -665,7 +663,6 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setIsVersionEnabled(isVersionEnabled)
         .addAllMetadata(bucketArgs.getMetadata())
-        .setStoragePolicy(storagePolicy)
         .setAllowFallbackStoragePolicy(allowFallbackStoragePolicy)
         .setSourceVolume(bucketArgs.getSourceVolume())
         .setSourceBucket(bucketArgs.getSourceBucket())
@@ -686,6 +683,10 @@ public class RpcClient implements ClientProtocol {
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);
+    }
+
+    if (storagePolicy != null) {
+      builder.setStoragePolicy(storagePolicy);
     }
 
     DefaultReplicationConfig defaultReplicationConfig =
