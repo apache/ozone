@@ -155,7 +155,7 @@ public class TestKeyManagerImpl {
   @TempDir
   private static File dir;
   private static PrefixManager prefixManager;
-  private static KeyManagerImpl keyManager;
+  private static KeyManager keyManager;
   private static StorageContainerManager scm;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
   private static StorageContainerLocationInternalInterface mockScmContainerClient;
@@ -215,7 +215,7 @@ public class TestKeyManagerImpl {
         mockScmContainerClient);
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
-    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
+    keyManager = omTestManagers.getKeyManager();
     prefixManager = omTestManagers.getPrefixManager();
     writeClient = omTestManagers.getWriteClient();
     rpcClient = omTestManagers.getRpcClient();
