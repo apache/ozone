@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_DATASTREAM;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -125,8 +127,17 @@ public class RatisPipelineProvider
     int openPipelines = totalActivePipelines - closedPipelines;
     // Check per-datanode pipeline limit
     if (datanodePipelineLimit > 0) {
-      int healthyNodeCount = getNodeManager()
-          .getNodeCount(NodeStatus.inServiceHealthy());
+      final int healthyNodeCount;
+      if (storageTier != null && storageTier != StorageTier.EMPTY) {
+        StorageType storageType = storageTier.getUniformStorageType();
+        // The pipeline count is per tier, so only nodes supporting that tier contribute to its ceiling.
+        healthyNodeCount = (int) getNodeManager().getNodes(IN_SERVICE, HEALTHY).stream()
+            .filter(node -> NodeUtils.getDatanodeStorageTypes(node).contains(storageType))
+            .count();
+      } else {
+        // Preserve the existing limit check and subsequent validation for null/empty tiers.
+        healthyNodeCount = getNodeManager().getNodeCount(NodeStatus.inServiceHealthy());
+      }
       int allowedOpenPipelines = (datanodePipelineLimit * healthyNodeCount)
           / replicationConfig.getRequiredNodes();
       return openPipelines >= allowedOpenPipelines;
