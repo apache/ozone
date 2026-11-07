@@ -58,6 +58,7 @@ import org.apache.hadoop.ipc_.CallerContext;
 import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -1966,11 +1967,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       int partNumberMarker, int maxParts) throws IOException {
     MultipartUploadListPartsRequest.Builder multipartUploadListPartsRequest =
         MultipartUploadListPartsRequest.newBuilder();
-    multipartUploadListPartsRequest.setVolume(volumeName)
+    multipartUploadListPartsRequest.setVolume(
+        volumeName == null ? OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT : volumeName)
         .setBucket(bucketName).setKey(keyName).setUploadID(uploadID)
         .setPartNumbermarker(partNumberMarker).setMaxParts(maxParts);
 
     OMRequest omRequest = createOMRequest(Type.ListMultiPartUploadParts)
+        .setAssumeS3Context(volumeName == null)
         .setListMultipartUploadPartsRequest(
             multipartUploadListPartsRequest.build()).build();
 
@@ -1998,7 +2001,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws IOException {
     ListMultipartUploadsRequest request = ListMultipartUploadsRequest
         .newBuilder()
-        .setVolume(volumeName)
+        .setVolume(volumeName == null ? OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT : volumeName)
         .setBucket(bucketName)
         .setPrefix(prefix == null ? "" : prefix)
         .setKeyMarker(keyMarker == null ? "" : keyMarker)
@@ -2008,6 +2011,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     OMRequest omRequest = createOMRequest(Type.ListMultipartUploads)
+        .setAssumeS3Context(volumeName == null)
         .setListMultipartUploadsRequest(request)
         .build();
 

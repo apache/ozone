@@ -85,10 +85,11 @@ public class TestListMultipartUploads {
   @ParameterizedTest
   @CsvSource({", 0", "'', 0", "owner, 1"})
   public void testOnlyLooksUpBucketForOwner(String expectedOwner, int bucketLookups) throws Exception {
+    String volumeName = bucketLookups == 0 ? null : "volume1";
     when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
     OzoneMultipartUpload upload = new OzoneMultipartUpload("volume1", "bucket1", "prefix/key", "upload1",
         Instant.EPOCH, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-    when(proxy.listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload", 2))
+    when(proxy.listMultipartUploads(volumeName, "bucket1", "prefix/", "prefix/previous", "previous-upload", 2))
         .thenReturn(new OzoneMultipartUploadList(Collections.singletonList(upload), "prefix/key", "upload1", true));
 
     try (Response response = endpoint.get("bucket1")) {
@@ -105,8 +106,9 @@ public class TestListMultipartUploads {
       assertThat(result.getUploads()).hasSize(1);
       assertThat(result.getUploads().get(0).getKey()).isEqualTo("prefix/key");
     }
+    verify(endpoint.getClient().getObjectStore(), times(bucketLookups)).getS3Volume();
     verify(proxy, times(bucketLookups)).getBucketDetails("volume1", "bucket1");
-    verify(proxy).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload", 2);
+    verify(proxy).listMultipartUploads(volumeName, "bucket1", "prefix/", "prefix/previous", "previous-upload", 2);
   }
 
   @Test
@@ -125,20 +127,20 @@ public class TestListMultipartUploads {
       "BUCKET_NOT_FOUND, NO_SUCH_BUCKET", "VOLUME_NOT_FOUND, NO_SUCH_BUCKET", "PERMISSION_DENIED, ACCESS_DENIED"
   })
   public void testProtocolErrors(ResultCodes resultCode, S3ErrorTable expectedError) throws Exception {
-    when(proxy.listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload", 2))
+    when(proxy.listMultipartUploads(null, "bucket1", "prefix/", "prefix/previous", "previous-upload", 2))
         .thenThrow(new OMException("List uploads failed", resultCode));
 
     assertErrorResponse(expectedError, () -> endpoint.get("bucket1"));
 
     verify(proxy, never()).getBucketDetails("volume1", "bucket1");
-    verify(proxy).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload", 2);
+    verify(proxy).listMultipartUploads(null, "bucket1", "prefix/", "prefix/previous", "previous-upload", 2);
   }
 
   @ParameterizedTest
   @CsvSource({"1, 1", "1000, 1000", "1001, 1000"})
   public void testMaxUploadsAndEmptyResult(int requested, int forwarded) throws Exception {
     endpoint.queryParamsForTest().set(QueryParams.MAX_UPLOADS, Integer.toString(requested));
-    when(proxy.listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload", forwarded))
+    when(proxy.listMultipartUploads(null, "bucket1", "prefix/", "prefix/previous", "previous-upload", forwarded))
         .thenReturn(new OzoneMultipartUploadList(Collections.emptyList(), null, null, false));
 
     try (Response response = endpoint.get("bucket1")) {
@@ -148,7 +150,7 @@ public class TestListMultipartUploads {
       assertThat(result.isTruncated()).isFalse();
     }
     verify(proxy, never()).getBucketDetails("volume1", "bucket1");
-    verify(proxy).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous",
+    verify(proxy).listMultipartUploads(null, "bucket1", "prefix/", "prefix/previous",
         "previous-upload", forwarded);
   }
 
@@ -160,7 +162,7 @@ public class TestListMultipartUploads {
     assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT, () -> endpoint.get("bucket1"));
 
     verify(proxy, never()).getBucketDetails("volume1", "bucket1");
-    verify(proxy, never()).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload",
+    verify(proxy, never()).listMultipartUploads(null, "bucket1", "prefix/", "prefix/previous", "previous-upload",
         maxUploads);
   }
 }

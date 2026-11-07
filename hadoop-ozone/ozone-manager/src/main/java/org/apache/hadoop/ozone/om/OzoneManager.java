@@ -4406,7 +4406,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return getS3VolumeContext(false);
   }
 
-  S3VolumeContext getS3VolumeContext(boolean skipChecks) throws IOException {
+  public S3VolumeContext getS3VolumeContext(boolean skipChecks) throws IOException {
     long start = Time.monotonicNowNanos();
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed

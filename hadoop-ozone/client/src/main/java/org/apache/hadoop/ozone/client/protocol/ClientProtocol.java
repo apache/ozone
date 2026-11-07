@@ -908,7 +908,7 @@ public interface ClientProtocol {
 
   /**
    * Returns list of parts of a multipart upload key.
-   * @param volumeName
+   * @param volumeName volume name, or null to resolve the S3 volume context
    * @param bucketName
    * @param keyName
    * @param uploadID
@@ -922,7 +922,7 @@ public interface ClientProtocol {
       int maxParts)  throws IOException;
 
   /**
-   * Return with the inflight multipart uploads.
+   * Return with the inflight multipart uploads. A null volume name resolves the S3 volume context.
    */
   OzoneMultipartUploadList listMultipartUploads(String volumename,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException;
