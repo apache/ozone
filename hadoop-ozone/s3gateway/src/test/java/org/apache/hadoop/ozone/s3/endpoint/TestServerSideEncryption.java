@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_KEY_MD5_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CONTEXT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_ALGORITHM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_KEY_HEADER;
@@ -42,6 +43,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_KEY_MD5_HEAD
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_KMS_KEY_ID_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -57,6 +59,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -306,6 +309,9 @@ public class TestServerSideEncryption {
         assertEquals(200, response.getStatus());
         assertEquals(algorithm, response.getHeaderString(SSE_HEADER));
         assertEquals(kmsKeyId, response.getHeaderString(SSE_KMS_KEY_ID_HEADER));
+        // the stored algorithm is not returned as user metadata
+        assertThat(response.getStringHeaders().keySet())
+            .noneMatch(name -> name.contains(RESERVED_USER_METADATA_KEY_PREFIX));
       }
     }
   }
@@ -379,7 +385,22 @@ public class TestServerSideEncryption {
     }
   }
 
-  /** User metadata with the name of the stored algorithm is kept apart from it, in any bucket. */
+  /**
+   * User metadata {@code x-amz-server-side-encryption} written before the algorithm was stored is still returned as
+   * user metadata, and not read as the algorithm.
+   */
+  @Test
+  public void userMetadataNamedLikeTheHeaderWrittenBeforeIsKept() throws IOException {
+    put(objectEndpoint, ENCRYPTED, KEY_NAME, CONTENT).close();
+    ((OzoneBucketStub) encryptedBucket).putKeyMetadataForTest(KEY_NAME, SSE_HEADER, AES256);
+
+    assertReadReports(ENCRYPTED, KEY_NAME, AWS_KMS, BUCKET_KEY);
+    try (Response response = get(objectEndpoint, ENCRYPTED, KEY_NAME)) {
+      assertEquals(AES256, response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + SSE_HEADER));
+    }
+  }
+
+  /** User metadata with the name of the SSE header is kept apart from the stored algorithm, in any bucket. */
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   public void userMetadataNamedLikeTheAlgorithmIsKept(boolean encrypted) throws IOException {

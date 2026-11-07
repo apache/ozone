@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_ALGORITHM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_KEY_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_KEY_MD5_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CONTEXT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_ALGORITHM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_KEY_HEADER;
@@ -55,6 +56,12 @@ final class ServerSideEncryption {
   static final String AES256 = "AES256";
   static final String AWS_KMS = "aws:kms";
   static final String AWS_KMS_DSSE = "aws:kms:dsse";
+
+  /**
+   * The key metadata that stores the algorithm an object was written with. A user metadata key can never be equal to
+   * it, in any version, because a header name cannot contain {@code ':'}.
+   */
+  static final String ALGORITHM_METADATA_KEY = RESERVED_USER_METADATA_KEY_PREFIX + "sse:algorithm";
 
   private static final List<String> CUSTOMER_KEY_HEADERS = ImmutableList.of(
       SSE_CUSTOMER_ALGORITHM_HEADER, SSE_CUSTOMER_KEY_HEADER, SSE_CUSTOMER_KEY_MD5_HEADER,
@@ -117,10 +124,10 @@ final class ServerSideEncryption {
    * of its own request.
    */
   static void putAlgorithm(Map<String, String> metadata, Map<String, String> sseHeaders) {
-    metadata.remove(SSE_HEADER);
+    metadata.remove(ALGORITHM_METADATA_KEY);
     final String algorithm = sseHeaders.get(SSE_HEADER);
     if (algorithm != null) {
-      metadata.put(SSE_HEADER, algorithm);
+      metadata.put(ALGORITHM_METADATA_KEY, algorithm);
     }
   }
 
@@ -134,7 +141,7 @@ final class ServerSideEncryption {
     if (kmsKey == null) {
       return ImmutableMap.of();
     }
-    return AES256.equals(key.getMetadata().get(SSE_HEADER))
+    return AES256.equals(key.getMetadata().get(ALGORITHM_METADATA_KEY))
         ? ImmutableMap.of(SSE_HEADER, AES256)
         : ImmutableMap.of(SSE_HEADER, AWS_KMS, SSE_KMS_KEY_ID_HEADER, kmsKey);
   }
