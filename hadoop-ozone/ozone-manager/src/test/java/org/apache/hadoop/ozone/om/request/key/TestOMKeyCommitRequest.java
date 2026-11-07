@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -569,6 +571,36 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(1, bucketInfo.getUsedNamespace());
+  }
+
+  @Test
+  public void testOverwriteHsyncKeyWithoutOpenKey() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    List<KeyLocation> keyLocations = getKeyLocation(5);
+    dataSize = keyLocations.size() * 100;
+    List<OmKeyLocationInfo> allocatedBlockList = keyLocations.stream()
+        .map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    // the key is hsync'ed, then its writer's open key is removed by the open key cleanup
+    String hsyncOpenKey = addKeyToOpenKeyTable(allocatedBlockList);
+    OMClientResponse omClientResponse = getOmKeyCommitRequest(doPreExecute(createCommitKeyRequest(keyLocations, true)))
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).delete(hsyncOpenKey);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .addCacheEntry(new CacheKey<>(hsyncOpenKey), CacheValue.get(101L));
+
+    // another client overwrites the key
+    clientID = Time.now();
+    version += 1;
+    addKeyToOpenKeyTable(allocatedBlockList);
+    omClientResponse = getOmKeyCommitRequest(doPreExecute(createCommitKeyRequest(keyLocations, false)))
+        .validateAndUpdateCache(ozoneManager, 102L);
+
+    assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(getOzonePathKey()).getMetadata())
+        .doesNotContainKey(OzoneConsts.HSYNC_CLIENT_ID);
   }
 
   private Map<String, RepeatedOmKeyInfo> doKeyCommit(boolean isHSync,
