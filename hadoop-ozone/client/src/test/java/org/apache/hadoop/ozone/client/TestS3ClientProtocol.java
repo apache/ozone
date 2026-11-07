@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -117,6 +118,44 @@ class TestS3ClientProtocol {
       verify(delegate).getObjectTagging("tenant-volume", "bucket", "key");
       verify(delegate).getS3VolumeContext();
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(OzoneManagerVersion.class)
+  void resolvesS3ContextVolumeForMultipartListing(OzoneManagerVersion version) throws Exception {
+    when(delegate.getOmVersion()).thenReturn(version);
+    when(delegate.getS3VolumeContext()).thenReturn(new S3VolumeContext(
+        OmVolumeArgs.newBuilder().setVolume("tenant-volume").setOwnerName("owner").setAdminName("admin").build(),
+        "owner"));
+
+    client.listParts(null, "bucket", "key", "upload-id", 3, 2);
+    client.listMultipartUploads(null, "bucket", "prefix/", "previous", "previous-upload", 2);
+
+    boolean resolveOnOm = OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version);
+    String volumeName = resolveOnOm ? null : "tenant-volume";
+    verify(delegate).listParts(volumeName, "bucket", "key", "upload-id", 3, 2);
+    verify(delegate).listMultipartUploads(volumeName, "bucket", "prefix/", "previous", "previous-upload", 2);
+    verify(delegate, times(resolveOnOm ? 0 : 2)).getS3VolumeContext();
+  }
+
+  @Test
+  void multipartListingUsesCurrentOmVersion() throws Exception {
+    when(delegate.getOmVersion()).thenReturn(OzoneManagerVersion.ZDU, OzoneManagerVersion.ZDU,
+        OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION, OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION);
+    when(delegate.getS3VolumeContext()).thenReturn(new S3VolumeContext(
+        OmVolumeArgs.newBuilder().setVolume("tenant-volume").setOwnerName("owner").setAdminName("admin").build(),
+        "owner"));
+
+    client.listParts(null, "bucket", "key", "upload-id", 0, 10);
+    client.listMultipartUploads(null, "bucket", "prefix/", "", "", 10);
+    client.listParts(null, "bucket", "key", "upload-id", 0, 10);
+    client.listMultipartUploads(null, "bucket", "prefix/", "", "", 10);
+
+    verify(delegate).listParts("tenant-volume", "bucket", "key", "upload-id", 0, 10);
+    verify(delegate).listMultipartUploads("tenant-volume", "bucket", "prefix/", "", "", 10);
+    verify(delegate).listParts(null, "bucket", "key", "upload-id", 0, 10);
+    verify(delegate).listMultipartUploads(null, "bucket", "prefix/", "", "", 10);
+    verify(delegate, times(2)).getS3VolumeContext();
   }
 
   @ParameterizedTest

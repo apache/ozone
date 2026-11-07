@@ -2475,11 +2475,22 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.abortMultipartUpload(omKeyArgs);
   }
 
+  private String resolveS3VolumeForMultipartListing(String volumeName) throws IOException {
+    if (volumeName == null) {
+      if (OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion())) {
+        return null;
+      }
+      volumeName = getS3VolumeContext().getOmVolumeArgs().getVolume();
+    }
+    verifyVolumeName(volumeName);
+    return volumeName;
+  }
+
   @Override
   public OzoneMultipartUploadPartListParts listParts(String volumeName,
       String bucketName, String keyName, String uploadID, int partNumberMarker,
       int maxParts)  throws IOException {
-    verifyVolumeName(volumeName);
+    volumeName = resolveS3VolumeForMultipartListing(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(uploadID);
     Preconditions.checkArgument(maxParts > 0, "Max Parts Should be greater " +
@@ -2511,7 +2522,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
-    verifyVolumeName(volumeName);
+    volumeName = resolveS3VolumeForMultipartListing(volumeName);
     verifyBucketName(bucketName);
 
     OmMultipartUploadList omMultipartUploadList;
