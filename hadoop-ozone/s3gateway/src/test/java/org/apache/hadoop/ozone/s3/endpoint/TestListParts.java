@@ -161,8 +161,8 @@ public class TestListParts {
       assertThat(result.getPartList()).hasSize(1);
       assertThat(result.getPartList().get(0).getETag()).isEqualTo("etag4");
     }
-    verify(endpoint.getClient().getObjectStore(), times(bucketLookups)).getS3Volume();
-    verify(proxy, times(bucketLookups)).getBucketDetails("volume1", "bucket1");
+    verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
+    verify(proxy, times(bucketLookups)).getBucketDetails(null, "bucket1");
     verify(proxy).listParts(volumeName, "bucket1", "key1", "upload1", 3, 2);
   }
 
@@ -200,13 +200,13 @@ public class TestListParts {
 
   @ParameterizedTest
   @CsvSource({"PERMISSION_DENIED, ACCESS_DENIED", "TOKEN_EXPIRED, EXPIRED_TOKEN"})
-  public void testOwnerVolumeLookupErrors(ResultCodes resultCode, S3ErrorTable expectedError) throws Exception {
+  public void testOwnerBucketLookupErrors(ResultCodes resultCode, S3ErrorTable expectedError) throws Exception {
     ClientProtocol proxy = mock(ClientProtocol.class);
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
     ObjectEndpoint endpoint = newEndpoint(proxy, headers);
-    when(endpoint.getClient().getObjectStore().getS3Volume())
-        .thenThrow(new OMException("Volume lookup failed", resultCode));
+    when(proxy.getBucketDetails(null, "bucket1"))
+        .thenThrow(new OMException("Bucket lookup failed", resultCode));
 
     OS3Exception error = assertErrorResponse(expectedError,
         () -> EndpointTestUtils.listParts(endpoint, "bucket1", "key1", "upload1", 2, 3));
@@ -221,7 +221,7 @@ public class TestListParts {
         .setName("volume1").setAcls(Collections.emptyList()).build();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    when(proxy.getBucketDetails(null, "bucket1")).thenReturn(bucket);
     ObjectStore objectStore = mock(ObjectStore.class);
     when(objectStore.getS3Volume()).thenReturn(volume);
     when(objectStore.getClientProxy()).thenReturn(proxy);

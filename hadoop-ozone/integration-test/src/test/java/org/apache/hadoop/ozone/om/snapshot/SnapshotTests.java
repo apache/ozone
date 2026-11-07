@@ -22,9 +22,23 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.ClusterForTests;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.TestInstance;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class SnapshotTests extends ClusterForTests<MiniOzoneCluster> {
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
 
   @Override
   protected void onClusterReady() throws Exception {
