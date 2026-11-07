@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADD
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
 
 import java.net.URI;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.slf4j.Logger;
@@ -41,6 +42,8 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
  * Factory class for creating S3 clients.
  */
 public class S3ClientFactory {
+  public static final String ACCESS_KEY = "user";
+  public static final String SECRET_KEY = "password";
   private static final Logger LOG = LoggerFactory.getLogger(S3ClientFactory.class);
   private final OzoneConfiguration conf;
 
@@ -71,8 +74,14 @@ public class S3ClientFactory {
    * @throws Exception if there is an error creating the client
    */
   public S3Client createS3ClientV2(boolean enablePathStyle) throws Exception {
+    return createS3ClientV2(enablePathStyle, builder -> { });
+  }
+
+  /** Same as {@link #createS3ClientV2(boolean)}, with {@code overrides} applied after the common settings. */
+  public S3Client createS3ClientV2(boolean enablePathStyle, Consumer<S3ClientBuilder> overrides) throws Exception {
     S3ClientBuilder builder = S3Client.builder();
     configureCommon(builder, enablePathStyle);
+    overrides.accept(builder);
     return builder.build();
   }
 
@@ -88,8 +97,6 @@ public class S3ClientFactory {
 
   private <T extends S3BaseClientBuilder<T, ?>> void configureCommon(T builder, boolean enablePathStyle)
       throws Exception {
-    final String accessKey = "user";
-    final String secretKey = "password";
     final Region region = Region.US_EAST_1;
 
     final String protocol;
@@ -110,7 +117,7 @@ public class S3ClientFactory {
 
     LOG.info("S3 Endpoint is {}", endpoint);
 
-    AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
+    AwsBasicCredentials credentials = AwsBasicCredentials.create(ACCESS_KEY, SECRET_KEY);
 
     builder.region(region)
         .endpointOverride(new URI(endpoint))
