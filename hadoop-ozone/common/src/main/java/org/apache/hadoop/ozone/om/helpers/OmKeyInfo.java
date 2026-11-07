@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.ByteString;
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -125,6 +126,9 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
+  // IV of a multipart upload part in an encrypted bucket, set on the part's key.
+  private final byte[] partIv;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -143,6 +147,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.partIv = b.partIv;
   }
 
   /**
@@ -219,6 +224,10 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
+  }
+
+  public byte[] getPartIv() {
+    return partIv;
   }
 
   public String getOwnerName() {
@@ -526,6 +535,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private byte[] partIv;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -548,6 +558,7 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.partIv = obj.partIv;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
@@ -719,6 +730,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setPartIv(byte[] iv) {
+      this.partIv = iv;
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -867,6 +883,9 @@ public final class OmKeyInfo extends WithParentObjectId
     if (isOpenKey && expectedDataGeneration != null) {
       kb.setExpectedDataGeneration(expectedDataGeneration);
     }
+    if (partIv != null) {
+      kb.setPartIv(ByteString.copyFrom(partIv));
+    }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
@@ -919,6 +938,9 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     if (keyInfo.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
+    }
+    if (keyInfo.hasPartIv()) {
+      builder.setPartIv(keyInfo.getPartIv().toByteArray());
     }
 
     if (keyInfo.hasOwnerName()) {

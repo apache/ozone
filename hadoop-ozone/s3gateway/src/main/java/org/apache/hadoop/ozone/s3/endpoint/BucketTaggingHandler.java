@@ -69,7 +69,7 @@ public class BucketTaggingHandler extends BucketOperationHandler {
           TAG_BUCKET_NUM_LIMIT
       );
 
-      context.getVolume().getBucket(bucketName).putBucketTagging(tags);
+      context.getBucket(bucketName).putBucketTagging(tags);
 
       getMetrics().updatePutBucketTaggingSuccessStats(context.getStartNanos());
 
@@ -90,7 +90,7 @@ public class BucketTaggingHandler extends BucketOperationHandler {
     context.setAction(action);
 
     try {
-      context.getVolume().getBucket(bucketName).deleteBucketTagging();
+      context.getBucket(bucketName).deleteBucketTagging();
       getMetrics().updateDeleteBucketTaggingSuccessStats(context.getStartNanos());
       return Response.noContent().build();
     } catch (OMException ex) {
@@ -115,7 +115,7 @@ public class BucketTaggingHandler extends BucketOperationHandler {
     context.setAction(action);
 
     try {
-      Map<String, String> tagMap = context.getVolume().getBucket(bucketName).getBucketTagging();
+      Map<String, String> tagMap = context.getBucket(bucketName).getBucketTagging();
       if (tagMap.isEmpty()) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_TAG_SET, bucketName);
       }

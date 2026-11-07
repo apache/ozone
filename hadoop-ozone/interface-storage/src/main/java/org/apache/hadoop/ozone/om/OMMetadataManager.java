@@ -544,6 +544,18 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
       throws IOException;
 
   /**
+   * Returns the number of buckets that exist in the bucket table cache,
+   * excluding entries marked for deletion (cache values with a null payload).
+   * Used for enforcing {@code ozone.om.max.buckets} where
+   * {@link Table#getEstimatedKeyCount()} would still count delete tombstones
+   * until cache cleanup runs.
+   *
+   * @return number of live buckets
+   * @throws IOException
+   */
+  long countLiveBuckets() throws IOException;
+
+  /**
    * Return the existing upload keys which includes volumeName, bucketName,
    * keyName.
    * @param noPagination if true, returns all keys; if false, applies pagination

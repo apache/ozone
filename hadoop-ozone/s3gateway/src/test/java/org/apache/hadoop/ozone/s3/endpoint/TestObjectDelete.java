@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.abortMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -131,5 +133,27 @@ public class TestObjectDelete {
         .build();
 
     assertErrorResponse(PRECOND_FAILED, () -> delete(rest, "b1", "missing"));
+  }
+
+  @Test
+  void testDeleteWithEmptyUploadIdKeepsKey() throws IOException, OS3Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    assertStatus(HttpStatus.SC_OK, () -> put(rest, "b1", "key1", "content"));
+
+    // DELETE ?uploadId= aborts an upload that does not exist; it must not delete the committed key.
+    assertErrorResponse(NO_SUCH_UPLOAD, () -> abortMultipartUpload(rest, "b1", "key1", ""));
+
+    assertNotNull(bucket.getKey("key1"));
   }
 }
