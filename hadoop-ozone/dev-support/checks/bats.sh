@@ -30,16 +30,18 @@ source "${DIR}/install/bats.sh"
 
 rm -f "${REPORT_DIR}/output.log"
 
-find * \( \
-    -path '*/src/test/shell/*' -name '*.bats' \
-    -or -path dev-support/ci/errorprone.bats \
-    -or -path dev-support/ci/selective_ci_checks.bats \
-    -or -path dev-support/ci/pr_title_check.bats \
-    -or -path dev-support/ci/find_test_class_project.bats \
-    -or -path dev-support/ci/junit_summary.bats \
-    \) -print0 \
-  | xargs -0 -n1 bats --formatter tap \
-  | tee -a "${REPORT_DIR}/output.log"
+# accept specific tests as argument
+if [[ "${CI:-}" != "true" ]] && [[ "$#" -ge 1 ]]; then
+  echo "$@" \
+    | xargs -n1 bats --formatter tap
+# or run all tests
+else
+  find * \
+      \( -path '*/src/test/shell/*.bats' -or -path 'dev-support/ci/*.bats' \) \
+      -not -path '*/bats-core/*' -not -path '*/bats-support/*' -not -path '*/bats-assert/*' \
+      -print0 \
+    | xargs -0 -n1 bats --formatter tap
+fi | tee -a "${REPORT_DIR}/output.log"
 rc=$?
 
 grep '^\(not ok\|#\)' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
