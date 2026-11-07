@@ -169,6 +169,22 @@ public class TestOMFailoverProxyProvider {
     assertEquals(waitBetweenRetries, waitTime);
   }
 
+  @Test
+  public void testSuggestedLeaderIsTriedEvenIfAnEarlierRequestFailedOnIt() throws Exception {
+    final RetryPolicy retryPolicy = provider.getRetryPolicy(10);
+    final String newLeader = provider.getCurrentProxyOMNodeId();
+
+    // An earlier request fails on the OM while it is down, and then succeeds on the next OM.
+    retryPolicy.shouldRetry(new IOException("connection refused"), 0, 0, true);
+    provider.performFailover(null);
+
+    final RetryPolicy.RetryAction action = retryPolicy.shouldRetry(
+        new ServiceException(new OMNotLeaderException("not the leader", newLeader)), 0, 0, true);
+
+    assertEquals(0, action.delayMillis);
+    assertEquals(newLeader, provider.getNextProxyOMNodeId());
+  }
+
   /**
    * Tests waitTime reset after same node failover.
    */

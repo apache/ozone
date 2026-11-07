@@ -202,12 +202,21 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     // Client will attempt up to maxFailovers number of failovers between
     // available OMs before throwing exception.
     RetryPolicy retryPolicy = new RetryPolicy() {
+      // The OMs that have failed the current request of this thread; cleared at its first failure.
+      // A suggested leader in it is not followed, so that a request does not bounce between OMs.
+      private final ThreadLocal<Set<String>> failedOMs = ThreadLocal.withInitial(HashSet::new);
+
       @Override
       public RetryAction shouldRetry(Exception exception, int retries,
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
 
         String omNodeId = getCurrentProxyOMNodeId();
+        final Set<String> failedOMsOfRequest = failedOMs.get();
+        if (failovers == 0) {
+          failedOMsOfRequest.clear();
+        }
+        failedOMsOfRequest.add(omNodeId);
 
         if (LOG.isDebugEnabled()) {
           if (exception.getCause() != null) {
@@ -229,7 +238,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
             String suggestedNodeId =
                 notLeaderException.getSuggestedLeaderNodeId();
             if (suggestedNodeId != null && omProxies.get(suggestedNodeId) != null
-                && !isAttempted(suggestedNodeId)) {
+                && !failedOMsOfRequest.contains(suggestedNodeId)) {
               setNextOmProxy(suggestedNodeId);
               return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
                   failovers);
@@ -349,10 +358,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
             newProxyIndex, omProxies.getNodeId(newProxyIndex));
       }
     }
-  }
-
-  private synchronized boolean isAttempted(String nodeId) {
-    return attemptedOMs.contains(nodeId);
   }
 
   /**
