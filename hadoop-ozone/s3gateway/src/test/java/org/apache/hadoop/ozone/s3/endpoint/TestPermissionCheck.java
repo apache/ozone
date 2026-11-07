@@ -285,9 +285,7 @@ public class TestPermissionCheck {
 
   @Test
   public void testDeleteKey() throws IOException {
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
-        anyString(), anyBoolean());
+    doThrow(exception).when(clientProtocol).deleteKey(isNull(), anyString(), anyString(), anyBoolean(), isNull());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
