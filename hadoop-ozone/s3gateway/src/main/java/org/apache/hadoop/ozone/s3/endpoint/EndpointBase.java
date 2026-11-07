@@ -511,8 +511,9 @@ public abstract class EndpointBase {
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
       String metadataKey = entry.getKey();
-      // System ETag / Content-Type are returned via their own response header.
-      if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
+      // System ETag / Content-Type are returned via their own response header, the SSE algorithm via the SSE header.
+      if (RESERVED_METADATA_KEYS.containsKey(metadataKey)
+          || ServerSideEncryption.ALGORITHM_METADATA_KEY.equals(metadataKey)) {
         continue;
       }
       // Rebuild a remapped user value (e.g. ozone-s3-internal-content-type -> content-type).
