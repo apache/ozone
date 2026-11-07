@@ -767,6 +767,7 @@ public class TestContainerReader {
       assertNotNull(containerSet.getContainer(0));
       assertThat(logs.getOutput()).contains("Failed to remove leftover container import file " + first);
       assertThat(logs.getOutput()).contains("Failed to remove leftover container import file " + second);
+      assertThat(logs.getOutput()).doesNotContain("java.io.IOException: simulated deletion failure");
     } finally {
       logs.stopCapturing();
     }
@@ -786,7 +787,9 @@ public class TestContainerReader {
     try {
       new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true).run();
       assertNotNull(containerSet.getContainer(0));
-      assertThat(logs.getOutput()).contains("Failed to remove leftover container import files");
+      assertThat(logs.getOutput()).contains("Failed to list files in container import directory: " + copyDir);
+      assertThat(logs.getOutput()).doesNotContain("Failed to remove leftover container import files under",
+          "java.io.IOException");
       assertThat(logs.getOutput()).contains(copyDir.toString());
     } finally {
       logs.stopCapturing();

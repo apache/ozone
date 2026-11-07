@@ -110,24 +110,20 @@ public class ContainerReader implements Runnable {
 
   private void cleanupContainerCopyDir() {
     // Startup loads containers before starting the replication server, so no imports can be in progress here.
-    try {
-      File copyDir = ContainerImporter.getUntarDirectory(hddsVolume).toFile();
-      if (copyDir.exists()) {
-        File[] files = copyDir.listFiles();
-        if (files == null) {
-          throw new IOException("Failed to list " + copyDir);
-        }
-        for (File file : files) {
-          try {
-            FileUtils.forceDelete(file);
-          } catch (IOException | RuntimeException e) {
-            LOG.warn("Failed to remove leftover container import file {}", file.getAbsolutePath(), e);
-          }
+    File copyDir = ContainerImporter.getUntarDirectory(hddsVolume).toFile();
+    if (copyDir.exists()) {
+      File[] files = copyDir.listFiles();
+      if (files == null) {
+        LOG.warn("Failed to list files in container import directory: {}", copyDir);
+        return;
+      }
+      for (File file : files) {
+        try {
+          FileUtils.forceDelete(file);
+        } catch (IOException | RuntimeException e) {
+          LOG.warn("Failed to remove leftover container import file {}", file.getAbsolutePath());
         }
       }
-    } catch (IOException | RuntimeException e) {
-      LOG.warn("Failed to remove leftover container import files under {}: {}",
-          hddsVolume.getVolumeRootDir(), e.getMessage(), e);
     }
   }
 
