@@ -248,12 +248,14 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
       OmKeyInfo openKeyToDelete = OMFileRequest.getOmKeyInfoFromFileTable(true,
           omMetadataManager, prepared.dbOpenKeyToDeleteKey, keyName);
-      openKeyToDelete = openKeyToDelete.toBuilder()
-          .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
-          .setUpdateID(trxnLogIndex)
-          .build();
-      openKeyToDelete.setModificationTime(Time.now());
-      prepared.openKeyToDelete = openKeyToDelete;
+      if (openKeyToDelete != null) {
+        openKeyToDelete = openKeyToDelete.toBuilder()
+            .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+            .setUpdateID(trxnLogIndex)
+            .build();
+        openKeyToDelete.setModificationTime(Time.now());
+        prepared.openKeyToDelete = openKeyToDelete;
+      }
       // The cache write for this overwritten open key is deferred to the Phase 2 mutation tail, so it
       // happens under the narrowed bucket write lock with the other mutations.
     }
@@ -340,7 +342,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     OmBucketInfo omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
     // Deferred from Phase 1: mark the overwritten hsync open key, under the lock with the rest.
-    if (prepared.isOverwrittenHsyncKey) {
+    if (prepared.openKeyToDelete != null) {
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
           prepared.dbOpenKeyToDeleteKey, prepared.openKeyToDelete, keyName, trxnLogIndex);
     }
