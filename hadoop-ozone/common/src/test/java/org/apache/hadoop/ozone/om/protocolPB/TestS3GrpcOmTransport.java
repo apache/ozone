@@ -241,7 +241,7 @@ public class TestS3GrpcOmTransport {
     client.startClient(channel);
 
     assertThrows(Exception.class, () -> client.submitRequest(arbitraryOmRequest()));
-    assertEquals(maxFailoverAttempts, failoverCount);
+    assertEquals(maxFailoverAttempts + 1, failoverCount);
 
     failoverCount = 0;
     completeFailover = true;

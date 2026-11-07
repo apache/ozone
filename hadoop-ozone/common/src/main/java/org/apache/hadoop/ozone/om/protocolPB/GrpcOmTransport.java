@@ -215,7 +215,7 @@ public class GrpcOmTransport implements OmTransport {
         }
         Exception exp = new Exception(e);
         tryOtherHost = shouldRetry(unwrapException(exp),
-            expectedFailoverCount, ++requestFailoverCount);
+            expectedFailoverCount, requestFailoverCount++);
         if (!tryOtherHost) {
           throw new OMException(resultCode);
         }
