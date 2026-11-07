@@ -114,12 +114,83 @@ public class TestSignedChunksInputStream {
   }
 
   @ParameterizedTest
-  @EmptySource
+  @CsvSource({"7fffffff,false", "7fffffff,true", "80000000,false", "80000000,true",
+      "7fffffffffffffff,false", "7fffffffffffffff,true"})
+  void chunkLengthSupportsLongRange(String size, boolean buffered) throws IOException {
+    String body = size + ";chunk-signature=" + FAKE_SIGNATURE + "\r\na";
+    for (boolean verify : new boolean[]{false, true}) {
+      try (SignedChunksInputStream stream = new SignedChunksInputStream(
+          new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH)) {
+        if (verify) {
+          stream.attachValidator(newValidator());
+        }
+        if (buffered) {
+          byte[] buffer = new byte[4];
+          assertThat(stream.read(buffer, 2, 1)).isEqualTo(1);
+          assertThat(buffer[2]).isEqualTo((byte) 'a');
+        } else {
+          assertThat(stream.read()).isEqualTo('a');
+        }
+        if (verify) {
+          OS3Exception error = assertThrows(OS3Exception.class, stream::read);
+          assertThat(error.getCode()).isEqualTo(S3ErrorTable.INCOMPLETE_BODY.getCode());
+        } else {
+          assertThat(stream.read()).isEqualTo(-1);
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"8000000000000000", "10000000000000000"})
+  void rejectsOutOfRangeChunkSize(String size) {
+    InputStream stream = wrapContent(size + ";chunk-signature=" + FAKE_SIGNATURE + "\r\n");
+    assertBodyError(stream, S3ErrorTable.INVALID_REQUEST, "Invalid signed chunk size");
+  }
+
+  @Test
+  void rejectsBlankChunkHeader() {
+    assertBodyError(verifiedStream("\r\n"), S3ErrorTable.INVALID_REQUEST, "Invalid signature line");
+  }
+
+  @Test
+  void rejectsWrongChunkTerminatorBeforeEof() {
+    InputStream stream = verifiedStream("0;chunk-signature=" + FAKE_SIGNATURE + "\r\nX");
+    assertBodyError(stream, S3ErrorTable.INVALID_REQUEST, "Invalid chunk data terminator");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  void rejectEveryTruncatedBody(boolean singleByte, boolean verify) throws IOException {
+    String body = SignatureTestUtils.signedChunkedBodyWithTrailer(
+        new String[]{"1234", "56", "789"}, "x-amz-checksum-crc32c", "4waSgw==");
+    for (int length = 0; length < body.length(); length++) {
+      try (SignedChunksInputStream stream = new SignedChunksInputStream(
+          new ByteArrayInputStream(body.substring(0, length).getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C)) {
+        if (verify) {
+          stream.attachValidator(new ChunksValidator(SignatureTestUtils.signingKey(),
+              SignatureTestUtils.signatureInfo().getDateTime(), SignatureTestUtils.signatureInfo().getCredentialScope(),
+              SignatureTestUtils.signatureInfo().getSignature(), KEY_PATH));
+        }
+        OS3Exception error = assertThrows(OS3Exception.class, () -> {
+          if (singleByte) {
+            int value;
+            do {
+              value = stream.read();
+            } while (value != -1);
+          } else {
+            IOUtils.toByteArray(stream);
+          }
+        }, "Accepted truncated body at length " + length);
+        assertThat(error.getCode()).isEqualTo(S3ErrorTable.INCOMPLETE_BODY.getCode());
+        assertThat(error.getHttpCode()).isEqualTo(400);
+      }
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {
-      "x-amz-checksum-crc32c:sOO8/Q==",
-      "x-amz-checksum-crc32c:sOO8/Q==\r\n",
-      "x-amz-checksum-crc32c:sOO8/Q==\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE,
-      "x-amz-checksum-crc32c:sOO8/Q==\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n",
+      "\r\n",
       "x-amz-checksum-crc32c:sOO8/Q==\r\nx-amz-trailer-signature:not-hex\r\n\r\n",
       "malformed-header\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n",
       "x-amz-checksum-sha256:checksum\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n"
@@ -130,7 +201,7 @@ public class TestSignedChunksInputStream {
     ByteArrayInputStream original = new ByteArrayInputStream(body.getBytes(UTF_8));
     try (SignedChunksInputStream stream = new SignedChunksInputStream(original, KEY_PATH, TrailerHeader.CRC32C)) {
       OS3Exception error = assertThrows(OS3Exception.class, () -> IOUtils.toByteArray(stream));
-      assertThat(error.getCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode());
+      assertThat(error.getCode()).isEqualTo(S3ErrorTable.MALFORMED_TRAILER_ERROR.getCode());
     }
   }
 
@@ -143,7 +214,7 @@ public class TestSignedChunksInputStream {
       if (verify) {
         stream.attachValidator(newTrailerValidator());
       }
-      assertInvalidBody(stream, "Chunk or trailing header line is too long");
+      assertBodyError(stream, S3ErrorTable.MALFORMED_TRAILER_ERROR, "Chunk or trailing header line is too long");
     }
   }
 
@@ -401,7 +472,7 @@ public class TestSignedChunksInputStream {
           SignatureTestUtils.signatureInfo().getDateTime(), SignatureTestUtils.signatureInfo().getCredentialScope(),
           SignatureTestUtils.signatureInfo().getSignature(), KEY_PATH));
       OS3Exception error = assertThrows(OS3Exception.class, stream::verifyComplete);
-      assertThat(error.getCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode());
+      assertThat(error.getCode()).isEqualTo(S3ErrorTable.MALFORMED_TRAILER_ERROR.getCode());
     }
   }
 
@@ -431,7 +502,7 @@ public class TestSignedChunksInputStream {
     SignedChunksInputStream is = new SignedChunksInputStream(
         new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
-    assertInvalidBody(is, "Missing trailing signature");
+    assertBodyError(is, S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
   }
 
   @Test
@@ -441,7 +512,7 @@ public class TestSignedChunksInputStream {
     SignedChunksInputStream is = new SignedChunksInputStream(
         new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
-    assertInvalidBody(is, "Truncated trailing header");
+    assertBodyError(is, S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
   }
 
   @Test
@@ -450,7 +521,7 @@ public class TestSignedChunksInputStream {
         new ByteArrayInputStream((trailerBody() + "extra").getBytes(UTF_8)), KEY_PATH,
         TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
-    assertInvalidBody(is, "Unexpected data after trailing signature");
+    assertBodyError(is, S3ErrorTable.MALFORMED_TRAILER_ERROR, "Unexpected data after trailing signature");
   }
 
   @Test
@@ -460,7 +531,7 @@ public class TestSignedChunksInputStream {
         new ByteArrayInputStream(body.substring(0, body.length() - 2).getBytes(UTF_8)), KEY_PATH,
         TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
-    assertInvalidBody(is, "Invalid trailer terminator");
+    assertBodyError(is, S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
   }
 
   @ParameterizedTest
@@ -516,22 +587,23 @@ public class TestSignedChunksInputStream {
         + "400;chunk-signature=" + CHUNK2_SIGNATURE + "\r\n"
         + repeat('a', 1024) + "\r\n";
     InputStream is = verifiedStream(body);
-    assertInvalidBody(is, "terminating 0-byte chunk");
+    assertBodyError(is, S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
   }
 
-  @Test
-  void rejectsFinalChunkMissingDataTerminator() {
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  void rejectsFinalChunkMissingDataTerminator(int missingBytes) {
     String body = signedChunkedBody('a');
-    body = body.substring(0, body.length() - 2);
+    body = body.substring(0, body.length() - missingBytes);
     InputStream is = verifiedStream(body);
-    assertInvalidBody(is, "Invalid chunk data terminator");
+    assertBodyError(is, S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
   }
 
   @Test
   void rejectsBodyTruncatedMidPayload() throws Exception {
     String body = "10000;chunk-signature=" + CHUNK1_SIGNATURE + "\r\n" + repeat('a', 100);
     InputStream is = verifiedStream(body);
-    assertInvalidBody(is, "terminating 0-byte chunk");
+    assertBodyError(is, S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
   }
 
   @Test
@@ -552,7 +624,7 @@ public class TestSignedChunksInputStream {
   })
   void rejectsChunkSignatureThatIsNotHmacSha256(String signature) {
     InputStream is = wrapContent("0A;chunk-signature=" + signature + "\r\n1234567890\r\n");
-    assertInvalidBody(is, "Invalid signature line");
+    assertBodyError(is, S3ErrorTable.INVALID_REQUEST, "Invalid signature line");
   }
 
   /** A chunk that fails verification must surface as SignatureDoesNotMatch (HTTP 403), not any other error. */
@@ -562,11 +634,10 @@ public class TestSignedChunksInputStream {
     assertEquals(S3ErrorTable.SIGNATURE_DOES_NOT_MATCH.getHttpCode(), ex.getHttpCode());
   }
 
-  /** A malformed body must surface as InvalidRequest (HTTP 400), not as an InternalError. */
-  private static void assertInvalidBody(InputStream is, String expectedMessage) {
+  private static void assertBodyError(InputStream is, S3ErrorTable expected, String expectedMessage) {
     OS3Exception ex = assertThrows(OS3Exception.class, () -> IOUtils.toString(is, UTF_8));
-    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), ex.getCode());
-    assertEquals(S3ErrorTable.INVALID_REQUEST.getHttpCode(), ex.getHttpCode());
+    assertEquals(expected.getCode(), ex.getCode());
+    assertEquals(expected.getHttpCode(), ex.getHttpCode());
     assertThat(ex.getErrorMessage()).contains(expectedMessage);
   }
 
