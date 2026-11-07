@@ -119,7 +119,7 @@ public class SignedChunksInputStream extends InputStream {
    * Size of the chunk payload. If zero, the signature line should be parsed to
    * retrieve the subsequent chunk payload size.
    */
-  private int remainingData = 0;
+  private long remainingData = 0;
 
   /**
    * Every chunked uploads (multiple chunks) contains an additional final zero-byte
@@ -176,7 +176,7 @@ public class SignedChunksInputStream extends InputStream {
       } catch (IllegalArgumentException ignored) {
         // Invalid Base64 and incorrect decoded length are both malformed checksum values.
       }
-      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, resource);
+      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.MALFORMED_TRAILER_ERROR, resource);
       ex.setErrorMessage("Value for " + headerName + " header is invalid");
       throw ex;
     }
@@ -272,7 +272,7 @@ public class SignedChunksInputStream extends InputStream {
     int totalReadBytes = 0;
     while (currentLen > 0 && !isFinalChunkEncountered && ensureChunkPayload()) {
       // The chunk payload size has been decoded, now read the actual chunk payload
-      int realReadLen = originalStream.read(b, currentOff, Math.min(remainingData, currentLen));
+      int realReadLen = originalStream.read(b, currentOff, (int) Math.min(remainingData, currentLen));
       if (realReadLen == -1) {
         stopAtUnexpectedEof();
         break;
@@ -324,14 +324,12 @@ public class SignedChunksInputStream extends InputStream {
     }
   }
 
-  /**
-   * A malformed chunked body is the client's error, so it must not surface as an InternalError.
-   * The message is specific; the S3 error code is the generic InvalidRequest (HTTP 400).
-   */
   private OS3Exception invalidBody(String message) {
-    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
-    ex.setErrorMessage(message);
-    return ex;
+    return bodyError(S3ErrorTable.INVALID_REQUEST, message);
+  }
+
+  private OS3Exception bodyError(S3ErrorTable error, String message) {
+    return S3ErrorTable.newError(error, keyPath).withMessage(message);
   }
 
   private void stopAtUnexpectedEof() throws IOException {
@@ -358,25 +356,34 @@ public class SignedChunksInputStream extends InputStream {
   }
 
   /**
-   * A verified stream must end with the terminating 0-byte chunk. Reaching EOF before it means the
-   * body was truncated, so the payload could not be fully verified. Unverified streams without a
+   * A verified stream must end with the terminating 0-byte chunk and, when declared, its complete trailer.
+   * Reaching EOF before completion means the payload could not be fully verified. Unverified streams without a
    * declared trailer keep their lenient behavior.
    */
   private void checkNotTruncated() throws IOException {
     if (requiresCompletion()) {
-      throw invalidBody("Chunked stream ended before the terminating 0-byte chunk");
+      throw bodyError(S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
     }
   }
 
   private void readChunkTerminator() throws IOException {
     int carriageReturn = originalStream.read();
+    if (requiresCompletion() && carriageReturn != '\r') {
+      if (carriageReturn == -1) {
+        checkNotTruncated();
+      }
+      throw invalidBody("Invalid chunk data terminator");
+    }
     int lineFeed = originalStream.read();
-    if (requiresCompletion() && (carriageReturn != '\r' || lineFeed != '\n')) {
+    if (requiresCompletion() && lineFeed != '\n') {
+      if (lineFeed == -1) {
+        checkNotTruncated();
+      }
       throw invalidBody("Invalid chunk data terminator");
     }
   }
 
-  private int readContentLengthFromHeader() throws IOException {
+  private long readContentLengthFromHeader() throws IOException {
     String signatureLine = readLine(false);
     if (signatureLine == null) {
       return -1;
@@ -388,7 +395,7 @@ public class SignedChunksInputStream extends InputStream {
     // 10000 will be read and decoded from base-16 representation to 65536, which is the size of
     // the subsequent chunk payload.
     signatureLine = signatureLine.trim();
-    if (signatureLine.isEmpty()) {
+    if (signatureLine.isEmpty() && !requiresCompletion()) {
       return -1;
     }
 
@@ -398,32 +405,33 @@ public class SignedChunksInputStream extends InputStream {
       throw invalidBody("Invalid signature line: " + signatureLine);
     }
     chunkSignature = matcher.group(2);
-    return Integer.parseInt(matcher.group(1), 16);
+    try {
+      return Long.parseLong(matcher.group(1), 16);
+    } catch (NumberFormatException ex) {
+      throw invalidBody("Invalid signed chunk size");
+    }
   }
 
   /** Check framing, authenticate the trailer if possible, then compare its checksum after the final terminator. */
   private void validateTrailer() throws IOException {
     String trailerLine = readLine(true);
-    if (trailerLine == null || trailerLine.isEmpty()) {
-      throw invalidBody("Missing trailing checksum header");
+    if (trailerLine.isEmpty()) {
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Missing trailing checksum header");
     }
     int separator = trailerLine.indexOf(':');
     if (separator <= 0) {
-      throw invalidBody("Invalid trailing header: " + trailerLine);
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Invalid trailing header: " + trailerLine);
     }
     String name = trailerLine.substring(0, separator).trim().toLowerCase(Locale.ROOT);
     String value = trailerLine.substring(separator + 1).trim();
     if (!trailerHeader.headerName.equals(name)) {
-      throw invalidBody("Unexpected trailing header: " + name);
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Unexpected trailing header: " + name);
     }
 
     String signatureLine = readLine(true);
-    if (signatureLine == null) {
-      throw invalidBody("Missing trailing signature");
-    }
     Matcher matcher = TRAILER_SIGNATURE_PATTERN.matcher(signatureLine.trim());
     if (!matcher.matches()) {
-      throw invalidBody("Invalid trailing signature");
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Invalid trailing signature");
     }
     if (validator != null) {
       validator.validateTrailer(matcher.group(1), DigestUtils.sha256Hex(name + ":" + value + "\n"));
@@ -431,10 +439,10 @@ public class SignedChunksInputStream extends InputStream {
     byte[] expected = trailerHeader.decodeValue(value, keyPath);
     // AWS SDKs terminate the trailer section with a blank line after the signature.
     if (!"".equals(readLine(true))) {
-      throw invalidBody("Invalid trailer terminator");
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Invalid trailer terminator");
     }
     if (originalStream.read() != -1) {
-      throw invalidBody("Unexpected data after trailing signature");
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Unexpected data after trailing signature");
     }
     trailerChecksum.verify(expected, keyPath);
   }
@@ -445,17 +453,13 @@ public class SignedChunksInputStream extends InputStream {
     while (true) {
       int current = originalStream.read();
       if (current == -1) {
-        if (trailingHeader && requiresCompletion() && line.length() > 0) {
-          throw invalidBody("Truncated trailing header");
-        }
-        if (!trailingHeader) {
-          checkNotTruncated();
-        }
+        checkNotTruncated();
         return line.length() == 0 ? null : line.toString();
       }
       line.append((char) current);
       if (line.length() > MAX_LINE_LENGTH) {
-        throw invalidBody("Chunk or trailing header line is too long");
+        throw bodyError(trailingHeader ? S3ErrorTable.MALFORMED_TRAILER_ERROR : S3ErrorTable.INVALID_REQUEST,
+            "Chunk or trailing header line is too long");
       }
       if (eol(previous, current)) {
         line.setLength(line.length() - 2);

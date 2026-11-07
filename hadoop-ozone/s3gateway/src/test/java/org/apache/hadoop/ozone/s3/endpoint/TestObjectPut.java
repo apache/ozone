@@ -367,9 +367,9 @@ class TestObjectPut {
     configureSignedChunksWithTrailer(CONTENT.length());
     String body = withoutFinalChunk(signedChunkedBody(CONTENT));
 
-    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INCOMPLETE_BODY,
         () -> putObject(body));
-    assertThat(ex.getErrorMessage()).contains("terminating 0-byte chunk");
+    assertThat(ex.getErrorMessage()).contains("Chunked stream ended before completion");
     assertKeyWasNotCommitted();
   }
 
@@ -423,9 +423,9 @@ class TestObjectPut {
   void testPutObjectRejectsMissingFinalChunk() {
     configureSignedChunks(CONTENT.length());
 
-    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INCOMPLETE_BODY,
         () -> putObject(withoutFinalChunk(signedChunkedBody(CONTENT))));
-    assertThat(ex.getErrorMessage()).contains("terminating 0-byte chunk");
+    assertThat(ex.getErrorMessage()).contains("Chunked stream ended before completion");
     assertKeyWasNotCommitted();
   }
 
@@ -505,8 +505,8 @@ class TestObjectPut {
     String completeBody = signedChunkedBody(CONTENT);
     String body = completeBody.substring(0, completeBody.length() - 2);
 
-    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST, () -> putObject(body));
-    assertThat(ex.getErrorMessage()).contains("Invalid chunk data terminator");
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INCOMPLETE_BODY, () -> putObject(body));
+    assertThat(ex.getErrorMessage()).contains("Chunked stream ended before completion");
     assertKeyWasNotCommitted();
   }
 
@@ -1304,7 +1304,7 @@ class TestObjectPut {
   void testDirectoryCreationRejectsIncompleteUnsignedTrailer(String body) {
     configureUnsignedTrailer(0, false);
 
-    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+    assertErrorResponse(S3ErrorTable.INCOMPLETE_BODY,
         () -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", body));
     assertThatThrownBy(() -> fsoBucket.getKey("dir/")).isInstanceOf(IOException.class);
   }
@@ -1466,7 +1466,7 @@ class TestObjectPut {
   void testPutObjectRejectsIncompleteUnsignedTrailer(boolean datastream) {
     configureUnsignedTrailer(CONTENT.length(), datastream);
 
-    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+    assertErrorResponse(S3ErrorTable.INCOMPLETE_BODY,
         () -> putObject("a\r\n" + CONTENT + "\r\n0\r\nx-amz-checksum-crc32:AAAAAA==\r\n"));
     assertKeyWasNotCommitted();
   }
@@ -1475,7 +1475,23 @@ class TestObjectPut {
   void testPutEmptyObjectRejectsMissingUnsignedTrailer() {
     configureUnsignedTrailer(0, false);
 
-    assertErrorResponse(S3ErrorTable.INVALID_REQUEST, () -> putObject("0\r\n"));
+    assertErrorResponse(S3ErrorTable.INCOMPLETE_BODY, () -> putObject("0\r\n"));
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  void testPutObjectRejectsMalformedTrailer(boolean signed, boolean datastream) {
+    configureUnsignedTrailer(CONTENT.length(), datastream);
+    if (signed) {
+      configureSignedChunksWithTrailer(CONTENT.length());
+    }
+    String header = "x-amz-checksum-crc32";
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn(header);
+    String body = signed ? signedChunkedBodyWithTrailer(CONTENT, header, "not-base64")
+        : "a\r\n" + CONTENT + "\r\n0\r\n" + header + ":not-base64\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.MALFORMED_TRAILER_ERROR, () -> putObject(body));
     assertKeyWasNotCommitted();
   }
 

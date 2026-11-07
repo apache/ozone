@@ -103,7 +103,7 @@ public class UnsignedChunksInputStream extends InputStream {
     }
     int value = originalStream.read();
     if (value == -1) {
-      throw invalidBody("Truncated chunk payload");
+      throw incompleteBody();
     }
     payloadChecksum.update((byte) value);
     remainingData--;
@@ -125,7 +125,7 @@ public class UnsignedChunksInputStream extends InputStream {
       int readLength = originalStream.read(b, off + totalReadBytes,
           (int) Math.min(remainingData, len - totalReadBytes));
       if (readLength == -1) {
-        throw invalidBody("Truncated chunk payload");
+        throw incompleteBody();
       }
       payloadChecksum.update(b, off + totalReadBytes, readLength);
       totalReadBytes += readLength;
@@ -139,7 +139,7 @@ public class UnsignedChunksInputStream extends InputStream {
     if (remainingData > 0) {
       return true;
     }
-    String size = readLine();
+    String size = readLine(false);
     if (!CHUNK_SIZE_PATTERN.matcher(size).matches()) {
       throw invalidBody("Invalid unsigned chunk size");
     }
@@ -157,8 +157,21 @@ public class UnsignedChunksInputStream extends InputStream {
   }
 
   private void endChunkIfComplete() throws IOException {
-    if (remainingData == 0 && (originalStream.read() != '\r' || originalStream.read() != '\n')) {
-      throw invalidBody("Invalid chunk data terminator");
+    if (remainingData == 0) {
+      int carriageReturn = originalStream.read();
+      if (carriageReturn == -1) {
+        throw incompleteBody();
+      }
+      if (carriageReturn != '\r') {
+        throw invalidBody("Invalid chunk data terminator");
+      }
+      int lineFeed = originalStream.read();
+      if (lineFeed == -1) {
+        throw incompleteBody();
+      }
+      if (lineFeed != '\n') {
+        throw invalidBody("Invalid chunk data terminator");
+      }
     }
   }
 
@@ -176,37 +189,38 @@ public class UnsignedChunksInputStream extends InputStream {
 
   /** Check framing and decode the value, then compare the checksum only after the final terminator. */
   private void readTrailer() throws IOException {
-    String trailer = readLine();
+    String trailer = readLine(true);
     int separator = trailer.indexOf(':');
     if (separator <= 0) {
-      throw invalidBody("Missing or invalid trailing checksum header");
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Missing or invalid trailing checksum header");
     }
     String name = trailer.substring(0, separator).trim().toLowerCase(Locale.ROOT);
     if (!trailerHeader.getHeaderName().equals(name)) {
-      throw invalidBody("Unexpected trailing header: " + name);
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Unexpected trailing header: " + name);
     }
     byte[] checksum = trailerHeader.decodeValue(trailer.substring(separator + 1).trim(), keyPath);
-    if (!readLine().isEmpty()) {
-      throw invalidBody("Invalid trailer terminator");
+    if (!readLine(true).isEmpty()) {
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Invalid trailer terminator");
     }
     if (originalStream.read() != -1) {
-      throw invalidBody("Unexpected data after trailing checksum");
+      throw bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, "Unexpected data after trailing checksum");
     }
     payloadChecksum.verify(checksum, keyPath);
     trailerChecksum = checksum;
   }
 
-  private String readLine() throws IOException {
+  private String readLine(boolean trailingHeader) throws IOException {
     StringBuilder line = new StringBuilder();
     int previous = -1;
     while (true) {
       int current = originalStream.read();
       if (current == -1) {
-        throw invalidBody("Chunked stream ended before completion");
+        throw incompleteBody();
       }
       line.append((char) current);
       if (line.length() > MAX_LINE_LENGTH) {
-        throw invalidBody("Chunk or trailing header line is too long");
+        throw bodyError(trailingHeader ? S3ErrorTable.MALFORMED_TRAILER_ERROR : S3ErrorTable.INVALID_REQUEST,
+            "Chunk or trailing header line is too long");
       }
       if (eol(previous, current)) {
         line.setLength(line.length() - 2);
@@ -217,8 +231,14 @@ public class UnsignedChunksInputStream extends InputStream {
   }
 
   private OS3Exception invalidBody(String message) {
-    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
-    ex.setErrorMessage(message);
-    return ex;
+    return bodyError(S3ErrorTable.INVALID_REQUEST, message);
+  }
+
+  private OS3Exception incompleteBody() {
+    return bodyError(S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
+  }
+
+  private OS3Exception bodyError(S3ErrorTable error, String message) {
+    return S3ErrorTable.newError(error, keyPath).withMessage(message);
   }
 }
