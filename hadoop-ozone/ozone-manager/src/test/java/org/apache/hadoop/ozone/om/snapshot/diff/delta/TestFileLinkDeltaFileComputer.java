@@ -321,12 +321,13 @@ public class TestFileLinkDeltaFileComputer {
     @SuppressWarnings("unchecked")
     UncheckedAutoCloseableSupplier<OmSnapshot> mockSnapshot = mock(UncheckedAutoCloseableSupplier.class);
 
-    when(omSnapshotManager.getActiveSnapshot("vol1", "bucket1", "snap1")).thenReturn(mockSnapshot);
+    when(omSnapshotManager.getActiveSnapshot("vol1", "bucket1", "snap1", snapshotInfo.getSnapshotId()))
+        .thenReturn(mockSnapshot);
 
     UncheckedAutoCloseableSupplier<OmSnapshot> result = deltaFileComputer.getSnapshot(snapshotInfo);
 
     assertEquals(mockSnapshot, result);
-    verify(omSnapshotManager, times(1)).getActiveSnapshot("vol1", "bucket1", "snap1");
+    verify(omSnapshotManager, times(1)).getActiveSnapshot("vol1", "bucket1", "snap1", snapshotInfo.getSnapshotId());
   }
 
   /**

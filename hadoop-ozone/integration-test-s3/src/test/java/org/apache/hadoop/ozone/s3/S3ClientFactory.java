@@ -23,14 +23,6 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
 
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import java.net.URI;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
@@ -59,58 +51,6 @@ public class S3ClientFactory {
    */
   public S3ClientFactory(OzoneConfiguration conf) {
     this.conf = conf;
-  }
-
-  /**
-   * Creates an AmazonS3 client (AWS SDK V1) with path style access enabled.
-   *
-   * @return AmazonS3 client
-   */
-  public AmazonS3 createS3Client() {
-    return createS3Client(true);
-  }
-
-  /**
-   * Creates an AmazonS3 client (AWS SDK V1).
-   *
-   * @param enablePathStyle whether to enable path style access
-   * @return AmazonS3 client
-   */
-  public AmazonS3 createS3Client(boolean enablePathStyle) {
-    final String accessKey = "user";
-    final String secretKey = "password";
-    final Regions region = Regions.DEFAULT_REGION;
-
-    final String protocol;
-    final HttpConfig.Policy webPolicy = getHttpPolicy(conf);
-    String host;
-
-    if (webPolicy.isHttpsEnabled()) {
-      // TODO: Currently HTTPS is disabled in the test, we can add HTTPS
-      // integration in the future
-      protocol = HTTPS_SCHEME;
-      host = conf.get(OZONE_S3G_HTTPS_ADDRESS_KEY);
-    } else {
-      protocol = HTTP_SCHEME;
-      host = conf.get(OZONE_S3G_HTTP_ADDRESS_KEY);
-    }
-
-    String endpoint = protocol + "://" + host;
-
-    AWSCredentialsProvider credentials = new AWSStaticCredentialsProvider(
-        new BasicAWSCredentials(accessKey, secretKey));
-
-    ClientConfiguration clientConfiguration = new ClientConfiguration();
-    LOG.info("S3 Endpoint is {}", endpoint);
-
-    return AmazonS3ClientBuilder.standard()
-        .withPathStyleAccessEnabled(enablePathStyle)
-        .withEndpointConfiguration(
-            new AwsClientBuilder.EndpointConfiguration(
-                endpoint, region.getName()))
-        .withClientConfiguration(clientConfiguration)
-        .withCredentials(credentials)
-        .build();
   }
 
   /**

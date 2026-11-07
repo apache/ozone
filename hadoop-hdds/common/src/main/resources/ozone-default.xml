@@ -1846,6 +1846,17 @@
     </description>
   </property>
   <property>
+    <name>hdds.heartbeat.report.max.limit</name>
+    <value>10000</value>
+    <tag>DATANODE</tag>
+    <description>
+      Maximum number of report messages (not containers) a datanode includes in
+      a single heartbeat to an SCM or Recon endpoint. Reports beyond the limit
+      stay queued and are sent in an immediate follow-up heartbeat. Values below
+      1 are treated as 1.
+    </description>
+  </property>
+  <property>
     <name>hdds.db.profile</name>
     <value>DISK</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -3774,6 +3785,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.scm.snapshot.connection.timeout</name>
+    <value>60s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Connection timeout for the HTTP(S) call made by Recon to download the SCM DB checkpoint,
+      used when hdds.grpc.tls.enabled is true.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.snapshot.read.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Read timeout for the HTTP(S) call made by Recon to download the SCM DB checkpoint,
+      used when hdds.grpc.tls.enabled is true. SCM creates the checkpoint before it sends
+      any data, so this should cover the checkpoint creation time.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.task.thread.count</name>
     <value>1</value>
     <tag>OZONE, RECON</tag>
@@ -3930,7 +3960,8 @@
     <value/>
     <description>
       The supported SSL protocols used to restrict connections towards the WebUI of different components,
-      and the S3 GateWay.
+      and the S3 GateWay. If unset, hadoop.ssl.enabled.protocols is used when it is explicitly configured,
+      otherwise TLSv1.2,TLSv1.3.
     </description>
   </property>
   <property>
@@ -4004,6 +4035,18 @@
     <tag>OZONE, CLIENT, SECURITY</tag>
     <value>10d</value>
     <description>Ozone client security key provider cache expiration time.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.om.version.refresh.interval</name>
+    <value>10m</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The interval after which the cached OM version is refreshed on the next version check.
+      Clients do not poll in the background. Failed refreshes retain the cached version and wait
+      for this interval before retrying. Supports time unit suffixes; milliseconds are assumed
+      if no unit is specified.
     </description>
   </property>
 
@@ -5099,6 +5142,16 @@
     <description>
       Maximum number of diff-candidate object IDs a snapshot diff job may retain
       in memory before spilling to a temporary RocksDB column family.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.optimized.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      When true, snapshot diff jobs use the optimized merge-join pipeline instead
+      of the legacy object-id map diff path.
     </description>
   </property>
 
