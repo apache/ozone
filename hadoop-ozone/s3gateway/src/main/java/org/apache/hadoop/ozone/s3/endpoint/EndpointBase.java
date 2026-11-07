@@ -43,6 +43,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
@@ -153,6 +154,8 @@ public abstract class EndpointBase {
       RESERVED_USER_METADATA_KEY_PREFIX + "content-language";
   protected static final String CONTENT_DISPOSITION_CUSTOM =
       RESERVED_USER_METADATA_KEY_PREFIX + "content-disposition";
+  protected static final String SSE_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "server-side-encryption";
 
   // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
   // collides with the system ETag / Content-Type stored under the same key, so
@@ -167,6 +170,7 @@ public abstract class EndpointBase {
           .put(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM)
           .put(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM)
           .put(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM)
+          .put(SSE_HEADER, SSE_CUSTOM)
           .build();
 
   // Custom key -> lower-cased header, to rebuild remapped user metadata on read.

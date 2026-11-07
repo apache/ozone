@@ -38,6 +38,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -108,6 +109,34 @@ final class ServerSideEncryption {
     return AWS_KMS.equals(algorithm)
         ? ImmutableMap.of(SSE_HEADER, algorithm, SSE_KMS_KEY_ID_HEADER, bucketKey)
         : ImmutableMap.of(SSE_HEADER, algorithm);
+  }
+
+  /**
+   * Stores the algorithm accepted by {@link #checkWrite} in the metadata of the key being written, for
+   * {@link #readHeaders}. A copy does not keep the algorithm of its source: like a new object, it gets the algorithm
+   * of its own request.
+   */
+  static void putAlgorithm(Map<String, String> metadata, Map<String, String> sseHeaders) {
+    metadata.remove(SSE_HEADER);
+    final String algorithm = sseHeaders.get(SSE_HEADER);
+    if (algorithm != null) {
+      metadata.put(SSE_HEADER, algorithm);
+    }
+  }
+
+  /**
+   * Returns the SSE headers of a GetObject or HeadObject response. Like in AWS, an encrypted object reports its
+   * encryption: the algorithm it was written with, or {@code aws:kms} if it was written without one (or before the
+   * algorithm was stored), and for {@code aws:kms} the KMS key. An object that is not encrypted reports none.
+   */
+  static Map<String, String> readHeaders(OzoneKey key) {
+    final String kmsKey = key.getEncryptionKeyName();
+    if (kmsKey == null) {
+      return ImmutableMap.of();
+    }
+    return AES256.equals(key.getMetadata().get(SSE_HEADER))
+        ? ImmutableMap.of(SSE_HEADER, AES256)
+        : ImmutableMap.of(SSE_HEADER, AWS_KMS, SSE_KMS_KEY_ID_HEADER, kmsKey);
   }
 
   /** Adds the SSE headers returned by {@link #checkWrite} to {@code response}. */
