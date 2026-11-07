@@ -263,4 +263,47 @@ public class TestOmLifeCycleConfiguration {
     assertDoesNotThrow(configFromProto::valid);
   }
 
+  @Test
+  public void testTagPresenceValidation() {
+    for (String[] tag : new String[][] {{null, "value"}, {"key", null}, {null, null}}) {
+      OmLCFilter filter = new OmLCFilter.Builder()
+          .setTag(tag[0], tag[1])
+          .build();
+      assertOMException(() -> configurationWithFilter(filter).build(), INVALID_REQUEST,
+          "A Tag must have a Key and a Value.");
+    }
+
+    for (String[] tag : new String[][] {{null, "value"}, {"key", null}}) {
+      OmLifecycleRuleAndOperator and = new OmLifecycleRuleAndOperator.Builder()
+          .setPrefix("prefix")
+          .addTag(tag[0], tag[1])
+          .build();
+      OmLCFilter filter = new OmLCFilter.Builder()
+          .setAndOperator(and)
+          .build();
+      assertOMException(() -> configurationWithFilter(filter).build(), INVALID_REQUEST,
+          tag[0] == null ? "A Tag's Key must be a length between 1 and" : "A Tag must have a Value.");
+    }
+
+    OmLCFilter emptyFilter = new OmLCFilter.Builder().build();
+    OmLCFilter emptyValue = new OmLCFilter.Builder()
+        .setTag("key", "")
+        .build();
+    OmLifecycleRuleAndOperator and = new OmLifecycleRuleAndOperator.Builder()
+        .setPrefix("prefix")
+        .addTag("key", "")
+        .build();
+    assertDoesNotThrow(() -> configurationWithFilter(emptyFilter).build());
+    assertDoesNotThrow(() -> configurationWithFilter(emptyValue).build());
+    assertDoesNotThrow(() -> configurationWithFilter(new OmLCFilter.Builder().setAndOperator(and).build()).build());
+  }
+
+  private OmLifecycleConfiguration.Builder configurationWithFilter(OmLCFilter filter) {
+    OmLCRule rule = new OmLCRule.Builder()
+        .setId("rule")
+        .setFilter(filter)
+        .setAction(new OmLCExpiration.Builder().setDays(1).build())
+        .build();
+    return getOmLifecycleConfiguration("volume", "bucket", Collections.singletonList(rule));
+  }
 }
