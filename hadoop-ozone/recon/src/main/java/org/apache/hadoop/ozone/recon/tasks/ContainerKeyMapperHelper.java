@@ -223,7 +223,12 @@ public abstract class ContainerKeyMapperHelper {
     return true;
   }
 
-  public static boolean process(OMUpdateEventBatch events,
+  /**
+   * Synchronized, because ReconTaskControllerImpl runs the FSO and OBS tasks at the same time. Each batch reads
+   * container key counts and the container count from the Recon DB and writes new totals, so without the lock the
+   * two tasks overwrite each other's changes.
+   */
+  public static synchronized boolean process(OMUpdateEventBatch events,
                                                String tableName,
                                                ReconContainerMetadataManager reconContainerMetadataManager,
                                                String taskName) {

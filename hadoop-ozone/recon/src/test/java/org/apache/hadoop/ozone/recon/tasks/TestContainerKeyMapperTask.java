@@ -26,6 +26,9 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -35,6 +38,9 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -52,6 +58,7 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -634,6 +641,50 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(1L));
     assertEquals(0, reconContainerMetadataManager.getKeyCountForContainer(2L));
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
+  }
+
+  @Test
+  public void testConcurrentFsoAndObsUpdatesOfSameContainer() throws Exception {
+    // An FSO key has a block in container 1. One batch changes only its metadata and puts an OBS key in container 1.
+    OmKeyInfo fsoKeyInfo = writeKey(BucketLayout.FILE_SYSTEM_OPTIMIZED, FILE_NAME, 1L);
+    getContainerKeyMapperTask(BucketLayout.FILE_SYSTEM_OPTIMIZED).reprocess(reconOMMetadataManager);
+    String fsoDbKey = getDbKey(BucketLayout.FILE_SYSTEM_OPTIMIZED, FILE_NAME);
+    String obsDbKey = getDbKey(BucketLayout.OBJECT_STORE, OTHER_FILE_NAME);
+    OMDBUpdateEvent obsPut = new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmKeyInfo>()
+        .setKey(obsDbKey)
+        .setValue(buildOmKeyInfo(VOLUME_NAME, BUCKET_NAME, OTHER_FILE_NAME, getLocationGroup(1L)))
+        .setTable(omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).getName())
+        .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+        .build();
+    OMUpdateEventBatch batch = new OMUpdateEventBatch(new ArrayList<>(Arrays.asList(
+        getUpdateEvent(BucketLayout.FILE_SYSTEM_OPTIMIZED, fsoDbKey, fsoKeyInfo, fsoKeyInfo), obsPut)), 0L);
+
+    ReconContainerMetadataManager fsoContainerMetadataManager = spy(reconContainerMetadataManager);
+    ContainerKeyMapperTaskFSO fsoTask = new ContainerKeyMapperTaskFSO(fsoContainerMetadataManager, omConfiguration);
+    ContainerKeyMapperTaskOBS obsTask = new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
+    FutureTask<ReconOmTask.TaskResult> fsoProcess =
+        new FutureTask<>(() -> fsoTask.process(batch, Collections.emptyMap()));
+    FutureTask<ReconOmTask.TaskResult> obsProcess =
+        new FutureTask<>(() -> obsTask.process(batch, Collections.emptyMap()));
+    Thread obsThread = new Thread(obsProcess);
+    // The FSO task pauses after it reads the key count of container 1, until the OBS task is done or waits for it.
+    CountDownLatch fsoCountRead = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      Object count = invocation.callRealMethod();
+      fsoCountRead.countDown();
+      GenericTestUtils.waitFor(() -> obsProcess.isDone() || obsThread.getState() == Thread.State.BLOCKED, 10, 10000);
+      return count;
+    }).when(fsoContainerMetadataManager).getKeyCountForContainer(1L);
+
+    new Thread(fsoProcess).start();
+    assertTrue(fsoCountRead.await(10, TimeUnit.SECONDS));
+    obsThread.start();
+    assertTrue(fsoProcess.get(10, TimeUnit.SECONDS).isTaskSuccess());
+    assertTrue(obsProcess.get(10, TimeUnit.SECONDS).isTaskSuccess());
+
+    assertThat(getKeysInContainer(1L)).containsExactlyInAnyOrder(fsoDbKey, obsDbKey);
+    assertEquals(2, reconContainerMetadataManager.getKeyCountForContainer(1L));
+    assertEquals(1, reconContainerMetadataManager.getCountForContainers());
   }
 
   private ReconOmTask getContainerKeyMapperTask(BucketLayout layout) {
