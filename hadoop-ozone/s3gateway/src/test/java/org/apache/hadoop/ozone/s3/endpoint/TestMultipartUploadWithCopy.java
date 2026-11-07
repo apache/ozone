@@ -152,18 +152,14 @@ public class TestMultipartUploadWithCopy {
             OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, null);
     partsList.add(part2);
 
-    Part part3 =
-        uploadPartWithCopy(KEY, uploadID, 3,
-            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3");
-    partsList.add(part3);
-
-    Part part4 =
+    // Re-upload part 3 with copy-if timestamps; complete must list each part number once.
+    Part part3WithCopyIf =
         uploadPartWithCopy(KEY, uploadID, 3,
             OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
             beforeSourceKeyModificationTimeStr,
             afterSourceKeyModificationTimeStr
             );
-    partsList.add(part4);
+    partsList.add(part3WithCopyIf);
 
     setHeaders();
     completeMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, TestMultipartUploadWithCopy.KEY, uploadID, partsList);

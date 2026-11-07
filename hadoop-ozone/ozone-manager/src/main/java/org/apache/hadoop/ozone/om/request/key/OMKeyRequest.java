@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
@@ -32,11 +31,13 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
+import com.google.protobuf.ByteString;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -69,9 +70,11 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -122,6 +125,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   private static final Set<AccessModeProto> READ_WRITE = EnumSet.of(READ, WRITE);
 
   protected static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
@@ -152,6 +156,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
     keyArgs = bucket.update(keyArgs);
     return keyArgs;
+  }
+
+  protected KeyArgs resolveBucketLinkForAudit(OzoneManager ozoneManager,
+      KeyArgs keyArgs) {
+    try {
+      return resolveBucketLink(ozoneManager, keyArgs);
+    } catch (IOException e) {
+      return keyArgs;
+    }
   }
 
   protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
@@ -749,6 +762,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     boolean acquireLock = false;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    newKeyArgs.clearPartIv();
 
     // When TDE is enabled, we are doing a DB read in pre-execute. As for
     // most of the operations we don't read from DB because of our isLeader
@@ -816,6 +830,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     boolean acquireLock = false;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    newKeyArgs.clearPartIv();
 
     if (ozoneManager.getKmsProvider() != null) {
       mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
@@ -840,6 +855,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
           if (omKeyInfo.getFileEncryptionInfo() != null) {
             newKeyArgs.setFileEncryptionInfo(
                 OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+            if (ozoneManager.getConfig().isMpuPartEncryptionIvEnabled()
+                && ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.MULTIPART_PART_IV)
+                && ClientVersion.MULTIPART_PART_IV_SUPPORT.isSupportedBy(getOmRequest().getVersion())) {
+              // Each part is encrypted as a separate stream, so it gets its own IV.
+              byte[] iv = new byte[omKeyInfo.getFileEncryptionInfo().getIV().length];
+              SECURE_RANDOM.nextBytes(iv);
+              newKeyArgs.setPartIv(ByteString.copyFrom(iv));
+            }
           }
         } else {
           LOG.warn("omKeyInfo not found. Key: " + dbMultipartOpenKey +
@@ -1104,6 +1127,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (keyArgs.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
     }
+    if (keyArgs.hasPartIv()) {
+      builder.setPartIv(keyArgs.getPartIv().toByteArray());
+    }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
       OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
@@ -1229,11 +1255,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
-    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder()
-        .setObjectID(OBJECT_ID_RECLAIM_BLOCKS)
-        .build();
-    // This is a special marker to indicate that SnapshotDeletingService
-    // can reclaim this key's blocks unconditionally.
+    // The pseudo key keeps the object ID and the hsync metadata of the key, so callers wrap before they remove the
+    // latter. A block committed by an earlier hsync may be referenced by a snapshot, and key deletion retains the
+    // pseudo key while the previous snapshot holds an hsync'ed version of the key with this object ID. That version
+    // may not list the block itself, as an hsync between two snapshots can drop a block that the older one references.
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder().build();
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,

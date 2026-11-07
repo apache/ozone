@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -290,11 +289,6 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
               .setObjectKey(result.getObjectKey())
               .addAllBlockResults(result.getBlockResultProtoList());
       resp.addResults(deleteResult.build());
-    }
-    // Advertise SCM Ratis follower replication lag.
-    final SCMRatisServer ratisServer = scm.getScmHAManager().getRatisServer();
-    if (ratisServer != null) {
-      resp.setScmFollowerReplicationLag(ratisServer.getFollowerReplicationLag());
     }
     return resp.build();
   }

@@ -144,24 +144,24 @@ Get S3 Credentials for Principals, Create Buckets, and Upload Files to Buckets
     # Kinit OM_ADMIN_USER that has access to all volumes/buckets per Ranger default policies
     Kinit test user               ${OM_ADMIN_USER}              ${OM_ADMIN_USER}.keytab
 
-    # Tenant 1 data
-    Execute                       ozone sh bucket create /${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}
     Create File                   ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
-    Execute                       ozone sh key put /${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
-
-    # Tenant 2 data and linked bucket
-    Execute                       ozone sh bucket create /${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}
-    Execute                       ozone sh key put /${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
-    Execute                       ozone sh bucket create /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
     Create File                   ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
-    Execute                       ozone sh key put /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}/${ANOTHER_BUCKET_TESTFILE} ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
-    # Link ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET} to ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
-    Execute                       ozone sh bucket link /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} /${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}
-    Execute                       ozone sh key put /${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}/${ANOTHER_BUCKET_TESTFILE} ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
 
+    # Tenant 1 data
+    Ozone Shell Batch
+    ...    bucket create /${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}
+    ...    key put /${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
+    # Tenant 2 data and linked bucket
+    ...    bucket create /${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}
+    ...    key put /${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
+    ...    bucket create /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
+    ...    key put /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}/${ANOTHER_BUCKET_TESTFILE} ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
+    # Link ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET} to ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
+    ...    bucket link /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} /${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}
+    ...    key put /${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}/${ANOTHER_BUCKET_TESTFILE} ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
     # Tenant 3 data
-    Execute                       ozone sh bucket create /${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}
-    Execute                       ozone sh key put /${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
+    ...    bucket create /${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}
+    ...    key put /${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
 
 Create Role-Scoped Tokens for All Three Tenants
     Set Global Variable           ${ROLE_ARN}                   arn:aws:iam::123456789012:role/${TENANT_ONE_ROLE}
@@ -271,7 +271,7 @@ Verify Limited-Scoped Token Accesses
     Get Object Should Fail        ${TENANT_ONE_LINKED_BUCKET}   ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Put Object Should Fail        ${TENANT_ONE_LINKED_BUCKET}   ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
-    Put Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
+    Put Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
 
     Configure STS Profile         ${USER_A_T2_STS_ACCESS_KEY_ID}  ${USER_A_T2_STS_SECRET_KEY}  ${USER_A_T2_STS_SESSION_TOKEN}
 

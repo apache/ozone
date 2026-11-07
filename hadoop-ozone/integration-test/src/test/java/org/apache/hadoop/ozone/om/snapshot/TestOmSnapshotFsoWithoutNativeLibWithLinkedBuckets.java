@@ -25,6 +25,6 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMI
 public class TestOmSnapshotFsoWithoutNativeLibWithLinkedBuckets extends OmSnapshotTests {
 
   public TestOmSnapshotFsoWithoutNativeLibWithLinkedBuckets() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, true, true);
+    super(FILE_SYSTEM_OPTIMIZED, false, false, true, true, false);
   }
 }

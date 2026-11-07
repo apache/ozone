@@ -138,7 +138,6 @@ public class TestFailureHandlingByClient {
 
     conf.setBoolean("ozone.client.stream.buffer.flush.delay", false);
 
-    conf.setQuietMode(false);
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(

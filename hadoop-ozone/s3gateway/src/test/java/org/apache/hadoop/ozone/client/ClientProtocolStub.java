@@ -221,7 +221,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteBucket(String volumeName, String bucketName)
       throws IOException {
-
+    objectStoreStub.getVolume(volumeName).deleteBucket(bucketName);
   }
 
   @Override
@@ -233,7 +233,10 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(String volumeName, String bucketName)
       throws IOException {
-    return null;
+    if (volumeName == null) {
+      return objectStoreStub.getS3Volume().getBucket(bucketName);
+    }
+    return objectStoreStub.getVolume(volumeName).getBucket(bucketName);
   }
 
   @Override
@@ -979,7 +982,8 @@ public class ClientProtocolStub implements ClientProtocol {
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     return null;
   }
@@ -1021,8 +1025,12 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    return getBucket(volumeName, bucketName).getObjectTagging(keyName);
+  public Map<String, String> getObjectTagging(
+      String volumeName, String bucketName, String keyName) throws IOException {
+    OzoneBucket bucket = volumeName == null
+        ? objectStoreStub.getS3Volume().getBucket(bucketName)
+        : getBucket(volumeName, bucketName);
+    return bucket.getObjectTagging(keyName);
   }
 
   @Override
