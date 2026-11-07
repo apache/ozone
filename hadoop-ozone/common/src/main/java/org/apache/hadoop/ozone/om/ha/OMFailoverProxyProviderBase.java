@@ -202,8 +202,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     // Client will attempt up to maxFailovers number of failovers between
     // available OMs before throwing exception.
     RetryPolicy retryPolicy = new RetryPolicy() {
-      // The OMs that have failed the current request of this thread; cleared at its first failure.
-      // A suggested leader in it is not followed, so that a request does not bounce between OMs.
+      // Stores the failed OMs per request, to debounce repeatedly failed OM-suggested leaders.
       private final ThreadLocal<Set<String>> failedOMs = ThreadLocal.withInitial(HashSet::new);
 
       @Override
