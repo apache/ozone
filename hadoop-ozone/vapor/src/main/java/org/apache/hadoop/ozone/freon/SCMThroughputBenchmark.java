@@ -66,7 +66,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -174,7 +174,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
 
   private StorageContainerDatanodeProtocol datanodeScmClient;
 
-  private StorageContainerLocationProtocol scmContainerClient;
+  private StorageContainerLocationInternalInterface scmContainerClient;
 
   private ScmBlockLocationProtocol scmBlockClient;
 
@@ -327,7 +327,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
     return new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
   }
 
-  private StorageContainerLocationProtocol createScmContainerClient() {
+  private StorageContainerLocationInternalInterface createScmContainerClient() {
     return HAUtils.getScmContainerClient(conf);
   }
 

@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
@@ -45,6 +46,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -63,8 +65,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -979,7 +983,20 @@ public class TestOmSnapshotLocalDataManager {
     createSnapshotLocalDataFile(snapshotId, previousSnapshotId);
     
     // Initialize - should load existing files
-    localDataManager = getNewOmSnapshotLocalDataManager();
+    AtomicInteger yamlLoads = new AtomicInteger();
+    // Static mocks are thread-local, so run the loader tasks on this thread while counting actual parses.
+    try (MockedStatic<Executors> executors = mockStatic(Executors.class);
+         MockedStatic<OmSnapshotLocalDataYaml> yaml = mockStatic(OmSnapshotLocalDataYaml.class, CALLS_REAL_METHODS)) {
+      executors.when(() -> Executors.newFixedThreadPool(anyInt(), any()))
+          .thenReturn(MoreExecutors.newDirectExecutorService());
+      yaml.when(() -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(any(File.class))).thenAnswer(load -> {
+        yamlLoads.incrementAndGet();
+        return load.callRealMethod();
+      });
+      localDataManager = getNewOmSnapshotLocalDataManager();
+    }
+    // snapshotId sorts first and depends on previousSnapshotId, but each YAML must still be parsed only once.
+    assertEquals(2, yamlLoads.get());
 
     assertNotNull(localDataManager);
     Map<UUID, OmSnapshotLocalDataManager.SnapshotVersionsMeta> versionMap =
@@ -1116,6 +1133,26 @@ public class TestOmSnapshotLocalDataManager {
       assertNotNull(provider.getMeta(),
           "getMeta() returned null. Calling getVersion() on it throws NullPointerException");
     }
+  }
+
+  @Test
+  public void testCheckOrphanSnapshotVersionsContinuesAfterLoadFailure() throws IOException {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    Map<UUID, Integer> orphanCheckMap = localDataManager.getSnapshotToBeCheckedForOrphans();
+    orphanCheckMap.clear();
+    orphanCheckMap.put(firstSnapId, 1);
+    orphanCheckMap.put(secondSnapId, 1);
+    // Corrupt the second snapshot's YAML after it has been loaded into the version graph.
+    Files.write(Paths.get(localDataManager.getSnapshotLocalPropertyYamlPath(secondSnapId)),
+        "not: [valid".getBytes(StandardCharsets.UTF_8));
+
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null);
+
+    // The first snapshot is still processed and the failed one stays queued for the next run.
+    assertThat(orphanCheckMap).containsOnlyKeys(secondSnapId).containsEntry(secondSnapId, 1);
   }
 
   @Test

@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.servlet.Filter;
@@ -265,6 +266,7 @@ public final class HttpServer2 implements FilterContainer {
   public static class Builder {
     private ArrayList<URI> endpoints = Lists.newArrayList();
     private String name;
+    private String metricsSourceId;
     private MutableConfigurationSource conf;
     private ConfigurationSource sslConf;
     private String[] pathSpecs;
@@ -302,6 +304,11 @@ public final class HttpServer2 implements FilterContainer {
 
     public Builder setName(String serverName) {
       this.name = serverName;
+      return this;
+    }
+
+    public Builder setMetricsSourceId(String sourceId) {
+      this.metricsSourceId = sourceId;
       return this;
     }
 
@@ -676,8 +683,11 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     private void setEnabledProtocols(SslContextFactory sslContextFactory) {
+      // core-default.xml sets hadoop.ssl.enabled.protocols to TLSv1.2, so honor it only when explicitly configured
       String enabledProtocols = conf.get(OzoneConfigKeys.OZONE_SSL_ENABLED_PROTOCOLS,
-          conf.get(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT));
+          conf.isExplicitlySet(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY)
+              ? conf.get(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY)
+              : OzoneConfigKeys.OZONE_SSL_ENABLED_PROTOCOLS_DEFAULT);
       List<String> originalExcludedProtocols = Arrays.asList(sslContextFactory.getExcludeProtocols());
       String[] enabledProtocolsArray = StringUtils.getTrimmedStrings(enabledProtocols);
 
@@ -730,7 +740,8 @@ public final class HttpServer2 implements FilterContainer {
       threadPool.setMaxThreads(maxThreads);
     }
 
-    metrics = HttpServer2Metrics.create(threadPool, builder.name);
+    metrics = HttpServer2Metrics.create(threadPool, builder.name,
+        builder.metricsSourceId == null ? builder.name + '-' + UUID.randomUUID() : builder.metricsSourceId);
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);
@@ -1516,11 +1527,12 @@ public final class HttpServer2 implements FilterContainer {
       // clear & stop webAppContext attributes to avoid memory leaks.
       webAppContext.clearAttributes();
       webAppContext.stop();
-      metrics.unRegister();
     } catch (Exception e) {
       LOG.error("Error while stopping web app context for webapp "
           + webAppContext.getDisplayName(), e);
       exception = addMultiException(exception, e);
+    } finally {
+      metrics.unRegister();
     }
 
     try {

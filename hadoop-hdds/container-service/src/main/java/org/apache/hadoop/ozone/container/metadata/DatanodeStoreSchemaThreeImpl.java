@@ -86,7 +86,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
       throws IOException {
     // Here we need to filter the keys with containerID as prefix
     // and followed by metadata prefixes such as #deleting#.
-    return new KeyValueBlockIterator(containerID,
+    return new KeyValueBlockIterator(this, containerID,
         getBlockDataTableWithIterator()
             .iterator(getContainerKeyPrefix(containerID)),
         KeyPrefixFilter.newFilter(getContainerKeyPrefix(containerID) + "#", true));
@@ -95,7 +95,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
   @Override
   public BlockIterator<BlockData> getBlockIterator(long containerID, KeyPrefixFilter filter)
       throws IOException {
-    return new KeyValueBlockIterator(containerID,
+    return new KeyValueBlockIterator(this, containerID,
         getBlockDataTableWithIterator()
             .iterator(getContainerKeyPrefix(containerID)), filter);
   }
@@ -136,28 +136,28 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         prefix);
   }
 
-  public void loadKVContainerData(File dumpDir)
+  public void loadKVContainerData(File dumpDir, long containerID)
       throws IOException {
 
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       processTable(batch, getTableDumpFile(getMetadataTable(), dumpDir),
           getDbDef().getMetadataColumnFamily().getKeyCodec(),
           getDbDef().getMetadataColumnFamily().getValueCodec(),
-          getMetadataTable());
+          getMetadataTable(), containerID);
       processTable(batch, getTableDumpFile(getBlockDataTable(), dumpDir),
           getDbDef().getBlockDataColumnFamily().getKeyCodec(),
           getDbDef().getBlockDataColumnFamily().getValueCodec(),
-          getBlockDataTable());
+          getBlockDataTable(), containerID);
       if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
         processTable(batch, getTableDumpFile(getLastChunkInfoTable(), dumpDir),
             getDbDef().getLastChunkInfoColumnFamily().getKeyCodec(),
             getDbDef().getLastChunkInfoColumnFamily().getValueCodec(),
-            getLastChunkInfoTable());
+            getLastChunkInfoTable(), containerID);
       }
       processTable(batch, getTableDumpFile(getDeleteTransactionTable(), dumpDir),
           ((DatanodeSchemaThreeDBDefinition)getDbDef()).getDeleteTransactionsColumnFamily().getKeyCodec(),
           ((DatanodeSchemaThreeDBDefinition)getDbDef()).getDeleteTransactionsColumnFamily().getValueCodec(),
-          getDeleteTransactionTable());
+          getDeleteTransactionTable(), containerID);
 
       getStore().commitBatchOperation(batch);
     } catch (RocksDBException e) {
@@ -165,13 +165,15 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     }
   }
 
-  private <K, V> void processTable(BatchOperation batch, File tableDumpFile,
-      Codec<K> keyCodec, Codec<V> valueCodec, Table<K, V> table) throws IOException, RocksDBException {
+  private <V> void processTable(BatchOperation batch, File tableDumpFile, Codec<String> keyCodec, Codec<V> valueCodec,
+      Table<String, V> table, long containerID) throws IOException, RocksDBException {
     if (isFileEmpty(tableDumpFile)) {
       LOG.debug("SST File {} is empty. Skipping processing.", tableDumpFile.getAbsolutePath());
       return;
     }
 
+    // The dump of a container holds only keys with its prefix, see dumpKVContainerData.
+    final String prefix = getContainerKeyPrefix(containerID);
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedSstFileReader sstFileReader = new ManagedSstFileReader(managedOptions)) {
       sstFileReader.open(tableDumpFile.getAbsolutePath());
@@ -181,7 +183,11 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         for (iterator.get().seekToFirst(); iterator.get().isValid(); iterator.get().next()) {
           byte[] key = iterator.get().key();
           byte[] value = iterator.get().value();
-          K decodedKey = keyCodec.fromPersistedFormat(key);
+          String decodedKey = keyCodec.fromPersistedFormat(key);
+          if (!decodedKey.startsWith(prefix)) {
+            throw new IOException("Dump file " + tableDumpFile.getName() + " has a key outside container "
+                + containerID);
+          }
           V decodedValue = valueCodec.fromPersistedFormat(value);
           table.putWithBatch(batch, decodedKey, decodedValue);
         }

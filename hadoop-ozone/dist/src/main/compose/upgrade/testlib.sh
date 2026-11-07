@@ -135,3 +135,27 @@ generate() {
 validate() {
   execute_robot_test "${2}" -N "${OUTPUT_NAME}-validate-${1}" -v PREFIX:"$1" ${@:3} upgrade/validate.robot
 }
+
+## @description Creates a snapshot of the bucket generated with the given prefix,
+##   reads earlier snapshots and diffs against the previous one.
+## @param The prefix of the data to be snapshotted.
+## @param The name of the snapshot to create.
+## @param The container to run the robot test in.
+## @param All remaining parameters are passed directly to the robot command.
+snapshot() {
+  # Snapshots were added in 1.4.0.
+  if [[ "$OZONE_UPGRADE_FROM" == 1.[0-3].* ]]; then
+    return
+  fi
+  execute_robot_test "${3}" -N "${OUTPUT_NAME}-snapshot-${2}" -v PREFIX:"$1" -v SNAPSHOT:"$2" ${@:4} upgrade/snapshot.robot
+}
+
+## @description Waits until the RPC port of every OM is open.
+##   wait_for_om_leader returns as soon as one OM is leader, and OM roles lists
+##   peers from config, so neither notices an OM that failed to start.
+wait_for_all_oms() {
+  local om
+  for om in $(docker-compose config --services | grep '^om'); do
+    wait_for_port "$om" 9862 120
+  done
+}

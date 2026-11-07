@@ -73,7 +73,6 @@ tools:
 documentation:
   - changed-files:
       - any-glob-to-any-file:
-          - 'hadoop-hdds/docs/**'
           - '**/*.md'
 
 UI:

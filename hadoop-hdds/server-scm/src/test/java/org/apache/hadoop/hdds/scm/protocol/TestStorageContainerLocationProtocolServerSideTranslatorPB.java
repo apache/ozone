@@ -73,14 +73,14 @@ import org.junit.jupiter.api.Test;
  */
 class TestStorageContainerLocationProtocolServerSideTranslatorPB {
 
-  private StorageContainerLocationProtocol impl;
+  private StorageContainerLocationInternalInterface impl;
   private StorageContainerLocationProtocolServerSideTranslatorPB service;
   private Map<DatanodeID, DatanodeInfo> registry;
   private List<DatanodeDetails> nodes;
 
   @BeforeEach
   void setUp() throws Exception {
-    impl = mock(StorageContainerLocationProtocol.class);
+    impl = mock(StorageContainerLocationInternalInterface.class);
     StorageContainerManager scm = mock(StorageContainerManager.class);
 
     registry = new HashMap<>();

@@ -258,7 +258,7 @@
         <tr ng-repeat="typestat in nodeStatus|orderBy:columnName:reverse">
             <td ng-switch="typestat.port > 0">
                 <span ng-switch-when="true">
-                    <a href="{{typestat.protocol}}://{{typestat.hostname}}:{{typestat.port}}" target="_blank">{{typestat.hostname}}</a>
+                    <a href="{{typestat.protocol}}://{{typestat.urlhost}}:{{typestat.port}}" target="_blank">{{typestat.hostname}}</a>
                 </span>
                 <span ng-switch-when="false">
                     {{typestat.hostname}}

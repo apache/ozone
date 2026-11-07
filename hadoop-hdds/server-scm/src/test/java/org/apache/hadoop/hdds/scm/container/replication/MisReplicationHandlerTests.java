@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -55,6 +54,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeCommand;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -69,10 +69,12 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
  */
 public abstract class MisReplicationHandlerTests {
 
+  private static final String TARGET_RACK = "/target-rack";
+
   private ContainerInfo container;
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private Set<DatanodeCommand> commandsSent;
   private final AtomicBoolean throwThrottledException =
       new AtomicBoolean(false);
   private ReplicationManagerMetrics metrics;
@@ -125,8 +127,14 @@ public abstract class MisReplicationHandlerTests {
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus = mock(ContainerPlacementStatus.class);
     when(mockedContainerPlacementStatus.isPolicySatisfied()).thenReturn(false);
-    when(placementPolicy.validateContainerPlacement(anyList(),
-        anyInt())).thenReturn(mockedContainerPlacementStatus);
+    // testMisReplication puts the targets on a rack of their own, and moving a replica there fixes the placement.
+    ContainerPlacementStatus placementAfterCopy = mock(ContainerPlacementStatus.class);
+    when(placementAfterCopy.isPolicySatisfied()).thenReturn(true);
+    when(placementPolicy.validateContainerPlacement(anyList(), anyInt())).thenAnswer(invocation -> {
+      List<DatanodeDetails> dns = invocation.getArgument(0);
+      return dns.stream().anyMatch(dn -> TARGET_RACK.equals(dn.getNetworkLocation()))
+          ? placementAfterCopy : mockedContainerPlacementStatus;
+    });
     return placementPolicy;
   }
 
@@ -199,7 +207,7 @@ public abstract class MisReplicationHandlerTests {
                     .collect(Collectors.toSet());
     List<DatanodeDetails> targetNodes =
             IntStream.range(0, expectedNumberOfNodes)
-                    .mapToObj(i -> MockDatanodeDetails.randomDatanodeDetails())
+                    .mapToObj(i -> MockDatanodeDetails.createDatanodeDetails("target" + i, TARGET_RACK))
                     .collect(Collectors.toList());
     if (expectedNumberOfNodes > 0) {
       when(mockedPlacementPolicy.chooseDatanodes(
@@ -221,14 +229,12 @@ public abstract class MisReplicationHandlerTests {
           pendingOp, result, maintenanceCnt);
     } finally {
       assertEquals(expectedNumberOfCommands, commandsSent.size());
-      for (Pair<DatanodeDetails, SCMCommand<?>> pair : commandsSent) {
-        SCMCommand<?> command = pair.getValue();
+      for (DatanodeCommand datanodeCommand : commandsSent) {
+        SCMCommand<?> command = datanodeCommand.command();
         assertSame(replicateContainerCommand, command.getType());
-        ReplicateContainerCommand replicateContainerCommand =
-            (ReplicateContainerCommand) command;
-        assertEquals(replicateContainerCommand.getContainerID(),
-            container.getContainerID());
-        DatanodeDetails replicateSrcDn = pair.getKey();
+        ReplicateContainerCommand replicateContainerCommand = (ReplicateContainerCommand) command;
+        assertEquals(replicateContainerCommand.getContainerID(), container.getContainerID());
+        DatanodeDetails replicateSrcDn = datanodeCommand.datanode();
         DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
         assertThat(sourceDns).contains(replicateSrcDn);
         assertThat(targetNodes).contains(target);

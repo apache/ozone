@@ -35,14 +35,17 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
@@ -136,6 +139,17 @@ class TestKeyInputStream extends InputStreamTests {
       testReadChunkWithByteBuffer(bucket);
       testSkip(bucket);
       testECSeek(bucket);
+    }
+
+    // The same EC reads through a client that reads the cells of different data indexes in parallel.
+    OzoneConfiguration parallelReadConf = new OzoneConfiguration(getCluster().getConf());
+    OzoneClientConfig clientConfig = parallelReadConf.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadEnabled(true);
+    parallelReadConf.setFromObject(clientConfig);
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(parallelReadConf)) {
+      testECSeek(BucketForTesting.newBuilder(client).build());
+      assertThat(Thread.getAllStackTraces().keySet())
+          .anyMatch(t -> t.getName().startsWith("ec-parallel-reader-"));
     }
   }
 

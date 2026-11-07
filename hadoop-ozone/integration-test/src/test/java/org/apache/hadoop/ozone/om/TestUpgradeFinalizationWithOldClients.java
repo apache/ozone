@@ -27,7 +27,7 @@ import java.io.UncheckedIOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -85,7 +85,7 @@ class TestUpgradeFinalizationWithOldClients {
       cluster.waitForClusterToBeReady();
       OzoneManager om = cluster.getOzoneManager();
       StorageContainerManager scm = cluster.getStorageContainerManager();
-      StorageContainerLocationProtocol scmClient = cluster.getStorageContainerLocationClient();
+      StorageContainerLocationInternalInterface scmClient = cluster.getStorageContainerLocationClient();
 
       try (OzoneClient client = cluster.newClient()) {
         OzoneManagerProtocol omClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();

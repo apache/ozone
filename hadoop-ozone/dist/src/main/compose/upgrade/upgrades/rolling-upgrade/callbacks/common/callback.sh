@@ -37,6 +37,10 @@ with_old_version() {
   validate old1 "$CLIENT"
 
   generate overwrite "$CLIENT"
+
+  snapshot overwrite original "$CLIENT" --include create-snapshot
+  # The new version replays the WAL of this diff into db.snapdiff SST files, which must stay readable after downgrade
+  snapshot overwrite original2 "$CLIENT" -v FROM_SNAPSHOT:original -v EARLIER_SNAPSHOTS:original
 }
 
 with_this_version_pre_finalized() {
@@ -49,6 +53,8 @@ with_this_version_pre_finalized() {
 
   validate overwrite "$CLIENT"
   generate overwrite "$CLIENT" --exclude create-volume-and-bucket
+
+  snapshot overwrite pre-finalized "$CLIENT" -v FROM_SNAPSHOT:original2 -v EARLIER_SNAPSHOTS:original,original2
 }
 
 with_old_version_downgraded() {
@@ -61,6 +67,8 @@ with_old_version_downgraded() {
 
   validate overwrite "$CLIENT"
   generate overwrite "$CLIENT" --exclude create-volume-and-bucket
+
+  snapshot overwrite downgraded "$CLIENT" -v FROM_SNAPSHOT:pre-finalized -v EARLIER_SNAPSHOTS:original,original2,pre-finalized
 }
 
 with_this_version_finalized() {
@@ -73,4 +81,6 @@ with_this_version_finalized() {
   validate new2 "$CLIENT"
 
   validate overwrite "$CLIENT"
+
+  snapshot overwrite finalized "$CLIENT" -v FROM_SNAPSHOT:downgraded -v EARLIER_SNAPSHOTS:original,original2,pre-finalized,downgraded
 }
