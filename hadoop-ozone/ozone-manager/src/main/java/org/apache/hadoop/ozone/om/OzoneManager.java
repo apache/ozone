@@ -565,13 +565,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Objects.requireNonNull(conf, "conf == null");
-    setConfiguration(conf);
     TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
     TracingReconfigurationCallback tracingReconfigurationCallback =
         TracingReconfigurationCallback.init("OzoneManager", tracingConfig);
     // Load HA related configurations
-    OMHANodeDetails omhaNodeDetails =
-        OMHANodeDetails.loadOMHAConfig(configuration);
+    OMHANodeDetails omhaNodeDetails = OMHANodeDetails.loadOMHAConfig(conf);
+    setConfiguration(conf);
 
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
@@ -1160,7 +1159,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     updateActiveSnapshotMetrics();
 
     if (withNewSnapshot) {
-      versionManager.finalizeFromSnapshotIfRequired(metadataManager.getMetaTable());
+      versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
     }
   }
 
@@ -1586,7 +1585,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(conf, omNodeRpcAddr, omService,
+    return startRpcServer(conf, config.getRpcBindAddress(omNodeRpcAddr), omService,
         omInterService, omAdminService, reconfigureService);
   }
 

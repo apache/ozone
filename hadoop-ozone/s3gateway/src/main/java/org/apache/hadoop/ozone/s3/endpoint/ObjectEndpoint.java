@@ -330,6 +330,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           }
 
           output.checkContentSha256(multiDigestInputStream, amzContentSha256Header);
+          output.markTransferComplete();
         }
       }
       getMetrics().incPutKeySuccessLength(putLength);
@@ -1072,6 +1073,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
               writeGuard.getMetadata().put(OzoneConsts.ETAG, md5Hash);
               writeGuard.addPreCommit(
                   () -> requirePartETag(writeGuard.getMetadata()));
+              writeGuard.markTransferComplete();
             }
             return ozoneOutputStream.getCommitUploadPartInfo();
           });
@@ -1108,6 +1110,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           writeGuard.getMetadata().put(OzoneConsts.ETAG, md5Hash);
           writeGuard.addPreCommit(
               () -> requirePartETag(writeGuard.getMetadata()));
+          writeGuard.markTransferComplete();
         }
         omMultipartCommitUploadPartInfo = ozoneOutputStream.getCommitUploadPartInfo();
         getMetrics().incPutKeySuccessLength(putLength);
@@ -1215,6 +1218,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         eTag = reusedETag != null ? reusedETag
             : DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
         dest.getMetadata().put(OzoneConsts.ETAG, eTag);
+        dest.markTransferComplete();
       }
       modificationTime = destStream.getModificationTime();
     }
