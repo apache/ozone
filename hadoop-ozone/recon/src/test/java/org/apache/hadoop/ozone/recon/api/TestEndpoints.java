@@ -136,6 +136,8 @@ import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountKey;
@@ -150,6 +152,7 @@ import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize
 import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.jooq.DSLContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -168,12 +171,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private MetricsProxyEndpoint metricsProxyEndpoint;
   private VolumeEndpoint volumeEndpoint;
   private BucketEndpoint bucketEndpoint;
+  private OMMetadataManager testOmMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTaskFSO fileSizeCountTaskFSO;
   private FileSizeCountTaskOBS fileSizeCountTaskOBS;
   private ContainerSizeCountTask containerSizeCountTask;
   private OmTableInsightTask omTableInsightTask;
   private ReconStorageContainerManagerFacade reconScm;
+  private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider reconReplicaHistoryDBProvider;
   private boolean isSetupDone = false;
   private String pipelineId;
   private DatanodeDetails datanodeDetails;
@@ -209,9 +215,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   }
 
   private void initializeInjector() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    testOmMetadataManager =
+        initializeNewOmMetadataManager(Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(testOmMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails2 = randomDatanodeDetails();
@@ -293,6 +299,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     reconScm = (ReconStorageContainerManagerFacade)
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+    reconReplicaHistoryDBProvider = reconTestInjector.getInstance(ReconReplicaHistoryDBProvider.class);
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     volumeEndpoint = reconTestInjector.getInstance(VolumeEndpoint.class);
@@ -586,6 +594,25 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS).execute();
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconReplicaHistoryDBProvider != null) {
+      reconReplicaHistoryDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (testOmMetadataManager != null) {
+      testOmMetadataManager.stop();
+    }
   }
 
   private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)

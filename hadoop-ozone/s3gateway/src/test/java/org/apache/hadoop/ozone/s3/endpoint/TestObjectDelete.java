@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.abortMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObjectEndpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_OWNER_MISMATCH;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
@@ -41,19 +43,27 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.http.HttpStatus;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test delete object.
  */
 public class TestObjectDelete {
+
+  @BeforeEach
+  void setupMetrics() {
+    S3GatewayMetrics.create(new OzoneConfiguration());
+  }
 
   @Test
   void testDeleteWithoutVolumeOrBucketLookup() throws Exception {
@@ -65,7 +75,7 @@ public class TestObjectDelete {
 
     verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
     verify(protocol, never()).getS3VolumeContext();
-    verify(volume, never()).getBucket(anyString());
+    verify(protocol, never()).getBucketDetails(any(), anyString());
     verify(protocol).deleteKey(null, "b1", "key", false, null);
   }
 
@@ -74,16 +84,21 @@ public class TestObjectDelete {
     OzoneVolume volume = mock(OzoneVolume.class);
     ClientProtocol protocol = mock(ClientProtocol.class);
     ObjectEndpoint original = createObjectEndpoint(protocol, volume, "b1");
-    when(volume.getBucket("b1").getOwner()).thenReturn("owner");
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(protocol.getBucketDetails(null, "b1")).thenReturn(bucket);
+    when(bucket.getOwner()).thenReturn("owner");
     HttpHeaders headers = mock(HttpHeaders.class);
+    when(bucket.getVolumeName()).thenReturn("tenant-volume");
     when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(original.getClient()).setHeaders(headers).build();
 
     assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(endpoint, "b1", "key"));
 
-    verify(endpoint.getClient().getObjectStore()).getS3Volume();
-    verify(protocol).deleteKey("s3Volume", "b1", "key", false, null);
+    verify(protocol).getBucketDetails(null, "b1");
+    verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
+    verify(protocol, never()).getS3VolumeContext();
+    verify(protocol).deleteKey("tenant-volume", "b1", "key", false, null);
     verify(protocol, never()).deleteKey(isNull(), anyString(), anyString(), anyBoolean(), any());
   }
 
@@ -92,7 +107,9 @@ public class TestObjectDelete {
     OzoneVolume volume = mock(OzoneVolume.class);
     ClientProtocol protocol = mock(ClientProtocol.class);
     ObjectEndpoint original = createObjectEndpoint(protocol, volume, "b1");
-    when(volume.getBucket("b1").getOwner()).thenReturn("owner");
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(protocol.getBucketDetails(null, "b1")).thenReturn(bucket);
+    when(bucket.getOwner()).thenReturn("owner");
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("wrong-owner");
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -199,5 +216,27 @@ public class TestObjectDelete {
         .build();
 
     assertErrorResponse(PRECOND_FAILED, () -> delete(rest, "b1", "missing"));
+  }
+
+  @Test
+  void testDeleteWithEmptyUploadIdKeepsKey() throws IOException, OS3Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    assertStatus(HttpStatus.SC_OK, () -> put(rest, "b1", "key1", "content"));
+
+    // DELETE ?uploadId= aborts an upload that does not exist; it must not delete the committed key.
+    assertErrorResponse(NO_SUCH_UPLOAD, () -> abortMultipartUpload(rest, "b1", "key1", ""));
+
+    assertNotNull(bucket.getKey("key1"));
   }
 }

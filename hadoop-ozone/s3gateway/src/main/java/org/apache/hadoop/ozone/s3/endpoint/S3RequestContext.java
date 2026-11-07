@@ -57,17 +57,28 @@ class S3RequestContext {
     return volume;
   }
 
+  /** Returns the cached volume name without an OM call, or null if it has not been looked up. */
   String getResolvedVolumeName() {
+    if (bucket != null) {
+      return bucket.getVolumeName();
+    }
     return volume == null ? null : volume.getName();
   }
 
   OzoneBucket getBucket(String name) throws IOException {
     if (bucket == null) {
-      bucket = getVolume().getBucket(name);
+      bucket = endpoint.getClientProtocol().getBucketDetails(volume != null ? volume.getName() : null, name);
     } else {
       Preconditions.assertEquals(bucket.getName(), name, "Multiple buckets in one request are not supported");
     }
     return bucket;
+  }
+
+  /**
+   * Returns the S3 volume name, reusing the bucket already looked up in this request to avoid another call.
+   */
+  String getVolumeName() throws IOException {
+    return bucket != null ? bucket.getVolumeName() : getVolume().getName();
   }
 
   S3GAction getAction() {

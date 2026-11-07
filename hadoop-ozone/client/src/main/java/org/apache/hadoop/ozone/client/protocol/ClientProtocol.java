@@ -334,7 +334,7 @@ public interface ClientProtocol {
 
   /**
    * Returns {@link OzoneBucket}.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
    * @param bucketName Name of the Bucket
    * @return {@link OzoneBucket}
    * @throws IOException
@@ -653,7 +653,7 @@ public interface ClientProtocol {
 
   /**
    * Deletes an existing key.
-   * @param volumeName Name of the Volume; S3 clients may pass null to resolve it from their S3 context.
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param recursive recursive deletion of all sub path keys if true,
@@ -666,7 +666,7 @@ public interface ClientProtocol {
 
   /**
    * Deletes an existing key if the key's current ETag matches expectedETag.
-   * @param volumeName Name of the Volume; S3 clients may pass null to resolve it from their S3 context.
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param recursive recursive deletion of all sub path keys if true,
@@ -1647,12 +1647,14 @@ public interface ClientProtocol {
    * @param toSnapshot The name of the ending snapshot
    * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @param orderedReport when true, FSO diff reports apply dependency ordering
    * @return the result of submitting snapshot diff job.
    * @throws IOException in case of any exception while generating snapshot diff
    */
   SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName, String bucketName,
                                                 String fromSnapshot, String toSnapshot,
-                                                boolean forceFullDiff, boolean disableNativeDiff)
+                                                boolean forceFullDiff, boolean disableNativeDiff,
+                                                boolean orderedReport)
       throws IOException;
 
   /**

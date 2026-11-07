@@ -31,9 +31,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
 /**
@@ -42,10 +45,21 @@ import org.junit.jupiter.api.TestMethodOrder;
  * not-ready path (OM stopped).  The OM-stop step is destructive and the cluster
  * is shared across the class, so the checks are ordered.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class TestS3GatewayHealthCheck extends ClusterForTests<MiniOzoneCluster> {
 
   private final S3GatewayService s3g = new S3GatewayService();
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
 
   @Override
   protected OzoneConfiguration createOzoneConfig() {
