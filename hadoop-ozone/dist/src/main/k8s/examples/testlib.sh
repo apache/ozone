@@ -188,11 +188,11 @@ execute_robot_test() {
 }
 
 combine_reports() {
-  if [[ -d "${ROBOT_OUTPUT_DIR}" ]]; then
+  if [[ -d "${ROBOT_OUTPUT_DIR}" ]] && [[ -n "${CONTAINER:-}" ]]; then
     local title="$(basename $(pwd))"
     kubectl exec -it "${CONTAINER}" -- rebot --logtitle "${title}" --name "${title}" --nostatusrc \
       --outputdir /robot --output output.xml --report NONE /robot/*.xml || true
-    rm -f result
+    rm -fr result
     mkdir -p result
     mv -iv "${ROBOT_OUTPUT_DIR}"/{log.html,output.xml} result/
   fi
