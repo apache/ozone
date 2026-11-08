@@ -52,15 +52,15 @@ class TestS3RequestContext {
   }
 
   @Test
-  void returnsResolvedVolumeWithoutLookup() throws IOException {
+  void returnsCachedVolumeNameWithoutLookup() throws IOException {
     when(bucket.getVolumeName()).thenReturn("volume1");
 
-    assertThat(context.getResolvedVolumeName()).isNull();
+    assertThat(context.getCachedVolumeName()).isNull();
     verify(endpoint, never()).getVolume();
 
     context.getBucket("bucket1");
 
-    assertThat(context.getResolvedVolumeName()).isEqualTo("volume1");
+    assertThat(context.getCachedVolumeName()).isEqualTo("volume1");
     verify(endpoint, never()).getVolume();
     verify(proxy).getBucketDetails(null, "bucket1");
   }
@@ -80,7 +80,7 @@ class TestS3RequestContext {
     when(endpoint.getVolume()).thenReturn(volume);
     when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
     context.getVolume();
-    assertThat(context.getResolvedVolumeName()).isEqualTo("volume1");
+    assertThat(context.getCachedVolumeName()).isEqualTo("volume1");
     verify(endpoint).getVolume();
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
     verify(proxy, never()).getBucketDetails(null, "bucket1");

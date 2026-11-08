@@ -58,7 +58,7 @@ class S3RequestContext {
   }
 
   /** Returns the cached volume name without an OM call, or null if it has not been looked up. */
-  String getResolvedVolumeName() {
+  String getCachedVolumeName() {
     if (bucket != null) {
       return bucket.getVolumeName();
     }

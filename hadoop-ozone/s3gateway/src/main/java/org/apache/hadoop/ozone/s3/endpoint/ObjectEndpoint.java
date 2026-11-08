@@ -753,7 +753,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       deleteCondition = S3ConditionalRequest.parseDeleteCondition(getHeaders(), keyPath);
 
-      getClientProtocol().deleteKey(context.getResolvedVolumeName(), context.getBucketName(), keyPath, false,
+      getClientProtocol().deleteKey(context.getCachedVolumeName(), context.getBucketName(), keyPath, false,
           deleteCondition.getExpectedETag());
 
       getMetrics().updateDeleteKeySuccessStats(startNanos);
