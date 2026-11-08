@@ -83,6 +83,7 @@ all_pods_are_running() {
 }
 
 pre_run_setup() {
+  create_robot_dir
   regenerate_resources
   reset_k8s_env
   start_k8s_env
@@ -115,6 +116,7 @@ post_run() {
   get_logs
   stop_k8s_env
   revert_resources
+  delete_robot_dir
   set -e
 }
 
@@ -161,8 +163,6 @@ regenerate_resources() {
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
   local runner_image="${OZONE_RUNNER_IMAGE:-apache/ozone-runner}" # may be specified by user running the test
 
-  create_robot_dir
-
   flekszible generate \
     -t mount:name=ozone,path=/opt/hadoop,hostPath="$OZONE_ROOT" \
     -t mount:name=robot,path=/robot,hostPath="$ROBOT_OUTPUT_DIR" \
@@ -207,10 +207,13 @@ print_phase() {
 create_robot_dir() {
   if [[ -z "${ROBOT_OUTPUT_DIR:-}" ]]; then
     export ROBOT_OUTPUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"
+    export ROBOT_OUTPUT_DIR_CREATED="true"
     chmod go+rwx "${ROBOT_OUTPUT_DIR}"
-    _k8s_delete_test_data() {
-      rm -frv "${ROBOT_OUTPUT_DIR}"
-    }
-    trap _k8s_delete_test_data EXIT HUP INT TERM
+  fi
+}
+
+delete_robot_dir() {
+  if [[ "${ROBOT_OUTPUT_DIR_CREATED:-}" == "true" ]] && [[ -n "${ROBOT_OUTPUT_DIR:-}" ]] && [[ -d "${ROBOT_OUTPUT_DIR}" ]]; then
+    rm -frv "${ROBOT_OUTPUT_DIR}"
   fi
 }
