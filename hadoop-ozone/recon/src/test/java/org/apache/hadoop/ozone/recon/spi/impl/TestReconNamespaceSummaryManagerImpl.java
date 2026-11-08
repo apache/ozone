@@ -33,9 +33,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,14 +51,17 @@ public class TestReconNamespaceSummaryManagerImpl {
   private static Path temporaryFolder;
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private static int[] testBucket;
+  private static OMMetadataManager omMetadataManager;
+  private static ReconOMMetadataManager reconOMMetadataManager;
+  private static ReconDBProvider reconDBProvider;
   private static final Set<Long> TEST_CHILD_DIR =
           new HashSet<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    omMetadataManager = initializeNewOmMetadataManager(Files.createDirectory(
+        temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
             new ReconTestInjector.Builder(temporaryFolder.toFile())
@@ -66,9 +71,24 @@ public class TestReconNamespaceSummaryManagerImpl {
                     .build();
     reconNamespaceSummaryManager = reconTestInjector.getInstance(
             ReconNamespaceSummaryManagerImpl.class);
+    // ReconNamespaceSummaryManagerImpl already provisioned this singleton, so this does not open a new DB.
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     testBucket = new int[40];
     for (int i = 0; i < 40; ++i) {
       testBucket[i] = i + 1;
+    }
+  }
+
+  @AfterAll
+  public static void tearDown() throws Exception {
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
     }
   }
 

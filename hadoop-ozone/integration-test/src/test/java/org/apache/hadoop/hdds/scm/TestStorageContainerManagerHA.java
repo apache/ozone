@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -146,48 +147,30 @@ public class TestStorageContainerManagerHA {
     // in order to initialize and bootstrap SCM instances only
     cluster = haMiniClusterBuilder.build();
 
-    List<StorageContainerManager> storageContainerManagersList = cluster.getStorageContainerManagersList();
-
-    // stop the single SCM instance in order to imitate further simultaneous start of SCMs
-    storageContainerManagersList.get(0).stop();
-    storageContainerManagersList.get(0).join();
-
-    // WHEN (imitate simultaneous start of the SCMs)
-    int retryCount = 0;
-    while (true) {
-      CountDownLatch scmInstancesCounter = new CountDownLatch(scmInstancesCount);
-      AtomicInteger failedSCMs = new AtomicInteger();
-      for (StorageContainerManager scm : storageContainerManagersList) {
-        new Thread(() -> {
-          try {
-            scm.start();
-          } catch (IOException e) {
-            failedSCMs.incrementAndGet();
-          } finally {
-            scmInstancesCounter.countDown();
-          }
-        }).start();
-      }
-      scmInstancesCounter.await();
-      if (failedSCMs.get() == 0) {
-        break;
-      } else {
-        for (StorageContainerManager scm : storageContainerManagersList) {
-          scm.stop();
-          scm.join();
-          LOG.info("Stopping StorageContainerManager server at {}",
-              scm.getClientRpcAddress());
+    // WHEN (imitate simultaneous start of the SCMs that were bootstrapped but not started). A stopped SCM cannot be
+    // started again, so the running SCM is left as is.
+    List<StorageContainerManager> inactiveSCMs = new ArrayList<>();
+    cluster.getInactiveSCM().forEachRemaining(inactiveSCMs::add);
+    CountDownLatch scmInstancesCounter = new CountDownLatch(inactiveSCMs.size());
+    AtomicInteger failedSCMs = new AtomicInteger();
+    for (StorageContainerManager scm : inactiveSCMs) {
+      new Thread(() -> {
+        try {
+          scm.start();
+        } catch (Exception e) {
+          LOG.error("Failed to start SCM {}", scm.getSCMNodeId(), e);
+          failedSCMs.incrementAndGet();
+        } finally {
+          scmInstancesCounter.countDown();
         }
-        ++retryCount;
-        LOG.info("SCMs port conflicts, retried {} times",
-            retryCount);
-        failedSCMs.set(0);
-      }
+      }).start();
     }
+    scmInstancesCounter.await();
+    assertEquals(0, failedSCMs.get());
 
     // THEN expect only one SCM node (leader) will have 'scmha_metrics_scmha_leader_state' metric set to 1
     int leaderCount = 0;
-    for (StorageContainerManager scm : storageContainerManagersList) {
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
       if (scm.getScmHAMetrics() != null && scm.getScmHAMetrics().getSCMHAMetricsInfoLeaderState() == 1) {
         leaderCount++;
         break;
