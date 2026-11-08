@@ -240,5 +240,5 @@ public final class DatanodeAdminMonitorTestUtil {
    * A datanode grouped together with its operational state and the EC replica index it hosts,
    * used to build the replicas of a mocked EC container.
    */
-  public record ECReplicaSpec(HddsProtos.NodeOperationalState nodeState, DatanodeDetails datanode, int replicaIndex) { }
+  record ECReplicaSpec(HddsProtos.NodeOperationalState nodeState, DatanodeDetails datanode, int replicaIndex) { }
 }
