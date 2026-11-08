@@ -616,7 +616,7 @@ public final class FSOperations {
      * @param is input stream to for the file to create.
      * @param path path of the file to create.
      * @param perm permission for the file.
-     * @param override if the file should be overriden if it already exist.
+     * @param override if the file should be overridden if it already exist.
      * @param repl the replication factor for the file.
      * @param blockSize the block size for the file.
      * @param unmaskedPerm unmasked permissions for the file
