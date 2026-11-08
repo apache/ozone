@@ -31,6 +31,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,7 +44,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CharSequenceInputStream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -221,8 +221,8 @@ public abstract class GenericTestUtils {
 
   public static <K, V> Map<V, K> getReverseMap(Map<K, List<V>> map) {
     return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
-            .map(v -> Pair.of(v, entry.getKey())))
-            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+            .map(v -> new AbstractMap.SimpleEntry<>(v, entry.getKey())))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   /**
