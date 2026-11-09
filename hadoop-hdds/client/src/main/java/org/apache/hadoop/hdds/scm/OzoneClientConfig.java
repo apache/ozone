@@ -382,6 +382,31 @@ public class OzoneClientConfig {
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
 
+  @Config(key = "ozone.client.stream.read.pread.reuse.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.CLIENT},
+      description = "Reuse the streams of positioned streaming reads: after a positioned read, its stream to the "
+          + "datanode stays open for the next positioned read of the same block, instead of a new stream being opened "
+          + "for every positioned read.")
+  private boolean streamReadPreadReuseEnabled = false;
+
+  @Config(key = "ozone.client.stream.read.pread.max-idle-readers",
+      defaultValue = "2",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "The most idle positioned-read streams kept open per block, when "
+          + "ozone.client.stream.read.pread.reuse.enabled is true.")
+  private int streamReadPreadMaxIdleReaders = 2;
+
+  @Config(key = "ozone.client.stream.read.pread.idle-timeout",
+      defaultValue = "1s",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.CLIENT},
+      description = "How long an idle positioned-read stream is kept open for reuse, when "
+          + "ozone.client.stream.read.pread.reuse.enabled is true.")
+  private Duration streamReadPreadIdleTimeout = Duration.ofSeconds(1);
+
   @Config(key = "ozone.client.netty.warmup.enabled",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
@@ -478,6 +503,21 @@ public class OzoneClientConfig {
               "Resetting to default {}.",
           streamReadTimeout, defaultTimeout);
       streamReadTimeout = defaultTimeout;
+    }
+
+    if (streamReadPreadMaxIdleReaders < 0) {
+      LOG.warn("Invalid ozone.client.stream.read.pread.max-idle-readers = {}. Resetting to 0.",
+          streamReadPreadMaxIdleReaders);
+      streamReadPreadMaxIdleReaders = 0;
+    }
+
+    Duration defaultPreadIdleTimeout = Duration.ofSeconds(1);
+    if (streamReadPreadIdleTimeout == null
+        || streamReadPreadIdleTimeout.isZero()
+        || streamReadPreadIdleTimeout.isNegative()) {
+      LOG.warn("Invalid ozone.client.stream.read.pread.idle-timeout = {}. Resetting to default {}.",
+          streamReadPreadIdleTimeout, defaultPreadIdleTimeout);
+      streamReadPreadIdleTimeout = defaultPreadIdleTimeout;
     }
   }
 
@@ -771,6 +811,30 @@ public class OzoneClientConfig {
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {
     this.streamReadTimeout = streamReadTimeout;
+  }
+
+  public boolean isStreamReadPreadReuseEnabled() {
+    return streamReadPreadReuseEnabled;
+  }
+
+  public void setStreamReadPreadReuseEnabled(boolean streamReadPreadReuseEnabled) {
+    this.streamReadPreadReuseEnabled = streamReadPreadReuseEnabled;
+  }
+
+  public int getStreamReadPreadMaxIdleReaders() {
+    return streamReadPreadMaxIdleReaders;
+  }
+
+  public void setStreamReadPreadMaxIdleReaders(int streamReadPreadMaxIdleReaders) {
+    this.streamReadPreadMaxIdleReaders = streamReadPreadMaxIdleReaders;
+  }
+
+  public Duration getStreamReadPreadIdleTimeout() {
+    return streamReadPreadIdleTimeout;
+  }
+
+  public void setStreamReadPreadIdleTimeout(Duration streamReadPreadIdleTimeout) {
+    this.streamReadPreadIdleTimeout = streamReadPreadIdleTimeout;
   }
 
   public boolean isDatastreamPutBlockWithoutRaftEnabled() {
