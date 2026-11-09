@@ -307,8 +307,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
   /**
    * For an OPEN container, SCM can return a pipeline built from the replicas that have reported instead of the
    * container's write pipeline, for example while some of its datanodes have not registered yet. Recon records the
-   * returned pipeline as the one the container is written to, so get the write pipeline by the ID in the
-   * {@link ContainerInfo} when the two differ.
+   * returned pipeline as the one the container is written to, so use the write pipeline by the ID in the
+   * {@link ContainerInfo} when the two differ. Recon's own pipeline is used if it has it, otherwise SCM is asked.
    *
    * @return the write pipeline, or null if SCM no longer has it.
    */
@@ -317,6 +317,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
     final PipelineID writePipelineID = containerWithPipeline.getContainerInfo().getPipelineID();
     if (pipeline == null || writePipelineID == null || pipeline.getId().equals(writePipelineID)) {
       return pipeline;
+    }
+    if (pipelineManager.containsPipeline(writePipelineID)) {
+      return pipelineManager.getPipeline(writePipelineID);
     }
     try {
       return scmClient.getPipeline(writePipelineID.getProtobuf());

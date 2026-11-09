@@ -79,6 +79,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Unit tests to validate the SCMClientProtocolServer
@@ -265,11 +267,15 @@ public class TestSCMClientProtocolServer {
 
   /**
    * An OPEN container whose pipeline lists a datanode that is not registered must be served from the live replicas
-   * instead of the stored pipeline, and a pipeline with all nodes registered is still returned as is.
+   * instead of the stored pipeline, and a pipeline with all nodes registered is still returned as is. A dormant
+   * pipeline (ozone admin pipeline deactivate) still has open containers that serve reads, so the check must not
+   * depend on the pipeline state.
    */
-  @Test
-  public void testGetContainerWithPipelineSkipsStoredPipelineWithUnregisteredNode() throws Exception {
-    Pipeline storedPipeline = MockPipeline.createPipeline(3);
+  @ParameterizedTest
+  @EnumSource(value = Pipeline.PipelineState.class, names = {"OPEN", "DORMANT"})
+  public void testGetContainerWithPipelineSkipsStoredPipelineWithUnregisteredNode(Pipeline.PipelineState state)
+      throws Exception {
+    Pipeline storedPipeline = MockPipeline.createPipeline(3).toBuilder().setState(state).build();
     Pipeline replicaPipeline = MockPipeline.createPipeline(2);
     ContainerInfo container = new ContainerInfo.Builder()
         .setContainerID(1)
@@ -298,46 +304,6 @@ public class TestSCMClientProtocolServer {
 
       DatanodeDetails unregistered = storedPipeline.getNodes().get(1);
       when(nodeManager.isNodeRegistered(unregistered)).thenReturn(false);
-      assertEquals(replicaPipeline, testServer.getContainerWithPipeline(container.getContainerID()).getPipeline());
-    } finally {
-      testServer.stop();
-    }
-  }
-
-  /**
-   * A dormant pipeline (ozone admin pipeline deactivate) still has open containers that serve reads, so the check
-   * must not depend on the pipeline state.
-   */
-  @Test
-  public void testGetContainerWithPipelineSkipsDormantPipelineWithUnregisteredNode() throws Exception {
-    Pipeline dormantPipeline = MockPipeline.createPipeline(3).toBuilder()
-        .setState(Pipeline.PipelineState.DORMANT)
-        .build();
-    Pipeline replicaPipeline = MockPipeline.createPipeline(2);
-    ContainerInfo container = new ContainerInfo.Builder()
-        .setContainerID(1)
-        .setState(LifeCycleState.OPEN)
-        .setPipelineID(dormantPipeline.getId())
-        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
-        .build();
-
-    ContainerManagerImpl containerManager = mock(ContainerManagerImpl.class);
-    when(containerManager.getContainer(container.containerID())).thenReturn(container);
-    PipelineManager pipelineManager = mock(PipelineManager.class);
-    when(pipelineManager.getPipeline(dormantPipeline.getId())).thenReturn(dormantPipeline);
-    when(pipelineManager.createPipelineForRead(any(), any())).thenReturn(replicaPipeline);
-    NodeManager nodeManager = mock(NodeManager.class);
-    when(nodeManager.isNodeRegistered(any(DatanodeDetails.class))).thenReturn(true);
-    when(nodeManager.isNodeRegistered(dormantPipeline.getNodes().get(0))).thenReturn(false);
-    StorageContainerManager storageContainerManager = mockStorageContainerManager(Collections.emptyList());
-    when(storageContainerManager.getContainerManager()).thenReturn(containerManager);
-    when(storageContainerManager.getPipelineManager()).thenReturn(pipelineManager);
-    when(storageContainerManager.getScmNodeManager()).thenReturn(nodeManager);
-    when(storageContainerManager.getScmContext()).thenReturn(SCMContext.emptyContext());
-
-    SCMClientProtocolServer testServer = new SCMClientProtocolServer(
-        new OzoneConfiguration(), storageContainerManager, mock(ReconfigurationHandler.class));
-    try {
       assertEquals(replicaPipeline, testServer.getContainerWithPipeline(container.getContainerID()).getPipeline());
     } finally {
       testServer.stop();
