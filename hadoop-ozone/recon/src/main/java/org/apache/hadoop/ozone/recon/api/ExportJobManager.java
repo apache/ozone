@@ -246,13 +246,13 @@ public class ExportJobManager {
     String tarFilePath = job.getFilePath();  // Use the filename set in submitJob
     
     try {
-      // Create job-specific directory for CSV files
-      Files.createDirectories(jobDir);
-      
-      // Remove from queue and mark as running
+      // Remove from queue first so a job that fails below (e.g. creating its directory) does not keep its slot
       synchronized (jobQueue) {
         jobQueue.remove(job.getJobId());
       }
+
+      // Create job-specific directory for CSV files and mark as running
+      Files.createDirectories(jobDir);
       job.setStatus(JobStatus.RUNNING);
       LOG.info("Starting export job {}", job.getJobId());
       
