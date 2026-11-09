@@ -39,7 +39,6 @@
     <aspectj.java25.version>1.9.25.1</aspectj.java25.version>
     <aspectj.java8.version>1.9.7</aspectj.java8.version>
     <assertj.version>3.27.7</assertj.version>
-    <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
     <aws-java-sdk2.version>2.55.6</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
@@ -362,23 +361,6 @@
             <artifactId>mail</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.amazonaws</groupId>
-        <artifactId>aws-java-sdk-core</artifactId>
-        <version>${aws-java-sdk.version}</version>
-        <exclusions>
-          <exclusion>
-            <!-- depend on jcl-over-slf4j instead -->
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.amazonaws</groupId>
-        <artifactId>aws-java-sdk-s3</artifactId>
-        <version>${aws-java-sdk.version}</version>
       </dependency>
       <dependency>
         <groupId>com.bettercloud</groupId>
@@ -2127,6 +2109,23 @@
               </configuration>
             </execution>
             <execution>
+              <id>ban-aws-sdk-v1</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>com.amazonaws</exclude>
+                    </excludes>
+                    <message>AWS SDK for Java v1 is end of life, use AWS SDK for Java v2 (software.amazon.awssdk)</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
               <id>ban-imports</id>
               <goals>
                 <goal>enforce</goal>
@@ -2193,6 +2192,17 @@
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
                       <bannedImport>org.apache.hadoop.hdfs.DFSConfigKeys</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>AWS SDK for Java v1 is end of life, use AWS SDK for Java v2 (software.amazon.awssdk)</reason>
+                    <bannedImports>
+                      <bannedImport>com.amazonaws.**</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>

@@ -144,6 +144,13 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.snapshot.enabled";
   public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = true;
 
+  public static final String OZONE_RECON_SCM_SNAPSHOT_CONNECTION_TIMEOUT =
+      "ozone.recon.scm.snapshot.connection.timeout";
+  public static final String OZONE_RECON_SCM_SNAPSHOT_CONNECTION_TIMEOUT_DEFAULT = "60s";
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_READ_TIMEOUT = "ozone.recon.scm.snapshot.read.timeout";
+  public static final String OZONE_RECON_SCM_SNAPSHOT_READ_TIMEOUT_DEFAULT = "10m";
+
   public static final String OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD =
       "ozone.recon.nssummary.flush.db.max.threshold";
 

@@ -125,6 +125,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (isInitialized()) {
       return;
     }
+    // A closed stream has no client to get the block with.
+    checkOpen();
 
     BlockData blockData = null;
     long length = blockInfo.getLength();
