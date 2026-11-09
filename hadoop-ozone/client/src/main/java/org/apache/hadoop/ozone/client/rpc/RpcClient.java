@@ -139,6 +139,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -242,7 +243,6 @@ public class RpcClient implements ClientProtocol {
   private static final long OM_VERSION_REFRESHING = -1L;
   private volatile OzoneManagerVersion omVersion;
   private final AtomicLong omVersionLastUpdate = new AtomicLong();
-  private final boolean s3AuthCheck;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -294,14 +294,13 @@ public class RpcClient implements ClientProtocol {
         ozoneManagerProtocolClientSideTranslatorPB =
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
         clientId.toString());
-    this.ozoneManagerClient = TracingUtil.createProxy(
+    this.ozoneManagerClient = TracingUtil.createClientProxy(
         ozoneManagerProtocolClientSideTranslatorPB,
         OzoneManagerClientProtocol.class, conf);
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
     omVersionLastUpdate.set(clock.millis());
-    s3AuthCheck = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false);
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -1361,10 +1360,23 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(
       String volumeName, String bucketName) throws IOException {
+    if (volumeName == null && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion())) {
+      verifyBucketName(bucketName);
+      // Volume name is not important, as we call InfoBucket with
+      // assumeS3Context = true, OM will infer the correct s3 volume.
+      BucketInfoWithS3Context bucketInfo =
+          ozoneManagerClient.getBucketInfo(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT, bucketName, true);
+      bucketInfo.getUserPrincipal().ifPresent(this::updateS3Principal);
+      return buildOzoneBucket(bucketInfo.getBucketInfo());
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
+    return buildOzoneBucket(bucketInfo);
+  }
+
+  private OzoneBucket buildOzoneBucket(OmBucketInfo bucketInfo) {
     return OzoneBucket.newBuilder(conf, this)
         .setVolumeName(bucketInfo.getVolumeName())
         .setName(bucketInfo.getBucketName())
@@ -3201,7 +3213,7 @@ public class RpcClient implements ClientProtocol {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
-    boolean assumeS3Context = volumeName == null && s3AuthCheck
+    boolean assumeS3Context = volumeName == null
         && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
     if (assumeS3Context) {
       volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
