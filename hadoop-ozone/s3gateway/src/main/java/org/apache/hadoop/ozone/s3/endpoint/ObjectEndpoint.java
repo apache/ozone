@@ -387,11 +387,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
-    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
-    // A negative part number is not a valid part; reject it as InvalidArgument.
-    if (partNumber < 0) {
-      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
-    }
 
     final long startNanos = context.getStartNanos();
     final PerformanceStringBuilder perf = context.getPerf();
@@ -400,6 +395,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       final String bucketName = context.getBucketName();
 
       context.setAction(S3GAction.GET_KEY);
+
+      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
+      final int partNumber = parsePartNumber(rangeHeaderVal, keyPath);
 
       OzoneKeyDetails keyDetails = (partNumber != 0) ?
           getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
@@ -422,7 +420,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       LOG.debug("Data length of the key {} is {}", keyPath, length);
 
-      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
       RangeHeader rangeHeader = null;
 
       LOG.debug("range Header provided value: {}", rangeHeaderVal);
@@ -510,6 +507,23 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       getMetrics().updateGetKeyFailureStats(startNanos);
       throw ex;
     }
+  }
+
+  private int parsePartNumber(String rangeHeaderVal, String keyPath) {
+    if (!queryParams().containsKey(QueryParams.PART_NUMBER)) {
+      return 0;
+    }
+
+    if (rangeHeaderVal != null) {
+      throw newError(INVALID_REQUEST, keyPath)
+          .withMessage("Cannot specify both Range header and partNumber query parameter");
+    }
+
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    if (partNumber <= 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
+    return partNumber;
   }
 
   static void addLastModifiedDate(
@@ -640,11 +654,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     ObjectRequestContext context = new ObjectRequestContext(S3GAction.HEAD_KEY, bucketName);
     long startNanos = context.getStartNanos();
     ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
-    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
-    // A negative part number is not a valid part; reject it as InvalidArgument.
-    if (partNumber < 0) {
-      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
-    }
 
     OzoneKey key;
     RangeHeader rangeHeader = null;
@@ -653,6 +662,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         OzoneBucket bucket = context.getBucket();
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
+      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
+      final int partNumber = parsePartNumber(rangeHeaderVal, keyPath);
+
       // A partNumber is validated against the object's parts and yields the
       // metadata of that part; an out-of-range part throws InvalidPart.
       key = (partNumber != 0) ?
@@ -668,7 +680,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         return conditionalResponse;
       }
 
-      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
       if (rangeHeaderVal != null) {
         rangeHeader = RangeHeaderParserUtil.parseRangeHeader(rangeHeaderVal, key.getDataSize());
         if (rangeHeader.isInValidRange()) {
