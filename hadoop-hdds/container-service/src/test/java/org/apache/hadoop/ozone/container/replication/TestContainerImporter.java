@@ -285,9 +285,8 @@ class TestContainerImporter {
   }
 
   @ParameterizedTest
-  @CsvSource({"SSD, SSD, SSD", "SSD, DISK, SSD", "DISK, SSD, DISK", ", SSD, SSD", ", DISK, DISK"})
-  void testImportPreservesRecordedTypeOrInitializesLegacyType(StorageType recordedType, StorageType volumeType,
-      StorageType expectedType) throws Exception {
+  @CsvSource({"SSD, SSD", "SSD, DISK", "DISK, SSD", ", SSD", ", DISK"})
+  void testImportPreservesRecordedType(StorageType recordedType, StorageType volumeType) throws Exception {
     containerData.setStorageType(recordedType);
     HddsVolume targetVolume = mock(HddsVolume.class);
     when(targetVolume.getStorageType()).thenReturn(volumeType);
@@ -295,8 +294,9 @@ class TestContainerImporter {
 
     containerImporter.importContainer(containerId, tarFile.toPath(), targetVolume, NO_COMPRESSION);
 
-    assertEquals(expectedType, containerData.getStorageType());
+    assertEquals(recordedType, containerData.getStorageType());
     assertEquals(targetVolume, containerData.getVolume());
+    assertEquals(volumeType, containerData.getVolume().getStorageType());
     assertThat(tarFile).doesNotExist();
     assertThat(containerImporter.getImportContainerProgress()).isEmpty();
   }

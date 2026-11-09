@@ -39,10 +39,12 @@ import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -189,15 +191,17 @@ class TestGrpcReplicationService {
 
   @ParameterizedTest
   @CsvSource({
-      "SSD, SSD, DISK, SSD, SSD",
-      "DISK, DISK, SSD, DISK, DISK",
-      ", SSD, DISK, SSD, SSD",
-      ", , SSD, SSD, SSD",
-      "SSD, , DISK, DISK, SSD",
-      "SSD, DISK, SSD, DISK, SSD"
+      "SSD, SSD, DISK, SSD",
+      "DISK, DISK, SSD, DISK",
+      ", SSD, DISK, SSD",
+      ", DISK, SSD, DISK",
+      ", , SSD, SSD",
+      ", , DISK, DISK",
+      "SSD, , DISK, DISK",
+      "SSD, DISK, SSD, DISK"
   })
-  void testUploadPreservesRecordedTypeOrInitializesLegacyType(StorageType recordedType, StorageType requestedType,
-      StorageType defaultType, StorageType expectedVolumeType, StorageType expectedRecordedType) throws Exception {
+  void testUploadPreservesRecordedType(StorageType recordedType, StorageType requestedType,
+      StorageType defaultType, StorageType expectedVolumeType) throws Exception {
     // Emulate a legacy descriptor or a recorded type that can differ from the volume's current label.
     Container<?> sourceContainer = containerController.getContainer(CONTAINER_ID);
     sourceContainer.getContainerData().setStorageType(recordedType);
@@ -243,9 +247,15 @@ class TestGrpcReplicationService {
       Container<?> imported = targetContainers.getContainer(CONTAINER_ID);
       assertNotNull(imported);
       assertEquals(expectedVolumeType, imported.getContainerData().getVolume().getStorageType());
-      assertEquals(expectedRecordedType, imported.getContainerData().getStorageType());
-      assertEquals(expectedRecordedType,
+      assertEquals(recordedType, imported.getContainerData().getStorageType());
+      assertEquals(recordedType,
           ContainerDataYaml.readContainerFile(imported.getContainerFile()).getStorageType());
+      ContainerReplicaProto report = imported.getContainerReport();
+      assertEquals(recordedType != null, report.hasStorageType());
+      if (recordedType != null) {
+        assertEquals(StorageTypeUtils.getStorageTypeProto(recordedType), report.getStorageType());
+      }
+      assertEquals(StorageTypeUtils.getStorageTypeProto(expectedVolumeType), report.getVolumeStorageType());
       for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(targetVolumes.getVolumesList())) {
         assertEquals(0, volume.getCommittedBytes());
       }

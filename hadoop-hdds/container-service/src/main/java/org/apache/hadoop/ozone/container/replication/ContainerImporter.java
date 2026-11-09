@@ -125,11 +125,7 @@ public class ContainerImporter {
       }
       ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
-      // Preserve the replica's recorded type, which can differ from a relabelled volume's type.
-      // Initialise missing legacy metadata from the destination volume; reports also expose the volume type separately.
-      if (containerData.getStorageType() == null) {
-        containerData.setStorageType(targetVolume.getStorageType());
-      }
+      // Preserve the recorded type, including null for legacy replicas; reports expose the volume type separately.
       // lastDataScanTime should be cleared for an imported container
       containerData.setDataScanTimestamp(null);
 
