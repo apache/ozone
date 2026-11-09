@@ -269,7 +269,7 @@ public class DatanodeInfo extends DatanodeDetails {
   public int getMetaDataVolumeCount() {
     try {
       lock.readLock().lock();
-      return metadataStorageReports.size();
+      return (int) metadataStorageReports.stream().filter(report -> !report.getFailed()).count();
     } finally {
       lock.readLock().unlock();
     }
