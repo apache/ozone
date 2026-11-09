@@ -28,16 +28,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.TestInstance;
 
 /**
  * Base class for Ozone integration tests.  Manages lifecycle of {@link MiniOzoneCluster}.
  * <p/>
  * Subclasses can tweak configuration by overriding {@link #createOzoneConfig()}.
  */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class ClusterForTests<C extends MiniOzoneCluster> {
 
   private C cluster;
@@ -97,16 +93,20 @@ public abstract class ClusterForTests<C extends MiniOzoneCluster> {
     // override if needed
   }
 
-  @BeforeAll
-  void startCluster() throws Exception {
+  protected void startCluster() throws Exception {
     cluster = createCluster();
     cluster.waitForClusterToBeReady();
     onClusterReady();
   }
 
-  @AfterAll
-  void shutdownCluster() {
+  protected void shutdownCluster() {
     IOUtils.closeQuietly(cluster);
   }
 
+  /**
+   * Test cases for non-HA cluster should implement this.
+   */
+  public interface TestCase {
+    MiniOzoneCluster cluster();
+  }
 }
