@@ -72,8 +72,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -84,7 +84,7 @@ import org.junit.jupiter.api.TestInstance;
  * Tests to verify Object store with prefix enabled cases.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
+public abstract class TestObjectStoreWithFSO implements ClusterForTests.TestCase {
   private static final Path ROOT =
       new Path(OZONE_URI_DELIMITER);
   private MiniOzoneCluster cluster;

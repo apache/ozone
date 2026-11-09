@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,7 @@ import org.junit.jupiter.api.TestInstance;
  * Test OM Metrics for OzoneFileSystem operations.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase {
+public abstract class TestOzoneFileSystemMetrics implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   private FileSystem fs;

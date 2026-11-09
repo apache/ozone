@@ -44,7 +44,10 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
@@ -54,7 +57,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -67,7 +70,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test OzoneFSInputStream by reading through multiple interfaces.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
+public abstract class TestOzoneFSInputStream implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   // EC bucket filesystems reading the cells one at a time and in parallel
@@ -143,6 +146,13 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     try (FSDataInputStream stream = ecFs.open(path)) {
       stream.seek(123);
       PositionedReadTestHelper.runConcurrentPositionedReads(expected, stream::readFully);
+      assertEquals(123, stream.getPos());
+
+      // the index streams of the block are open now, so further positioned reads need no GetBlock
+      XceiverClientMetrics metrics = XceiverClientManager.getXceiverClientMetrics();
+      long getBlockCalls = metrics.getContainerOpCountMetrics(ContainerProtos.Type.GetBlock);
+      PositionedReadTestHelper.runConcurrentPositionedReads(expected, stream::readFully);
+      assertEquals(getBlockCalls, metrics.getContainerOpCountMetrics(ContainerProtos.Type.GetBlock));
       assertEquals(123, stream.getPos());
     }
   }

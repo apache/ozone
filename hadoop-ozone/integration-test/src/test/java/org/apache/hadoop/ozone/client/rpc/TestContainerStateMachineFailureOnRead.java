@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createContainerForTesting;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,7 +55,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -161,7 +161,7 @@ public class TestContainerStateMachineFailureOnRead {
     try (XceiverClientRatis xceiverClientRatis =
         XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
       xceiverClientRatis.connect();
-      TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+      createContainerForTesting(xceiverClientRatis, 100L);
     }
 
     OmKeyLocationInfo omKeyLocationInfo;

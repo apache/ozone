@@ -45,7 +45,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.ClusterForTests;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CompletedPart;
@@ -53,6 +55,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 
 /** Verifies backend client metrics through real S3 HTTP requests. */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
   private static final String BUCKET = "client-metrics";
   private static final String CONTENT = "OM client latency metrics";
@@ -83,9 +86,15 @@ class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
     metricsHandle = OmClientMetrics.acquireHandle(s3g.getConf());
   }
 
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
   @AfterAll
-  void closeClients() {
+  void afterAll() {
     closeQuietly(s3, metricsHandle);
+    shutdownCluster();
   }
 
   @Test

@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.XceiverClientShortCircuit.vintPrefixed;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +38,8 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
+import com.google.common.primitives.Bytes;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -74,6 +78,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.unix.DomainSocket;
@@ -744,6 +749,53 @@ public class TestXceiverServerDomainSocket {
   }
 
   /**
+   * If a response send fails partway, the server closes the connection instead of writing the next response after
+   * the truncated frame.
+   */
+  @Test
+  public void testConnectionClosedAfterFailedResponse() throws Exception {
+    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, "1m");
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_WRITE_TIMEOUT, "1s");
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+        conf, null, readExecutors, metrics, factory);
+    DomainSocket sock = null;
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+        LoggerFactory.getLogger(XceiverServerDomainSocket.class.getPackage().getName() + ".Receiver"));
+    try {
+      server.setContainerDispatcher(createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics));
+      server.start();
+      sock = factory.createSocket(readTimeout, writeTimeout, localhost);
+      DataOutputStream outputStream = new DataOutputStream(sock.getOutputStream());
+      // Do not read from the socket until the first send hits the 1 s write timeout with a full kernel buffer.
+      int payloadSize = 4 * 1024 * 1024;
+      ContainerProtos.ContainerCommandRequestProto second = getEchoRequest(0);
+      sendRequest(outputStream, getEchoRequest(payloadSize));
+      sendRequest(outputStream, second);
+      GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains("Failed to send response"), 100, 30000);
+
+      ByteArrayOutputStream received = new ByteArrayOutputStream();
+      IOUtils.copy(sock.getInputStream(), received);
+      ByteArrayOutputStream secondFrame = new ByteArrayOutputStream();
+      DataOutputStream frameOutput = new DataOutputStream(secondFrame);
+      frameOutput.writeShort(OzoneClientConfig.DATA_TRANSFER_VERSION);
+      frameOutput.writeShort(ContainerProtos.Type.Echo.getNumber());
+      ContainerCommandResponseBuilders.getEchoResponse(second).writeDelimitedTo(frameOutput);
+      assertThat(received.toByteArray()).hasSizeLessThan(payloadSize);
+      assertThat(Bytes.indexOf(received.toByteArray(), secondFrame.toByteArray()))
+          .as("position of the second response").isEqualTo(-1);
+    } finally {
+      logCapturer.stopCapturing();
+      conf.unset(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT);
+      conf.unset(OzoneConfigKeys.OZONE_CLIENT_WRITE_TIMEOUT);
+      factory.close();
+      IOUtils.closeQuietly(sock);
+      server.stop();
+    }
+  }
+
+  /**
    * Echo and a failed GetBlock carry no block file. Their responses are sent without an error on the datanode.
    */
   @Test
@@ -885,6 +937,50 @@ public class TestXceiverServerDomainSocket {
     }
   }
 
+  /**
+   * One short-circuit GetBlock is one container operation. The domain-socket read goes through Receiver and the
+   * dispatcher, and NumOps, numGetBlock, and numLocalGetBlock each increase by 1.
+   */
+  @Test
+  public void testShortCircuitGetBlockIncrementsNumOpsOnce() throws Exception {
+    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+        conf, null, readExecutors, metrics, factory);
+    XceiverClientShortCircuit client = null;
+    try {
+      server.setContainerDispatcher(createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics));
+      server.start();
+      XceiverClientShortCircuit c = new XceiverClientShortCircuit(MockPipeline.createSingleNodePipeline(), conf,
+          MockDatanodeDetails.randomDatanodeDetails());
+      c.connect();
+      client = c;
+
+      long numOps = storageContainerCounter("NumOps");
+      long numGetBlock = storageContainerCounter("numGetBlock");
+      long numLocalGetBlock = storageContainerCounter("numLocalGetBlock");
+
+      ContainerProtos.ContainerCommandRequestProto request = getBlockRequestFor(client);
+      ContainerProtos.ContainerCommandResponseProto response = client.sendCommand(request, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      assertTrue(response.getGetBlock().getShortCircuitAccessGranted());
+      long localID = request.getGetBlock().getBlockID().getLocalID();
+      try (FileInputStream in = client.getFileInputStream(request.getCallId(), localID)) {
+        assertNotNull(in);
+      }
+
+      assertEquals(numOps + 1, storageContainerCounter("NumOps"));
+      assertEquals(numGetBlock + 1, storageContainerCounter("numGetBlock"));
+      assertEquals(numLocalGetBlock + 1, storageContainerCounter("numLocalGetBlock"));
+    } finally {
+      if (client != null) {
+        client.close();
+      }
+      factory.close();
+      server.stop();
+    }
+  }
+
   private static void sendRequest(DataOutputStream outputStream, ContainerProtos.ContainerCommandRequestProto request)
       throws IOException {
     outputStream.writeShort(OzoneClientConfig.DATA_TRANSFER_VERSION);
@@ -903,6 +999,10 @@ public class TestXceiverServerDomainSocket {
     return responseProto;
   }
 
+  private static long storageContainerCounter(String name) {
+    return getLongCounter(name, getMetrics(ContainerMetrics.STORAGE_CONTAINER_METRICS));
+  }
+
   private static void receiveBlockFile(DomainSocket sock) throws IOException {
     FileInputStream[] fis = new FileInputStream[1];
     byte[] buf = new byte[1];
@@ -912,10 +1012,14 @@ public class TestXceiverServerDomainSocket {
   }
 
   private ContainerProtos.ContainerCommandRequestProto getEchoRequest() {
+    return getEchoRequest(0);
+  }
+
+  private ContainerProtos.ContainerCommandRequestProto getEchoRequest(int responsePayloadSize) {
     return ContainerProtos.ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.Echo)
         .setContainerID(1)
-        .setEcho(ContainerProtos.EchoRequestProto.newBuilder())
+        .setEcho(ContainerProtos.EchoRequestProto.newBuilder().setPayloadSizeResp(responsePayloadSize))
         .setDatanodeUuid(UUID.randomUUID().toString())
         .build();
   }

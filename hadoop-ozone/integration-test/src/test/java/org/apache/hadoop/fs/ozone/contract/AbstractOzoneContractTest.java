@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.tools.contract.AbstractContractDistCpTest;
 import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -60,17 +61,23 @@ abstract class AbstractOzoneContractTest extends ClusterForTests<MiniOzoneCluste
 
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
-  @AfterAll
-  void closeFileSystems() throws IOException {
-    // Contracts cache filesystems for different buckets; release their clients before the cluster's leak check.
-    FileSystem.closeAll();
-  }
-
   /**
    * This must be implemented by all subclasses.
    * @return the FS contract
    */
   abstract AbstractFSContract createOzoneContract(Configuration conf);
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() throws IOException {
+    // Contracts cache filesystems for different buckets; release their clients before the cluster's leak check.
+    FileSystem.closeAll();
+    shutdownCluster();
+  }
 
   @Override
   protected OzoneConfiguration createOzoneConfig() {
