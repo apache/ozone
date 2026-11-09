@@ -1852,19 +1852,22 @@
     <description>
       Maximum number of report messages (not containers) a datanode includes in
       a single heartbeat to an SCM or Recon endpoint. Reports beyond the limit
-      stay queued and are sent in an immediate follow-up heartbeat. Values below
-      1 are treated as 1.
+      stay queued and are sent in later scheduled heartbeats. Values below 1
+      are treated as 1.
     </description>
   </property>
   <property>
-    <name>hdds.heartbeat.max.command.status.report.size</name>
+    <name>hdds.heartbeat.command.status.report.max.size</name>
     <value>64MB</value>
     <tag>DATANODE</tag>
     <description>
       Maximum serialized size of command status reports included in one
       heartbeat. The effective limit can be lower when other heartbeat fields
       consume the safe RPC payload budget. Reports beyond the limit stay queued
-      for a later heartbeat.
+      for a later heartbeat. A single command status that exceeds this limit is
+      sent as the only command status report when it still fits within the
+      remaining safe RPC payload, ensuring that it does not block all later
+      command statuses.
     </description>
   </property>
   <property>

@@ -21,8 +21,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_MAX_COMMAND_STATUS_REPORT_SIZE;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_MAX_COMMAND_STATUS_REPORT_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
@@ -119,10 +119,10 @@ public class HeartbeatEndpointTask
     this.maxReportsPerHB = Math.max(1, conf.getInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT,
         HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT));
     this.maxCommandStatusReportBytes = (long) conf.getStorageSize(
-        HDDS_HEARTBEAT_MAX_COMMAND_STATUS_REPORT_SIZE,
-        HDDS_HEARTBEAT_MAX_COMMAND_STATUS_REPORT_SIZE_DEFAULT, BYTES);
+        HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE,
+        HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE_DEFAULT, BYTES);
     Preconditions.checkArgument(maxCommandStatusReportBytes > 0,
-        HDDS_HEARTBEAT_MAX_COMMAND_STATUS_REPORT_SIZE + " must be positive");
+        HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE + " must be positive");
     int ipcMaximumDataLength = conf.getInt(
         CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH,
         CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
@@ -174,8 +174,7 @@ public class HeartbeatEndpointTask
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
       addQueuedCommandCounts(requestBuilder);
-      commandStatusSelection = addCommandStatusReports(
-          requestBuilder, maxReportsPerHB - reportCount);
+      commandStatusSelection = addCommandStatusReports(requestBuilder, maxReportsPerHB - reportCount);
       SCMHeartbeatRequestProto request = requestBuilder.build();
       LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
@@ -272,12 +271,12 @@ public class HeartbeatEndpointTask
     long currentHeartbeatSize = requestBuilder.build().getSerializedSize();
     long remainingSafeBytes = Math.max(
         0, safeHeartbeatSize - currentHeartbeatSize);
-    long commandStatusReportBudget = Math.min(
-        maxCommandStatusReportBytes, remainingSafeBytes);
+    long commandStatusReportBudget = Math.min(maxCommandStatusReportBytes, remainingSafeBytes);
+    long oversizedThreshold = Math.min(maxCommandStatusReportBytes, safeHeartbeatSize);
     CommandStatusReportSelection selection =
         context.getCommandStatusReports(rpcEndpoint.getAddress(),
             remainingReportCount, commandStatusReportBudget,
-            maxCommandStatusReportBytes);
+            remainingSafeBytes, oversizedThreshold);
     for (CommandStatusReportsProto report : selection.getReports()) {
       requestBuilder.addCommandStatusReports(report);
     }
@@ -288,14 +287,12 @@ public class HeartbeatEndpointTask
           rpcEndpoint.getAddress(), currentHeartbeatSize, safeHeartbeatSize);
     }
     if (selection.getOversizedBytes() > 0) {
-      LOG.warn("A command status for {} is {} bytes, exceeding the configured "
-              + "per-heartbeat command status report limit of {} bytes",
+      LOG.warn("A command status for {} is {} bytes, exceeding the effective "
+              + "limit of {} bytes (configured limit: {}, safe heartbeat size: {})",
           rpcEndpoint.getAddress(), selection.getOversizedBytes(),
-          maxCommandStatusReportBytes);
+          oversizedThreshold, maxCommandStatusReportBytes, safeHeartbeatSize);
     }
     if (context.getQueueMetrics() != null) {
-      context.getQueueMetrics().setCommandStatusReportBytesDeferred(
-          rpcEndpoint.getAddress(), selection.getDeferredBytes());
       context.getQueueMetrics().setOversizedCommandStatusReportBytes(
           rpcEndpoint.getAddress(), selection.getOversizedBytes());
     }
