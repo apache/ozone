@@ -395,7 +395,7 @@ public class TestSCMStateMachine {
       }
       assertThat(versionManager.getApparentVersion()).isEqualTo(STORAGE_SPACE_DISTRIBUTION);
       assertThat(versionManager.getPersistedApparentVersion()).isEqualTo(STORAGE_SPACE_DISTRIBUTION.serialize());
- InOrder order = inOrder(buffer);
+      InOrder order = inOrder(buffer);
       order.verify(buffer).addToBuffer(finalizationStore, APPARENT_VERSION_KEY,
           String.valueOf(WITNESSED_CONTAINER_DB_PROTO_VALUE.serialize()));
       // Every apply will call finalize upgrade and write the resulting apparent version to the DB.
