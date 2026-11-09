@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_HA;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -150,13 +149,13 @@ public class TestScmStartupWithDifferentApparentVersions {
    */
   @Test
   public void testFinalizeFromDBNoOpWhenDBEqualsApparent() throws Exception {
-    OzoneConfiguration conf = createScmStorage(SOFTWARE_VERSION.serialize());
+    OzoneConfiguration conf = createScmStorage(ZDU.serialize());
     StorageContainerManager scm = HddsTestUtils.getScm(conf, new SCMConfigurator());
     try {
-      scm.getScmMetadataStore().getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(SOFTWARE_VERSION.serialize()));
+      scm.getScmMetadataStore().getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(ZDU.serialize()));
       scm.getVersionManager().finalizeFromDBIfRequired(scm.getScmMetadataStore().getMetaTable());
-      assertVersions(scm, SOFTWARE_VERSION, SOFTWARE_VERSION);
-      assertFalse(scm.getVersionManager().needsFinalization());
+      assertVersions(scm, ZDU, ZDU);
+      assertTrue(scm.getVersionManager().needsFinalization());
     } finally {
       scm.stop();
       scm.join();

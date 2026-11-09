@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneManagerVersion.SOFTWARE_VERSION;
 import static org.apache.hadoop.ozone.OzoneManagerVersion.ZDU;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -121,13 +120,13 @@ public class TestOMStartupWithDifferentApparentVersions {
    */
   @Test
   public void testFinalizeFromDBNoOpWhenDBEqualsApparent() throws Exception {
-    OzoneConfiguration conf = createOMStorage(SOFTWARE_VERSION.serialize());
+    OzoneConfiguration conf = createOMStorage(ZDU.serialize());
     try (OMVersionManager versionManager = createVersionManager(conf);
         OmMetadataManagerImpl metadataManager = new OmMetadataManagerImpl(conf, null)) {
-      metadataManager.getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(SOFTWARE_VERSION.serialize()));
+      metadataManager.getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(ZDU.serialize()));
       versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
-      assertVersions(versionManager, conf, metadataManager, SOFTWARE_VERSION, SOFTWARE_VERSION);
-      assertFalse(versionManager.needsFinalization());
+      assertVersions(versionManager, conf, metadataManager, ZDU, ZDU);
+      assertTrue(versionManager.needsFinalization());
     }
   }
 
