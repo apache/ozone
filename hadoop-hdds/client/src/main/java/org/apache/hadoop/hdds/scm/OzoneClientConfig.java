@@ -158,6 +158,14 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean streamReadBlock = false;
 
+  @Config(key = "ozone.client.grpc.pooled.streams.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      description = "Send untraced blocking requests to the datanode over pooled gRPC streams. "
+          + "If false, each request opens a stream of its own.",
+      tags = ConfigTag.CLIENT)
+  private boolean pooledStreamsEnabled = true;
+
   @Config(key = "ozone.client.max.retries",
       defaultValue = "5",
       description = "Maximum number of retries by Ozone Client on "
@@ -747,6 +755,10 @@ public class OzoneClientConfig {
 
   public void setStreamReadBlock(boolean streamReadBlock) {
     this.streamReadBlock = streamReadBlock;
+  }
+
+  public boolean isPooledStreamsEnabled() {
+    return pooledStreamsEnabled;
   }
 
   public long getStreamReadPreReadSize() {

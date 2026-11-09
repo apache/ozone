@@ -112,6 +112,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private final Semaphore semaphore;
   private long timeout;
   private final long streamReadTimeoutNanos;
+  private final boolean pooledStreamsEnabled;
   private long idleStreamTimeoutNanos = IDLE_STREAM_TIMEOUT_NANOS;
   private final SecurityConfig secConfig;
   private final boolean topologyAwareRead;
@@ -140,6 +141,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT));
     this.streamReadTimeoutNanos = config.getObject(OzoneClientConfig.class)
         .getStreamReadTimeout().toNanos();
+    this.pooledStreamsEnabled = config.getObject(OzoneClientConfig.class).isPooledStreamsEnabled();
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -865,7 +867,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     final ChannelInfo channelInfo = dnChannelInfoMap.get(dnId);
     final ReplyObserver reply = new ReplyObserver(request, dn, replyFuture, requestTime);
-    if (replyFuture instanceof CallerRunsReplyFuture && !Span.current().getSpanContext().isValid()) {
+    if (pooledStreamsEnabled && replyFuture instanceof CallerRunsReplyFuture
+        && !Span.current().getSpanContext().isValid()) {
       // No trace context to send, so a pooled stream carries the same headers as a new one would.
       channelInfo.leaseStream().send(request, reply, (CallerRunsReplyFuture) replyFuture,
           System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout));
@@ -964,7 +967,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     void send(ContainerCommandRequestProto request, ReplyObserver reply, CallerRunsReplyFuture future,
         long deadlineNanos) {
-      future.setDeadline(deadlineNanos, this::cancel);
+      future.setDeadline(deadlineNanos, () -> cancel(reply));
       currentFuture = future;
       current.set(reply);
       if (closed && current.compareAndSet(reply, null)) {
@@ -991,6 +994,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     public void onNext(ContainerCommandResponseProto value) {
       final ReplyObserver reply = current.getAndSet(null);
       currentFuture = null;
+      if (reply == null) {
+        // no request is attached, e.g. it was abandoned just before this reply: never reuse the stream
+        closed = true;
+        requestStream.cancel("reply without a request", null);
+        return;
+      }
       // back in the pool before the permit is released, so the thread woken by the permit finds the stream
       owner.releaseStream(this);
       reply.onNext(value);
@@ -1034,10 +1043,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       requestStream.onCompleted();
     }
 
-    /** Called when the request timed out or its waiter gave up; the stream fails the request and is dropped. */
-    private void cancel() {
-      closed = true;
-      requestStream.cancel("request abandoned by the client", null);
+    /**
+     * Called when the request timed out or its waiter gave up: fails the request and drops the stream, unless
+     * its reply already returned the stream to the pool, where the stream may carry another request by now.
+     */
+    private void cancel(ReplyObserver reply) {
+      if (current.compareAndSet(reply, null)) {
+        currentFuture = null;
+        closed = true;
+        requestStream.cancel("request abandoned by the client", null);
+        reply.onError(Status.CANCELLED.withDescription("request abandoned by the client").asRuntimeException());
+      }
     }
   }
 
@@ -1047,6 +1063,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * response is parsed and the future completed on the caller, without a
    * hand-off through gRPC's shared executor (as gRPC blocking stubs do).
    * Once the waiter returns, queued and later callbacks run directly.
+   * Only {@code get} runs the callbacks and enforces the deadline: without a
+   * caller in {@code get}, {@code join()} or a dependent stage never completes.
    */
   @VisibleForTesting
   static final class CallerRunsReplyFuture

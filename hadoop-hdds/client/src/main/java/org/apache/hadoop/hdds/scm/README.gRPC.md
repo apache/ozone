@@ -85,13 +85,16 @@ Messages in our case are sent via bi-directional streaming with the help of
 StreamObservers.
 
 When we initiate a connection we create a stub, and a channel. A blocking call
-without a trace context (the production default, tracing is off) takes an idle
+without a trace context (the default while tracing is off, but any valid span on
+the calling thread counts, including an application's own span) takes an idle
 pooled stream of the channel to the datanode, or opens one, and sends exactly
 one request on it at a time. The datanode answers the requests of a stream in
 order, so the next reply belongs to the current request. After the reply the
 stream returns to the pool; it is half-closed when the channel leaves READY or
 after it has been idle for a minute, and dropped when a request on it fails or
 is abandoned. The reply is delivered on the waiting thread (`CallerRunsReplyFuture` is the call's executor).
+Setting `ozone.client.grpc.pooled.streams.enabled` to false turns the pool off:
+such a call then opens a stream per call like a traced one.
 Traced blocking calls, `sendCommandOnAllNodes` and the async path (the
 one-argument `sendCommandAsync`) still open one bi-directional stream per call
 with a gRPC deadline, send in one request proto message, get back the response

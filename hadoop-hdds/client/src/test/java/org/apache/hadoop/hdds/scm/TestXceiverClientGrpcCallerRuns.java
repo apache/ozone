@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -84,6 +85,7 @@ class TestXceiverClientGrpcCallerRuns {
   private volatile boolean fail;
   private volatile ContainerCommandResponseProto response;
   private volatile boolean hang;
+  private volatile boolean duplicateReply;
   private volatile Server hangingServer;
   private volatile CountDownLatch barrier;
   private final AtomicInteger streamsOpened = new AtomicInteger();
@@ -131,6 +133,12 @@ class TestXceiverClientGrpcCallerRuns {
                     .setCmdType(request.getCmdType())
                     .setResult(ContainerProtos.Result.SUCCESS)
                     .build());
+                if (duplicateReply) {
+                  responseObserver.onNext(ContainerCommandResponseProto.newBuilder()
+                      .setCmdType(request.getCmdType())
+                      .setResult(ContainerProtos.Result.SUCCESS)
+                      .build());
+                }
               }
 
               @Override
@@ -310,6 +318,21 @@ class TestXceiverClientGrpcCallerRuns {
   }
 
   @Test
+  void pooledStreamsCanBeDisabled() throws Exception {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean("ozone.client.grpc.pooled.streams.enabled", false);
+    client.close();
+    client = newClient(Collections.singletonList(dn), config);
+
+    for (int i = 0; i < 3; i++) {
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          client.sendCommand(readContainer(), Collections.emptyList()).getResult());
+    }
+    assertEquals(3, streamsOpened.get());
+    assertEquals(0, client.getIdleStreamCount(dn));
+  }
+
+  @Test
   void concurrentCommandsUseDistinctStreams() throws Exception {
     final int n = 4;
     // the server holds each request until all n arrived, so they cannot share a stream
@@ -349,6 +372,7 @@ class TestXceiverClientGrpcCallerRuns {
 
   @Test
   void timeoutFailsWithDeadlineExceededAndCancelsTheStream() throws Exception {
+    final int permits = client.getAvailablePermits();
     client.setTimeout(1000);
     hang = true;
     ExecutionException e = assertThrows(ExecutionException.class,
@@ -360,6 +384,60 @@ class TestXceiverClientGrpcCallerRuns {
     assertEquals(ContainerProtos.Result.SUCCESS,
         client.sendCommand(readContainer(), Collections.emptyList()).getResult());
     assertEquals(2, streamsOpened.get());
+    assertEquals(permits, client.getAvailablePermits());
+  }
+
+  @Test
+  void abandonedRequestDoesNotCancelTheNextRequestOnTheStream() throws Exception {
+    XceiverClientGrpc.PooledStream stream = new XceiverClientGrpc.PooledStream(null);
+    @SuppressWarnings("unchecked")
+    ClientCallStreamObserver<ContainerCommandRequestProto> call = mock(ClientCallStreamObserver.class);
+    stream.beforeStart(call);
+    XceiverClientGrpc.CallerRunsReplyFuture first = new XceiverClientGrpc.CallerRunsReplyFuture();
+    stream.send(readContainer(), client.new ReplyObserver(readContainer(), dn, first, 0), first, System.nanoTime());
+    // the reply to the first request returned the stream to the pool and the next request leased it,
+    // before the first request's future was completed
+    XceiverClientGrpc.CallerRunsReplyFuture next = new XceiverClientGrpc.CallerRunsReplyFuture();
+    stream.send(readContainer(), client.new ReplyObserver(readContainer(), dn, next, 0), next,
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(30));
+
+    // the first request's waiter passes its deadline
+    ExecutionException e = assertThrows(ExecutionException.class, first::get);
+    assertEquals(Status.Code.DEADLINE_EXCEEDED, Status.fromThrowable(e.getCause()).getCode());
+
+    verify(call, never()).cancel(any(), any());
+    assertFalse(stream.isClosed());
+  }
+
+  @Test
+  void replyWithoutARequestDropsTheStream() {
+    XceiverClientGrpc.PooledStream stream = new XceiverClientGrpc.PooledStream(null);
+    @SuppressWarnings("unchecked")
+    ClientCallStreamObserver<ContainerCommandRequestProto> call = mock(ClientCallStreamObserver.class);
+    stream.beforeStart(call);
+
+    stream.onNext(ContainerCommandResponseProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.ReadContainer)
+        .setResult(ContainerProtos.Result.SUCCESS)
+        .build());
+
+    assertTrue(stream.isClosed());
+    verify(call).cancel(any(), any());
+  }
+
+  @Test
+  void duplicateReplyDropsTheStreamWithoutLeakingPermits() throws Exception {
+    final int permits = client.getAvailablePermits();
+    duplicateReply = true;
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        client.sendCommand(readContainer(), Collections.emptyList()).getResult());
+    GenericTestUtils.waitFor(() -> streamsEnded.get() == 1, 10, 10_000);
+
+    duplicateReply = false;
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        client.sendCommand(readContainer(), Collections.emptyList()).getResult());
+    assertEquals(2, streamsOpened.get());
+    assertEquals(permits, client.getAvailablePermits());
   }
 
   @Test
