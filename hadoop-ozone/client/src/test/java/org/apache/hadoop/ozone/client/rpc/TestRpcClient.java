@@ -704,7 +704,7 @@ public class TestRpcClient {
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
-  public void testMultipartObjectSizeReachesOMOrRejectsOldVersion(OzoneManagerVersion version) throws IOException {
+  public void testMultipartObjectSizeOnlySentToSupportedOM(OzoneManagerVersion version) throws IOException {
     List<KeyArgs> requests = new ArrayList<>();
     OmTransport transport = new MockOmTransport() {
       @Override
@@ -728,16 +728,12 @@ public class TestRpcClient {
         requests.clear();
         IOException error = assertThrows(IOException.class, () -> client.completeMultipartUpload("vol", "bucket",
             "key", "upload-id", Collections.singletonMap(1, "part-etag"), null, null, null, size));
-        if (size == null || OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE.isSupportedBy(version)) {
-          assertEquals("captured", error.getMessage());
-          assertThat(requests).hasSize(1);
-          assertEquals(size != null, requests.get(0).hasDataSize());
-          if (size != null) {
-            assertEquals(size.longValue(), requests.get(0).getDataSize());
-          }
-        } else {
-          assertThat(requests).isEmpty();
-          assertThat(error.getMessage()).contains("does not support the expected multipart object size");
+        assertEquals("captured", error.getMessage());
+        assertThat(requests).hasSize(1);
+        boolean sendSize = size != null && OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE.isSupportedBy(version);
+        assertEquals(sendSize, requests.get(0).hasDataSize());
+        if (sendSize) {
+          assertEquals(size.longValue(), requests.get(0).getDataSize());
         }
       }
     } finally {

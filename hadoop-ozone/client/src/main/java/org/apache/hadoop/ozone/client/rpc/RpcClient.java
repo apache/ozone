@@ -2384,9 +2384,6 @@ public class RpcClient implements ClientProtocol {
       String excludedETag, Long expectedDataSize) throws IOException {
     if (expectedDataSize != null) {
       Preconditions.checkArgument(expectedDataSize >= 0, "Expected object size must be non-negative");
-      if (!OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE.isSupportedBy(omVersion)) {
-        throw new IOException("OzoneManager does not support the expected multipart object size.");
-      }
     }
     if (excludedETag != null) {
       checkIfNoneMatchETagSupport();
@@ -2411,7 +2408,9 @@ public class RpcClient implements ClientProtocol {
     }
 
     builder.setExcludedETag(excludedETag);
-    builder.setExpectedDataSize(expectedDataSize);
+    if (expectedDataSize != null && OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE.isSupportedBy(getOmVersion())) {
+      builder.setExpectedDataSize(expectedDataSize);
+    }
     OmKeyArgs keyArgs = builder.build();
 
     OmMultipartUploadCompleteList omMultipartUploadCompleteList =

@@ -26,6 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -48,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -102,9 +106,25 @@ public class TestS3MultipartUploadCompleteRequest
     assertPreExecuteAclDenialIsAudited(getS3MultipartUploadCompleteReq(omRequest), OMAction.COMPLETE_MULTIPART_UPLOAD);
   }
 
+  @Test
+  public void testPreExecuteWithExpectedSizeDoesNotCheckDisabledFeatures() throws Exception {
+    OMRequest request = OMRequestTestUtils.createCompleteMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        Collections.emptyList());
+    request = request.toBuilder().setCompleteMultiPartUploadRequest(request.getCompleteMultiPartUploadRequest()
+        .toBuilder().setKeyArgs(request.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setDataSize(1)))
+        .build();
+    getS3MultipartUploadCompleteReq(request).preExecute(ozoneManager);
+    verify(ozoneManager, never()).checkFeatureEnabled(OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE);
+  }
+
   @ParameterizedTest
-  @CsvSource({"0, 1, false", "100, 99, false", "100, 101, false", "100, 0, false", "100, 99, true"})
-  public void testCompleteWithExpectedSize(long actualSize, long expectedSize, boolean overwrite) throws Exception {
+  @CsvSource({"0, 1, false, true", "100, 99, false, true", "100, 101, false, true", "100, 0, false, true",
+      "100, 99, true, true", "100, 99, false, false", "100, 99, true, false"})
+  public void testCompleteWithExpectedSize(long actualSize, long expectedSize, boolean overwrite, boolean sizeSupported)
+      throws Exception {
+    when(ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE))
+        .thenReturn(sizeSupported);
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
@@ -137,7 +157,16 @@ public class TestS3MultipartUploadCompleteRequest
     OMRequest mismatching = complete.toBuilder().setCompleteMultiPartUploadRequest(
         complete.getCompleteMultiPartUploadRequest().toBuilder().setKeyArgs(
             complete.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setDataSize(expectedSize))).build();
-    OMClientResponse failure = getS3MultipartUploadCompleteReq(mismatching).validateAndUpdateCache(ozoneManager, 4L);
+    OMRequest prepared = getS3MultipartUploadCompleteReq(mismatching).preExecute(ozoneManager);
+    OMClientResponse failure = getS3MultipartUploadCompleteReq(prepared).validateAndUpdateCache(ozoneManager, 4L);
+    if (!sizeSupported) {
+      assertEquals(OzoneManagerProtocolProtos.Status.OK, failure.getOMResponse().getStatus());
+      assertEquals(actualSize, omMetadataManager.getKeyTable(getBucketLayout())
+          .get(getOzoneDBKey(volumeName, bucketName, keyName)).getDataSize());
+      assertNull(omMetadataManager.getMultipartInfoTable()
+          .get(getMultipartKey(volumeName, bucketName, keyName, uploadID)));
+      return;
+    }
     assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST, failure.getOMResponse().getStatus());
     assertEquals(original, omMetadataManager.getKeyTable(getBucketLayout())
         .get(getOzoneDBKey(volumeName, bucketName, keyName)));
