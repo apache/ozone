@@ -44,8 +44,8 @@ import java.util.regex.Pattern;
  * </p>
  *
  * <p>
- * The logic is similar to {@link SignedChunksInputStream}, but since it is an unsigned chunked upload
- * there is no "chunk-signature" to parse.
+ * {@link AwsChunkedInputStream} does the parsing shared with {@link SignedChunksInputStream}. Since it is an
+ * unsigned chunked upload, there is no "chunk-signature" to parse.
  * </p>
  *
  * <p>
