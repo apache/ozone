@@ -331,7 +331,6 @@ public class OzoneManagerServiceProviderImpl
    * as "caught up" and skip the rebuild, leaving the derived tables permanently built against the old
    * lineage. A new lineage that lands on exactly the same sequence number cannot be detected here.
    */
-  @VisibleForTesting
   Map<String, ReconOmTask> getTasksToReprocessOnStartup(ReconTaskStatusUpdater deltaTaskStatusUpdater) {
     return reconTaskController.getRegisteredTasks()
         .entrySet()
