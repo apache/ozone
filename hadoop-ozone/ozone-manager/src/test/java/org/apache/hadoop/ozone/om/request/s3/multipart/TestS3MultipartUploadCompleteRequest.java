@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.doThrow;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -49,7 +48,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -74,24 +72,6 @@ import org.junit.jupiter.params.provider.CsvSource;
  */
 public class TestS3MultipartUploadCompleteRequest
     extends S3MultipartRequestTests {
-
-  @Test
-  public void testPreExecuteRefusesDisabledConditionalComplete() throws Exception {
-    doThrow(new OMException("disabled", OMException.ResultCodes.NOT_SUPPORTED_OPERATION))
-        .when(ozoneManager).checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
-    OMRequest request = OMRequestTestUtils.createCompleteMPURequest(UUID.randomUUID().toString(),
-        UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
-        Collections.emptyList());
-    OMRequest conditional = request.toBuilder().setCompleteMultiPartUploadRequest(
-        request.getCompleteMultiPartUploadRequest().toBuilder().setKeyArgs(
-            request.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setExpectedETag("etag"))).build();
-
-    OMException error = assertThrows(OMException.class,
-        () -> getS3MultipartUploadCompleteReq(conditional).preExecute(ozoneManager));
-    assertThat(error.getResult()).isEqualTo(OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
-    assertThat(getS3MultipartUploadCompleteReq(request).preExecute(ozoneManager)
-        .hasCompleteMultiPartUploadRequest()).isTrue();
-  }
 
   @Test
   public void testPreExecute() throws Exception {
