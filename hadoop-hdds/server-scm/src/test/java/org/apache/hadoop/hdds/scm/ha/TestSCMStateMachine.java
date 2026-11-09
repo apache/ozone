@@ -382,20 +382,26 @@ public class TestSCMStateMachine {
       SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.FINALIZE,
           new FinalizationStateManagerInvoker(finalizationStateManager, mock(SCMRatisServer.class)));
 
-      // The entries a pre-ZDU leader writes to finalize from HBASE_SUPPORT, then one of them replayed.
       long index = 0;
       for (SCMRatisRequest request : Arrays.asList(
           finalizeRequest("addFinalizingMark"),
           finalizeRequest("finalizeLayoutFeature", WITNESSED_CONTAINER_DB_PROTO_VALUE.serialize()),
           finalizeRequest("finalizeLayoutFeature", STORAGE_SPACE_DISTRIBUTION.serialize()),
           finalizeRequest("removeFinalizingMark"),
+          // Test that a commit with an older layout version does not move the apparent version backwards.
           finalizeRequest("finalizeLayoutFeature", WITNESSED_CONTAINER_DB_PROTO_VALUE.serialize()))) {
         assertThat(applyingStateMachine.applyTransaction(newTransaction(request, ++index)))
             .isCompletedWithValue(Message.EMPTY);
       }
       assertThat(versionManager.getApparentVersion()).isEqualTo(STORAGE_SPACE_DISTRIBUTION);
       assertThat(versionManager.getPersistedApparentVersion()).isEqualTo(STORAGE_SPACE_DISTRIBUTION.serialize());
-      verify(buffer, times(2))
+ InOrder order = inOrder(buffer);
+      order.verify(buffer).addToBuffer(finalizationStore, APPARENT_VERSION_KEY,
+          String.valueOf(WITNESSED_CONTAINER_DB_PROTO_VALUE.serialize()));
+      // Every apply will call finalize upgrade and write the resulting apparent version to the DB.
+      // When an older apparent version is encountered, finalize will be a no-op, but the current apparent version is
+      // still added to the buffer.
+      order.verify(buffer, times(2))
           .addToBuffer(finalizationStore, APPARENT_VERSION_KEY, String.valueOf(STORAGE_SPACE_DISTRIBUTION.serialize()));
 
       assertThat(applyingStateMachine.applyTransaction(newTransaction(finalizeRequest("finalizeUpgrade"), ++index)))
