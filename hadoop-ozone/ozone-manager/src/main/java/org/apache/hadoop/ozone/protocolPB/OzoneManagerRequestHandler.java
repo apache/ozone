@@ -64,12 +64,14 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -138,6 +140,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVol
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
@@ -235,8 +238,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setListVolumeResponse(listVolumeResponse);
         break;
       case InfoBucket:
-        InfoBucketResponse infoBucketResponse = infoBucket(
-            request.getInfoBucketRequest());
+        InfoBucketResponse infoBucketResponse = infoBucket(request, responseBuilder);
         responseBuilder.setInfoBucketResponse(infoBucketResponse);
         break;
       case ListBuckets:
@@ -440,7 +442,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case GetObjectTagging:
         OzoneManagerProtocolProtos.GetObjectTaggingResponse getObjectTaggingResponse =
-            getObjectTagging(request.getGetObjectTaggingRequest());
+            getObjectTagging(request.getGetObjectTaggingRequest(),
+                request.getAssumeS3Context());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
       case GetLifecycleConfiguration:
@@ -682,13 +685,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private InfoBucketResponse infoBucket(InfoBucketRequest request)
+  private InfoBucketResponse infoBucket(OMRequest request, OMResponse.Builder responseBuilder)
       throws IOException {
+    InfoBucketRequest infoBucketRequest = request.getInfoBucketRequest();
     InfoBucketResponse.Builder resp =
         InfoBucketResponse.newBuilder();
-    OmBucketInfo omBucketInfo = impl.getBucketInfo(
-        request.getVolumeName(), request.getBucketName());
-    resp.setBucketInfo(omBucketInfo.getProtobuf());
+    boolean assumeS3Context = request.hasAssumeS3Context() && request.getAssumeS3Context();
+    BucketInfoWithS3Context context = impl.getBucketInfo(
+        infoBucketRequest.getVolumeName(), infoBucketRequest.getBucketName(), assumeS3Context);
+    resp.setBucketInfo(context.getBucketInfo().getProtobuf());
+    if (assumeS3Context) {
+      context.getUserPrincipal().ifPresent(responseBuilder::setUserPrincipal);
+    }
 
     return resp.build();
   }
@@ -726,6 +734,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setForceUpdateContainerCacheFromSCM(
             keyArgs.getForceUpdateContainerCacheFromSCM())
         .setMultipartUploadPartNumber(keyArgs.getMultipartNumber())
+        .setRequireFileSystemLayout(request.getRequireFileSystemLayout())
         .build();
     KeyInfoWithVolumeContext keyInfo = impl.getKeyInfo(omKeyArgs,
         request.getAssumeS3Context());
@@ -1027,6 +1036,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setPurgeableKeys(bytes.getPurgeableKeys())
         .setSnapshotTrappedDirs(bytes.getSnapshotTrappedDirs())
         .setPurgeableDirs(bytes.getPurgeableDirs())
+        .setPurgeableKeyBytes(bytes.getPurgeableKeyBytes())
+        .setPurgeableDirBytes(bytes.getPurgeableDirBytes())
         .build();
   }
 
@@ -1323,6 +1334,60 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupKey
+  )
+  public static OMResponse disallowLookupKeyWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasLookupKeyResponse() || !hasMultipartPartIv(resp.getLookupKeyResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getLookupKeyResponse().getKeyInfo(), resp.toBuilder().clearLookupKeyResponse());
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.GetKeyInfo
+  )
+  public static OMResponse disallowGetKeyInfoWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasGetKeyInfoResponse() || !hasMultipartPartIv(resp.getGetKeyInfoResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getGetKeyInfoResponse().getKeyInfo(),
+        resp.toBuilder().clearGetKeyInfoResponse());
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupFile
+  )
+  public static OMResponse disallowLookupFileWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasLookupFileResponse() || !hasMultipartPartIv(resp.getLookupFileResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getLookupFileResponse().getKeyInfo(),
+        resp.toBuilder().clearLookupFileResponse());
+  }
+
+  private static boolean hasMultipartPartIv(KeyInfo keyInfo) {
+    return keyInfo.getKeyLocationListList().stream()
+        .anyMatch(list -> list.getKeyLocationsList().stream().anyMatch(KeyLocation::hasPartIv));
+  }
+
+  private static OMResponse disallowMultipartPartIv(KeyInfo keyInfo, OMResponse.Builder resp) {
+    return resp.setStatus(Status.NOT_SUPPORTED_OPERATION)
+        .setMessage("Key " + keyInfo.getVolumeName() + "/" + keyInfo.getBucketName() + "/" + keyInfo.getKeyName()
+            + " is a multipart key whose parts have their own encryption IV, which the client can not read."
+            + " Please upgrade the client before trying to read the key.")
+        .build();
+  }
+
   private ListStatusResponse listStatus(
       ListStatusRequest request, ClientVersion clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
@@ -1336,9 +1401,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
+    final long numEntries = limitListSize(request.getNumEntries());
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), limitListSize(request.getNumEntries()),
+            request.getStartKey(), numEntries,
             allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
@@ -1346,6 +1412,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (OzoneFileStatus status : statuses) {
       listStatusResponseBuilder.addStatuses(status.getProtobuf(clientVersion));
     }
+    listStatusResponseBuilder.setIsTruncated(isListStatusTruncated(statuses.size(), numEntries));
     return listStatusResponseBuilder.build();
   }
 
@@ -1365,9 +1432,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     OmKeyArgs omKeyArgs = omKeyArgsBuilder.build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
+    final long numEntries = limitListSize(request.getNumEntries());
     List<OzoneFileStatusLight> statuses =
         impl.listStatusLight(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), limitListSize(request.getNumEntries()),
+            request.getStartKey(), numEntries,
             allowPartialPrefixes);
     ListStatusLightResponse.Builder
         listStatusLightResponseBuilder =
@@ -1375,7 +1443,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (OzoneFileStatusLight status : statuses) {
       listStatusLightResponseBuilder.addStatuses(status.getProtobuf());
     }
+    listStatusLightResponseBuilder.setIsTruncated(isListStatusTruncated(statuses.size(), numEntries));
     return listStatusLightResponseBuilder.build();
+  }
+
+  /**
+   * More entries may follow a listing page only if it is full. listStatus returns
+   * {@code min(page size, remaining entries)}, where the page size is the request
+   * capped by both server limits, so a shorter page is the last one.
+   */
+  private boolean isListStatusTruncated(int returned, long numEntries) {
+    return returned >= OmMetadataReader.listStatusPageSize(impl.getConfiguration(), numEntries);
   }
 
   @RequestFeatureValidator(
@@ -1599,7 +1677,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             submitSnapshotDiffRequest.getFromSnapshot(),
             submitSnapshotDiffRequest.getToSnapshot(),
             submitSnapshotDiffRequest.getForceFullDiff(),
-            submitSnapshotDiffRequest.getDisableNativeDiff());
+            submitSnapshotDiffRequest.getDisableNativeDiff(),
+            submitSnapshotDiffRequest.getOrdered());
 
     SubmitSnapshotDiffResponse.Builder builder = SubmitSnapshotDiffResponse
         .newBuilder();
@@ -1758,13 +1837,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
   }
 
-  private GetObjectTaggingResponse getObjectTagging(GetObjectTaggingRequest request)
-      throws IOException {
+  private GetObjectTaggingResponse getObjectTagging(
+      GetObjectTaggingRequest request, boolean assumeS3Context) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
     GetObjectTaggingResponse.Builder resp =

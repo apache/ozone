@@ -22,12 +22,26 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
-import org.apache.hadoop.ozone.s3.awssdk.v1.AbstractS3SDKV1Tests;
+import org.apache.hadoop.ozone.s3.S3GatewayService;
 import org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests;
 import org.apache.ozone.test.ClusterForTests;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.TestInstance;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class OzoneS3SDKTests extends ClusterForTests<MiniOzoneCluster> {
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
 
   @Override
   protected OzoneConfiguration createOzoneConfig() {
@@ -41,15 +55,10 @@ abstract class OzoneS3SDKTests extends ClusterForTests<MiniOzoneCluster> {
   protected MiniOzoneCluster createCluster() throws Exception {
     return newClusterBuilder()
         .addService(new MultiS3GatewayService(5))
+        // Outside the proxy, so only a test that addresses it reads the cells of EC keys in parallel.
+        .addService(new S3GatewayService(conf -> conf.setBoolean("ozone.client.ec.parallel.read.enabled", true),
+            AbstractS3SDKV2Tests.EC_PARALLEL_READ_S3G_HTTP_ADDRESS_KEY))
         .build();
-  }
-
-  @Nested
-  class V1 extends AbstractS3SDKV1Tests {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
   }
 
   @Nested

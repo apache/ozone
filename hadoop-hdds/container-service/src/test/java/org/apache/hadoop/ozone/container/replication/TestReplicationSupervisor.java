@@ -524,6 +524,12 @@ public class TestReplicationSupervisor {
     ReplicationSupervisorMetrics replicationMetrics =
         ReplicationSupervisorMetrics.create(replicationSupervisor);
 
+    // The latency metric has millisecond resolution, so make each successful reconciliation take at least 1 ms.
+    doAnswer(invocation -> {
+      Thread.sleep(1);
+      return null;
+    }).when(mockController).reconcileContainer(any(), anyLong(), any());
+
     try {
       //WHEN
       replicationSupervisor.addTask(createReconciliationTask(1L));

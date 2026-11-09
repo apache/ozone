@@ -41,6 +41,8 @@ public final class S3GActionIamMapper {
     case GET_BUCKET:
     case HEAD_BUCKET:
       return "ListBucket";
+    case LIST_OBJECT_VERSIONS:
+      return "ListBucketVersions";
     case CREATE_BUCKET:
       return "CreateBucket";
     case DELETE_BUCKET:

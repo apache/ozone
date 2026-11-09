@@ -41,32 +41,27 @@ setup_ranger_acceptance_env() {
     fi
   fi
 
-  if [[ -z "${RANGER_VERSION:-}" ]]; then
-    export RANGER_VERSION="${ranger.version}"
-  fi
-
-  : "${DOWNLOAD_DIR:=${TEMP_DIR:-/tmp}}"
+  # where tarballs will be extracted
+  : "${TEMP_DIR:=/tmp}"
 
   export COMPOSE_FILE=docker-compose.yaml:ranger.yaml:../common/ranger.yaml
   export OM_SERVICE_ID="omservice"
   export SCM=scm1.org
   export SECURITY_ENABLED=true
 
-  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
-    curl -LO https://downloads.apache.org/ranger/KEYS
-    gpg --import KEYS
+  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD:-}" != "true" ]]; then
+    import_keys https://downloads.apache.org/ranger/KEYS
   fi
 
-  download_and_verify_apache_release "ranger/${RANGER_VERSION}/apache-ranger-${RANGER_VERSION}.tar.gz"
-  tar -C "${DOWNLOAD_DIR}" -x -z -f "${DOWNLOAD_DIR}/apache-ranger-${RANGER_VERSION}.tar.gz"
-  export RANGER_SOURCE_DIR="${DOWNLOAD_DIR}/apache-ranger-${RANGER_VERSION}"
+  ( tarball=$(download_ranger) && tar -C "${TEMP_DIR}" -x -z -f "${tarball}" ) || return 1
+  export RANGER_SOURCE_DIR="${TEMP_DIR}/apache-ranger-${RANGER_VERSION}"
   chmod -R a+rX "${RANGER_SOURCE_DIR}"
   export RANGER_INIT_POSTGRES_SH="${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/rdbms/init_postgres.sh"
 
   # Create a temp install.properties so we can override feature flags from .env.
   local ranger_admin_install_properties_src
   ranger_admin_install_properties_src="${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/admin/ranger-admin-install-postgres.properties"
-  RANGER_ADMIN_INSTALL_PROPERTIES="$(mktemp "${DOWNLOAD_DIR%/}/ranger-admin-install-postgres.XXXXXX")"
+  RANGER_ADMIN_INSTALL_PROPERTIES="$(mktemp "${TEMP_DIR%/}/ranger-admin-install-postgres.XXXXXX")"
   cp -f "${ranger_admin_install_properties_src}" "${RANGER_ADMIN_INSTALL_PROPERTIES}"
   chmod a+r "${RANGER_ADMIN_INSTALL_PROPERTIES}"
 
@@ -89,9 +84,8 @@ setup_ranger_acceptance_env() {
   if [[ -d "${RANGER_SOURCE_DIR}/dev-support/ranger-docker" ]]; then
     find "${RANGER_SOURCE_DIR}/dev-support/ranger-docker" -type f -name '*.sh' -exec chmod a+x {} +
   fi
-  download_and_verify_apache_release "ranger/${RANGER_VERSION}/plugins/ozone/ranger-${RANGER_VERSION}-ozone-plugin.tar.gz"
-  tar -C "${DOWNLOAD_DIR}" -x -z -f "${DOWNLOAD_DIR}/ranger-${RANGER_VERSION}-ozone-plugin.tar.gz"
-  export RANGER_OZONE_PLUGIN_DIR="${DOWNLOAD_DIR}/ranger-${RANGER_VERSION}-ozone-plugin"
+  ( tarball=$(download_ranger_ozone_plugin) && tar -C "${TEMP_DIR}" -x -z -f "${tarball}" ) || return 1
+  export RANGER_OZONE_PLUGIN_DIR="${TEMP_DIR}/ranger-${RANGER_VERSION}-ozone-plugin"
   chmod -R a+rX "${RANGER_OZONE_PLUGIN_DIR}"
   chmod a+x "${RANGER_OZONE_PLUGIN_DIR}"/*.sh
 

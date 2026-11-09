@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,17 +45,28 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ratis.proto.RaftProtos.LogEntryProto;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.statemachine.TransactionContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,6 +110,7 @@ public class TestSCMHATransactionBufferMonitorTask {
     when(scm.getScmMetadataStore()).thenReturn(metadataStore);
     when(scm.getSystemClock()).thenReturn(clock);
     when(scm.getScmBlockManager()).thenReturn(blockManager);
+    when(scm.getPerfMetrics()).thenReturn(mock(SCMPerformanceMetrics.class));
     when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
 
     transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
@@ -227,6 +240,83 @@ public class TestSCMHATransactionBufferMonitorTask {
   }
 
   @Test
+  public void testSaveConfigurationDoesNotFlushUnderStaleIndexDuringApply() throws Exception {
+    StatefulServiceStateManager stateManager = StatefulServiceStateManagerImpl.newBuilder()
+        .setStatefulServiceConfig(statefulServiceConfigTable)
+        .setSCMDBTransactionBuffer(transactionBuffer)
+        .setRatisServer(SCMHAManagerStub.getInstance(true, transactionBuffer).getRatisServer())
+        .build();
+    ByteString config = ByteString.copyFromUtf8("value");
+
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
+    transactionBuffer.flush();
+    // Ensure the zero-wait flush is deferred by the apply guard, not by timeDiff == 0.
+    advanceClockPastFlushInterval();
+
+    transactionBuffer.beginApplyingTransaction();
+    try {
+      stateManager.saveConfiguration("svc", config);
+      assertEquals(TRX_INFO_T4, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+      assertNull(statefulServiceConfigTable.get("svc"),
+          "saveConfiguration must not commit config under the stale transaction index");
+      transactionBuffer.updateLatestTrxInfo(TRX_INFO_T5);
+    } finally {
+      transactionBuffer.endApplyingTransaction();
+    }
+
+    transactionBuffer.flushIfNeeded(0);
+    assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+    assertEquals(config, statefulServiceConfigTable.get("svc"));
+  }
+
+  @Test
+  public void testSaveConfigurationIsReadableAfterApply() throws Exception {
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
+    transactionBuffer.flush();
+    advanceClockPastFlushInterval();
+
+    StorageContainerManager scm = mock(StorageContainerManager.class);
+    SCMContext context = mock(SCMContext.class);
+    when(context.isLeader()).thenReturn(true);
+    when(scm.getScmContext()).thenReturn(context);
+    when(scm.getMetrics()).thenReturn(mock(SCMMetrics.class));
+    when(scm.getDatanodeProtocolServer()).thenReturn(mock(SCMDatanodeProtocolServer.class));
+    when(scm.getScmSafeModeManager()).thenReturn(mock(SCMSafeModeManager.class));
+    SCMStateMachine stateMachine = new SCMStateMachine(scm, transactionBuffer);
+    try {
+      SCMRatisServer ratisServer = mock(SCMRatisServer.class);
+      when(ratisServer.getProxyHandler(any())).thenAnswer(invocation -> {
+        ScmInvoker<?> invoker = invocation.getArgument(0);
+        stateMachine.registerInvoker(invoker.getType(), invoker);
+        return invoker.getProxy();
+      });
+      StatefulServiceStateManager stateManager = StatefulServiceStateManagerImpl.newBuilder()
+          .setStatefulServiceConfig(statefulServiceConfigTable)
+          .setSCMDBTransactionBuffer(transactionBuffer)
+          .setRatisServer(ratisServer)
+          .build();
+      ByteString config = ByteString.copyFromUtf8("value");
+      SCMRatisRequest request = SCMRatisRequest.of(RequestType.STATEFUL_SERVICE_CONFIG, "saveConfiguration",
+          new Class<?>[] {String.class, ByteString.class}, "svc", config);
+      StateMachineLogEntryProto smLogEntry = StateMachineLogEntryProto.newBuilder()
+          .setLogData(request.encode().getContent()).build();
+      LogEntryProto logEntry = LogEntryProto.newBuilder().setTerm(1).setIndex(5)
+          .setStateMachineLogEntry(smLogEntry).build();
+      TransactionContext trx = mock(TransactionContext.class);
+      when(trx.getStateMachineLogEntry()).thenReturn(smLogEntry);
+      when(trx.getLogEntry()).thenReturn(logEntry);
+
+      stateMachine.applyTransaction(trx).get();
+
+      assertEquals(config, stateManager.readConfiguration("svc"));
+      assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+      assertEquals(TermIndex.valueOf(1, 5), stateMachine.getLastAppliedTermIndex());
+    } finally {
+      stateMachine.stopDNServerStartRetry();
+    }
+  }
+
+  @Test
   public void testMonitorTaskDoesNotPartialFlushDuringTransactionApply()
       throws Exception {
     transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
@@ -320,6 +410,76 @@ public class TestSCMHATransactionBufferMonitorTask {
     }
     flusher.join(10_000);
     assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+  }
+
+  /**
+   * Verifies that {@link DeletedBlockLogStateManagerImpl#addTransactionsToDB} holds the buffer lock across the
+   * row-plus-summary write, so a concurrent flush() cannot commit the transaction row without the matching summary.
+   */
+  @Test
+  public void testAddTransactionsToDBBlocksConcurrentFlushUntilDurable() throws Exception {
+    long txId = 42L;
+    DeletedBlocksTransaction tx = DeletedBlocksTransaction.newBuilder()
+        .setTxID(txId)
+        .setContainerID(1L)
+        .setCount(0)
+        .addLocalID(1L)
+        .build();
+    DeletedBlocksTransactionSummary summary = DeletedBlocksTransactionSummary.newBuilder()
+        .setTotalTransactionCount(1)
+        .setTotalBlockCount(1)
+        .setTotalBlockSize(1)
+        .setTotalBlockReplicatedSize(3)
+        .build();
+
+    // Pause the writer right after the row is added to the buffer, before the summary is.
+    Table<Long, DeletedBlocksTransaction> deletedTable = spy(metadataStore.getDeletedBlocksTXTable());
+    CountDownLatch rowBuffered = new CountDownLatch(1);
+    CountDownLatch releaseWriter = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      invocation.callRealMethod();
+      rowBuffered.countDown();
+      releaseWriter.await(10, TimeUnit.SECONDS);
+      return null;
+    }).when(deletedTable).putWithBatch(any(), any(), any());
+    DeletedBlockLogStateManagerImpl stateManager = new DeletedBlockLogStateManagerImpl(
+        deletedTable, statefulServiceConfigTable, mock(ContainerManager.class), transactionBuffer);
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
+    transactionBuffer.flush();
+
+    Thread writer = new Thread(() -> {
+      try {
+        stateManager.addTransactionsToDB(new ArrayList<>(Collections.singletonList(tx)), summary);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
+    writer.start();
+    assertTrue(rowBuffered.await(10, TimeUnit.SECONDS), "Timed out waiting for writer to buffer the row");
+
+    Thread flusher = new Thread(() -> {
+      transactionBuffer.updateLatestTrxInfo(TRX_INFO_T5);
+      try {
+        transactionBuffer.flush();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
+    flusher.start();
+    waitFor(() -> flusher.getState() == Thread.State.WAITING, 10, 5_000);
+
+    // flush() is blocked by the buffer lock, so neither the row nor the summary is durable yet.
+    assertEquals(TRX_INFO_T4, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+    assertNull(deletedTable.get(txId));
+    assertNull(statefulServiceConfigTable.get(SERVICE_DEFINITION.getServiceName()));
+
+    releaseWriter.countDown();
+    writer.join(10_000);
+    flusher.join(10_000);
+
+    assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+    assertEquals(tx, deletedTable.get(txId));
+    assertEquals(summary.toByteString(), statefulServiceConfigTable.get(SERVICE_DEFINITION.getServiceName()));
   }
 
   /**

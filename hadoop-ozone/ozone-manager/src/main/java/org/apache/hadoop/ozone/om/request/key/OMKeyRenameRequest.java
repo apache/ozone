@@ -89,8 +89,18 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
         .setModificationTime(Time.now()).setKeyName(srcKey);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckAcls(newKeyArgs.build(),
-        ozoneManager, srcKey, dstKey);
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckAcls(newKeyArgs.build(),
+          ozoneManager, srcKey, dstKey);
+    } catch (IOException ex) {
+      markForAudit(ozoneManager.getAuditLogger(),
+          buildAuditMessage(OMAction.RENAME_KEY,
+              buildAuditMap(resolveBucketLinkForAudit(ozoneManager, newKeyArgs.build()),
+                  renameKeyRequest.toBuilder().setToKeyName(dstKey).build()),
+              ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
 
     return getOmRequest().toBuilder()
         .setRenameKeyRequest(renameKeyRequest.toBuilder().setToKeyName(dstKey)
@@ -174,6 +184,12 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       if (fromKeyValue == null) {
           // TODO: Add support for renaming open key
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
+      }
+
+      if (renameKeyRequest.hasUpdateID() && fromKeyValue.getUpdateID() != renameKeyRequest.getUpdateID()) {
+        throw new OMException("UpdateID does not match. Key: " + fromKeyName +
+            ", Expected UpdateID: " + fromKeyValue.getUpdateID() +
+            ", Given UpdateID: " + renameKeyRequest.getUpdateID(), OMException.ResultCodes.UPDATE_ID_NOT_MATCH);
       }
 
       fromKeyValue = fromKeyValue.toBuilder()

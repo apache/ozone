@@ -1991,6 +1991,45 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testOpenDoesNotTriggerInfoBucket() throws Exception {
+    Path file = new Path(bucketPath, "open-rpc-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    ContractTestUtils.writeTextFile(fs, file, "data", true);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    try (FSDataInputStream stream = fs.open(file)) {
+      assertEquals('d', stream.read());
+    }
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "open must not trigger InfoBucket");
+  }
+
+  @Test
+  void testOpenRejectsObsBucket() throws Exception {
+    OzoneBucket obsBucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    DataTestUtil.createKey(obsBucket, "obs-key", "data".getBytes(StandardCharsets.UTF_8));
+    Path obsKeyPath = new Path(new Path(new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()),
+        obsBucket.getName()), "obs-key");
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> fs.open(obsKeyPath));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "open must not trigger InfoBucket");
+  }
+
+  @Test
+  void testOpenInMissingBucketFails() throws Exception {
+    // The failure now comes from GetKeyInfo instead of InfoBucket, with the same result code.
+    Path missingFile = new Path(new Path(new Path(OZONE_URI_DELIMITER, volumeName), "missing-bucket"), "file");
+    OMException exception = assertThrows(OMException.class, () -> fs.open(missingFile));
+    assertEquals(BUCKET_NOT_FOUND, exception.getResult());
+  }
+
+  @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);

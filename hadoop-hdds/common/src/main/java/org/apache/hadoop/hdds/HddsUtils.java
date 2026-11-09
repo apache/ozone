@@ -110,6 +110,33 @@ public final class HddsUtils {
 
   private static final int NO_PORT = -1;
 
+  /**
+   * Returns whether two IP literals denote the same address without resolving hostnames.
+   *
+   * @param first the first IP literal
+   * @param second the second IP literal
+   * @return whether both values are IP literals with identical address bytes
+   */
+  public static boolean isSameIpAddress(String first, String second) {
+    return first != null && second != null
+        && first.indexOf('%') < 0 && second.indexOf('%') < 0
+        && InetAddresses.isInetAddress(first) && InetAddresses.isInetAddress(second)
+        && InetAddresses.forString(first).equals(InetAddresses.forString(second));
+  }
+
+  /**
+   * Normalizes an IP literal for use as an internal address-map key without resolving hostnames.
+   *
+   * @param address an IP literal or hostname
+   * @return the canonical IP literal, or the original hostname or scoped literal
+   */
+  public static String normalizeIpAddress(String address) {
+    if (address == null || address.indexOf('%') >= 0 || !InetAddresses.isInetAddress(address)) {
+      return address;
+    }
+    return InetAddresses.toAddrString(InetAddresses.forString(address));
+  }
+
   private HddsUtils() {
   }
 
@@ -354,7 +381,7 @@ public final class HddsUtils {
    * @param value host or host:port
    * @throws ConfigurationException if the host is an unbracketed IPv6 literal
    */
-  private static void validateHostPortAuthority(String key, String value) {
+  public static void validateHostPortAuthority(String key, String value) {
     if (value == null || value.isEmpty() || value.startsWith("[")) {
       return;
     }
@@ -648,6 +675,7 @@ public final class HddsUtils {
     case UpdateContainer:
     case GetContainerChecksumInfo:
     case ListBlock:
+    case Echo:
       return true;
     default:
       return false;

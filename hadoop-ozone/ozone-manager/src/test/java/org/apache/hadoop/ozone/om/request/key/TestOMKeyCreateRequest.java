@@ -27,11 +27,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -45,11 +48,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -61,6 +66,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -74,11 +84,14 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -92,9 +105,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -129,6 +144,85 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     ReplicationConfig ratis3Config =
         ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
     preExecuteTest(true, 1, ratis3Config);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true, MULTIPART_PART_IV_SUPPORT, true", "false, MULTIPART_PART_IV_SUPPORT, true",
+      "true, BUCKET_LAYOUT_SUPPORT, true", "true, MULTIPART_PART_IV_SUPPORT, false"})
+  public void testPreExecuteMultipartKeyEncryptionIv(boolean partIvAllowed, ClientVersion clientVersion,
+      boolean partIvEnabled) throws Exception {
+    when(ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.MULTIPART_PART_IV)).thenReturn(partIvAllowed);
+    ozoneManager.getConfig().setMpuPartEncryptionIvEnabled(partIvEnabled);
+    when(ozoneManager.getKmsProvider()).thenReturn(mock(KeyProviderCryptoExtension.class));
+    when(ozoneManager.resolveBucketLink(any(Pair.class))).thenReturn(new ResolvedBucket(volumeName, bucketName,
+        volumeName, bucketName, "owner", getBucketLayout()));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    // The multipart open key holds the encryption info generated when the upload was initiated.
+    String mpuKeyName = "mpu-key";
+    String uploadID = UUID.randomUUID().toString();
+    byte[] uploadIv = new byte[16];
+    random.nextBytes(uploadIv);
+    FileEncryptionInfo uploadEncInfo = new FileEncryptionInfo(CipherSuite.AES_CTR_NOPADDING,
+        CryptoProtocolVersion.ENCRYPTION_ZONES, new byte[16], uploadIv, "key1", "key1@0");
+    OmKeyInfo multipartOpenKey = createOmKeyInfo(volumeName, bucketName, mpuKeyName, replicationConfig).build();
+    multipartOpenKey.setFileEncryptionInfo(uploadEncInfo);
+    OMKeyCreateRequest request = getOMKeyCreateRequest(createKeyRequest(true, 1, mpuKeyName));
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).put(
+        request.getDBMultipartOpenKey(volumeName, bucketName, mpuKeyName, uploadID, omMetadataManager),
+        multipartOpenKey);
+
+    List<KeyArgs> partKeyArgs = new ArrayList<>();
+    for (int partNumber = 1; partNumber <= 2; partNumber++) {
+      OMRequest omRequest = createKeyRequest(true, partNumber, mpuKeyName);
+      // A part IV sent by the client is not used.
+      omRequest = omRequest.toBuilder().setVersion(clientVersion.serialize())
+          .setCreateKeyRequest(omRequest.getCreateKeyRequest().toBuilder()
+              .setKeyArgs(omRequest.getCreateKeyRequest().getKeyArgs().toBuilder().setMultipartUploadID(uploadID)
+                  .setPartIv(ByteString.copyFrom(uploadIv))))
+          .build();
+      KeyArgs keyArgs = getOMKeyCreateRequest(omRequest).preExecute(ozoneManager).getCreateKeyRequest().getKeyArgs();
+      // The EDEK can only be decrypted with the upload's IV, so the encryption info is not changed.
+      FileEncryptionInfo partEncInfo = OMPBHelper.convert(keyArgs.getFileEncryptionInfo());
+      assertEquals(uploadEncInfo.getKeyName(), partEncInfo.getKeyName());
+      assertArrayEquals(uploadEncInfo.getEncryptedDataEncryptionKey(), partEncInfo.getEncryptedDataEncryptionKey());
+      assertArrayEquals(uploadIv, partEncInfo.getIV());
+      partKeyArgs.add(keyArgs);
+    }
+
+    if (partIvAllowed && clientVersion == ClientVersion.MULTIPART_PART_IV_SUPPORT && partIvEnabled) {
+      byte[] partIv1 = partKeyArgs.get(0).getPartIv().toByteArray();
+      byte[] partIv2 = partKeyArgs.get(1).getPartIv().toByteArray();
+      assertThat(partIv1).hasSameSizeAs(uploadIv).isNotEqualTo(uploadIv);
+      assertThat(partIv2).hasSameSizeAs(uploadIv).isNotEqualTo(uploadIv).isNotEqualTo(partIv1);
+    } else {
+      assertThat(partKeyArgs).noneMatch(KeyArgs::hasPartIv);
+    }
+  }
+
+  @Test
+  public void testPreExecuteClearsPartIvOfNormalKey() throws Exception {
+    OMRequest omRequest = createKeyRequest(false, 0);
+    // A part IV sent by the client is not used.
+    KeyArgs.Builder keyArgs = omRequest.getCreateKeyRequest().getKeyArgs().toBuilder()
+        .setPartIv(ByteString.copyFrom(new byte[16]));
+    omRequest = omRequest.toBuilder()
+        .setCreateKeyRequest(omRequest.getCreateKeyRequest().toBuilder().setKeyArgs(keyArgs)).build();
+    OMRequest modifiedOmRequest = getOMKeyCreateRequest(omRequest).preExecute(ozoneManager);
+    assertFalse(modifiedOmRequest.getCreateKeyRequest().getKeyArgs().hasPartIv());
+  }
+
+  @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = createKeyRequest(true, 1);
+    KeyArgs keyArgs = omRequest.getCreateKeyRequest().getKeyArgs().toBuilder()
+        .setMultipartUploadID("invalid/" + UUID.randomUUID()).build();
+    OMRequest invalidRequest = omRequest.toBuilder()
+        .setCreateKeyRequest(omRequest.getCreateKeyRequest().toBuilder().setKeyArgs(keyArgs)).build();
+
+    OMException e = assertThrows(OMException.class,
+        () -> getOMKeyCreateRequest(invalidRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
   }
 
   private void preExecuteTest(boolean isMultipartKey, int partNumber,
@@ -361,6 +455,51 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         openKeyInfo.getCreationTime());
   }
 
+  public static Collection<Object[]> ifNoneMatchData() {
+    List<Object[]> cases = new ArrayList<>();
+    for (Object[] lockOptions : data()) {
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], false, null});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, null});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, "excluded-etag"});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, "different-etag"});
+    }
+    return cases;
+  }
+
+  @ParameterizedTest
+  @MethodSource("ifNoneMatchData")
+  public void testCreateWithExcludedETag(boolean setKeyPathLock, boolean setFileSystemPaths,
+      boolean keyExists, String existingETag) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    if (keyExists) {
+      OmKeyInfo.Builder existing = createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig).setUpdateID(1L);
+      if (existingETag != null) {
+        existing.addMetadata(OzoneConsts.ETAG, existingETag);
+      }
+      omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(), existing.build());
+    }
+
+    OMRequest request = createKeyRequestWithExpectedETag(null);
+    OMRequest modified = doPreExecute(request.toBuilder().setCreateKeyRequest(
+        request.getCreateKeyRequest().toBuilder().setKeyArgs(
+            request.getCreateKeyRequest().getKeyArgs().toBuilder().setExcludedETag("excluded-etag"))).build());
+    OMClientResponse response = getOMKeyCreateRequest(modified).validateAndUpdateCache(ozoneManager, 100L);
+    OmKeyInfo openKey = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(modified.getCreateKeyRequest().getClientID()));
+    if ("excluded-etag".equals(existingETag)) {
+      assertEquals(KEY_ALREADY_EXISTS, response.getOMResponse().getStatus());
+      assertNull(openKey);
+      assertEquals(existingETag, omMetadataManager.getKeyTable(getBucketLayout()).get(getOzoneKey())
+          .getMetadata().get(OzoneConsts.ETAG));
+    } else {
+      assertEquals(OK, response.getOMResponse().getStatus());
+      assertNotNull(openKey);
+      assertEquals(keyExists ? 1L : OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT, openKey.getExpectedDataGeneration());
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCache(
@@ -578,6 +717,33 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     assertNull(omKeyInfo);
+  }
+
+  @Test
+  public void testRejectInvalidReplicationConfig() throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(false, false));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMRequest.Builder request = createKeyRequest(true, 1).toBuilder();
+    request.getCreateKeyRequestBuilder().getKeyArgsBuilder().setType(EC)
+        .setEcReplicationConfig(OMRequestTestUtils.invalidEcReplicationConfig());
+    OMRequest modifiedRequest = doPreExecute(request.build());
+    OMClientResponse response = getOMKeyCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(INVALID_REQUEST, response.getOMResponse().getStatus());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithInvalidPartNumber(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    for (int partNumber : new int[] {0, -1}) {
+      OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(true, partNumber));
+      OMClientResponse response = getOMKeyCreateRequest(modifiedOmRequest).validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
   }
 
   @ParameterizedTest

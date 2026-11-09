@@ -80,13 +80,13 @@ public class GrpcMetrics implements MetricsSource {
 
   // There should be no getter method to avoid
   // exposing internal representation. FindBugs error raised.
-  private MutableQuantiles[] grpcQueueTimeMillisQuantiles;
+  private MutableQuantiles[] grpcQueueTimeNanosQuantiles;
 
   private final ConcurrentMutableRate grpcProcessingTime;
 
   // There should be no getter method to avoid
   // exposing internal representation. FindBugs error raised.
-  private MutableQuantiles[] grpcProcessingTimeMillisQuantiles;
+  private MutableQuantiles[] grpcProcessingTimeNanosQuantiles;
 
   @Metric("Number of active clients connected")
   private MutableCounterLong numOpenClientConnections;
@@ -96,25 +96,25 @@ public class GrpcMetrics implements MetricsSource {
     this.requestType = "NoRequest";
     // Names match what MutableMetricsFactory derived from the field names, so
     // the emitted metrics are unchanged
-    grpcQueueTime = new ConcurrentMutableRate("GrpcQueueTime", "Queue time", false);
-    grpcProcessingTime = new ConcurrentMutableRate("GrpcProcessingTime", "Processing time", false);
+    grpcQueueTime = new ConcurrentMutableRate("GrpcQueueTime", "Queue time in nanoseconds", false);
+    grpcProcessingTime = new ConcurrentMutableRate("GrpcProcessingTime", "Processing time in nanoseconds", false);
     int[] intervals = conf.getInts(
         OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY);
     grpcQuantileEnable = (intervals.length > 0);
     if (grpcQuantileEnable) {
-      grpcQueueTimeMillisQuantiles =
+      grpcQueueTimeNanosQuantiles =
           new MutableQuantiles[intervals.length];
-      grpcProcessingTimeMillisQuantiles =
+      grpcProcessingTimeNanosQuantiles =
           new MutableQuantiles[intervals.length];
       for (int i = 0; i < intervals.length; i++) {
         int interval = intervals[i];
-        grpcQueueTimeMillisQuantiles[i] = registry
+        grpcQueueTimeNanosQuantiles[i] = registry
             .newQuantiles("grpcQueueTime" + interval
-                    + "s", "grpc queue time in millisecond", "ops",
+                    + "s", "grpc queue time in nanoseconds", "ops",
                 "latency", interval);
-        grpcProcessingTimeMillisQuantiles[i] = registry.newQuantiles(
+        grpcProcessingTimeNanosQuantiles[i] = registry.newQuantiles(
             "grpcProcessingTime" + interval + "s",
-            "grpc processing time in millisecond",
+            "grpc processing time in nanoseconds",
             "ops", "latency", interval);
       }
     }
@@ -137,8 +137,8 @@ public class GrpcMetrics implements MetricsSource {
    */
   public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
-    MetricUtil.stop(grpcProcessingTimeMillisQuantiles);
-    MetricUtil.stop(grpcQueueTimeMillisQuantiles);
+    MetricUtil.stop(grpcProcessingTimeNanosQuantiles);
+    MetricUtil.stop(grpcQueueTimeNanosQuantiles);
   }
 
   @Override
@@ -167,10 +167,10 @@ public class GrpcMetrics implements MetricsSource {
     unknownMessagesReceived.incr();
   }
 
-  public void addGrpcQueueTime(int queueTime) {
+  public void addGrpcQueueTime(long queueTime) {
     grpcQueueTime.add(queueTime);
     if (grpcQuantileEnable) {
-      for (MutableQuantiles q : grpcQueueTimeMillisQuantiles) {
+      for (MutableQuantiles q : grpcQueueTimeNanosQuantiles) {
         if (q != null) {
           q.add(queueTime);
         }
@@ -178,10 +178,10 @@ public class GrpcMetrics implements MetricsSource {
     }
   }
 
-  public void addGrpcProcessingTime(int processingTime) {
+  public void addGrpcProcessingTime(long processingTime) {
     grpcProcessingTime.add(processingTime);
     if (grpcQuantileEnable) {
-      for (MutableQuantiles q : grpcProcessingTimeMillisQuantiles) {
+      for (MutableQuantiles q : grpcProcessingTimeNanosQuantiles) {
         if (q != null) {
           q.add(processingTime);
         }

@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -126,6 +128,31 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     OMClientResponse response = getOMKeyRenameRequest(omRequest).validateAndUpdateCache(ozoneManager, 100L);
 
     assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS, response.getOMResponse().getStatus());
+  }
+
+  @Override
+  @Test
+  public void testValidateAndUpdateCacheWithUpdateID() throws Exception {
+    String dbFromKey = OMRequestTestUtils.addFileToKeyTable(false, false,
+        fromKeyInfo.getFileName(), fromKeyInfo, clientID, txnLogId, omMetadataManager);
+    long updateID = fromKeyInfo.getUpdateID();
+    OMRequest omRequest = createRenameKeyRequest(volumeName, bucketName, fromKeyName, toKeyName);
+
+    OMRequest mismatchRequest = doPreExecute(omRequest.toBuilder().setRenameKeyRequest(
+        omRequest.getRenameKeyRequest().toBuilder().setUpdateID(updateID + 1)).build());
+    OMClientResponse response = getOMKeyRenameRequest(mismatchRequest).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.UPDATE_ID_NOT_MATCH, response.getOMResponse().getStatus());
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbFromKey));
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey));
+
+    OMRequest matchRequest = doPreExecute(omRequest.toBuilder().setRenameKeyRequest(
+        omRequest.getRenameKeyRequest().toBuilder().setUpdateID(updateID)).build());
+    response = getOMKeyRenameRequest(matchRequest).validateAndUpdateCache(ozoneManager, 101L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbFromKey));
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey));
   }
 
   @Override
@@ -338,6 +365,19 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   @Override
   protected OMKeyRenameRequest getOMKeyRenameRequest(OMRequest omRequest) {
     return new OMKeyRenameRequestWithFSO(omRequest, getBucketLayout());
+  }
+
+  @Override
+  protected OMKeyRenameRequest createDeniedRenameRequest() {
+    return new OMKeyRenameRequestWithFSO(
+        createRenameKeyRequest(volumeName, bucketName, fromKeyName, toKeyName),
+        getBucketLayout()) {
+      @Override
+      protected void checkACLsWithFSO(OzoneManager ozoneManager, String volumeName,
+          String bucketName, String keyName, IAccessAuthorizer.ACLType aclType) throws IOException {
+        throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
   }
 
   @Override

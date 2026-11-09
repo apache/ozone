@@ -34,7 +34,10 @@ set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/license"}
+CHECK=license
+
+BASE_DIR="$(pwd -P)"
+REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="${REPORT_DIR}/summary.txt"
 
@@ -42,7 +45,7 @@ DEFAULT_SRC="target/generated-sources/license/THIRD-PARTY.txt"
 src="${1:-${DEFAULT_SRC}}"
 
 if [[ ! -e ${src} ]]; then
-  MAVEN_OPTIONS="-B -fae -DskipDocs -DskipRecon --no-transfer-progress ${MAVEN_OPTIONS:-}"
+  MAVEN_OPTIONS="-B -fae -DskipRecon --no-transfer-progress ${MAVEN_OPTIONS:-}"
   mvn ${MAVEN_OPTIONS} license:aggregate-add-third-party | tee "${REPORT_DIR}/output.log"
   src="${DEFAULT_SRC}"
 fi

@@ -64,8 +64,9 @@ import org.slf4j.LoggerFactory;
  * {@link TestOfsGetFileChecksumRpcBenchmark}: {@link #NUM_BUCKETS} buckets are listed
  * {@link #ACCESSES_PER_BUCKET} times each from a shuffled access sequence, single-threaded and with
  * {@link #CONCURRENT_THREADS} client threads. Each listed directory holds {@link #FILES_PER_DIR} files, so the
- * entries fit in one page; {@code BasicRootedOzoneFileSystem} still lists until a page adds nothing, so each
- * listStatus makes {@link #LISTINGS_PER_CALL} adapter listings on both arms.
+ * entries fit in one page, and since HDDS-16943 OM reports that page as complete, so each listStatus makes
+ * {@link #LISTINGS_PER_CALL} adapter listing. Before HDDS-16943 the client listed until a page added nothing,
+ * which took two listings.
  */
 @Tag("benchmark")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -83,8 +84,8 @@ public class TestOfsListStatusRpcBenchmark {
   private static final int CONCURRENT_THREADS = 10;
   /** Entries in each listed directory. */
   private static final int FILES_PER_DIR = 10;
-  /** Adapter listings per listStatus: the page with the entries, then one that adds nothing. */
-  private static final int LISTINGS_PER_CALL = 2;
+  /** Adapter listings per listStatus: one page, which OM reports as complete (HDDS-16943). */
+  private static final int LISTINGS_PER_CALL = 1;
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
@@ -150,9 +151,8 @@ public class TestOfsListStatusRpcBenchmark {
   }
 
   /**
-   * Invariants that hold on both the baseline and the fixed code, so the identical benchmark passes in either
-   * worktree: every listStatus issues {@link #LISTINGS_PER_CALL} listing RPCs, and the bucket and volume RPCs stay
-   * within one per listing.
+   * Invariants of the workload: every listStatus issues {@link #LISTINGS_PER_CALL} listing RPCs, and the bucket and
+   * volume RPCs stay within one per listing.
    */
   private void assertWorkloadInvariants(Result r) {
     long listings = (long) TOTAL_CALLS * LISTINGS_PER_CALL;

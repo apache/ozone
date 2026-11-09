@@ -30,6 +30,7 @@ public class TestS3GActionIamMapper {
   public void mapsCoreObjectActions() {
     assertEquals("ListBucket", S3GActionIamMapper.toS3ActionString(S3GAction.GET_BUCKET));
     assertEquals("ListBucket", S3GActionIamMapper.toS3ActionString(S3GAction.HEAD_BUCKET));
+    assertEquals("ListBucketVersions", S3GActionIamMapper.toS3ActionString(S3GAction.LIST_OBJECT_VERSIONS));
     assertEquals("CreateBucket", S3GActionIamMapper.toS3ActionString(S3GAction.CREATE_BUCKET));
     assertEquals("DeleteBucket", S3GActionIamMapper.toS3ActionString(S3GAction.DELETE_BUCKET));
     assertEquals("GetBucketAcl", S3GActionIamMapper.toS3ActionString(S3GAction.GET_ACL));

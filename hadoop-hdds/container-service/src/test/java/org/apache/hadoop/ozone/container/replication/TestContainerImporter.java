@@ -29,6 +29,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -189,6 +190,15 @@ class TestContainerImporter {
                 tarFile.toPath(), null, NO_COMPRESSION));
     Assertions.assertTrue(scException.getMessage().
         contains("Container checksum error"));
+  }
+
+  @Test
+  void testImportContainerChecksContainerID() throws Exception {
+    File tarFile = containerTarFile(containerId, containerData);
+    StorageContainerException ex = assertThrows(StorageContainerException.class,
+        () -> containerImporter.importContainer(containerId + 1, tarFile.toPath(), null, NO_COMPRESSION));
+    assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, ex.getResult());
+    verify(controllerMock, never()).importContainer(any(), any(), any());
   }
 
   @Test

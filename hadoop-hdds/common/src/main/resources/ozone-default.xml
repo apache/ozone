@@ -1221,7 +1221,11 @@
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
-      The heartbeat interval from a Datanode to Recon.
+      The heartbeat interval from a Datanode to Recon. The Datanode sends
+      the heartbeat to Recon together with a heartbeat to SCM, so the
+      interval is at least hdds.heartbeat.interval. It is at most a third
+      of ozone.scm.stale.node.interval, so that Recon does not mark the
+      Datanode as stale.
     </description>
   </property>
   <property>
@@ -1839,6 +1843,17 @@
     <description>
       Maximum number of Pipeline Actions sent by the datanode to SCM in a
       single heartbeat.
+    </description>
+  </property>
+  <property>
+    <name>hdds.heartbeat.report.max.limit</name>
+    <value>10000</value>
+    <tag>DATANODE</tag>
+    <description>
+      Maximum number of report messages (not containers) a datanode includes in
+      a single heartbeat to an SCM or Recon endpoint. Reports beyond the limit
+      stay queued and are sent in an immediate follow-up heartbeat. Values below
+      1 are treated as 1.
     </description>
   </property>
   <property>
@@ -2569,8 +2584,8 @@
     <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM
-      SCM allocates and deletes blocks only for this service user or an SCM admin, so the property must be set in the
-      configuration of SCM as well.
+      SCM issues an OM certificate only to this service user, and allocates and deletes blocks only for this service
+      user or an SCM admin, so the property must be set in the configuration of SCM as well.
     </description>
   </property>
   <property>
@@ -3770,6 +3785,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.scm.snapshot.connection.timeout</name>
+    <value>60s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Connection timeout for the HTTP(S) call made by Recon to download the SCM DB checkpoint,
+      used when hdds.grpc.tls.enabled is true.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.snapshot.read.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Read timeout for the HTTP(S) call made by Recon to download the SCM DB checkpoint,
+      used when hdds.grpc.tls.enabled is true. SCM creates the checkpoint before it sends
+      any data, so this should cover the checkpoint creation time.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.task.thread.count</name>
     <value>1</value>
     <tag>OZONE, RECON</tag>
@@ -3926,7 +3960,8 @@
     <value/>
     <description>
       The supported SSL protocols used to restrict connections towards the WebUI of different components,
-      and the S3 GateWay.
+      and the S3 GateWay. If unset, hadoop.ssl.enabled.protocols is used when it is explicitly configured,
+      otherwise TLSv1.2,TLSv1.3.
     </description>
   </property>
   <property>
@@ -4000,6 +4035,18 @@
     <tag>OZONE, CLIENT, SECURITY</tag>
     <value>10d</value>
     <description>Ozone client security key provider cache expiration time.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.om.version.refresh.interval</name>
+    <value>10m</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The interval after which the cached OM version is refreshed on the next version check.
+      Clients do not poll in the background. Failed refreshes retain the cached version and wait
+      for this interval before retrying. Supports time unit suffixes; milliseconds are assumed
+      if no unit is specified.
     </description>
   </property>
 
@@ -4351,7 +4398,8 @@
     <value>5s</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The minimum timeout duration for SCM ratis leader
-      election. Default is 1s.</description>
+      election. Default is 5s. It is used as raft.server.rpc.timeout.min of SCM's Ratis server,
+      and raft.server.rpc.timeout.max is set to this value plus 200ms.</description>
   </property>
   <property>
     <name>ozone.scm.ha.raft.server.rpc.first-election.timeout</name>
@@ -5098,6 +5146,16 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.diff.optimized.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      When true, snapshot diff jobs use the optimized merge-join pipeline instead
+      of the legacy object-id map diff path.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.secret.key.file.name</name>
     <value>secret_keys.json</value>
     <tag>SCM, SECURITY</tag>
@@ -5267,6 +5325,8 @@
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
       own fully qualified hostname at startup. The _HOST placeholder
       allows using the same configuration setting on all Datanodes.
+      SCM issues a Datanode certificate only to this service user, so the
+      property must be set in the configuration of SCM as well.
     </description>
   </property>
   <property>

@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.PriorityQueue;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 
 /**
@@ -50,7 +51,6 @@ public final class LatestVersionedKWayMergeIterator implements
   public static final int ROCKS_TYPE_VALUE = 1;
   private static final int DEFAULT_READ_AHEAD_SIZE = 2 * 1024 * 1024;
 
-  private final ManagedOptions options;
   private final List<ClosableIterator<? extends MergeHead>> iterators;
   private final Long exclusiveMinSequenceNumber;
 
@@ -59,41 +59,45 @@ public final class LatestVersionedKWayMergeIterator implements
   private List<MergedKeyValue> emitQueue;
   private boolean initialized;
 
-  public static LatestVersionedKWayMergeIterator overRawSstFiles(Collection<Path> sstFiles) {
-    return overRawSstFiles(sstFiles, DEFAULT_READ_AHEAD_SIZE, null);
-  }
-
-  public static LatestVersionedKWayMergeIterator overRawSstFiles(Collection<Path> sstFiles,
-      int readAheadSizePerFile) {
-    return overRawSstFiles(sstFiles, readAheadSizePerFile, null);
-  }
-
   /**
-   * Opens one iterator per SST file and merges them.
+   * Opens one iterator per SST file and merges them within an optional user-key range.
+   *
+   * <p>Caller contract: {@code fromUserKeyInclusive} and {@code toUserKeyExclusive} are wrapped by
+   * native {@link org.apache.hadoop.hdds.utils.db.managed.ManagedSlice} objects without copying.
+   * Callers must not mutate either array until the returned iterator is closed.
    *
    * @param exclusiveMinSequenceNumber when non-null, each source skips entries with
    *        sequence {@code <=} this value while advancing; when null, no entries are skipped
+   * @param fromUserKeyInclusive when non-null and non-empty, each source seeks to this lower bound
+   * @param toUserKeyExclusive when non-null and non-empty, each source stops before this upper bound
    */
   public static LatestVersionedKWayMergeIterator overRawSstFiles(Collection<Path> sstFiles,
-      int readAheadSizePerFile, Long exclusiveMinSequenceNumber) {
+      int readAheadSizePerFile, Long exclusiveMinSequenceNumber,
+      byte[] fromUserKeyInclusive, byte[] toUserKeyExclusive) {
     Objects.requireNonNull(sstFiles, "sstFiles cannot be null");
-    ManagedOptions options = new ManagedOptions();
     List<ClosableIterator<? extends MergeHead>> sources = new ArrayList<>(sstFiles.size());
-    try {
+    try (ManagedOptions options = new ManagedOptions()) {
       for (Path file : sstFiles) {
-        sources.add(new RawSstIterator(options, file, readAheadSizePerFile));
+        sources.add(new RawSstIterator(options, file, readAheadSizePerFile, fromUserKeyInclusive,
+            toUserKeyExclusive));
       }
-      return new LatestVersionedKWayMergeIterator(options, sources, exclusiveMinSequenceNumber);
     } catch (RuntimeException e) {
       IOUtils.closeQuietly(sources);
-      options.close();
       throw e;
     }
+    return new LatestVersionedKWayMergeIterator(sources, exclusiveMinSequenceNumber);
   }
 
+  /**
+   * Opens one iterator per SST file, skipping entries at or below {@code exclusiveMinSequenceNumber}.
+   *
+   * <p>Bound arrays must stay unchanged until the returned iterator is closed; see
+   * {@link #overRawSstFiles(Collection, int, Long, byte[], byte[])}.
+   */
   public static LatestVersionedKWayMergeIterator overRawSstFilesFromSequence(Collection<Path> sstFiles,
-      long exclusiveMinSequenceNumber) {
-    return overRawSstFiles(sstFiles, DEFAULT_READ_AHEAD_SIZE, exclusiveMinSequenceNumber);
+      long exclusiveMinSequenceNumber, byte[] fromUserKeyInclusive, byte[] toUserKeyExclusive) {
+    return overRawSstFiles(sstFiles, DEFAULT_READ_AHEAD_SIZE, exclusiveMinSequenceNumber,
+        fromUserKeyInclusive, toUserKeyExclusive);
   }
 
   @VisibleForTesting
@@ -101,14 +105,12 @@ public final class LatestVersionedKWayMergeIterator implements
       List<ClosableIterator<MergedKeyValue>> iterators, Long exclusiveMinSequenceNumber) {
     List<ClosableIterator<? extends MergeHead>> sources = new ArrayList<>(iterators.size());
     sources.addAll(iterators);
-    return new LatestVersionedKWayMergeIterator(null, sources, exclusiveMinSequenceNumber);
+    return new LatestVersionedKWayMergeIterator(sources, exclusiveMinSequenceNumber);
   }
 
   private LatestVersionedKWayMergeIterator(
-      ManagedOptions options,
       List<ClosableIterator<? extends MergeHead>> iterators,
       Long exclusiveMinSequenceNumber) {
-    this.options = options;
     this.iterators = new ArrayList<>(Objects.requireNonNull(iterators, "iterators cannot be null"));
     this.exclusiveMinSequenceNumber = exclusiveMinSequenceNumber;
     this.sourceHeads = new PriorityQueue<>(Math.max(this.iterators.size(), 1));
@@ -218,9 +220,6 @@ public final class LatestVersionedKWayMergeIterator implements
   @Override
   public void close() {
     IOUtils.closeQuietly(iterators);
-    if (options != null) {
-      options.close();
-    }
   }
 
   private static int compareUserKeys(byte[] left, byte[] right) {
@@ -371,21 +370,30 @@ public final class LatestVersionedKWayMergeIterator implements
   private static final class RawSstIterator implements ClosableIterator<RawSstHeapHead> {
     private final ManagedRawSSTFileReader reader;
     private final ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> iterator;
+    private final ManagedSlice fromSlice;
+    private final ManagedSlice toSlice;
     private boolean closed;
 
-    private RawSstIterator(ManagedOptions options, Path file, int readAheadSize) {
+    private RawSstIterator(ManagedOptions options, Path file, int readAheadSize,
+        byte[] fromUserKeyInclusive, byte[] toUserKeyExclusive) {
       ManagedRawSSTFileReader openedReader = new ManagedRawSSTFileReader(
           options, file.toAbsolutePath().toString(), readAheadSize);
+      ManagedSlice openedFromSlice = toManagedSlice(fromUserKeyInclusive);
+      ManagedSlice openedToSlice = toManagedSlice(toUserKeyExclusive);
       ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> openedIterator;
       try {
         openedIterator = openedReader.newIterator(
-            kv -> kv, null, null, IteratorType.KEY_AND_VALUE);
+            kv -> kv, openedFromSlice, openedToSlice, IteratorType.KEY_AND_VALUE);
       } catch (RuntimeException e) {
+        closeQuietly(openedToSlice);
+        closeQuietly(openedFromSlice);
         openedReader.close();
         throw e;
       }
       this.reader = openedReader;
       this.iterator = openedIterator;
+      this.fromSlice = openedFromSlice;
+      this.toSlice = openedToSlice;
     }
 
     @Override
@@ -411,8 +419,27 @@ public final class LatestVersionedKWayMergeIterator implements
         return;
       }
       closed = true;
-      iterator.close();
-      reader.close();
+      if (iterator != null) {
+        iterator.close();
+      }
+      if (reader != null) {
+        reader.close();
+      }
+      closeQuietly(toSlice);
+      closeQuietly(fromSlice);
+    }
+
+    private static ManagedSlice toManagedSlice(byte[] key) {
+      if (key == null || key.length == 0) {
+        return null;
+      }
+      return new ManagedSlice(key);
+    }
+
+    private static void closeQuietly(ManagedSlice slice) {
+      if (slice != null) {
+        slice.close();
+      }
     }
   }
 
