@@ -910,9 +910,7 @@ public class TestHddsDispatcher {
       final DispatcherContext[] notVerify = {
           newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA),
           newContext(Op.READ_STATE_MACHINE_DATA),
-          newContext(Op.APPLY_TRANSACTION),
-          newContext(Op.STREAM_LINK, WriteChunkStage.COMMIT_DATA),
-          newContext(Op.STREAM_COMMAND, WriteChunkStage.COMMIT_DATA)
+          newContext(Op.APPLY_TRANSACTION)
       };
       for (DispatcherContext context : notVerify) {
         LOG.info("notVerify {}", context);
@@ -929,6 +927,8 @@ public class TestHddsDispatcher {
           Op.HANDLE_WRITE_CHUNK,
           Op.HANDLE_SHORT_CIRCUIT_READ,
           Op.STREAM_INIT,
+          Op.STREAM_LINK,
+          Op.STREAM_COMMAND,
       };
 
       for (Op op : verify) {
