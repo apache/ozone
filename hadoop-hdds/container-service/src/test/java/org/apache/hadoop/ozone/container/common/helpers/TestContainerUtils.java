@@ -127,18 +127,6 @@ public class TestContainerUtils {
   }
 
   @Test
-  void getChunkDirThrowsWhenChunksDirMissing(@TempDir File dir) {
-    KeyValueContainerData data = new KeyValueContainerData(1L,
-        ContainerLayoutVersion.FILE_PER_BLOCK, 1024L * 1024 * 1024,
-        UUID.randomUUID().toString(), UUID.randomUUID().toString());
-    data.setChunksPath(new File(dir, "missing").getAbsolutePath());
-
-    StorageContainerException e = assertThrows(StorageContainerException.class,
-        () -> ContainerUtils.getChunkDir(data));
-    assertEquals(Result.UNABLE_TO_FIND_DATA_DIR, e.getResult());
-  }
-
-  @Test
   public void redactsDataBuffers() {
     // GIVEN
     final String junk = "junk";

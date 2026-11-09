@@ -225,8 +225,7 @@ public class FilePerChunkStrategy implements ChunkManager {
     HddsVolume volume = containerData.getVolume();
 
     // In version1, we verify checksum if it is available and return data
-    // of the chunk file. Reads use the cached chunks directory to skip the
-    // per-read stat; writes keep validating so a missing directory is detected.
+    // of the chunk file.
     File finalChunkFile = FILE_PER_CHUNK.getChunkFile(
         containerData.getChunksDirForRead(), blockID, info.getChunkName());
 
@@ -288,6 +287,7 @@ public class FilePerChunkStrategy implements ChunkManager {
         }
       }
     }
+    // Report a missing chunks directory rather than the missing chunk.
     ContainerUtils.getChunkDir(containerData);
     throw new StorageContainerException(
         "Chunk file can't be found " + possibleFiles.toString(),

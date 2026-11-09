@@ -238,8 +238,6 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     HddsVolume volume = containerData.getVolume();
 
-    // Reads use the cached chunks directory to skip the per-read stat; writes
-    // keep validating via getChunkFile so a missing directory is still detected.
     final File chunkFile = FILE_PER_BLOCK.getChunkFile(containerData.getChunksDirForRead(), blockID, null);
 
     final long len = info.getLen();
@@ -254,6 +252,7 @@ public class FilePerBlockStrategy implements ChunkManager {
       return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
           readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
     } catch (StorageContainerException ex) {
+      // Report a missing chunks directory rather than the failed read.
       ContainerUtils.getChunkDir(containerData);
       throw ex;
     }

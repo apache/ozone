@@ -79,8 +79,7 @@ public abstract class ContainerData {
   // Path to Physical file system where chunks are stored.
   private String chunksPath;
 
-  // Chunks directory resolved and validated once from chunksPath, cached to
-  // avoid re-stat-ing it on every chunk operation. Not serialized.
+  // Chunks directory resolved and validated once from chunksPath, cached for reads. Not serialized.
   private transient volatile File chunksDirFile;
 
   // State of the Container
