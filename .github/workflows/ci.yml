@@ -189,6 +189,7 @@ jobs:
       java-version: ${{ matrix.java }}
       needs-ozone-source-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
+      runner: ${{ matrix.os }}
       script: compile
       script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dozone.java.version.server=${{ matrix.java }}"
       sha: ${{ needs.build-info.outputs.sha }}
