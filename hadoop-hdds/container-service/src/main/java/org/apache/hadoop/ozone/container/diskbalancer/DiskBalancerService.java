@@ -240,11 +240,8 @@ public class DiskBalancerService extends BackgroundService {
       if (diskBalancerInfoFile.exists()) {
         diskBalancerInfo = readDiskBalancerInfoFile(diskBalancerInfoFile);
       } else {
-        boolean shouldRunDefault =
-            conf.getObject(DiskBalancerConfiguration.class)
-                .getDiskBalancerShouldRun();
-        diskBalancerInfo = new DiskBalancerInfo(shouldRunDefault,
-            new DiskBalancerConfiguration());
+        DiskBalancerConfiguration diskBalancerConf = conf.getObject(DiskBalancerConfiguration.class);
+        diskBalancerInfo = new DiskBalancerInfo(diskBalancerConf.getDiskBalancerShouldRun(), diskBalancerConf);
       }
     } catch (IOException e) {
       LOG.warn("Can not load diskBalancerInfo from diskBalancer.info file. " +

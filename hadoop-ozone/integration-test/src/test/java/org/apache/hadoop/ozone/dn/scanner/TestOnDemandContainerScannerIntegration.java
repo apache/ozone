@@ -39,13 +39,14 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandScannerMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -73,38 +74,38 @@ class TestOnDemandContainerScannerIntegration
    - Block checksums are verified on the client side. If there is a checksum
    error during read, the datanode will not learn about it.
    */
-  static Collection<TestContainerCorruptions> supportedCorruptionTypes() {
-    return TestContainerCorruptions.getAllParamsExcept(
-        TestContainerCorruptions.MISSING_METADATA_DIR,
-        TestContainerCorruptions.MISSING_CONTAINER_FILE,
-        TestContainerCorruptions.CORRUPT_CONTAINER_FILE,
-        TestContainerCorruptions.TRUNCATED_CONTAINER_FILE,
-        TestContainerCorruptions.CORRUPT_BLOCK,
-        TestContainerCorruptions.TRUNCATED_BLOCK);
+  static Collection<ContainerTestCorruptions> supportedCorruptionTypes() {
+    return ContainerTestCorruptions.getAllParamsExcept(
+        ContainerTestCorruptions.MISSING_METADATA_DIR,
+        ContainerTestCorruptions.MISSING_CONTAINER_FILE,
+        ContainerTestCorruptions.CORRUPT_CONTAINER_FILE,
+        ContainerTestCorruptions.TRUNCATED_CONTAINER_FILE,
+        ContainerTestCorruptions.CORRUPT_BLOCK,
+        ContainerTestCorruptions.TRUNCATED_BLOCK);
   }
 
-  static Collection<TestContainerCorruptions> supportedCorruptionTypesForOpen() {
-    Set<TestContainerCorruptions> set = EnumSet.copyOf(supportedCorruptionTypes());
+  static Collection<ContainerTestCorruptions> supportedCorruptionTypesForOpen() {
+    Set<ContainerTestCorruptions> set = EnumSet.copyOf(supportedCorruptionTypes());
     // Open containers will be checked only for metadata corruption, so missing block is not a valid corruption type.
-    set.remove(TestContainerCorruptions.MISSING_BLOCK);
+    set.remove(ContainerTestCorruptions.MISSING_BLOCK);
     return set;
   }
 
   @BeforeAll
   static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED,
-        true);
-    // Disable both background container scanners to make sure only the
-    // on-demand scanner is detecting failures.
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED,
-        false);
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED,
-        false);
+    ContainerScannerConfiguration scannerConfig = ozoneConfig.getObject(ContainerScannerConfiguration.class);
+    scannerConfig.setEnabled(true);
+    // Disable the background metadata scanner.
+    scannerConfig.setMetadataScanEnabled(false);
+    ozoneConfig.setFromObject(scannerConfig);
     buildCluster(ozoneConfig);
+  }
+
+  @BeforeEach
+  void pauseBackgroundScanners() {
+    // Disabling data scanning also disables the on-demand scanner, so pause background scanning instead.
+    pauseScanner();
   }
 
   /**
@@ -113,7 +114,7 @@ class TestOnDemandContainerScannerIntegration
    */
   @ParameterizedTest
   @MethodSource("supportedCorruptionTypes")
-  void testCorruptionDetected(TestContainerCorruptions corruption)
+  void testCorruptionDetected(ContainerTestCorruptions corruption)
       throws Exception {
     String keyName = "testKey";
     long containerID = writeDataThenCloseContainer(keyName);
@@ -141,8 +142,8 @@ class TestOnDemandContainerScannerIntegration
     corruption.assertLogged(containerID, 1, logCapturer);
     long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
 
-    if (corruption == TestContainerCorruptions.MISSING_METADATA_DIR ||
-        corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR) {
+    if (corruption == ContainerTestCorruptions.MISSING_METADATA_DIR ||
+        corruption == ContainerTestCorruptions.MISSING_CONTAINER_DIR) {
       // In these cases, the new tree will not be able to be written since it exists in the metadata directory.
       // When the tree write fails, the in-memory checksum should remain at its original value.
       assertEquals(initialReportedDataChecksum, newReportedDataChecksum);
@@ -164,7 +165,7 @@ class TestOnDemandContainerScannerIntegration
    */
   @ParameterizedTest
   @MethodSource("supportedCorruptionTypesForOpen")
-  void testCorruptionDetectedForOpenContainers(TestContainerCorruptions corruption)
+  void testCorruptionDetectedForOpenContainers(ContainerTestCorruptions corruption)
       throws Exception {
     String keyName = "keyName";
 

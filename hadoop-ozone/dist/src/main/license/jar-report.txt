@@ -12,9 +12,6 @@ share/ozone/lib/asm-util.jar
 share/ozone/lib/asm.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/avro.jar
-share/ozone/lib/aws-java-sdk-core.jar
-share/ozone/lib/aws-java-sdk-kms.jar
-share/ozone/lib/aws-java-sdk-s3.jar
 share/ozone/lib/bcpkix-jdk18on.jar
 share/ozone/lib/bcprov-jdk18on.jar
 share/ozone/lib/bcutil-jdk18on.jar
@@ -72,7 +69,6 @@ share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
 share/ozone/lib/hdds-container-service.jar
-share/ozone/lib/hdds-docs.jar
 share/ozone/lib/hdds-erasurecode.jar
 share/ozone/lib/hdds-interface-admin.jar
 share/ozone/lib/hdds-interface-client.jar
@@ -98,7 +94,6 @@ share/ozone/lib/j2objc-annotations.jar
 share/ozone/lib/jackson-annotations.jar
 share/ozone/lib/jackson-core.jar
 share/ozone/lib/jackson-databind.jar
-share/ozone/lib/jackson-dataformat-cbor.jar
 share/ozone/lib/jackson-dataformat-xml.jar
 share/ozone/lib/jackson-datatype-jsr310.jar
 share/ozone/lib/jackson-jaxrs-base.jar
@@ -109,6 +104,7 @@ share/ozone/lib/jakarta.activation.jar
 share/ozone/lib/jakarta.annotation-api.jar
 share/ozone/lib/jakarta.inject-api.jar
 share/ozone/lib/jakarta.inject.jar
+share/ozone/lib/jakarta.transaction-api.jar
 share/ozone/lib/jakarta.validation-api.jar
 share/ozone/lib/jakarta.ws.rs-api.jar
 share/ozone/lib/jakarta.xml.bind-api.jar
@@ -117,7 +113,6 @@ share/ozone/lib/javax.annotation-api.jar
 share/ozone/lib/javax.el-api.jar
 share/ozone/lib/javax.inject.jar
 share/ozone/lib/javax.interceptor-api.jar
-share/ozone/lib/javax.servlet-api.jar
 share/ozone/lib/jaxb-core.jar
 share/ozone/lib/jaxb-impl.jar
 share/ozone/lib/jaxb-runtime.jar
@@ -135,14 +130,25 @@ share/ozone/lib/jersey-media-jaxb.jar
 share/ozone/lib/jersey-media-json-jackson.jar
 share/ozone/lib/jersey-server.jar
 share/ozone/lib/jettison.jar
+share/ozone/lib/jetty-annotations.jar
+share/ozone/lib/jetty-ee-webapp.jar
+share/ozone/lib/jetty-ee8-annotations.jar
+share/ozone/lib/jetty-ee8-cdi.jar
+share/ozone/lib/jetty-ee8-nested.jar
+share/ozone/lib/jetty-ee8-plus.jar
+share/ozone/lib/jetty-ee8-security.jar
+share/ozone/lib/jetty-ee8-servlet.jar
+share/ozone/lib/jetty-ee8-webapp.jar
 share/ozone/lib/jetty-http.jar
 share/ozone/lib/jetty-io.jar
+share/ozone/lib/jetty-jndi.jar
+share/ozone/lib/jetty-plus.jar
 share/ozone/lib/jetty-security.jar
 share/ozone/lib/jetty-server.jar
-share/ozone/lib/jetty-servlet.jar
+share/ozone/lib/jetty-servlet-api.jar
+share/ozone/lib/jetty-session.jar
 share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
-share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
 share/ozone/lib/jffi-native.jar
 share/ozone/lib/jffi.jar
@@ -151,7 +157,6 @@ share/ozone/lib/jgrapht-ext.jar
 share/ozone/lib/jgraphx.jar
 share/ozone/lib/jheaps.jar
 share/ozone/lib/jline.jar
-share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jnr-a64asm.jar
 share/ozone/lib/jnr-constants.jar
 share/ozone/lib/jnr-ffi.jar
@@ -231,6 +236,8 @@ share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-cli-admin.jar
 share/ozone/lib/ozone-cli-debug.jar
 share/ozone/lib/ozone-cli-interactive.jar
+share/ozone/lib/ozone-cli-local.jar
+share/ozone/lib/ozone-cli-other.jar
 share/ozone/lib/ozone-cli-repair.jar
 share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-client.jar
@@ -252,7 +259,6 @@ share/ozone/lib/ozone-recon.jar
 share/ozone/lib/ozone-reconcodegen.jar
 share/ozone/lib/ozone-s3-secret-store.jar
 share/ozone/lib/ozone-s3gateway.jar
-share/ozone/lib/ozone-tools.jar
 share/ozone/lib/ozone-vapor.jar
 share/ozone/lib/parquet-avro.jar
 share/ozone/lib/parquet-column.jar
@@ -267,10 +273,10 @@ share/ozone/lib/picocli-shell-jline3.jar
 share/ozone/lib/picocli.jar
 share/ozone/lib/proto-google-common-protos.jar
 share/ozone/lib/protobuf-java.jar
-share/ozone/lib/protobuf-java.jar
 share/ozone/lib/ranger-audit-core.jar
 share/ozone/lib/ranger-authz-api.jar
 share/ozone/lib/ranger-common-utils.jar
+share/ozone/lib/r2dbc-spi.RELEASE.jar
 share/ozone/lib/ranger-intg.jar
 share/ozone/lib/ranger-plugin-classloader.jar
 share/ozone/lib/ranger-plugins-common.jar
@@ -288,6 +294,7 @@ share/ozone/lib/ratis-shell.jar
 share/ozone/lib/ratis-thirdparty-misc.jar
 share/ozone/lib/ratis-tools.jar
 share/ozone/lib/re2j.jar
+share/ozone/lib/reactive-streams.jar
 share/ozone/lib/reflections.jar
 share/ozone/lib/reload4j.jar
 share/ozone/lib/retrofit.jar

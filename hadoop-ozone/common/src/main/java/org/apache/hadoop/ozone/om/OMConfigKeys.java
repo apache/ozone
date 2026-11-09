@@ -285,12 +285,6 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
-  public static final String
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY
-      = "ozone.om.ratis.server.retry.cache.timeout";
-  public static final TimeDuration
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY
       = "ozone.om.ratis.minimum.timeout";
   public static final TimeDuration OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
@@ -710,6 +704,19 @@ public final class OMConfigKeys {
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
       = 1_000_000_000L;
 
+  public static final String
+      OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB
+      = "ozone.om.snapshot.diff.max.in.memory.entries.per.job";
+  public static final int
+      OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT
+      = 1_000_000;
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED
+      = "ozone.om.snapshot.diff.optimized.enabled";
+
+  public static final boolean OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED_DEFAULT
+      = false;
+
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";
 
@@ -780,9 +787,23 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.local.data.manager.service.interval";
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
 
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL
+      = "ozone.om.sts.token.cleanup.service.interval";
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL_DEFAULT
+      = "3h";
+
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT
+      = "ozone.om.sts.token.cleanup.service.timeout";
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = "15m";
+
   public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
       "ozone.om.ratis.events.max.limit";
   public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
+
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL =
+      "ozone.om.upgrade.finalization.check.interval";
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL_DEFAULT = "1m";
 
   /**
    * Never constructed.

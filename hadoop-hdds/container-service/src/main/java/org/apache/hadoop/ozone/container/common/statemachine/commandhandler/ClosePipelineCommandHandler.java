@@ -153,10 +153,10 @@ public class ClosePipelineCommandHandler implements CommandHandler {
                       // command in another datanode
                       LOG.debug("Failed to remove group {} for pipeline {} on peer {} since the group has " +
                           "been removed by earlier close pipeline command handled in another datanode", raftGroupId,
-                          pipelineID, peer.getId());
+                          pipelineID, peer);
                     } catch (IOException ioe) {
                       LOG.warn("Failed to remove group {} of pipeline {} on peer {}",
-                          raftGroupId, pipelineID, peer.getId(), ioe);
+                          raftGroupId, pipelineID, peer, ioe);
                     }
                   });
             }

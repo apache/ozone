@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -144,15 +143,12 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
     }
 
-    Map<Integer, Pair<ContainerReplica, NodeStatus>> sources =
-        filterSources(replicas, deletionInFlight);
-    List<DatanodeDetails> availableSourceNodes =
-        sources.values().stream().map(Pair::getLeft)
-            .map(ContainerReplica::getDatanodeDetails)
-            .filter(datanodeDetails ->
-                datanodeDetails.getPersistedOpState() ==
-                    HddsProtos.NodeOperationalState.IN_SERVICE)
-            .collect(Collectors.toList());
+    Map<Integer, SourceReplica> sources = filterSources(replicas, deletionInFlight);
+    List<DatanodeDetails> availableSourceNodes = sources.values().stream()
+        .map(SourceReplica::replica)
+        .map(ContainerReplica::getDatanodeDetails)
+        .filter(dn -> dn.getPersistedOpState() == HddsProtos.NodeOperationalState.IN_SERVICE)
+        .collect(Collectors.toList());
 
     try {
       IOException firstException = null;
@@ -229,7 +225,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     return commandsSent;
   }
 
-  private Map<Integer, Pair<ContainerReplica, NodeStatus>> filterSources(
+  private Map<Integer, SourceReplica> filterSources(
       Set<ContainerReplica> replicas, List<DatanodeDetails> deletionInFlight) {
     return replicas.stream().filter(r -> r
             .getState() == State.CLOSED)
@@ -239,14 +235,13 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
         .map(r -> {
           try {
-            return Pair.of(r,
-                replicationManager.getNodeStatus(r.getDatanodeDetails()));
+            return new SourceReplica(r, replicationManager.getNodeStatus(r.getDatanodeDetails()));
           } catch (NodeNotFoundException e) {
             throw new IllegalStateException("Unable to find NodeStatus for "
                 + r.getDatanodeDetails(), e);
           }
         })
-        .filter(pair -> pair.getRight().isHealthy())
+        .filter(source -> source.nodeStatus().isHealthy())
         // If there are multiple nodes online for a given index, we just
         // pick any IN_SERVICE one. At the moment, the input streams cannot
         // handle multiple replicas for the same index, so if we passed them
@@ -254,10 +249,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         // If neither of the nodes are in service, we just pass one through,
         // as it will be decommission or maintenance.
         .collect(Collectors.toMap(
-            pair -> pair.getLeft().getReplicaIndex(),
-            pair -> pair,
+            source -> source.replica().getReplicaIndex(),
+            source -> source,
             (p1, p2) -> {
-              if (p1.getRight().getOperationalState() == IN_SERVICE) {
+              if (p1.nodeStatus().getOperationalState() == IN_SERVICE) {
                 return p1;
               } else {
                 return p2;
@@ -272,21 +267,44 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    */
   private int processMissingIndexes(
       ECContainerReplicaCount replicaCount, Map<Integer,
-      Pair<ContainerReplica, NodeStatus>> sources,
+      SourceReplica> sources,
+      List<DatanodeDetails> availableSourceNodes,
+      List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> usedNodes) throws IOException {
+    List<Integer> missingIndexes = replicaCount.unavailableIndexes(true);
+    if (missingIndexes.isEmpty()) {
+      return 0;
+    }
+    return processReconstruction(replicaCount, missingIndexes, sources,
+        availableSourceNodes, excludedNodes, usedNodes);
+  }
+
+  /**
+   * Core logic to schedule an EC reconstruction command.
+   *
+   * @param replicaCount the current replica count of the container
+   * @param missingIndexes the indexes that need to be reconstructed
+   * @param sources available source replicas
+   * @param availableSourceNodes healthy source nodes
+   * @param excludedNodes nodes to be excluded from target selection
+   * @param usedNodes nodes already used for this container
+   * @return number of commands sent
+   * @throws IOException if an error occurs
+   */
+  private int processReconstruction(
+      ECContainerReplicaCount replicaCount,
+      List<Integer> missingIndexes,
+      Map<Integer, SourceReplica> sources,
       List<DatanodeDetails> availableSourceNodes,
       List<DatanodeDetails> excludedNodes,
       List<DatanodeDetails> usedNodes) throws IOException {
     ContainerInfo container = replicaCount.getContainer();
     ECReplicationConfig repConfig =
-        (ECReplicationConfig)container.getReplicationConfig();
-    List<Integer> missingIndexes = replicaCount.unavailableIndexes(true);
-    LOG.debug("Processing missing indexes {} for container {}.", missingIndexes,
-        container.containerID());
+        (ECReplicationConfig) container.getReplicationConfig();
+    LOG.debug("Processing reconstruction of indexes {} for container {}.",
+        missingIndexes, container.containerID());
     final int expectedTargetCount = missingIndexes.size();
     boolean recoveryIsCritical = expectedTargetCount == repConfig.getParity();
-    if (expectedTargetCount == 0) {
-      return 0;
-    }
 
     int commandsSent = 0;
     if (sources.size() >= repConfig.getData()) {
@@ -295,9 +313,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       final boolean hasOverloaded = !excludedDueToLoad.isEmpty();
       final List<DatanodeDetails> excludedOrOverloadedNodes = hasOverloaded
           ? new ArrayList<>(ImmutableSet.<DatanodeDetails>builder()
-              .addAll(excludedNodes)
-              .addAll(excludedDueToLoad)
-              .build())
+          .addAll(excludedNodes)
+          .addAll(excludedDueToLoad)
+          .build())
           : excludedNodes;
 
       // placement with overloaded nodes excluded
@@ -347,18 +365,45 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             selectedDatanodes, availableSourceNodes);
       }
       if (0 < targetCount) {
-        usedNodes.addAll(selectedDatanodes);
-        // TODO - what are we adding all the selected nodes to available
-        //        sources?
-        availableSourceNodes.addAll(selectedDatanodes);
         List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
             sourceDatanodesWithIndex = new ArrayList<>();
-        for (Pair<ContainerReplica, NodeStatus> src : sources.values()) {
+
+        // If we have more than the required number of data blocks, we can
+        // prefer IN_SERVICE nodes to avoid overloading decommissioning nodes.
+        List<SourceReplica> sortedSources =
+            sources.values().stream()
+                .sorted((p1, p2) -> {
+                  boolean p1InService = p1.nodeStatus().getOperationalState() == IN_SERVICE;
+                  boolean p2InService = p2.nodeStatus().getOperationalState() == IN_SERVICE;
+                  if (p1InService && !p2InService) {
+                    return -1;
+                  }
+                  if (!p1InService && p2InService) {
+                    return 1;
+                  }
+                  return 0;
+                })
+                .collect(Collectors.toList());
+
+        int inServiceCount = 0;
+        for (SourceReplica src : sortedSources) {
+          if (src.nodeStatus().getOperationalState() == IN_SERVICE) {
+            inServiceCount++;
+          }
+        }
+
+        for (SourceReplica src : sortedSources) {
+          // If we have enough in-service nodes to fulfill the reconstruction
+          // requirements, we skip any out-of-service nodes.
+          if (inServiceCount >= repConfig.getData() &&
+              src.nodeStatus().getOperationalState() != IN_SERVICE) {
+            continue;
+          }
           sourceDatanodesWithIndex.add(
               new ReconstructECContainersCommand
                   .DatanodeDetailsAndReplicaIndex(
-                  src.getLeft().getDatanodeDetails(),
-                  src.getLeft().getReplicaIndex()));
+                  src.replica().getDatanodeDetails(),
+                  src.replica().getReplicaIndex()));
         }
 
         final ReconstructECContainersCommand reconstructionCommand =
@@ -366,13 +411,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 sourceDatanodesWithIndex, selectedDatanodes,
                 integers2ByteString(missingIndexes),
                 repConfig);
-        // This can throw a CommandTargetOverloadedException, but there is no
-        // point in retrying here. The sources we picked already have the
-        // overloaded nodes excluded, so we should not get an overloaded
-        // exception, but it could happen due to other threads adding work to
-        // the DNs. If it happens here, we just let the exception bubble up.
         replicationManager.sendThrottledReconstructionCommand(
             container, reconstructionCommand);
+        usedNodes.addAll(selectedDatanodes);
+        availableSourceNodes.addAll(selectedDatanodes);
         for (int i = 0; i < missingIndexes.size(); i++) {
           adjustPendingOps(
               replicaCount, selectedDatanodes.get(i), missingIndexes.get(i));
@@ -381,7 +423,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
       if (targetCount != expectedTargetCount) {
         LOG.debug("Insufficient nodes were returned from the placement policy" +
-            " to fully reconstruct container {}. Requested {} received {}",
+                " to fully reconstruct container {}. Requested {} received {}",
             container.getContainerID(), expectedTargetCount, targetCount);
         if (hasOverloaded && recoveryIsCritical) {
           metrics.incrECPartialReconstructionCriticalTotal();
@@ -398,9 +440,15 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               + " {}. Available sources are: {}", container.containerID(),
           repConfig.getData(), sources.size(), sources);
     }
-    LOG.trace("Sent {} commands for container {}.", commandsSent,
-        container.containerID());
     return commandsSent;
+  }
+
+  private static boolean hasSufficientSourcesForDecommissionReconstruction(Map<Integer, SourceReplica> sources,
+      Set<Integer> decomIndexes, int requiredDataSources) {
+    long nonDecommissionSourceCount = sources.keySet().stream()
+        .filter(index -> !decomIndexes.contains(index))
+        .count();
+    return nonDecommissionSourceCount >= requiredDataSources;
   }
 
   private List<DatanodeDetails> getTargetDatanodes(
@@ -421,77 +469,133 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    */
   private int processDecommissioningIndexes(
       ECContainerReplicaCount replicaCount,
-      Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
+      Map<Integer, SourceReplica> sources,
       List<DatanodeDetails> availableSourceNodes,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> usedNodes)
       throws IOException {
     ContainerInfo container = replicaCount.getContainer();
     Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
-    int commandsSent = 0;
-    if (!decomIndexes.isEmpty()) {
-      LOG.debug("Processing decommissioning indexes {} for container {}.",
-          decomIndexes, container.containerID());
-      final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
-          container, decomIndexes.size(), usedNodes, excludedNodes);
+    if (decomIndexes.isEmpty()) {
+      return 0;
+    }
 
-      ContainerPlacementStatus placementStatusWithSelectedTargets =
-          validatePlacement(container, availableSourceNodes, selectedDatanodes);
-      if (!placementStatusWithSelectedTargets.isPolicySatisfied()) {
-        LOG.debug("Target nodes + existing nodes for EC container {}" +
-                " will not satisfy placement policy {}. Reason: {}. Selected" +
-                " nodes: {}. Available source nodes: {}. Resuming recovery " +
-                "regardless.",
-            container.containerID(), containerPlacement.getClass().getName(),
-            placementStatusWithSelectedTargets.misReplicatedReason(),
-            selectedDatanodes, availableSourceNodes);
-      }
-
-      usedNodes.addAll(selectedDatanodes);
-      Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
-      // In this case we need to do one to one copy.
-      CommandTargetOverloadedException overloadedException = null;
-      for (Integer decomIndex : decomIndexes) {
-        Pair<ContainerReplica, NodeStatus> source = sources.get(decomIndex);
-        if (source == null) {
-          LOG.warn("Cannot find source replica for decommissioning index " +
-                  "{} in container {}", decomIndex, container.containerID());
+    if (replicationManager.getConfig().isEcDecommissionReconstructionEnabled()) {
+      ECReplicationConfig repConfig = (ECReplicationConfig) container.getReplicationConfig();
+      for (Integer index : decomIndexes) {
+        SourceReplica source = sources.get(index);
+        if (source == null || !replicationManager.isNodeHighlyLoaded(source.replica().getDatanodeDetails())) {
           continue;
         }
-        ContainerReplica sourceReplica = source.getLeft();
-        if (!iterator.hasNext()) {
-          LOG.warn("Couldn't find enough targets. Available source"
-              + " nodes: {}, the target nodes: {}, excluded nodes: {},"
-              + " usedNodes: {}, and the decommission indexes: {}",
-              sources.values().stream()
-                  .map(Pair::getLeft).collect(Collectors.toSet()),
-              selectedDatanodes, excludedNodes, usedNodes, decomIndexes);
+        if (!hasSufficientSourcesForDecommissionReconstruction(
+            sources, decomIndexes, repConfig.getData())) {
+          LOG.debug("Insufficient non-decommission sources to reconstruct "
+                  + "decommission indexes for container {}, using 1-1 "
+                  + "replication.",
+              container.containerID());
+          metrics.incrEcDecommissionReconstructionFallbackInsufficientSourcesTotal();
           break;
         }
-        try {
-          createReplicateCommand(
-              container, iterator, sourceReplica, replicaCount);
-          commandsSent++;
-        } catch (CommandTargetOverloadedException e) {
-          LOG.debug("Unable to send Replicate command for container {}" +
-              " index {} because the source node {} is overloaded.",
-              container.getContainerID(), sourceReplica.getReplicaIndex(),
-              sourceReplica.getDatanodeDetails());
-          overloadedException = e;
+        if (replicationManager.isReconstructionLimitReached()) {
+          LOG.debug("Global reconstruction limit reached for container {}, "
+              + "using 1-1 replication for decommission recovery.",
+              container.containerID());
+          metrics.incrEcReconstructionGlobalLimitReachedTotal();
+          break;
         }
+        LOG.info("Source node {} is highly loaded, switching to reconstruction for decommissioning container {}",
+            source.replica().getDatanodeDetails(), container.containerID());
+        try {
+          int commandsSent = processReconstruction(replicaCount,
+              new ArrayList<>(decomIndexes), sources, availableSourceNodes,
+              excludedNodes, usedNodes);
+          if (commandsSent > 0) {
+            metrics.incrEcReconstructionDecommissionTriggeredTotal();
+            return commandsSent;
+          }
+          metrics.incrEcDecommissionReconstructionFallbackNoOpTotal();
+        } catch (CommandTargetOverloadedException e) {
+          LOG.debug("Reconstruction throttled for decommissioning container "
+                  + "{}, using 1-1 replication.",
+              container.containerID(), e);
+          metrics.incrEcDecommissionReconstructionFallbackTargetOverloadedTotal();
+        } catch (InsufficientDatanodesException e) {
+          if (replicaCount.decommissioningOnlyIndexes(true).size() < decomIndexes.size()) {
+            metrics.incrEcReconstructionDecommissionTriggeredTotal();
+            throw e;
+          }
+          LOG.debug("Reconstruction could not place targets for decommissioning "
+                  + "container {}, using 1-1 replication.",
+              container.containerID(), e);
+          metrics.incrEcDecommissionReconstructionFallbackNoOpTotal();
+        }
+        break;
       }
-      if (overloadedException != null) {
-        throw overloadedException;
-      }
+    }
 
-      if (selectedDatanodes.size() != decomIndexes.size()) {
-        LOG.debug("Insufficient nodes were returned from the placement policy" +
-            " to fully replicate the decommission indexes for container {}." +
-            " Requested {} received {}", container.getContainerID(),
-            decomIndexes.size(), selectedDatanodes.size());
-        metrics.incrEcPartialReplicationForOutOfServiceReplicasTotal();
-        throw new InsufficientDatanodesException(decomIndexes.size(),
-            selectedDatanodes.size());
+    LOG.debug("Processing decommissioning indexes {} for container {}.",
+        decomIndexes, container.containerID());
+    final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
+        container, decomIndexes.size(), usedNodes, excludedNodes);
+
+    ContainerPlacementStatus placementStatusWithSelectedTargets =
+        validatePlacement(container, availableSourceNodes, selectedDatanodes);
+    if (!placementStatusWithSelectedTargets.isPolicySatisfied()) {
+      LOG.debug("Target nodes + existing nodes for EC container {}" +
+              " will not satisfy placement policy {}. Reason: {}. Selected" +
+              " nodes: {}. Available source nodes: {}. Resuming recovery " +
+              "regardless.",
+          container.containerID(), containerPlacement.getClass().getName(),
+          placementStatusWithSelectedTargets.misReplicatedReason(),
+          selectedDatanodes, availableSourceNodes);
+    }
+
+    usedNodes.addAll(selectedDatanodes);
+    Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
+    // In this case we need to do one to one copy.
+    int commandsSent = 0;
+    CommandTargetOverloadedException overloadedException = null;
+    for (Integer decomIndex : decomIndexes) {
+      SourceReplica source = sources.get(decomIndex);
+      if (source == null) {
+        LOG.warn("Cannot find source replica for decommissioning index " +
+                "{} in container {}", decomIndex, container.containerID());
+        continue;
       }
+      ContainerReplica sourceReplica = source.replica();
+      if (!iterator.hasNext()) {
+        LOG.warn("Couldn't find enough targets. Available source"
+            + " nodes: {}, the target nodes: {}, excluded nodes: {},"
+            + " usedNodes: {}, and the decommission indexes: {}",
+            sources.values().stream()
+                .map(SourceReplica::replica)
+                .collect(Collectors.toSet()),
+            selectedDatanodes, excludedNodes, usedNodes, decomIndexes);
+        break;
+      }
+      try {
+        createReplicateCommand(
+            container, iterator, sourceReplica, replicaCount);
+        commandsSent++;
+      } catch (CommandTargetOverloadedException e) {
+        LOG.debug("Unable to send Replicate command for container {}" +
+            " index {} because the source node {} is overloaded.",
+            container.getContainerID(), sourceReplica.getReplicaIndex(),
+            sourceReplica.getDatanodeDetails());
+        overloadedException = e;
+      }
+    }
+    if (overloadedException != null) {
+      throw overloadedException;
+    }
+
+    if (selectedDatanodes.size() != decomIndexes.size()) {
+      LOG.debug("Insufficient nodes were returned from the placement policy" +
+          " to fully replicate the decommission indexes for container {}." +
+          " Requested {} received {}", container.getContainerID(),
+          decomIndexes.size(), selectedDatanodes.size());
+      metrics.incrEcPartialReplicationForOutOfServiceReplicasTotal();
+      throw new InsufficientDatanodesException(decomIndexes.size(),
+          selectedDatanodes.size());
     }
     LOG.trace("Sent {} commands for container {}.", commandsSent,
         container.containerID());
@@ -508,7 +612,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    */
   private int processMaintenanceOnlyIndexes(
       ECContainerReplicaCount replicaCount,
-      Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
+      Map<Integer, SourceReplica> sources,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> usedNodes)
       throws IOException {
     Set<Integer> maintIndexes = replicaCount.maintenanceOnlyIndexes(true);
@@ -542,20 +646,21 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       if (additionalMaintenanceCopiesNeeded <= 0) {
         break;
       }
-      Pair<ContainerReplica, NodeStatus> source = sources.get(maintIndex);
+      SourceReplica source = sources.get(maintIndex);
       if (source == null) {
         LOG.warn("Cannot find source replica for maintenance index " +
             "{} in container {}", maintIndex, container.containerID());
         continue;
       }
-      ContainerReplica sourceReplica = source.getLeft();
+      ContainerReplica sourceReplica = source.replica();
       if (!iterator.hasNext()) {
         LOG.warn("Couldn't find enough targets. Available source"
                 + " nodes: {}, target nodes: {}, excluded nodes: {},"
                 + " usedNodes: {} and"
                 + " maintenance indexes: {}",
             sources.values().stream()
-                .map(Pair::getLeft).collect(Collectors.toSet()),
+                .map(SourceReplica::replica)
+                .collect(Collectors.toSet()),
             targets, excludedNodes, usedNodes, maintIndexes);
         break;
       }
@@ -714,5 +819,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
     }
   }
+
+  /**
+   * A container replica paired with the current status of its host node,
+   * used as a candidate source for EC reconstruction or replication.
+   */
+  private record SourceReplica(ContainerReplica replica, NodeStatus nodeStatus) { }
 
 }

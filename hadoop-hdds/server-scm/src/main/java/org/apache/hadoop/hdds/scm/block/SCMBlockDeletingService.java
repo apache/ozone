@@ -186,16 +186,13 @@ public class SCMBlockDeletingService extends BackgroundService
           for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
               transactions.getDatanodeTransactionMap().entrySet()) {
             DatanodeID dnId = entry.getKey();
-            long blocksToDn = 0;
             List<DeletedBlocksTransaction> dnTXs = entry.getValue();
             if (!dnTXs.isEmpty()) {
               Set<Long> dnTxSet = dnTXs.stream()
                   .map(DeletedBlocksTransaction::getTxID)
                   .collect(Collectors.toSet());
-              for (DeletedBlocksTransaction deletedBlocksTransaction : dnTXs) {
-                blocksToDn +=
-                    deletedBlocksTransaction.getLocalIDList().size();
-              }
+              long blocksToDn =
+                  transactions.getNumberOfBlocksForDatanode(dnId);
               processedTxIDs.addAll(dnTxSet);
               DeleteBlocksCommand command = new DeleteBlocksCommand(dnTXs);
               command.setTerm(scmContext.getTermOfLeader());

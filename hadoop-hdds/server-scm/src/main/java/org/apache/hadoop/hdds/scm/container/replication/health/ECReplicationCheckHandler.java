@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
@@ -49,7 +48,6 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       // This handler is only for EC containers.
       return false;
     }
-    ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
     ContainerHealthResult health = checkHealth(request);
     LOG.debug("Checking container {} in ECReplicationCheckHandler", container);
@@ -84,16 +82,15 @@ public class ECReplicationCheckHandler extends AbstractCheck {
             healthState = ContainerHealthState.UNHEALTHY;
           }
         }
-        report.incrementAndSample(healthState, container);
       } else {
         healthState = ContainerHealthState.UNDER_REPLICATED;
-        report.incrementAndSample(healthState, container);
       }
       if (!underHealth.isReplicatedOkAfterPending() &&
           (!underHealth.isUnrecoverable()
               || (underHealth.hasUnreplicatedOfflineIndexes() && !underHealth.offlineIndexesOkAfterPending()))) {
         request.getReplicationQueue().enqueue(underHealth);
       }
+      request.setHealthState(healthState);
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending "
           + "is [{}]. isUnrecoverable is [{}]. isMissing is [{}]. "
           + "hasUnreplicatedOfflineIndexes is [{}]",
@@ -103,7 +100,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       return true;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      report.incrementAndSample(ContainerHealthState.OVER_REPLICATED, container);
+      request.setHealthState(ContainerHealthState.OVER_REPLICATED);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending()) {

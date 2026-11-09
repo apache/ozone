@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static org.apache.hadoop.hdds.security.exception.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -40,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ipc_.Server.Call;
@@ -71,7 +73,8 @@ import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSecretResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
@@ -179,8 +182,12 @@ public class TestS3GetSecretRequest {
 
   @AfterEach
   public void tearDown() throws Exception {
+    if (omMetadataManager != null) {
+      omMetadataManager.close();
+    }
     omMetrics.unRegister();
     framework().clearInlineMocks();
+    Server.getCurCall().remove();
   }
 
   private OMRequest createTenantRequest(String tenantNameStr) {
@@ -309,6 +316,34 @@ public class TestS3GetSecretRequest {
   }
 
   @Test
+  public void testGetSecretStringOfRevokedSecret() throws IOException {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    S3Secret secret = processSuccessSecretRequest(USER_ALICE, 1, true);
+    S3SecretManager secretManager = ozoneManager.getS3SecretManager();
+    assertEquals(secret.getAwsSecret(), secretManager.getSecretString(USER_ALICE));
+    // Keep the persisted secret until the revoke is flushed.
+    omMetadataManager.storeSecret(USER_ALICE, S3SecretValue.of(USER_ALICE, secret.getAwsSecret()));
+
+    OMRequest revokeRequest = OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeS3Secret)
+        .setRevokeS3SecretRequest(OzoneManagerProtocolProtos.RevokeS3SecretRequest.newBuilder()
+            .setKerberosID(USER_ALICE))
+        .build();
+    OMClientRequest request = new S3RevokeSecretRequest(revokeRequest);
+    request = new S3RevokeSecretRequest(request.preExecute(ozoneManager));
+    OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 2);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+
+    assertTrue(secretManager.cache().get(USER_ALICE).isDeleted());
+    assertNotNull(omMetadataManager.getSecret(USER_ALICE));
+    assertNull(secretManager.getSecret(USER_ALICE));
+    OzoneSecurityException exception = assertThrows(OzoneSecurityException.class,
+        () -> secretManager.getSecretString(USER_ALICE));
+    assertEquals(S3_SECRET_NOT_FOUND, exception.getResult());
+  }
+
+  @Test
   public void testGetSecretOfAnotherUserAsAdmin() throws IOException {
 
     // This effectively makes alice an S3 admin.
@@ -370,6 +405,36 @@ public class TestS3GetSecretRequest {
     // Get secret of "carol@EXAMPLE.COM" (as another regular user).
     // Run preExecute, expect USER_MISMATCH
     processFailedSecretRequest(USER_CAROL);
+  }
+
+  @Test
+  public void testSecretRequestsWithoutRpcUser() throws IOException {
+    // Create the secret first so that the set request passes its existence check.
+    processSuccessSecretRequest(USER_ALICE, 1, true);
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+    Server.getCurCall().remove();
+
+    assertPreExecuteDenied(new S3GetSecretRequest(s3GetSecretRequest(USER_ALICE)));
+    assertPreExecuteDenied(new OMSetSecretRequest(OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.SetS3Secret)
+        .setSetS3SecretRequest(OzoneManagerProtocolProtos.SetS3SecretRequest.newBuilder()
+            .setAccessId(USER_ALICE)
+            .setSecretKey("secretKey12345")
+            .build())
+        .build()));
+    assertPreExecuteDenied(new S3RevokeSecretRequest(OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeS3Secret)
+        .setRevokeS3SecretRequest(OzoneManagerProtocolProtos.RevokeS3SecretRequest.newBuilder()
+            .setKerberosID(USER_ALICE)
+            .build())
+        .build()));
+  }
+
+  private void assertPreExecuteDenied(OMClientRequest request) {
+    OMException e = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+    assertEquals(ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test
@@ -444,10 +509,8 @@ public class TestS3GetSecretRequest {
     when(omMultiTenantManager.isTenantAdmin(ugiAlice, TENANT_ID, false))
         .thenReturn(true);
 
-    // Init LayoutVersionManager to prevent NPE in checkLayoutFeature
-    final OMLayoutVersionManager lvm =
-        new OMLayoutVersionManager(OMLayoutVersionManager.maxLayoutVersion());
-    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
 
     // 1. CreateTenantRequest: Create tenant "finance".
     long txLogIndex = 1;

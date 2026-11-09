@@ -110,7 +110,7 @@ public class TestOMHALeaderSpecificACLEnforcement {
   public void restoreLeadership() throws IOException, InterruptedException, TimeoutException {
     OzoneManager currentLeader = cluster.getOMLeader();
     if (!currentLeader.getOMNodeId().equals(theLeaderOM.getOMNodeId())) {
-      currentLeader.transferLeadership(theLeaderOM.getOMNodeId());
+      client.getProxy().getOzoneManagerClient().transferLeadership(theLeaderOM.getOMNodeId());
       GenericTestUtils.waitFor(() -> {
         try {
           OzoneManager currentLeaderCheck = cluster.getOMLeader();
@@ -148,6 +148,8 @@ public class TestOMHALeaderSpecificACLEnforcement {
     
     // Step 4: Force leadership transfer to another OM node
     OzoneManager newLeader = cluster.transferOMLeadershipToAnotherNode(currentLeader);
+    assertEquals(NUM_OF_OMS, cluster.getOzoneManagersList().size(),
+        "Leadership transfer must preserve the cluster's OM list");
     assertNotEquals(leaderNodeId, newLeader.getOMNodeId(), 
         "Leadership should have transferred to a different node");
     

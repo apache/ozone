@@ -25,6 +25,10 @@
   <name>Apache Ozone HDDS Test Utils</name>
   <description>Apache Ozone Distributed Data Store Test Utils</description>
 
+  <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>ch.qos.reload4j</groupId>
@@ -41,10 +45,6 @@
     <dependency>
       <groupId>jakarta.annotation</groupId>
       <artifactId>jakarta.annotation-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>

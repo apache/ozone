@@ -35,15 +35,17 @@ import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -53,6 +55,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -61,6 +64,9 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test operation permission check result.
@@ -78,7 +84,7 @@ public class TestPermissionCheck {
   private HttpHeaders headers;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
         OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
@@ -87,17 +93,18 @@ public class TestPermissionCheck {
     bucket = mock(OzoneBucket.class);
     volume = mock(OzoneVolume.class);
     when(volume.getName()).thenReturn("s3Volume");
-    exception = new OMException("Permission Denied",
-        OMException.ResultCodes.PERMISSION_DENIED);
+    exception = new OMException("Permission Denied", ResultCodes.PERMISSION_DENIED);
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getConfiguration()).thenReturn(conf);
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+    when(clientProtocol.getBucketDetails(isNull(), anyString())).thenReturn(bucket);
+    when(bucket.getVolumeName()).thenReturn("s3Volume");
   }
 
   /**
@@ -118,8 +125,7 @@ public class TestPermissionCheck {
    */
   @Test
   public void testGetBucket() throws IOException {
-    doThrow(exception).when(volume).getBucket(anyString());
-    when(objectStore.getS3Volume()).thenReturn(volume);
+    doThrow(exception).when(clientProtocol).getBucketDetails(isNull(), anyString());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -143,9 +149,8 @@ public class TestPermissionCheck {
 
   @Test
   public void testDeleteBucket() throws IOException {
-    doThrow(exception).when(volume).deleteBucket(anyString());
+    doThrow(exception).when(clientProtocol).deleteBucket("s3Volume", "bucketName");
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -157,8 +162,7 @@ public class TestPermissionCheck {
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listMultipartUploads(any(), any(), any(), anyInt());
+    doThrow(exception).when(clientProtocol).listMultipartUploads(any(), any(), any(), any(), any(), anyInt());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -170,8 +174,6 @@ public class TestPermissionCheck {
   @Test
   public void testListKey() throws IOException {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).listKeys(anyString(), isNull(),
         anyBoolean());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
@@ -184,31 +186,42 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteKeys() throws IOException, OS3Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
-    Map<String, ErrorInfo> deleteErrors = new HashMap<>();
-    deleteErrors.put("deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
+    final Map<String, ErrorInfo> deleteErrors = Collections.singletonMap(
+        "deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
     when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
 
-    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+    final BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
-    MultiDeleteRequest request = new MultiDeleteRequest();
-    List<MultiDeleteRequest.DeleteObject> objectList = new ArrayList<>();
-    objectList.add(new MultiDeleteRequest.DeleteObject("deleteKeyName"));
-    request.setQuiet(false);
-    request.setObjects(objectList);
+    final MultiDeleteRequest request = createMultiDeleteRequest();
 
-    MultiDeleteResponse response =
-        bucketEndpoint.multiDelete("BucketName", "keyName", request);
+    final MultiDeleteResponse response = bucketEndpoint.multiDelete("BucketName", "keyName", request);
     assertEquals(1, response.getErrors().size());
     assertEquals("ACCESS_DENIED", response.getErrors().get(0).getCode());
   }
 
+  @ParameterizedTest
+  @MethodSource("deleteKeysTranslatedOMFailures")
+  public void testDeleteKeysTranslatesContainedOMFailures(ResultCodes resultCode, S3ErrorTable expectedError)
+      throws IOException {
+    when(objectStore.getVolume(anyString())).thenReturn(volume);
+    doThrow(new IOException("DeleteObjects failed", new OMException("OM failure", resultCode)))
+        .when(bucket).deleteKeys(any(), anyBoolean());
+
+    final BucketEndpoint bucketEndpoint = spy(new BucketEndpoint());
+    EndpointBuilder.newBucketEndpointBuilder()
+        .setBase(bucketEndpoint)
+        .setClient(client)
+        .build();
+    final MultiDeleteRequest request = createMultiDeleteRequest();
+
+    assertErrorResponse(expectedError, () -> bucketEndpoint.multiDelete("BucketName", "keyName", request));
+    verify(bucketEndpoint).auditMultiDeleteFailure(
+        any(), eq(Collections.singletonList("deleteKeyName")), any(OMException.class));
+  }
+
   @Test
   public void testGetAcl() throws Exception {
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).getAcls();
 
     when(headers.getHeaderString(S3Acl.GRANT_READ))
@@ -225,7 +238,7 @@ public class TestPermissionCheck {
   @Test
   public void testSetAcl() throws Exception {
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
+    when(clientProtocol.getBucketDetails("s3Volume", "bucketName")).thenReturn(bucket);
     doThrow(exception).when(bucket).setAcl(any());
 
     when(headers.getHeaderString(S3Acl.GRANT_READ))
@@ -246,7 +259,6 @@ public class TestPermissionCheck {
   public void testGetKey() throws IOException {
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -260,10 +272,8 @@ public class TestPermissionCheck {
 
   @Test
   public void testPutKey() throws IOException {
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket("bucketName")).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).createKey(
-            anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap());
+            anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
@@ -276,7 +286,6 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteKey() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
         anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -290,9 +299,7 @@ public class TestPermissionCheck {
 
   @Test
   public void testMultiUploadKey() throws IOException {
-    when(objectStore.getS3Volume()).thenReturn(volume);
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any(), anyMap(), anyMap());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
@@ -308,10 +315,9 @@ public class TestPermissionCheck {
   public void testObjectTagging() throws Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket("bucketName")).thenReturn(bucket);
-    when(bucket.getObjectTagging(anyString())).thenThrow(exception);
-    doThrow(exception).when(bucket).putObjectTagging(anyString(), anyMap());
-    doThrow(exception).when(bucket).deleteObjectTagging(anyString());
+    when(clientProtocol.getObjectTagging(isNull(), anyString(), anyString())).thenThrow(exception);
+    doThrow(exception).when(clientProtocol).putObjectTagging(anyString(), anyString(), anyString(), anyMap());
+    doThrow(exception).when(clientProtocol).deleteObjectTagging(anyString(), anyString(), anyString());
 
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
@@ -332,5 +338,23 @@ public class TestPermissionCheck {
         () -> deleteTagging(objectEndpoint, "bucketName", "keyPath"));
     assertErrorResponse(S3ErrorTable.ACCESS_DENIED,
         () -> getTagging(objectEndpoint, "bucketName", "keyPath"));
+  }
+
+  private static MultiDeleteRequest createMultiDeleteRequest() {
+    final MultiDeleteRequest request = new MultiDeleteRequest();
+    request.setQuiet(false);
+    request.setObjects(Collections.singletonList(new MultiDeleteRequest.DeleteObject("deleteKeyName")));
+    return request;
+  }
+
+  private static Stream<Arguments> deleteKeysTranslatedOMFailures() {
+    return Stream.of(
+        Arguments.of(ResultCodes.ACCESS_DENIED, S3ErrorTable.ACCESS_DENIED),
+        Arguments.of(ResultCodes.PERMISSION_DENIED, S3ErrorTable.ACCESS_DENIED),
+        Arguments.of(ResultCodes.INVALID_TOKEN, S3ErrorTable.ACCESS_DENIED),
+        Arguments.of(ResultCodes.REVOKED_TOKEN, S3ErrorTable.ACCESS_DENIED),
+        Arguments.of(ResultCodes.TOKEN_EXPIRED, S3ErrorTable.EXPIRED_TOKEN),
+        Arguments.of(ResultCodes.BUCKET_NOT_FOUND, S3ErrorTable.NO_SUCH_BUCKET)
+    );
   }
 }

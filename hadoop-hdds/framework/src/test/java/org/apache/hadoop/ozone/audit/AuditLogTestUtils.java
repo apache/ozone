@@ -32,6 +32,7 @@ import org.apache.commons.io.FileUtils;
  */
 public final class AuditLogTestUtils {
   private static final String AUDITLOG_FILENAME = "audit.log";
+  private static final String SYSTEM_AUDITLOG_FILENAME = "system_audit.log";
 
   private AuditLogTestUtils() {
   }
@@ -55,8 +56,26 @@ public final class AuditLogTestUtils {
         1000, 10000);
   }
 
+  /**
+   * Searches for the given action in the system audit log file.
+   */
+  public static void verifySystemAuditLog(AuditAction action,
+      AuditEventStatus eventStatus) throws InterruptedException, TimeoutException {
+    waitFor(
+        () -> fileContains(SYSTEM_AUDITLOG_FILENAME, action.getAction(), eventStatus.getStatus()),
+        1000, 10000);
+  }
+
   public static boolean auditLogContains(String... strings) {
-    File file = new File(AUDITLOG_FILENAME);
+    return fileContains(AUDITLOG_FILENAME, strings);
+  }
+
+  public static boolean systemAuditLogContains(String... strings) {
+    return fileContains(SYSTEM_AUDITLOG_FILENAME, strings);
+  }
+
+  private static boolean fileContains(String filename, String... strings) {
+    File file = new File(filename);
     try {
       String contents = FileUtils.readFileToString(file, UTF_8);
       for (String s : strings) {
@@ -72,9 +91,14 @@ public final class AuditLogTestUtils {
 
   public static void truncateAuditLogFile() throws IOException {
     Files.write(Paths.get(AUDITLOG_FILENAME), new byte[0]);
+    Files.write(Paths.get(SYSTEM_AUDITLOG_FILENAME), new byte[0]);
   }
 
   public static void deleteAuditLogFile() {
     FileUtils.deleteQuietly(new File(AUDITLOG_FILENAME));
+  }
+
+  public static void deleteSystemAuditLogFile() {
+    FileUtils.deleteQuietly(new File(SYSTEM_AUDITLOG_FILENAME));
   }
 }

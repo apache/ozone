@@ -19,23 +19,34 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -44,18 +55,27 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.AfterEach;
+import org.apache.hadoop.security.token.Token;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -65,28 +85,37 @@ import org.junit.jupiter.api.io.TempDir;
  * servicing commands from the scm client.
  */
 public class TestSCMClientProtocolServer {
-  private SCMClientProtocolServer server;
-  private StorageContainerManager scm;
-  private StorageContainerLocationProtocolServerSideTranslatorPB service;
-
-  @BeforeEach
-  void setUp(@TempDir File testDir) throws Exception {
+  private static SCMClientProtocolServer server;
+  private static StorageContainerManager scm;
+  private static StorageContainerLocationProtocolServerSideTranslatorPB service;
+  private static SCMSafeModeManager mockSafeModeManager;
+  
+  @BeforeAll
+  static void setUp(@TempDir File testDir) throws Exception {
     OzoneConfiguration config = SCMTestUtils.getConf(testDir);
+
+    mockSafeModeManager = mock(SCMSafeModeManager.class);
+
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
+    configurator.setScmSafeModeManager(mockSafeModeManager);
     config.set(OZONE_READONLY_ADMINISTRATORS, "testUser");
     scm = HddsTestUtils.getScm(config, configurator);
     scm.start();
-    scm.exitSafeMode();
 
     server = scm.getClientProtocolServer();
     service = new StorageContainerLocationProtocolServerSideTranslatorPB(server,
         scm, mock(ProtocolMessageMetrics.class));
   }
 
-  @AfterEach
-  public void tearDown() throws Exception {
+  @BeforeEach
+  void setUp() {
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(false);
+  }
+
+  @AfterAll
+  public static void tearDown() throws Exception {
     if (scm != null) {
       scm.stop();
       scm.join();
@@ -130,6 +159,24 @@ public class TestSCMClientProtocolServer {
     }
   }
 
+  @Test
+  public void testGetContainerTokenRequiresFullAdmin() throws Exception {
+    ContainerID containerID = ContainerID.valueOf(1L);
+    UserGroupInformation readOnlyAdmin =
+        UserGroupInformation.createUserForTesting("testUser", new String[] {"testGroup"});
+
+    try {
+      // the SCM starter user is a full admin
+      assertThat(server.getContainerToken(containerID)).isNotNull();
+      assertThatThrownBy(() -> readOnlyAdmin.doAs(
+          (PrivilegedExceptionAction<Token<?>>) () -> server.getContainerToken(containerID)))
+          .isInstanceOf(AccessControlException.class)
+          .hasMessageContaining("SCM superuser privilege is required");
+    } finally {
+      UserGroupInformation.reset();
+    }
+  }
+
   /**
    * Tests listContainer of scm.
    */
@@ -144,6 +191,43 @@ public class TestSCMClientProtocolServer {
       // Test call from a legacy client, which uses a different method of listContainer
       assertEquals(10, scmServer.listContainer(1, 10, null,
           HddsProtos.ReplicationFactor.THREE).getContainerInfoList().size());
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testGetExistingContainersInBatchWithoutPipelines() throws Exception {
+    StorageContainerManager mockScm = mockStorageContainerManager();
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(mockScm.getPipelineManager()).thenReturn(pipelineManager);
+    ContainerInfo info = newContainerInfoForTest();
+    info.setSuppressed(true);
+    when(mockScm.getContainerManager().getContainer(ContainerID.valueOf(1))).thenReturn(info);
+    when(mockScm.getContainerManager().getContainer(ContainerID.valueOf(2)))
+        .thenThrow(new ContainerNotFoundException(ContainerID.valueOf(2)));
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockScm, mock(ReconfigurationHandler.class));
+    try {
+      assertEquals(Collections.singletonList(info), scmServer.getExistingContainersInBatch(Arrays.asList(2L, 1L)));
+      verify(mockScm).checkAdminAccess(any(), eq(true));
+      assertTrue(scmServer.getExistingContainersInBatch(Collections.emptyList()).isEmpty());
+      verifyNoInteractions(pipelineManager);
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testGetExistingContainersInBatchChecksAdminAccess() throws Exception {
+    StorageContainerManager mockScm = mockStorageContainerManager();
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockScm, mock(ReconfigurationHandler.class));
+    doThrow(new AccessControlException("Access denied")).when(mockScm).checkAdminAccess(any(), eq(true));
+    try {
+      assertThrows(AccessControlException.class,
+          () -> scmServer.getExistingContainersInBatch(Arrays.asList(1L, 2L)));
+      verify(mockScm.getContainerManager(), never()).getContainer(any());
     } finally {
       scmServer.stop();
     }
@@ -214,6 +298,52 @@ public class TestSCMClientProtocolServer {
     when(scmNodeDetails.getClientProtocolServerAddressKey()).thenReturn("test");
     when(storageContainerManager.getScmNodeDetails()).thenReturn(scmNodeDetails);
     return storageContainerManager;
+  }
+
+  @Test
+  public void testLegacyFinalizeScmUpgradeAlreadyFinalized() throws Exception {
+    FinalizationManager mockFinalizationManager = mock(FinalizationManager.class);
+    SCMClientProtocolServer testServer = serverWithMockFinalization(false, mockFinalizationManager);
+    try {
+      StatusAndMessages result = testServer.finalizeScmUpgrade("testClientID");
+      assertEquals(ALREADY_FINALIZED, result.status());
+      assertTrue(result.msgs().isEmpty());
+      verify(mockFinalizationManager, never()).finalizeUpgrade();
+    } finally {
+      testServer.stop();
+    }
+  }
+
+  @Test
+  public void testLegacyFinalizeScmUpgradeFinalizationRequired() throws Exception {
+    FinalizationManager mockFinalizationManager = mock(FinalizationManager.class);
+    SCMClientProtocolServer testServer = serverWithMockFinalization(true, mockFinalizationManager);
+    try {
+      StatusAndMessages result = testServer.finalizeScmUpgrade("testClientID");
+      assertEquals(ALREADY_FINALIZED, result.status());
+      assertTrue(result.msgs().isEmpty());
+      verify(mockFinalizationManager, never()).finalizeUpgrade();
+    } finally {
+      testServer.stop();
+    }
+  }
+
+  private SCMClientProtocolServer serverWithMockFinalization(
+      boolean needsFinalization, FinalizationManager finalizationManager) throws IOException {
+    ScmVersionManager mockVersionManager = mock(ScmVersionManager.class);
+    when(mockVersionManager.needsFinalization()).thenReturn(needsFinalization);
+
+    StorageContainerManager mockScm = mockStorageContainerManager();
+    when(mockScm.getVersionManager()).thenReturn(mockVersionManager);
+    when(mockScm.getFinalizationManager()).thenReturn(finalizationManager);
+
+    return new SCMClientProtocolServer(
+        new OzoneConfiguration(), mockScm, mock(ReconfigurationHandler.class));
+  }
+
+  @Test
+  public void testGetPeerUpgradeStatusReturnsLocalVersion() throws IOException {
+    assertEquals(HDDSVersion.SOFTWARE_VERSION, server.getPeerUpgradeStatus());
   }
 
   private ContainerInfo newContainerWithLastUsedTime(long containerId,

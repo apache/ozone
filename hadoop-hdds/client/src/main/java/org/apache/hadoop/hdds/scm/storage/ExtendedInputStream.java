@@ -17,12 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
+import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.util.StringUtils;
@@ -31,20 +34,51 @@ import org.apache.hadoop.util.StringUtils;
  * Abstact class which extends InputStream and some common interfaces used by
  * various Ozone InputStream classes.
  */
-public abstract class ExtendedInputStream extends InputStream
-    implements Seekable, CanUnbuffer, ByteBufferReadable, StreamCapabilities {
+public abstract class ExtendedInputStream extends FSInputStream
+    implements Seekable, CanUnbuffer, ByteBufferReadable, ByteBufferPositionedReadable, StreamCapabilities {
 
   protected static final int EOF = -1;
 
+  @Override
+  public int read(long position, ByteBuffer buffer) throws IOException {
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
+    }
+    if (buffer.isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
+    return buffer.hasRemaining() ? readPositioned(position, buffer) : 0;
+  }
+
   /**
-   * Positioned read.
-   *
-   * @param position the starting position of the read.
-   * @param buffer the buffer for storing the data.
-   * @return true iff positioned read is supported in this implementation.
+   * Read without changing the sequential cursor. Implementations must allow concurrent calls.
    */
-  public boolean readFully(long position, ByteBuffer buffer) throws IOException {
-    return false;
+  protected abstract int readPositioned(long position, ByteBuffer buffer) throws IOException;
+
+  @Override
+  public void readFully(long position, ByteBuffer buffer) throws IOException {
+    do {
+      int n = read(position, buffer);
+      if (n < 0) {
+        throw new EOFException("End of stream at position " + position);
+      }
+      if (n == 0 && buffer.hasRemaining()) {
+        throw new IOException("No progress reading at position " + position);
+      }
+      position += n;
+    } while (buffer.hasRemaining());
+  }
+
+  @Override
+  public int read(long position, byte[] buffer, int offset, int length) throws IOException {
+    validatePositionedReadArgs(position, buffer, offset, length);
+    return read(position, ByteBuffer.wrap(buffer, offset, length));
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+    validatePositionedReadArgs(position, buffer, offset, length);
+    readFully(position, ByteBuffer.wrap(buffer, offset, length));
   }
 
   @Override
@@ -100,6 +134,7 @@ public abstract class ExtendedInputStream extends InputStream
   @Override
   public boolean hasCapability(String capability) {
     switch (StringUtils.toLowerCase(capability)) {
+    case StreamCapabilities.PREADBYTEBUFFER:
     case StreamCapabilities.READBYTEBUFFER:
     case StreamCapabilities.UNBUFFER:
       return true;

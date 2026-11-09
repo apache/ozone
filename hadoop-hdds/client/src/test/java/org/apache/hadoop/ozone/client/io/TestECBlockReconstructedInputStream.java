@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.client.io;
 
 import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -28,9 +30,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,6 +47,8 @@ import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test for the ECBlockReconstructedInputStream class.
@@ -361,6 +368,110 @@ public class TestECBlockReconstructedInputStream {
       bufs[i] = ByteBuffer.allocate(size);
     }
     return bufs;
+  }
+
+  @Test
+  void concurrentPositionedReadsReconstructIndependentStripes() throws Exception {
+    int chunk = repConfig.getEcChunkSize();
+    int blockLength = chunk * 7 - 101;
+    ByteBuffer[] data = allocateBuffers(repConfig.getData(), chunk * 3);
+    ECStreamTestUtil.randomFill(data, chunk, dataGenerator, blockLength);
+    addDataStreamsToFactory(data, generateParity(data, repConfig));
+    byte[] expected = new byte[blockLength];
+    ECStreamTestUtil.randomFill(ByteBuffer.wrap(expected), new SplittableRandom(randomSeed));
+    BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(repConfig, blockLength,
+        ECStreamTestUtil.createIndexMap(2, 3, 4, 5));
+    streamFactory.setCurrentPipeline(info.getPipeline());
+    ECBlockInputStreamFactory factory = ECBlockInputStreamFactoryImpl.getInstance(streamFactory, bufferPool,
+        () -> ecReconstructExecutor);
+    ExecutorService readers = Executors.newFixedThreadPool(2);
+    try (ECBlockInputStreamProxy stream = new ECBlockInputStreamProxy(repConfig, info, null, null, factory,
+        conf.getObject(OzoneClientConfig.class))) {
+      List<Future<?>> futures = new ArrayList<>();
+      for (int offset : new int[] {chunk - 37, chunk * 3 - 29}) {
+        futures.add(readers.submit((Callable<Void>) () -> {
+          byte[] actual = new byte[chunk * 3 + 53];
+          stream.readFully(offset, actual);
+          assertArrayEquals(Arrays.copyOfRange(expected, offset, offset + actual.length), actual);
+          return null;
+        }));
+      }
+      for (Future<?> future : futures) {
+        future.get(20, TimeUnit.SECONDS);
+      }
+      assertEquals(0, stream.getPos());
+    } finally {
+      readers.shutdownNow();
+    }
+  }
+
+  @Test
+  void healthyPositionedReadsReuseTheIndexStreams() throws Exception {
+    int chunk = repConfig.getEcChunkSize();
+    int blockLength = chunk * 7 - 101;
+    byte[] expected = setUpBlockData(blockLength);
+    BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(repConfig, blockLength,
+        ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
+    streamFactory.setCurrentPipeline(info.getPipeline());
+    try (ECBlockInputStreamProxy stream = createProxy(info)) {
+      stream.seek(chunk + 11);
+      byte[] actual = new byte[blockLength];
+      stream.readFully(0, actual);
+      assertArrayEquals(expected, actual);
+      List<ECStreamTestUtil.TestBlockInputStream> indexStreams = streamFactory.getBlockStreams();
+      assertEquals(repConfig.getData(), indexStreams.size());
+
+      for (int offset : new int[] {chunk - 37, chunk * 3 - 29, blockLength - 5}) {
+        byte[] range = new byte[Math.min(chunk + 53, blockLength - offset)];
+        stream.readFully(offset, range);
+        assertArrayEquals(Arrays.copyOfRange(expected, offset, offset + range.length), range);
+      }
+      // no new reader, so no new index streams, and only positioned reads on them
+      assertEquals(indexStreams, streamFactory.getBlockStreams());
+      for (ECStreamTestUtil.TestBlockInputStream indexStream : indexStreams) {
+        assertEquals(0, indexStream.getPos());
+        assertThat(indexStream.getPositionedReads()).isPositive();
+      }
+      assertEquals(chunk + 11, stream.getPos());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  void failedHealthyPositionedReadReconstructs(int failedIndexes) throws Exception {
+    int chunk = repConfig.getEcChunkSize();
+    int blockLength = chunk * 7 - 101;
+    byte[] expected = setUpBlockData(blockLength);
+    BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(repConfig, blockLength,
+        ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
+    streamFactory.setCurrentPipeline(info.getPipeline());
+    // up to the parity count of data indexes fail, from the first positioned read on
+    streamFactory.setFailIndexes(failedIndexes == 1 ? new Integer[] {2} : new Integer[] {1, 3});
+    try (ECBlockInputStreamProxy stream = createProxy(info)) {
+      stream.seek(chunk + 11);
+      for (int offset : new int[] {chunk - 37, 0, chunk * 3 - 29}) {
+        byte[] actual = new byte[chunk * 3 + 53];
+        stream.readFully(offset, actual);
+        assertArrayEquals(Arrays.copyOfRange(expected, offset, offset + actual.length), actual);
+      }
+      assertEquals(chunk + 11, stream.getPos());
+    }
+  }
+
+  /** Fills the data and parity streams of the factory, and returns the block data. */
+  private byte[] setUpBlockData(int blockLength) throws IOException {
+    ByteBuffer[] data = allocateBuffers(repConfig.getData(), repConfig.getEcChunkSize() * 3);
+    ECStreamTestUtil.randomFill(data, repConfig.getEcChunkSize(), dataGenerator, blockLength);
+    addDataStreamsToFactory(data, generateParity(data, repConfig));
+    byte[] expected = new byte[blockLength];
+    ECStreamTestUtil.randomFill(ByteBuffer.wrap(expected), new SplittableRandom(randomSeed));
+    return expected;
+  }
+
+  private ECBlockInputStreamProxy createProxy(BlockLocationInfo info) {
+    ECBlockInputStreamFactory factory = ECBlockInputStreamFactoryImpl.getInstance(streamFactory, bufferPool,
+        () -> ecReconstructExecutor);
+    return new ECBlockInputStreamProxy(repConfig, info, null, null, factory, conf.getObject(OzoneClientConfig.class));
   }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {

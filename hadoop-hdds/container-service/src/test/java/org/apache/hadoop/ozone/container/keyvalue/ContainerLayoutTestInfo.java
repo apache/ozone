@@ -43,72 +43,42 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public enum ContainerLayoutTestInfo {
 
-  DUMMY {
-    @Override
-    public ChunkManager createChunkManager(boolean sync, BlockManager manager) {
-      return new ChunkManagerDummyImpl();
+  DUMMY,
+  FILE_PER_CHUNK,
+  FILE_PER_BLOCK;
+
+  public ChunkManager createChunkManager(boolean sync, BlockManager manager) {
+    return switch (this) {
+    case DUMMY -> new ChunkManagerDummyImpl();
+    case FILE_PER_CHUNK -> new FilePerChunkStrategy(sync, manager);
+    case FILE_PER_BLOCK -> new FilePerBlockStrategy(sync, null);
+    };
+  }
+
+  public void validateFileCount(File dir, long blockCount, long chunkCount) {
+    switch (this) {
+    case DUMMY -> assertFileCount(dir, 0);
+    case FILE_PER_CHUNK -> assertFileCount(dir, chunkCount);
+    case FILE_PER_BLOCK -> assertFileCount(dir, blockCount);
+    default -> throw new IllegalStateException();
     }
+  }
 
-    @Override
-    public void validateFileCount(File dir, long blockCount, long chunkCount) {
-      assertFileCount(dir, 0);
-    }
-
-    @Override
-    public ContainerLayoutVersion getLayout() {
-      return null;
-    }
-
-    @Override
-    public void updateConfig(OzoneConfiguration config) {
-      config.setBoolean(HDDS_CONTAINER_PERSISTDATA, false);
-    }
-  },
-
-  FILE_PER_CHUNK {
-    @Override
-    public ChunkManager createChunkManager(boolean sync, BlockManager manager) {
-      return new FilePerChunkStrategy(sync, manager);
-    }
-
-    @Override
-    public void validateFileCount(File dir, long blockCount, long chunkCount) {
-      assertFileCount(dir, chunkCount);
-    }
-
-    @Override
-    public ContainerLayoutVersion getLayout() {
-      return ContainerLayoutVersion.FILE_PER_CHUNK;
-    }
-  },
-
-  FILE_PER_BLOCK {
-    @Override
-    public ChunkManager createChunkManager(boolean sync, BlockManager manager) {
-      return new FilePerBlockStrategy(sync, null);
-    }
-
-    @Override
-    public void validateFileCount(File dir, long blockCount, long chunkCount) {
-      assertFileCount(dir, blockCount);
-    }
-
-    @Override
-    public ContainerLayoutVersion getLayout() {
-      return ContainerLayoutVersion.FILE_PER_BLOCK;
-    }
-  };
-
-  public abstract ChunkManager createChunkManager(boolean sync,
-      BlockManager manager);
-
-  public abstract void validateFileCount(File dir, long blockCount,
-      long chunkCount);
-
-  public abstract ContainerLayoutVersion getLayout();
+  public ContainerLayoutVersion getLayout() {
+    return switch (this) {
+    case DUMMY -> null;
+    case FILE_PER_CHUNK -> ContainerLayoutVersion.FILE_PER_CHUNK;
+    case FILE_PER_BLOCK -> ContainerLayoutVersion.FILE_PER_BLOCK;
+    };
+  }
 
   public void updateConfig(OzoneConfiguration config) {
-    config.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, getLayout().name());
+    ContainerLayoutVersion layout = getLayout();
+    if (layout == null) {
+      config.setBoolean(HDDS_CONTAINER_PERSISTDATA, false);
+    } else {
+      config.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, layout.name());
+    }
   }
 
   private static void assertFileCount(File dir, long count) {

@@ -17,14 +17,18 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -34,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.QuotaRepairRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -91,5 +96,122 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
 
     OmBucketInfo durableBucket = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
     assertThat(durableBucket.getUsedBytes()).isEqualTo(0);
+  }
+
+  @Test
+  public void testStaleDeltaSkippedWhenBucketRecreatedUnderSameName() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo originalBucket = omMetadataManager.getBucketTable().get(bucketKey);
+    long staleObjectID = originalBucket.getObjectID();
+
+    // Simulate the bucket being deleted and recreated under the same name after the
+    // repair scan captured staleObjectID, but before the repair transaction commits.
+    OmBucketInfo recreatedBucket = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketLayout(originalBucket.getBucketLayout())
+        .setCreationTime(Time.now())
+        .setObjectID(staleObjectID + 1)
+        .setUsedBytes(0)
+        .setUsedNamespace(0)
+        .build();
+    omMetadataManager.getBucketTable().put(bucketKey, recreatedBucket);
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey), CacheValue.get(1L, recreatedBucket));
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setClientId("test-client")
+        .setCmdType(Type.QuotaRepair)
+        .setQuotaRepairRequest(QuotaRepairRequest.newBuilder()
+            .addBucketCount(BucketQuotaCount.newBuilder()
+                .setVolName(volumeName)
+                .setBucketName(bucketName)
+                .setBucketObjectID(staleObjectID)
+                .setDiffUsedBytes(-1000)
+                .setDiffUsedNamespace(-1)
+                .setSupportOldQuota(false)
+                .build())
+            .setSupportVolumeOldQuota(false)
+            .build())
+        .build();
+
+    OMQuotaRepairRequest omQuotaRepairRequest = new OMQuotaRepairRequest(omRequest);
+    OMClientResponse omClientResponse =
+        omQuotaRepairRequest.validateAndUpdateCache(ozoneManager, 2L);
+    assertThat(omClientResponse.getOMResponse().getStatus()).isEqualTo(Status.OK);
+
+    OmBucketInfo cachedBucket =
+        OMKeyRequest.getBucketInfo(omMetadataManager, volumeName, bucketName);
+    assertThat(cachedBucket.getObjectID()).isEqualTo(staleObjectID + 1);
+    assertThat(cachedBucket.getUsedBytes()).isEqualTo(0);
+    assertThat(cachedBucket.getUsedNamespace()).isEqualTo(0);
+  }
+
+  @Test
+  public void testOldVolumeQuotaRepairKeepsUnflushedVolumeChanges() throws Exception {
+    String deletedVolumeKey = addOldQuotaVolume(true);
+    String usedVolumeKey = addOldQuotaVolume(true);
+    String quotaSetVolumeKey = addOldQuotaVolume(true);
+    String unchangedVolumeKey = addOldQuotaVolume(true);
+    String createdVolumeKey = addOldQuotaVolume(false);
+
+    // Volume changes applied after those rows were flushed, still waiting for the next flush.
+    Table<String, OmVolumeArgs> volumeTable = omMetadataManager.getVolumeTable();
+    volumeTable.addCacheEntry(new CacheKey<>(deletedVolumeKey), CacheValue.get(2L));
+    OmVolumeArgs unflushedUsedVolume = volumeTable.get(usedVolumeKey)
+        .toBuilder()
+        .setUsedNamespace(1)
+        .incRefCount()
+        .build();
+    volumeTable.addCacheEntry(new CacheKey<>(usedVolumeKey), CacheValue.get(3L, unflushedUsedVolume));
+    OmVolumeArgs unflushedQuotaSetVolume = volumeTable.get(quotaSetVolumeKey)
+        .toBuilder()
+        .setQuotaInNamespace(10)
+        .build();
+    volumeTable.addCacheEntry(new CacheKey<>(quotaSetVolumeKey), CacheValue.get(4L, unflushedQuotaSetVolume));
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setClientId("test-client")
+        .setCmdType(Type.QuotaRepair)
+        .setQuotaRepairRequest(QuotaRepairRequest.newBuilder()
+            .setSupportVolumeOldQuota(true)
+            .build())
+        .build();
+    OMClientResponse omClientResponse = new OMQuotaRepairRequest(omRequest).validateAndUpdateCache(ozoneManager, 5L);
+    assertThat(omClientResponse.getOMResponse().getStatus()).isEqualTo(Status.OK);
+
+    assertThat(volumeTable.get(deletedVolumeKey)).as("volume deleted before the repair").isNull();
+    OmVolumeArgs usedVolume = volumeTable.get(usedVolumeKey);
+    assertThat(usedVolume.getQuotaInNamespace()).isEqualTo(QUOTA_RESET);
+    assertThat(usedVolume.getUsedNamespace()).isEqualTo(1);
+    assertThat(usedVolume.getRefCount()).isEqualTo(1);
+    assertThat(volumeTable.get(quotaSetVolumeKey).getQuotaInNamespace()).isEqualTo(10);
+    assertThat(volumeTable.get(unchangedVolumeKey).getQuotaInNamespace()).isEqualTo(QUOTA_RESET);
+    assertThat(volumeTable.get(createdVolumeKey).getQuotaInNamespace()).as("volume created before the repair")
+        .isEqualTo(QUOTA_RESET);
+  }
+
+  /** Adds a volume as written by a release without namespace quota to the table cache, and to RocksDB if flushed. */
+  private String addOldQuotaVolume(boolean flushed) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
+        .setVolume(volumeName)
+        .setAdminName("admin")
+        .setOwnerName("owner")
+        .setCreationTime(Time.now())
+        .setQuotaInNamespace(OLD_QUOTA_DEFAULT)
+        .build();
+    String volumeKey = omMetadataManager.getVolumeKey(volumeName);
+    if (flushed) {
+      OMRequestTestUtils.addVolumeToOM(omMetadataManager, volumeArgs);
+    } else {
+      omMetadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey), CacheValue.get(1L, volumeArgs));
+    }
+    return volumeKey;
   }
 }
