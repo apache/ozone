@@ -18,9 +18,12 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -33,6 +36,7 @@ import org.apache.hadoop.ozone.client.OzoneBucketStub.KeyMetadataAwareOutputStre
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -49,7 +53,7 @@ class TestS3ObjectWriteGuard {
   private static final byte[] CONTENT = "content".getBytes(UTF_8);
 
   @Test
-  void readIOExceptionBlocksCommitWithCause() {
+  void readIOExceptionBlocksCommit() {
     IOException failure = new IOException("read failed");
     S3ObjectWriteGuard guard = newGuard(CONTENT.length);
 
@@ -57,11 +61,11 @@ class TestS3ObjectWriteGuard {
         () -> guard.copyFrom(failingInputStream(failure), 4));
 
     assertSame(failure, thrown);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
-  void readRuntimeExceptionBlocksCommitWithCause() {
+  void readRuntimeExceptionBlocksCommit() {
     RuntimeException failure = new IllegalStateException("read failed");
     S3ObjectWriteGuard guard = newGuard(CONTENT.length);
 
@@ -69,7 +73,7 @@ class TestS3ObjectWriteGuard {
         () -> guard.copyFrom(failingInputStream(failure), 4));
 
     assertSame(failure, thrown);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
@@ -89,7 +93,7 @@ class TestS3ObjectWriteGuard {
     assertSame(failure, thrown);
     assertThat(keyOutputStream.getWriteAttempts()).isEqualTo(1);
     assertThat(writtenLength(guard)).isZero();
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
@@ -100,6 +104,7 @@ class TestS3ObjectWriteGuard {
         4);
 
     assertThat(copied).isEqualTo(2);
+    guard.markTransferComplete();
     OS3Exception failure = assertThrows(OS3Exception.class, guard::close);
     assertThat(failure.getErrorMessage()).contains(
         "Request body length 2 does not match expected length "
@@ -108,7 +113,7 @@ class TestS3ObjectWriteGuard {
   }
 
   @Test
-  void datastreamWriteIOExceptionBlocksCommitWithCause() {
+  void datastreamWriteIOExceptionBlocksCommit() {
     IOException failure = new IOException("datastream write failed");
     FailingKeyMetadataAwareByteBufferStreamOutput keyOutputStream =
         new FailingKeyMetadataAwareByteBufferStreamOutput(failure);
@@ -122,7 +127,7 @@ class TestS3ObjectWriteGuard {
 
     assertSame(failure, thrown);
     assertThat(keyOutputStream.getWriteAttempts()).isEqualTo(1);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
@@ -136,7 +141,7 @@ class TestS3ObjectWriteGuard {
         }));
 
     assertSame(failure, thrown);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   @Test
@@ -153,7 +158,53 @@ class TestS3ObjectWriteGuard {
         }));
 
     assertSame(failure, thrown);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "content"})
+  void transferNotMarkedCompleteBlocksCommit(String content) throws IOException {
+    KeyMetadataAwareOutputStream keyOutputStream = new KeyMetadataAwareOutputStream(Collections.emptyMap());
+    byte[] bytes = content.getBytes(UTF_8);
+    S3ObjectWriteGuard guard = new S3ObjectWriteGuard(
+        new OzoneOutputStream(keyOutputStream, null), bytes.length, KEY_PATH);
+    guard.copyFrom(new ByteArrayInputStream(bytes), CONTENT.length);
+
+    IOException failure = assertThrows(IOException.class, guard::close);
+
+    assertThat(failure).hasMessage("S3 object transfer did not complete before commit: " + KEY_PATH);
+    assertThat(keyOutputStream.getModificationTime()).isZero();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "content"})
+  void completedTransferCommits(String content) throws IOException {
+    KeyMetadataAwareOutputStream keyOutputStream = new KeyMetadataAwareOutputStream(Collections.emptyMap());
+    byte[] bytes = content.getBytes(UTF_8);
+    S3ObjectWriteGuard guard = new S3ObjectWriteGuard(
+        new OzoneOutputStream(keyOutputStream, null), bytes.length, KEY_PATH);
+    guard.copyFrom(new ByteArrayInputStream(bytes), CONTENT.length);
+    guard.markTransferComplete();
+
+    guard.close();
+
+    assertThat(keyOutputStream.toByteArray()).isEqualTo(bytes);
+    assertThat(keyOutputStream.getModificationTime()).isPositive();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void finalChunkErrorBlocksCommitAfterExactLengthRead(boolean datastream) throws IOException {
+    S3ObjectWriteGuard guard = datastream ? new S3ObjectStreamingWriteGuard(
+        new OzoneDataStreamOutput(new KeyMetadataAwareByteBufferStreamOutput(Collections.emptyMap()), null),
+        CONTENT.length, KEY_PATH) : newGuard(CONTENT.length);
+    SignedChunksInputStream chunks = spy(new SignedChunksInputStream(
+        new ByteArrayInputStream(signedChunkedBody("content").getBytes(UTF_8)), KEY_PATH));
+    OutOfMemoryError failure = new OutOfMemoryError("final chunk verification");
+    doThrow(failure).when(chunks).verifyComplete();
+
+    assertSame(failure, assertThrows(OutOfMemoryError.class, () -> guard.copyFrom(chunks, CONTENT.length)));
+    assertThrows(IOException.class, guard::close);
   }
 
   private static S3ObjectWriteGuard newGuard(long expectedLength) {
@@ -175,10 +226,10 @@ class TestS3ObjectWriteGuard {
         new ByteArrayInputStream(body), KEY_PATH, TrailerHeader.CRC32);
     MultiDigestInputStream input = new MultiDigestInputStream(chunks, Collections.emptyList());
 
-    OS3Exception failure = assertThrows(OS3Exception.class, () -> guard.copyFrom(input, CONTENT.length));
+    assertThrows(OS3Exception.class, () -> guard.copyFrom(input, CONTENT.length));
 
     assertThat(writtenLength(guard)).isEqualTo(CONTENT.length);
-    assertCommitBlockedBy(guard, failure);
+    assertCommitBlocked(guard);
   }
 
   private static InputStream failingInputStream(Throwable failure) {
@@ -208,12 +259,11 @@ class TestS3ObjectWriteGuard {
     throw new AssertionError(failure);
   }
 
-  private static void assertCommitBlockedBy(
-      S3ObjectWriteGuard guard, Throwable failure) {
+  private static void assertCommitBlocked(S3ObjectWriteGuard guard) {
     IOException commitFailure = assertThrows(IOException.class, guard::close);
     assertThat(commitFailure.getMessage()).isEqualTo(
-        "S3 object transfer failed before commit: " + KEY_PATH);
-    assertSame(failure, commitFailure.getCause());
+        "S3 object transfer did not complete before commit: " + KEY_PATH);
+    assertThat(commitFailure.getCause()).isNull();
   }
 
   private static long writtenLength(S3ObjectWriteGuard guard)

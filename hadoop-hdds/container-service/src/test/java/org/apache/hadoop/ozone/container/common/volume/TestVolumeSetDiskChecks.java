@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -349,6 +350,62 @@ public class TestVolumeSetDiskChecks {
     checkReportCount(stateContext.getAllAvailableReports(scm1),
         expectedReportCount);
     volumeSet.shutdown();
+  }
+
+  /**
+   * An open EC container on a failed volume is reported to SCM for closing, because unlike Ratis, nothing else would
+   * close it. Closed EC containers and Ratis containers on the failed volume are not.
+   */
+  @Test
+  public void testVolumeFailureClosesOpenEcContainers() throws IOException {
+    conf = getConfWithDataNodeDirs(1);
+    ContainerTestUtils.enableSchemaV3(conf);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, new File(dir, "scm").getAbsolutePath());
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, new File(dir, "datanodeID").getAbsolutePath());
+    UUID datanodeId = UUID.randomUUID();
+    ContainerSet conSet = newContainerSet(20);
+    final MutableVolumeSet volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, new DummyChecker(conf, new Timer(), 0));
+    StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
+
+    long openEc = addContainer(conSet, volumeSet, datanodeId, State.OPEN, 2);
+    long closedEc = addContainer(conSet, volumeSet, datanodeId, State.CLOSED, 3);
+    long openRatis = addContainer(conSet, volumeSet, datanodeId, State.OPEN, 0);
+
+    DatanodeStateMachine datanodeStateMachineMock = mock(DatanodeStateMachine.class);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    when(ozoneContainer.getContainerSet()).thenReturn(conSet);
+    when(datanodeStateMachineMock.getContainer()).thenReturn(ozoneContainer);
+    StateContext stateContext = new StateContext(new OzoneConfiguration(),
+        DatanodeStateMachine.DatanodeStates.getInitState(), datanodeStateMachineMock, "");
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    stateContext.addEndpoint(scm1);
+
+    volumeSet.failVolume(volumeSet.getVolumesList().get(0).getStorageDir().getPath());
+    conSet.handleVolumeFailures(stateContext);
+
+    assertThat(conSet.getMissingContainerSet()).contains(openEc, closedEc, openRatis);
+    assertThat(stateContext.getPendingContainerAction(scm1, 10)).containsExactly(ContainerAction.newBuilder()
+        .setContainerID(openEc)
+        .setAction(ContainerAction.Action.CLOSE)
+        .setReason(ContainerAction.Reason.CONTAINER_UNHEALTHY)
+        .build());
+    volumeSet.shutdown();
+  }
+
+  private long addContainer(ContainerSet conSet, MutableVolumeSet volumeSet, UUID datanodeId, State state,
+      int replicaIndex) throws IOException {
+    long containerID = ContainerTestHelper.getTestContainerID();
+    KeyValueContainerData data = new KeyValueContainerData(containerID, ContainerLayoutVersion.FILE_PER_CHUNK,
+        ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(), datanodeId.toString());
+    data.setState(state);
+    data.setReplicaIndex(replicaIndex);
+    data.setSchemaVersion(OzoneConsts.SCHEMA_V3);
+    KeyValueContainer container = new KeyValueContainer(data, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
+    conSet.addContainer(container);
+    return containerID;
   }
 
   void checkReportCount(List<Message> reports,

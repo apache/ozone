@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tagging;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,6 +28,8 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
@@ -47,6 +50,23 @@ public class TestS3DeleteObjectTaggingRequest extends OMKeyRequestTests {
   @Test
   public void testPreExecute() throws Exception {
     doPreExecute(volumeName, bucketName, keyName);
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedIsAudited() throws Exception {
+    OMRequest originalRequest = createDeleteObjectTaggingRequest(volumeName, bucketName, keyName);
+    assertPreExecuteAclDenialIsAudited(getDeleteObjectTaggingRequest(originalRequest), OMAction.DELETE_OBJECT_TAGGING);
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedOnLinkAuditsSourceBucket() throws Exception {
+    resolveRequestedBucketAsLinkTo("source-volume", "source-bucket");
+    OMRequest originalRequest = createDeleteObjectTaggingRequest(volumeName, bucketName, keyName);
+    AuditMessage message = assertPreExecuteAclDenialIsAudited(getDeleteObjectTaggingRequest(originalRequest),
+        OMAction.DELETE_OBJECT_TAGGING);
+    assertThat(message.getFormattedMessage())
+        .contains("\"volume\":\"source-volume\"", "\"bucket\":\"source-bucket\"")
+        .doesNotContain(bucketName);
   }
 
   @Test

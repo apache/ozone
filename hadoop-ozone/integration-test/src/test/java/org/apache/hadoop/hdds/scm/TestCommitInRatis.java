@@ -84,7 +84,6 @@ public class TestCommitInRatis {
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
-    conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();

@@ -60,7 +60,7 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -74,7 +74,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Class tests create with object store and getFileStatus.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.TestCase {
+public abstract class TestOzoneFSWithObjectStoreCreate implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   private OzoneFileSystem o3fs;

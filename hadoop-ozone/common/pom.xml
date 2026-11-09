@@ -66,6 +66,16 @@
       <artifactId>grpc-netty</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-protobuf</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-handler</artifactId>
     </dependency>
@@ -206,11 +216,7 @@
             <phase>generate-resources</phase>
             <configuration>
               <source>
-                <directory>${basedir}/../</directory>
-                <includes>
-                  <include>*/src/main/java/**/*.java</include>
-                  <include>*/src/main/proto/*.proto</include>
-                </includes>
+                <directory>${project.basedir}/src/main/resources</directory>
               </source>
             </configuration>
           </execution>

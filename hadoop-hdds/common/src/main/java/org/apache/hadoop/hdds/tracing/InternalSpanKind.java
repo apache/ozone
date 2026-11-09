@@ -23,11 +23,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation that marks a proxied client method as SpanKind.INTERNAL.
- * Used for methods that do not send an outbound RPC.
+ * Annotation to mark a method of a proxy delegate as SpanKind.INTERNAL, overriding the proxy's default span kind.
+ * Used for methods a client proxy handles internally instead of issuing an outbound RPC, such as closing a transport.
+ * Must be placed on the delegate's implementation method; it is ignored on interface methods.
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD})
 public @interface InternalSpanKind {
 }
 
