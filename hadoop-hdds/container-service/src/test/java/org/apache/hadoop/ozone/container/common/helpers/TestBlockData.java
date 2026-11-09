@@ -18,14 +18,22 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,5 +141,66 @@ public class TestBlockData {
     final BlockData subject = new BlockData(blockID);
     assertEquals("[blockId=conID: 5 locID: 123 bcsId: 42 replicaIndex: null storageType: null, size=0]",
         subject.toString());
+  }
+
+  private static Stream<StorageType> storageTypes() {
+    return Stream.of(null, StorageType.DISK, StorageType.SSD, StorageType.ARCHIVE);
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageTypes")
+  public void testDatabaseSerializationOmitsStorageType(StorageType storageType) throws Exception {
+    BlockData data = blockDataWithStorageType(storageType);
+    ContainerProtos.BlockData wire = data.getProtoBufMessage();
+    assertEquals(storageType != null, wire.getBlockID().hasStorageTypeID());
+    ContainerProtos.BlockData expected = wire.toBuilder()
+        .setBlockID(wire.getBlockID().toBuilder().clearStorageTypeID()).build();
+
+    byte[] bytes = BlockData.getCodec().toPersistedFormat(data);
+    assertEquals(expected, ContainerProtos.BlockData.parseFrom(bytes));
+    try (CodecBuffer buffer = BlockData.getCodec().toCodecBuffer(data, CodecBuffer.Allocator.getDirect())) {
+      assertEquals(expected, ContainerProtos.BlockData.parseFrom(buffer.asReadOnlyByteBuffer()));
+      assertNull(BlockData.getCodec().fromCodecBuffer(buffer).getBlockID().getStorageType());
+    }
+    assertNull(BlockData.getCodec().fromPersistedFormat(bytes).getBlockID().getStorageType());
+    assertNull(BlockData.getCodec().copyObject(data).getBlockID().getStorageType());
+    // Database encoding and copying must not strip the type from the original request.
+    assertEquals(wire, data.getProtoBufMessage());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageTypes")
+  public void testReadsExistingRecordsWithOrWithoutStorageType(StorageType storageType) throws Exception {
+    ContainerProtos.BlockData existing = blockDataWithStorageType(storageType).getProtoBufMessage();
+    BlockData decoded = BlockData.getCodec().fromPersistedFormat(existing.toByteArray());
+    assertEquals(storageType, decoded.getBlockID().getStorageType());
+    assertEquals(existing, decoded.getProtoBufMessage());
+    assertFalse(ContainerProtos.BlockData.parseFrom(BlockData.getCodec().toPersistedFormat(decoded))
+        .getBlockID().hasStorageTypeID());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageTypes")
+  public void testResponseUsesSuppliedStorageType(StorageType storageType) throws Exception {
+    BlockData data = blockDataWithStorageType(StorageType.SSD);
+    ContainerProtos.BlockData wire = data.getProtoBufMessage();
+    ContainerProtos.BlockData response = data.getProtoBufMessage(storageType);
+    assertEquals(storageType, BlockID.getFromProtobuf(response.getBlockID()).getStorageType());
+    assertEquals(wire.toBuilder().setBlockID(wire.getBlockID().toBuilder().clearStorageTypeID()).build(),
+        response.toBuilder().setBlockID(response.getBlockID().toBuilder().clearStorageTypeID()).build());
+    assertEquals(wire, data.getProtoBufMessage());
+  }
+
+  private static BlockData blockDataWithStorageType(StorageType storageType) throws Exception {
+    ContainerProtos.DatanodeBlockID.Builder id = ContainerProtos.DatanodeBlockID.newBuilder()
+        .setContainerID(5).setLocalID(123).setBlockCommitSequenceId(42).setReplicaIndex(2);
+    if (storageType != null) {
+      id.setStorageTypeID(StorageTypeUtils.getID(storageType));
+    }
+    BlockData data = new BlockData(BlockID.getFromProtobuf(id.build()));
+    data.addMetadata("key", "value");
+    data.addChunk(buildChunkInfo("chunk0", 0, 1024));
+    data.addChunk(buildChunkInfo("chunk1", 1024, 512));
+    return data;
   }
 }
