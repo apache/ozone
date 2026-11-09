@@ -65,8 +65,6 @@ public final class DatanodeQueueMetrics implements MetricsSource {
       "CommandStatusReportQueue";
   public static final String COMMAND_STATUS_REPORT_SENT_PREFIX =
       "CommandStatusReportSent";
-  public static final String COMMAND_STATUS_REPORT_DEFERRED_PREFIX =
-      "CommandStatusReportDeferred";
   public static final String COMMAND_STATUS_REPORT_REQUEUED_PREFIX =
       "CommandStatusReportRequeued";
   public static final String COMMAND_STATUS_REPORT_OVERSIZED_PREFIX =
@@ -84,11 +82,9 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   private Map<HostAndPort, MetricsInfo> pipelineActionQueueMap;
   private Map<HostAndPort, MetricsInfo> commandStatusReportQueueBytesMap;
   private Map<HostAndPort, MetricsInfo> commandStatusReportSentBytesMap;
-  private Map<HostAndPort, MetricsInfo> commandStatusReportDeferredBytesMap;
   private Map<HostAndPort, MetricsInfo> commandStatusReportRequeuedBytesMap;
   private Map<HostAndPort, MetricsInfo> oversizedCommandStatusReportBytesMap;
   private Map<HostAndPort, AtomicLong> commandStatusReportSentBytes;
-  private Map<HostAndPort, AtomicLong> commandStatusReportDeferredBytes;
   private Map<HostAndPort, AtomicLong> commandStatusReportRequeuedBytes;
   private Map<HostAndPort, AtomicLong> oversizedCommandStatusReportBytes;
 
@@ -132,11 +128,9 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     pipelineActionQueueMap = new HashMap<>();
     commandStatusReportQueueBytesMap = new HashMap<>();
     commandStatusReportSentBytesMap = new HashMap<>();
-    commandStatusReportDeferredBytesMap = new HashMap<>();
     commandStatusReportRequeuedBytesMap = new HashMap<>();
     oversizedCommandStatusReportBytesMap = new HashMap<>();
     commandStatusReportSentBytes = new HashMap<>();
-    commandStatusReportDeferredBytes = new HashMap<>();
     commandStatusReportRequeuedBytes = new HashMap<>();
     oversizedCommandStatusReportBytes = new HashMap<>();
   }
@@ -192,11 +186,6 @@ public final class DatanodeQueueMetrics implements MetricsSource {
           commandStatusReportSentBytes.get(entry.getKey()).get());
     }
     for (Map.Entry<HostAndPort, MetricsInfo> entry:
-        commandStatusReportDeferredBytesMap.entrySet()) {
-      builder.addGauge(entry.getValue(),
-          commandStatusReportDeferredBytes.get(entry.getKey()).get());
-    }
-    for (Map.Entry<HostAndPort, MetricsInfo> entry:
         commandStatusReportRequeuedBytesMap.entrySet()) {
       builder.addCounter(entry.getValue(),
           commandStatusReportRequeuedBytes.get(entry.getKey()).get());
@@ -231,9 +220,6 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     commandStatusReportSentBytesMap.computeIfAbsent(endpoint,
         k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_SENT_PREFIX,
             endpointName, "Command status report bytes sent to "));
-    commandStatusReportDeferredBytesMap.computeIfAbsent(endpoint,
-        k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_DEFERRED_PREFIX,
-            endpointName, "Command status report bytes deferred for "));
     commandStatusReportRequeuedBytesMap.computeIfAbsent(endpoint,
         k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_REQUEUED_PREFIX,
             endpointName, "Command status report bytes requeued for "));
@@ -241,8 +227,6 @@ public final class DatanodeQueueMetrics implements MetricsSource {
         k -> getByteMetricsInfo(COMMAND_STATUS_REPORT_OVERSIZED_PREFIX,
             endpointName, "Oversized command status report bytes for "));
     commandStatusReportSentBytes.computeIfAbsent(endpoint,
-        k -> new AtomicLong());
-    commandStatusReportDeferredBytes.computeIfAbsent(endpoint,
         k -> new AtomicLong());
     commandStatusReportRequeuedBytes.computeIfAbsent(endpoint,
         k -> new AtomicLong());
@@ -256,11 +240,9 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     pipelineActionQueueMap.remove(endpoint);
     commandStatusReportQueueBytesMap.remove(endpoint);
     commandStatusReportSentBytesMap.remove(endpoint);
-    commandStatusReportDeferredBytesMap.remove(endpoint);
     commandStatusReportRequeuedBytesMap.remove(endpoint);
     oversizedCommandStatusReportBytesMap.remove(endpoint);
     commandStatusReportSentBytes.remove(endpoint);
-    commandStatusReportDeferredBytes.remove(endpoint);
     commandStatusReportRequeuedBytes.remove(endpoint);
     oversizedCommandStatusReportBytes.remove(endpoint);
   }
@@ -269,12 +251,6 @@ public final class DatanodeQueueMetrics implements MetricsSource {
       HostAndPort endpoint, long bytes) {
     commandStatusReportSentBytes.computeIfAbsent(endpoint,
         k -> new AtomicLong()).addAndGet(bytes);
-  }
-
-  public void setCommandStatusReportBytesDeferred(
-      HostAndPort endpoint, long bytes) {
-    commandStatusReportDeferredBytes.computeIfAbsent(endpoint,
-        k -> new AtomicLong()).set(bytes);
   }
 
   public void incrCommandStatusReportBytesRequeued(
@@ -287,6 +263,24 @@ public final class DatanodeQueueMetrics implements MetricsSource {
       HostAndPort endpoint, long bytes) {
     oversizedCommandStatusReportBytes.computeIfAbsent(endpoint,
         k -> new AtomicLong()).set(bytes);
+  }
+
+  @VisibleForTesting
+  public long getCommandStatusReportBytesSent(HostAndPort endpoint) {
+    AtomicLong value = commandStatusReportSentBytes.get(endpoint);
+    return value == null ? 0 : value.get();
+  }
+
+  @VisibleForTesting
+  public long getCommandStatusReportBytesRequeued(HostAndPort endpoint) {
+    AtomicLong value = commandStatusReportRequeuedBytes.get(endpoint);
+    return value == null ? 0 : value.get();
+  }
+
+  @VisibleForTesting
+  public long getOversizedCommandStatusReportBytes(HostAndPort endpoint) {
+    AtomicLong value = oversizedCommandStatusReportBytes.get(endpoint);
+    return value == null ? 0 : value.get();
   }
 
   @VisibleForTesting

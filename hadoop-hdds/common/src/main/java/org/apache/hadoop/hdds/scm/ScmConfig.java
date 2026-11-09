@@ -112,7 +112,12 @@ public class ScmConfig extends ReconfigurableConfig {
               + "The block num is counted at the replica level."
               + "If SCM has 100000 blocks which need to be deleted and the "
               + "configuration is 5000 then it would only send 5000 blocks "
-              + "for deletion to the datanodes."
+              + "for deletion to the datanodes. Increasing this value can "
+              + "increase delete command acknowledgement size; each "
+              + "acknowledgement must fit within the datanode heartbeat "
+              + "command status report limit "
+              + "(hdds.heartbeat.command.status.report.max.size) and the IPC "
+              + "size limit (ipc.maximum.data.length)."
   )
   private int blockDeletionLimit;
 

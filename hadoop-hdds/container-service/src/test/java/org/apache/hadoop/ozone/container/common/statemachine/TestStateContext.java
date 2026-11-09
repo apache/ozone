@@ -233,27 +233,6 @@ public class TestStateContext {
   }
 
   @Test
-  public void testGetAllAvailableReportsRespectsLimit() throws IOException {
-    StateContext ctx = createSubject();
-    HostAndPort scm1 = new HostAndPort("scm1", 9001);
-    ctx.addEndpoint(scm1);
-
-    // Queue 10 ICRs; no full report is refreshed, so only ICRs are returned.
-    batchAddIncrementalReport(ctx,
-        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 10);
-
-    // A limited collection returns at most the limit and leaves the rest.
-    assertEquals(4, ctx.getAllAvailableReports(scm1, 4).size());
-    assertTrue(ctx.hasPendingReports(scm1));
-    assertEquals(4, ctx.getAllAvailableReports(scm1, 4).size());
-    assertTrue(ctx.hasPendingReports(scm1));
-    // Last chunk drains the queue.
-    assertEquals(2, ctx.getAllAvailableReports(scm1, 4).size());
-    assertFalse(ctx.hasPendingReports(scm1));
-    assertEquals(0, ctx.getAllAvailableReports(scm1, 4).size());
-  }
-
-  @Test
   public void testCommandStatusReportsRespectByteLimit() throws IOException {
     StateContext context = createSubject();
     HostAndPort scm = new HostAndPort("scm", 9001);
@@ -265,17 +244,15 @@ public class TestStateContext {
     context.addIncrementalReport(second);
 
     long firstBytes = commandStatusReportWireSize(first);
-    CommandStatusReportSelection selection = context.getCommandStatusReports(
-        scm, 10, firstBytes, firstBytes);
+    CommandStatusReportSelection selection =
+        context.getCommandStatusReports(scm, 10, firstBytes, firstBytes, firstBytes);
     assertEquals(Collections.singletonList(first), selection.getReports());
     assertEquals(firstBytes, selection.getSelectedBytes());
-    assertEquals(commandStatusReportWireSize(second),
-        selection.getDeferredBytes());
+    assertEquals(commandStatusReportWireSize(second), context.getCommandStatusReportQueueBytes(scm));
   }
 
   @Test
-  public void testAggregateCommandStatusReportIsSplitAtStatusBoundary()
-      throws IOException {
+  public void testAggregateCommandStatusReportIsSplitAtStatusBoundary() throws IOException {
     StateContext context = createSubject();
     HostAndPort scm = new HostAndPort("scm", 9001);
     context.addEndpoint(scm);
@@ -302,23 +279,23 @@ public class TestStateContext {
 
     CommandStatusReportSelection selection = context.getCommandStatusReports(
         scm, 10, commandStatusReportWireSize(firstBatch),
+        commandStatusReportWireSize(firstBatch),
         commandStatusReportWireSize(firstBatch));
     assertEquals(Collections.singletonList(firstBatch),
         selection.getReports());
-    assertEquals(commandStatusReportWireSize(secondBatch),
-        selection.getDeferredBytes());
+    assertEquals(commandStatusReportWireSize(secondBatch), context.getCommandStatusReportQueueBytes(scm));
 
     selection = context.getCommandStatusReports(
         scm, 10, commandStatusReportWireSize(firstBatch),
+        commandStatusReportWireSize(firstBatch),
         commandStatusReportWireSize(firstBatch));
     assertEquals(Collections.singletonList(secondBatch),
         selection.getReports());
-    assertEquals(0, selection.getDeferredBytes());
+    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
   }
 
   @Test
-  public void testNonCommandReportsAreSelectedIndependently()
-      throws IOException {
+  public void testNonCommandReportsAreSelectedIndependently() throws IOException {
     StateContext context = createSubject();
     HostAndPort scm = new HostAndPort("scm", 9001);
     context.addEndpoint(scm);
@@ -336,7 +313,7 @@ public class TestStateContext {
   }
 
   @Test
-  public void testOversizedCommandStatusRemainsQueued() throws IOException {
+  public void testOversizedCommandStatusMakesProgressWhenSafe() throws IOException {
     StateContext context = createSubject();
     HostAndPort scm = new HostAndPort("scm", 9001);
     context.addEndpoint(scm);
@@ -344,38 +321,18 @@ public class TestStateContext {
     context.addIncrementalReport(report);
     long reportBytes = commandStatusReportWireSize(report);
 
-    CommandStatusReportSelection selection = context.getCommandStatusReports(
-        scm, 10, reportBytes - 1, reportBytes - 1);
-    assertTrue(selection.getReports().isEmpty());
-    assertEquals(reportBytes, selection.getDeferredBytes());
+    CommandStatusReportSelection selection =
+        context.getCommandStatusReports(scm, 10, reportBytes - 1, reportBytes, reportBytes - 1);
+    assertEquals(Collections.singletonList(report), selection.getReports());
+    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
     assertEquals(reportBytes, selection.getOversizedBytes());
 
+    context.addIncrementalReport(report);
     selection = context.getCommandStatusReports(
-        scm, 10, reportBytes, reportBytes);
-    assertEquals(Collections.singletonList(report), selection.getReports());
-    assertEquals(0, selection.getDeferredBytes());
-  }
-
-  @Test
-  public void testHasPendingReportsWithFullReports() throws IOException {
-    StateContext ctx = createSubject();
-    HostAndPort scm1 = new HostAndPort("scm1", 9001);
-    ctx.addEndpoint(scm1);
-
-    // addEndpoint marks the full-report ready flags true, but no full report
-    // value has been generated yet, so nothing is actually pending.
-    assertFalse(ctx.hasPendingReports(scm1));
-
-    // Generate all three full reports; now values exist and flags are ready.
-    batchRefreshfullReports(ctx, StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
-    batchRefreshfullReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 1);
-    batchRefreshfullReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
-    assertTrue(ctx.hasPendingReports(scm1));
-
-    // With a cap of one, a heartbeat takes a single full report but the others
-    // stay ready, so a follow-up is still needed.
-    assertEquals(1, ctx.getAllAvailableReports(scm1, 1).size());
-    assertTrue(ctx.hasPendingReports(scm1));
+        scm, 10, reportBytes - 1, reportBytes - 1, reportBytes - 1);
+    assertTrue(selection.getReports().isEmpty());
+    assertEquals(reportBytes, context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(reportBytes, selection.getOversizedBytes());
   }
 
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
@@ -860,17 +817,17 @@ public class TestStateContext {
     // (100 - 3 non-incremental reports)
     expectedReportCount.put(
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 97);
-    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm1, 100),
+    checkReportCount(ctx.getAvailableNonCommandStatusReports(scm1, 100),
         expectedReportCount);
-    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
+    checkReportCount(ctx.getAvailableNonCommandStatusReports(scm2, 100),
         expectedReportCount);
     expectedReportCount.clear();
     expectedReportCount.put(
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME,
         totalIncrementalCount - 97);
-    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm1, 100),
+    checkReportCount(ctx.getAvailableNonCommandStatusReports(scm1, 100),
         expectedReportCount);
-    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
+    checkReportCount(ctx.getAvailableNonCommandStatusReports(scm2, 100),
         expectedReportCount);
   }
 

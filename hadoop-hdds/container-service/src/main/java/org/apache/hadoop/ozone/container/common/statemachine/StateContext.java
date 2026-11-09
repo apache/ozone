@@ -379,20 +379,9 @@ public class StateContext {
    */
   public List<Message> getAllAvailableReports(
       HostAndPort endpoint) {
-    return getAllAvailableReportsUpToLimit(endpoint, Integer.MAX_VALUE);
-  }
-
-  /**
-   * Returns up to {@code maxLimit} available reports for the endpoint,
-   * removing them from the queue. Any reports beyond the limit stay queued
-   * and are returned by a later call; callers can use
-   * {@link #hasPendingReports(HostAndPort)} to detect that case.
-   *
-   * @return List of reports
-   */
-  public List<Message> getAllAvailableReports(
-      HostAndPort endpoint, int maxLimit) {
-    return getAllAvailableReportsUpToLimit(endpoint, maxLimit);
+    List<Message> reports = getFullReports(endpoint, Integer.MAX_VALUE);
+    reports.addAll(getIncrementalReports(endpoint, Integer.MAX_VALUE - reports.size()));
+    return reports;
   }
 
   /**
@@ -411,11 +400,13 @@ public class StateContext {
   /**
    * Selects command status reports within both the report count and serialized
    * byte limits. An aggregate report may be split between complete command
-   * statuses, but an individual command status is never split.
+   * statuses, but an individual command status is never split. To guarantee
+   * progress, one status may exceed {@code maxBytes} when it still fits within
+   * {@code maxSingleStatusBytes}.
    */
   public CommandStatusReportSelection getCommandStatusReports(
       HostAndPort endpoint, int maxLimit, long maxBytes,
-      long maxConfiguredBytes) {
+      long maxSingleStatusBytes, long oversizedThreshold) {
     List<CommandStatusReportsProto> selected = new LinkedList<>();
     long selectedBytes = 0;
     long oversizedBytes = 0;
@@ -448,33 +439,34 @@ public class StateContext {
             selectedBytes +=
                 getCommandStatusReportWireSize(split.getSelected());
             iterator.set(split.getRemainder());
-          } else if (getFirstCommandStatusWireSize(report)
-              > maxConfiguredBytes) {
-            oversizedBytes = getFirstCommandStatusWireSize(report);
+          } else {
+            long firstStatusBytes = getFirstCommandStatusWireSize(report);
+            if (selected.isEmpty() && firstStatusBytes <= maxSingleStatusBytes) {
+              if (report.getCmdStatusCount() == 0) {
+                selected.add(report);
+                selectedBytes += firstStatusBytes;
+                iterator.remove();
+              } else {
+                CommandStatusReportSplit singleStatus =
+                    splitCommandStatusReport(report, firstStatusBytes);
+                selected.add(singleStatus.getSelected());
+                selectedBytes += firstStatusBytes;
+                if (singleStatus.getRemainder().getCmdStatusCount() == 0) {
+                  iterator.remove();
+                } else {
+                  iterator.set(singleStatus.getRemainder());
+                }
+              }
+            }
+            if (firstStatusBytes > oversizedThreshold) {
+              oversizedBytes = firstStatusBytes;
+            }
           }
           break;
         }
       }
-      return new CommandStatusReportSelection(selected, selectedBytes,
-          getCommandStatusReportQueueBytes(endpoint), oversizedBytes);
+      return new CommandStatusReportSelection(selected, selectedBytes, oversizedBytes);
     }
-  }
-
-  /**
-   * Returns true if any reports are still queued for the endpoint.
-   */
-  public boolean hasPendingReports(HostAndPort endpoint) {
-    synchronized (incrementalReportsQueue) {
-      List<Message> reportsForEndpoint = incrementalReportsQueue.get(endpoint);
-      if (reportsForEndpoint != null && !reportsForEndpoint.isEmpty()) {
-        return true;
-      }
-    }
-    Map<String, AtomicBoolean> fullReports =
-        isFullReportReadyToBeSent.get(endpoint);
-    return fullReports != null && fullReports.entrySet().stream()
-        .anyMatch(report -> report.getValue().get()
-            && type2Reports.get(report.getKey()).get() != null);
   }
 
   /**
@@ -505,17 +497,6 @@ public class StateContext {
           .getContainerSet()
           .getContainerReport();
     }
-  }
-
-  @VisibleForTesting
-  List<Message> getAllAvailableReportsUpToLimit(
-      HostAndPort endpoint,
-      int limit) {
-    List<Message> reports = getFullReports(endpoint, limit);
-    List<Message> incrementalReports = getIncrementalReports(endpoint,
-        limit - reports.size()); // get all (MAX_VALUE)
-    reports.addAll(incrementalReports);
-    return reports;
   }
 
   List<Message> getIncrementalReports(
@@ -628,15 +609,12 @@ public class StateContext {
   public static final class CommandStatusReportSelection {
     private final List<CommandStatusReportsProto> reports;
     private final long selectedBytes;
-    private final long deferredBytes;
     private final long oversizedBytes;
 
-    private CommandStatusReportSelection(
-        List<CommandStatusReportsProto> reports, long selectedBytes,
-        long deferredBytes, long oversizedBytes) {
+    private CommandStatusReportSelection(List<CommandStatusReportsProto> reports, long selectedBytes,
+        long oversizedBytes) {
       this.reports = reports;
       this.selectedBytes = selectedBytes;
-      this.deferredBytes = deferredBytes;
       this.oversizedBytes = oversizedBytes;
     }
 
@@ -646,10 +624,6 @@ public class StateContext {
 
     public long getSelectedBytes() {
       return selectedBytes;
-    }
-
-    public long getDeferredBytes() {
-      return deferredBytes;
     }
 
     public long getOversizedBytes() {
