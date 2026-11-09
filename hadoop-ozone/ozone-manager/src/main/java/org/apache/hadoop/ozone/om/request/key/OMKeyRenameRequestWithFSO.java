@@ -254,12 +254,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
                 + toKeyName, OMException.ResultCodes.KEY_ALREADY_EXISTS);
       }
     } else {
-      // Destination doesn't exist and the cases are:
-      // case-7) Check whether dst parent dir exists or not. If parent
-      // doesn't exist then throw exception, otw the source can be renamed to
-      // destination path.
+      // Destination doesn't exist, or is the bucket root, which getOMKeyInfoIfExists can't resolve. The cases are:
       if (toKeyName.isEmpty()) {
-        // case-8) Destination is the bucket root, where the source keeps its
+        // case-7) Destination is the bucket root, where the source keeps its
         // file name. As in case-5, that name must not be taken there already,
         // unless the source itself is at the bucket root.
         String newToKeyName = OzoneFSUtils.getFileName(fromKeyName);
@@ -270,6 +267,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
               OMException.ResultCodes.KEY_ALREADY_EXISTS);
         }
       }
+      // case-8) Check whether dst parent dir exists or not. If parent
+      // doesn't exist then throw exception, otw the source can be renamed to
+      // destination path.
       renameToParent = OMFileRequest.getKeyParentDir(volumeName,
               bucketName, toKeyName, ozoneManager, omMetadataManager);
       renameToKeyName = toKeyName;

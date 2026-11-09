@@ -173,17 +173,28 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   public void testRenameToBucketRootKeepsFileName() throws Exception {
     addKeyToTable(fromKeyInfo);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.OK, renameToBucketRoot(fromKeyName));
+    OMClientResponse response = renameToBucketRoot(fromKeyName);
 
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
     assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(getBucketRootDBKey("fromKey")).getObjectID())
         .isEqualTo(fromKeyInfo.getObjectID());
+
+    // validateAndUpdateCache only fills the table cache; flush the response to check what reaches RocksDB.
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .getSkipCache(getDbPathKey(fromKeyParentInfo.getObjectID(), "fromKey")));
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout()).getSkipCache(getBucketRootDBKey("fromKey"))
+        .getObjectID()).isEqualTo(fromKeyInfo.getObjectID());
   }
 
   @Test
   public void testRenameBucketRootFileToBucketRoot() throws Exception {
     OmKeyInfo rootFile = addFileToBucketRoot("fromKey");
 
-    assertEquals(OzoneManagerProtocolProtos.Status.OK, renameToBucketRoot("fromKey"));
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, renameToBucketRoot("fromKey").getOMResponse().getStatus());
 
     assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(getBucketRootDBKey("fromKey")).getObjectID())
         .isEqualTo(rootFile.getObjectID());
@@ -194,7 +205,8 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     addKeyToTable(fromKeyInfo);
     OmKeyInfo rootFile = addFileToBucketRoot("fromKey");
 
-    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS, renameToBucketRoot(fromKeyName));
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS,
+        renameToBucketRoot(fromKeyName).getOMResponse().getStatus());
 
     assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(getBucketRootDBKey("fromKey")).getObjectID())
         .isEqualTo(rootFile.getObjectID());
@@ -209,7 +221,8 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     OMRequestTestUtils.addDirKeyToDirTable(false, OMFileRequest.getDirectoryInfo(rootDir), volumeName, bucketName,
         txnLogId, omMetadataManager);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS, renameToBucketRoot(fromKeyName));
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS,
+        renameToBucketRoot(fromKeyName).getOMResponse().getStatus());
 
     assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(getBucketRootDBKey("fromKey"))).isNull();
   }
@@ -225,10 +238,12 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
         bucketName, txnLogId, omMetadataManager);
 
     assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS,
-        renameToBucketRoot(sameNameChild.getKeyName()));
+        renameToBucketRoot(sameNameChild.getKeyName()).getOMResponse().getStatus());
 
     assertThat(omMetadataManager.getDirectoryTable().get(getBucketRootDBKey(parentName)).getObjectID())
         .isEqualTo(fromKeyParentInfo.getObjectID());
+    assertThat(omMetadataManager.getDirectoryTable().get(getDbPathKey(fromKeyParentInfo.getObjectID(), parentName))
+        .getObjectID()).isEqualTo(sameNameChild.getObjectID());
   }
 
   @Override
@@ -315,7 +330,7 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
 
   /**
    * Turns toKeyName itself into a directory, so a rename to it resolves as
-   * case-4 instead of case-7.
+   * case-4 instead of case-8.
    */
   private OmKeyInfo addToKeyAsDirectory() throws Exception {
     OmKeyInfo toKeyDirInfo = getOmKeyInfo(toKeyName)
@@ -407,9 +422,9 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     return modifiedOmRequest;
   }
 
-  private OzoneManagerProtocolProtos.Status renameToBucketRoot(String fromKey) throws Exception {
+  private OMClientResponse renameToBucketRoot(String fromKey) throws Exception {
     OMRequest omRequest = doPreExecute(createRenameKeyRequest(volumeName, bucketName, fromKey, ""));
-    return getOMKeyRenameRequest(omRequest).validateAndUpdateCache(ozoneManager, 100L).getOMResponse().getStatus();
+    return getOMKeyRenameRequest(omRequest).validateAndUpdateCache(ozoneManager, 100L);
   }
 
   private OmKeyInfo addFileToBucketRoot(String fileName) throws Exception {
