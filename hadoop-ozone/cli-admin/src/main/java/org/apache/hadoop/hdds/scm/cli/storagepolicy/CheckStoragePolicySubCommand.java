@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.cli.storagepolicy;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -83,7 +82,6 @@ public class CheckStoragePolicySubCommand extends ScmSubcommand {
    *
    * @param withReplicas true to add the container and replica details
    */
-  @VisibleForTesting
   public String buildReport(OzoneKeyDetails keyDetails, ScmClient scmClient, boolean withReplicas)
       throws IOException {
     List<String> lines = new ArrayList<>();
@@ -92,7 +90,7 @@ public class CheckStoragePolicySubCommand extends ScmSubcommand {
 
     OzoneStoragePolicy policy = (OzoneStoragePolicy) keyDetails.getStoragePolicy();
     if (policy == null) {
-      lines.add("  Key Unset StoragePolicy");
+      lines.add("  Storage Policy: none recorded for this key");
       return String.join("\n", lines);
     }
 

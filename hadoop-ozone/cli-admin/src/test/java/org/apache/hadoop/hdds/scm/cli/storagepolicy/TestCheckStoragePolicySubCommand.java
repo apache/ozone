@@ -117,41 +117,36 @@ public class TestCheckStoragePolicySubCommand {
   }
 
   /**
-   * The container storage type is right but the replica sits on a volume of another type: NO, and the reason names
-   * volumeStorageType only.
+   * A HOT key expects SSD. A replica whose storage type or volumeStorageType is not a match returns NO.
+   * The reasons name each type that differs, storageType first. Rows (storageType, volumeStorageType):
+   * <ul>
+   *   <li>SSD, DISK: the container type is right but the replica sits on a volume of another type.</li>
+   *   <li>DISK, ARCHIVE: both types are wrong.</li>
+   *   <li>DISK, DISK: strict rule. The fallback tier of HOT is DISK, but only the creation tier counts.</li>
+   * </ul>
    */
-  @Test
-  public void testWrongVolumeStorageTypeIsReported() throws IOException {
-    scmReturns(1L, replicas(1L, 3, StorageType.SSD, StorageType.DISK));
-
-    ReplicaCheck replica = onlyReplicaOfFirstContainer(OzoneStoragePolicy.HOT, 1L);
-
-    assertThat(replica.matches()).isFalse();
-    assertThat(replica.getMismatchReasons()).containsExactly("volumeStorageType DISK != expected SSD");
-  }
-
-  /** Both types are wrong: NO, and both reasons are listed, storageType first. */
-  @Test
-  public void testBothTypesWrongReportsBothReasons() throws IOException {
-    scmReturns(1L, replicas(1L, 3, StorageType.DISK, StorageType.ARCHIVE));
-
-    ReplicaCheck replica = onlyReplicaOfFirstContainer(OzoneStoragePolicy.HOT, 1L);
-
-    assertThat(replica.matches()).isFalse();
-    assertThat(replica.getMismatchReasons()).containsExactly(
-        "storageType DISK != expected SSD", "volumeStorageType ARCHIVE != expected SSD");
-  }
-
-  /** Strict rule: only the creation tier counts. A HOT key that fell back to DISK is NO. */
-  @Test
-  public void testReplicaOnFallbackTierDoesNotMatch() throws IOException {
-    // HOT creates on SSD and falls back to DISK. The strict rule counts DISK as a mismatch.
-    scmReturns(1L, replicas(1L, 3, StorageType.DISK, StorageType.DISK));
+  @ParameterizedTest
+  @CsvSource({"SSD,DISK", "DISK,ARCHIVE", "DISK,DISK"})
+  public void testReplicaOffCreationTierIsReported(StorageType storageType, StorageType volumeStorageType)
+      throws IOException {
+    // One reason for each type that is not SSD, storageType first.
+    List<String> expectedReasons = new ArrayList<>();
+    if (storageType != StorageType.SSD) {
+      expectedReasons.add("storageType " + storageType + " != expected SSD");
+    }
+    if (volumeStorageType != StorageType.SSD) {
+      expectedReasons.add("volumeStorageType " + volumeStorageType + " != expected SSD");
+    }
+    scmReturns(1L, replicas(1L, 3, storageType, volumeStorageType));
 
     List<ContainerCheck> checks = cmd.evaluate(keyDetails(OzoneStoragePolicy.HOT, RATIS_THREE, 1L), scmClient);
 
     assertThat(CheckStoragePolicySubCommand.keyMatches(checks)).isFalse();
     assertThat(checks.get(0).matches()).isFalse();
+    assertThat(checks.get(0).getReplicaChecks()).hasSize(3).allSatisfy(replica -> {
+      assertThat(replica.matches()).isFalse();
+      assertThat(replica.getMismatchReasons()).containsExactlyElementsOf(expectedReasons);
+    });
   }
 
   /**
@@ -435,7 +430,7 @@ public class TestCheckStoragePolicySubCommand {
   public void testKeyWithoutStoragePolicyPrintsNoticeAndSkipsScm() throws IOException {
     String report = cmd.buildReport(keyDetails(null, RATIS_THREE, 1L), scmClient, true);
 
-    assertThat(report).isEqualTo(lines(KEY_HEADER, "  Key Unset StoragePolicy"));
+    assertThat(report).isEqualTo(lines(KEY_HEADER, "  Storage Policy: none recorded for this key"));
     verifyNoInteractions(scmClient);
   }
 
@@ -457,17 +452,6 @@ public class TestCheckStoragePolicySubCommand {
     CommandLine storagePolicy = new CommandLine(new StoragePolicyCommands());
 
     assertThat(storagePolicy.getSubcommands()).containsKey("check");
-  }
-
-  /**
-   * Evaluates a one-container key and returns the first replica check. It first asserts that all replicas of the
-   * container have the same result, so a test can read one replica for the whole container.
-   */
-  private ReplicaCheck onlyReplicaOfFirstContainer(StoragePolicy policy, long containerId) throws IOException {
-    List<ContainerCheck> checks = cmd.evaluate(keyDetails(policy, RATIS_THREE, containerId), scmClient);
-    List<ReplicaCheck> replicaChecks = checks.get(0).getReplicaChecks();
-    assertThat(replicaChecks).isNotEmpty().allMatch(r -> r.matches() == replicaChecks.get(0).matches());
-    return replicaChecks.get(0);
   }
 
   /** Builds an Ozone client mock whose volume, bucket and key lookups for vol1/bucket1/key1 return this key. */
