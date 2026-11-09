@@ -48,14 +48,14 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.HATests;
+import org.apache.ozone.test.HACluster;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.junit.jupiter.api.Test;
 
 /**
  * Tests for SCM HA.
  */
-public abstract class TestStorageContainerManagerHAWithAllRunning implements HATests.TestCase {
+public abstract class TestStorageContainerManagerHAWithAllRunning implements HACluster.TestCase {
 
   private static final int OM_COUNT = 3;
   private static final int SCM_COUNT = 3;

@@ -658,7 +658,7 @@ public final class HddsServerUtil {
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         new SCMSecurityProtocolClientSideTranslatorPB(
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
-    return TracingUtil.createProxy(scmSecurityClient,
+    return TracingUtil.createClientProxy(scmSecurityClient,
         SCMSecurityProtocolClientSideTranslatorPB.class, conf);
   }
 
@@ -678,7 +678,7 @@ public final class HddsServerUtil {
                 UserGroupInformation.getCurrentUser(),
                 SecretKeyProtocolScmPB.class), SecretKeyProtocolScmPB.class);
 
-    return TracingUtil.createProxy(scmSecretClient,
+    return TracingUtil.createClientProxy(scmSecretClient,
         SecretKeyProtocolScm.class, conf);
   }
 
@@ -792,7 +792,7 @@ public final class HddsServerUtil {
     includeFile(file, OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME, archiveOutput);
   }
 
-  static boolean ratisSnapshotComplete(Path dir) {
+  public static boolean ratisSnapshotComplete(Path dir) {
     return new File(dir.toString(),
         OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME).exists();
   }

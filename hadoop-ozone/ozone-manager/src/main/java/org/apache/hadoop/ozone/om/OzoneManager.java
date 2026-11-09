@@ -270,6 +270,7 @@ import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -564,13 +565,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Objects.requireNonNull(conf, "conf == null");
-    setConfiguration(conf);
     TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
     TracingReconfigurationCallback tracingReconfigurationCallback =
         TracingReconfigurationCallback.init("OzoneManager", tracingConfig);
     // Load HA related configurations
-    OMHANodeDetails omhaNodeDetails =
-        OMHANodeDetails.loadOMHAConfig(configuration);
+    OMHANodeDetails omhaNodeDetails = OMHANodeDetails.loadOMHAConfig(conf);
+    setConfiguration(conf);
 
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
@@ -1159,7 +1159,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     updateActiveSnapshotMetrics();
 
     if (withNewSnapshot) {
-      versionManager.finalizeFromSnapshotIfRequired(metadataManager.getMetaTable());
+      versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
     }
   }
 
@@ -1585,7 +1585,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(conf, omNodeRpcAddr, omService,
+    return startRpcServer(conf, config.getRpcBindAddress(omNodeRpcAddr), omService,
         omInterService, omAdminService, reconfigureService);
   }
 
@@ -3298,19 +3298,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmBucketInfo getBucketInfo(String volume, String bucket)
       throws IOException {
+    return getBucketInfo(volume, bucket, false).getBucketInfo();
+  }
+
+  @Override
+  public BucketInfoWithS3Context getBucketInfo(String volume, String bucket, boolean assumeS3Context)
+      throws IOException {
+    String resolvedVolumeName = volume;
+    BucketInfoWithS3Context.Builder builder = BucketInfoWithS3Context.newBuilder();
+    if (assumeS3Context) {
+      S3VolumeContext context = getS3VolumeContext(true);
+      resolvedVolumeName = context.getOmVolumeArgs().getVolume();
+      builder.setUserPrincipal(context.getUserPrincipal());
+    }
+
     boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(volume);
+    Map<String, String> auditMap = buildAuditMap(resolvedVolumeName);
     auditMap.put(OzoneConsts.BUCKET, bucket);
     try {
       if (getAclsEnabled()) {
         omMetadataReader.checkAcls(ResourceType.BUCKET,
-            StoreType.OZONE, ACLType.READ, volume,
+            StoreType.OZONE, ACLType.READ, resolvedVolumeName,
             bucket, null);
       }
       metrics.incNumBucketInfos();
 
-      return enrichLinkBucketInfo(
-          bucketManager.getBucketInfo(volume, bucket));
+      builder.setBucketInfo(enrichLinkBucketInfo(bucketManager.getBucketInfo(resolvedVolumeName, bucket)));
+      return builder.build();
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;
@@ -4703,6 +4717,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       termIndex = installCheckpoint(leaderId, checkpointLocation);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
+      throw new IOException("Failed to install snapshot from Leader " + leaderId, ex);
     } finally {
       cleanupCheckpoint(omDBCheckpoint);
     }
@@ -4759,6 +4774,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long startTime = Time.monotonicNow();
     File oldDBLocation = metadataManager.getStore().getDbLocation();
     Path omDbPath = Paths.get(checkpointLocation.toString(), OM_DB_NAME);
+    IOException installFailure = null;
     try {
       // Stop Background services
       keyManager.stop();
@@ -4768,20 +4784,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Pause the State Machine. It flushes the transactions already applied and rejects new ones until unpause.
       omRatisServer.getOmStateMachine().pause();
     } catch (Exception e) {
-      LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
-          "installing the new checkpoint.");
       // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
       startSecretManagerIfNecessary();
       startTrashEmptier(configuration);
-      throw e;
+      throw new IOException("Failed to install checkpoint " + checkpointTrxnInfo + ": Cannot stop/pause services.", e);
     }
-
     File dbBackup = null;
     TermIndex termIndex = omRatisServer.getLastAppliedTermIndex();
     long term = termIndex.getTerm();
     long lastAppliedIndex = termIndex.getIndex();
-
     // Check if current applied log index is smaller than the downloaded
     // checkpoint transaction index. If yes, proceed by stopping the ratis
     // server so that the OM state can be re-initialized. If no then do not
@@ -4823,6 +4835,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.error("Failed to install Snapshot from {} as OM failed to replace" +
             " DB with downloaded checkpoint. Reloading old OM state.",
             leaderId, e);
+        installFailure = new IOException("Failed to install checkpoint " + checkpointTrxnInfo
+            + ": Cannot replace DB.", e);
       }
     } else {
       LOG.warn("Cannot proceed with InstallSnapshot as OM is at TermIndex {} " +
@@ -4890,13 +4904,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to delete the backup of the original DB {}",
           dbBackup, e);
     }
-
+    if (installFailure != null) {
+      throw installFailure;
+    }
     if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
-      // Install Snapshot failed and old state was reloaded. Return null to
-      // Ratis to indicate that installation failed.
+      // An older checkpoint was skipped. Return null to Ratis to indicate that no snapshot was installed.
       return null;
     }
-
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
     TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
