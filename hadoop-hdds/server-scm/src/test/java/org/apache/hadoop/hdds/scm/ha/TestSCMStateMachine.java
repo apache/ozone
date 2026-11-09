@@ -418,6 +418,8 @@ public class TestSCMStateMachine {
           finalizeRequest("finalizeLayoutFeature", STORAGE_SPACE_DISTRIBUTION.serialize() + 1);
       ExitUtils.ExitException unknownLayout = assertThrows(ExitUtils.ExitException.class,
           () -> applyingStateMachine.applyTransaction(newTransaction(unknownLayoutRequest, unknownLayoutIndex)));
+      // Verify that the previous cases would have failed and caught a compatibility issue if the request type or
+      // layout feature was not known.
       assertThat(unknownLayout).hasMessageContaining("Unknown pre-ZDU layout version 11");
     } finally {
       ExitUtils.clear();
