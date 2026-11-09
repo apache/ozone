@@ -149,7 +149,7 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testStopWaitsForOmSyncBeforeClosingMetadataManager() throws Exception {
+  public void testStopInterruptsAndWaitsForOmSyncBeforeClosingMetadataManager() throws Exception {
     ReconOMMetadataManager metadataManager = mock(ReconOMMetadataManager.class);
     ReconTaskController taskController = getMockTaskController();
     OzoneManagerServiceProviderImpl provider = new OzoneManagerServiceProviderImpl(configuration,
@@ -161,10 +161,17 @@ public class TestOzoneManagerServiceProviderImpl {
     schedulerField.set(provider, scheduler);
     ExecutorService stopExecutor = Executors.newSingleThreadExecutor();
     CountDownLatch syncStarted = new CountDownLatch(1);
+    CountDownLatch syncInterrupted = new CountDownLatch(1);
     CountDownLatch finishSync = new CountDownLatch(1);
     Future<?> sync = scheduler.submit(() -> {
       syncStarted.countDown();
-      Uninterruptibles.awaitUninterruptibly(finishSync);
+      try {
+        finishSync.await();
+      } catch (InterruptedException e) {
+        syncInterrupted.countDown();
+        Uninterruptibles.awaitUninterruptibly(finishSync);
+        Thread.currentThread().interrupt();
+      }
     });
     Future<?> stop = null;
     try {
@@ -174,6 +181,7 @@ public class TestOzoneManagerServiceProviderImpl {
         return null;
       });
       GenericTestUtils.waitFor(scheduler::isShutdown, 10, 10000);
+      assertTrue(syncInterrupted.await(10, TimeUnit.SECONDS), "OM sync should be interrupted immediately on stop");
       assertFalse(sync.isDone());
       verify(taskController, never()).stop();
       verify(metadataManager, never()).stop();

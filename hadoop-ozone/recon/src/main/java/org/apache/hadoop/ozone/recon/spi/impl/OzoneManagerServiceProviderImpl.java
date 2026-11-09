@@ -393,6 +393,7 @@ public class OzoneManagerServiceProviderImpl
   @Override
   public void stop() throws Exception {
     LOG.info("Stopping Ozone Manager Service Provider.");
+    scheduler.shutdownNow();
     stopSyncDataFromOMThread();
     reconTaskController.stop();
     omMetadataManager.stop();
