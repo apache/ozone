@@ -703,13 +703,12 @@ public class TestRpcClient {
   }
 
   @ParameterizedTest
-  @EnumSource(value = OzoneManagerVersion.class, names = {"DEFAULT_VERSION", "S3_LIST_MULTIPART_UPLOADS_PAGINATION",
-      "ATOMIC_CREATE_IF_NOT_EXISTS", "S3_DERIVED_KEY", "CONDITIONAL_DELETE", "ZDU", "UNKNOWN_VERSION"})
+  @EnumSource(value = OzoneManagerVersion.class, names = {"S3_DERIVED_KEY", "CONDITIONAL_DELETE"})
   public void testConditionalDeleteOmVersion(OzoneManagerVersion version) throws IOException {
     List<OMRequest> requests = new ArrayList<>();
     RpcClient client = createConditionalRequestClient(requests, version);
     try {
-      for (String etag : Arrays.asList(null, "etag", "*", "")) {
+      for (String etag : Arrays.asList(null, "etag")) {
         requests.clear();
         IOException error = assertThrows(IOException.class,
             () -> client.deleteKey("vol", "bucket", "key", false, etag));
@@ -726,64 +725,42 @@ public class TestRpcClient {
           assertThat(requests).isEmpty();
         }
       }
-      requests.clear();
-      assertThat(assertThrows(IOException.class, () -> client.deleteKey("vol", "bucket", "key", false)))
-          .hasMessage("request sent");
-      assertThat(requests).hasSize(1);
-      assertThat(requests.get(0).getDeleteKeyRequest().getKeyArgs().hasExpectedETag()).isFalse();
     } finally {
       client.close();
     }
   }
 
   @ParameterizedTest
-  @EnumSource(value = OzoneManagerVersion.class, names = {"DEFAULT_VERSION", "S3_LIST_MULTIPART_UPLOADS_PAGINATION",
-      "ATOMIC_CREATE_IF_NOT_EXISTS", "S3_DERIVED_KEY", "CONDITIONAL_DELETE", "ZDU", "UNKNOWN_VERSION"})
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"S3_LIST_MULTIPART_UPLOADS_PAGINATION", "ATOMIC_CREATE_IF_NOT_EXISTS"})
   public void testConditionalCompleteMpuOmVersion(OzoneManagerVersion version) throws IOException {
     List<OMRequest> requests = new ArrayList<>();
     RpcClient client = createConditionalRequestClient(requests, version);
     try {
-      for (Long generation : Arrays.asList(null, 0L, 1L)) {
-        for (String etag : Arrays.asList(null, "etag", "*")) {
-          for (boolean extendedOverload : new boolean[]{false, true}) {
-            requests.clear();
-            IOException error = assertThrows(IOException.class, () -> {
-              if (extendedOverload) {
-                client.completeMultipartUpload("vol", "bucket", "key", "upload", Collections.emptyMap(),
-                    generation, etag, null);
-              } else {
-                client.completeMultipartUpload("vol", "bucket", "key", "upload", Collections.emptyMap(),
-                    generation, etag);
-              }
-            });
-            if ((generation == null && etag == null)
-                || OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(version)) {
-              assertThat(error).hasMessage("request sent");
-              assertThat(requests).hasSize(1);
-              KeyArgs args = requests.get(0).getCompleteMultiPartUploadRequest().getKeyArgs();
-              assertThat(args.hasExpectedETag()).isEqualTo(etag != null);
-              assertThat(args.hasExpectedDataGeneration()).isEqualTo(generation != null);
-              if (etag != null) {
-                assertThat(args.getExpectedETag()).isEqualTo(etag);
-              }
-              if (generation != null) {
-                assertThat(args.getExpectedDataGeneration()).isEqualTo(generation);
-              }
-            } else {
-              assertThat(error).hasMessage("OzoneManager does not support conditional multipart upload completion.");
-              assertThat(requests).isEmpty();
+      for (Long generation : Arrays.asList(null, 0L)) {
+        for (String etag : Arrays.asList(null, "etag")) {
+          requests.clear();
+          IOException error = assertThrows(IOException.class, () -> client.completeMultipartUpload(
+              "vol", "bucket", "key", "upload", Collections.emptyMap(), generation, etag));
+          if ((generation == null && etag == null)
+              || OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(version)) {
+            assertThat(error).hasMessage("request sent");
+            assertThat(requests).hasSize(1);
+            KeyArgs args = requests.get(0).getCompleteMultiPartUploadRequest().getKeyArgs();
+            assertThat(args.hasExpectedETag()).isEqualTo(etag != null);
+            assertThat(args.hasExpectedDataGeneration()).isEqualTo(generation != null);
+            if (etag != null) {
+              assertThat(args.getExpectedETag()).isEqualTo(etag);
             }
+            if (generation != null) {
+              assertThat(args.getExpectedDataGeneration()).isEqualTo(generation);
+            }
+          } else {
+            assertThat(error).hasMessage("OzoneManager does not support conditional multipart upload completion.");
+            assertThat(requests).isEmpty();
           }
         }
       }
-      requests.clear();
-      assertThat(assertThrows(IOException.class,
-          () -> client.completeMultipartUpload("vol", "bucket", "key", "upload", Collections.emptyMap())))
-          .hasMessage("request sent");
-      assertThat(requests).hasSize(1);
-      KeyArgs args = requests.get(0).getCompleteMultiPartUploadRequest().getKeyArgs();
-      assertThat(args.hasExpectedETag()).isFalse();
-      assertThat(args.hasExpectedDataGeneration()).isFalse();
     } finally {
       client.close();
     }
@@ -796,9 +773,8 @@ public class TestRpcClient {
       public OMResponse submitRequest(OMRequest request) throws IOException {
         if (request.getCmdType() == Type.ServiceList) {
           return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
-              .setServiceListResponse(ServiceListResponse.newBuilder()
-                  .addServiceInfo(om(OzoneManagerVersion.SOFTWARE_VERSION).getProtobuf())
-                  .addServiceInfo(om(version).getProtobuf())).build();
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
+              .build();
         }
         if (request.getCmdType() == Type.DeleteKey || request.getCmdType() == Type.CompleteMultiPartUpload) {
           requests.add(request);

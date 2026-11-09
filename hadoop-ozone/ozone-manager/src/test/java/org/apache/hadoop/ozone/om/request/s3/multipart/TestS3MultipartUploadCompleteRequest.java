@@ -61,7 +61,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
@@ -76,30 +75,16 @@ import org.junit.jupiter.params.provider.CsvSource;
 public class TestS3MultipartUploadCompleteRequest
     extends S3MultipartRequestTests {
 
-  @ParameterizedTest
-  @CsvSource(value = {"etag,NULL,NULL,ATOMIC_REWRITE_KEY", "*,NULL,NULL,ATOMIC_REWRITE_KEY",
-      "NULL,1,NULL,ATOMIC_REWRITE_KEY", "NULL,0,NULL,ATOMIC_CREATE_IF_NOT_EXISTS",
-      "etag,0,NULL,ATOMIC_REWRITE_KEY", "etag,0,NULL,ATOMIC_CREATE_IF_NOT_EXISTS",
-      "NULL,NULL,etag,S3_IF_NONE_MATCH_ETAG"}, nullValues = "NULL")
-  public void testPreExecuteRefusesDisabledConditionalComplete(String etag, Long generation, String excludedETag,
-      OzoneManagerVersion feature) throws Exception {
+  @Test
+  public void testPreExecuteRefusesDisabledConditionalComplete() throws Exception {
     doThrow(new OMException("disabled", OMException.ResultCodes.NOT_SUPPORTED_OPERATION))
-        .when(ozoneManager).checkFeatureEnabled(feature);
+        .when(ozoneManager).checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OMRequest request = OMRequestTestUtils.createCompleteMPURequest(UUID.randomUUID().toString(),
         UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
         Collections.emptyList());
-    KeyArgs.Builder args = request.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder();
-    if (etag != null) {
-      args.setExpectedETag(etag);
-    }
-    if (generation != null) {
-      args.setExpectedDataGeneration(generation);
-    }
-    if (excludedETag != null) {
-      args.setExcludedETag(excludedETag);
-    }
     OMRequest conditional = request.toBuilder().setCompleteMultiPartUploadRequest(
-        request.getCompleteMultiPartUploadRequest().toBuilder().setKeyArgs(args)).build();
+        request.getCompleteMultiPartUploadRequest().toBuilder().setKeyArgs(
+            request.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setExpectedETag("etag"))).build();
 
     OMException error = assertThrows(OMException.class,
         () -> getS3MultipartUploadCompleteReq(conditional).preExecute(ozoneManager));

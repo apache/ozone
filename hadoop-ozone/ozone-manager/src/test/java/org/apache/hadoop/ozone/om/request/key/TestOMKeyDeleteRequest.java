@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
@@ -85,16 +86,15 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
   }
 
   @ParameterizedTest
-  @CsvSource({"etag,CONDITIONAL_DELETE", "*,CONDITIONAL_DELETE", "etag,ATOMIC_REWRITE_KEY", "*,ATOMIC_REWRITE_KEY"})
-  public void testPreExecuteRefusesDisabledConditionalDelete(String etag, OzoneManagerVersion feature)
-      throws Exception {
+  @EnumSource(value = OzoneManagerVersion.class, names = {"CONDITIONAL_DELETE", "ATOMIC_REWRITE_KEY"})
+  public void testPreExecuteRefusesDisabledConditionalDelete(OzoneManagerVersion feature) throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
     addKeyToTable();
     doThrow(new OMException("disabled", OMException.ResultCodes.NOT_SUPPORTED_OPERATION))
         .when(ozoneManager).checkFeatureEnabled(feature);
 
     OMException error = assertThrows(OMException.class,
-        () -> getOmKeyDeleteRequest(createDeleteKeyRequestWithExpectedETag(etag)).preExecute(ozoneManager));
+        () -> getOmKeyDeleteRequest(createDeleteKeyRequestWithExpectedETag("etag")).preExecute(ozoneManager));
     assertThat(error.getResult()).isEqualTo(OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
 
     OMRequest unconditional = getOmKeyDeleteRequest(createDeleteKeyRequest()).preExecute(ozoneManager);

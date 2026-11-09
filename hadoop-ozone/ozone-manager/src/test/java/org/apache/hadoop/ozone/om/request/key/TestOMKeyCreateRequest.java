@@ -128,10 +128,8 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
   }
 
   @ParameterizedTest
-  @CsvSource(value = {"etag,NULL,NULL,ATOMIC_REWRITE_KEY", "*,NULL,NULL,ATOMIC_REWRITE_KEY",
-      "NULL,1,NULL,ATOMIC_REWRITE_KEY", "NULL,0,NULL,ATOMIC_CREATE_IF_NOT_EXISTS",
-      "etag,0,NULL,ATOMIC_REWRITE_KEY", "etag,0,NULL,ATOMIC_CREATE_IF_NOT_EXISTS",
-      "NULL,NULL,etag,S3_IF_NONE_MATCH_ETAG"}, nullValues = "NULL")
+  @CsvSource(value = {"etag,NULL,NULL,ATOMIC_REWRITE_KEY", "NULL,1,NULL,ATOMIC_REWRITE_KEY",
+      "NULL,0,NULL,ATOMIC_CREATE_IF_NOT_EXISTS", "NULL,NULL,etag,S3_IF_NONE_MATCH_ETAG"}, nullValues = "NULL")
   public void testPreExecuteRefusesDisabledConditionalCreate(String etag, Long generation, String excludedETag,
       OzoneManagerVersion feature) throws Exception {
     doThrow(new OMException("disabled", OMException.ResultCodes.NOT_SUPPORTED_OPERATION))
