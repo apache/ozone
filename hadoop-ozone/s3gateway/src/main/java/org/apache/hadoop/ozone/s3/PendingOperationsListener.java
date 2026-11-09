@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.s3;
 
 import java.util.concurrent.atomic.AtomicReference;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
@@ -28,42 +26,38 @@ import org.glassfish.jersey.server.monitoring.RequestEvent;
 import org.glassfish.jersey.server.monitoring.RequestEventListener;
 
 /**
- * Counts S3 operations from post-matching request filtering until Jersey finishes processing the response,
- * including streaming responses and failures. Requests rejected before this filter are not counted.
+ * Counts S3 operations from request matching until Jersey finishes processing the response,
+ * including streaming responses and failures. Requests rejected before matching are not counted.
  */
 @Provider
-public class PendingOperationsFilter implements ContainerRequestFilter, ApplicationEventListener, RequestEventListener {
-
-  private static final String COUNTED_METRICS = "PENDING_OPERATION_METRICS";
-
-  @Override
-  public void filter(ContainerRequestContext requestContext) {
-    S3GatewayMetrics metrics = S3GatewayMetrics.getMetrics();
-    if (metrics != null) {
-      metrics.incrPendingOperations();
-      requestContext.setProperty(COUNTED_METRICS, new AtomicReference<>(metrics));
-    }
-  }
+public class PendingOperationsListener implements ApplicationEventListener {
 
   @Override
   public void onEvent(ApplicationEvent event) {
-    // Only request completion events affect the pending operations gauge.
+    // Only request events affect the pending operations gauge.
   }
 
   @Override
   public RequestEventListener onRequest(RequestEvent event) {
-    return this;
+    return new PendingOperation();
   }
 
-  @Override
-  public void onEvent(RequestEvent event) {
-    if (event.getType() == RequestEvent.Type.FINISHED) {
-      Object counted = event.getContainerRequest().getProperty(COUNTED_METRICS);
-      if (counted instanceof AtomicReference) {
+  private static final class PendingOperation implements RequestEventListener {
+    private final AtomicReference<S3GatewayMetrics> counted = new AtomicReference<>();
+
+    @Override
+    public void onEvent(RequestEvent event) {
+      if (event.getType() == RequestEvent.Type.REQUEST_MATCHED) {
+        S3GatewayMetrics metrics = S3GatewayMetrics.getMetrics();
+        if (metrics != null) {
+          metrics.incrPendingOperations();
+          counted.set(metrics);
+        }
+      } else if (event.getType() == RequestEvent.Type.FINISHED) {
         // Jersey can release both the original response and a mapped error response.
-        Object metrics = ((AtomicReference<?>) counted).getAndSet(null);
-        if (metrics instanceof S3GatewayMetrics) {
-          ((S3GatewayMetrics) metrics).decrPendingOperations();
+        S3GatewayMetrics metrics = counted.getAndSet(null);
+        if (metrics != null) {
+          metrics.decrPendingOperations();
         }
       }
     }

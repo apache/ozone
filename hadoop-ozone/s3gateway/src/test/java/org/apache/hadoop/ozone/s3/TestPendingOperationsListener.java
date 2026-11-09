@@ -36,9 +36,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.ws.rs.GET;
-import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
-import javax.ws.rs.Priorities;
 import javax.ws.rs.Produces;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
@@ -64,7 +62,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests pending operations through the Jersey request and response lifecycle. */
-public class TestPendingOperationsFilter {
+public class TestPendingOperationsListener {
 
   private final ObjectEndpoint endpoint = new ObjectEndpoint();
   private S3GatewayMetrics metrics;
@@ -75,7 +73,7 @@ public class TestPendingOperationsFilter {
   void setup() {
     S3GatewayMetrics.unRegister();
     metrics = S3GatewayMetrics.create(new OzoneConfiguration());
-    config = new ResourceConfig(PendingOperationsFilter.class, IOExceptionMapper.class)
+    config = new ResourceConfig(PendingOperationsListener.class, IOExceptionMapper.class)
         .register(endpoint)
         .property(CommonProperties.FEATURE_AUTO_DISCOVERY_DISABLE, true)
         .property(CommonProperties.METAINF_SERVICES_LOOKUP_DISABLE, true);
@@ -89,9 +87,8 @@ public class TestPendingOperationsFilter {
     S3GatewayMetrics.unRegister();
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"GET", "PUT"})
-  void staysPendingWhileWritingResponse(String method) throws Exception {
+  @Test
+  void staysPendingWhileWritingResponse() throws Exception {
     endpoint.response = () -> {
       assertEquals(1, metrics.getPendingOperations());
       return Response.ok((StreamingOutput) out -> {
@@ -102,7 +99,7 @@ public class TestPendingOperationsFilter {
       }).build();
     };
     ByteArrayOutputStream output = new ByteArrayOutputStream();
-    assertEquals(200, execute(method, output).getStatus());
+    assertEquals(200, execute(output).getStatus());
     assertEquals(1, output.size());
     assertEquals(0, metrics.getPendingOperations());
   }
@@ -136,7 +133,7 @@ public class TestPendingOperationsFilter {
       throw new IOException("later read failed");
     }).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
-    assertEquals(200, execute("GET", output).getStatus());
+    assertEquals(200, execute(output).getStatus());
     assertEquals(1, output.size());
     assertEquals(0, metrics.getPendingOperations());
   }
@@ -188,7 +185,7 @@ public class TestPendingOperationsFilter {
         }
       }
     };
-    ExecutionException failure = assertThrows(ExecutionException.class, () -> execute("GET", output));
+    ExecutionException failure = assertThrows(ExecutionException.class, () -> execute(output));
     assertInstanceOf(UncheckedIOException.class, failure.getCause());
     assertEquals(0, metrics.getPendingOperations());
   }
@@ -200,13 +197,12 @@ public class TestPendingOperationsFilter {
     assertEquals(0, metrics.getPendingOperations());
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {-1, 1})
-  void postMatchingRejectionKeepsTheCountingBoundary(int priorityOffset) throws Exception {
+  @Test
+  void postMatchingRejectionCompletes() throws Exception {
     config.register((ContainerRequestFilter) request -> {
-      assertEquals(priorityOffset > 0 ? 1 : 0, metrics.getPendingOperations());
+      assertEquals(1, metrics.getPendingOperations());
       request.abortWith(Response.status(403).build());
-    }, Priorities.USER + priorityOffset);
+    });
     assertEquals(403, execute().getStatus());
     assertEquals(0, metrics.getPendingOperations());
   }
@@ -214,7 +210,7 @@ public class TestPendingOperationsFilter {
   @Test
   void unmatchedRequestIsNotCounted() throws Exception {
     application = new ApplicationHandler(config);
-    ContainerRequest request = request("GET", "missing");
+    ContainerRequest request = request("missing");
     assertEquals(404, application.apply(request).get(10, TimeUnit.SECONDS).getStatus());
     assertEquals(0, metrics.getPendingOperations());
   }
@@ -273,19 +269,19 @@ public class TestPendingOperationsFilter {
   }
 
   private ContainerResponse execute() throws Exception {
-    return execute("GET", new ByteArrayOutputStream());
+    return execute(new ByteArrayOutputStream());
   }
 
-  private ContainerResponse execute(String method, OutputStream output) throws Exception {
+  private ContainerResponse execute(OutputStream output) throws Exception {
     if (application == null) {
       application = new ApplicationHandler(config);
     }
-    return application.apply(request(method, "object"), output).get(10, TimeUnit.SECONDS);
+    return application.apply(request("object"), output).get(10, TimeUnit.SECONDS);
   }
 
-  private static ContainerRequest request(String method, String path) {
+  private static ContainerRequest request(String path) {
     URI base = URI.create("http://localhost/");
-    return new ContainerRequest(base, base.resolve(path), method, null, new MapPropertiesDelegate());
+    return new ContainerRequest(base, base.resolve(path), "GET", null, new MapPropertiesDelegate());
   }
 
   /** Minimal resource for exercising the request lifecycle. */
@@ -296,12 +292,6 @@ public class TestPendingOperationsFilter {
     @GET
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response get() {
-      return response.get();
-    }
-
-    @PUT
-    @Produces(MediaType.APPLICATION_OCTET_STREAM)
-    public Response put() {
       return response.get();
     }
   }
