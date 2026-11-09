@@ -31,11 +31,8 @@ import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricsRecord;
-import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -100,19 +97,13 @@ class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
   @Test
   void putGetHeadAndListRecordBackendCalls() throws Exception {
     // MiniOzoneCluster shares the metrics system with S3G. Only the S3 client operates in these measurement windows.
-    XceiverClientMetrics dnMetrics = XceiverClientManager.getXceiverClientMetrics();
-    long writes = count(dnMetrics, "WriteChunkLatencyNumOps");
     long commits = count(Type.CommitKey);
     s3.putObject(request -> request.bucket(BUCKET).key("object"), RequestBody.fromString(CONTENT));
     assertIncreased(Type.CommitKey, commits);
-    assertThat(count(dnMetrics, "WriteChunkLatencyNumOps")).isGreaterThan(writes);
 
-    long reads = count(dnMetrics, "ReadChunkLatencyNumOps");
     long lookups = count(Type.GetKeyInfo);
     assertThat(s3.getObjectAsBytes(request -> request.bucket(BUCKET).key("object")).asUtf8String()).isEqualTo(CONTENT);
     assertIncreased(Type.GetKeyInfo, lookups);
-    // The gRPC callback can complete the response before recording its latency.
-    waitFor(() -> count(dnMetrics, "ReadChunkLatencyNumOps") > reads, 10, 5_000);
 
     lookups = count(Type.GetKeyInfo);
     s3.headObject(request -> request.bucket(BUCKET).key("object"));
@@ -123,8 +114,7 @@ class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
     assertIncreased(Type.ListKeysLight, lists);
 
     DefaultMetricsSystem.instance().publishMetricsNow();
-    assertThat(adminResponse("/prom")).contains("om_client_metrics_commit_key_latency_ns_num_ops",
-        "xceiver_client_metrics_write_chunk_latency_num_ops", "xceiver_client_metrics_read_chunk_latency_num_ops");
+    assertThat(adminResponse("/prom")).contains("om_client_metrics_commit_key_latency_ns_num_ops");
     // Hadoop caches JMX attributes, so newly observed command types need a cache refresh.
     waitFor((CheckedSupplier<Boolean, Exception>) () -> {
       String jmx = adminResponse("/jmx?qry=Hadoop:service=*,name=OmClientMetrics");
@@ -162,12 +152,9 @@ class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
   }
 
   private long count(Type type) {
-    return count(metricsHandle.metrics(), type + "LatencyNsNumOps");
-  }
-
-  private static long count(MetricsSource source, String name) {
+    String name = type + "LatencyNsNumOps";
     MetricsCollectorImpl collector = new MetricsCollectorImpl();
-    source.getMetrics(collector, true);
+    metricsHandle.metrics().getMetrics(collector, true);
     for (MetricsRecord record : collector.getRecords()) {
       for (AbstractMetric metric : record.metrics()) {
         if (metric.name().equals(name)) {

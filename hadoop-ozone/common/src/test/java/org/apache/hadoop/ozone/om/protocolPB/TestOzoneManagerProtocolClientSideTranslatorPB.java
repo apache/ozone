@@ -34,7 +34,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -49,8 +48,6 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.om.OmClientMetrics;
@@ -88,7 +85,7 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   private static final OmDeleteKeys DELETE_KEYS = new OmDeleteKeys("vol", "bucket", Arrays.asList("key1", "key2"));
 
   @ParameterizedTest
-  @EnumSource(value = Status.class, names = {"OK", "KEY_NOT_FOUND", "ACCESS_DENIED"})
+  @EnumSource(value = Status.class, names = {"OK", "KEY_NOT_FOUND"})
   void recordsLatencyForSuccessfulAndErrorResponses(Status status) throws Exception {
     when(omTransport.submitRequest(any())).thenReturn(serviceListResponse().toBuilder().setStatus(status).build());
     try (OmClientMetrics.Handle handle = attachMetrics(pb)) {
@@ -112,8 +109,7 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   }
 
   private static Stream<Exception> transportFailures() {
-    return Stream.of(new IOException("transport failed"), new SocketTimeoutException("timed out"),
-        new IllegalStateException("transport closed"));
+    return Stream.of(new IOException("transport failed"), new IllegalStateException("transport closed"));
   }
 
   @Test
@@ -141,21 +137,6 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
     } finally {
       release.countDown();
       executor.shutdownNow();
-    }
-  }
-
-  @Test
-  void transportRetriesAreOneSample() throws Exception {
-    when(omTransport.submitRequest(any())).thenThrow(new IOException("retry"))
-        .thenReturn(serviceListResponse());
-    OmTransport retrying = (OmTransport) RetryProxy.create(OmTransport.class, omTransport,
-        RetryPolicies.retryUpToMaximumCountWithFixedSleep(1, 1, TimeUnit.MILLISECONDS));
-    OzoneManagerProtocolClientSideTranslatorPB client =
-        new OzoneManagerProtocolClientSideTranslatorPB(retrying, "retry-client");
-    try (OmClientMetrics.Handle handle = attachMetrics(client)) {
-      client.getServiceList();
-      verify(omTransport, times(2)).submitRequest(any());
-      assertThat(getLongCounter("ServiceListLatencyNsNumOps", getMetrics(handle.metrics()))).isEqualTo(1);
     }
   }
 

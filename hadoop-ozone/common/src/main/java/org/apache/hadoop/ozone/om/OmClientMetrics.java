@@ -100,7 +100,6 @@ public final class OmClientMetrics implements MetricsSource {
     referenceCount--;
     if (referenceCount == 0) {
       instance.stop();
-      // Do not hold the instance lock while unregistering from the metrics system.
       try {
         DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
       } finally {
