@@ -36,6 +36,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
@@ -114,6 +115,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final AtomicBoolean idlePreadTrimScheduled = new AtomicBoolean();
   // Set by close() before it closes the idle readers, so that a positioned read ending later closes its reader.
   private volatile boolean closed;
+  // Advanced by unbuffer() and refreshBlockInfo() before they close the idle readers, so that a positioned read that
+  // started before closes its reader instead of keeping it.
+  private final AtomicLong idlePreadGeneration = new AtomicLong();
 
   public StreamBlockInputStream(
       BlockLocationInfo blockInfo, Pipeline pipeline,
@@ -230,8 +234,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     int callRetries = 0;
     boolean retriedIdleReader = false;
     while (true) {
+      final long generation = idlePreadGeneration.get();
       final Pipeline pipeline = pipelineRef.get();
-      final IdlePreadReader idle = preadReuseEnabled ? leaseIdlePreadReader(pipeline) : null;
+      // after an idle reader failed, retry on a new stream: the other idle readers may be just as stale
+      final IdlePreadReader idle = preadReuseEnabled && !retriedIdleReader ? leaseIdlePreadReader(pipeline) : null;
       final XceiverClientGrpc client = idle != null ? idle.client : acquireGrpcClientForReadData(factory, pipeline);
       final StreamingReader reader = idle != null ? idle.reader : new StreamingReader(client);
       boolean reuse = false;
@@ -252,22 +258,34 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
       } catch (IOException e) {
         dst.position(startPosition);
-        if (idle != null && !retriedIdleReader) {
+        if (idle != null && !retriedIdleReader && mayBeStaleStream(e)) {
           // The stream may have broken while it was idle, which says nothing about the datanode: retry once on a
-          // new stream before the failure counts.
+          // new stream before the failure counts. The other idle readers share the channel, so drop them too.
           retriedIdleReader = true;
+          closeIdlePreadReaders();
           LOG.debug("{}: retry positioned read at {} on a new stream after {} failed", name, blockOffset, reader, e);
           continue;
         }
         handlePreadException(e, reader, blockOffset, callRetries++);
       } finally {
         if (reuse) {
-          returnIdlePreadReader(idle != null ? idle : new IdlePreadReader(reader, client, factory, pipeline));
+          final IdlePreadReader returned = idle != null ? idle : new IdlePreadReader(reader, client, factory, pipeline);
+          returnIdlePreadReader(returned, generation);
         } else {
           factory.releaseClientForReadData(client, false);
         }
       }
     }
+  }
+
+  /**
+   * Whether the failure of a positioned read on an idle reader may come from the stream having broken while it was
+   * idle. A broken stream fails fast. A timeout means the datanode did not answer on a live stream, and an interrupt
+   * comes from the caller, so neither is retried on a new stream: they count as usual.
+   */
+  private static boolean mayBeStaleStream(IOException e) {
+    return !(ConnectionFailureUtils.unwrapCause(e) instanceof TimeoutIOException)
+        && !Thread.currentThread().isInterrupted();
   }
 
   /**
@@ -279,7 +297,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private IdlePreadReader leaseIdlePreadReader(Pipeline pipeline) throws IOException {
     for (IdlePreadReader idle = idlePreadReaders.poll(); idle != null; idle = idlePreadReaders.poll()) {
       idlePreadReaderCount.decrementAndGet();
-      if (idle.pipeline == pipeline && idle.reader.isReusable()
+      if (idle.generation == idlePreadGeneration.get() && idle.pipeline == pipeline && idle.reader.isReusable()
           && !failedStreamingDatanodes.contains(idle.reader.getResponse().getDatanodeDetails().getID())) {
         try {
           idle.reader.resumePermit();
@@ -294,18 +312,23 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return null;
   }
 
-  /** Keeps the reader of a successful positioned read open for the next one, or closes it if it cannot be kept. */
-  private void returnIdlePreadReader(IdlePreadReader idle) {
+  /**
+   * Keeps the reader of a successful positioned read open for the next one, or closes it if it cannot be kept.
+   *
+   * @param generation {@link #idlePreadGeneration} when the positioned read started
+   */
+  private void returnIdlePreadReader(IdlePreadReader idle, long generation) {
     // An idle reader must not hold one of the client's permits, which bound the requests in flight.
     idle.reader.releasePermitWhileIdle();
-    if (closed || !reserveIdlePreadReaderSlot()) {
+    if (closed || generation != idlePreadGeneration.get() || !reserveIdlePreadReaderSlot()) {
       closeIdlePreadReader(idle);
       return;
     }
     idle.idleSinceNanos = System.nanoTime();
+    idle.generation = generation;
     idlePreadReaders.push(idle);
-    if (closed) {
-      // close() may have closed the idle readers before this one was added.
+    if (closed || generation != idlePreadGeneration.get()) {
+      // close(), unbuffer() or refreshBlockInfo() may have closed the idle readers before this one was added.
       closeIdlePreadReaders();
     } else {
       scheduleIdlePreadTrim(preadIdleTimeoutNanos);
@@ -339,8 +362,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       final long idleNanos = now - oldest.idleSinceNanos;
       if (idleNanos < preadIdleTimeoutNanos) {
         idlePreadReaders.offerLast(oldest);
-        if (closed) {
-          // close() may have closed the idle readers while this one was taken out.
+        if (closed || oldest.generation != idlePreadGeneration.get()) {
+          // close(), unbuffer() or refreshBlockInfo() may have closed the idle readers while this one was taken out.
           closeIdlePreadReaders();
         } else {
           scheduleIdlePreadTrim(preadIdleTimeoutNanos - idleNanos);
@@ -359,9 +382,17 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private static void closeIdlePreadReader(IdlePreadReader idle) {
-    closeStream(idle.reader);
-    idle.factory.releaseClientForReadData(idle.client, false);
+  /**
+   * Closes an idle reader and releases its client. Never throws: it runs from close(), unbuffer(), the trimmer, the
+   * error path of a read and the end of a successful read, none of which must fail because of an idle reader.
+   */
+  private void closeIdlePreadReader(IdlePreadReader idle) {
+    try {
+      closeStream(idle.reader);
+      idle.factory.releaseClientForReadData(idle.client, false);
+    } catch (RuntimeException e) {
+      LOG.warn("{}: failed to close idle positioned-read reader {}", name, idle.reader, e);
+    }
   }
 
   private int preadOnce(XceiverClientGrpc client, StreamingReader reader, Pipeline pipeline,
@@ -506,6 +537,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void unbuffer() {
     releaseClient();
+    idlePreadGeneration.incrementAndGet();
     closeIdlePreadReaders();
   }
 
@@ -704,7 +736,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
-    // The idle readers belong to the old pipeline.
+    // The idle readers, and those of positioned reads in progress, belong to the old pipeline.
+    idlePreadGeneration.incrementAndGet();
     closeIdlePreadReaders();
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
@@ -736,13 +769,19 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return reader != null ? reader : name;
   }
 
-  /** An open positioned-read stream, with the client reference it holds, between two positioned reads. */
+  /**
+   * An open positioned-read stream, with the client reference it holds, between two positioned reads.
+   * It keeps that reference while idle, so the client, and the channel the stream runs on, stay open: the client
+   * cache does not close a referenced client, even after evicting it. The idle timeout bounds how long.
+   */
   private static final class IdlePreadReader {
     private final StreamingReader reader;
     private final XceiverClientGrpc client;
     private final XceiverClientFactory factory;
     private final Pipeline pipeline;
+    // set before each push into the idle deque, which publishes them to the thread that takes it out
     private long idleSinceNanos;
+    private long generation;
 
     IdlePreadReader(StreamingReader reader, XceiverClientGrpc client, XceiverClientFactory factory, Pipeline pipeline) {
       this.reader = reader;
