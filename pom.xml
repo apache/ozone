@@ -40,6 +40,7 @@
     <aspectj.java8.version>1.9.7</aspectj.java8.version>
     <assertj.version>3.27.7</assertj.version>
     <aws-java-sdk2.version>2.55.6</aws-java-sdk2.version>
+    <ban-httpcomponents.skip>true</ban-httpcomponents.skip>
     <ban-rocksdb.skip>true</ban-rocksdb.skip>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
@@ -2140,6 +2141,25 @@
                       <exclude>org.rocksdb:rocksdbjni</exclude>
                     </excludes>
                     <message>Ozone client artifacts must not depend on RocksDB, which adds about 85 MB of native libraries to them</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-httpcomponents</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <!-- enabled in the shaded filesystem module; unshaded client modules get httpclient from Hadoop -->
+                <skip>${ban-httpcomponents.skip}</skip>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>org.apache.httpcomponents</exclude>
+                    </excludes>
+                    <message>The Ozone filesystem jar must not bundle Apache HttpComponents, use java.net.URI instead</message>
                   </bannedDependencies>
                 </rules>
               </configuration>
