@@ -198,7 +198,7 @@ function check_if_tests_are_needed_at_all() {
 function run_all_tests_if_environment_files_changed() {
     start_end::group_start "Check if everything should be run"
     local pattern_array=(
-        "^.github/workflows/check.yml"
+        "^.github/actions/check/action.yml"
         "^.github/workflows/ci.yml"
         "^.github/workflows/post-commit.yml"
         "^dev-support/ci"

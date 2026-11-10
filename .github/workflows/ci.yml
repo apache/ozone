@@ -45,6 +45,11 @@ env:
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_WITH_COVERAGE: ${{ github.event_name != 'pull_request' }}
+  OZONE_IMAGE: ghcr.io/apache/ozone
+  OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
+  OZONE_VOLUME_OWNER: 1000
+  RANGER_IMAGE: ghcr.io/apache/ranger
+  SPARK_SQL_IMAGE: ghcr.io/apache/spark-docker/spark
 
 permissions: { }
 
@@ -135,18 +140,44 @@ jobs:
     needs:
       - build-info
     if: needs.build-info.outputs.needs-build == 'true' || needs.build-info.outputs.needs-integration-tests == 'true'
-    uses: $/.github/workflows/check.yml
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-npm-cache: true
-      ratis-args: ${{ inputs.ratis_args }}
-      script: build
-      script-args: ${{ needs.build-info.outputs.build-args }}
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 60
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-npm-cache: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: build
+          script-args: ${{ env.BUILD_ARGS }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+      - name: Store binaries for tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ozone-bin
+          path: |
+            hadoop-ozone/dist/target/ozone-*.tar.gz
+            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Store source tarball for compilation
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ozone-src
+          path: |
+            hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Store Maven repo for tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+          retention-days: 1
 
   generate-config-doc:
     needs:
@@ -185,36 +216,40 @@ jobs:
           - java: 21
             os: macos-15
       fail-fast: false
-    uses: $/.github/workflows/check.yml
-    with:
-      java-version: ${{ matrix.java }}
-      needs-ozone-source-tarball: true
-      ratis-args: ${{ inputs.ratis_args }}
-      runner: ${{ matrix.os }}
-      script: compile
-      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dozone.java.version.server=${{ matrix.java }}"
-      sha: ${{ needs.build-info.outputs.sha }}
-      split: ${{ matrix.java }}
-      timeout-minutes: 45
-      with-coverage: false
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ matrix.java }}
+          needs-ozone-source-tarball: true
+          ratis-args: ${{ inputs.ratis_args }}
+          runner: ${{ matrix.os }}
+          script: compile
+          script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dozone.java.version.server=${{ matrix.java }}"
+          split: ${{ matrix.java }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          OZONE_WITH_COVERAGE: false
 
   basic:
     needs:
       - build-info
     if: needs.build-info.outputs.needs-basic-check == 'true'
-    uses: $/.github/workflows/check.yml
-    with:
-      checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-maven-cache: ${{ !contains('author,bats', matrix.check) }}
-      ratis-args: ${{ inputs.ratis_args }}
-      script: ${{ matrix.check }}
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 30
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-maven-cache: ${{ !contains('author,bats', matrix.check) }}
+          ratis-args: ${{ inputs.ratis_args }}
+          script: ${{ matrix.check }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
@@ -228,44 +263,46 @@ jobs:
       - build
       - basic
     if: contains(needs.build-info.outputs.basic-checks, 'errorprone')
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: true
-      ratis-args: ${{ inputs.ratis_args }}
-      script: errorprone
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-ozone-repo: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: errorprone
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
 
   dependency:
     needs:
       - build-info
       - build
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-binary-tarball: true
-      script: dependency
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-ozone-binary-tarball: true
+          script: dependency
 
   license:
     needs:
       - build-info
       - build
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: true
-      script: license
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-ozone-repo: true
+          script: license
 
   javadoc:
     needs:
@@ -273,15 +310,15 @@ jobs:
       - build
       - basic
     if: needs.build-info.outputs.needs-compile == 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: true
-      script: javadoc
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-ozone-repo: true
+          script: javadoc
 
   repro:
     needs:
@@ -290,19 +327,23 @@ jobs:
       - basic
       - dependency
       - license
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: true
-      ratis-args: ${{ inputs.ratis_args }}
-      script: repro
-      script-args: ${{ needs.build-info.outputs.build-args }}
-      post-failure: hadoop-ozone/dev-support/checks/_diffoscope.sh
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 30
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-ozone-repo: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: repro
+          script-args: ${{ env.BUILD_ARGS }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+      - name: Execute post-failure steps
+        if: ${{ failure() }}
+        run: |
+          hadoop-ozone/dev-support/checks/_diffoscope.sh
 
   acceptance:
     needs:
@@ -312,19 +353,20 @@ jobs:
       - dependency
       - license
     if: needs.build-info.outputs.needs-compose-tests == 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      java-version: 11 # Hadoop may not work with newer Java
-      needs-ozone-binary-tarball: true
-      ratis-args: ${{ inputs.ratis_args }}
-      script: acceptance
-      script-args: ${{ matrix.suite }}
-      sha: ${{ needs.build-info.outputs.sha }}
-      split: ${{ matrix.suite }}
-      timeout-minutes: 60
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: 11 # Hadoop may not work with newer Java
+          needs-ozone-binary-tarball: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: acceptance
+          script-args: ${{ matrix.suite }}
+          split: ${{ matrix.suite }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
@@ -343,18 +385,19 @@ jobs:
       - dependency
       - license
     if: needs.build-info.outputs.needs-compose-tests == 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      needs-ozone-binary-tarball: true
-      ratis-args: ${{ inputs.ratis_args }}
-      script: acceptance
-      script-args: xcompat/test-old.sh ${{ matrix.version }}
-      sha: ${{ needs.build-info.outputs.sha }}
-      split: compat-old-${{ matrix.version }}
-      timeout-minutes: 30
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          needs-ozone-binary-tarball: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: acceptance
+          script-args: xcompat/test-old.sh ${{ matrix.version }}
+          split: compat-old-${{ matrix.version }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         version: ${{ fromJson(needs.build-info.outputs.acceptance-versions) }}
@@ -369,18 +412,19 @@ jobs:
       - dependency
       - license
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      needs-ozone-binary-tarball: true
-      ratis-args: ${{ inputs.ratis_args }}
-      script: kubernetes
-      script-args: ${{ matrix.suite }}
-      sha: ${{ needs.build-info.outputs.sha }}
-      split: ${{ matrix.suite }}
-      timeout-minutes: 10
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          needs-ozone-binary-tarball: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: kubernetes
+          script-args: ${{ matrix.suite }}
+          split: ${{ matrix.suite }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.kubernetes-suites) }}
@@ -396,20 +440,23 @@ jobs:
       - dependency
       - license
     if: needs.build-info.outputs.needs-integration-tests == 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: true
-      pre-script: sudo hostname localhost
-      ratis-args: ${{ inputs.ratis_args }}
-      script: integration
-      script-args: -Ptest-${{ matrix.profile }} -Phadoop-native-lib -Drocks_tools_native
-      sha: ${{ needs.build-info.outputs.sha }}
-      split: ${{ matrix.profile }}
-      timeout-minutes: 90
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Execute pre-test steps
+        run: |
+          sudo hostname localhost
+      - name: Perform check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-ozone-repo: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: integration
+          script-args: -Ptest-${{ matrix.profile }} -Phadoop-native-lib -Drocks_tools_native
+          split: ${{ matrix.profile }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
@@ -424,21 +471,23 @@ jobs:
       - dependency
       - license
     if: needs.build-info.outputs.needs-integration-tests == 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      display-name: junit
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: true
-      pre-script: sudo hostname localhost
-      ratis-args: ${{ inputs.ratis_args }}
-      script: integration
-      script-args: -pl :${{ matrix.module }} -Pmodule-test -Phadoop-native-lib -Drocks_tools_native
-      sha: ${{ needs.build-info.outputs.sha }}
-      split: ${{ matrix.module }}
-      timeout-minutes: 60
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Execute pre-test steps
+        run: |
+          sudo hostname localhost
+      - name: Perform check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          needs-ozone-repo: true
+          ratis-args: ${{ inputs.ratis_args }}
+          script: integration
+          script-args: -pl :${{ matrix.module }} -Pmodule-test -Phadoop-native-lib -Drocks_tools_native
+          split: ${{ matrix.module }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         module: ${{ fromJson(needs.build-info.outputs.junit-modules) }}
@@ -457,18 +506,21 @@ jobs:
     if: |
       needs.build-info.outputs.test-classes != '' &&
       needs.build-info.outputs.needs-integration-tests != 'true'
-    uses: $/.github/workflows/check.yml
-    secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      pre-script: sudo hostname localhost
-      ratis-args: ${{ inputs.ratis_args }}
-      script: integration
-      script-args: -Drocks_tools_native -DskipShade -Dtest=${{ needs.build-info.outputs.test-classes }}
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 90
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Execute pre-test steps
+        run: |
+          sudo hostname localhost
+      - name: Run check
+        uses: $/.github/actions/check
+        with:
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+          ratis-args: ${{ inputs.ratis_args }}
+          script: integration
+          script-args: -Drocks_tools_native -DskipShade -Dtest=${{ needs.build-info.outputs.test-classes }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
 
   coverage:
     runs-on: ubuntu-24.04
