@@ -33,7 +33,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -228,18 +227,16 @@ public class NodeDecommissionManager {
     if (dns.size() < 2) {
       return dns.isEmpty() ? null : dns.get(0);
     }
-    List<Pair<DatanodeDetails, Long>> dnsWithHeartbeat = dns.stream()
-        .map(dn -> Pair.of(dn, nodeManager.getLastHeartbeat(dn)))
-        .sorted(Comparator.comparingLong(Pair::getRight))
+    List<DatanodeHeartbeat> dnsWithHeartbeat = dns.stream()
+        .map(dn -> new DatanodeHeartbeat(dn, nodeManager.getLastHeartbeat(dn)))
+        .sorted(Comparator.comparingLong(DatanodeHeartbeat::lastHeartbeat))
         .collect(Collectors.toList());
     // The last element should have the largest (newest) heartbeat. But also
     // check it is not identical to the last but 1 element, as then we cannot
     // determine which node to decommission.
-    Pair<DatanodeDetails, Long> last = dnsWithHeartbeat.get(
-        dnsWithHeartbeat.size() - 1);
-    if (last.getRight() > dnsWithHeartbeat.get(
-        dnsWithHeartbeat.size() - 2).getRight()) {
-      return last.getLeft();
+    DatanodeHeartbeat last = dnsWithHeartbeat.get(dnsWithHeartbeat.size() - 1);
+    if (last.lastHeartbeat() > dnsWithHeartbeat.get(dnsWithHeartbeat.size() - 2).lastHeartbeat()) {
+      return last.datanode();
     }
     return null;
   }
@@ -644,4 +641,10 @@ public class NodeDecommissionManager {
   public int getMaintenanceRemainingRedundancy() {
     return rmConf.getMaintenanceRemainingRedundancy();
   }
+
+  /**
+   * A datanode paired with the time of its last heartbeat, used to pick the datanode
+   * with the most recent heartbeat to decommission.
+   */
+  private record DatanodeHeartbeat(DatanodeDetails datanode, long lastHeartbeat) { }
 }
