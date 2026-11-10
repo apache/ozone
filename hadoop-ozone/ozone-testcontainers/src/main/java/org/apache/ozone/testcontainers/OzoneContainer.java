@@ -27,7 +27,7 @@ import org.testcontainers.utility.DockerImageName;
 /**
  * Testcontainers wrapper for a single-node Ozone with S3 Gateway, so JVM
  * integration tests can start Ozone the way they use the MinIO or LocalStack
- * modules. Wraps the all-in-one quickstart image (HDDS-14452 / ozone-docker#49),
+ * modules. Wraps the all-in-one quickstart image,
  * which runs SCM, OM, datanode, S3 Gateway, Recon and HttpFS in one container
  * and exposes S3G on 9878.
  *
