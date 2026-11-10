@@ -1837,6 +1837,9 @@ public class OzoneBucket extends WithMetadata {
     private Stack<Pair<String, String>> stack;
     private String removeStartKey = "";
 
+    /** OM partial-prefix widening is sent once per listKeys iterator. */
+    private boolean listPrefixWideningSent;
+
     /**
      * Creates an Iterator to iterate over all keys after prevKey in the bucket.
      * If prevKey is null it iterates from the first key in the bucket.
@@ -2162,7 +2165,8 @@ public class OzoneBucket extends WithMetadata {
       // set on the first page at that path (startKey blank): otherwise OM would
       // apply the same widening on every pagination step and sibling listing under
       // the same keyPrefix string, causing timeouts. Deeper DFS uses other keyPrefix
-      // values or non-empty startKey and omits listPrefix.
+      // values or non-empty startKey and omits listPrefix. listPrefixWideningSent
+      // ensures widening is not re-sent when the iterator revisits the user prefix.
       ListStatusLightOptions.Builder optionsBuilder = ListStatusLightOptions.builder()
           .setVolumeName(volumeName)
           .setBucketName(name)
@@ -2171,12 +2175,14 @@ public class OzoneBucket extends WithMetadata {
           .setStartKey(startKey)
           .setNumEntries(listCacheSize)
           .setAllowPartialPrefixes(true);
-      if (StringUtils.isBlank(startKey)
-          && OmUtils.normalizeKey(keyPrefix, true)
-              .equals(OmUtils.normalizeKey(getKeyPrefix(), true))) {
+      boolean atUserPrefix = OmUtils.normalizeKey(keyPrefix, true)
+          .equals(OmUtils.normalizeKey(getKeyPrefix(), true));
+      boolean attachListPrefix = StringUtils.isBlank(startKey) && atUserPrefix
+          && !listPrefixWideningSent;
+      if (attachListPrefix) {
         optionsBuilder.setListPrefix(getKeyPrefix());
+        listPrefixWideningSent = true;
       }
-
       // 1. Get immediate children of keyPrefix, starting with startKey
       List<OzoneFileStatusLight> statuses = proxy.listStatusLight(optionsBuilder.build());
 
@@ -2185,7 +2191,10 @@ public class OzoneBucket extends WithMetadata {
       // then resultList shouldn't contain the startKey element.
       // Since proxy#listStatus API won't return keyPrefix element in the
       // resultList. So, this is to add user given keyPrefix to the return list.
-      addKeyPrefixInfoToResultList(keyPrefix, startKey, keysResultList);
+      // Partial-prefix widening already returns the prefix directory entry.
+      if (!attachListPrefix) {
+        addKeyPrefixInfoToResultList(keyPrefix, startKey, keysResultList);
+      }
 
       // 3. Special case: ListKey expects startKey shouldn't present in the
       // resultList. Since proxy#listStatus API returns startKey element to
@@ -2194,6 +2203,7 @@ public class OzoneBucket extends WithMetadata {
 
       // 4. Iterating over the resultStatuses list and add each key to the
       // resultList.
+      String deferredUserPrefixDescent = null;
       for (int indx = 0; indx < statuses.size(); indx++) {
         OzoneFileStatusLight status = statuses.get(indx);
         BasicOmKeyInfo keyInfo = status.getKeyInfo();
@@ -2201,23 +2211,41 @@ public class OzoneBucket extends WithMetadata {
         keysResultList.add(ozoneKey);
 
         if (status.isDirectory()) {
+          String childKey = OmUtils.normalizeKey(keyInfo.getKeyName(), true);
           // Adding in-progress keyPath back to the stack to make sure
           // all the siblings will be fetched.
-          stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+          stack.push(new ImmutablePair<>(keyPrefix, childKey));
+          boolean userPrefixDirectory = attachListPrefix
+              && atUserPrefix
+              && childKey.equals(OmUtils.normalizeKey(getKeyPrefix(), true));
+          if (userPrefixDirectory && indx < statuses.size() - 1) {
+            deferredUserPrefixDescent = childKey;
+            continue;
+          }
           // Adding current directory to the stack, so that this dir will be
           // the top element. Moving seek pointer to fetch sub-paths
-          stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
+          stack.push(new ImmutablePair<>(childKey, ""));
+          if (deferredUserPrefixDescent != null) {
+            stack.push(new ImmutablePair<>(deferredUserPrefixDescent, ""));
+            deferredUserPrefixDescent = null;
+          }
           // Return it so that the next iteration will be
           // started using the stacked items.
           return true;
         } else if (indx == statuses.size() - 1) {
           // The last element is a FILE and reaches the listCacheSize.
           // Now, sets next seek key to this element
-          stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+          stack.push(new ImmutablePair<>(keyPrefix,
+              OmUtils.normalizeKey(keyInfo.getKeyName(), true)));
           // Return it so that the next iteration will be
           // started using the stacked items.
           return true;
         }
+      }
+
+      if (deferredUserPrefixDescent != null) {
+        stack.push(new ImmutablePair<>(deferredUserPrefixDescent, ""));
+        return true;
       }
 
       return false;
