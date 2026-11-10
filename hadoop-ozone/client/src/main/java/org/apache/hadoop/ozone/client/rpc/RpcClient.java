@@ -1578,7 +1578,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private void checkIfNoneMatchETagSupport() throws IOException {
-    if (getOmVersion().compareTo(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) < 0) {
+    if (!OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support If-None-Match entity ETags for writes.");
     }
   }

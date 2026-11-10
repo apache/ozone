@@ -392,7 +392,7 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       // An empty bucket name takes the getBucket path, which reports it as FileNotFoundException.
       if (!ofsPath.getBucketName().isEmpty()
-          && proxy.getOmVersion().compareTo(OzoneManagerVersion.GET_KEY_INFO_REJECTS_OBS) >= 0) {
+          && OzoneManagerVersion.GET_KEY_INFO_REJECTS_OBS.isSupportedBy(proxy.getOmVersion())) {
         // Ask OM to reject an OBJECT_STORE bucket (HDDS-16948), so read without fetching the bucket first.
         try {
           return proxy.readFile(ofsPath.getVolumeName(), ofsPath.getBucketName(), key, true).getInputStream();
@@ -542,7 +542,7 @@ public class BasicRootedOzoneClientAdapterImpl
    * file system rename can be sent without fetching the bucket to learn its layout.
    */
   boolean isRenameRequiringFileSystemOptimizedSupported() {
-    return proxy.getOmVersion().compareTo(OzoneManagerVersion.RENAME_KEY_REJECTS_NON_FSO) >= 0;
+    return OzoneManagerVersion.RENAME_KEY_REJECTS_NON_FSO.isSupportedBy(proxy.getOmVersion());
   }
 
   /**
@@ -761,8 +761,7 @@ public class BasicRootedOzoneClientAdapterImpl
             volume, bucket, uri);
       } else {
         OzoneFileStatus status;
-        if (proxy.getOmVersion()
-            .compareTo(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS) >= 0) {
+        if (OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS.isSupportedBy(proxy.getOmVersion())) {
           status = proxy.getOzoneFileStatus(ofsPath.getVolumeName(),
               ofsPath.getBucketName(), key, headOp);
         } else {
@@ -1032,7 +1031,7 @@ public class BasicRootedOzoneClientAdapterImpl
       List<OzoneFileStatus> statuses = Collections.emptyList();
       List<OzoneFileStatusLight> lightStatuses = Collections.emptyList();
       boolean complete = false;
-      if (proxy.getOmVersion().compareTo(OzoneManagerVersion.LIST_STATUS_REJECTS_OBS) >= 0) {
+      if (OzoneManagerVersion.LIST_STATUS_REJECTS_OBS.isSupportedBy(proxy.getOmVersion())) {
         // Ask OM to reject an OBJECT_STORE bucket (HDDS-16760), so list without
         // fetching the bucket first. The bucket is fetched only when the listing
         // fails because a bucket is missing, to tell an orphan link bucket
@@ -1489,8 +1488,7 @@ public class BasicRootedOzoneClientAdapterImpl
     // client can talk to an older OM that lacks that check, so when the negotiated
     // OM version predates LOOKUP_FILE_REJECTS_OBS, fall back to LookupKey and
     // validate the bucket layout client-side as before.
-    boolean omRejectsObs = proxy.getOmVersion()
-        .compareTo(OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS) >= 0;
+    boolean omRejectsObs = OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS.isSupportedBy(proxy.getOmVersion());
     if (!omRejectsObs) {
       // Called for its layout validation side effect; the bucket itself is not needed.
       getBucket(ofsPath, false);
