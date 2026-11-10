@@ -358,8 +358,12 @@ public class OzoneManagerServiceProviderImpl
         TimeUnit.MILLISECONDS);
   }
 
-  private void stopSyncDataFromOMThread() {
-    scheduler.shutdown();
+  private void stopSyncDataFromOMThread(boolean interrupt) {
+    if (interrupt) {
+      scheduler.shutdownNow();
+    } else {
+      scheduler.shutdown();
+    }
     try {
       if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
         scheduler.shutdownNow();
@@ -380,7 +384,7 @@ public class OzoneManagerServiceProviderImpl
       // We are shutting down the scheduler and then starting another one,
       // setting the initialDelay to 0, which triggers an OM DB sync
       // immediately.
-      stopSyncDataFromOMThread();
+      stopSyncDataFromOMThread(false);
       scheduler = Executors.newScheduledThreadPool(1, threadFactory);
       startSyncDataFromOM(0L);
       return true;
@@ -393,8 +397,7 @@ public class OzoneManagerServiceProviderImpl
   @Override
   public void stop() throws Exception {
     LOG.info("Stopping Ozone Manager Service Provider.");
-    scheduler.shutdownNow();
-    stopSyncDataFromOMThread();
+    stopSyncDataFromOMThread(true);
     reconTaskController.stop();
     omMetadataManager.stop();
     reconSnapshotProvider.close();
