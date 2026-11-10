@@ -70,6 +70,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   private final boolean requireFileSystemLayout;
   private final String expectedETag;
   private final String excludedETag;
+  // Optional expected size for multipart completion, carried in KeyArgs.dataSize.
+  private final Long expectedDataSize;
   private final boolean derivedKeyPiggyBacking;
 
   private OmKeyArgs(Builder b) {
@@ -97,6 +99,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.requireFileSystemLayout = b.requireFileSystemLayout;
     this.expectedETag = b.expectedETag;
     this.excludedETag = b.excludedETag;
+    this.expectedDataSize = b.expectedDataSize;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
   }
 
@@ -204,6 +207,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return expectedETag;
   }
 
+  public Long getExpectedDataSize() {
+    return expectedDataSize;
+  }
+
   public String getExcludedETag() {
     return excludedETag;
   }
@@ -293,6 +300,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private boolean requireFileSystemLayout;
     private String expectedETag;
     private String excludedETag;
+    private Long expectedDataSize;
     private boolean derivedKeyPiggyBacking;
 
     public Builder() {
@@ -342,6 +350,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
       this.excludedETag = obj.excludedETag;
+      this.expectedDataSize = obj.expectedDataSize;
       this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
@@ -497,6 +506,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setExpectedETag(String eTag) {
       this.expectedETag = eTag;
+      return this;
+    }
+
+    public Builder setExpectedDataSize(Long size) {
+      this.expectedDataSize = size;
       return this;
     }
 

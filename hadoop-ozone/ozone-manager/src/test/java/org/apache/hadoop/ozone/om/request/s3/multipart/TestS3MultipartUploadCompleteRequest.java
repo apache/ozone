@@ -26,6 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -48,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -100,6 +104,80 @@ public class TestS3MultipartUploadCompleteRequest
         UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
         Collections.emptyList());
     assertPreExecuteAclDenialIsAudited(getS3MultipartUploadCompleteReq(omRequest), OMAction.COMPLETE_MULTIPART_UPLOAD);
+  }
+
+  @Test
+  public void testPreExecuteWithExpectedSizeDoesNotCheckDisabledFeatures() throws Exception {
+    OMRequest request = OMRequestTestUtils.createCompleteMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        Collections.emptyList());
+    request = request.toBuilder().setCompleteMultiPartUploadRequest(request.getCompleteMultiPartUploadRequest()
+        .toBuilder().setKeyArgs(request.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setDataSize(1)))
+        .build();
+    getS3MultipartUploadCompleteReq(request).preExecute(ozoneManager);
+    verify(ozoneManager, never()).checkFeatureEnabled(OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"0, 1, false, true", "100, 99, false, true", "100, 101, false, true", "100, 0, false, true",
+      "100, 99, true, true", "100, 99, false, false", "100, 99, true, false"})
+  public void testCompleteWithExpectedSize(long actualSize, long expectedSize, boolean overwrite, boolean sizeSupported)
+      throws Exception {
+    when(ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE))
+        .thenReturn(sizeSupported);
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    if (overwrite) {
+      checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName, new HashMap<>(), new HashMap<>());
+    }
+    OmKeyInfo original = overwrite ? omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName)) : null;
+    OMRequest initiate = doPreExecuteInitiateMPU(volumeName, bucketName, keyName);
+    OMClientResponse initiateResponse = getS3InitiateMultipartUploadReq(initiate)
+        .validateAndUpdateCache(ozoneManager, 1L);
+    String uploadID = initiateResponse.getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+    long clientID = Time.now();
+    OMRequest commit = doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, uploadID, 1,
+        Collections.singletonList(createKeyLocation(1, 1).toBuilder().setLength(actualSize).build()));
+    addKeyToTable(volumeName, bucketName, keyName, clientID);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        getS3MultipartUploadCommitReq(commit).validateAndUpdateCache(ozoneManager, 2L).getOMResponse().getStatus());
+    OMRequest unusedPart = doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID + 1, uploadID, 2,
+        Collections.singletonList(createKeyLocation(2, 2)));
+    addKeyToTable(volumeName, bucketName, keyName, clientID + 1);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        getS3MultipartUploadCommitReq(unusedPart).validateAndUpdateCache(ozoneManager, 3L).getOMResponse().getStatus());
+    String partETag = commit.getCommitMultiPartUploadRequest().getKeyArgs().getMetadataList().stream()
+        .filter(kv -> kv.getKey().equals(OzoneConsts.ETAG)).findFirst().get().getValue();
+    List<Part> parts = Collections.singletonList(Part.newBuilder().setETag(partETag).setPartName(partETag)
+        .setPartNumber(1).build());
+    OMRequest complete = doPreExecuteCompleteMPU(volumeName, bucketName, keyName, uploadID, parts);
+    OMRequest mismatching = complete.toBuilder().setCompleteMultiPartUploadRequest(
+        complete.getCompleteMultiPartUploadRequest().toBuilder().setKeyArgs(
+            complete.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setDataSize(expectedSize))).build();
+    OMRequest prepared = getS3MultipartUploadCompleteReq(mismatching).preExecute(ozoneManager);
+    OMClientResponse failure = getS3MultipartUploadCompleteReq(prepared).validateAndUpdateCache(ozoneManager, 4L);
+    if (!sizeSupported) {
+      assertEquals(OzoneManagerProtocolProtos.Status.OK, failure.getOMResponse().getStatus());
+      assertEquals(actualSize, omMetadataManager.getKeyTable(getBucketLayout())
+          .get(getOzoneDBKey(volumeName, bucketName, keyName)).getDataSize());
+      assertNull(omMetadataManager.getMultipartInfoTable()
+          .get(getMultipartKey(volumeName, bucketName, keyName, uploadID)));
+      return;
+    }
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST, failure.getOMResponse().getStatus());
+    assertEquals(original, omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName)));
+    assertNotNull(omMetadataManager.getMultipartInfoTable()
+        .get(getMultipartKey(volumeName, bucketName, keyName, uploadID)));
+
+    OMRequest matching = complete.toBuilder().setCompleteMultiPartUploadRequest(
+        complete.getCompleteMultiPartUploadRequest().toBuilder().setKeyArgs(
+            complete.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setDataSize(actualSize))).build();
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        getS3MultipartUploadCompleteReq(matching).validateAndUpdateCache(ozoneManager, 5L).getOMResponse().getStatus());
   }
 
   @Test

@@ -531,6 +531,15 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag, Long expectedDataSize) throws IOException {
+    return getBucket(volumeName, bucketName).completeMultipartUpload(keyName, uploadID, partsMap,
+        expectedDataGeneration, expectedETag, excludedETag, expectedDataSize);
+  }
+
+  @Override
   public void abortMultipartUpload(String volumeName, String bucketName,
                                    String keyName, String uploadID)
       throws IOException {

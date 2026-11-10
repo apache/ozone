@@ -964,6 +964,45 @@ public class TestRpcClient {
     }
   }
 
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testMultipartObjectSizeOnlySentToSupportedOM(OzoneManagerVersion version) throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList)
+              .setStatus(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK)
+              .setSuccess(true).setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(
+                  om(version).getProtobuf())).build();
+        }
+        if (request.getCmdType() == Type.CompleteMultiPartUpload) {
+          requests.add(request.getCompleteMultiPartUploadRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      for (Long size : Arrays.asList(null, 0L, 123L)) {
+        requests.clear();
+        IOException error = assertThrows(IOException.class, () -> client.completeMultipartUpload("vol", "bucket",
+            "key", "upload-id", Collections.singletonMap(1, "part-etag"), null, null, null, size));
+        assertEquals("captured", error.getMessage());
+        assertThat(requests).hasSize(1);
+        boolean sendSize = size != null && OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE.isSupportedBy(version);
+        assertEquals(sendSize, requests.get(0).hasDataSize());
+        if (sendSize) {
+          assertEquals(size.longValue(), requests.get(0).getDataSize());
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   private static ServiceInfo om(OzoneManagerVersion version) {
     return new ServiceInfo.Builder()
         .setNodeType(HddsProtos.NodeType.OM)

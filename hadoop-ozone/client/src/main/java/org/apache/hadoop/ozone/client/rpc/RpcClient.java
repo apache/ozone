@@ -2411,6 +2411,18 @@ public class RpcClient implements ClientProtocol {
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
       String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
       String excludedETag) throws IOException {
+    return completeMultipartUpload(volumeName, bucketName, keyName, uploadID, partsMap, expectedDataGeneration,
+        expectedETag, excludedETag, null);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:parameternumber")
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag, Long expectedDataSize) throws IOException {
+    if (expectedDataSize != null) {
+      Preconditions.checkArgument(expectedDataSize >= 0, "Expected object size must be non-negative");
+    }
     if (excludedETag != null) {
       checkIfNoneMatchETagSupport();
     }
@@ -2434,6 +2446,9 @@ public class RpcClient implements ClientProtocol {
     }
 
     builder.setExcludedETag(excludedETag);
+    if (expectedDataSize != null && OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE.isSupportedBy(getOmVersion())) {
+      builder.setExpectedDataSize(expectedDataSize);
+    }
     OmKeyArgs keyArgs = builder.build();
 
     OmMultipartUploadCompleteList omMultipartUploadCompleteList =

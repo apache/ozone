@@ -128,6 +128,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     if (keyArgs.hasExcludedETag()) {
       ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
     }
+    if (keyArgs.hasDataSize() && keyArgs.getDataSize() < 0) {
+      throw new OMException("Expected object size must be non-negative", OMException.ResultCodes.INVALID_REQUEST);
+    }
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -323,6 +326,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         long dataSize = getMultipartDataSize(requestedVolume, requestedBucket,
                 keyName, ozoneKey, partKeyInfoMap, partsListSize,
                 partLocationInfos, partsList, ozoneManager);
+
+        // Use the finalized version so all OMs apply the same validation during a rolling upgrade.
+        if (keyArgs.hasDataSize()
+            && ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE)
+            && keyArgs.getDataSize() != dataSize) {
+          throw new OMException("The specified object size does not match the actual object size.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
 
         // All parts have same replication information. Here getting from last
         // part.

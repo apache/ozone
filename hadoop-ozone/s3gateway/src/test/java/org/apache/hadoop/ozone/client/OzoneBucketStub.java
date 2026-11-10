@@ -798,6 +798,26 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String key, String uploadID,
+      Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag, String excludedETag,
+      Long expectedDataSize) throws IOException {
+    if (expectedDataSize != null && partList.containsKey(key)) {
+      long actualSize = 0;
+      for (Integer partNumber : partsMap.keySet()) {
+        Part part = partList.get(key).get(partNumber);
+        if (part == null) {
+          throw new OMException(ResultCodes.INVALID_PART);
+        }
+        actualSize += part.getContent().length;
+      }
+      if (actualSize != expectedDataSize) {
+        throw new OMException(ResultCodes.INVALID_REQUEST);
+      }
+    }
+    return completeMultipartUpload(key, uploadID, partsMap, expectedDataGeneration, expectedETag, excludedETag);
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key, String uploadID,
       Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag, String excludedETag)
       throws IOException {
     validateIfNoneMatch(key, excludedETag);

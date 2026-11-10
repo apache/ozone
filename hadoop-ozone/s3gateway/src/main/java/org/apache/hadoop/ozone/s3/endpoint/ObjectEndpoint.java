@@ -914,8 +914,23 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         expectedETag = writeConditions.getExpectedETag();
       }
 
+      Long expectedDataSize = null;
+      String objectSize = getHeaders().getHeaderString(S3Consts.MP_OBJECT_SIZE_HEADER);
+      if (objectSize != null) {
+        try {
+          expectedDataSize = Long.parseLong(objectSize);
+          if (expectedDataSize < 0) {
+            throw new NumberFormatException("Negative object size");
+          }
+        } catch (NumberFormatException ex) {
+          OS3Exception error = newError(INVALID_REQUEST, key, ex);
+          error.setErrorMessage("Invalid x-amz-mp-object-size header.");
+          throw error;
+        }
+      }
       omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(
-          key, uploadID, partsMap, expectedDataGeneration, expectedETag, writeConditions.getExcludedETag());
+          key, uploadID, partsMap, expectedDataGeneration, expectedETag, writeConditions.getExcludedETag(),
+          expectedDataSize);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
