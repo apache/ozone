@@ -335,6 +335,48 @@ public class TestStateContext {
     assertEquals(reportBytes, selection.getOversizedBytes());
   }
 
+  @Test
+  public void testOversizedCommandStatusPreservesAggregateOrder() throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
+    CommandStatus firstSmall = newCommandStatus(1, 16);
+    CommandStatus oversized = newCommandStatus(2, 256);
+    CommandStatus lastSmall = newCommandStatus(3, 16);
+    CommandStatusReportsProto aggregate = CommandStatusReportsProto.newBuilder()
+        .addCmdStatus(firstSmall)
+        .addCmdStatus(oversized)
+        .addCmdStatus(lastSmall)
+        .build();
+    CommandStatusReportsProto firstSmallReport =
+        CommandStatusReportsProto.newBuilder().addCmdStatus(firstSmall).build();
+    CommandStatusReportsProto oversizedReport =
+        CommandStatusReportsProto.newBuilder().addCmdStatus(oversized).build();
+    CommandStatusReportsProto lastSmallReport =
+        CommandStatusReportsProto.newBuilder().addCmdStatus(lastSmall).build();
+    CommandStatusReportsProto firstRemainder = CommandStatusReportsProto.newBuilder()
+        .addCmdStatus(oversized)
+        .addCmdStatus(lastSmall)
+        .build();
+    long smallBytes = commandStatusReportWireSize(firstSmallReport);
+    long oversizedBytes = commandStatusReportWireSize(oversizedReport);
+    context.addIncrementalReport(aggregate);
+
+    CommandStatusReportSelection selection =
+        context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+    assertEquals(Collections.singletonList(firstSmallReport), selection.getReports());
+    assertEquals(commandStatusReportWireSize(firstRemainder), context.getCommandStatusReportQueueBytes(scm));
+
+    selection = context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+    assertEquals(Collections.singletonList(oversizedReport), selection.getReports());
+    assertEquals(oversizedBytes, selection.getOversizedBytes());
+    assertEquals(commandStatusReportWireSize(lastSmallReport), context.getCommandStatusReportQueueBytes(scm));
+
+    selection = context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+    assertEquals(Collections.singletonList(lastSmallReport), selection.getReports());
+    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
+  }
+
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
     for (int i = 0; i < count; i++) {
       ctx.refreshFullReport(newMockReport(reportName));
