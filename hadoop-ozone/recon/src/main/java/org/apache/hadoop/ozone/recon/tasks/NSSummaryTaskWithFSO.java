@@ -115,20 +115,20 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           // directory update on DirTable
           handleUpdateOnDirTable(omdbUpdateEvent, action, nsSummaryMap);
         }
-      } catch (IOException ioEx) {
+        if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+          // Deleting hard deleted directories also along with this flush operation from NSSummary table
+          // Same list of objectIdsToBeDeleted is used for follow up flush operation as well and done intentionally
+          // to make sure that after final flush all objectIds are deleted from NSSummary table.
+          if (!flushAndCommitUpdatedNSToDB(nsSummaryMap, objectIdsToBeDeleted)) {
+            return new ImmutablePair<>(seekPos, false);
+          }
+          seekPos = itrPos + eventCounter;
+        }
+      } catch (IOException | RuntimeException ex) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
+            ex);
         nsSummaryMap.clear();
         return new ImmutablePair<>(seekPos, false);
-      }
-      if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-        // Deleting hard deleted directories also along with this flush operation from NSSummary table
-        // Same list of objectIdsToBeDeleted is used for follow up flush operation as well and done intentionally
-        // to make sure that after final flush all objectIds are deleted from NSSummary table.
-        if (!flushAndCommitUpdatedNSToDB(nsSummaryMap, objectIdsToBeDeleted)) {
-          return new ImmutablePair<>(seekPos, false);
-        }
-        seekPos = eventCounter + 1;
       }
     }
     // flush and commit left out entries at end.
@@ -140,7 +140,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithFSO");
-    return new ImmutablePair<>(seekPos, true);
+    return new ImmutablePair<>(itrPos + eventCounter, true);
   }
 
   private void handleUpdateOnDirTable(OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent,

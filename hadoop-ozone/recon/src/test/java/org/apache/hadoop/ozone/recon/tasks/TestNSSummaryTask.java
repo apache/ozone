@@ -380,14 +380,14 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
           nSSummaryTask.process(batch, legacySeekOnly);
 
       assertTrue(result.isTaskSuccess());
-      // Each sub-task reports its resume position independently. Legacy was
-      // told to skip the first three stream indices; FSO/OBS consumed from 0.
+      // Each sub-task reports its resume position independently. A sub-task
+      // that succeeds reports the end of the batch, wherever it started from.
       assertNotNull(result.getSubTaskSeekPositions());
-      assertEquals(0, result.getSubTaskSeekPositions()
+      assertEquals(5, result.getSubTaskSeekPositions()
           .get(NSSummaryTask.BucketType.FSO.name()).intValue());
-      assertEquals(3, result.getSubTaskSeekPositions()
+      assertEquals(5, result.getSubTaskSeekPositions()
           .get(NSSummaryTask.BucketType.LEGACY.name()).intValue());
-      assertEquals(0, result.getSubTaskSeekPositions()
+      assertEquals(5, result.getSubTaskSeekPositions()
           .get(NSSummaryTask.BucketType.OBS.name()).intValue());
 
       // FSO/OBS processed from the start; Legacy only picked up the update.
@@ -401,6 +401,25 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
           .getNSSummary(BUCKET_THREE_OBJECT_ID).getNumOfFiles());
       assertEquals(KEY_FOUR_SIZE, getReconNamespaceSummaryManager()
           .getNSSummary(BUCKET_THREE_OBJECT_ID).getSizeOfFiles());
+    }
+
+    @Test
+    public void testRetryWithReturnedSeekPositionsDoesNotReapply() throws IOException {
+      // A retry passes the seek positions of the failed attempt. Sub-tasks that
+      // succeeded must not apply their events a second time.
+      OMUpdateEventBatch batch = new OMUpdateEventBatch(Arrays.asList(
+          legacyPutEvent(KEY_FIVE, KEY_FIVE_OBJECT_ID, KEY_FIVE_SIZE),
+          obsPutEvent(KEY_FOUR, KEY_FOUR_OBJECT_ID, KEY_FOUR_SIZE)),
+          0L);
+
+      ReconOmTask.TaskResult result = nSSummaryTask.process(batch, Collections.emptyMap());
+      assertTrue(result.isTaskSuccess());
+      assertTrue(nSSummaryTask.process(batch, result.getSubTaskSeekPositions()).isTaskSuccess());
+
+      assertEquals(2, getReconNamespaceSummaryManager()
+          .getNSSummary(BUCKET_TWO_OBJECT_ID).getNumOfFiles());
+      assertEquals(2, getReconNamespaceSummaryManager()
+          .getNSSummary(BUCKET_THREE_OBJECT_ID).getNumOfFiles());
     }
 
     @Test
