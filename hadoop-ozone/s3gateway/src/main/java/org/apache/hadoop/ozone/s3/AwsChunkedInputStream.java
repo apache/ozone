@@ -239,7 +239,7 @@ public abstract class AwsChunkedInputStream extends InputStream {
 
   /** Check framing, authenticate the trailer if possible, then compare its checksum after the final terminator. */
   private void readTrailer() throws IOException {
-    String trailerLine = readLine(true);
+    String trailerLine = readTrailerLine();
     if (trailerLine == null || trailerLine.isEmpty()) {
       throw invalidBody("Missing trailing checksum header");
     }
@@ -255,7 +255,7 @@ public abstract class AwsChunkedInputStream extends InputStream {
     readTrailerSignature(name, value);
     byte[] expected = trailerHeader.decodeValue(value, keyPath);
     // AWS SDKs terminate the trailer section with a blank line.
-    if (!"".equals(readLine(true))) {
+    if (!"".equals(readTrailerLine())) {
       throw invalidBody("Invalid trailer terminator");
     }
     if (originalStream.read() != -1) {
@@ -265,7 +265,12 @@ public abstract class AwsChunkedInputStream extends InputStream {
     trailerChecksum = expected;
   }
 
-  String readLine(boolean trailingHeader) throws IOException {
+  /** Read a line of the trailer section, or null at the end of the stream. */
+  String readTrailerLine() throws IOException {
+    return readLine(true);
+  }
+
+  private String readLine(boolean trailingHeader) throws IOException {
     StringBuilder line = new StringBuilder();
     int previous = -1;
     while (true) {

@@ -165,7 +165,7 @@ public class SignedChunksInputStream extends AwsChunkedInputStream {
 
   @Override
   void readTrailerSignature(String name, String value) throws IOException {
-    String signatureLine = readLine(true);
+    String signatureLine = readTrailerLine();
     if (signatureLine == null) {
       throw invalidBody("Missing trailing signature");
     }
