@@ -53,7 +53,7 @@ public class OzoneContainer extends GenericContainer<OzoneContainer> {
     super(image);
     withExposedPorts(S3G_PORT);
     waitingFor(new WaitAllStrategy()
-        .withStrategy(Wait.forListeningPort())
+        .withStrategy(Wait.forListeningPorts(S3G_PORT))
         .withStrategy(Wait.forSuccessfulCommand("ozone admin safemode wait -t 5"))
         .withStartupTimeout(Duration.ofMinutes(4)));
   }

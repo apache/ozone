@@ -14,10 +14,7 @@
 
 # Ozone Testcontainers module
 
-A Testcontainers module so JVM projects can start a single-node Ozone with S3
-Gateway from their integration tests the same way they use the MinIO / LocalStack
-modules. Motivated by the container-based test-framework interest (e.g. Trino)
-raised on [HDDS-14893](https://issues.apache.org/jira/browse/HDDS-14893).
+A Testcontainers module so JVM projects can start a single-node Ozone with S3 Gateway from their integration tests the same way they use the MinIO / LocalStack modules. Motivated by the container-based test-framework interest (e.g. Trino) raised on [HDDS-14893](https://issues.apache.org/jira/browse/HDDS-14893).
 
 ## Status
 
@@ -42,11 +39,13 @@ try (OzoneContainer ozone = new OzoneContainer(DockerImageName.parse("apache/ozo
 }
 ```
 
-Choose an explicit version of the all-in-one quickstart image
-([HDDS-14452](https://issues.apache.org/jira/browse/HDDS-14452)). The image version is independent
-of the `ozone-testcontainers` dependency version. The image must run a non-secure Ozone cluster
-with S3 Gateway on port 9878 and provide the `ozone admin safemode wait` command.
-See the `OzoneContainer` javadoc for credentials and readiness behavior.
+Choose an explicit version of the all-in-one quickstart image ([HDDS-14452](https://issues.apache.org/jira/browse/HDDS-14452)). The image version is independent of the `ozone-testcontainers` dependency version. The image must run a non-secure Ozone cluster with S3 Gateway on port 9878 and provide the `ozone admin safemode wait` command. See the `OzoneContainer` javadoc for credentials and readiness behavior.
+
+## Known limitations
+
+- Use path-style requests (`forcePathStyle(true)` in AWS SDK v2). S3 Gateway in the image is not configured for virtual-hosted-style requests and reads them as path-style, so they fail (CreateBucket returns a bare 405 Method Not Allowed) or act on the wrong bucket.
+- `OZONE-SITE.XML_*` environment variables make the container exit on startup, because the image's entrypoint cannot overwrite the bundled `/etc/hadoop/ozone-site.xml`.
+- The container runs all Ozone services, so give it 4-6 GB of memory ([HDDS-14452](https://issues.apache.org/jira/browse/HDDS-14452)).
 
 ## Run
 
@@ -54,11 +53,8 @@ See the `OzoneContainer` javadoc for credentials and readiness behavior.
 mvn -pl :ozone-testcontainers test
 ```
 
-The S3 smoke test needs a running Docker daemon and is skipped without one; the readiness
-unit tests always run.
+The S3 smoke test needs a running Docker daemon and is skipped without one.
 
 ## Notes
 
-- An image based on `ozone local run` (available since
-  [HDDS-15087](https://issues.apache.org/jira/browse/HDDS-15087)) could replace the
-  all-in-one image in a follow-up.
+- An image based on `ozone local run` (available since [HDDS-15087](https://issues.apache.org/jira/browse/HDDS-15087)) could replace the all-in-one image in a follow-up.
