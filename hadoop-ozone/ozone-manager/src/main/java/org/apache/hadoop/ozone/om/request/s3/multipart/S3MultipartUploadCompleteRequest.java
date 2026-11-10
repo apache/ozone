@@ -92,6 +92,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequest.class);
 
+  private static final String COMPLETED_UPLOAD_ID = "ozone-s3-internal-multipart-upload-id";
+  private static final String COMPLETED_UPLOAD_PARTS = "ozone-s3-internal-multipart-parts";
+
   private BiFunction<OzoneManagerProtocolProtos.Part, PartKeyInfo, MultipartCommitRequestPart> eTagBasedValidator =
       (part, partKeyInfo) -> {
         String eTag = part.getETag();
@@ -281,6 +284,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           omMetadataManager);
 
       if (multipartKeyInfo == null) {
+        OmKeyInfo completedKey = omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+        if (completedKey != null && uploadID.equals(completedKey.getMetadata().get(COMPLETED_UPLOAD_ID))
+            && completedPartsHash(partsList).equals(completedKey.getMetadata().get(COMPLETED_UPLOAD_PARTS))) {
+          omResponse.setCompleteMultiPartUploadResponse(MultipartUploadCompleteResponse.newBuilder()
+              .setVolume(requestedVolume).setBucket(requestedBucket).setKey(keyName)
+              .setHash(completedKey.getMetadata().get(OzoneConsts.ETAG)));
+          omClientResponse = new S3MultipartUploadCompleteResponse(omResponse.build(), getBucketLayout());
+          logResult(ozoneManager, multipartUploadCompleteRequest, partsList, auditMap,
+              volumeName, bucketName, keyName, null, Result.SUCCESS);
+          return omClientResponse;
+        }
         throw new OMException(
             failureMessage(requestedVolume, requestedBucket, keyName),
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -566,7 +580,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         builder.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    return builder.setUpdateID(trxnLogIndex).build();
+    // Retain enough information to recognize a retry after the multipart tables have been cleaned up.
+    return builder.addMetadata(COMPLETED_UPLOAD_ID, keyArgs.getMultipartUploadID())
+        .addMetadata(COMPLETED_UPLOAD_PARTS, completedPartsHash(partsList))
+        .setUpdateID(trxnLogIndex).build();
   }
 
   protected String getDBOzoneKey(OMMetadataManager omMetadataManager,
@@ -810,6 +827,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       }
     }
     return req;
+  }
+
+  private static String completedPartsHash(List<OzoneManagerProtocolProtos.Part> partsList) {
+    // Only serialize the parts; the required keyArgs are deliberately excluded from this digest.
+    return DigestUtils.sha256Hex(MultipartUploadCompleteRequest.newBuilder()
+        .addAllPartsList(partsList).buildPartial().toByteArray());
   }
 
   private String multipartUploadedKeyHash(
