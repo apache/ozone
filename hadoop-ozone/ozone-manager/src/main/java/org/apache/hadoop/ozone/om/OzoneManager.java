@@ -2145,10 +2145,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     instantiateServices(false);
 
-    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
-    // and the finalization included in the snapshot is not in the Raft log to be replayed.
-    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
-
     metadataManager.start(configuration);
     keyManager.start(configuration);
     startSecretManagerIfNecessary();
@@ -2182,6 +2178,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.startSnapshotDirectoryMetrics(configuration, getMetadataManager());
 
     initializeRatisServer(false);
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    // Ratis must be initialized first so that upgrade actions (e.g. quota repair) can check leader status.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
     if (omRatisServer != null) {
       omRatisServer.start();
     }
