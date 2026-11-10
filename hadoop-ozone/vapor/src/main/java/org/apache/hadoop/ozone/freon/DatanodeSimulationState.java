@@ -41,8 +41,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -126,12 +126,12 @@ class DatanodeSimulationState {
   }
 
   public synchronized SCMHeartbeatRequestProto heartbeatRequest(
-      InetSocketAddress endpoint, LayoutVersionProto layoutInfo)
+      InetSocketAddress endpoint, DatanodeVersionProto versionInfo)
       throws IOException {
     SCMHeartbeatRequestProto.Builder builder =
         SCMHeartbeatRequestProto.newBuilder()
             .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
-            .setDataNodeLayoutVersion(layoutInfo)
+            .setDatanodeVersion(versionInfo)
             .setNodeReport(createNodeReport())
             .setPipelineReports(createPipelineReport());
 

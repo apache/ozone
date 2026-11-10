@@ -26,6 +26,7 @@
   <name>Apache Ozone FileSystem Common</name>
   <properties>
     <file.encoding>UTF-8</file.encoding>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
 
   <dependencies>
@@ -92,6 +93,12 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-client</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 

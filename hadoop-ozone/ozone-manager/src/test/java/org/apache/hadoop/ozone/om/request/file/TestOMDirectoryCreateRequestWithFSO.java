@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
@@ -64,7 +63,8 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -111,10 +111,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
             .thenReturn(new ResolvedBucket("", "",
                     "", "", "",
                     BucketLayout.DEFAULT));
-    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
-    when(lvm.getMetadataLayoutVersion()).thenReturn(0);
-    when(lvm.isAllowed(anyString())).thenReturn(true);
-    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
   }
 
   @AfterEach
@@ -217,6 +215,34 @@ public class TestOMDirectoryCreateRequestWithFSO {
         omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
     assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+  }
+
+  @Test
+  public void testFailedRequestDoesNotLeakNamespaceQuota() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    // A single-level directory has no missing parents, so the first ACL lookup, and with it the
+    // first chance to fail, happens after the namespace charge is applied.
+    String keyName = "dir1";
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    long usedNamespaceBefore = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+
+    // Neither preExecute nor setUGI runs, so the request carries no user info and the ACL lookup
+    // for the leaf directory fails with UNAUTHORIZED.
+    OMDirectoryCreateRequestWithFSO omDirCreateRequestFSO =
+        new OMDirectoryCreateRequestWithFSO(
+            createDirectoryRequest(volumeName, bucketName, keyName),
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    OMClientResponse omClientResponse =
+        omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertSame(OzoneManagerProtocolProtos.Status.UNAUTHORIZED,
+        omClientResponse.getOMResponse().getStatus());
+    assertEquals(usedNamespaceBefore, omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
   }
 
   @Test

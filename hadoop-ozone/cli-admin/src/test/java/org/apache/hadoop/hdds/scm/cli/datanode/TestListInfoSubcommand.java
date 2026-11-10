@@ -101,14 +101,16 @@ public class TestListInfoSubcommand {
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      if (state == HddsProtos.NodeState.HEALTHY_READONLY) {
+        continue; // HEALTHY_READONLY is no longer a valid state and the protobuf definition is deprecated.
+      }
       p = Pattern.compile(
           "^Health State:\\s+" + state + "$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
-    // Ensure the nodes are ordered by health state HEALTHY,
-    // HEALTHY_READONLY, STALE, DEAD
-    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+HEALTHY_READONLY.+",
+    // Ensure the nodes are ordered by health state HEALTHY, STALE, DEAD
+    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+",
         Pattern.DOTALL);
 
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
@@ -149,12 +151,15 @@ public class TestListInfoSubcommand {
 
     // Check all expected health states are present
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      if (state == HddsProtos.NodeState.HEALTHY_READONLY) {
+        continue; // HEALTHY_READONLY is no longer a valid state and the protobuf definition is deprecated.
+      }
       assertTrue(healthStates.contains(state.toString()),
           "Expected health state: " + state + " but not found");
     }
 
-    // Check order: HEALTHY -> STALE -> DEAD -> HEALTHY_READONLY
-    List<String> expectedOrder = Arrays.asList("HEALTHY", "STALE", "DEAD", "HEALTHY_READONLY");
+    // Check order: HEALTHY -> STALE -> DEAD
+    List<String> expectedOrder = Arrays.asList("HEALTHY", "STALE", "DEAD");
     int lastIndex = -1;
     for (String state : healthStates) {
       int index = expectedOrder.indexOf(state);
@@ -214,6 +219,28 @@ public class TestListInfoSubcommand {
     assertEquals("IN_SERVICE", opState, "Expected opState IN_SERVICE but got: " + opState);
     assertEquals(nodes.get(0).getNodeID().getUuid(), uuid,
         "Expected UUID " + nodes.get(0).getNodeID().getUuid() + " but got: " + uuid);
+  }
+
+  @Test
+  public void testDataNodeByIpv6AddressTextForm() throws Exception {
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    HddsProtos.Node original = nodes.get(0);
+    HddsProtos.DatanodeDetailsProto nodeId = original.getNodeID().toBuilder()
+        .setIpAddress("2001:db8:0:0:0:0:0:1")
+        .build();
+    nodes.set(0, HddsProtos.Node.newBuilder(original).setNodeID(nodeId).build());
+
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodes);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--ip", "2001:db8::1", "--json");
+    cmd.execute(scmClient);
+
+    JsonNode root = mapper.readTree(outContent.toString(DEFAULT_ENCODING));
+    assertEquals(1, root.size());
+    assertEquals(nodes.get(0).getNodeID().getUuid(), root.get(0).get("id").asText());
   }
 
   @ParameterizedTest
@@ -480,10 +507,6 @@ public class TestListInfoSubcommand {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.DECOMMISSIONING);
         builder.addNodeStates(HddsProtos.NodeState.DEAD);
-      } else if (i == 2) {
-        builder.addNodeOperationalStates(
-            HddsProtos.NodeOperationalState.IN_SERVICE);
-        builder.addNodeStates(HddsProtos.NodeState.HEALTHY_READONLY);
       } else {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.IN_SERVICE);

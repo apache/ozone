@@ -17,12 +17,18 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -33,12 +39,17 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -53,9 +64,12 @@ import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitP
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests S3 Multipart upload commit part request.
@@ -71,6 +85,26 @@ public class TestS3MultipartUploadCommitPartRequest
 
     doPreExecuteCommitMPU(volumeName, bucketName, keyName, Time.now(),
         UUID.randomUUID().toString(), 1);
+  }
+
+  @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = OMRequestTestUtils.createCommitPartMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), Time.now(), 0, "invalid/" + UUID.randomUUID(),
+        1, Collections.emptyList());
+
+    OMException e = assertThrows(OMException.class,
+        () -> getS3MultipartUploadCommitReq(omRequest).preExecute(ozoneManager));
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedIsAudited() throws Exception {
+    OMRequest omRequest = OMRequestTestUtils.createCommitPartMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), getKeyName(), Time.now(), 0, UUID.randomUUID().toString(), 1,
+        Collections.emptyList());
+    assertPreExecuteAclDenialIsAudited(getS3MultipartUploadCommitReq(omRequest),
+        OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY);
   }
 
   @Test
@@ -443,7 +477,7 @@ public class TestS3MultipartUploadCommitPartRequest
             .collect(Collectors.toList());
 
     assertEquals(overwriteKeyLocationInfos, locationsInfoListFromCommitPartRequest);
-    assertEquals(overwriteKeyLocationInfos, newPartOmKeyInfo.getLatestVersionLocations().getLocationList());
+    assertEquals(overwriteKeyLocationInfos, newPartOmKeyInfo.getLatestVersionLocations().createLocationList());
     assertEquals(1, newPartOmKeyInfo.getKeyLocationVersions().size());
 
     Map<String, RepeatedOmKeyInfo> toDeleteKeyList =
@@ -453,7 +487,7 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(1, toDeleteKeyList.size());
     assertEquals(originalKeyLocationList.size(), toDeleteKeyList.values().stream()
         .findFirst().get().cloneOmKeyInfoList().get(0).getKeyLocationVersions()
-        .get(0).getLocationList().size());
+        .get(0).createLocationList().size());
   }
 
   @Test
@@ -516,7 +550,7 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(1, toDeleteKeyList.size());
     assertEquals(2, toDeleteKeyList.values().stream()
         .findFirst().get().cloneOmKeyInfoList().get(0).getKeyLocationVersions()
-        .get(0).getLocationList().size());
+        .get(0).createLocationList().size());
 
     String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
         keyName, multipartUploadID);
@@ -653,7 +687,7 @@ public class TestS3MultipartUploadCommitPartRequest
             .collect(Collectors.toList());
 
     assertEquals(overwriteCommittedBlockList, locationsInfoListFromCommitPartRequest);
-    assertEquals(overwriteCommittedBlockList, newPartOmKeyInfo.getLatestVersionLocations().getLocationList());
+    assertEquals(overwriteCommittedBlockList, newPartOmKeyInfo.getLatestVersionLocations().createLocationList());
     assertEquals(1, newPartOmKeyInfo.getKeyLocationVersions().size());
 
     Map<String, RepeatedOmKeyInfo> toDeleteKeyMap =
@@ -848,6 +882,155 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(0, parts.size());
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION, OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION})
+  public void testValidateAndUpdateCacheWithInvalidPartNumber(int schemaVersion) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    createParentPath(volumeName, bucketName);
+
+    String uploadId = UUID.randomUUID().toString();
+    createMpuEntry(volumeName, bucketName, keyName, uploadId, 1L, schemaVersion);
+
+    for (int partNumber : new int[] {0, -1}) {
+      long clientID = Time.now() + partNumber;
+      addKeyToOpenKeyTableWithETag(volumeName, bucketName, keyName, clientID, UUID.randomUUID().toString());
+
+      OMRequest commitRequest = doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, uploadId, partNumber);
+      OMClientResponse response = getS3MultipartUploadCommitReq(commitRequest).validateAndUpdateCache(ozoneManager, 2L);
+      assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION, OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION})
+  public void testQuotaExceededCommitIsNotVisibleToLaterRequests(int schemaVersion) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    String uploadId = initiateUploadInBucketWithRoomForOneBlock(volumeName, bucketName, keyName, schemaVersion);
+    List<KeyLocation> blocks = getKeyLocation(2);
+
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 1, blocks.subList(0, 1), 3L)).isEqualTo(OK);
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 2, blocks.subList(1, 2), 4L))
+        .isEqualTo(QUOTA_EXCEEDED);
+
+    // The rejected commit writes nothing to DB, so what the cache shows must not depend on whether it was flushed.
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
+    assertThat(omMetadataManager.getMultipartPartsTable().get(OmMultipartPartKey.of(uploadId, 2))).isNull();
+    assertThat(omMetadataManager.getMultipartInfoTable().get(multipartKey).getUpdateID()).isEqualTo(3L);
+    assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(volumeName, bucketName, keyName, 4L))).isNotNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION, OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION})
+  public void testAbortAfterQuotaExceededCommitReleasesOnlyCommittedParts(int schemaVersion) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    String uploadId = initiateUploadInBucketWithRoomForOneBlock(volumeName, bucketName, keyName, schemaVersion);
+    List<KeyLocation> blocks = getKeyLocation(2);
+
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 1, blocks.subList(0, 1), 3L)).isEqualTo(OK);
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 2, blocks.subList(1, 2), 4L))
+        .isEqualTo(QUOTA_EXCEEDED);
+
+    OMClientResponse abortResponse = getS3MultipartUploadAbortReq(
+        doPreExecuteAbortMPU(volumeName, bucketName, keyName, uploadId)).validateAndUpdateCache(ozoneManager, 5L);
+
+    assertThat(abortResponse.getOMResponse().getStatus()).isEqualTo(OK);
+    assertThat(omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName))
+        .getUsedBytes()).isZero();
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION, OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION})
+  public void testAbortAfterQuotaExceededOverwriteDeletesCommittedPart(int schemaVersion) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    String uploadId = initiateUploadInBucketWithRoomForOneBlock(volumeName, bucketName, keyName, schemaVersion);
+    List<KeyLocation> blocks = getKeyLocation(3);
+
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 1, blocks.subList(0, 1), 3L)).isEqualTo(OK);
+    // Overwriting part 1 with two blocks needs one more block than the bucket has room for.
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 1, blocks.subList(1, 3), 4L))
+        .isEqualTo(QUOTA_EXCEEDED);
+
+    OMClientResponse abortResponse = getS3MultipartUploadAbortReq(
+        doPreExecuteAbortMPU(volumeName, bucketName, keyName, uploadId)).validateAndUpdateCache(ozoneManager, 5L);
+    assertThat(abortResponse.getOMResponse().getStatus()).isEqualTo(OK);
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      abortResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+
+    // The block of the committed part is the one the abort has to hand over for deletion.
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
+    assertThat(omMetadataManager.getDeletedTable().getRangeKVs(null, 100, multipartKey).stream()
+        .flatMap(kv -> kv.getValue().getOmKeyInfoList().stream())
+        .flatMap(keyInfo -> keyInfo.getLatestVersionLocations().createLocationList().stream())
+        .map(OmKeyLocationInfo::getLocalID))
+        .containsExactly(blocks.get(0).getBlockID().getContainerBlockID().getLocalID());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION, OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION})
+  public void testCompleteRejectsPartWhoseCommitExceededQuota(int schemaVersion) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    String uploadId = initiateUploadInBucketWithRoomForOneBlock(volumeName, bucketName, keyName, schemaVersion);
+    List<KeyLocation> blocks = getKeyLocation(2);
+
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 1, blocks.subList(0, 1), 3L)).isEqualTo(OK);
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 2, blocks.subList(1, 2), 4L))
+        .isEqualTo(QUOTA_EXCEEDED);
+
+    Part rejectedPart = Part.newBuilder().setPartNumber(2).setPartName(S3MultipartUploadCommitPartRequest.getPartName(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName), uploadId, 2)).build();
+    OMClientResponse completeResponse = getS3MultipartUploadCompleteReq(doPreExecuteCompleteMPU(volumeName, bucketName,
+        keyName, uploadId, Collections.singletonList(rejectedPart))).validateAndUpdateCache(ozoneManager, 5L);
+
+    assertThat(completeResponse.getOMResponse().getStatus()).isEqualTo(INVALID_PART);
+  }
+
+  @Test
+  public void testCommitAfterQuotaExceededCommitPersistsOnlyAcceptedPart() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    // Only the legacy layout keeps the parts inline in the entry that every later part commit rewrites.
+    String uploadId = initiateUploadInBucketWithRoomForOneBlock(volumeName, bucketName, keyName,
+        OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION);
+    List<KeyLocation> blocks = getKeyLocation(3);
+
+    assertThat(commitPart(volumeName, bucketName, keyName, uploadId, 1, blocks.subList(0, 2), 3L))
+        .isEqualTo(QUOTA_EXCEEDED);
+    OMClientResponse commitResponse = commitPartAndGetResponse(volumeName, bucketName, keyName, uploadId, 2,
+        blocks.subList(2, 3), 4L);
+    assertThat(commitResponse.getOMResponse().getStatus()).isEqualTo(OK);
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      commitResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
+    assertThat(omMetadataManager.getMultipartInfoTable().getSkipCache(multipartKey).getPartKeyInfoMap())
+        .extracting(PartKeyInfo::getPartNumber).containsExactly(2);
+
+    OMClientResponse abortResponse = getS3MultipartUploadAbortReq(
+        doPreExecuteAbortMPU(volumeName, bucketName, keyName, uploadId)).validateAndUpdateCache(ozoneManager, 5L);
+
+    assertThat(abortResponse.getOMResponse().getStatus()).isEqualTo(OK);
+    assertThat(omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName))
+        .getUsedBytes()).isZero();
+  }
+
   @Test
   public void testScanPartsReturnsCommittedPart() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -1028,15 +1211,53 @@ public class TestS3MultipartUploadCommitPartRequest
     assertTrue(parts.isEmpty());
   }
 
+  /**
+   * Initiates an upload in a bucket whose space quota has room for one of the blocks of
+   * {@link #getKeyLocation(int)} but not for two. The bucket default replication matches the one of the part keys.
+   */
+  private String initiateUploadInBucketWithRoomForOneBlock(String volumeName, String bucketName, String keyName,
+      int schemaVersion) throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager, OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName).setBucketLayout(getBucketLayout()).setQuotaInBytes(300)
+        .setDefaultReplicationConfig(
+            new DefaultReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.ONE))));
+    createParentPath(volumeName, bucketName);
+    return initiateMultipartUploadWithSchemaVersion(volumeName, bucketName, keyName, schemaVersion);
+  }
+
+  /**
+   * Opens a part with the given blocks and commits it, using the transaction index as the client ID.
+   */
+  private OzoneManagerProtocolProtos.Status commitPart(String volumeName, String bucketName, String keyName,
+      String uploadId, int partNumber, List<KeyLocation> blocks, long trxnLogIndex) throws Exception {
+    return commitPartAndGetResponse(volumeName, bucketName, keyName, uploadId, partNumber, blocks, trxnLogIndex)
+        .getOMResponse().getStatus();
+  }
+
+  private OMClientResponse commitPartAndGetResponse(String volumeName, String bucketName, String keyName,
+      String uploadId, int partNumber, List<KeyLocation> blocks, long trxnLogIndex) throws Exception {
+    addKeyToOpenKeyTable(volumeName, bucketName, keyName, trxnLogIndex,
+        blocks.stream().map(OmKeyLocationInfo::getFromProtobuf).collect(Collectors.toList()));
+    OMRequest commitRequest = doPreExecuteCommitMPU(volumeName, bucketName, keyName, trxnLogIndex, uploadId,
+        partNumber, blocks);
+    return getS3MultipartUploadCommitReq(commitRequest).validateAndUpdateCache(ozoneManager, trxnLogIndex);
+  }
+
   private void createSplitSchemaMpuEntry(String volumeName, String bucketName,
       String keyName, String uploadId, long trxnIdx) throws IOException {
+    createMpuEntry(volumeName, bucketName, keyName, uploadId, trxnIdx,
+        OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION);
+  }
+
+  private void createMpuEntry(String volumeName, String bucketName, String keyName, String uploadId, long trxnIdx,
+      int schemaVersion) throws IOException {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadId)
         .setCreationTime(Time.now())
         .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setObjectID(trxnIdx)
         .setUpdateID(trxnIdx)
-        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .setSchemaVersion(schemaVersion)
         .build();
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()

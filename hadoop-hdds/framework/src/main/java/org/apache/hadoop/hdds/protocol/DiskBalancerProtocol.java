@@ -38,7 +38,7 @@ public interface DiskBalancerProtocol extends Closeable {
   long VERSIONID = 1L;
 
   GetDiskBalancerInfoRequestProto DEFAULT_GET_DISK_BALANCER_INFO_REQUEST
-      = GetDiskBalancerInfoRequestProto.newBuilder().setClientVersion(ClientVersion.CURRENT_VERSION).build();
+      = GetDiskBalancerInfoRequestProto.newBuilder().setClientVersion(ClientVersion.CURRENT.serialize()).build();
 
   @Idempotent
   default DatanodeDiskBalancerInfoProto getDiskBalancerInfo() throws IOException {

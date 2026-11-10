@@ -54,11 +54,15 @@ public class AbstractReconSqlDBTest {
   private Injector injector;
   private DSLContext dslContext;
   private Provider<DataSourceConfiguration> configurationProvider;
+  private boolean customProvider;
 
   public AbstractReconSqlDBTest() {
   }
 
   public void init(Path temporaryFolder) {
+    if (customProvider) {
+      return;
+    }
     try {
       FileSystemUtils.deleteRecursively(temporaryFolder.resolve("Config"));
       configurationProvider =
@@ -75,6 +79,7 @@ public class AbstractReconSqlDBTest {
 
   protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
     configurationProvider = provider;
+    customProvider = true;
   }
 
   @BeforeEach

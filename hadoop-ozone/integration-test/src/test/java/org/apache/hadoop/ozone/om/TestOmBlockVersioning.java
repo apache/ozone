@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -47,7 +47,7 @@ import org.junit.jupiter.api.TestInstance;
  * This class tests the versioning of blocks from OM side.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
+public abstract class TestOmBlockVersioning implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   private OzoneManager ozoneManager;
@@ -98,7 +98,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     OmKeyLocationInfoGroup highestVersion =
         checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(0, highestVersion.getVersion());
-    assertEquals(1, highestVersion.getLocationList().size());
+    assertEquals(1, highestVersion.createLocationList().size());
 
     // 2nd update, version 1
     openKey = writeClient.openKey(keyArgs);
@@ -112,7 +112,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(1, highestVersion.getVersion());
-    assertEquals(1, highestVersion.getLocationList().size());
+    assertEquals(1, highestVersion.createLocationList().size());
 
     // 3rd update, version 2
     openKey = writeClient.openKey(keyArgs);
@@ -132,7 +132,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(2, highestVersion.getVersion());
-    assertEquals(2, highestVersion.getLocationList().size());
+    assertEquals(2, highestVersion.createLocationList().size());
   }
 
   private OmKeyLocationInfoGroup checkVersions(
@@ -171,7 +171,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     OmKeyInfo keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
     assertEquals(1,
-        keyInfo.getLatestVersionLocations().getLocationList().size());
+        keyInfo.getLatestVersionLocations().createLocationList().size());
 
     // When bucket versioning is disabled, overwriting a key doesn't increment
     // its version count. Rather it always resets the version to 0
@@ -181,7 +181,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     assertEquals(dataString, DataTestUtil.getKey(bucket, keyName));
     assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
     assertEquals(1,
-        keyInfo.getLatestVersionLocations().getLocationList().size());
+        keyInfo.getLatestVersionLocations().createLocationList().size());
 
     dataString = RandomStringUtils.secure().nextAlphabetic(200);
     DataTestUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
@@ -190,6 +190,6 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     assertEquals(dataString, DataTestUtil.getKey(bucket, keyName));
     assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
     assertEquals(1,
-        keyInfo.getLatestVersionLocations().getLocationList().size());
+        keyInfo.getLatestVersionLocations().createLocationList().size());
   }
 }

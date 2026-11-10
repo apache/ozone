@@ -17,15 +17,31 @@
 
 package org.apache.hadoop.ozone.s3.exception;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * This class tests OS3Exception class.
+ * This class tests OS3Exception and OS3ExceptionMapper.
  */
+@ExtendWith(MockitoExtension.class)
 public class TestOS3Exceptions {
+
+  @Mock
+  private RequestIdentifier requestIdentifier;
+
+  @InjectMocks
+  private OS3ExceptionMapper exceptionMapper;
 
   @Test
   public void testOS3Exceptions() {
@@ -42,6 +58,49 @@ public class TestOS3Exceptions {
     String expected = String.format(formatString, ex.getCode(),
         ex.getErrorMessage(), ex.getResource(),
         ex.getRequestId());
+    assertEquals(expected, val);
+  }
+
+  @Test
+  public void testResponseContentType() {
+    when(requestIdentifier.getRequestId()).thenReturn("request-id");
+    OS3Exception exception = S3ErrorTable.newError(
+        S3ErrorTable.ACCESS_DENIED, "bucket");
+
+    Response response = exceptionMapper.toResponse(exception);
+
+    assertEquals(MediaType.APPLICATION_XML_TYPE, response.getMediaType());
+  }
+
+  /**
+   * AWS S3 returns HTTP 400 Bad Request for ExpiredToken (not 403).
+   */
+  @Test
+  public void testExpiredTokenUsesBadRequestHttpStatus() {
+    assertEquals(HTTP_BAD_REQUEST, S3ErrorTable.EXPIRED_TOKEN.getHttpCode());
+    final OS3Exception fromTable = S3ErrorTable.newError(S3ErrorTable.EXPIRED_TOKEN, "resource");
+    assertEquals(HTTP_BAD_REQUEST, fromTable.getHttpCode());
+  }
+
+  @Test
+  public void testOS3ExceptionWithToken0() {
+    final OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.EXPIRED_TOKEN, "resource");
+    ex.setRequestId(OzoneUtils.getRequestID());
+    ex.setHostId(OzoneUtils.getRequestID());
+    ex.setToken0("token-value");
+
+    final String val = ex.toXml();
+    final String formatString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n" +
+        "<Error>%n" +
+        "  <Code>%s</Code>%n" +
+        "  <Message>%s</Message>%n" +
+        "  <Resource>%s</Resource>%n" +
+        "  <RequestId>%s</RequestId>%n" +
+        "  <HostId>%s</HostId>%n" +
+        "  <Token-0>%s</Token-0>%n" +
+        "</Error>%n";
+    final String expected = String.format(formatString, ex.getCode(), ex.getErrorMessage(), ex.getResource(),
+        ex.getRequestId(), ex.getHostId(), ex.getToken0());
     assertEquals(expected, val);
   }
 }

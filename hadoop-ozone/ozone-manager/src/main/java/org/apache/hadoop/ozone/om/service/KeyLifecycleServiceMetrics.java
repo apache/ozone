@@ -17,19 +17,22 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 
 /**
  * Class contains metrics related to the OM KeyLifeCycle services.
  */
 @Metrics(about = "Lifecycle Service Metrics", context = OzoneConsts.OZONE)
-public final class KeyLifecycleServiceMetrics {
+public final class KeyLifecycleServiceMetrics implements MetricsSource {
 
   public static final String METRICS_SOURCE_NAME =
       KeyLifecycleServiceMetrics.class.getSimpleName();
@@ -42,8 +45,7 @@ public final class KeyLifecycleServiceMetrics {
   @Metric("Total no. of tasks failed")
   private MutableGaugeLong numFailureTask;
 
-  @Metric("Execution time of a success task for a bucket")
-  private MutableRate taskLatencyMs;
+  private final ConcurrentMutableRate taskLatencyMs;
 
   // following metrics are updated by both success and failure tasks
   @Metric("Number of key iterated")
@@ -70,10 +72,31 @@ public final class KeyLifecycleServiceMetrics {
 
   private KeyLifecycleServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+    this.taskLatencyMs = new ConcurrentMutableRate("TaskLatencyMs",
+        "Execution time of a success task for a bucket", false);
   }
 
   public MetricsRegistry getRegistry() {
     return registry;
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME);
+    numSkippedTask.snapshot(builder, all);
+    numSuccessTask.snapshot(builder, all);
+    numFailureTask.snapshot(builder, all);
+    taskLatencyMs.snapshot(builder, all);
+    numKeyIterated.snapshot(builder, all);
+    numDirIterated.snapshot(builder, all);
+    numDirDeleted.snapshot(builder, all);
+    numKeyDeleted.snapshot(builder, all);
+    numKeyRenamed.snapshot(builder, all);
+    numDirRenamed.snapshot(builder, all);
+    sizeKeyDeleted.snapshot(builder, all);
+    sizeKeyRenamed.snapshot(builder, all);
+    numMultipartUploadsIterated.snapshot(builder, all);
+    numMultipartUploadsAborted.snapshot(builder, all);
   }
 
   /**

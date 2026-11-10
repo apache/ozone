@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -29,6 +31,8 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -41,7 +45,9 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests the S3Utils APIs.
@@ -75,13 +81,65 @@ public class TestS3Utils {
       "rs-6-3-1024k"
   );
 
+  @ParameterizedTest
+  @EmptySource
+  @ValueSource(strings = {
+      "invalid",
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff",
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeffff",
+      "g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      " 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  })
+  void testRejectMalformedContentSha256(String hash) {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+
+    OS3Exception error = assertThrows(OS3Exception.class,
+        () -> S3Utils.validateSignatureHeader(headers, "key", true));
+
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), error.getCode());
+    assertEquals(400, error.getHttpCode());
+    assertEquals("An error occurred (InvalidArgument): The " + S3Consts.X_AMZ_CONTENT_SHA256 +
+        " header must contain 64 hexadecimal characters", error.getErrorMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      S3Consts.UNSIGNED_PAYLOAD,
+      S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER,
+      S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD,
+      S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER,
+      S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD,
+      S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER
+  })
+  void testAcceptContentSha256(String hash) throws OS3Exception {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+
+    assertEquals(hash, S3Utils.validateSignatureHeader(headers, "key", true));
+  }
+
+  @Test
+  void testMissingContentSha256() throws OS3Exception {
+    HttpHeaders headers = mock(HttpHeaders.class);
+
+    assertEquals(S3Consts.UNSIGNED_PAYLOAD, S3Utils.validateSignatureHeader(headers, "key", false));
+    OS3Exception error = assertThrows(OS3Exception.class,
+        () -> S3Utils.validateSignatureHeader(headers, "key", true));
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), error.getCode());
+  }
+
   public static List<Arguments> validS3ReplicationConfigs() {
     List<Arguments> args = new ArrayList<>();
     for (String s3StorageType : S3STORAGETYPES) {
       for (String s3StorageConfig : S3STORAGECONFIG) {
         for (ReplicationConfig clientReplConfig : REPLICATIONS) {
           for (ReplicationConfig bucketReplConfig: REPLICATIONS) {
-            args.add(Arguments.of(s3StorageType, s3StorageConfig, clientReplConfig, bucketReplConfig));
+            for (boolean standardUsesClientDefault : new boolean[] {false, true}) {
+              args.add(Arguments.of(s3StorageType, s3StorageConfig, clientReplConfig, bucketReplConfig,
+                  standardUsesClientDefault));
+            }
           }
         }
       }
@@ -92,11 +150,11 @@ public class TestS3Utils {
   @ParameterizedTest
   @MethodSource("validS3ReplicationConfigs")
   public void testValidResolveS3ClientSideReplicationConfig(String s3StorageType, String s3StorageConfig,
-      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig)
-      throws OS3Exception {
+      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig,
+      boolean standardUsesClientDefault) throws OS3Exception {
     ReplicationConfig replicationConfig = S3Utils
         .resolveS3ClientSideReplicationConfig(s3StorageType, s3StorageConfig,
-            clientConfiguredReplConfig, bucketReplConfig);
+            clientConfiguredReplConfig, bucketReplConfig, standardUsesClientDefault);
 
     final ReplicationConfig expectedReplConfig;
     if (!StringUtils.isEmpty(s3StorageType)) {
@@ -107,7 +165,8 @@ public class TestS3Utils {
           expectedReplConfig = EC32REPLICATIONCONFIG;
         }
       } else if (S3StorageType.STANDARD.name().equals(s3StorageType)) {
-        expectedReplConfig = RATIS3REPLICATIONCONFIG;
+        expectedReplConfig = standardUsesClientDefault && clientConfiguredReplConfig != null
+            ? clientConfiguredReplConfig : RATIS3REPLICATIONCONFIG;
       } else {
         expectedReplConfig = RATIS1REPLICATIONCONFIG;
       }
@@ -145,13 +204,21 @@ public class TestS3Utils {
       throws OS3Exception {
     OS3Exception exception = assertThrows(OS3Exception.class, () -> S3Utils.
         resolveS3ClientSideReplicationConfig(
-            s3StorageType, s3StorageConfig, clientConfiguredReplConfig, bucketReplConfig));
+            s3StorageType, s3StorageConfig, clientConfiguredReplConfig, bucketReplConfig, false));
     assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
   }
 
   @Test
   public void testGenerateCanonicalUserId() {
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
+  }
+
+  @Test
+  public void testWrapOS3ExceptionContentType() {
+    OS3Exception exception = S3ErrorTable.newError(
+        S3ErrorTable.ACCESS_DENIED, "bucket");
+    assertEquals(MediaType.APPLICATION_XML_TYPE,
+        S3Utils.wrapOS3Exception(exception).getResponse().getMediaType());
   }
 
   static Stream<Arguments> wrongContentMD5Provider() throws Exception {

@@ -386,7 +386,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       SecurityConfig config, CertificateStore scmCertStore,
       BigInteger rootCertId, PKIProfile pkiProfile, String component)
       throws IOException {
-    String subject = String.format(SCM_ROOT_CA_PREFIX, rootCertId) +
+    String subject = SCM_ROOT_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,

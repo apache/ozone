@@ -43,6 +43,11 @@ public class DefaultSecretKeyClient implements SecretKeyClient {
   }
 
   @Override
+  public void refetchSecretKey() {
+    signerClientDelegate.refetchSecretKey();
+  }
+
+  @Override
   public void start(ConfigurationSource conf) throws IOException {
     signerClientDelegate.start(conf);
   }

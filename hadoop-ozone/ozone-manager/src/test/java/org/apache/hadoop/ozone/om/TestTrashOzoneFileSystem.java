@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
 import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestCount;
 import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestTime;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -95,6 +97,33 @@ class TestTrashOzoneFileSystem {
         Collection<FileStatus> trashRoots = fs.getTrashRoots(true);
         assertEquals(TRASH_ROOT_COUNT, trashRoots.size());
       }
+    } finally {
+      omTestManagers.stop();
+    }
+  }
+
+  @Test
+  void testGetFileStatusDoesNotIncrementOmRpcMetric(@TempDir File testDir) throws Exception {
+    OmTestManagers omTestManagers = newOmTestManagers(testDir);
+    try {
+      OzoneManager om = omTestManagers.getOzoneManager();
+      OzoneManagerProtocol writeClient = omTestManagers.getWriteClient();
+      String volumeName = "vol-" + objectId.incrementAndGet();
+      String bucketName = "bucket-" + objectId.incrementAndGet();
+      createVolumeAndBucket(omTestManagers, volumeName, bucketName,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED, writeClient);
+
+      long getFileStatusBefore = om.getMetrics().getNumGetFileStatus();
+      long trashGetFileStatusBefore = getLongCounter("NumTrashGetFileStatus",
+          getMetrics(OMMetrics.class.getSimpleName()));
+      try (FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>) () -> new TrashOzoneFileSystem(om))) {
+        fs.getFileStatus(new Path("/" + volumeName + "/" + bucketName + "/" + TRASH_PREFIX));
+      }
+
+      assertEquals(getFileStatusBefore, om.getMetrics().getNumGetFileStatus());
+      assertEquals(trashGetFileStatusBefore + 1,
+          getLongCounter("NumTrashGetFileStatus", getMetrics(OMMetrics.class.getSimpleName())));
     } finally {
       omTestManagers.stop();
     }

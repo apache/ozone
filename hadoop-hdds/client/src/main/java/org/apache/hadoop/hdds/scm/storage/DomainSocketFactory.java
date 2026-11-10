@@ -133,6 +133,10 @@ public final class DomainSocketFactory {
     return instance;
   }
 
+  public static boolean isNativeLibraryLoaded() {
+    return nativeLibraryLoaded;
+  }
+
   private DomainSocketFactory(ConfigurationSource conf) {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     boolean shortCircuitEnabled = clientConfig.isShortCircuitEnabled();
@@ -153,7 +157,7 @@ public final class DomainSocketFactory {
       } else {
         pathInfo = PathInfo.VALID;
         isEnabled = true;
-        timer = new Timer(DomainSocketFactory.class.getSimpleName() + "-Timer");
+        timer = new Timer(DomainSocketFactory.class.getSimpleName() + "-Timer", true);
         LOG.info(FEATURE + " is enabled within {} ns.", System.nanoTime() - startTime);
       }
     }

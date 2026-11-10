@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.recon;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.createContainerForTesting;
-import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createContainerForTesting;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.runTestOzoneContainerViaDataNode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -340,9 +340,8 @@ public class TestReconTasks {
    * <p>Classification logic: When a CLOSING container has zero replicas,
    * {@code ClosingContainerHandler} samples it as {@code MISSING}. Then
    * {@code handleMissingContainer()} calls {@code isEmptyMissing()} which checks
-   * {@link ContainerInfo#getNumberOfKeys()}. Since the container was created via
-   * XceiverClient bypassing Ozone Manager, SCM's key count is 0, so the container
-   * is classified as {@code EMPTY_MISSING} rather than {@code MISSING}.</p>
+   * {@link ContainerInfo#getNumberOfKeys()}. Since no block is written, container reports keep the key
+   * count at 0, so Recon classifies the container as {@code EMPTY_MISSING} rather than {@code MISSING}.</p>
    *
    * <p>Note: this test relies on the CLOSING-state path (not the CLOSED-state path),
    * so no explicit container close is needed before node shutdown. The dead-node
@@ -365,8 +364,11 @@ public class TestReconTasks {
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
+    // Do NOT write a block here: container reports propagate the datanode's block count into
+    // ContainerInfo#numberOfKeys, and a non-zero key count yields MISSING instead of EMPTY_MISSING.
     XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
-    runTestOzoneContainerViaDataNode(containerID, client);
+    client.connect();
+    createContainerForTesting(client, containerID);
 
     // Wait for Recon to receive the container report from the single datanode.
     // This ensures DeadNodeHandler can find and remove the replica when the node dies.

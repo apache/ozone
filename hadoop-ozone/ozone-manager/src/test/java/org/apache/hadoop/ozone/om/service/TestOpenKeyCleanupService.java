@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -276,6 +277,7 @@ class TestOpenKeyCleanupService {
     when(om.getScmClient().getContainerClient().getContainerWithPipeline(anyLong()))
         .thenReturn(new ContainerWithPipeline(Mockito.mock(ContainerInfo.class), pipeline));
 
+    final long createTime = Time.now();
     // Create 5 keys with directories
     createOpenKeys(keyCount / 2, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, false, true);
     // Create 5 keys without directory
@@ -289,6 +291,7 @@ class TestOpenKeyCleanupService {
     assertExpiredOpenKeys(false, true,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
+    final long commitTime = Time.now();
     openKeyCleanupService.resume();
 
     // keys should be recovered and there should not be any expired key pending
@@ -297,6 +300,11 @@ class TestOpenKeyCleanupService {
     List<OmKeyInfo> listKeyInfo = getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
     // Verify keyName and fileName is same after auto commit key.
     listKeyInfo.stream().forEach(key -> assertEquals(key.getKeyName(), key.getFileName()));
+    // Verify auto commit sets the modification time, ignoring keys left by earlier tests.
+    assertThat(listKeyInfo)
+        .filteredOn(key -> key.getCreationTime() >= createTime)
+        .hasSize(keyCount)
+        .allSatisfy(key -> assertThat(key.getModificationTime()).isGreaterThanOrEqualTo(commitTime));
   }
 
   /**

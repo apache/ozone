@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import java.util.List;
+
 /**
  * Information about moving containers.
  */
@@ -25,20 +27,23 @@ public class ContainerMoveInfo {
   private final long containerMovesCompleted;
   private final long containerMovesFailed;
   private final long containerMovesTimeout;
+  private final List<ContainerMoveFailureDetail> failures;
 
   public ContainerMoveInfo(long containerMovesScheduled, long containerMovesCompleted, long containerMovesFailed,
-                           long containerMovesTimeout) {
+                           long containerMovesTimeout, List<ContainerMoveFailureDetail> failures) {
     this.containerMovesScheduled = containerMovesScheduled;
     this.containerMovesCompleted = containerMovesCompleted;
     this.containerMovesFailed = containerMovesFailed;
     this.containerMovesTimeout = containerMovesTimeout;
+    this.failures = failures;
   }
 
-  public ContainerMoveInfo(ContainerBalancerMetrics metrics) {
+  public ContainerMoveInfo(ContainerBalancerMetrics metrics, ContainerMoveFailureTracker failureTracker) {
     this.containerMovesScheduled = metrics.getNumContainerMovesScheduledInLatestIteration();
     this.containerMovesCompleted = metrics.getNumContainerMovesCompletedInLatestIteration();
     this.containerMovesFailed = metrics.getNumContainerMovesFailedInLatestIteration();
     this.containerMovesTimeout = metrics.getNumContainerMovesTimeoutInLatestIteration();
+    this.failures = failureTracker.getFailures();
   }
 
   public long getContainerMovesScheduled() {
@@ -55,5 +60,9 @@ public class ContainerMoveInfo {
 
   public long getContainerMovesTimeout() {
     return containerMovesTimeout;
+  }
+
+  public List<ContainerMoveFailureDetail> getFailures() {
+    return failures;
   }
 }

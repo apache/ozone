@@ -21,8 +21,10 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.S3GAction;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.Preconditions;
 
 class S3RequestContext {
   private final long startNanos;
@@ -30,12 +32,14 @@ class S3RequestContext {
   private final EndpointBase endpoint;
   private S3GAction action;
   private OzoneVolume volume;
+  private OzoneBucket bucket;
 
   S3RequestContext(EndpointBase endpoint, S3GAction action) {
     this.endpoint = endpoint;
     this.startNanos = Time.monotonicNowNanos();
     this.perf = new PerformanceStringBuilder();
     this.action = action;
+    endpoint.applyS3Action(action);
   }
 
   long getStartNanos() {
@@ -53,12 +57,37 @@ class S3RequestContext {
     return volume;
   }
 
+  /** Returns the cached volume name without an OM call, or null if it has not been looked up. */
+  String getCachedVolumeName() {
+    if (bucket != null) {
+      return bucket.getVolumeName();
+    }
+    return volume == null ? null : volume.getName();
+  }
+
+  OzoneBucket getBucket(String name) throws IOException {
+    if (bucket == null) {
+      bucket = endpoint.getClientProtocol().getBucketDetails(volume != null ? volume.getName() : null, name);
+    } else {
+      Preconditions.assertEquals(bucket.getName(), name, "Multiple buckets in one request are not supported");
+    }
+    return bucket;
+  }
+
+  /**
+   * Returns the S3 volume name, reusing the bucket already looked up in this request to avoid another call.
+   */
+  String getVolumeName() throws IOException {
+    return bucket != null ? bucket.getVolumeName() : getVolume().getName();
+  }
+
   S3GAction getAction() {
     return action;
   }
 
   void setAction(S3GAction action) {
     this.action = action;
+    endpoint.applyS3Action(action);
   }
 
   /**

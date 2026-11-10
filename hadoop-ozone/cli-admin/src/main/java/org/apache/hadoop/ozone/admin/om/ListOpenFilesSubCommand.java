@@ -103,7 +103,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   private void execute(OzoneManagerProtocol ozoneManagerClient) throws IOException {
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     final OzoneManagerVersion omVersion = RpcClient.getOmVersion(serviceInfoEx);
-    if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+    if (!OzoneManagerVersion.HBASE_SUPPORT.isSupportedBy(omVersion)) {
       System.err.println("Error: This command requires OzoneManager version "
           + OzoneManagerVersion.HBASE_SUPPORT.name() + " or later.");
       return;

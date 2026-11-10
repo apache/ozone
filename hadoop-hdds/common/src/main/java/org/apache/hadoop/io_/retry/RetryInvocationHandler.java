@@ -48,9 +48,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
   public static final Logger LOG = LoggerFactory.getLogger(
       RetryInvocationHandler.class);
 
-  public static final ThreadLocal<Boolean> SET_CALL_ID_FOR_TEST =
-      ThreadLocal.withInitial(() -> true);
-
   static class Call {
     private final Method method;
     private final Object[] args;
@@ -153,10 +150,16 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     }
 
     Object invokeMethod() throws Throwable {
-      if (isRpc && SET_CALL_ID_FOR_TEST.get()) {
+      if (isRpc) {
         Client.setCallIdAndRetryCount(callId, counters.retries);
       }
-      return retryInvocationHandler.invokeMethod(method, args);
+      try {
+        return retryInvocationHandler.invokeMethod(method, args);
+      } finally {
+        if (isRpc) {
+          Client.clearCallIdAndRetryCount();
+        }
+      }
     }
 
     @Override
@@ -422,6 +425,9 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
   static boolean isRpcInvocation(Object proxy) {
     if (proxy instanceof ProtocolTranslator) {
       proxy = ((ProtocolTranslator) proxy).getUnderlyingProxyObject();
+    }
+    if (proxy instanceof RpcProxy) {
+      return true;
     }
     if (!Proxy.isProxyClass(proxy.getClass())) {
       return false;

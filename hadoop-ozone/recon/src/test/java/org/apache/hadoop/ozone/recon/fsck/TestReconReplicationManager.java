@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -58,6 +60,8 @@ import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContaine
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Smoke tests for ReconReplicationManager Local ReplicationManager.
@@ -222,6 +226,65 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
         UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).size());
   }
 
+  @ParameterizedTest
+  @CsvSource({"EC, 1", "EC, 4", "RATIS, 0"})
+  public void testReplicaChecksumMismatch(HddsProtos.ReplicationType replicationType, int duplicateIndex)
+      throws Exception {
+    long containerId = 306L;
+    boolean isEC = replicationType == HddsProtos.ReplicationType.EC;
+    int requiredNodes = isEC ? 5 : 3;
+    ContainerInfo container = mockContainerInfo(containerId, 5, 1024L, requiredNodes);
+    when(container.getReplicationType()).thenReturn(replicationType);
+    when(containerManager.getContainers()).thenReturn(Collections.singletonList(container));
+    when(containerManager.getContainer(container.containerID())).thenReturn(container);
+
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i = 1; i <= requiredNodes; i++) {
+      ContainerReplica replica = mock(ContainerReplica.class);
+      int replicaIndex = isEC ? i : 0;
+      when(replica.getReplicaIndex()).thenReturn(replicaIndex);
+      when(replica.getDataChecksum()).thenReturn(1000L + replicaIndex);
+      replicas.add(replica);
+    }
+    when(containerManager.getContainerReplicas(container.containerID())).thenReturn(replicas);
+    reconRM = createStateInjectingReconRM(Collections.emptyMap());
+
+    reconRM.processAll();
+    assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
+        "Different EC indexes may have different checksums");
+
+    ContainerReplica duplicate = mock(ContainerReplica.class);
+    when(duplicate.getReplicaIndex()).thenReturn(duplicateIndex);
+    when(duplicate.getDataChecksum()).thenReturn(1000L + duplicateIndex);
+    replicas.add(duplicate);
+    reconRM.processAll();
+    assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
+        "Replicas of the same index with matching checksums should not report a mismatch");
+
+    when(duplicate.getDataChecksum()).thenReturn(2000L);
+    reconRM.processAll();
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> mismatches =
+        schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10);
+    assertEquals(1, mismatches.size());
+    assertEquals(containerId, mismatches.get(0).getContainerId());
+
+    when(container.isSuppressed()).thenReturn(true);
+    reconRM.processAll();
+    assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
+        "Suppressed containers should have existing checksum mismatches removed");
+
+    when(container.isSuppressed()).thenReturn(false);
+    reconRM.processAll();
+    mismatches = schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10);
+    assertEquals(1, mismatches.size());
+    assertEquals(containerId, mismatches.get(0).getContainerId());
+
+    when(duplicate.getDataChecksum()).thenReturn(1000L + duplicateIndex);
+    reconRM.processAll();
+    assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
+        "Resolved checksum mismatches should be removed");
+  }
+
   @Test
   public void testProcessAllMapsCompositeScmStatesToBaseStates() throws Exception {
     final long unhealthyUnderContainerId = 401L;
@@ -331,6 +394,32 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
   }
 
   @Test
+  public void testProcessAllFollowsSuppressedFlag() throws Exception {
+    ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(1L)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setNumberOfKeys(10)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setOwner("test")
+        .build();
+    when(containerManager.getContainers()).thenReturn(Collections.singletonList(container));
+    when(containerManager.getContainer(container.containerID())).thenReturn(container);
+    when(containerManager.getContainerReplicas(container.containerID())).thenReturn(Collections.emptySet());
+
+    reconRM.processAll();
+    assertThat(missingContainerIds()).containsExactly(1L);
+
+    // The SCM container sync sets the flag on the container Recon already holds.
+    container.setSuppressed(true);
+    reconRM.processAll();
+    assertThat(missingContainerIds()).isEmpty();
+
+    container.setSuppressed(false);
+    reconRM.processAll();
+    assertThat(missingContainerIds()).containsExactly(1L);
+  }
+
+  @Test
   public void testReconReplicationManagerCreation() {
     // Verify ReconReplicationManager was created successfully
     assertNotNull(reconRM);
@@ -405,6 +494,13 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     schemaManagerV2.insertUnhealthyContainerRecords(new ArrayList<>());
 
     // No assertion needed - just verify no exceptions thrown
+  }
+
+  private List<Long> missingContainerIds() {
+    List<Long> ids = new ArrayList<>();
+    schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.MISSING, 0, 0, 100)
+        .forEach(r -> ids.add(r.getContainerId()));
+    return ids;
   }
 
   private ContainerInfo mockContainerInfo(long containerId, long numberOfKeys,

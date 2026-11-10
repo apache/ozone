@@ -45,4 +45,9 @@ class ObjectGetTorrentHandler extends ObjectOperationHandler {
     context.setAction(S3GAction.GET_OBJECT_TORRENT);
     throw newError(NOT_IMPLEMENTED, "GetObjectTorrent");
   }
+
+  @Override
+  S3GAction getAction() {
+    return queryParams().get(QueryParams.TORRENT) == null ? null : S3GAction.NOT_IMPLEMENTED;
+  }
 }

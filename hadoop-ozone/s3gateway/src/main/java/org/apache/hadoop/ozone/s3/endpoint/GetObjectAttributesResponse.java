@@ -84,12 +84,6 @@ public class GetObjectAttributesResponse {
 
   /**
    * Represents the ObjectParts element in the GetObjectAttributes response.
-   *
-   * <p>For completed multipart-uploaded objects, {@code partsCount} is derived from
-   * the composite ETag suffix (e.g. {@code "hash-15"} → 15 parts). Per-part sizes
-   * are not stored for completed multipart uploads in Ozone and are therefore omitted
-   * from the part list in this response.
-   * TODO: Will support completed multipart uploads in this ticket: HDDS-16073
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "ObjectParts")
@@ -168,6 +162,10 @@ public class GetObjectAttributesResponse {
 
   /**
    * A single part entry within {@link ObjectParts}.
+   *
+   * <p>AWS returns {@code Part} elements for general-purpose buckets only when an additional
+   * checksum was stored at upload time. {@code PartNumber} and {@code Size} are included when
+   * present; per-part checksum fields are omitted until Ozone stores them.
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Part")

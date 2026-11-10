@@ -109,6 +109,11 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public List<VALUE> multiGetSkipCache(List<KEY> keys) throws RocksDatabaseException, CodecException {
+    return table.multiGetSkipCache(keys);
+  }
+
+  @Override
   public VALUE getIfExist(KEY key) throws RocksDatabaseException, CodecException {
     return table.getIfExist(key);
   }

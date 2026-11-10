@@ -17,19 +17,19 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
-import java.util.Map;
 import java.util.OptionalInt;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
@@ -85,7 +85,7 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     SCMNodeInfo targetNode;
     if (serviceId != null) {
       // HA mode: find leader
-      targetNode = findLeaderNode(scmClient);
+      targetNode = findLeaderNode(scmClient, nodes);
       if (targetNode == null) {
         throw new IOException("Could not determine leader node");
       }
@@ -100,9 +100,12 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
   /**
    * Find the leader node from SCM roles.
    * @param scmClient the SCM client
+   * @param nodes the SCM nodes configured for the service
    * @return the leader SCMNodeInfo
    */
-  private SCMNodeInfo findLeaderNode(ScmClient scmClient) throws IOException {
+  @VisibleForTesting
+  static SCMNodeInfo findLeaderNode(ScmClient scmClient, List<SCMNodeInfo> nodes)
+      throws IOException {
     try {
       List<String> roles = scmClient.getScmRoles();
       for (String role : roles) {
@@ -172,9 +175,11 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
       }
 
       if (isVerbose()) {
-        Map<String, Pair<Boolean, String>> rules = scmClient.getSafeModeRuleStatuses();
+        List<SafeModeRuleStatusProto> rules = scmClient.getSafeModeRuleStatuses();
         if (rules != null && !rules.isEmpty()) {
-          printSafeModeRules(rules);
+          for (SafeModeRuleStatusProto r : rules) {
+            System.out.printf("validated:%s, %s, %s%n", r.getValidate(), r.getRuleName(), r.getStatusText());
+          }
         }
       }
     } catch (Exception e) {
@@ -187,7 +192,7 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
    * Inputs may be bare hosts or host:port strings. Handles IPv6 equivalence
    * (e.g. 2001:db8::1 vs 2001:db8:0:0:0:0:0:1) by resolving to InetAddress.
    */
-  private boolean matchesAddress(String address1, String address2) {
+  private static boolean matchesAddress(String address1, String address2) {
     if (address1.equalsIgnoreCase(address2)) {
       return true;
     }
@@ -215,14 +220,6 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     } catch (Exception e) {
       // If address resolution fails, no match
       return false;
-    }
-  }
-  
-  private void printSafeModeRules(Map<String, Pair<Boolean, String>> rules) {
-    for (Map.Entry<String, Pair<Boolean, String>> entry : rules.entrySet()) {
-      Pair<Boolean, String> value = entry.getValue();
-      System.out.printf("validated:%s, %s, %s%n",
-          value.getLeft(), entry.getKey(), value.getRight());
     }
   }
 }

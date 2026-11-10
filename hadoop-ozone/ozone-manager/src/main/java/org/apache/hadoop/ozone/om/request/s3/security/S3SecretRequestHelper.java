@@ -21,11 +21,16 @@ import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.KERBEROS;
 
 import java.io.IOException;
 import java.util.Optional;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
@@ -42,15 +47,35 @@ public final class S3SecretRequestHelper {
   private S3SecretRequestHelper() {
   }
 
+  /** Records the attached cutoff without lowering an existing one; old log entries without a cutoff return null. */
+  public static Long updateStsRevocationCutoff(OMMetadataManager metadataManager, OMRequest request, String accessId,
+      long transactionIndex) throws IOException {
+    if (!request.hasRevokeSTSTokenRequest()) {
+      return null;
+    }
+    Table<String, Long> table = metadataManager.getS3RevokedStsTokenTable();
+    Long existing = table.getIfExist(accessId);
+    long requested = request.getRevokeSTSTokenRequest().getRevocationTimeMillis();
+    long cutoff = existing == null ? requested : Math.max(existing, requested);
+    table.addCacheEntry(new CacheKey<>(accessId), CacheValue.get(transactionIndex, cutoff));
+    return cutoff;
+  }
+
   /**
    * Retrieves thread-local UGI for request or construct new one
    * based on provided accessId.
    *
+   * @param ozoneManager OzoneManager instance.
    * @param accessId user identifier from request.
    * @return {@link UserGroupInformation} instance.
+   * @throws OMException if security is enabled and the request has no RPC user.
    */
-  public static UserGroupInformation getOrCreateUgi(String accessId) {
+  public static UserGroupInformation getOrCreateUgi(OzoneManager ozoneManager, String accessId) throws OMException {
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (ugi == null && ozoneManager.isSecurityEnabled()) {
+      throw new OMException("S3 secret operations on accessId '" + accessId + "' require an RPC user."
+          + " Send the request over the OM RPC transport.", ResultCodes.PERMISSION_DENIED);
+    }
     if (ugi == null && Strings.isNotEmpty(accessId)) {
       return UserGroupInformation.createRemoteUser(accessId, KERBEROS);
     } else {

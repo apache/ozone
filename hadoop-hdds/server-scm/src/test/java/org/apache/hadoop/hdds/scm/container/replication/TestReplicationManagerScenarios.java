@@ -44,7 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -62,13 +62,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeIdCommand;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,7 +102,7 @@ public class TestReplicationManagerScenarios {
   private Map<ContainerID, Set<ContainerReplica>> containerReplicaMap;
   private Set<ContainerInfo> containerInfoSet;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
-  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
+  private Set<DatanodeIdCommand> commandsSent;
 
   private OzoneConfiguration configuration;
   private ContainerManager containerManager;
@@ -178,8 +179,7 @@ public class TestReplicationManagerScenarios {
     commandsSent = new HashSet<>();
     eventPublisher = mock(EventPublisher.class);
     doAnswer(invocation -> {
-      commandsSent.add(Pair.of(invocation.getArgument(0),
-          invocation.getArgument(1)));
+      commandsSent.add(new DatanodeIdCommand(invocation.getArgument(0), invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
@@ -200,6 +200,14 @@ public class TestReplicationManagerScenarios {
           DatanodeDetails dn = invocation.getArgument(0);
           return NODE_STATUS_MAP.getOrDefault(dn, NodeStatus.inServiceHealthy());
         });
+
+    // Replication commands look up each involved datanode's apparent version,
+    // so return an info reporting the current version for every node.
+    DatanodeInfo defaultNodeInfo = mock(DatanodeInfo.class);
+    when(defaultNodeInfo.getLastKnownApparentVersion())
+        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(nodeManager.getNode(any(DatanodeID.class)))
+        .thenReturn(defaultNodeInfo);
 
     final HashMap<SCMCommandProto.Type, Integer> countMap = new HashMap<>();
     for (SCMCommandProto.Type type : SCMCommandProto.Type.values()) {
@@ -332,11 +340,11 @@ public class TestReplicationManagerScenarios {
     // datanodes.
     for (ExpectedCommands expectedCommand : expectedCommands) {
       boolean found = false;
-      for (Pair<DatanodeID, SCMCommand<?>> command : commandsSent) {
-        if (command.getRight().getType() == expectedCommand.getType()) {
+      for (DatanodeIdCommand command : commandsSent) {
+        if (command.command().getType() == expectedCommand.getType()) {
           if (expectedCommand.hasExpectedDatanode()) {
             // We need to assert against the command the datanode is sent to
-            DatanodeDetails commandDatanode = findDatanode(command.getKey());
+            DatanodeDetails commandDatanode = findDatanode(command.datanodeId());
             if (commandDatanode != null && expectedCommand.isTargetExpected(commandDatanode)) {
               found = true;
               commandsSent.remove(command);

@@ -75,7 +75,7 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest omRequest = super.preExecute(ozoneManager);
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     SetLifecycleConfigurationRequest request =
         omRequest.getSetLifecycleConfigurationRequest();
     LifecycleConfiguration lifecycleConfiguration =
@@ -103,6 +103,13 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
 
     validateAbortMpuDaysAgainstCleanupThreshold(ozoneManager, lifecycleConfiguration);
 
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    OmBucketInfo bucketInfo = metadataManager.getBucketTable().get(
+        metadataManager.getBucketKey(resolvedBucket.realVolume(), resolvedBucket.realBucket()));
+    if (bucketInfo == null) {
+      throw new OMException("Bucket doesn't exist", BUCKET_NOT_FOUND);
+    }
+
     SetLifecycleConfigurationRequest.Builder newCreateRequest =
         request.toBuilder();
 
@@ -110,6 +117,8 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
         lifecycleConfiguration.toBuilder()
             .setVolume(resolvedBucket.realVolume())
             .setBucket(resolvedBucket.realBucket());
+    // Bind the request to the bucket validated above, see validateAndUpdateCache.
+    newLifecycleConfiguration.setBucketObjectID(bucketInfo.getObjectID());
 
     newLifecycleConfiguration.setCreationTime(System.currentTimeMillis());
     newCreateRequest.setLifecycleConfiguration(newLifecycleConfiguration);
@@ -154,6 +163,12 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
         LOG.debug("bucket: {} in volume: {} doesn't exist", bucketName,
             volumeName);
         throw new OMException("Bucket doesn't exist", BUCKET_NOT_FOUND);
+      }
+      // Reject the request if the bucket it was validated against has been replaced by another one.
+      if (lifecycleConfiguration.hasBucketObjectID() &&
+          lifecycleConfiguration.getBucketObjectID() != bucketInfo.getObjectID()) {
+        throw new OMException("Bucket " + volumeName + "/" + bucketName + " was deleted and recreated after the " +
+            "lifecycle configuration was validated", BUCKET_NOT_FOUND);
       }
 
       OmLifecycleConfiguration.Builder lcBuilder =
@@ -241,9 +256,8 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
                 " day(s), which is not less than the cluster MPU expire threshold (" +
                 OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + "=" + expireThresholdConfig +
                 "). The MultipartUploadCleanupService will clean up the upload before the " +
-                "lifecycle rule fires, making the rule ineffective. " +
-                "Set daysAfterInitiation to a value less than " + expireThresholdConfig +
-                ", or increase " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",
+                "lifecycle rule fires, making the rule ineffective. Make sure daysAfterInitiation " +
+                "time duration is shorter than " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",
                 OMException.ResultCodes.INVALID_REQUEST);
           }
         }

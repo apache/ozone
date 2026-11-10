@@ -83,6 +83,19 @@ class TestSubmitSnapshotDiffResponse {
   }
 
   @Test
+  void testSubmitResponseForCustomFsoOrderedResubmitMessage() {
+    SubmitSnapshotDiffResponse response = new SubmitSnapshotDiffResponse(
+        "Previous snapshot diff attempt found with an unordered report. Status: DONE.\n"
+            + "Submitting a new job with ordered report. Please retry after 1000 "
+            + "ms using --get-report option to get the report.\n");
+
+    String message = response.getResponse();
+    assertTrue(message.contains("unordered report"));
+    assertTrue(message.contains("ordered report"));
+    assertTrue(message.contains("--get-report"));
+  }
+
+  @Test
   void testSubmitResponseForCancelledJobIncludesReason() {
     SubmitSnapshotDiffResponse response =
         new SubmitSnapshotDiffResponse(1000L, JobStatus.CANCELLED, "previously cancelled");

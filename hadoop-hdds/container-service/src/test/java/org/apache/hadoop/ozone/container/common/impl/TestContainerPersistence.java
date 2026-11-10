@@ -980,8 +980,7 @@ public class TestContainerPersistence {
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
     List<ChunkInfo> chunkList = new LinkedList<>();
     for (int x = 0; x < chunkCount; x++) {
-      ChunkInfo info = new ChunkInfo(String.format("%d.data",
-          blockID.getLocalID()), x * datalen, datalen);
+      ChunkInfo info = getChunk(blockID.getLocalID(), x, x * datalen, datalen);
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,

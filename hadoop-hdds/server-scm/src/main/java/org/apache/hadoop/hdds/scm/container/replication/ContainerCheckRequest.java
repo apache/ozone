@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -37,6 +38,7 @@ public final class ContainerCheckRequest {
   private final ReplicationManagerReport report;
   private final ReplicationQueue replicationQueue;
   private final boolean readOnly;
+  private ContainerHealthState healthState = ContainerHealthState.HEALTHY;
 
   private ContainerCheckRequest(Builder builder) {
     this.containerInfo = builder.containerInfo;
@@ -75,6 +77,15 @@ public final class ContainerCheckRequest {
 
   public boolean isReadOnly() {
     return readOnly;
+  }
+
+  public ContainerHealthState getHealthState() {
+    return healthState;
+  }
+
+  public void setHealthState(ContainerHealthState state) {
+    this.healthState = state;
+    report.incrementAndSample(state, containerInfo);
   }
 
   /**

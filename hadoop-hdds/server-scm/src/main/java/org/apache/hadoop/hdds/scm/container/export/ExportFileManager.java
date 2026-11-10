@@ -19,19 +19,31 @@ package org.apache.hadoop.hdds.scm.container.export;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
+import java.util.zip.GZIPOutputStream;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.ozone.util.UUIDUtil;
 import org.apache.ratis.util.AtomicFileOutputStream;
 import org.slf4j.Logger;
@@ -44,44 +56,43 @@ import org.slf4j.LoggerFactory;
  * uses the layout below. The manager gzip-compresses the archive ({@code .tar.gz}) so operators
  * can stream entries with {@code zcat}.
  *
- * <p>While a job runs, shard text files are written under {@code export_{jobId}/}. The archive is
- * created only after all shards are written. The export manager writes
- * {@code container-ids_{scope}_{timestamp}_job{jobId}.tar.gz.tmp} and atomically renames it to
+ * <p>While a job runs, part text files are written under {@code export_{jobId}/}. The archive is
+ * created only after all parts are written. The export manager writes
+ * {@code container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz.tmp} and atomically renames it to
  * {@code .tar.gz} on close ({@link AtomicFileOutputStream}), so a partial {@code .tar.gz} is
- * never visible. {@link #lock()} uses {@code in_use.lock} to exclude concurrent writers.
+ * never visible. {@link #start()} acquires {@code in_use.lock} to exclude concurrent writers.
  *
  * <pre>
  * {exportDirectory}/
  * ├── in_use.lock
- * ├── container-ids_{scope}_{timestamp}_job{jobId}.tar.gz
- * ├── container-ids_{scope}_{timestamp}_job{jobId}.tar.gz.tmp
+ * ├── container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz
+ * ├── container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz.tmp
  * └── export_{jobId}/
- *     ├── container-ids_{scope}_{metadataTimestamp}_part001.txt
+ *     ├── container-ids_{scope}_{jobStartTime}_part001.txt
  *     └── ...
  * </pre>
  *
  * <p><b>Incomplete work</b> ({@code export_{jobId}/} and {@code .tar.gz.tmp}) is removed by
- * {@link #cleanupFailedJob(Path, File)} on failure or cancel, and by {@link #start()} for every
- * leftover directory and temp file after SCM restart. Completed {@code .tar.gz} files are kept.
+ * {@link #cleanupFailedJob(ExportJob)} on failure or cancel, and by {@link #start()} for every
+ * leftover directory and temp file after SCM restart. Completed {@code .tar.gz} files are kept
+ * until the export manager evicts them with {@link #deleteArchive(String)}; {@link #listCompletedArchiveNames()}
+ * returns the existing ones, oldest first.
  *
- * <p><b>Completed {@code .tar.gz}</b> remains on disk until the export manager evicts it
- * ({@code maxTerminalJobs} in {@code ContainerExportManager}) via {@link #deleteExportTar(String)}.
- *
- * <p><b>SCM restart:</b> in-memory job status is lost. {@link #start()} clears incomplete work;
- * {@link #listCompletedArchivePaths()} returns existing {@code tarPath} values (oldest first);
- * {@link #jobIdFromArchiveFileName(String)} parses {@code jobId} for terminal-job rebuild in
- * {@code ContainerExportManager}.
+ * <p><b>SCM restart:</b> {@link #start()} acquires the export directory lock and clears incomplete work.
  */
 final class ExportFileManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ExportFileManager.class);
 
   static final String EXPORT_JOB_DIR_PREFIX = "export_";
+  static final String EXPORT_ARCHIVE_PREFIX = "container-ids_";
   static final String EXPORT_ARCHIVE_JOB_INFIX = "_job";
   static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
   static final String EXPORT_ARCHIVE_TMP_SUFFIX = EXPORT_ARCHIVE_SUFFIX + AtomicFileOutputStream.TMP_EXTENSION;
   static final String EXPORT_LOCK_NAME = "in_use.lock";
-  private static final int ARCHIVE_TIMESTAMP_LENGTH = 16;
+  private static final int EXPORT_JOB_START_TIME_LENGTH = 19;
+  private static final DateTimeFormatter EXPORT_JOB_START_TIME_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").withZone(ZoneOffset.UTC);
 
   private final String exportDirectory;
   private FileLock exportDirectoryLock;
@@ -90,16 +101,22 @@ final class ExportFileManager {
     this.exportDirectory = Objects.requireNonNull(exportDirectory, "exportDirectory == null");
   }
 
+  static String resolveExportDirectory(OzoneConfiguration conf) {
+    File scmDbDir = ServerUtils.getScmDbDir(conf);
+    return new File(scmDbDir, ExportLimits.EXPORT_SUBDIR).getAbsolutePath();
+  }
+
   String getExportDirectory() {
     return exportDirectory;
   }
 
   void start() throws IOException {
     Files.createDirectories(Paths.get(exportDirectory));
+    lock();
     removeIncompleteWorkOnStartup();
   }
 
-  void lock() throws IOException {
+  private synchronized void lock() throws IOException {
     if (exportDirectoryLock != null) {
       return;
     }
@@ -119,7 +136,7 @@ final class ExportFileManager {
     }
   }
 
-  void unlock() throws IOException {
+  synchronized void unlock() throws IOException {
     if (exportDirectoryLock == null) {
       return;
     }
@@ -128,75 +145,114 @@ final class ExportFileManager {
     exportDirectoryLock = null;
   }
 
-  File resolveArchiveFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
-    return new File(exportDirectory, String.format("container-ids_%s_%s%s%s%s",
-        scope.getValue(), archiveTimestamp, EXPORT_ARCHIVE_JOB_INFIX, jobId.getValue(), EXPORT_ARCHIVE_SUFFIX));
+  static String archiveFileName(ExportScope scope, String jobStartTime, ExportJob.Id jobId) {
+    return String.format("%s%s_%s%s%s%s",
+        EXPORT_ARCHIVE_PREFIX, scope, jobStartTime, EXPORT_ARCHIVE_JOB_INFIX, jobId, EXPORT_ARCHIVE_SUFFIX);
   }
 
-  File resolveArchiveTempFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
-    return AtomicFileOutputStream.getTemporaryFile(resolveArchiveFile(scope, archiveTimestamp, jobId));
+  void createJobDirectory(ExportJob.Id jobId) throws IOException {
+    Files.createDirectories(jobDirectory(jobId));
+  }
+
+  OutputStream newPartOutputStream(ExportJob.Id jobId, String partFileName) throws IOException {
+    return Files.newOutputStream(jobDirectory(jobId).resolve(partFileName));
+  }
+
+  void writeArchive(ExportJob job, BooleanSupplier isLeaderReady) throws IOException {
+    Path jobDir = jobDirectory(job.getId());
+    File[] parts = jobDir.toFile().listFiles((dir, name) -> name.endsWith(".txt"));
+    if (parts == null || parts.length == 0) {
+      throw new IOException("No part files found for " + job);
+    }
+    Arrays.sort(parts, Comparator.comparing(File::getName));
+    File archiveFile = new File(exportDirectory, job.getFileName());
+    try (AtomicFileOutputStream atomicOut = new AtomicFileOutputStream(archiveFile);
+         GZIPOutputStream gzipOut = new GZIPOutputStream(atomicOut);
+         ArchiveOutputStream<TarArchiveEntry> tarOut = Archiver.tar(gzipOut)) {
+      for (File part : parts) {
+        if (!isLeaderReady.getAsBoolean()) {
+          // close() would publish the partial archive; abort() discards the temp file instead.
+          atomicOut.abort();
+          throw new IOException("SCM lost leadership while archiving " + job);
+        }
+        Archiver.includeFile(part, part.getName(), tarOut);
+      }
+    }
+  }
+
+  void deleteJobDirectory(ExportJob.Id jobId) {
+    Path jobDir = jobDirectory(jobId);
+    if (Files.exists(jobDir) && !FileUtils.deleteQuietly(jobDir.toFile())) {
+      LOG.warn("Failed to delete container export job directory {}; it will be removed on next SCM start", jobDir);
+    }
   }
 
   /**
-   * Returns completed archive paths ({@code tarPath} in {@code ExportJob.Status}), oldest first.
+   * Returns the file names of completed archives, oldest first. Only names produced by
+   * {@link #archiveFileName} are returned, so other files in the directory are never evicted.
    */
-  List<String> listCompletedArchivePaths() {
-    File exportDir = new File(exportDirectory);
-    File[] matches = exportDir.listFiles((dir, fileName) -> fileName.endsWith(EXPORT_ARCHIVE_SUFFIX)
-        && !fileName.endsWith(EXPORT_ARCHIVE_TMP_SUFFIX));
-    if (matches == null || matches.length == 0) {
+  List<String> listCompletedArchiveNames() {
+    final File[] archives = new File(exportDirectory).listFiles(
+        (dir, name) -> jobStartTimeFromArchiveFileName(name) != null && jobIdFromArchiveFileName(name) != null);
+    if (archives == null) {
       return Collections.emptyList();
     }
-    Arrays.sort(matches, Comparator.comparing(
-        file -> archiveTimestampFromArchiveFileName(file.getName())));
-    List<String> archivePaths = new ArrayList<>(matches.length);
-    for (File archive : matches) {
-      archivePaths.add(archive.getAbsolutePath());
-    }
-    return archivePaths;
+    return Arrays.stream(archives)
+        .map(File::getName)
+        .sorted(Comparator.comparing(ExportFileManager::jobStartTimeFromArchiveFileName)
+            .thenComparing(Comparator.naturalOrder()))
+        .collect(Collectors.toList());
   }
 
-  static String archiveTimestampFromArchiveFileName(String fileName) {
-    int jobIndex = fileName.lastIndexOf(EXPORT_ARCHIVE_JOB_INFIX);
-    if (jobIndex < ARCHIVE_TIMESTAMP_LENGTH + 1
-            || !fileName.endsWith(EXPORT_ARCHIVE_SUFFIX)
-            || fileName.endsWith(EXPORT_ARCHIVE_TMP_SUFFIX)) {
+  void deleteArchive(String archiveFileName) {
+    final File archive = new File(exportDirectory, archiveFileName);
+    if (archive.isFile() && !FileUtils.deleteQuietly(archive)) {
+      LOG.warn("Failed to delete container export archive {}; it will be reconsidered on next SCM start", archive);
+    }
+  }
+
+  static String formatJobStartTime(Instant jobStartTime) {
+    return EXPORT_JOB_START_TIME_FORMAT.format(jobStartTime);
+  }
+
+  /** Returns the job start time in an archive file name, or null if the name is not an export archive. */
+  static String jobStartTimeFromArchiveFileName(String fileName) {
+    final int jobIndex = fileName.lastIndexOf(EXPORT_ARCHIVE_JOB_INFIX);
+    if (!fileName.startsWith(EXPORT_ARCHIVE_PREFIX) || !fileName.endsWith(EXPORT_ARCHIVE_SUFFIX)
+        || jobIndex < EXPORT_ARCHIVE_PREFIX.length() + EXPORT_JOB_START_TIME_LENGTH + 1) {
       return null;
     }
-    return fileName.substring(jobIndex - ARCHIVE_TIMESTAMP_LENGTH, jobIndex);
+    final String jobStartTime = fileName.substring(jobIndex - EXPORT_JOB_START_TIME_LENGTH, jobIndex);
+    try {
+      EXPORT_JOB_START_TIME_FORMAT.parse(jobStartTime);
+      return jobStartTime;
+    } catch (DateTimeParseException e) {
+      return null;
+    }
   }
 
   static ExportJob.Id jobIdFromArchiveFileName(String fileName) {
     if (!fileName.endsWith(EXPORT_ARCHIVE_SUFFIX)) {
       return null;
     }
-    String nameWithoutSuffix = fileName.substring(0, fileName.length() - EXPORT_ARCHIVE_SUFFIX.length());
-    int jobIndex = nameWithoutSuffix.lastIndexOf(EXPORT_ARCHIVE_JOB_INFIX);
+    final String nameWithoutSuffix = fileName.substring(0, fileName.length() - EXPORT_ARCHIVE_SUFFIX.length());
+    final int jobIndex = nameWithoutSuffix.lastIndexOf(EXPORT_ARCHIVE_JOB_INFIX);
     if (jobIndex < 0) {
       return null;
     }
-    String jobId = nameWithoutSuffix.substring(jobIndex + EXPORT_ARCHIVE_JOB_INFIX.length());
+    final String jobId = nameWithoutSuffix.substring(jobIndex + EXPORT_ARCHIVE_JOB_INFIX.length());
     return UUIDUtil.isValidUuidString(jobId) ? ExportJob.Id.of(jobId) : null;
   }
 
-  void deleteExportTar(String tarPath) {
-    if (tarPath == null) {
-      return;
-    }
-    File archive = new File(tarPath);
-    if (archive.isFile() && FileUtils.deleteQuietly(archive)) {
-      LOG.debug("Removed container export archive: {}", archive.getName());
-    }
+  void cleanupFailedJob(ExportJob job) {
+    FileUtils.deleteQuietly(jobDirectory(job.getId()).toFile());
+    File archive = new File(exportDirectory, job.getFileName());
+    FileUtils.deleteQuietly(archive);
     FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archive));
   }
 
-  void cleanupFailedJob(Path jobDir, File archiveFile) {
-    if (jobDir != null) {
-      FileUtils.deleteQuietly(jobDir.toFile());
-    }
-    if (archiveFile != null) {
-      FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archiveFile));
-    }
+  private Path jobDirectory(ExportJob.Id jobId) {
+    return Paths.get(exportDirectory, exportJobDirName(jobId));
   }
 
   private void removeIncompleteWorkOnStartup() {
@@ -221,7 +277,7 @@ final class ExportFileManager {
   }
 
   static String exportJobDirName(ExportJob.Id jobId) {
-    return EXPORT_JOB_DIR_PREFIX + jobId.getValue();
+    return EXPORT_JOB_DIR_PREFIX + jobId;
   }
 
   private static ExportJob.Id jobIdFromExportDirName(String dirName) {

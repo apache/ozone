@@ -103,6 +103,14 @@ public final class S3GatewayConfigKeys {
   public static final int OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT = 1000;
 
   /**
+   * Configuration key that makes an explicit {@code x-amz-storage-class: STANDARD} use the {@code ozone.replication}
+   * setting, when set, instead of {@link org.apache.hadoop.ozone.s3.util.S3StorageType#STANDARD}.
+   */
+  public static final String OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY =
+      "ozone.s3g.standard.storage-class.use-client-default";
+  public static final boolean OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT = false;
+
+  /**
    * Never constructed.
    */
   private S3GatewayConfigKeys() {

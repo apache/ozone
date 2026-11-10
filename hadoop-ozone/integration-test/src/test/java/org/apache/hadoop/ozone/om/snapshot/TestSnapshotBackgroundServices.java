@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.hadoop.ozone.DataTestUtil.readFully;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -24,11 +25,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -38,7 +42,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,6 +54,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -71,6 +76,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -494,15 +500,27 @@ public class TestSnapshotBackgroundServices {
     createSnapshotsEachWithNewKeys(newLeaderOM);
 
     File sstBackupDir = getSstBackupDir(newLeaderOM);
-    File[] files = sstBackupDir.listFiles();
-    assertNotNull(files);
-    int numberOfSstFiles = files.length;
+    Set<String> existingCompactionInputs = getCompactionLogEntries(newLeaderOM).stream()
+        .flatMap(entry -> entry.getInputFileInfoList().stream())
+        .map(fileInfo -> fileInfo.getFileName())
+        .collect(toSet());
+
+    // Force a completed key-table compaction instead of relying on automatic compaction or a previous test.
+    CompactDBUtil.compactTable(newLeaderOM.getMetadataManager(), KEY_TABLE,
+        ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+    List<File> compactionInputs = getCompactionLogEntries(newLeaderOM).stream()
+        .flatMap(entry -> entry.getInputFileInfoList().stream())
+        .map(fileInfo -> fileInfo.getFileName())
+        .filter(fileName -> !existingCompactionInputs.contains(fileName))
+        .map(fileName -> new File(sstBackupDir, fileName + ROCKSDB_SST_SUFFIX))
+        .filter(File::exists)
+        .collect(toList());
+    assertFalse(compactionInputs.isEmpty(), "Expected new backup SST inputs from the completed compaction");
 
     assertEquals(cluster.getOMLeader(), newLeaderOM);
     resumeBackupCompactionFilesPruning(newLeaderOM);
 
-    checkIfCompactionBackupFilesWerePruned(sstBackupDir,
-        numberOfSstFiles);
+    GenericTestUtils.waitFor(() -> compactionInputs.stream().noneMatch(File::exists), 1000, 10000);
 
     confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(newLeaderOM);
   }
@@ -565,17 +583,6 @@ public class TestSnapshotBackgroundServices {
     assertEquals(Collections.singletonList(
             SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
         diff.getDiffList());
-  }
-
-  private static void checkIfCompactionBackupFilesWerePruned(
-      File sstBackupDir,
-      int numberOfSstFiles
-  ) throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> {
-      int newNumberOfSstFiles = Objects.requireNonNull(
-          sstBackupDir.listFiles()).length;
-      return numberOfSstFiles > newNumberOfSstFiles;
-    }, 1000, 10000);
   }
 
   private static File getSstBackupDir(OzoneManager ozoneManager) {

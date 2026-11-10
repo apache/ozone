@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,11 +39,14 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -217,6 +221,56 @@ public class TestOmUtils {
   }
 
   @Test
+  void getOmSocketAddressIpv6HostPort() throws UnknownHostException {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]:100");
+
+    assertEquals("[2001:db8::10]:100", OmUtils.getOmRpcAddress(conf));
+    InetSocketAddress addr = OmUtils.getOmAddress(conf);
+    assertEquals(InetAddress.getByName("2001:db8::10"), addr.getAddress());
+    assertEquals(100, addr.getPort());
+  }
+
+  @Test
+  void getOmSocketAddressIpv6Host() throws UnknownHostException {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]");
+
+    int defaultPort = OMConfigKeys.OZONE_OM_PORT_DEFAULT;
+    assertEquals("[2001:db8::10]:" + defaultPort,
+        OmUtils.getOmRpcAddress(conf));
+    InetSocketAddress addr = OmUtils.getOmAddress(conf);
+    assertEquals(InetAddress.getByName("2001:db8::10"), addr.getAddress());
+    assertEquals(defaultPort, addr.getPort());
+  }
+
+  @Test
+  void getOmRpcAddressIpv6ForConfigKey() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    String addressKey = OZONE_OM_ADDRESS_KEY + ".service.node";
+    conf.set(addressKey, "[2001:db8::10]:100");
+
+    assertEquals("[2001:db8::10]:100",
+        OmUtils.getOmRpcAddress(conf, addressKey));
+  }
+
+  @Test
+  void getOmPeerHttpAddressesIpv6() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String serviceId = "service";
+    String nodeId = "node";
+    conf.set(ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, serviceId, nodeId),
+        "[2001:db8::10]:100");
+    conf.set(ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, serviceId, nodeId),
+        "[2001:db8::10]:200");
+
+    assertEquals("[2001:db8::10]:100",
+        OmUtils.getHttpAddressForOMPeerNode(conf, serviceId, nodeId, "fallback"));
+    assertEquals("[2001:db8::10]:200",
+        OmUtils.getHttpsAddressForOMPeerNode(conf, serviceId, nodeId, "fallback"));
+  }
+
+  @Test
   void getOmSocketAddressEmpty() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     // Assert that we are able to use default configs if no value is specified.
@@ -386,6 +440,34 @@ public class TestOmUtils {
   }
 
   @Test
+  public void testGetBucketDeletedBytesIsClassifiedAsReadOnlyAndFollowerEligible() {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.GetBucketDeletedBytes)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+    assertTrue(OmUtils.isReadOnly(request));
+    assertTrue(OmUtils.shouldSendToFollower(request));
+  }
+
+  @Test
+  void testOmAddressesBracketIPv6Literals() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::1]:9999");
+
+    assertEquals("[2001:db8::1]:9999", OmUtils.getOmRpcAddress(conf));
+
+    String peerAddressKey = OZONE_OM_ADDRESS_KEY + ".omservice.om1";
+    conf.set(peerAddressKey, "[2001:db8::2]");
+    assertEquals("[2001:db8::2]:" + OMConfigKeys.OZONE_OM_PORT_DEFAULT,
+        OmUtils.getOmRpcAddress(conf, peerAddressKey));
+
+    assertEquals("[2001:db8::3]:" + OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT,
+        OmUtils.getHttpAddressForOMPeerNode(conf, "omservice", "om1", "2001:db8::3"));
+    assertEquals("[2001:db8::3]:" + OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_DEFAULT,
+        OmUtils.getHttpsAddressForOMPeerNode(conf, "omservice", "om1", "2001:db8::3"));
+  }
+
+  @Test
   public void testResolveOmHostAcceptsIpv6Literal() {
     // A bracketed or bare IPv6 literal must parse into a host:port authority.
     // Before HDDS-15775 the bare form made createSocketAddr throw
@@ -402,5 +484,39 @@ public class TestOmUtils {
         // Unresolved or unreachable in the test environment is acceptable.
       }
     }
+  }
+
+  @Test
+  void getOmRpcAddressRejectsWildcardPeerAddress() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+        "omservice", "om1");
+    conf.set(rpcAddrKey, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> OmUtils.getOmRpcAddress(conf, rpcAddrKey));
+
+    assertThat(e.getMessage()).contains(rpcAddrKey).contains("0.0.0.0");
+  }
+
+  @Test
+  void getOmRpcAddressAcceptsPeerHostname() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+        "omservice", "om1");
+    conf.set(rpcAddrKey, "om1.example.com");
+
+    assertEquals("om1.example.com:" + OZONE_OM_PORT_DEFAULT,
+        OmUtils.getOmRpcAddress(conf, rpcAddrKey));
+  }
+
+  /**
+   * The non-HA client failover proxy reads the unsuffixed property, which is
+   * the non-HA OM's own RPC address and ships as a wildcard.
+   */
+  @Test
+  void getOmRpcAddressKeepsWildcardDefault() {
+    assertEquals("0.0.0.0:" + OZONE_OM_PORT_DEFAULT,
+        OmUtils.getOmRpcAddress(new OzoneConfiguration(), OZONE_OM_ADDRESS_KEY));
   }
 }

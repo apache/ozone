@@ -19,14 +19,16 @@ package org.apache.hadoop.hdds.tracing;
 
 import static java.util.Collections.emptyMap;
 
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * A Java proxy invocation handler to trace all the methods of the delegate
@@ -39,12 +41,11 @@ public class TraceAllMethod<T> implements InvocationHandler {
   /**
    * Cache for all the method objects of the delegate class.
    */
-  private final Map<String, Map<Class<?>[], Pair<Boolean, Method>>> methods = new HashMap<>();
+  private final Map<String, Map<Class<?>[], DelegatedMethodInfo>> methods = new HashMap<>();
   private final T delegate;
-
   private final String name;
 
-  public TraceAllMethod(T delegate, String name) {
+  public TraceAllMethod(T delegate, String name, SpanKind spanKind) {
     this.delegate = delegate;
     this.name = name;
     for (Method method : delegate.getClass().getMethods()) {
@@ -53,57 +54,64 @@ public class TraceAllMethod<T> implements InvocationHandler {
       }
       boolean shouldSkip = method.isAnnotationPresent(SkipTracing.class);
       methods.computeIfAbsent(method.getName(), any -> new HashMap<>())
-          .put(method.getParameterTypes(), Pair.of(shouldSkip, method));
+          .put(method.getParameterTypes(), new DelegatedMethodInfo(shouldSkip, findSpanKind(method, spanKind)));
     }
   }
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args)
       throws Throwable {
-    Pair<Boolean, Method> methodInfo = findDelegatedMethod(method);
-    if (methodInfo == null) {
-      throw new NoSuchMethodException("Method not found: " + method.getName());
-    }
-    boolean shouldSkip = methodInfo.getLeft();
-    Method delegateMethod = methodInfo.getRight();
-    if (shouldSkip) {
-      try {
-        return delegateMethod.invoke(delegate, args);
-      } catch (Exception ex) {
-        if (ex.getCause() != null) {
-          throw ex.getCause();
-        } else {
-          throw ex;
-        }
-      }
+    DelegatedMethodInfo methodInfo = findDelegatedMethod(method);
+    if (methodInfo == null || methodInfo.shouldSkip) {
+      return invokeDelegate(method, args);
     }
 
-    // if a call is within a process, not an outbound RPC to other processes (OM/SCM/DN) , it is marked as INTERNAL.
-    SpanKind spanKind = delegateMethod.isAnnotationPresent(InternalSpanKind.class)
-        ? SpanKind.INTERNAL
-        : SpanKind.CLIENT;
-
-    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(
-        name + "." + method.getName(), spanKind)) {
-      try {
-        return delegateMethod.invoke(delegate, args);
-      } catch (Exception ex) {
-        if (ex.getCause() != null) {
-          throw ex.getCause();
-        } else {
-          throw ex;
-        }
-      }
+    Span span = TracingUtil.createSpan(name + "." + method.getName(), methodInfo.spanKind);
+    try (Scope ignored = span.makeCurrent()) {
+      return invokeDelegate(method, args);
+    } catch (Throwable ex) {
+      TracingUtil.recordException(span, ex);
+      throw ex;
+    } finally {
+      span.end();
     }
   }
 
-  private Pair<Boolean, Method> findDelegatedMethod(Method method) {
-    for (Entry<Class<?>[], Pair<Boolean, Method>> entry : methods.getOrDefault(
+  private Object invokeDelegate(Method method, Object[] args) throws Throwable {
+    try {
+      return method.invoke(delegate, args);
+    } catch (InvocationTargetException e) {
+      throw e.getCause();
+    }
+  }
+
+  private static SpanKind findSpanKind(Method method, SpanKind defaultSpanKind) {
+    if (method.isAnnotationPresent(InternalSpanKind.class)) {
+      return SpanKind.INTERNAL;
+    }
+    return defaultSpanKind;
+  }
+
+  private DelegatedMethodInfo findDelegatedMethod(Method method) {
+    for (Entry<Class<?>[], DelegatedMethodInfo> entry : methods.getOrDefault(
         method.getName(), emptyMap()).entrySet()) {
       if (Arrays.equals(entry.getKey(), method.getParameterTypes())) {
         return entry.getValue();
       }
     }
     return null;
+  }
+
+  /**
+   * Whether a method should be skipped and the delegate method to invoke.
+   */
+  private static final class DelegatedMethodInfo {
+    private final boolean shouldSkip;
+    private final SpanKind spanKind;
+
+    private DelegatedMethodInfo(boolean shouldSkip, SpanKind spanKind) {
+      this.shouldSkip = shouldSkip;
+      this.spanKind = spanKind;
+    }
   }
 }

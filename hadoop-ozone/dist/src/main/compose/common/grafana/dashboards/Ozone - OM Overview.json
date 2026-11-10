@@ -1294,7 +1294,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "**Paired legends** match **Buckets & layouts — rate** (seven series). OBS+FSO create/delete **`om_metrics`** rows are summed on the rate side. **`service list`** is **OmClient ServiceList RPC** (**`om_client_protocol_*`** rate/latency), not **`om_metrics_num_bucket_s3_lists`** (that counter has no callers in OM). **`GetS3VolumeContext`** likewise uses **`om_client_protocol_*`**.",
+      "description": "**Paired legends** match **Buckets & layouts — rate** (seven series). OBS+FSO create/delete **`om_metrics`** rows are summed on the rate side. **`service list`** is **OmClient ServiceList RPC** (**`om_client_protocol_*`** rate/latency). **`GetS3VolumeContext`** likewise uses **`om_client_protocol_*`**.",
       "fieldConfig": {
         "defaults": {
           "color": {
