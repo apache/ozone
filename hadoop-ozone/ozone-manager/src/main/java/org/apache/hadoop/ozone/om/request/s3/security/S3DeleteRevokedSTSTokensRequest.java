@@ -18,7 +18,11 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -32,12 +36,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles DeleteRevokedSTSTokens requests submitted by {@link RevokedSTSTokenCleanupService}.
- * Each request contains originalAccessKeyIds to remove from the revocation table.
+ * Each request lists originalAccessKeyIds to remove from the revocation table. When {@code purgeBeforeMillis} is set,
+ * an entry is removed only if its current cutoff is older than that threshold. Requests without
+ * {@code purgeBeforeMillis} delete all listed ids.
  */
 public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
+
+  private static final Logger LOG = LoggerFactory.getLogger(S3DeleteRevokedSTSTokensRequest.class);
 
   public S3DeleteRevokedSTSTokensRequest(OMRequest omRequest) {
     super(omRequest);
@@ -64,7 +74,40 @@ public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
     final OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
     final List<String> originalAccessKeyIds = request.getOriginalAccessKeyIdList();
-    return new S3DeleteRevokedSTSTokensResponse(originalAccessKeyIds, omResponse.build());
+    final Table<String, Long> table = ozoneManager.getMetadataManager().getS3RevokedStsTokenTable();
+    final List<String> deletedIds;
+    try {
+      if (!request.hasPurgeBeforeMillis()) {
+        // Delete all listed ids if the request does not have purgeBeforeMillis
+        deletedIds = originalAccessKeyIds;
+      } else {
+        final long purgeBeforeMillis = request.getPurgeBeforeMillis();
+        deletedIds = new ArrayList<>();
+        for (String originalAccessKeyId : originalAccessKeyIds) {
+          final Long revocationTimeMillis = table.getIfExist(originalAccessKeyId);
+          // A cutoff written after the scan, such as a newer revocation of the same key, is kept unless it is also
+          // older than purgeBeforeMillis.
+          if (revocationTimeMillis != null && revocationTimeMillis < purgeBeforeMillis) {
+            deletedIds.add(originalAccessKeyId);
+          }
+        }
+      }
+    } catch (IOException e) {
+      return new S3DeleteRevokedSTSTokensResponse(null, createErrorOMResponse(omResponse, e));
+    }
+
+    if (request.hasPurgeBeforeMillis() && deletedIds.size() < originalAccessKeyIds.size()) {
+      LOG.info(
+          "Skipped {} of {} revoked STS token purge entries because the cutoff is not older than the purge " +
+          "threshold or the entry was already removed.", originalAccessKeyIds.size() - deletedIds.size(),
+          originalAccessKeyIds.size());
+    }
+
+    // The full table cache only evicts delete markers, so without one a deleted key's old cutoff stays cached
+    for (String originalAccessKeyId : deletedIds) {
+      table.addCacheEntry(new CacheKey<>(originalAccessKeyId), CacheValue.get(context.getIndex()));
+    }
+    return new S3DeleteRevokedSTSTokensResponse(deletedIds, omResponse.build());
   }
 }
 

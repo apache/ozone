@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT;
@@ -302,6 +303,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
       conf.setIfUnset(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, "true");
       conf.setIfUnset(HDDS_HEARTBEAT_INTERVAL, "1s");
+      conf.setIfUnset(HDDS_RECON_HEARTBEAT_INTERVAL, "1s");
       conf.setIfUnset(OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME, "1s");
       conf.setIfUnset(OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "1s");
       conf.setIfUnset(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, "100ms");

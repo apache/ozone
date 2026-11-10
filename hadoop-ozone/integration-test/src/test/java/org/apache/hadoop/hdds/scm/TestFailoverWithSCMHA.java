@@ -119,7 +119,7 @@ public class TestFailoverWithSCMHA {
         .setLogLevel(SCMBlockLocationFailoverProxyProvider.class, Level.DEBUG);
     LogCapturer logCapture = LogCapturer.captureLogs(SCMBlockLocationFailoverProxyProvider.class);
     ScmBlockLocationProtocol scmBlockLocationProtocol = TracingUtil
-        .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
+        .createClientProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
     scmBlockLocationProtocol.getScmInfo();
     assertThat(logCapture.getOutput())
@@ -132,7 +132,7 @@ public class TestFailoverWithSCMHA {
     logCapture = LogCapturer.captureLogs(SCMContainerLocationFailoverProxyProvider.class);
     proxyProvider.changeCurrentProxy(scm.getSCMNodeId());
     StorageContainerLocationInternalInterface scmContainerClient =
-        TracingUtil.createProxy(
+        TracingUtil.createClientProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
                 proxyProvider), StorageContainerLocationInternalInterface.class, conf);
 

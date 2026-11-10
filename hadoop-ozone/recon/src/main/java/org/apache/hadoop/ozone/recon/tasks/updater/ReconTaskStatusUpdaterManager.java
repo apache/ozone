@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.ozone.recon.schema.SqlDbUtils;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.jooq.DSLContext;
@@ -77,7 +78,7 @@ public class ReconTaskStatusUpdaterManager {
             DSLContext dsl = DSL.using(reconTaskStatusDao.configuration());
 
             // Check if upgrade columns exist
-            if (columnExists(dsl, "LAST_TASK_RUN_STATUS")) {
+            if (columnExists(dsl, "last_task_run_status")) {
               // Schema is upgraded - use normal DAO with all columns
               tasks = reconTaskStatusDao.findAll();
               LOG.debug("Loaded tasks using full schema (all columns present)");
@@ -117,18 +118,12 @@ public class ReconTaskStatusUpdaterManager {
    * Check if a column exists in the RECON_TASK_STATUS table.
    *
    * @param dsl the DSL context
-   * @param columnName the column name to check (case-insensitive, will be converted to uppercase)
+   * @param columnName the column name to check (case-insensitive)
    * @return true if the column exists, false otherwise
    */
   private boolean columnExists(DSLContext dsl, String columnName) {
     try {
-      // Query Derby system catalog to check if column exists
-      Integer count = dsl.selectCount()
-          .from(DSL.table(name("SYS", "SYSCOLUMNS")))
-          .where(DSL.field(name("TABLENAME")).eq(RECON_TASK_STATUS_TABLE_NAME))
-          .and(DSL.field(name("COLUMNNAME")).eq(columnName.toUpperCase()))
-          .fetchOne(0, int.class);
-      return count != null && count > 0;
+      return dsl.connectionResult(conn -> SqlDbUtils.columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, columnName));
     } catch (Exception e) {
       LOG.debug("Could not check column existence, assuming columns don't exist: {}", e.getMessage());
       return false;

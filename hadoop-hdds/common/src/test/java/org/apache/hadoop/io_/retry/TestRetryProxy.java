@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
@@ -322,6 +323,31 @@ public class TestRetryProxy {
       verify(policy, times(1)).shouldRetry(any(Exception.class), anyInt(),
           anyInt(), anyBoolean());
       assertEquals(RetryDecision.FAIL, caughtRetryAction.action);
+    }
+  }
+
+  @Test
+  public void testCallIdClearedWhenNoRpcIsIssued() throws Exception {
+    // Implementing RpcProxy makes the handler set the call id; the implementation
+    // then throws without issuing an RPC, so nothing consumes it.
+    class UnreliableRpcProxy extends UnreliableImplementation implements RpcProxy {
+      @Override
+      public ConnectionId getConnectionId() {
+        return null;
+      }
+
+      @Override
+      public void close() {
+      }
+    }
+
+    UnreliableInterface unreliable = (UnreliableInterface) RetryProxy.create(
+        UnreliableInterface.class, new UnreliableRpcProxy(), TRY_ONCE_THEN_FAIL);
+
+    for (int i = 0; i < 2; i++) {
+      // Without the call id being cleared, the second attempt throws IllegalStateException.
+      assertThrows(UnreliableInterface.FatalException.class,
+          unreliable::alwaysFailsWithFatalException);
     }
   }
 }
