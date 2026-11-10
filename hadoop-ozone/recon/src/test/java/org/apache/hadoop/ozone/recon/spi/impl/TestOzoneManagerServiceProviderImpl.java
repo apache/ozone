@@ -48,9 +48,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -60,6 +62,12 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
@@ -94,6 +102,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.test.GenericTestUtils;
 import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -140,6 +149,58 @@ public class TestOzoneManagerServiceProviderImpl {
       configuration.clear();
     }
 
+  }
+
+  @Test
+  public void testStopInterruptsAndWaitsForOmSyncBeforeClosingMetadataManager() throws Exception {
+    ReconOMMetadataManager metadataManager = mock(ReconOMMetadataManager.class);
+    ReconTaskController taskController = getMockTaskController();
+    OzoneManagerServiceProviderImpl provider = new OzoneManagerServiceProviderImpl(configuration,
+        metadataManager, taskController, new ReconUtils(), ozoneManagerProtocol,
+        reconContext, getMockTaskStatusUpdaterManager());
+    ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    Field schedulerField = OzoneManagerServiceProviderImpl.class.getDeclaredField("scheduler");
+    schedulerField.setAccessible(true);
+    schedulerField.set(provider, scheduler);
+    ExecutorService stopExecutor = Executors.newSingleThreadExecutor();
+    CountDownLatch syncStarted = new CountDownLatch(1);
+    CountDownLatch syncInterrupted = new CountDownLatch(1);
+    CountDownLatch finishSync = new CountDownLatch(1);
+    Future<?> sync = scheduler.submit(() -> {
+      syncStarted.countDown();
+      try {
+        finishSync.await();
+      } catch (InterruptedException e) {
+        syncInterrupted.countDown();
+        Uninterruptibles.awaitUninterruptibly(finishSync);
+        Thread.currentThread().interrupt();
+      }
+    });
+    Future<?> stop = null;
+    try {
+      assertTrue(syncStarted.await(10, TimeUnit.SECONDS));
+      stop = stopExecutor.submit(() -> {
+        provider.stop();
+        return null;
+      });
+      GenericTestUtils.waitFor(scheduler::isShutdown, 10, 10000);
+      assertTrue(syncInterrupted.await(10, TimeUnit.SECONDS), "OM sync should be interrupted immediately on stop");
+      assertFalse(sync.isDone());
+      verify(taskController, never()).stop();
+      verify(metadataManager, never()).stop();
+      finishSync.countDown();
+      stop.get(10, TimeUnit.SECONDS);
+      assertTrue(scheduler.isTerminated());
+      verify(taskController).stop();
+      verify(metadataManager).stop();
+    } finally {
+      finishSync.countDown();
+      scheduler.shutdownNow();
+      if (stop != null) {
+        stop.get(10, TimeUnit.SECONDS);
+      }
+      stopExecutor.shutdownNow();
+    }
   }
 
   @Test

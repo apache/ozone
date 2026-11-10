@@ -57,6 +57,14 @@ class S3RequestContext {
     return volume;
   }
 
+  /** Returns the cached volume name without an OM call, or null if it has not been looked up. */
+  String getCachedVolumeName() {
+    if (bucket != null) {
+      return bucket.getVolumeName();
+    }
+    return volume == null ? null : volume.getName();
+  }
+
   OzoneBucket getBucket(String name) throws IOException {
     if (bucket == null) {
       bucket = endpoint.getClientProtocol().getBucketDetails(volume != null ? volume.getName() : null, name);

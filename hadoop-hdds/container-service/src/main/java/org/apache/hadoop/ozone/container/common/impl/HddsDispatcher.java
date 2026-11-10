@@ -79,6 +79,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.CheckedConsumer;
@@ -930,6 +932,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       perf.appendOpLatencyMs(oPLatencyMS);
       performanceAudit(action, msg, dispatcherContext, perf, oPLatencyMS);
 
+    } catch (StatusRuntimeException sre) {
+      // The client cancelled the call or its connection dropped: not a container failure.
+      if (sre.getStatus().getCode() != Status.Code.CANCELLED) {
+        throw sre;
+      }
+      LOG.debug("Streaming {} for container {} ended early: {}", cmdType, msg.getContainerID(), sre.getStatus());
     } catch (StorageContainerException sce) {
       audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
