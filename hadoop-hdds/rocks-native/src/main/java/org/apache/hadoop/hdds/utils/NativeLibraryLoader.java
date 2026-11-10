@@ -29,11 +29,9 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,9 +126,9 @@ public class NativeLibraryLoader {
 
       }
       if (!loaded) {
-        Pair<Optional<File>, List<File>> files = copyResourceFromJarToTemp(libraryName, dependentFiles);
-        if (files.getKey().isPresent()) {
-          System.load(files.getKey().get().getAbsolutePath());
+        LoadedLibrary files = copyResourceFromJarToTemp(libraryName, dependentFiles);
+        if (files.libraryFile().isPresent()) {
+          System.load(files.libraryFile().get().getAbsolutePath());
           loaded = true;
         }
       }
@@ -154,27 +152,36 @@ public class NativeLibraryLoader {
         .getResourceAsStream(libraryFileName);
   }
 
-  private Pair<Optional<File>, List<File>> copyResourceFromJarToTemp(final String libraryName,
-                                                                     final List<String> dependentFileNames)
+  private LoadedLibrary copyResourceFromJarToTemp(final String libraryName, final List<String> dependentFileNames)
       throws IOException {
     final String libraryFileName = getJniLibraryFileName(libraryName);
     InputStream is = null;
     try {
       is = getResourceStream(libraryFileName);
       if (is == null) {
-        return Pair.of(Optional.empty(), null);
+        return new LoadedLibrary(Optional.empty(), null);
       }
 
-      final String nativeLibDir =
-          Objects.nonNull(getSystemProperty(NATIVE_LIB_TMP_DIR)) ?
-              getSystemProperty(NATIVE_LIB_TMP_DIR) : "";
-      final File dir = new File(nativeLibDir).getAbsoluteFile();
+      final String nativeLibDir = getSystemProperty(NATIVE_LIB_TMP_DIR);
+      final boolean useWorkingDir = nativeLibDir == null || nativeLibDir.isEmpty();
+      final File dir = new File(useWorkingDir ? getSystemProperty("user.dir") : nativeLibDir).getAbsoluteFile();
 
       // create a temporary dir to copy the library to
-      final Path tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
+      Path tempPath;
+      try {
+        tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
+      } catch (IOException e) {
+        if (!useWorkingDir) {
+          throw e;
+        }
+        // The working directory may not be writable, fall back to java.io.tmpdir.
+        LOG.info("Unable to extract {} under working directory {}, using java.io.tmpdir instead: {}",
+            libraryName, dir, e.toString());
+        tempPath = Files.createTempDirectory(libraryName);
+      }
       final File tempDir = tempPath.toFile();
       if (!tempDir.exists()) {
-        return Pair.of(Optional.empty(), null);
+        return new LoadedLibrary(Optional.empty(), null);
       }
 
       Path libPath = tempPath.resolve(libraryFileName);
@@ -201,11 +208,17 @@ public class NativeLibraryLoader {
       ShutdownHookManager.get().addShutdownHook(
           () -> FileUtils.deleteQuietly(tempDir),
           LIBRARY_SHUTDOWN_HOOK_PRIORITY);
-      return Pair.of(Optional.of(libFile), dependentFiles);
+      return new LoadedLibrary(Optional.of(libFile), dependentFiles);
     } finally {
       if (is != null) {
         is.close();
       }
     }
   }
+
+  /**
+   * A native library file extracted to a temp directory, paired with its dependent files,
+   * used to load the library with System.load.
+   */
+  private record LoadedLibrary(Optional<File> libraryFile, List<File> dependentFiles) { }
 }

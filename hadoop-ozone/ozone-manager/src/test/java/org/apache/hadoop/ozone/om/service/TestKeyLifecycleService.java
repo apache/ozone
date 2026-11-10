@@ -31,20 +31,13 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -222,9 +215,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   static Stream<Arguments> stateSaveConfiguration() {
     return Stream.of(
-        Arguments.of(-1, -1),
-        Arguments.of(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT,
-            OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT)
+        Arguments.of(1, 1),
+        Arguments.of(KeyLifecycleServiceConfig.Defaults.STATE_SAVE_INTERVAL_MS,
+            KeyLifecycleServiceConfig.Defaults.STATE_SAVE_KEYS_PROCESSED)
     );
   }
 
@@ -239,13 +232,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
     ServerUtils.setOzoneMetaDirPath(conf, testDir.toString());
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
         200, TimeUnit.MILLISECONDS);
-    conf.setBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, true);
-    conf.setTimeDuration(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
-    conf.setInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE, 50);
+    conf.setBoolean(KeyLifecycleServiceConfig.Keys.ENABLED, true);
+    conf.setTimeDuration(KeyLifecycleServiceConfig.Keys.INTERVAL, SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
+    conf.setInt(KeyLifecycleServiceConfig.Keys.DELETE_BATCH_SIZE, 50);
     conf.setQuietMode(false);
     conf.setBoolean(ENABLE_FILESYSTEM_PATHS, false);
-    conf.setLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS, stateSaveInternal);
-    conf.setLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED, maxKeysProcessedPerState);
+    conf.setLong(KeyLifecycleServiceConfig.Keys.STATE_SAVE_INTERVAL_MS, stateSaveInternal);
+    conf.setLong(KeyLifecycleServiceConfig.Keys.STATE_SAVE_KEYS_PROCESSED, maxKeysProcessedPerState);
     OmLCExpiration.setTest(true);
     KeyLifecycleService.setTest(true);
   }
@@ -260,6 +253,48 @@ class TestKeyLifecycleService extends OzoneTestBase {
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
+  }
+
+  private static OmDirectoryInfo dirInfoWithName(String name) {
+    return OmDirectoryInfo.newBuilder().setName(name)
+        .setObjectID(Math.abs((long) name.hashCode()) + 1).setParentObjectID(1L).build();
+  }
+
+  @Test
+  void testDirectoryListSortByName() {
+    KeyLifecycleService.DirectoryList list = new KeyLifecycleService.DirectoryList();
+    // Add children out of order, as a cache-resident dir (lower name) followed by table siblings would.
+    list.addSubDir("keyC", dirInfoWithName("dirC"), "root/dirC");
+    list.addSubDir("keyA", dirInfoWithName("dirA"), "root/dirA");
+    list.addSubDir("keyB", dirInfoWithName("dirB"), "root/dirB");
+
+    list.sortByName();
+
+    // Ascending name order means the LIFO stack pops siblings in strictly descending name order,
+    // which is the property canSkipDir depends on when deciding a resumed directory was already scanned.
+    assertThat(list.getSubDirList())
+        .extracting(OmDirectoryInfo::getName)
+        .containsExactly("dirA", "dirB", "dirC");
+    // Parallel key list must remain index-aligned with the sorted directories.
+    assertThat(list.getSubDirKeyList()).containsExactly("keyA", "keyB", "keyC");
+  }
+
+  @Test
+  void testDirectoryListRemoveIf() {
+    KeyLifecycleService.DirectoryList list = new KeyLifecycleService.DirectoryList();
+    list.addSubDir("keyA", dirInfoWithName("dirA"), "root/dirA");
+    list.addSubDir("keyB", dirInfoWithName("dirB"), "root/dirB");
+    list.addSubDir("keyC", dirInfoWithName("dirC"), "root/dirC");
+
+    // Remove first and last (multiple backward removals), as prefix filtering might.
+    list.removeIf(i -> i == 0 || i == 2);
+
+    assertThat(list.getSubDirCount()).isEqualTo(1);
+    assertThat(list.getSubDirList()).hasSize(1);
+    assertThat(list.getSubDirKeyList()).hasSize(1);
+    assertThat(list.getSubDirList().get(0).getName()).isEqualTo("dirB");
+    assertThat(list.getSubDirKeyList().get(0)).isEqualTo("keyB");
+    assertThat(list.getLastSubDirPath()).isEqualTo("root/dirB");
   }
 
   /**
@@ -435,8 +470,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
         String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
 
-        if (stateSaveInternal == -1) {
-          // With 5 keys and stateSaveIntervalMs = -1, it should save on every key iteration.
+        if (maxKeysProcessedPerState == 1) {
+          // With 5 keys and maxKeysProcessedPerState = 1, it should save on every key iteration.
           // It will save at least 5 times (one for each key).
           verify(spyTable, atLeast(5))
               .addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)), any());
@@ -625,7 +660,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertNotNull(scanState);
       assertNull(scanState.getScanEndTime(),
           "Aborted scan must not persist scanEndTime so a new leader can resume");
-      assertTrue(logCapturer.getOutput().contains("KeyLifecycleService is suspended, disabled, or leader not ready"));
+      assertTrue(logCapturer.getOutput()
+          .contains("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart"));
       keyLifecycleService.resume();
       deleteLifecyclePolicy(volumeName, bucketName);
     }
@@ -903,7 +939,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         }, WAIT_CHECK_INTERVAL, 10000);
 
         OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
-        if (stateSaveInternal != -1) {
+        if (maxKeysProcessedPerState != 1) {
           if (maxSize == 2) {
             if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
               assertEquals("dir3/dir6/dir9", scanState.getLastScannedDir());
@@ -2151,7 +2187,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
     void testKeyUpdatedShouldNotGetDeleted(BucketLayout bucketLayout)
         throws IOException, InterruptedException, TimeoutException {
-      assumeTrue(stateSaveInternal != -1);
+      assumeTrue(maxKeysProcessedPerState != 1);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       GenericTestUtils.LogCapturer log =
@@ -2426,7 +2462,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
             (getDeletedKeyCount() - initialDeletedKeyCount) == keyCount, WAIT_CHECK_INTERVAL, 5000);
         assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
       }
-      if (stateSaveInternal != -1) {
+      if (maxKeysProcessedPerState != 1) {
         GenericTestUtils.waitFor(() ->
                 log.getOutput().contains("LimitedSizeList has reached maximum size " + maxListSize),
             WAIT_CHECK_INTERVAL, 5000);
@@ -3294,7 +3330,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @MethodSource("parameters1")
     void testKeyDeletedOrRenamed(BucketLayout bucketLayout, boolean deleted)
         throws IOException, InterruptedException, TimeoutException {
-      assumeTrue(stateSaveInternal != -1);
+      assumeTrue(maxKeysProcessedPerState != 1);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       GenericTestUtils.LogCapturer log =
@@ -3582,8 +3618,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
         KeyLifecycleService.setInjectors(null);
         keyLifecycleService.setOzoneTrash(null);
         keyLifecycleService.setMoveToTrashEnabled(true);
-        keyLifecycleService.setKeyDeleteBatchSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
-            OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
+        keyLifecycleService.setKeyDeleteBatchSize(conf.getInt(KeyLifecycleServiceConfig.Keys.DELETE_BATCH_SIZE,
+            KeyLifecycleServiceConfig.Defaults.DELETE_BATCH_SIZE));
         keyLifecycleService.resume();
       }
     }

@@ -623,7 +623,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
         LOG.info("Scrubbing pipeline: id: {} since it stays at ALLOCATED " +
             "stage for {} mins.", id,
-            Duration.between(currentTime, p.getCreationTimestamp())
+            Duration.between(p.getCreationTimestamp(), currentTime)
                 .toMinutes());
         closePipeline(id);
         deletePipeline(id);

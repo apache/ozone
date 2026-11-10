@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -87,6 +88,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         super.preExecute(ozoneManager).getCommitMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -95,9 +97,17 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath).build();
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckOpenKeyAcls(newKeyArgs,
-        ozoneManager, ACLType.WRITE,
-        multipartCommitUploadPartRequest.getClientID());
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckOpenKeyAcls(newKeyArgs, ozoneManager, ACLType.WRITE,
+          multipartCommitUploadPartRequest.getClientID());
+    } catch (IOException ex) {
+      Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
+      auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
+          OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY, auditMap, ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
     return getOmRequest().toBuilder().setCommitMultiPartUploadRequest(
         multipartCommitUploadPartRequest.toBuilder().setKeyArgs(
             resolvedArgs)).setUserInfo(getUserInfo()).build();
@@ -180,14 +190,18 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       // set the data size and location info list
       omKeyInfo.setDataSize(keyArgs.getDataSize());
-      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
-          keyArgs.getKeyLocationsList().stream()
+      List<OmKeyLocationInfo> locations = keyArgs.getKeyLocationsList().stream()
           .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()), true);
+          .collect(Collectors.toList());
+      // Blocks carry the part's IV, which is set by OM on the open key.
+      final byte[] partIv = omKeyInfo.getPartIv();
+      locations.forEach(location -> location.setPartIv(partIv));
+      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(locations, true);
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       int partNumber = keyArgs.getMultipartNumber();
+      validatePartNumber(partNumber);
       partName = getPartName(ozoneKey, uploadID, partNumber);
 
       if (multipartKeyInfo == null) {
@@ -235,9 +249,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
               OMException.ResultCodes.INVALID_REQUEST);
         }
         multipartPartInfo = OmMultipartPartInfo.from(partName, partNumber, omKeyInfo);
-        omMetadataManager.getMultipartPartsTable().addCacheEntry(
-            new CacheKey<>(multipartPartKey),
-            CacheValue.get(trxnLogIndex, multipartPartInfo));
       }
 
       // Set the UpdateID to current transactionLogIndex
@@ -248,19 +259,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // OldPartKeyInfo will be deleted. Its updateID will be set in
       // S3MultipartUploadCommitPartResponse before being added to
       // DeletedKeyTable.
-
-      // Add to cache.
-
-      // Delete from open key table and add it to multipart info table.
-      // No need to add cache entries to delete table, as no
-      // read/write requests that info for validation.
-      omMetadataManager.getMultipartInfoTable().addCacheEntry(
-          new CacheKey<>(multipartKey),
-          CacheValue.get(trxnLogIndex, multipartKeyInfo));
-
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(openKey),
-          CacheValue.get(trxnLogIndex));
 
       omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
@@ -316,6 +314,24 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       }
       commitResponseBuilder.setModificationTime(keyArgs.getModificationTime());
       omResponse.setCommitMultiPartUploadResponse(commitResponseBuilder);
+
+      // Add to cache after the quota check.
+      if (multipartPartInfo != null) {
+        omMetadataManager.getMultipartPartsTable().addCacheEntry(
+            new CacheKey<>(multipartPartKey),
+            CacheValue.get(trxnLogIndex, multipartPartInfo));
+      }
+
+      // Delete from open key table and add it to multipart info table.
+      // No need to add cache entries to delete table, as no
+      // read/write requests that info for validation.
+      omMetadataManager.getMultipartInfoTable().addCacheEntry(
+          new CacheKey<>(multipartKey),
+          CacheValue.get(trxnLogIndex, multipartKeyInfo));
+
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+          new CacheKey<>(openKey),
+          CacheValue.get(trxnLogIndex));
 
       omMetadataManager.getBucketTable().addCacheEntry(
           omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);

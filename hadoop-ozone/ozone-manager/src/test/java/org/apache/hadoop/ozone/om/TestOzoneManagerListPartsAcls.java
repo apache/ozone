@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -40,12 +42,12 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -188,6 +190,20 @@ public class TestOzoneManagerListPartsAcls {
     verify(metrics, never()).incNumListMultipartUploadParts();
     verify(metrics).incNumListMultipartUploadPartFails();
     verify(omSpy).buildAuditMessageForFailure(any(), anyMap(), any(Throwable.class));
+  }
+
+  @Test
+  void testInvalidUploadIdFailsWithoutKeyManager() throws Exception {
+    setupS3Request();
+    when(omSpy.getAclsEnabled()).thenReturn(true);
+
+    OMException e = assertThrows(OMException.class,
+        () -> omSpy.listParts(REQUESTED_VOLUME, REQUESTED_BUCKET, KEY_NAME, "invalid/" + UPLOAD_ID, 0, 10));
+
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+    verify(omMetadataReader, never()).checkAcls(any(), any(), any(), any(), any(), any());
+    verify(keyManager, never()).listParts(anyString(), anyString(), anyString(), anyString(), anyInt(), anyInt());
+    verify(metrics).incNumListMultipartUploadPartFails();
   }
 
   private void setupS3Request() {

@@ -218,6 +218,10 @@ public class SCMStateMachine extends BaseStateMachine {
 
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
+      // Configuration writes must be readable when apply completes, with their matching transaction index.
+      if (request.getType() == RequestType.STATEFUL_SERVICE_CONFIG) {
+        transactionBuffer.flush();
+      }
       updateLastAppliedTermIndex(appliedTermIndex);
 
       transactionBuffer.flushIfPendingLimitReached();

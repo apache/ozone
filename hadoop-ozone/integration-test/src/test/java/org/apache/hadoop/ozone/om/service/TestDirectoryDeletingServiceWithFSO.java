@@ -110,6 +110,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   private int snapshotCountAfterTest = -1;
   private boolean pendingSdsResume = false;
   private DirectoryDeletingService pendingResumeDds = null;
+  private DirectoryDeletingService pendingShutdownDds = null;
   private boolean needsTableCleanup = false;
   private String snapshotCleanupVolume = null;
   private String snapshotCleanupBucket = null;
@@ -160,6 +161,10 @@ public class TestDirectoryDeletingServiceWithFSO {
   @AfterEach
   public void cleanup() throws Exception {
     try {
+      if (pendingShutdownDds != null) {
+        pendingShutdownDds.shutdown();
+        pendingShutdownDds = null;
+      }
       if (pendingSdsResume) {
         cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().resume();
         pendingSdsResume = false;
@@ -634,7 +639,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> omSnapshotManager);
     DirectoryDeletingService service = Mockito.spy(new DirectoryDeletingService(1000, TimeUnit.MILLISECONDS, 1000,
         ozoneManager, cluster.getConf(), 1, false));
-    service.shutdown();
+    pendingShutdownDds = service;
     final int initialSnapshotCount =
         (int) cluster.getOzoneManager().getMetadataManager().countRowsInTable(snapshotInfoTable);
     snapshotCountAfterTest = initialSnapshotCount;
@@ -673,7 +678,7 @@ public class TestDirectoryDeletingServiceWithFSO {
       return null;
     }).when(service).optimizeDirDeletesAndSubmitRequest(anyList(), anyList(), eq(null), anyLong(), any(),
         any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), anyMap(), any(),
-        anyLong(), any(AtomicInteger.class));
+        anyLong(), any(AtomicInteger.class), any());
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);

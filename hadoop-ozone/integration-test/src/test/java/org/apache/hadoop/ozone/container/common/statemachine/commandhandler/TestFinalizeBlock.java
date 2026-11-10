@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,10 +66,12 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -112,11 +115,26 @@ public class TestFinalizeBlock {
         .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ONE, 30000);
+    // SCM can open the pipeline before its Ratis leader is ready. A WriteChunk rejected with
+    // LeaderNotReadyException can be followed by a PutBlock the leader accepts, which marks the container UNHEALTHY.
+    Pipeline openPipeline = cluster.getStorageContainerManager().getPipelineManager()
+        .getPipelines(RatisReplicationConfig.getInstance(ONE), Pipeline.PipelineState.OPEN).get(0);
+    XceiverServerRatis ratisServer = (XceiverServerRatis) cluster.getHddsDatanodes().get(0)
+        .getDatanodeStateMachine().getContainer().getWriteChannel();
+    GenericTestUtils.waitFor(() -> isLeaderReady(ratisServer, openPipeline), 100, 30000);
 
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
+  }
+
+  private static boolean isLeaderReady(XceiverServerRatis server, Pipeline pipeline) {
+    try {
+      return server.getServerDivision(RaftGroupId.valueOf(pipeline.getId().getId())).getInfo().isLeaderReady();
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   @AfterEach

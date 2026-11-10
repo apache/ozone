@@ -358,8 +358,12 @@ public class OzoneManagerServiceProviderImpl
         TimeUnit.MILLISECONDS);
   }
 
-  private void stopSyncDataFromOMThread() {
-    scheduler.shutdown();
+  private void stopSyncDataFromOMThread(boolean interrupt) {
+    if (interrupt) {
+      scheduler.shutdownNow();
+    } else {
+      scheduler.shutdown();
+    }
     try {
       if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
         scheduler.shutdownNow();
@@ -380,7 +384,7 @@ public class OzoneManagerServiceProviderImpl
       // We are shutting down the scheduler and then starting another one,
       // setting the initialDelay to 0, which triggers an OM DB sync
       // immediately.
-      stopSyncDataFromOMThread();
+      stopSyncDataFromOMThread(false);
       scheduler = Executors.newScheduledThreadPool(1, threadFactory);
       startSyncDataFromOM(0L);
       return true;
@@ -393,9 +397,9 @@ public class OzoneManagerServiceProviderImpl
   @Override
   public void stop() throws Exception {
     LOG.info("Stopping Ozone Manager Service Provider.");
+    stopSyncDataFromOMThread(true);
     reconTaskController.stop();
     omMetadataManager.stop();
-    scheduler.shutdownNow();
     reconSnapshotProvider.close();
     metrics.unRegister();
     reconSyncMetrics.unRegister();
@@ -505,11 +509,9 @@ public class OzoneManagerServiceProviderImpl
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(
           ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-      // Do not wipe the candidate dir here. The shared RDBSnapshotProvider's
-      // checkLeaderConsistency() manages it on the next attempt: kept for the
-      // same leader (so a future batched/chunked transfer can resume the parts
-      // already received), reset on a leader change. It only holds fully
-      // extracted files, see ReconRDBSnapshotProvider#untarContentsOfTarball.
+      // Clear the candidate dir, as the OM follower does after a failed download, so a partly extracted file
+      // is never reported to the leader as already received on the next attempt.
+      reconSnapshotProvider.init();
       return null;
     }
   }
@@ -733,6 +735,11 @@ public class OzoneManagerServiceProviderImpl
         boolean fullSnapshot = false;
 
         if (currentSequenceNumber <= 0) {
+          fullSnapshot = true;
+        } else if (!omMetadataManager.getStore().getDbLocation().exists()) {
+          // A failed full snapshot leaves Recon on its previous OM DB, whose directory was deleted before the fetch.
+          LOG.warn("Recon OM DB directory {} no longer exists, fetching a full snapshot.",
+              omMetadataManager.getStore().getDbLocation());
           fullSnapshot = true;
         } else {
           // Get updates from OM and apply to local Recon OM DB and update task status in table
