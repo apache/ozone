@@ -54,7 +54,8 @@ import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
  * <p>
  *
  * <p>
- * The logic is similar to {@link UnsignedChunksInputStream}, but there is a "chunk-signature" to parse.
+ * {@link AwsChunkedInputStream} does the parsing shared with {@link UnsignedChunksInputStream}. This class also
+ * parses the "chunk-signature" of each chunk.
  * </p>
  *
  * <p>
