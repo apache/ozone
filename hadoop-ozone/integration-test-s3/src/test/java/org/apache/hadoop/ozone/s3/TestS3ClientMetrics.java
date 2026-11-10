@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_L
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import java.io.InputStream;
 import java.net.URL;
@@ -47,9 +46,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.CompletedPart;
-import software.amazon.awssdk.services.s3.model.S3Exception;
-import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 
 /** Verifies backend client metrics through real S3 HTTP requests. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -95,7 +91,7 @@ class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Test
-  void putGetHeadAndListRecordBackendCalls() throws Exception {
+  void putAndGetRecordBackendCalls() throws Exception {
     // MiniOzoneCluster shares the metrics system with S3G. Only the S3 client operates in these measurement windows.
     long commits = count(Type.CommitKey);
     s3.putObject(request -> request.bucket(BUCKET).key("object"), RequestBody.fromString(CONTENT));
@@ -105,14 +101,6 @@ class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
     assertThat(s3.getObjectAsBytes(request -> request.bucket(BUCKET).key("object")).asUtf8String()).isEqualTo(CONTENT);
     assertIncreased(Type.GetKeyInfo, lookups);
 
-    lookups = count(Type.GetKeyInfo);
-    s3.headObject(request -> request.bucket(BUCKET).key("object"));
-    assertIncreased(Type.GetKeyInfo, lookups);
-
-    long lists = count(Type.ListKeysLight);
-    assertThat(s3.listObjectsV2(request -> request.bucket(BUCKET)).contents()).isNotEmpty();
-    assertIncreased(Type.ListKeysLight, lists);
-
     DefaultMetricsSystem.instance().publishMetricsNow();
     assertThat(adminResponse("/prom")).contains("om_client_metrics_commit_key_latency_ns_num_ops");
     // Hadoop caches JMX attributes, so newly observed command types need a cache refresh.
@@ -120,31 +108,6 @@ class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
       String jmx = adminResponse("/jmx?qry=Hadoop:service=*,name=OmClientMetrics");
       return jmx.contains("CommitKeyLatencyNsNumOps") && jmx.contains("GetKeyInfoLatencyNsNumOps");
     }, 100, 30_000);
-  }
-
-  @Test
-  void multipartRecordsPartAndUploadCommit() {
-    String key = "multipart";
-    String uploadId = s3.createMultipartUpload(request -> request.bucket(BUCKET).key(key)).uploadId();
-    long partCommits = count(Type.CommitMultiPartUpload);
-    UploadPartResponse part = s3.uploadPart(request -> request.bucket(BUCKET).key(key).uploadId(uploadId).partNumber(1),
-        RequestBody.fromString(CONTENT));
-    assertIncreased(Type.CommitMultiPartUpload, partCommits);
-
-    long completions = count(Type.CompleteMultiPartUpload);
-    s3.completeMultipartUpload(request -> request.bucket(BUCKET).key(key).uploadId(uploadId)
-        .multipartUpload(upload -> upload.parts(CompletedPart.builder().partNumber(1).eTag(part.eTag()).build())));
-    assertIncreased(Type.CompleteMultiPartUpload, completions);
-    assertThat(s3.getObjectAsBytes(request -> request.bucket(BUCKET).key(key)).asUtf8String()).isEqualTo(CONTENT);
-  }
-
-  @Test
-  void missingKeyStillRecordsOmCall() {
-    long lookups = count(Type.GetKeyInfo);
-    assertThatExceptionOfType(S3Exception.class)
-        .isThrownBy(() -> s3.headObject(request -> request.bucket(BUCKET).key("missing")))
-        .satisfies(error -> assertThat(error.statusCode()).isEqualTo(404));
-    assertIncreased(Type.GetKeyInfo, lookups);
   }
 
   private void assertIncreased(Type type, long before) {

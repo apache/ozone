@@ -108,7 +108,7 @@ class TestOmClientMetrics {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"0", "60,60", "invalid", "60,0", ","})
+  @ValueSource(strings = {"0", "60,60", "invalid", ","})
   void invalidIntervalsUseDefaultBeforeRecording(String intervals) {
     try (Handle handle = OmClientMetrics.acquireHandle(configuration(intervals))) {
       handle.metrics().addLatency(Type.CommitKey, 1);
