@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.s3.awssdk;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleServiceConfig;
 import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
 import org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests;
@@ -46,8 +46,8 @@ abstract class OzoneS3SDKTests extends ClusterForTests<MiniOzoneCluster> {
   @Override
   protected OzoneConfiguration createOzoneConfig() {
     OzoneConfiguration conf = createBaseConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, true);
-    conf.setTimeDuration(OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setBoolean(KeyLifecycleServiceConfig.Keys.ENABLED, true);
+    conf.setTimeDuration(KeyLifecycleServiceConfig.Keys.INTERVAL, 1, TimeUnit.SECONDS);
     return conf;
   }
 
