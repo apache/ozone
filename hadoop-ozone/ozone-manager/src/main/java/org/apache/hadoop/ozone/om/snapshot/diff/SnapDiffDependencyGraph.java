@@ -53,12 +53,9 @@ import org.slf4j.LoggerFactory;
  *   <li>Descendant RENAME or MODIFY before ancestor DELETE or RENAME(source)
  *       on a strict source-path prefix. CREATE is omitted because its source
  *       path is a to-snapshot path, not a from-snapshot path.</li>
- *   <li>Ancestor CREATE/RENAME(target) before descendant CREATE/RENAME/MODIFY
- *       on a strict to-snapshot path prefix, except when the ancestor path is
- *       reoccupied (freed on the from-snapshot side by DELETE or RENAME
- *       source, and re-occupied on the to-snapshot side by CREATE or RENAME
- *       target in the same diff) and the descendant is a from-snapshot
- *       MODIFY/RENAME still reported under that path.</li>
+ *   <li>Ancestor CREATE/RENAME(target) before descendant CREATE/RENAME(target)
+ *       on a strict to-snapshot path prefix. MODIFY is omitted because its
+ *       path is a from-snapshot path.</li>
  *   <li>DELETE before CREATE/RENAME(target) that targets the same path.</li>
  *   <li>RENAME(source) before CREATE that reuses the rename source path.</li>
  *   <li>RENAME(source) before RENAME(target) that reuses the same path, so a
@@ -333,16 +330,12 @@ public final class SnapDiffDependencyGraph {
     validateRenameTargetDoesNotMatchCreatePath(renameNodesByTargetPath,
         createNodesByPath);
 
-    Set<String> reoccupiedPaths = buildReoccupiedPaths(deleteNodesByPath,
-        renameNodesBySourcePath, createNodesByPath, renameNodesByTargetPath);
-
     addPathConflictEdges(deleteNodesByPath, createNodesByPath,
         renameNodesByTargetPath);
     addRenameBeforeCreateEdges(renameNodesBySourcePath, createNodesByPath);
     addRenameChainEdges(renameNodesBySourcePath, renameNodesByTargetPath);
     addPathPrefixFromSnapshotEdges(deleteNodesByPath, renameNodesBySourcePath);
-    addPathPrefixToSnapshotEdges(createNodesByPath, renameNodesByTargetPath,
-        reoccupiedPaths);
+    addPathPrefixToSnapshotEdges(createNodesByPath, renameNodesByTargetPath);
 
     buildObjectIdGroups(renameCount);
     addIntraObjectRenameEdges();
@@ -588,24 +581,22 @@ public final class SnapDiffDependencyGraph {
   }
 
   /**
-   * To-snapshot path-prefix edges. A descendant CREATE/RENAME/MODIFY cannot be
-   * applied until ancestor directories exist on the to-snapshot side.
+   * To-snapshot path-prefix edges. A descendant CREATE or RENAME(target)
+   * cannot be applied until ancestor directories exist on the to-snapshot side.
    *
-   * <p>When a path appears in both {@code deleteNodesByPath} and
-   * {@code createNodesByPath} it is a <em>replaced</em> path (old object
-   * deleted, new object created at the same path). A CREATE at a replaced path
-   * must not order from-snapshot MODIFY/RENAME descendants that still live
-   * under the old tree, or a cycle appears (CREATE {@code ->} child {@code ->}
-   * DELETE {@code ->} CREATE). Pure CREATE descendants (new to-snapshot keys)
-   * still depend on the ancestor CREATE.
+   * <p>MODIFY is excluded: it is reported at its from-snapshot path, which
+   * exists before any to-snapshot ancestor is created, and it is ordered by
+   * {@link #addPathPrefixFromSnapshotEdges}. An edge from the to-snapshot
+   * occupier of an ancestor path would form a cycle whenever that path, or an
+   * ancestor of it, is freed in the same diff (CREATE A {@code ->} MODIFY
+   * A/child {@code ->} DELETE A {@code ->} CREATE A).
    */
   private void addPathPrefixToSnapshotEdges(
       Map<String, Integer> createNodesByPath,
-      Map<String, Integer> renameNodesByTargetPath,
-      Set<String> reoccupiedPaths) {
+      Map<String, Integer> renameNodesByTargetPath) {
     for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
       NodeData entry = nodes.get(nodeId);
-      if (entry.isDelete()) {
+      if (entry.isDelete() || entry.getDiffType() == DiffType.MODIFY) {
         continue;
       }
       String toSnapshotPath = getToSnapshotPath(entry);
@@ -615,76 +606,16 @@ public final class SnapDiffDependencyGraph {
       final int toNodeId = nodeId;
       forEachStrictPrefix(toSnapshotPath, ancestorPath -> {
         Integer ancestorCreateNodeId = createNodesByPath.get(ancestorPath);
-        if (ancestorCreateNodeId != null
-            && !shouldSkipReoccupiedPathToSnapshotEdge(ancestorPath,
-            reoccupiedPaths, entry)) {
+        if (ancestorCreateNodeId != null) {
           addEdge(ancestorCreateNodeId, toNodeId);
         }
         Integer ancestorRenameNodeId =
             renameNodesByTargetPath.get(ancestorPath);
-        if (ancestorRenameNodeId != null
-            && !shouldSkipReoccupiedPathToSnapshotEdge(ancestorPath,
-            reoccupiedPaths, entry)) {
+        if (ancestorRenameNodeId != null) {
           addEdge(ancestorRenameNodeId, toNodeId);
         }
       });
     }
-  }
-
-  /**
-   * Paths that are freed on the from-snapshot side (DELETE or RENAME source)
-   * and re-occupied on the to-snapshot side (CREATE or RENAME target) in the
-   * same diff. A from-snapshot MODIFY/RENAME descendant reported under such a
-   * path still lives in the old subtree, so it must not depend on the
-   * to-snapshot occupier of the ancestor path.
-   */
-  private static Set<String> buildReoccupiedPaths(
-      Map<String, Integer> deleteNodesByPath,
-      Map<String, Integer> renameNodesBySourcePath,
-      Map<String, Integer> createNodesByPath,
-      Map<String, Integer> renameNodesByTargetPath) {
-    int occupierCount = createNodesByPath.size() + renameNodesByTargetPath.size();
-    Set<String> reoccupiedPaths =
-        new HashSet<>(expectedHashMapCapacity(occupierCount));
-    for (String path : createNodesByPath.keySet()) {
-      if (deleteNodesByPath.containsKey(path)
-          || renameNodesBySourcePath.containsKey(path)) {
-        reoccupiedPaths.add(path);
-      }
-    }
-    for (String path : renameNodesByTargetPath.keySet()) {
-      if (deleteNodesByPath.containsKey(path)
-          || renameNodesBySourcePath.containsKey(path)) {
-        reoccupiedPaths.add(path);
-      }
-    }
-    return reoccupiedPaths;
-  }
-
-  /**
-   * Skip {@code ancestorPath -> descendant} to-snapshot prefix edges when the
-   * ancestor path is reoccupied and the descendant is a from-snapshot
-   * MODIFY/RENAME still reported under the old tree at that path.
-   */
-  private static boolean shouldSkipReoccupiedPathToSnapshotEdge(
-      String ancestorPath,
-      Set<String> reoccupiedPaths,
-      NodeData descendant) {
-    if (!reoccupiedPaths.contains(ancestorPath)) {
-      return false;
-    }
-    DiffType diffType = descendant.getDiffType();
-    if (diffType != DiffType.MODIFY && diffType != DiffType.RENAME) {
-      return false;
-    }
-    return isStrictPathPrefix(ancestorPath, descendant.getSourcePath());
-  }
-
-  private static boolean isStrictPathPrefix(String prefix, String path) {
-    if (prefix == null || path == null) {
-      return false;
-    }
-    return path.startsWith(prefix + PATH_SEPARATOR);
   }
 
   private static String getToSnapshotPath(NodeData entry) {
