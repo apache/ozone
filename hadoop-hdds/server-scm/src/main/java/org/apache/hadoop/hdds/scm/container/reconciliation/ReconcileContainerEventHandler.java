@@ -71,7 +71,7 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
     }
 
     EligibilityResult result = ReconciliationEligibilityHandler.isEligibleForReconciliation(containerID,
-        containerManager);
+        containerManager, nodeManager);
     if (!result.isOk()) {
       LOG.error("{}", result);
       return;
@@ -90,14 +90,10 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
               datanode, containerID);
           continue;
         }
-        if (!status.isHealthy()) {
-          continue;
-        }
-        if (status.isInService()) {
+        if (ReconciliationEligibilityHandler.isTarget(status)) {
           targets.add(datanode);
-          peers.add(datanode);
-        } else if (status.isDecommissioning() || status.isEnteringMaintenance()) {
-          // Transitioning nodes remain peers so other replicas can recover any unique data before the node leaves.
+        }
+        if (ReconciliationEligibilityHandler.isPeer(status)) {
           peers.add(datanode);
         }
       }

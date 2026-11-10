@@ -1703,7 +1703,7 @@ public class SCMClientProtocolServer implements
 
     try {
       EligibilityResult result = ReconciliationEligibilityHandler.isEligibleForReconciliation(containerID,
-          getScm().getContainerManager());
+          getScm().getContainerManager(), getScm().getScmNodeManager());
       if (!result.isOk()) {
         switch (result.getResult()) {
         case OK:
@@ -1716,6 +1716,7 @@ public class SCMClientProtocolServer implements
         case INELIGIBLE_REPLICATION_TYPE:
         case NOT_ENOUGH_REQUIRED_NODES:
         case NO_REPLICAS_FOUND:
+        case NO_ELIGIBLE_TARGETS:
           throw new SCMException(result.toString(), ResultCodes.UNSUPPORTED_OPERATION);
         default:
           throw new SCMException("Unknown reconciliation eligibility result " + result, ResultCodes.INTERNAL_ERROR);

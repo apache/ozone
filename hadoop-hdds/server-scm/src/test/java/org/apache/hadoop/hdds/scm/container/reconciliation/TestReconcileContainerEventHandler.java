@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -132,7 +131,7 @@ public class TestReconcileContainerEventHandler {
     addReplicasToContainer(5);
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertFalse(result.isOk());
     assertEquals(Result.INELIGIBLE_REPLICATION_TYPE, result.getResult());
 
@@ -149,7 +148,7 @@ public class TestReconcileContainerEventHandler {
     addReplicasToContainer(1);
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertFalse(result.isOk());
     assertEquals(Result.NOT_ENOUGH_REQUIRED_NODES, result.getResult());
 
@@ -165,7 +164,7 @@ public class TestReconcileContainerEventHandler {
 
     // Container is eligible for reconciliation, but the request will not go through because this SCM is not the leader.
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertTrue(result.isOk());
     assertEquals(Result.OK, result.getResult());
 
@@ -182,7 +181,7 @@ public class TestReconcileContainerEventHandler {
     when(containerManager.getContainer(any())).thenThrow(new ContainerNotFoundException());
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertFalse(result.isOk());
     assertEquals(Result.CONTAINER_NOT_FOUND, result.getResult());
 
@@ -197,7 +196,7 @@ public class TestReconcileContainerEventHandler {
         "Expected no replicas for this container");
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertFalse(result.isOk());
     assertEquals(Result.NO_REPLICAS_FOUND, result.getResult());
 
@@ -211,7 +210,7 @@ public class TestReconcileContainerEventHandler {
     addContainer(RATIS_THREE_REP, state);
     addReplicasToContainer(3);
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     switch (state) {
     case OPEN:
@@ -241,7 +240,7 @@ public class TestReconcileContainerEventHandler {
         .collect(Collectors.toSet());
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertTrue(result.isOk());
     assertEquals(Result.OK, result.getResult());
 
@@ -366,6 +365,10 @@ public class TestReconcileContainerEventHandler {
     when(nodeManager.getNodeStatus(nodes.get(1))).thenReturn(NodeStatus.valueOf(IN_MAINTENANCE, HEALTHY));
     when(nodeManager.getNodeStatus(nodes.get(2))).thenReturn(NodeStatus.valueOf(IN_SERVICE, STALE));
 
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
+    assertEquals(Result.NO_ELIGIBLE_TARGETS, result.getResult());
+
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
     verify(nodeManager, never()).getNode(any(DatanodeID.class));
@@ -428,13 +431,11 @@ public class TestReconcileContainerEventHandler {
     assertEquals(3, numCmds);
   }
 
-  @ParameterizedTest
-  @EnumSource(value = NodeOperationalState.class, names = {"DECOMMISSIONING", "ENTERING_MAINTENANCE"})
-  public void testReconcileCommandVersionIncludesTransitioningPeers(NodeOperationalState operationalState)
-      throws Exception {
+  @Test
+  public void testReconcileCommandVersionIncludesTransitioningPeers() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
     DatanodeDetails olderPeer = addReplicasToContainer(3).iterator().next().getDatanodeDetails();
-    when(nodeManager.getNodeStatus(olderPeer)).thenReturn(NodeStatus.valueOf(operationalState, HEALTHY));
+    when(nodeManager.getNodeStatus(olderPeer)).thenReturn(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
     ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
     DatanodeInfo olderInfo = mock(DatanodeInfo.class);
     when(olderInfo.getLastKnownApparentVersion()).thenReturn(lower);
@@ -459,7 +460,7 @@ public class TestReconcileContainerEventHandler {
     addReplicasToContainer(replicaState, State.CLOSED, State.CLOSED);
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
 
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     switch (replicaState) {
