@@ -32,6 +32,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collection;
+import java.util.StringJoiner;
 import org.apache.hadoop.hdds.NodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
@@ -201,10 +202,13 @@ public final class OMNodeDetails extends NodeDetails {
         : OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     URL url;
     try {
-      String query = OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA + "=true&" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH
-          + "=" + flush;
-      url = new URI(isHttp ? "http" : "https", isHttp ? getHttpAddress() : getHttpsAddress(), path, query, null)
-          .toURL();
+      String scheme = isHttp ? "http" : "https";
+      String address = isHttp ? getHttpAddress() : getHttpsAddress();
+      String query = new StringJoiner("&")
+          .add(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA + "=true")
+          .add(OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=" + flush)
+          .toString();
+      url = new URI(scheme, address, path, query, null).toURL();
     } catch (URISyntaxException | MalformedURLException e) {
       throw new IOException("Could not get OM DB Checkpoint Endpoint Url", e);
     }
