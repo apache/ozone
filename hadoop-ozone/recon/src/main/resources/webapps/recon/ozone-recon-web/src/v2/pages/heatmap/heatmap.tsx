@@ -150,6 +150,7 @@ const Heatmap: React.FC<{}> = () => {
     //Normalize Size so other blocks also get visualized if size is large in bytes minimize and if size is too small make it big
     // Apply only to leaves, including those whose zero color is omitted by the API.
     if (obj.hasOwnProperty('size') && !('children' in obj && obj.children?.length)) {
+      (obj as HeatmapChild).color = (obj as HeatmapChild).color ?? 0;
 
       // hide block at key,volume,bucket level if size accessCount and maxAccessCount are zero apply normalized size only for leaf level
       if ((obj as HeatmapChild)?.size === 0 && (obj as HeatmapChild)?.accessCount === 0) {

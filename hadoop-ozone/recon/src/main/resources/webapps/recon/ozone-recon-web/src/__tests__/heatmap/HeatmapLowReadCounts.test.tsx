@@ -48,6 +48,8 @@ describe.each([undefined, 0, 0.002])('heatmap leaf with color %s', color => {
     vi.mocked(useApiData).mockReturnValue({ data } as any);
     render(<Heatmap />);
     await waitFor(() => expect((data.children[0] as any).normalizedSize).toBeGreaterThan(0));
+    expect(data.children[0].color).toBe(color ?? 0);
+    expect(data.children[1].color).toBe(1);
     expect((data as any).normalizedSize).toBeUndefined();
   });
 
@@ -58,6 +60,8 @@ describe.each([undefined, 0, 0.002])('heatmap leaf with color %s', color => {
     expect(page.minmax(data)).toEqual([128, 256]);
     page.updateSize(data);
     expect((data.children[0] as any).normalizedSize).toBeGreaterThan(0);
+    expect(data.children[0].color).toBe(color ?? 0);
+    expect(data.children[1].color).toBe(1);
     expect((data as any).normalizedSize).toBeUndefined();
   });
 
