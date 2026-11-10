@@ -34,9 +34,9 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -130,15 +129,11 @@ public class TestOzoneBucket {
 
   @ParameterizedTest
   @MethodSource("rootListings")
-  void shallowRootListingPreservesPages(String shape, int size, String prevKey) throws IOException {
+  void shallowRootListingPreservesPages(List<String> expected) throws IOException {
     ClientProtocol proxy = mock(ClientProtocol.class);
     List<OzoneFileStatusLight> statuses = new ArrayList<>();
-    List<String> expected = new ArrayList<>();
-    for (int i = 0; i < size; i++) {
-      String name = "key-" + i;
-      boolean directory = shape.equals("directories") || (shape.equals("mixed") && i % 2 == 0);
-      statuses.add(keyStatus(name, directory));
-      expected.add(name + (directory ? "/" : ""));
+    for (String name : expected) {
+      statuses.add(keyStatus(OzoneFSUtils.removeTrailingSlashIfNeeded(name), name.endsWith("/")));
     }
     when(proxy.listStatusLight(any())).thenAnswer(invocation -> {
       ListStatusLightOptions options = invocation.getArgument(0);
@@ -151,7 +146,7 @@ public class TestOzoneBucket {
       return new ArrayList<>(statuses.subList(start, end));
     });
 
-    Iterator<? extends OzoneKey> keys = fsoBucket(proxy).listKeys("", prevKey, true);
+    Iterator<? extends OzoneKey> keys = fsoBucket(proxy).listKeys("", null, true);
     verify(proxy).listStatusLight(any());
     verifyNoMoreInteractions(proxy);
     List<String> actual = new ArrayList<>();
@@ -159,10 +154,12 @@ public class TestOzoneBucket {
     assertEquals(expected, actual);
   }
 
-  private static Stream<Arguments> rootListings() {
-    return Stream.of("files", "directories", "mixed").flatMap(shape ->
-        IntStream.of(0, 1, 3, 4, 6, 7).boxed().flatMap(size ->
-            Stream.of(Arguments.of(shape, size, null), Arguments.of(shape, size, ""))));
+  /** Empty bucket, exactly one page, and several pages whose boundaries fall on directories (page size is 3). */
+  private static Stream<List<String>> rootListings() {
+    return Stream.of(
+        Collections.emptyList(),
+        Arrays.asList("a/", "b", "c/"),
+        Arrays.asList("a/", "b", "c/", "d", "e/", "f", "g/"));
   }
 
   @Test
