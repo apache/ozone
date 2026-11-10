@@ -26,7 +26,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -105,7 +105,7 @@ public class TestSimplePipelineProvider {
   private List<DatanodeDetails> createListOfNodes(int nodeCount) {
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < nodeCount; i++) {
-      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
     return nodes;
   }

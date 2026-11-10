@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
@@ -176,9 +176,9 @@ class TestContainerBalancerMoveFailureBreakdown {
   @Test
   void testSameReasonAggregatesSourceFailureCountsFromMultipleSources() {
     ContainerMoveFailureTracker tracker = new ContainerMoveFailureTracker();
-    DatanodeDetails source1 = MockDatanodeDetails.createDatanodeDetails("1.1.1.1", "/r1");
-    DatanodeDetails source2 = MockDatanodeDetails.createDatanodeDetails("2.2.2.2", "/r1");
-    DatanodeDetails target = MockDatanodeDetails.createDatanodeDetails("3.3.3.3", "/r2");
+    DatanodeDetails source1 = DatanodeDetailsTestUtils.createDatanodeDetails("1.1.1.1", "/r1");
+    DatanodeDetails source2 = DatanodeDetailsTestUtils.createDatanodeDetails("2.2.2.2", "/r1");
+    DatanodeDetails target = DatanodeDetailsTestUtils.createDatanodeDetails("3.3.3.3", "/r2");
 
     String reason = MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT.name();
     tracker.recordFailure(reason, source1, target);

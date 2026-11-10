@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createContainerForTesting;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.runTestOzoneContainerViaDataNode;
@@ -44,8 +44,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -72,7 +72,7 @@ public class TestOzoneContainer {
     try {
       // We don't start Ozone Container via data node, we will do it
       // independently in our test path.
-      Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+      Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
       conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
@@ -105,7 +105,7 @@ public class TestOzoneContainer {
     OzoneContainer container = null;
 
     try {
-      Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+      Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
       conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,

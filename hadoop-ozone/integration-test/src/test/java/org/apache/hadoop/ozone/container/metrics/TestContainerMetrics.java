@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -171,7 +171,7 @@ public class TestContainerMetrics {
 
     try {
       final Pipeline pipeline =
-          MockPipeline.createSingleNodePipeline();
+          PipelineTestUtils.createSingleNodePipeline();
       initConf.accept(pipeline);
 
       DatanodeDetails dn = pipeline.getFirstNode();

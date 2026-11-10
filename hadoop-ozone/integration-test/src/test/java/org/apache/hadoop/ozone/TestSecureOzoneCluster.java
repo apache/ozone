@@ -89,7 +89,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
@@ -358,7 +358,7 @@ class TestSecureOzoneCluster extends KerberosTests {
       assertThatThrownBy(() -> securityClient.getOMCertificate(omInfo, csr))
           .hasMessageContaining("is not allowed to request a OM certificate");
       assertThatThrownBy(() -> securityClient.getDataNodeCertificate(
-          MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage(), csr))
+          DatanodeDetailsTestUtils.randomDatanodeDetails().getProtoBufMessage(), csr))
           .hasMessageContaining("is not allowed to request a DATANODE certificate");
       // SCM role certificates are refused to non admins before the service user check.
       assertThatThrownBy(() -> securityClient.getSCMCertificate(scmInfo, csr)).hasMessageContaining("Access denied");
@@ -378,7 +378,7 @@ class TestSecureOzoneCluster extends KerberosTests {
       assertThat(securityClient.getOMCertificate(omInfo, csr)).isNotEmpty();
       // The service user of one role does not get a certificate of another role.
       assertThatThrownBy(() -> securityClient.getDataNodeCertificate(
-          MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage(), csr))
+          DatanodeDetailsTestUtils.randomDatanodeDetails().getProtoBufMessage(), csr))
           .hasMessageContaining("is not allowed to request a DATANODE certificate");
     }
   }

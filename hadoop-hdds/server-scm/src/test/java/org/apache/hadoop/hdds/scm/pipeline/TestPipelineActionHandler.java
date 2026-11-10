@@ -25,7 +25,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
@@ -121,7 +121,7 @@ public class TestPipelineActionHandler {
             .setAction(PipelineAction.Action.CLOSE).build())
         .build();
     return new PipelineActionsFromDatanode(
-        MockDatanodeDetails.randomDatanodeDetails(), actionsProto);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), actionsProto);
   }
 
 }

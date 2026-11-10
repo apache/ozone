@@ -60,7 +60,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
@@ -122,7 +122,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
   public void testFileSizeFailure() throws IOException {
     KeyValueHandler handler = createKeyValueHandler(newContainerSet());
     ContainerProtos.ContainerCommandRequestProto request =
-        getWriteChunkRequest(MockPipeline.createSingleNodePipeline(), getBlockID(), 20);
+        getWriteChunkRequest(PipelineTestUtils.createSingleNodePipeline(), getBlockID(), 20);
     FileChannel channel = mock(FileChannel.class);
     IOException failure = new IOException("Failed to read file size");
     when(channel.size()).thenThrow(failure);

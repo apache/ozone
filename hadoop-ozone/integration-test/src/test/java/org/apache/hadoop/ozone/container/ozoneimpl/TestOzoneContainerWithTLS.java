@@ -28,7 +28,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATI
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.container.ContainerID.valueOf;
-import static org.apache.hadoop.hdds.scm.pipeline.MockPipeline.createPipeline;
+import static org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils.createPipeline;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCloseContainer;
@@ -58,8 +58,8 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -420,7 +420,7 @@ public class TestOzoneContainerWithTLS {
   }
 
   private DatanodeDetails aDatanode() {
-    return MockDatanodeDetails.createDatanodeDetails(
+    return DatanodeDetailsTestUtils.createDatanodeDetails(
         DatanodeID.randomID(), "localhost", "0.0.0.0",
         "/default-rack");
   }

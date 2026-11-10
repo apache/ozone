@@ -37,14 +37,14 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
@@ -128,13 +128,13 @@ class TestSecureOzoneContainer {
     ContainerID containerID = ContainerID.valueOf(getTestContainerID());
     OzoneContainer container = null;
     try {
-      Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+      Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
       conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.toString());
       conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT, pipeline
           .getFirstNode().getStandalonePort().getValue());
       conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT, false);
 
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       container = new OzoneContainer(null, dn, conf, ContainerTestUtils
           .getMockContext(dn, conf), caClient, secretKeyClient, volumeChoosingPolicy);
       MutableVolumeSet volumeSet = container.getVolumeSet();

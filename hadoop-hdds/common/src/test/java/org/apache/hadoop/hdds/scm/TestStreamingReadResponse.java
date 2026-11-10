@@ -28,7 +28,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
@@ -81,7 +81,7 @@ class TestStreamingReadResponse {
   }
 
   private static StreamingReadResponse newResponse(FakeRequestObserver observer) {
-    return new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), observer);
+    return new StreamingReadResponse(DatanodeDetailsTestUtils.randomDatanodeDetails(), observer);
   }
 
   @Test

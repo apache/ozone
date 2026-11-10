@@ -78,8 +78,8 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -251,9 +251,9 @@ public class TestReplicationManager {
   @Test
   public void testPendingOpsClearedWhenStarting() {
     containerReplicaPendingOps.scheduleAddReplica(ContainerID.valueOf(1),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE, 5L, clock.millis());
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE, 5L, clock.millis());
     containerReplicaPendingOps.scheduleDeleteReplica(ContainerID.valueOf(2),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
     assertEquals(1, containerReplicaPendingOps
         .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
     assertEquals(1, containerReplicaPendingOps
@@ -401,7 +401,7 @@ public class TestReplicationManager {
     ContainerReplica unhealthy =
         createContainerReplica(container.containerID(), 0, IN_SERVICE,
             ContainerReplicaProto.State.UNHEALTHY, 1, 123,
-            MockDatanodeDetails.randomDatanodeDetails(), origin);
+            DatanodeDetailsTestUtils.randomDatanodeDetails(), origin);
     replicas.add(unhealthy);
     storeContainerAndReplicas(container, replicas);
 
@@ -639,7 +639,7 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5, null,
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 5, null,
         clock.millis() + 10000, 5L, clock.millis());
 
     replicationManager.processContainer(
@@ -682,7 +682,7 @@ public class TestReplicationManager {
 
     ContainerReplica replica  = createContainerReplica(container.containerID(),
         1, IN_SERVICE, ContainerReplicaProto.State.CLOSED,
-        0, 0, MockDatanodeDetails.randomDatanodeDetails(), DatanodeID.randomID());
+        0, 0, DatanodeDetailsTestUtils.randomDatanodeDetails(), DatanodeID.randomID());
 
     storeContainerAndReplicas(container, Collections.singleton(replica));
 
@@ -921,7 +921,7 @@ public class TestReplicationManager {
     addReplicas(container, ContainerReplicaProto.State.CLOSED,
         1, 2, 3, 4, 5, 5);
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5, null,
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 5, null,
         clock.millis() + 10000);
     replicationManager.processContainer(
         container, repQueue, repReport);
@@ -1104,7 +1104,7 @@ public class TestReplicationManager {
     ContainerInfo containerInfo =
         ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
         HddsProtos.LifeCycleState.CLOSED, 10, 20);
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     DeleteContainerCommand deleteContainerCommand = new DeleteContainerCommand(
         containerInfo.getContainerID());
@@ -1165,11 +1165,11 @@ public class TestReplicationManager {
     for (int i = 1; i <= 3; i++) {
       sourceNodes.add(
           new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
-              MockDatanodeDetails.randomDatanodeDetails(), i));
+              DatanodeDetailsTestUtils.randomDatanodeDetails(), i));
     }
     List<DatanodeDetails> targetNodes = new ArrayList<>();
-    DatanodeDetails target4 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails target5 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target4 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails target5 = DatanodeDetailsTestUtils.randomDatanodeDetails();
     targetNodes.add(target4);
     targetNodes.add(target5);
     byte[] missingIndexes = {4, 5};
@@ -1219,8 +1219,8 @@ public class TestReplicationManager {
             HddsProtos.LifeCycleState.CLOSED, 10, 20);
 
     // command will be pushed from source to target
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails source = DatanodeDetailsTestUtils.randomDatanodeDetails();
     ReplicateContainerCommand command = ContainerTestUtils.getReplicateContainerCommand(
         containerInfo.getContainerID(), target);
     command.setReplicaIndex(1);
@@ -1251,8 +1251,8 @@ public class TestReplicationManager {
     ContainerInfo containerInfo =
         ReplicationTestUtil.createContainerInfo(repConfig, 1,
             HddsProtos.LifeCycleState.CLOSED, 10, 20);
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails src = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails src = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     long scmDeadline = clock.millis() + rmConf.getEventTimeout();
     long datanodeDeadline = scmDeadline - rmConf.getDatanodeTimeoutOffset();
@@ -1278,15 +1278,15 @@ public class TestReplicationManager {
       throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
-    DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails cmdTarget = DatanodeDetailsTestUtils.randomDatanodeDetails();
     sourceNodes.put(cmdTarget, 0);
     for (int i = 1; i < 3; i++) {
-      sourceNodes.put(MockDatanodeDetails.randomDatanodeDetails(), i * 5);
+      sourceNodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i * 5);
     }
     mockReplicationCommandCounts(sourceNodes::get, any -> 0);
 
     testReplicationCommand(cmdTarget, sourceNodes.keySet(), 0,
-        MockDatanodeDetails.randomDatanodeDetails());
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
     assertEquals(0, replicationManager.getMetrics()
         .getReplicateContainerCmdsDeferredTotal());
   }
@@ -1299,18 +1299,18 @@ public class TestReplicationManager {
     int limit = replicationManager.getConfig().getDatanodeReplicationLimit();
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
 
-    DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails cmdTarget = DatanodeDetailsTestUtils.randomDatanodeDetails();
     cmdTarget.setPersistedOpState(ENTERING_MAINTENANCE);
     sourceNodes.put(cmdTarget, limit + 2);
 
     for (int i = 1; i < 3; i++) {
-      sourceNodes.put(MockDatanodeDetails.randomDatanodeDetails(), limit + 1);
+      sourceNodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), limit + 1);
     }
 
     mockReplicationCommandCounts(sourceNodes::get, any -> 0);
 
     testReplicationCommand(cmdTarget, sourceNodes.keySet(), 0,
-        MockDatanodeDetails.randomDatanodeDetails());
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
   }
 
   private void testReplicationCommand(
@@ -1345,13 +1345,13 @@ public class TestReplicationManager {
     int replicationCount = limit - reconstructionCount * reconstructionWeight;
     List<DatanodeDetails> sourceNodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
-      sourceNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      sourceNodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
 
     mockReplicationCommandCounts(any -> replicationCount,
         any -> reconstructionCount);
 
-    DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails destination = DatanodeDetailsTestUtils.randomDatanodeDetails();
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
 
@@ -1369,9 +1369,9 @@ public class TestReplicationManager {
       throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
     Map<DatanodeDetails, Integer> targetNodes = new HashMap<>();
-    DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails cmdTarget = DatanodeDetailsTestUtils.randomDatanodeDetails();
     targetNodes.put(cmdTarget, 0);
-    targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 5);
+    targetNodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 5);
 
     mockReplicationCommandCounts(targetNodes::get, any -> 0);
 
@@ -1408,8 +1408,8 @@ public class TestReplicationManager {
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand command = createReconstructionCommand(
-        container, MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails());
+        container, DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
     long overLoadedCount = replicationManager.getMetrics()
         .getEcReconstructionCmdsDeferredTotal();
     assertThrows(CommandTargetOverloadedException.class,
@@ -1444,9 +1444,9 @@ public class TestReplicationManager {
   private void assertReconstructionCarriesLowestApparentVersion(boolean sourceIsLowest)
       throws CommandTargetOverloadedException, NodeNotFoundException, NotLeaderException {
     Map<DatanodeDetails, Integer> targetNodes = new HashMap<>();
-    DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails cmdTarget = DatanodeDetailsTestUtils.randomDatanodeDetails();
     targetNodes.put(cmdTarget, 0);
-    targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 5);
+    targetNodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 5);
 
     mockReplicationCommandCounts(targetNodes::get, any -> 0);
 
@@ -1475,8 +1475,8 @@ public class TestReplicationManager {
   public void testReconstructionApparentVersionLookupThrowsWhenNodeNotFound()
       throws NodeNotFoundException {
     Map<DatanodeDetails, Integer> targetNodes = new HashMap<>();
-    targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 0);
-    targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 0);
+    targetNodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 0);
+    targetNodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 0);
 
     mockReplicationCommandCounts(targetNodes::get, any -> 0);
 
@@ -1500,7 +1500,7 @@ public class TestReplicationManager {
     for (int i = 1; i <= 3; i++) {
       sources.add(
           new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
-              MockDatanodeDetails.randomDatanodeDetails(), i));
+              DatanodeDetailsTestUtils.randomDatanodeDetails(), i));
     }
     byte[] missingIndexes = new byte[]{4, 5};
     return new ReconstructECContainersCommand(
@@ -1517,7 +1517,7 @@ public class TestReplicationManager {
             eq(SCMCommandProto.Type.deleteContainerCommand)))
         .thenAnswer(invocation -> 0);
 
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
@@ -1535,7 +1535,7 @@ public class TestReplicationManager {
             eq(SCMCommandProto.Type.deleteContainerCommand)))
         .thenAnswer(invocation -> limit + 1);
 
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     long overLoadedCount = replicationManager.getMetrics()
@@ -1556,9 +1556,9 @@ public class TestReplicationManager {
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     Map<DatanodeDetails, Integer> commandCounts = new HashMap<>();
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     commandCounts.put(dn1, repLimit - 1);
     commandCounts.put(dn2, repLimit - reconstructionWeight);
@@ -1568,7 +1568,7 @@ public class TestReplicationManager {
 
     replicationManager.sendThrottledReplicationCommand(container,
         new ArrayList<>(commandCounts.keySet()),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 1);
 
     Set<DatanodeDetails> excluded = replicationManager.getExcludedNodes();
     assertEquals(1, excluded.size());
@@ -1644,8 +1644,8 @@ public class TestReplicationManager {
     long commandDeadline = 1000;
     SCMCommand<?> command = new DeleteContainerCommand(1L, true);
 
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     ContainerReplicaOp addOp = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
@@ -1874,8 +1874,8 @@ public class TestReplicationManager {
     ContainerInfo containerInfo =
         ReplicationTestUtil.createContainerInfo(repConfig, 1,
             HddsProtos.LifeCycleState.CLOSED, 10, 20);
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails source = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
     ComponentVersion higher = HDDSVersion.ZDU;
@@ -1900,8 +1900,8 @@ public class TestReplicationManager {
     ContainerInfo containerInfo =
         ReplicationTestUtil.createContainerInfo(repConfig, 1,
             HddsProtos.LifeCycleState.CLOSED, 10, 20);
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails source = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     mockDatanodeWithApparentVersion(source, HDDSVersion.SOFTWARE_VERSION);
     // SCM has no information for the target.
@@ -1927,7 +1927,7 @@ public class TestReplicationManager {
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
         (ECReplicationConfig) repConfig);
     rm.sendThrottledReconstructionCommand(container, cmd);
@@ -1951,8 +1951,8 @@ public class TestReplicationManager {
     // Send one reconstruction command with 2 fragments
     ReconstructECContainersCommand cmd1 = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
-            MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails(),
+            DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
         (ECReplicationConfig) repConfig);
 
@@ -1963,7 +1963,7 @@ public class TestReplicationManager {
     // Send another reconstruction command with 1 fragment
     ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
         2L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(3)),
         (ECReplicationConfig) repConfig);
     rm.sendThrottledReconstructionCommand(container, cmd2);
@@ -2007,17 +2007,17 @@ public class TestReplicationManager {
 
     ReconstructECContainersCommand cmd1 = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
         (ECReplicationConfig) repConfig);
     ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
         2L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(2)),
         (ECReplicationConfig) repConfig);
     ReconstructECContainersCommand cmd3 = new ReconstructECContainersCommand(
         3L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(3)),
         (ECReplicationConfig) repConfig);
 
@@ -2042,7 +2042,7 @@ public class TestReplicationManager {
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
         (ECReplicationConfig) repConfig);
     rm.sendThrottledReconstructionCommand(container, cmd);
@@ -2069,8 +2069,8 @@ public class TestReplicationManager {
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
-            MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails(),
+            DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
         (ECReplicationConfig) repConfig);
     rm.sendThrottledReconstructionCommand(container, cmd);
@@ -2149,7 +2149,7 @@ public class TestReplicationManager {
           for (int i = 0; i < attemptsPerThread; i++) {
             ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
                 commandIdBase + i, Collections.emptyList(),
-                ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+                ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails()),
                 ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
                 (ECReplicationConfig) repConfig);
             try {
@@ -2189,8 +2189,8 @@ public class TestReplicationManager {
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
-            MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails(),
+            DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
         (ECReplicationConfig) repConfig);
 
@@ -2217,8 +2217,8 @@ public class TestReplicationManager {
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
-            MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails(),
+            DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
         (ECReplicationConfig) repConfig);
 
@@ -2278,8 +2278,8 @@ public class TestReplicationManager {
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand cmd = createReconstructionCommand(
-        container, MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails());
+        container, DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     assertThrows(CommandTargetOverloadedException.class,
         () -> rm.sendThrottledReconstructionCommand(container, cmd));
@@ -2312,7 +2312,7 @@ public class TestReplicationManager {
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
-        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails()),
         ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
         (ECReplicationConfig) repConfig);
 
@@ -2354,7 +2354,7 @@ public class TestReplicationManager {
     rmConf.setEcDecommissionReconstructionLoadFactor(0.9);
     rmConf.setDatanodeReplicationLimit(10);
     ReplicationManager rm = createReplicationManager();
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     mockReplicationCommandCounts(any -> 9, any -> 0);
     assertTrue(rm.isNodeHighlyLoaded(dn));
@@ -2369,7 +2369,7 @@ public class TestReplicationManager {
     rmConf.setEcDecommissionReconstructionLoadFactor(0.9);
     rmConf.setDatanodeReplicationLimit(20);
     ReplicationManager rm = createReplicationManager();
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     mockReplicationCommandCounts(any -> 15, any -> 1);
     assertTrue(rm.isNodeHighlyLoaded(dn));
@@ -2388,11 +2388,11 @@ public class TestReplicationManager {
     rmConf.setDatanodeReplicationLimit(10);
     ReplicationManager rm = createReplicationManager();
 
-    DatanodeDetails inServiceDn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails inServiceDn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     mockReplicationCommandCounts(any -> 9, any -> 0);
     assertTrue(rm.isNodeHighlyLoaded(inServiceDn));
 
-    DatanodeDetails decomDn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails decomDn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     decomDn.setPersistedOpState(DECOMMISSIONING);
     mockReplicationCommandCounts(any -> 18, any -> 0);
     assertTrue(rm.isNodeHighlyLoaded(decomDn));
@@ -2405,7 +2405,7 @@ public class TestReplicationManager {
   public void testIsNodeHighlyLoadedNodeNotFound()
       throws IOException, NodeNotFoundException {
     ReplicationManager rm = createReplicationManager();
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     when(nodeManager.getTotalDatanodeCommandCounts(any(), any(), any()))
         .thenThrow(new NodeNotFoundException(dn.getID()));
     assertTrue(rm.isNodeHighlyLoaded(dn));

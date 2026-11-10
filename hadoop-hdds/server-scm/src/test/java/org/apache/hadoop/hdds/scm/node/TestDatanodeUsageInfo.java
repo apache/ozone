@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;

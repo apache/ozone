@@ -46,7 +46,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -108,7 +108,7 @@ public class TestSCMContainerPlacementRackAware {
     for (int i = 0; i < datanodeCount; i++) {
       // Totally 3 racks, each has 5 datanodes
       DatanodeDetails datanodeDetails =
-          MockDatanodeDetails.createDatanodeDetails(
+          DatanodeDetailsTestUtils.createDatanodeDetails(
           hostname + i, rack + (i / NODE_PER_RACK));
       datanodes.add(datanodeDetails);
       cluster.add(datanodeDetails);
@@ -455,7 +455,7 @@ public class TestSCMContainerPlacementRackAware {
         new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     for (int i = 0; i < 15; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(
+      DatanodeDetails dn = DatanodeDetailsTestUtils.createDatanodeDetails(
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),

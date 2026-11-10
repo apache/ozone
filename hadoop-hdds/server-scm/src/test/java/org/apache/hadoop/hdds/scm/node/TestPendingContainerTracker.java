@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -60,7 +60,7 @@ public class TestPendingContainerTracker {
     datanodes = new ArrayList<>(NUM_DATANODES);
     for (int i = 0; i < NUM_DATANODES; i++) {
       DatanodeInfo dn = new DatanodeInfo(
-          MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(),
+          DatanodeDetailsTestUtils.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
       setupDefaultStorageReport(dn);
       datanodes.add(dn);
@@ -136,7 +136,7 @@ public class TestPendingContainerTracker {
   public void testTwoWindowRollAgesOutContainerAfterTwoIntervals() throws InterruptedException {
     long rollMs = 200L;
     DatanodeInfo shortDn = new DatanodeInfo(
-        MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(),
+        DatanodeDetailsTestUtils.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(),
         UpgradeUtils.defaultVersionProto(), rollMs);
 
     PendingContainerTracker shortRollTracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, rollMs, null);
@@ -173,7 +173,7 @@ public class TestPendingContainerTracker {
   @Test
   public void testUnknownDatanodeHasZeroPendingCount() {
     DatanodeInfo unknownDN = new DatanodeInfo(
-        MockDatanodeDetails.randomDatanodeDetails(), NodeStatus.inServiceHealthy(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), NodeStatus.inServiceHealthy(),
         UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     assertEquals(0, unknownDN.getPendingContainerAllocations().getCount());
   }
@@ -406,7 +406,7 @@ public class TestPendingContainerTracker {
   @Test
   public void testHasAvailableSpaceWithNoStorageReports() {
     DatanodeInfo emptyDn = new DatanodeInfo(
-        MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(),
+        DatanodeDetailsTestUtils.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(),
         UpgradeUtils.defaultVersionProto(),
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     // No storage reports set

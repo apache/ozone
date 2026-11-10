@@ -23,8 +23,8 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.createDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
@@ -78,8 +78,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
@@ -282,7 +282,7 @@ public class TestSCMNodeManager {
    */
   private DatanodeDetails registerWithCapacity(SCMNodeManager nodeManager,
       DatanodeVersionProto versionInfo, ErrorCode expectedResult) {
-    DatanodeDetails details = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails details = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     StorageReportProto storageReport =
         HddsTestUtils.createStorageReport(details.getID(),
@@ -292,7 +292,7 @@ public class TestSCMNodeManager {
             Long.MAX_VALUE);
 
     RegisteredCommand cmd = nodeManager.register(
-        MockDatanodeDetails.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
             Arrays.asList(metadataStorageReport)),
         getRandomPipelineReports(), versionInfo);
@@ -1011,7 +1011,7 @@ public class TestSCMNodeManager {
 
     try (SCMNodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig, eventPublisher,
         new NetworkTopologyImpl(conf), SCMContext.emptyContext(), versionManager)) {
-      DatanodeDetails node = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails node = DatanodeDetailsTestUtils.randomDatanodeDetails();
       StorageReportProto storageReport = HddsTestUtils.createStorageReport(
           node.getID(), node.getNetworkFullPath(), Long.MAX_VALUE);
       RegisteredCommand cmd = nodeManager.register(node,
@@ -1165,7 +1165,7 @@ public class TestSCMNodeManager {
         nodeManagerContext, versionManager);
 
     // Register a pre-finalized datanode to the pre-finalized SCM.
-    DatanodeDetails node1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails node1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
         node1.getID(), node1.getNetworkFullPath(), Long.MAX_VALUE);
     DatanodeVersionProto preFinalizedDNVersion =
@@ -1202,7 +1202,7 @@ public class TestSCMNodeManager {
         times(1)).fireEvent(NEW_NODE, node1);
     for (int i = 0; i < 3; i++) {
       nodeManager.addDatanodeCommand(node1.getID(), ContainerTestUtils
-          .getReplicateContainerCommand(1, MockDatanodeDetails.randomDatanodeDetails()));
+          .getReplicateContainerCommand(1, DatanodeDetailsTestUtils.randomDatanodeDetails()));
     }
     for (int i = 0; i < 5; i++) {
       nodeManager.addDatanodeCommand(node1.getID(),
@@ -1725,7 +1725,7 @@ public class TestSCMNodeManager {
 
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       for (int x = 0; x < nodeCount; x++) {
-        DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+        DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
         dnList.add(dn);
         DatanodeID dnId = dn.getID();
         long free = capacity - used;
@@ -1781,7 +1781,7 @@ public class TestSCMNodeManager {
   public void testCalculateStoragePercentage(long perCapacity,
       long used, long remaining, int volumeCount, String totalCapacity,
           String scmUsedPerc, String nonScmUsedPerc) {
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     DatanodeID dnId = dn.getID();
     List<StorageReportProto> reports = volumeCount > 0 ?
         generateStorageReportProto(volumeCount, dnId, perCapacity,
@@ -1814,7 +1814,7 @@ public class TestSCMNodeManager {
     List<DatanodeDetails> dnList = new ArrayList<>(1);
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dnList.add(dn);
       DatanodeID dnId = dn.getID();
       long free = capacity - used;
@@ -2124,7 +2124,7 @@ public class TestSCMNodeManager {
 
     for (int i = 0; i < nodeCount; i++) {
       DatanodeDetails datanodeDetails =
-          MockDatanodeDetails.randomDatanodeDetails();
+          DatanodeDetailsTestUtils.randomDatanodeDetails();
       final long capacity = 2000;
       final long used = 100;
       final long remaining = 1900;
@@ -2187,7 +2187,7 @@ public class TestSCMNodeManager {
       throws IOException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails datanodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
       DatanodeID dnId = datanodeDetails.getID();
 
       StorageReportProto report1 = HddsTestUtils
@@ -2391,14 +2391,14 @@ public class TestSCMNodeManager {
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
         scmContext, mockVersionManager());
 
-    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode = DatanodeDetailsTestUtils.randomDatanodeDetails();
     datanode.setPersistedOpState(oldState);
     nodeManager.register(datanode, null, HddsTestUtils.getRandomPipelineReports());
 
     nodeManager.setNodeOperationalState(datanode, newState, 0);
     verify(eventPublisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
 
-    DatanodeDetails reportedDatanode = MockDatanodeDetails.createDatanodeDetails(
+    DatanodeDetails reportedDatanode = DatanodeDetailsTestUtils.createDatanodeDetails(
         datanode.getID());
     reportedDatanode.setPersistedOpState(newState);
 

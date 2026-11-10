@@ -40,13 +40,13 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils;
@@ -71,9 +71,9 @@ public class TestXceiverClientGrpc {
   @BeforeEach
   public void setup() {
     dns = new ArrayList<>();
-    dns.add(MockDatanodeDetails.randomDatanodeDetails());
-    dns.add(MockDatanodeDetails.randomDatanodeDetails());
-    dns.add(MockDatanodeDetails.randomDatanodeDetails());
+    dns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    dns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    dns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     dnsInOrder = new ArrayList<>();
     for (int i = 2; i >= 0; i--) {
@@ -263,7 +263,7 @@ public class TestXceiverClientGrpc {
       throws IOException {
     final List<DatanodeDetails> seenDNs = new ArrayList<>();
     for (int i = 0; i < 100; i++) {
-      Pipeline randomPipeline = MockPipeline.createRatisPipeline();
+      Pipeline randomPipeline = PipelineTestUtils.createRatisPipeline();
       int nodeCount = randomPipeline.getNodes().size();
       assertThat(nodeCount).isGreaterThan(1);
       randomPipeline.getNodes().forEach(
@@ -377,7 +377,7 @@ public class TestXceiverClientGrpc {
   public void testStreamReadSendsImmediatelyWhenReady() throws Exception {
     TrackingStreamObserver obs = new TrackingStreamObserver(true);
     StreamingReadResponse response = new StreamingReadResponse(
-        MockDatanodeDetails.randomDatanodeDetails(), obs);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
 
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
@@ -395,7 +395,7 @@ public class TestXceiverClientGrpc {
   public void testStreamReadWaitsUntilReadyThenSends() throws Exception {
     TrackingStreamObserver obs = new TrackingStreamObserver(false);
     StreamingReaderSpi reader = mock(StreamingReaderSpi.class);
-    new XceiverClientGrpc.ReadyAwareResponseObserver(MockDatanodeDetails.randomDatanodeDetails(), reader)
+    new XceiverClientGrpc.ReadyAwareResponseObserver(DatanodeDetailsTestUtils.randomDatanodeDetails(), reader)
         .beforeStart(obs);
     ArgumentCaptor<StreamingReadResponse> captured = ArgumentCaptor.forClass(StreamingReadResponse.class);
     verify(reader).setStreamingReadResponse(captured.capture());
@@ -437,7 +437,7 @@ public class TestXceiverClientGrpc {
 
     TrackingStreamObserver obs = new TrackingStreamObserver(false);
     StreamingReadResponse response = new StreamingReadResponse(
-        MockDatanodeDetails.randomDatanodeDetails(), obs);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
 
     long start;
@@ -457,7 +457,7 @@ public class TestXceiverClientGrpc {
   public void testStreamReadRestoresInterruptFlagOnInterruption() throws Exception {
     TrackingStreamObserver obs = new TrackingStreamObserver(false);
     StreamingReadResponse response = new StreamingReadResponse(
-        MockDatanodeDetails.randomDatanodeDetails(), obs);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
 
     OzoneConfiguration longTimeout = new OzoneConfiguration();

@@ -27,8 +27,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 
@@ -54,7 +54,7 @@ public class TestContainerTokenVerifier
   @Override
   protected ContainerCommandRequestProto unverifiedRequest()
       throws IOException {
-    Pipeline pipeline = MockPipeline.createPipeline(1);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(1);
     return getWriteChunkRequest(
         pipeline, new BlockID(1, 0), 123);
   }
@@ -62,7 +62,7 @@ public class TestContainerTokenVerifier
   @Override
   protected ContainerCommandRequestProto verifiedRequest(
       ContainerTokenIdentifier tokenId) throws IOException {
-    Pipeline pipeline = MockPipeline.createPipeline(1);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(1);
     return getCreateContainerRequest(CONTAINER_ID.get(), pipeline);
   }
 

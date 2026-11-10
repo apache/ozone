@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineCommandProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -191,9 +191,9 @@ public class TestClosePipelineCommandHandler {
   }
 
   private List<DatanodeDetails> getDatanodes() {
-    final DatanodeDetails dnOne = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dnTwo = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dnThree = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dnOne = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dnTwo = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dnThree = DatanodeDetailsTestUtils.randomDatanodeDetails();
     return Arrays.asList(dnOne, dnTwo, dnThree);
   }
 

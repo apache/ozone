@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.XceiverClientManagerConfigBuilder;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,7 +133,7 @@ class TestXceiverClientManagerCloseContention {
               for (int i = 0; i < CYCLES_PER_THREAD; i++) {
                 // Distinct pipeline per cycle => distinct cache key => the
                 // previously cached client is evicted and closed.
-                Pipeline pipeline = MockPipeline.createPipeline(1);
+                Pipeline pipeline = PipelineTestUtils.createPipeline(1);
                 XceiverClientSpi client = manager.acquireClient(pipeline);
                 manager.releaseClient(client, false);
               }
@@ -244,10 +244,10 @@ class TestXceiverClientManagerCloseContention {
         return client;
       }
     }) {
-      XceiverClientSpi client1 = manager.acquireClient(MockPipeline.createPipeline(1));
+      XceiverClientSpi client1 = manager.acquireClient(PipelineTestUtils.createPipeline(1));
       manager.releaseClient(client1, false);
       // evicts client1, which has no reference left and so gets closed
-      XceiverClientSpi client2 = manager.acquireClient(MockPipeline.createPipeline(1));
+      XceiverClientSpi client2 = manager.acquireClient(PipelineTestUtils.createPipeline(1));
 
       assertThat(closeStarted.await(10, TimeUnit.SECONDS)).isTrue();
       assertThat(closeThread.get()).isNotSameAs(Thread.currentThread());
@@ -289,7 +289,7 @@ class TestXceiverClientManagerCloseContention {
       }
     }) {
       for (int i = 0; i < 3; i++) {
-        XceiverClientSpi client = manager.acquireClient(MockPipeline.createPipeline(1));
+        XceiverClientSpi client = manager.acquireClient(PipelineTestUtils.createPipeline(1));
         manager.releaseClient(client, false);
       }
     }

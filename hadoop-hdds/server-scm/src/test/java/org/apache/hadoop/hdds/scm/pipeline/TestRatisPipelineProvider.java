@@ -45,8 +45,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -191,7 +191,7 @@ public class TestRatisPipelineProvider {
   private List<DatanodeDetails> createListOfNodes(int count) {
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < count; i++) {
-      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
     return nodes;
   }

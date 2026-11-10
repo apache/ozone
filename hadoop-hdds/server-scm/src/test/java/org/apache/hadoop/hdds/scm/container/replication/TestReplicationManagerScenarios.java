@@ -50,8 +50,8 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -477,9 +477,9 @@ public class TestReplicationManagerScenarios {
       }
       if (datanode != null) {
         datanodeDetails = DATANODE_ALIASES.computeIfAbsent(datanode, (k) ->
-            MockDatanodeDetails.randomDatanodeDetails());
+            DatanodeDetailsTestUtils.randomDatanodeDetails());
       } else {
-        datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+        datanodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
       }
     }
 
@@ -651,10 +651,10 @@ public class TestReplicationManagerScenarios {
 
     public DatanodeDetails getDatanodeDetails() {
       if (datanode == null) {
-        return MockDatanodeDetails.randomDatanodeDetails();
+        return DatanodeDetailsTestUtils.randomDatanodeDetails();
       } else {
         return DATANODE_ALIASES.computeIfAbsent(datanode, (k) ->
-            MockDatanodeDetails.randomDatanodeDetails());
+            DatanodeDetailsTestUtils.randomDatanodeDetails());
       }
     }
 

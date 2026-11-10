@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -434,7 +434,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }
@@ -489,7 +489,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }
@@ -525,7 +525,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }
@@ -581,7 +581,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }
@@ -619,7 +619,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
     }
     Set<ContainerID> idsRatis = new HashSet<>();
@@ -679,7 +679,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }
@@ -780,7 +780,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }
@@ -850,7 +850,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }
@@ -936,7 +936,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeAdminError> error;
     List<DatanodeDetails> dns = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }
@@ -977,7 +977,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
     }
     Set<ContainerID> idsRatis = new HashSet<>();
@@ -1051,7 +1051,7 @@ public class TestNodeDecommissionManager {
     assertThat(nodeManager.getNodeStatus(target).getOperationalState())
         .isEqualTo(HddsProtos.NodeOperationalState.IN_SERVICE);
 
-    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+    nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(), null, null);
 
     assertThat(decom.decommissionNodes(singletonList(target.getIpAddress()), false)).isEmpty();
     assertThat(nodeManager.getNodeStatus(target).getOperationalState())
@@ -1070,7 +1070,7 @@ public class TestNodeDecommissionManager {
     assertThat(nodeManager.getNodeStatus(target).getOperationalState())
         .isEqualTo(HddsProtos.NodeOperationalState.IN_SERVICE);
 
-    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+    nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(), null, null);
 
     assertThat(decom.startMaintenanceNodes(singletonList(target.getIpAddress()), 1, false)).isEmpty();
     assertThat(nodeManager.getNodeStatus(target).getOperationalState())
@@ -1082,7 +1082,7 @@ public class TestNodeDecommissionManager {
     nodeManager.getNodeStateManager().pause();
     int totalNodes = healthyNodes + 1;
     for (int index = 0; index < totalNodes; index++) {
-      nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null, null);
+      nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(), null, null);
     }
     DatanodeDetails target = nodeManager.getAllNodes().get(0);
     nodeManager.getNodeStateManager().getNode(target).setNodeStatus(
@@ -1138,7 +1138,7 @@ public class TestNodeDecommissionManager {
   private List<DatanodeDetails> generateDatanodes() {
     List<DatanodeDetails> dns = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }

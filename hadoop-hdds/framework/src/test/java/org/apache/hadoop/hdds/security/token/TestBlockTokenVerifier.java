@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -52,14 +52,14 @@ public class TestBlockTokenVerifier
   @Override
   protected ContainerCommandRequestProto unverifiedRequest()
       throws IOException {
-    Pipeline pipeline = MockPipeline.createPipeline(1);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(1);
     return ContainerTestHelper.getCloseContainer(pipeline, 1);
   }
 
   @Override
   protected ContainerCommandRequestProto verifiedRequest(
       OzoneBlockTokenIdentifier tokenId) throws IOException {
-    Pipeline pipeline = MockPipeline.createPipeline(1);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(1);
     return getWriteChunkRequest(
         pipeline, new BlockID(1, 0), 1024);
   }

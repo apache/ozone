@@ -25,7 +25,7 @@ import java.util.Collections;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
@@ -86,8 +86,8 @@ public class TestReconstructECContainersCommand {
   }
 
   private ReconstructECContainersCommand createCommand() {
-    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
     byte[] missingIndexes = new byte[]{2};
     return new ReconstructECContainersCommand(1L,
         Collections.singletonList(new DatanodeDetailsAndReplicaIndex(source, 1)),

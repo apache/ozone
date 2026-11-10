@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -319,9 +319,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     // Two blocks on the same 3-node pipeline must be sorted once, and the
     // sorted order must land in every block's pipeline.
     List<DatanodeDetails> nodes = Arrays.asList(
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails());
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
@@ -374,9 +374,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     // the sort is skipped (sortDatanodesForWrite returns the input unchanged),
     // each pipeline must keep its own order: the unsorted result must not be
     // cached under the node set and reused for the other pipeline.
-    DatanodeDetails a = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails b = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails c = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails a = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails b = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails c = DatanodeDetailsTestUtils.randomDatanodeDetails();
     List<DatanodeDetails> nodes1 = Arrays.asList(a, b, c);
     List<DatanodeDetails> nodes2 = Arrays.asList(c, b, a);
     Pipeline pipeline1 = Pipeline.newBuilder()
@@ -429,9 +429,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     // OM must not sort, SCM receives an empty clientMachine, and the pipeline
     // order is preserved.
     List<DatanodeDetails> nodes = Arrays.asList(
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails());
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
@@ -468,9 +468,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   @Test
   public void sortDatanodesForWriteRequiresClientMachine() {
     List<DatanodeDetails> nodes = Arrays.asList(
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails());
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
     assertThrows(IllegalArgumentException.class,
         () -> keyManager.sortDatanodesForWrite(nodes, "", mock(NetworkTopology.class)));
   }

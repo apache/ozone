@@ -48,8 +48,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -168,7 +168,7 @@ public class TestPipelinePlacementPolicy {
   }
 
   private DatanodeDetails getNodesWithoutRackAwareness() {
-    DatanodeDetails node = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails node = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodesWithOutRackAwareness.add(node);
     return node;
   }
@@ -200,7 +200,7 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (Node node : SINGLE_NODE_RACK) {
       DatanodeDetails datanode = overwriteLocationInNode(
-          MockDatanodeDetails.randomDatanodeDetails(), node);
+          DatanodeDetailsTestUtils.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
     MockNodeManager localNodeManager = new MockNodeManager(cluster,
@@ -237,7 +237,7 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (Node node : SINGLE_NODE_RACK) {
       DatanodeDetails datanode = overwriteLocationInNode(
-          MockDatanodeDetails.randomDatanodeDetails(), node);
+          DatanodeDetailsTestUtils.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
     MockNodeManager localNodeManager = new MockNodeManager(cluster,
@@ -465,11 +465,11 @@ public class TestPipelinePlacementPolicy {
         nodeManager, stateManager, conf);
 
     List<DatanodeDetails> dns = new ArrayList<>();
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host1", "/rack1"));
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host2", "/rack1"));
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host3", "/rack2"));
     for (DatanodeDetails dn : dns) {
       cluster.add(dn);
@@ -519,11 +519,11 @@ public class TestPipelinePlacementPolicy {
         nodeManager, stateManager, conf);
 
     List<DatanodeDetails> dns = new ArrayList<>();
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host1", "/rack1"));
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host2", "/rack1"));
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host3", "/rack1"));
     for (DatanodeDetails dn : dns) {
       localCluster.add(dn);
@@ -592,13 +592,13 @@ public class TestPipelinePlacementPolicy {
 
   private List<DatanodeDetails> setupSkewedRacks() {
     List<DatanodeDetails> dns = new ArrayList<>();
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host1", "/rack1"));
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host2", "/rack2"));
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host3", "/rack2"));
-    dns.add(MockDatanodeDetails
+    dns.add(DatanodeDetailsTestUtils
         .createDatanodeDetails("host4", "/rack2"));
 
     nodeManager = new MockNodeManager(cluster, dns,
@@ -633,8 +633,8 @@ public class TestPipelinePlacementPolicy {
         int pipelineCount = 0;
         List<DatanodeDetails> dnList = new ArrayList<>();
         dnList.add(node);
-        dnList.add(MockDatanodeDetails.randomDatanodeDetails());
-        dnList.add(MockDatanodeDetails.randomDatanodeDetails());
+        dnList.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+        dnList.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
         Pipeline pipeline;
         HddsProtos.Pipeline pipelineProto;
 

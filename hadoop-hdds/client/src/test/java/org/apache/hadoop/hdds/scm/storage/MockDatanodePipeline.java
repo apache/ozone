@@ -48,8 +48,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.FilePositionCount;
@@ -107,7 +107,7 @@ public class MockDatanodePipeline {
 
   public MockDatanodePipeline(BlockID blockID) throws IOException {
     this.blockID = blockID;
-    this.pipeline = MockPipeline.createRatisPipeline();
+    this.pipeline = PipelineTestUtils.createRatisPipeline();
 
     // Ensure metrics are initialized
     XceiverClientManager.getXceiverClientMetrics();

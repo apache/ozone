@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -62,7 +62,7 @@ final class DummyBlockInputStreamWithRetry
           isRerfreshed.set(true);
           try {
             BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
-            Pipeline mockPipeline = MockPipeline.createPipeline(1);
+            Pipeline mockPipeline = PipelineTestUtils.createPipeline(1);
             when(blockLocationInfo.getPipeline()).thenReturn(mockPipeline);
             return blockLocationInfo;
           } catch (IOException e) {

@@ -36,8 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -121,7 +121,7 @@ public class TestQuasiClosedStuckOverReplicationHandler {
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
         0,
         null,
         Long.MAX_VALUE,

@@ -37,7 +37,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachHealthState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
-import static org.apache.hadoop.hdds.scm.pipeline.MockPipeline.createPipeline;
+import static org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils.createPipeline;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.createContainer;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getReplicateContainerCommand;

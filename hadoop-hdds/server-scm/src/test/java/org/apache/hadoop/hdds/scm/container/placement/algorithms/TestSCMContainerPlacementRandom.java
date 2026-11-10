@@ -32,7 +32,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -60,7 +60,7 @@ public class TestSCMContainerPlacementRandom {
     List<DatanodeInfo> datanodes = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
-          MockDatanodeDetails.randomDatanodeDetails(),
+          DatanodeDetailsTestUtils.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
@@ -131,7 +131,7 @@ public class TestSCMContainerPlacementRandom {
 
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
-      datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      datanodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
 
     NodeManager mockNodeManager = mock(NodeManager.class);
@@ -151,7 +151,7 @@ public class TestSCMContainerPlacementRandom {
     assertEquals(1, status.misReplicationCount(), 3);
 
     datanodes = new ArrayList<DatanodeDetails>();
-    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    datanodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     status = scmContainerPlacementRandom.validateContainerPlacement(
         datanodes, 3);
     assertTrue(status.isPolicySatisfied());
@@ -171,7 +171,7 @@ public class TestSCMContainerPlacementRandom {
     List<DatanodeInfo> datanodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
-          MockDatanodeDetails.randomDatanodeDetails(),
+          DatanodeDetailsTestUtils.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);

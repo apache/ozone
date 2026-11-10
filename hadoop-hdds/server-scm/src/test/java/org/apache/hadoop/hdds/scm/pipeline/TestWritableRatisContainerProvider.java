@@ -73,7 +73,7 @@ class TestWritableRatisContainerProvider {
 
   @Test
   void returnsExistingContainer() throws Exception {
-    Pipeline pipeline = MockPipeline.createPipeline(3);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(3);
     ContainerInfo existingContainer = pipelineHasContainer(pipeline);
 
     existingPipelines(pipeline);
@@ -86,10 +86,10 @@ class TestWritableRatisContainerProvider {
 
   @RepeatedTest(100)
   void skipsPipelineWithoutContainer() throws Exception {
-    Pipeline pipeline = MockPipeline.createPipeline(3);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(3);
     ContainerInfo existingContainer = pipelineHasContainer(pipeline);
 
-    Pipeline pipelineWithoutContainer = MockPipeline.createPipeline(3);
+    Pipeline pipelineWithoutContainer = PipelineTestUtils.createPipeline(3);
     existingPipelines(pipelineWithoutContainer, pipeline);
 
     ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
@@ -140,7 +140,7 @@ class TestWritableRatisContainerProvider {
   }
 
   private ContainerInfo createNewContainerOnDemand() throws IOException {
-    Pipeline newPipeline = MockPipeline.createPipeline(3);
+    Pipeline newPipeline = PipelineTestUtils.createPipeline(3);
     when(pipelineManager.createPipeline(REPLICATION_CONFIG))
         .thenReturn(newPipeline);
 

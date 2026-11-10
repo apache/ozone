@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -84,8 +84,8 @@ public class TestHeartbeatEndpointTask {
         mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
 
     List<DatanodeDetails> targetDns = new ArrayList<>();
-    targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
-    targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
+    targetDns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    targetDns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1, emptyList(), targetDns,
         UnsafeByteOperations.unsafeWrap(new byte[]{2, 5}),
@@ -127,8 +127,8 @@ public class TestHeartbeatEndpointTask {
         mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
 
     Set<DatanodeDetails> peerDNs = new HashSet<>();
-    peerDNs.add(MockDatanodeDetails.randomDatanodeDetails());
-    peerDNs.add(MockDatanodeDetails.randomDatanodeDetails());
+    peerDNs.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    peerDNs.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     ReconcileContainerCommand cmd = new ReconcileContainerCommand(1, peerDNs);
 
     when(scm.sendHeartbeat(any()))

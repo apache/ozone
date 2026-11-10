@@ -39,7 +39,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -163,7 +163,7 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = singletonList(
             new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
-                    MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
+                    DatanodeDetailsTestUtils.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
     pendingOp = singletonList(new ContainerReplicaOp(
