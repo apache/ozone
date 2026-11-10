@@ -64,6 +64,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Tests pending operations through the Jersey request and response lifecycle. */
 public class TestPendingOperationsListener {
 
+  private static final long TIMEOUT_SECONDS = 10;
+
   private final ObjectEndpoint endpoint = new ObjectEndpoint();
   private S3GatewayMetrics metrics;
   private ResourceConfig config;
@@ -85,6 +87,11 @@ public class TestPendingOperationsListener {
       application.onShutdown(null);
     }
     S3GatewayMetrics.unRegister();
+  }
+
+  @Test
+  void gatewayApplicationRegistersListener() {
+    assertTrue(new GatewayApplication().getClasses().contains(PendingOperationsListener.class));
   }
 
   @Test
@@ -211,7 +218,7 @@ public class TestPendingOperationsListener {
   void unmatchedRequestIsNotCounted() throws Exception {
     application = new ApplicationHandler(config);
     ContainerRequest request = request("missing");
-    assertEquals(404, application.apply(request).get(10, TimeUnit.SECONDS).getStatus());
+    assertEquals(404, application.apply(request).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).getStatus());
     assertEquals(0, metrics.getPendingOperations());
   }
 
@@ -242,7 +249,7 @@ public class TestPendingOperationsListener {
     endpoint.response = () -> Response.ok((StreamingOutput) out -> {
       started.countDown();
       try {
-        assertTrue(complete.await(10, TimeUnit.SECONDS));
+        assertTrue(complete.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(e);
@@ -255,16 +262,16 @@ public class TestPendingOperationsListener {
       Callable<ContainerResponse> request = this::execute;
       Future<ContainerResponse> first = executor.submit(request);
       Future<ContainerResponse> second = executor.submit(request);
-      assertTrue(started.await(10, TimeUnit.SECONDS));
+      assertTrue(started.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
       assertEquals(2, metrics.getPendingOperations());
       complete.countDown();
-      assertEquals(200, first.get(10, TimeUnit.SECONDS).getStatus());
-      assertEquals(200, second.get(10, TimeUnit.SECONDS).getStatus());
+      assertEquals(200, first.get(TIMEOUT_SECONDS, TimeUnit.SECONDS).getStatus());
+      assertEquals(200, second.get(TIMEOUT_SECONDS, TimeUnit.SECONDS).getStatus());
       assertEquals(0, metrics.getPendingOperations());
     } finally {
       complete.countDown();
       executor.shutdownNow();
-      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+      assertTrue(executor.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS));
     }
   }
 
@@ -276,7 +283,7 @@ public class TestPendingOperationsListener {
     if (application == null) {
       application = new ApplicationHandler(config);
     }
-    return application.apply(request("object"), output).get(10, TimeUnit.SECONDS);
+    return application.apply(request("object"), output).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
   }
 
   private static ContainerRequest request(String path) {
