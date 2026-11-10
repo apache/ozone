@@ -58,8 +58,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -106,7 +106,7 @@ public class TestStreamBlockInputStream {
     doAnswer(inv -> {
       StreamingReaderSpi reader = inv.getArgument(1);
       StreamingReadResponse response = new StreamingReadResponse(
-          MockDatanodeDetails.randomDatanodeDetails(), mock(ClientCallStreamObserver.class));
+          DatanodeDetailsTestUtils.randomDatanodeDetails(), mock(ClientCallStreamObserver.class));
       reader.setStreamingReadResponse(response);
       readers.put(response, reader);
       return null;
@@ -614,7 +614,7 @@ public class TestStreamBlockInputStream {
     }
     ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
     StreamingReadResponse streamingReadResponse = new StreamingReadResponse(
-        MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), requestObserver);
 
     AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
     List<Long> requestLengths = Collections.synchronizedList(new ArrayList<>());
@@ -684,7 +684,7 @@ public class TestStreamBlockInputStream {
     ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
     StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
     when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
-    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     AtomicInteger initCount = new AtomicInteger();
     XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
@@ -736,7 +736,7 @@ public class TestStreamBlockInputStream {
     ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
     StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
     when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
-    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
     XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
@@ -1061,7 +1061,7 @@ public class TestStreamBlockInputStream {
     ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
         mock(ClientCallStreamObserver.class);
     StreamingReadResponse streamingReadResponse = new StreamingReadResponse(
-        MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), requestObserver);
 
     XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
     AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
@@ -1110,7 +1110,7 @@ public class TestStreamBlockInputStream {
     ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
         mock(ClientCallStreamObserver.class);
     StreamingReadResponse streamingReadResponse = new StreamingReadResponse(
-        MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), requestObserver);
 
     AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
     AtomicInteger streamReads = new AtomicInteger();
@@ -1422,7 +1422,7 @@ public class TestStreamBlockInputStream {
     ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
     StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
     when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
-    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     // Every other ReadBlock request gets an error response; only one reader is active at a time here.
     AtomicInteger streamReads = new AtomicInteger();

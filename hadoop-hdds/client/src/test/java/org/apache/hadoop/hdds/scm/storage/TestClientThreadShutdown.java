@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -169,7 +169,7 @@ public class TestClientThreadShutdown {
       when(socketFactory.createSocket(anyInt(), anyInt(), any())).thenReturn(socket);
       Field instance = field(DomainSocketFactory.class, "instance");
       instance.set(null, socketFactory);
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       XceiverClientShortCircuit client = new XceiverClientShortCircuit(null, conf, dn);
       retainedClient = client;
       client.connect();

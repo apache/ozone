@@ -27,7 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
@@ -82,7 +82,7 @@ public class TestReplicateContainerCommandHandler {
     CommandHandlerMetrics metrics = CommandHandlerMetrics.create(handlerMap);
     try {
       doNothing().when(supervisor).addTask(any());
-      DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
       ReplicateContainerCommand command =
           ContainerTestUtils.getReplicateContainerCommand(1, target);
@@ -132,7 +132,7 @@ public class TestReplicateContainerCommandHandler {
     ReplicateContainerCommandHandler handler =
         new ReplicateContainerCommandHandler(supervisor, pushReplicator);
 
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
     ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
         1, target, HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
 

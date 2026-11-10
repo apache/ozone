@@ -59,8 +59,8 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -106,7 +106,7 @@ public class TestBlockInputStream {
     clientConfig.setChecksumVerify(false);
     clientConfig.setReadRetryInterval(0);
 
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
     blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         null, refreshFunction, chunks, chunkDataMap, clientConfig);
   }
@@ -283,7 +283,7 @@ public class TestBlockInputStream {
 
     try (BlockInputStream blockInputStreamWithRetry =
              new DummyBlockInputStreamWithRetry(blockID, blockSize,
-                 MockPipeline.createSingleNodePipeline(), null,
+                 PipelineTestUtils.createSingleNodePipeline(), null,
                  null, chunks, chunkDataMap, isRefreshed, null,
                  retryDelayConfig)) {
       assertFalse(isRefreshed.get());
@@ -300,10 +300,10 @@ public class TestBlockInputStream {
   @MethodSource("exceptionsTriggersRefresh")
   void refreshesPipelineOnReadFailure(IOException ex) throws Exception {
     // GIVEN
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
     BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
     when(blockLocationInfo.getPipeline()).thenReturn(pipeline);
-    Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline newPipeline = PipelineTestUtils.createSingleNodePipeline();
     BlockLocationInfo newBlockLocationInfo = mock(BlockLocationInfo.class);
 
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
@@ -321,10 +321,10 @@ public class TestBlockInputStream {
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
   void refreshesPipelineOnPositionedReadFailure(IOException ex) throws Exception {
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
     BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
     when(blockLocationInfo.getPipeline()).thenReturn(pipeline);
-    Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline newPipeline = PipelineTestUtils.createSingleNodePipeline();
     BlockLocationInfo newBlockLocationInfo = mock(BlockLocationInfo.class);
 
     testRefreshesPipelineOnPositionedReadFailure(ex, blockLocationInfo,
@@ -451,7 +451,7 @@ public class TestBlockInputStream {
       throws Exception {
     // GIVEN
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
 
     final int len = ThreadLocalRandom.current().nextInt(100, 300);
     final ChunkInputStream stream = throwingChunkInputStream(ex, len, false);
@@ -478,7 +478,7 @@ public class TestBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     BlockInputStream subject = new BlockInputStream(
         new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
-        MockPipeline.createSingleNodePipeline(), null, mock(XceiverClientFactory.class), refreshFunction,
+        PipelineTestUtils.createSingleNodePipeline(), null, mock(XceiverClientFactory.class), refreshFunction,
         clientConfig);
     subject.close();
 
@@ -493,8 +493,8 @@ public class TestBlockInputStream {
       throws Exception {
     // GIVEN
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-    Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
+    Pipeline newPipeline = PipelineTestUtils.createSingleNodePipeline();
     XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
     XceiverClientSpi client = mock(XceiverClientSpi.class);
     BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
@@ -596,7 +596,7 @@ public class TestBlockInputStream {
     chunkDataMap.put(chunkName, blockData);
     chunks.add(chunkInfo);
 
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
     return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         null, refreshFunction, chunks, chunkDataMap, clientConfig);
   }

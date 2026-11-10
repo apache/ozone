@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
@@ -98,7 +98,7 @@ public final class DatanodeAdminMonitorTestUtil {
     Set<ContainerReplica> replicas = new HashSet<>();
     for (HddsProtos.NodeOperationalState s : states) {
       replicas.add(generateReplica(containerID, s, CLOSED, 0,
-          MockDatanodeDetails.randomDatanodeDetails()));
+          DatanodeDetailsTestUtils.randomDatanodeDetails()));
     }
     ContainerInfo container = new ContainerInfo.Builder()
         .setContainerID(containerID.getIdForTesting())

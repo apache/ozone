@@ -48,8 +48,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -361,7 +361,7 @@ public final class ContainerTestHelper {
       updateRequestBuilder.addMetadata(kvBuilder.build());
     }
     Pipeline pipeline =
-        MockPipeline.createSingleNodePipeline();
+        PipelineTestUtils.createSingleNodePipeline();
 
     Builder request =
         ContainerCommandRequestProto.newBuilder();

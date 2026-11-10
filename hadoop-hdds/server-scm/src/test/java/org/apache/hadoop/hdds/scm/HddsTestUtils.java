@@ -37,8 +37,8 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
@@ -103,7 +103,7 @@ public final class HddsTestUtils {
    */
   public static DatanodeDetails getDatanodeDetails(
       RegisteredCommand registeredCommand) {
-    return MockDatanodeDetails.createDatanodeDetails(
+    return DatanodeDetailsTestUtils.createDatanodeDetails(
         registeredCommand.getDatanode().getID(),
         registeredCommand.getDatanode().getHostName(),
         registeredCommand.getDatanode().getIpAddress(),
@@ -121,7 +121,7 @@ public final class HddsTestUtils {
   public static DatanodeDetails createRandomDatanodeAndRegister(
       SCMNodeManager nodeManager) {
     return getDatanodeDetails(
-        nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null,
+        nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(), null,
                 getRandomPipelineReports()));
   }
 
@@ -757,9 +757,9 @@ public final class HddsTestUtils {
 
   public static Pipeline getRandomPipeline() {
     List<DatanodeDetails> nodes = new ArrayList<>();
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     return Pipeline.newBuilder()
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
@@ -778,7 +778,7 @@ public final class HddsTestUtils {
   public static SCMDatanodeProtocolServer.NodeRegistrationContainerReport
       createNodeRegistrationContainerReport(int numOfContainers) {
     return new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(
-        MockDatanodeDetails.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
         getRandomContainerReports(numOfContainers));
   }
 
@@ -796,7 +796,7 @@ public final class HddsTestUtils {
       containers.add(getRandomContainerInfo(c.getContainerID()));
     });
     return new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(
-        MockDatanodeDetails.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
         getContainerReports(containers));
   }
 

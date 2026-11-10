@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -87,7 +87,7 @@ public class TestKeyInputStreamEC {
       int nodeCount, long blockLength) {
     Map<DatanodeDetails, Integer> dnMap = new HashMap<>();
     for (int i = 0; i < nodeCount; i++) {
-      dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), i + 1);
+      dnMap.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i + 1);
     }
 
     Pipeline pipeline = Pipeline.newBuilder()

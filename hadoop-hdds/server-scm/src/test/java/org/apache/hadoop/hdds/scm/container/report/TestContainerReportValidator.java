@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -53,7 +53,7 @@ public class TestContainerReportValidator {
             HddsProtos.LifeCycleState.CLOSED, PipelineID.randomId(),
             new ECReplicationConfig(3, 2));
 
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     ContainerReplicaProto replica = getContainerReplica(
             containerInfo.containerID(), 1, dn);
     assertTrue(ContainerReportValidator.validate(containerInfo, dn,
@@ -67,7 +67,7 @@ public class TestContainerReportValidator {
             HddsProtos.LifeCycleState.CLOSED, PipelineID.randomId(),
             new ECReplicationConfig(3, 2));
 
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     ContainerReplicaProto replica = getContainerReplica(
             containerInfo.containerID(), replicaIndex, dn);
     assertFalse(ContainerReportValidator.validate(containerInfo, dn,

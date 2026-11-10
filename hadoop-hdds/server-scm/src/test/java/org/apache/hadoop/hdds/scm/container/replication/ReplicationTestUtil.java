@@ -37,8 +37,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -115,7 +115,7 @@ public final class ReplicationTestUtil {
       int... indexes) {
     Set<ContainerReplica> replicas = new HashSet<>();
     for (int i : indexes) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       replicas.add(createContainerReplica(containerID, i, IN_SERVICE,
           replicaState, keyCount, bytesUsed,
           dn, dn.getID()));
@@ -131,7 +131,7 @@ public final class ReplicationTestUtil {
     for (int i : indexes) {
       replicas.add(createContainerReplica(
           containerID, i, IN_SERVICE, replicaState, 123L, 1234L,
-          MockDatanodeDetails.randomDatanodeDetails(), originNodeId));
+          DatanodeDetailsTestUtils.randomDatanodeDetails(), originNodeId));
     }
     return replicas;
   }
@@ -140,7 +140,7 @@ public final class ReplicationTestUtil {
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState) {
     DatanodeDetails datanodeDetails
-        = MockDatanodeDetails.randomDatanodeDetails();
+        = DatanodeDetailsTestUtils.randomDatanodeDetails();
     return createContainerReplica(containerID, replicaIndex, opState,
         replicaState, 0L, 0L,
         datanodeDetails, datanodeDetails.getID());
@@ -153,7 +153,7 @@ public final class ReplicationTestUtil {
     for (NodeOperationalStateAndOrigin i : nodes) {
       replicas.add(createContainerReplica(
           containerID, 0, i.state(), replicaState, 123L, 1234L,
-          MockDatanodeDetails.randomDatanodeDetails(), i.origin()));
+          DatanodeDetailsTestUtils.randomDatanodeDetails(), i.origin()));
     }
     return replicas;
   }
@@ -166,7 +166,7 @@ public final class ReplicationTestUtil {
       HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState, long seqId) {
     return createContainerReplica(containerID, 0, opState, replicaState, 123L, 1234L,
-        MockDatanodeDetails.randomDatanodeDetails(), originNodeId, seqId);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), originNodeId, seqId);
   }
 
   /**
@@ -186,7 +186,7 @@ public final class ReplicationTestUtil {
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState) {
     DatanodeDetails datanodeDetails
-        = MockDatanodeDetails.randomDatanodeDetails();
+        = DatanodeDetailsTestUtils.randomDatanodeDetails();
     return createContainerReplica(containerID, replicaIndex, opState,
         replicaState, 123L, 1234L,
         datanodeDetails, datanodeDetails.getID());
@@ -196,7 +196,7 @@ public final class ReplicationTestUtil {
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState, long seqId) {
     DatanodeDetails datanodeDetails
-        = MockDatanodeDetails.randomDatanodeDetails();
+        = DatanodeDetailsTestUtils.randomDatanodeDetails();
     return createContainerReplica(containerID, replicaIndex, opState,
         replicaState, 123L, 1234L,
         datanodeDetails, datanodeDetails.getID(), seqId);
@@ -305,7 +305,7 @@ public final class ReplicationTestUtil {
   public static PlacementPolicy getSimpleTestPlacementPolicy(
       final NodeManager nodeManager, final OzoneConfiguration conf) {
 
-    final Node rackNode = MockDatanodeDetails.randomDatanodeDetails();
+    final Node rackNode = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     return new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
@@ -316,7 +316,7 @@ public final class ReplicationTestUtil {
               long metadataSizeRequired, long dataSizeRequired) {
         List<DatanodeDetails> dns = new ArrayList<>();
         for (int i = 0; i < nodesRequiredToChoose; i++) {
-          dns.add(MockDatanodeDetails.randomDatanodeDetails());
+          dns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
         }
         return dns;
       }
@@ -420,7 +420,7 @@ public final class ReplicationTestUtil {
               FAILED_TO_FIND_SUITABLE_NODE);
         }
         return Collections
-            .singletonList(MockDatanodeDetails.randomDatanodeDetails());
+            .singletonList(DatanodeDetailsTestUtils.randomDatanodeDetails());
       }
 
       @Override

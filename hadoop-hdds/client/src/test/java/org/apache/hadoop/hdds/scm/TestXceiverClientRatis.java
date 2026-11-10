@@ -37,8 +37,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.AsyncApi;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
@@ -67,7 +67,7 @@ class TestXceiverClientRatis {
   void setUp() throws Exception {
     when(raftClient.async()).thenReturn(async);
     when(async.watch(INDEX, ReplicationLevel.ALL_COMMITTED)).thenReturn(allCommitted);
-    Pipeline pipeline = MockPipeline.createRatisPipeline();
+    Pipeline pipeline = PipelineTestUtils.createRatisPipeline();
     client = XceiverClientRatis.newXceiverClientRatis(pipeline, new OzoneConfiguration());
     try (MockedStatic<RatisHelper> ratisHelper = mockStatic(RatisHelper.class, CALLS_REAL_METHODS)) {
       ratisHelper.when(() -> RatisHelper.newRaftClient(any(RpcType.class), any(Pipeline.class), any(), any(), any()))

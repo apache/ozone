@@ -36,7 +36,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.codec.CharEncoding;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.junit.jupiter.api.AfterEach;
@@ -151,7 +151,7 @@ public class TestUsageInfoSubcommand {
   }
 
   private HddsProtos.DatanodeDetailsProto createDatanodeDetails() {
-    return MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage();
+    return DatanodeDetailsTestUtils.randomDatanodeDetails().getProtoBufMessage();
   }
 
 }

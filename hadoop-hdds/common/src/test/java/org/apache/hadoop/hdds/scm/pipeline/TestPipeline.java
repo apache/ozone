@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.V0_PORTS;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.TestDatanodeDetails.assertPorts;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
@@ -50,7 +50,7 @@ public class TestPipeline {
 
   @Test
   public void protoIncludesNewPortsOnlyForV1() throws IOException {
-    Pipeline subject = MockPipeline.createPipeline(3);
+    Pipeline subject = PipelineTestUtils.createPipeline(3);
 
     HddsProtos.Pipeline proto =
         subject.getProtobufMessage(DEFAULT_VERSION);
@@ -79,7 +79,7 @@ public class TestPipeline {
     expected.put(dn1.getID(), HDDSVersion.STREAM_BLOCK_SUPPORT.serialize());
     expected.put(dn2.getID(), HDDSVersion.SOFTWARE_VERSION.serialize());
 
-    Pipeline subject = MockPipeline.createPipeline(Arrays.asList(dn0, dn1, dn2));
+    Pipeline subject = PipelineTestUtils.createPipeline(Arrays.asList(dn0, dn1, dn2));
 
     assertPerMemberVersions(expected, subject.getProtobufMessage(ClientVersion.CURRENT));
   }
@@ -95,7 +95,7 @@ public class TestPipeline {
     DatanodeDetails dn2 = randomDatanodeDetails();
     dn2.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
 
-    Pipeline subject = MockPipeline.createPipeline(Arrays.asList(dn0, dn1, dn2));
+    Pipeline subject = PipelineTestUtils.createPipeline(Arrays.asList(dn0, dn1, dn2));
 
     HddsProtos.Pipeline proto =
         subject.getProtobufMessage(ClientVersion.CURRENT, ALL_PORTS, override);
@@ -120,7 +120,7 @@ public class TestPipeline {
     overrides.put(dn1.getID(), HDDSVersion.STREAM_BLOCK_SUPPORT);
     overrides.put(dn2.getID(), HDDSVersion.SOFTWARE_VERSION);
 
-    Pipeline subject = MockPipeline.createPipeline(Arrays.asList(dn0, dn1, dn2));
+    Pipeline subject = PipelineTestUtils.createPipeline(Arrays.asList(dn0, dn1, dn2));
 
     Map<DatanodeID, Integer> expected = new HashMap<>();
     expected.put(dn0.getID(), HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize());
@@ -139,7 +139,7 @@ public class TestPipeline {
 
   @Test
   public void getProtobufMessageEC() throws IOException {
-    Pipeline subject = MockPipeline.createPipeline(3);
+    Pipeline subject = PipelineTestUtils.createPipeline(3);
 
     //when EC config is empty/null
     HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
@@ -147,7 +147,7 @@ public class TestPipeline {
 
 
     //when EC config is NOT empty
-    subject = MockPipeline.createEcPipeline();
+    subject = PipelineTestUtils.createEcPipeline();
 
     protobufMessage = subject.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
     assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
@@ -157,7 +157,7 @@ public class TestPipeline {
 
   @Test
   public void testReplicaIndexesSerialisedCorrectly() {
-    Pipeline pipeline = MockPipeline.createEcPipeline();
+    Pipeline pipeline = PipelineTestUtils.createEcPipeline();
     HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
     Pipeline reloadedPipeline = Pipeline.getFromProtobuf(protobufMessage);
 
@@ -169,13 +169,13 @@ public class TestPipeline {
 
   @Test
   public void testECPipelineIsAlwaysHealthy() {
-    Pipeline pipeline = MockPipeline.createEcPipeline();
+    Pipeline pipeline = PipelineTestUtils.createEcPipeline();
     assertTrue(pipeline.isHealthy());
   }
 
   @Test
   public void testBuilderCopiesAllFieldsFromOtherPipeline() {
-    Pipeline original = MockPipeline.createEcPipeline();
+    Pipeline original = PipelineTestUtils.createEcPipeline();
     Pipeline copied = original.toBuilder().build();
     assertEquals(original.getId(), copied.getId());
     assertEquals(original.getReplicationConfig(),
@@ -196,7 +196,7 @@ public class TestPipeline {
 
   @Test
   void idChangedIfNodesReplaced() {
-    Pipeline original = MockPipeline.createRatisPipeline();
+    Pipeline original = PipelineTestUtils.createRatisPipeline();
 
     Pipeline withDifferentNodes = original.toBuilder()
         .setNodes(Arrays.asList(randomDatanodeDetails(), randomDatanodeDetails(), randomDatanodeDetails()))
@@ -209,7 +209,7 @@ public class TestPipeline {
 
   @Test
   void testCopyForReadFromNode() {
-    Pipeline subject = MockPipeline.createRatisPipeline();
+    Pipeline subject = PipelineTestUtils.createRatisPipeline();
     DatanodeDetails node = subject.getNodes().iterator().next();
 
     Pipeline copy = subject.copyForReadFromNode(node);
@@ -222,13 +222,13 @@ public class TestPipeline {
 
   @Test
   void testCopyForReadFromNodeRejectsUnknownNode() {
-    Pipeline subject = MockPipeline.createRatisPipeline();
+    Pipeline subject = PipelineTestUtils.createRatisPipeline();
     assertThrows(IllegalStateException.class, () -> subject.copyForReadFromNode(randomDatanodeDetails()));
   }
 
   @Test
   void testEqualsAndHashCodeIgnoreNodeStatusValues() throws IOException {
-    Pipeline pipeline = MockPipeline.createRatisPipeline();
+    Pipeline pipeline = PipelineTestUtils.createRatisPipeline();
     Pipeline copy = pipeline.toBuilder().setNodes(pipeline.getNodes()).build();
 
     pipeline.reportDatanode(pipeline.getNodes().get(0));

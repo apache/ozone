@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -156,7 +156,7 @@ public final class MockCluster {
     // Create datanodes and add containers to them.
     for (int i = 0; i < nodeCount; i++) {
       DatanodeUsageInfo usageInfo =
-          new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat());
+          new DatanodeUsageInfo(DatanodeDetailsTestUtils.randomDatanodeDetails(), new SCMNodeStat());
       nodesInCluster[i] = usageInfo;
 
       // Create containers with varying used space.

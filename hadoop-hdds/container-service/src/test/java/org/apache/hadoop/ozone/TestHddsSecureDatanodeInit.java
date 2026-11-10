@@ -50,7 +50,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -135,7 +135,7 @@ public class TestHddsSecureDatanodeInit {
 
     cert = generateX509Cert(new KeyPair(publicKey, privateKey),
         null, Duration.ofSeconds(CERT_LIFETIME));
-    datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    datanodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     scmClient = mock(SCMSecurityProtocolClientSideTranslatorPB.class);
   }

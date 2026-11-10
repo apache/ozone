@@ -77,7 +77,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -160,7 +160,7 @@ public class TestReplicationSupervisor {
         DatanodeStateMachine.DatanodeStates.getInitState(),
         stateMachine, "");
     context.setTermOfLeaderSCM(CURRENT_TERM);
-    datanode = MockDatanodeDetails.randomDatanodeDetails();
+    datanode = DatanodeDetailsTestUtils.randomDatanodeDetails();
     mockClient = mock(DNContainerOperationClient.class);
     mockController = mock(ContainerController.class);
     when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
@@ -652,10 +652,10 @@ public class TestReplicationSupervisor {
 
       // Create reconcile commands with the same container ID but different peers
       ReconcileContainerCommand command1 = new ReconcileContainerCommand(containerID, Collections.singleton(
-          MockDatanodeDetails.randomDatanodeDetails()));
+          DatanodeDetailsTestUtils.randomDatanodeDetails()));
       command1.setTerm(1);
       ReconcileContainerCommand command2 = new ReconcileContainerCommand(containerID, Collections.singleton(
-          MockDatanodeDetails.randomDatanodeDetails()));
+          DatanodeDetailsTestUtils.randomDatanodeDetails()));
       command2.setTerm(1);
       assertEquals(command1, command2);
 
@@ -840,17 +840,17 @@ public class TestReplicationSupervisor {
     List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources =
         new ArrayList<>();
     sources.add(new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
-        MockDatanodeDetails.randomDatanodeDetails(), 1));
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 1));
     sources.add(new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
-        MockDatanodeDetails.randomDatanodeDetails(), 2));
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 2));
     sources.add(new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
-        MockDatanodeDetails.randomDatanodeDetails(), 3));
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 3));
 
     byte[] missingIndexes = new byte[1];
     missingIndexes[0] = 4;
 
     List<DatanodeDetails> target = singletonList(
-        MockDatanodeDetails.randomDatanodeDetails());
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(containerId, sources, target,
         UnsafeByteOperations.unsafeWrap(missingIndexes),
         new ECReplicationConfig(3, 2));
@@ -1025,8 +1025,8 @@ public class TestReplicationSupervisor {
   @ContainerLayoutTestInfo.ContainerTest
   public void testMaxQueueSize() {
     List<DatanodeDetails> datanodes = new ArrayList<>();
-    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    datanodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    datanodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     final int maxQueueSize = 2;
     DatanodeConfiguration datanodeConfig = new DatanodeConfiguration();
@@ -1520,7 +1520,7 @@ public class TestReplicationSupervisor {
 
   private ReplicationTask createPushTask(long containerId) {
     ReplicateContainerCommand cmd =
-        getReplicateContainerCommand(containerId, MockDatanodeDetails.randomDatanodeDetails());
+        getReplicateContainerCommand(containerId, DatanodeDetailsTestUtils.randomDatanodeDetails());
     cmd.setTerm(CURRENT_TERM);
     return new ReplicationTask(cmd, replicatorRef.get());
   }

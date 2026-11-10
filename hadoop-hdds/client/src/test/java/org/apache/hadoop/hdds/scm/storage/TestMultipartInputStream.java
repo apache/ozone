@@ -47,8 +47,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -69,7 +69,7 @@ public class TestMultipartInputStream {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
     Function<BlockID, BlockLocationInfo> refreshFunction = mock(Function.class);
     Checksum checksum = new Checksum(ChecksumType.NONE, 1024);
 
@@ -162,7 +162,7 @@ public class TestMultipartInputStream {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
     Function<BlockID, BlockLocationInfo> refreshFunction = mock(Function.class);
     Checksum checksum = new Checksum(ChecksumType.NONE, 1024);
 

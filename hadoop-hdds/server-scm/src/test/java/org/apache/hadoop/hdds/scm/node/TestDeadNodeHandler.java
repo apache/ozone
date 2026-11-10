@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -134,9 +134,9 @@ public class TestDeadNodeHandler {
   @SuppressWarnings("checkstyle:MethodLength")
   public void testOnMessage(@TempDir File tempDir) throws Exception {
     //GIVEN
-    DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     String storagePath = tempDir.getPath()
         .concat("/data-" + datanode1.getID());
@@ -169,23 +169,23 @@ public class TestDeadNodeHandler {
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
 
-    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
+    nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
-    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
+    nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
-    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
+    nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
 
-    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
+    nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
-    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
+    nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
-    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
+    nodeManager.register(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
 
@@ -286,7 +286,7 @@ public class TestDeadNodeHandler {
   @Test
   public void testDeadNodeHandlerSkipsNodeThatIsNoLongerDead(
       @TempDir File tempDir) throws Exception {
-    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode = DatanodeDetailsTestUtils.randomDatanodeDetails();
     String storagePath = tempDir.getPath()
         .concat("/data-" + datanode.getID());
     String metaStoragePath = tempDir.getPath()

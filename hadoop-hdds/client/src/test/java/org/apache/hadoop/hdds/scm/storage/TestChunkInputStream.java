@@ -55,8 +55,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.security.token.Token;
@@ -453,8 +453,8 @@ public class TestChunkInputStream {
   @Test
   public void connectsToNewPipeline() throws Exception {
     // GIVEN
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-    Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
+    Pipeline newPipeline = PipelineTestUtils.createSingleNodePipeline();
 
     Token<?> token = mock(Token.class);
     when(token.encodeToUrlString())

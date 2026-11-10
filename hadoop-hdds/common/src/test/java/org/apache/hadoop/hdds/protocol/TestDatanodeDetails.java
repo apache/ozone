@@ -44,7 +44,7 @@ public class TestDatanodeDetails {
 
   @Test
   void protoIncludesNewPortsOnlyForV1() {
-    DatanodeDetails subject = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails subject = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     HddsProtos.DatanodeDetailsProto proto =
         subject.toProto(DEFAULT_VERSION);
@@ -57,7 +57,7 @@ public class TestDatanodeDetails {
 
   @Test
   void testRequiredPortsProto() {
-    DatanodeDetails subject = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails subject = DatanodeDetailsTestUtils.randomDatanodeDetails();
     Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
         .collect(Collectors.toSet());
     HddsProtos.DatanodeDetailsProto proto =
@@ -72,7 +72,7 @@ public class TestDatanodeDetails {
   @Test
   public void testNewBuilderCurrentVersion() {
     // When the current version proto field is absent, the builder default (DEFAULT_VERSION) applies.
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
         .collect(Collectors.toSet());
     HddsProtos.DatanodeDetailsProto.Builder protoBuilder =

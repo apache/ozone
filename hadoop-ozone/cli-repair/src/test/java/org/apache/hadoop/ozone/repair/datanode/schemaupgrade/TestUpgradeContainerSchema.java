@@ -57,7 +57,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -133,7 +133,7 @@ class TestUpgradeContainerSchema {
     conf.set(HDDS_DATANODE_DIR_KEY, volume1Path + "," + volume2Path);
     conf.set(OZONE_METADATA_DIRS, metadataPath.toString());
 
-    datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    datanodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
   }
 
   private void initDatanode(HDDSLayoutFeature layoutFeature) throws IOException {

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
@@ -85,8 +85,8 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -95,8 +95,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerT
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -790,9 +790,9 @@ public class TestKeyValueHandler {
     Assertions.assertEquals(0, icrCount.get());
     // This should trigger container report validation in the ICR handler above.
     DNContainerOperationClient mockDnClient = mock(DNContainerOperationClient.class);
-    DatanodeDetails peer1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails peer2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails peer3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails peer1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails peer2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails peer3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
     when(mockDnClient.getContainerChecksumInfo(anyLong(), any())).thenReturn(null);
     keyValueHandler.reconcileContainer(mockDnClient, container, Sets.newHashSet(peer1, peer2, peer3));
     // Make sure all the replicas are used for reconciliation.
@@ -1155,7 +1155,7 @@ public class TestKeyValueHandler {
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     ContainerCommandRequestProto request = ContainerTestHelper
-        .getWriteChunkRequest(MockPipeline.createSingleNodePipeline(), blockID, 1024)
+        .getWriteChunkRequest(PipelineTestUtils.createSingleNodePipeline(), blockID, 1024)
         .toBuilder()
         .setWritePipelineVersion(HDDSVersion.ZDU.serialize())
         .build();
@@ -1184,7 +1184,7 @@ public class TestKeyValueHandler {
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     ContainerCommandRequestProto request = ContainerTestHelper
-        .getWriteSmallFileRequest(MockPipeline.createSingleNodePipeline(), blockID, 1024)
+        .getWriteSmallFileRequest(PipelineTestUtils.createSingleNodePipeline(), blockID, 1024)
         .toBuilder()
         .setWritePipelineVersion(HDDSVersion.ZDU.serialize())
         .build();
@@ -1288,7 +1288,7 @@ public class TestKeyValueHandler {
 
   private HddsDispatcher createGetBlockDispatcher(HandlerWithVolumeSet handlerWithVolume) throws IOException {
     DatanodeDetails datanodeDetails =
-        MockDatanodeDetails.createDatanodeDetails(DatanodeID.fromUuidString(DATANODE_UUID));
+        DatanodeDetailsTestUtils.createDatanodeDetails(DatanodeID.fromUuidString(DATANODE_UUID));
     StateContext context = ContainerTestUtils.getMockContext(datanodeDetails, conf);
     HashMap<ContainerType, Handler> handlers = new HashMap<>();
     handlers.put(ContainerType.KeyValueContainer, handlerWithVolume.getHandler());

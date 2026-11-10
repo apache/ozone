@@ -27,8 +27,8 @@ import java.util.Collections;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -85,7 +85,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
-    final Pipeline pipeline = MockPipeline.createPipeline(
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
 
     // Add data to read.
@@ -120,7 +120,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
-    final Pipeline pipeline = MockPipeline.createPipeline(
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
 
     // Add data to read.

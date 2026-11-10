@@ -32,7 +32,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -88,7 +88,7 @@ public class TestDataNodeSafeModeRule {
 
     assertFalse(rule.validate());
 
-    DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dd = DatanodeDetailsTestUtils.randomDatanodeDetails();
     NodeRegistrationContainerReport nodeReg = 
         new NodeRegistrationContainerReport(dd, null);
     
@@ -114,7 +114,7 @@ public class TestDataNodeSafeModeRule {
     assertFalse(rule.validate());
 
     for (int i = 0; i < 2; i++) {
-      DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dd = DatanodeDetailsTestUtils.randomDatanodeDetails();
       NodeRegistrationContainerReport nodeReg = 
           new NodeRegistrationContainerReport(dd, null);
       
@@ -126,7 +126,7 @@ public class TestDataNodeSafeModeRule {
 
     assertFalse(rule.validate());
     assertEquals(2, metrics.getCurrentRegisteredDatanodesCount().value());
-    DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dd = DatanodeDetailsTestUtils.randomDatanodeDetails();
     NodeRegistrationContainerReport nodeReg = 
         new NodeRegistrationContainerReport(dd, null);
     
@@ -153,7 +153,7 @@ public class TestDataNodeSafeModeRule {
 
     List<DatanodeDetails> healthyNodes = new ArrayList<>();
     for (int i = 0; i < requiredDns; i++) {
-      DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dd = DatanodeDetailsTestUtils.randomDatanodeDetails();
       healthyNodes.add(dd);
     }
     

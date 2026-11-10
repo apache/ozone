@@ -33,8 +33,8 @@ import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -62,7 +62,7 @@ public class TestSCMContainerPlacementCapacity {
     List<DatanodeInfo> datanodes = new ArrayList<>();
     for (int i = 0; i < 7; i++) {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
-          MockDatanodeDetails.randomDatanodeDetails(),
+          DatanodeDetailsTestUtils.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);

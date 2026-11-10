@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -84,7 +84,7 @@ public final class ECStreamTestUtil {
       int nodeCount, long blockLength) {
     Map<DatanodeDetails, Integer> datanodes = new HashMap<>();
     for (int i = 0; i < nodeCount; i++) {
-      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i + 1);
+      datanodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i + 1);
     }
     return createKeyInfo(repConf, blockLength, datanodes);
   }
@@ -210,7 +210,7 @@ public final class ECStreamTestUtil {
   public static Map<DatanodeDetails, Integer> createIndexMap(int... idxs) {
     Map<DatanodeDetails, Integer> map = new HashMap<>();
     for (int i : idxs) {
-      map.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+      map.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i);
     }
     return map;
   }
