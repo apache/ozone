@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doAnswer;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -57,7 +59,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -141,6 +145,69 @@ public class TestReconContainerManager
     assertTrue(containerManager.containerExist(containerID));
     assertEquals(LifeCycleState.OPEN,
         getContainerManager().getContainer(containerID).getState());
+  }
+
+  /**
+   * For an OPEN container SCM can return a pipeline built from reported replicas instead of the write pipeline.
+   * Recon must record the container against the pipeline in its ContainerInfo. If Recon already has that pipeline
+   * it is used without asking SCM.
+   */
+  @Test
+  public void testCheckAndAddNewOpenContainerUsesWritePipelineKnownToRecon() throws Exception {
+    // getTestContainer adds the write pipeline to Recon's pipeline manager.
+    ContainerWithPipeline fromScm = getTestContainer(120L, LifeCycleState.OPEN);
+    Pipeline readPipeline = getRandomPipeline();
+    Pipeline writePipeline = fromScm.getPipeline();
+    ContainerInfo containerInfo = fromScm.getContainerInfo();
+    StorageContainerServiceProvider scmClient = getContainerManager().getScmClient();
+    when(scmClient.getContainerWithPipeline(containerInfo.getContainerID()))
+        .thenReturn(new ContainerWithPipeline(containerInfo, readPipeline));
+
+    getContainerManager().checkAndAddNewContainer(containerInfo.containerID(), OPEN, randomDatanodeDetails());
+
+    assertTrue(getContainerManager().getPipelineToOpenContainer().containsKey(writePipeline.getId()));
+    assertFalse(getContainerManager().getPipelineToOpenContainer().containsKey(readPipeline.getId()));
+    verify(scmClient, never()).getPipeline(any());
+  }
+
+  /**
+   * The sync helper adds containers through addNewContainer directly. When Recon does not have the write pipeline
+   * yet it is fetched from SCM by the ID in the ContainerInfo.
+   */
+  @Test
+  public void testAddNewOpenContainerFetchesWritePipelineFromScm() throws Exception {
+    Pipeline writePipeline = getRandomPipeline();
+    Pipeline readPipeline = getRandomPipeline();
+    ContainerInfo containerInfo = newContainerInfo(122L, writePipeline);
+    assertFalse(getPipelineManager().containsPipeline(writePipeline.getId()));
+    StorageContainerServiceProvider scmClient = getContainerManager().getScmClient();
+    when(scmClient.getPipeline(writePipeline.getId().getProtobuf())).thenReturn(writePipeline);
+
+    getContainerManager().addNewContainer(new ContainerWithPipeline(containerInfo, readPipeline));
+
+    assertTrue(getContainerManager().getPipelineToOpenContainer().containsKey(writePipeline.getId()));
+    assertFalse(getContainerManager().getPipelineToOpenContainer().containsKey(readPipeline.getId()));
+    assertTrue(getPipelineManager().containsPipeline(writePipeline.getId()));
+    assertFalse(getPipelineManager().containsPipeline(readPipeline.getId()));
+    verify(scmClient).getPipeline(writePipeline.getId().getProtobuf());
+  }
+
+  /**
+   * If neither Recon nor SCM has the write pipeline, the container is not added, since an OPEN container cannot
+   * name a pipeline that is unknown. It is retried when a later report arrives.
+   */
+  @Test
+  public void testAddNewOpenContainerWhenWritePipelineIsGone() throws Exception {
+    Pipeline writePipeline = getRandomPipeline();
+    ContainerInfo containerInfo = newContainerInfo(121L, writePipeline);
+    StorageContainerServiceProvider scmClient = getContainerManager().getScmClient();
+    when(scmClient.getPipeline(writePipeline.getId().getProtobuf())).thenThrow(new PipelineNotFoundException("gone"));
+
+    assertThrows(IOException.class, () -> getContainerManager()
+        .addNewContainer(new ContainerWithPipeline(containerInfo, getRandomPipeline())));
+
+    assertFalse(getContainerManager().containerExist(containerInfo.containerID()));
+    assertTrue(getContainerManager().getPipelineToOpenContainer().isEmpty());
   }
 
   @Test
