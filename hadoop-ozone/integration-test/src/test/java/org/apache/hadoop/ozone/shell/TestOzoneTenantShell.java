@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -362,12 +363,15 @@ public class TestOzoneTenantShell {
             .collect(Collectors.toList());
     assertEquals(0, lines.size());
 
-    // warmup
-    executeHA(tenantShell, new String[] {});
-
     executeHA(tenantShell, new String[] {"list"});
-    checkOutput(out, "", true);
-    checkOutput(err, "", true);
+    // ignore possible output from gRPC TcpMetrics static init:
+    // ... org.apache.ratis.thirdparty.io.grpc.netty.TcpMetrics loadEpollInfo
+    // INFO: Epoll available during static init of TcpMetrics:true
+    Pattern tcpMetrics = Pattern.compile(".*TcpMetrics.*\n");
+    String stdout = tcpMetrics.matcher(out.get()).replaceAll("");
+    String stderr = tcpMetrics.matcher(err.get()).replaceAll("");
+    checkOutput(stdout, "", true);
+    checkOutput(stderr, "", true);
 
     // Create tenants
     // Equivalent to `ozone tenant create finance`
