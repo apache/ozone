@@ -50,8 +50,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +64,7 @@ import org.slf4j.LoggerFactory;
  * Test verifies object store with OZONE_OM_ENABLE_FILESYSTEM_PATHS enabled.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase {
+public abstract class TestObjectStoreWithLegacyFS implements ClusterForTests.TestCase {
 
   private OzoneClient client;
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,8 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class to test Multipart upload end to end.
@@ -69,7 +73,7 @@ public class TestMultipartUploadComplete {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
@@ -106,6 +110,48 @@ public class TestMultipartUploadComplete {
     partsList.add(uploadPart(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 2, uploadID, "Multipart Upload 2"));
 
     completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, partsList);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testMultipartIfMatchMissingKey(String ifMatch) throws Exception {
+    String key = OzoneConsts.KEY;
+    String content = "Multipart Upload 1";
+    String uploadID = initiateMultipartUpload(key);
+    Part part = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, content);
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
+
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part)));
+    assertEquals(key, ex.getResource());
+    assertThrows(IOException.class, () -> client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key));
+
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(null);
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, content);
+  }
+
+  @Test
+  public void testMultipartIfNoneMatchETag() throws Exception {
+    String key = OzoneConsts.KEY;
+    String uploadID = initiateMultipartUpload(key);
+    Part part = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "original-content");
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part));
+    String etag = client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key)
+        .getMetadata().get(OzoneConsts.ETAG);
+
+    String replacementUploadID = initiateMultipartUpload(key);
+    Part replacementPart = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, replacementUploadID, "new-content");
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"" + etag + "\"");
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, replacementUploadID,
+            singletonList(replacementPart)));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, "original-content");
+
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, replacementUploadID, singletonList(replacementPart));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, "new-content");
   }
 
   @Test
@@ -187,6 +233,25 @@ public class TestMultipartUploadComplete {
     OS3Exception ex = assertThrows(OS3Exception.class,
         () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, partsList));
     assertEquals(S3ErrorTable.INVALID_PART_ORDER.getCode(), ex.getCode());
+  }
+
+  @Test
+  public void testMultipartDuplicatePartNumberError() throws Exception {
+    String key = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(key);
+
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
+    Part part2 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 2, uploadID, "Multipart Upload 2");
+
+    assertErrorResponse(S3ErrorTable.INVALID_PART_ORDER,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, Arrays.asList(part1, part1)));
+    assertErrorResponse(S3ErrorTable.INVALID_PART_ORDER,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, Arrays.asList(part1, part2, part1)));
+    assertThrows(IOException.class, () -> client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key));
+
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, Arrays.asList(part1, part2));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key,
+        "Multipart Upload 1" + "Multipart Upload 2");
   }
 
   @Test

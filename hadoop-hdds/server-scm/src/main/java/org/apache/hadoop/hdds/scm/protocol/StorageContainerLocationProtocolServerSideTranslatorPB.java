@@ -25,11 +25,13 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipelineBatch;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetExistContainerWithPipelinesInBatch;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetExistingContainersInBatch;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetPipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListPipelines;
-import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
-import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.FOLLOWER_READABLE_COMMAND_TYPES;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface.ADMIN_COMMAND_TYPE;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface
+    .FOLLOWER_READABLE_COMMAND_TYPES;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -89,6 +91,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistingContainersInBatchRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistingContainersInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsRequestProto;
@@ -164,7 +168,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class is the server-side translator that forwards requests received on
  * {@link StorageContainerLocationProtocolPB} to the
- * {@link StorageContainerLocationProtocol} server implementation.
+ * {@link StorageContainerLocationInternalInterface} server implementation.
  */
 @InterfaceAudience.Private
 @SuppressWarnings({"method"})
@@ -185,7 +189,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           + " Please upgrade the client to a version that supports Erasure"
           + " Coded data, and retry!";
 
-  private final StorageContainerLocationProtocol impl;
+  private final StorageContainerLocationInternalInterface impl;
   private final StorageContainerManager scm;
   private static final String ROLE_TYPE = "SCM";
 
@@ -196,12 +200,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   /**
    * Creates a new StorageContainerLocationProtocolServerSideTranslatorPB.
    *
-   * @param impl            {@link StorageContainerLocationProtocol} server
+   * @param impl            {@link StorageContainerLocationInternalInterface} server
    *                        implementation
    * @param protocolMetrics
    */
   public StorageContainerLocationProtocolServerSideTranslatorPB(
-      StorageContainerLocationProtocol impl,
+      StorageContainerLocationInternalInterface impl,
       StorageContainerManager scm,
       ProtocolMessageMetrics<StorageContainerLocationProtocolProtos.Type> protocolMetrics)
       throws IOException {
@@ -231,6 +235,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     boolean checkResponseForECRepConfig = false;
     if (!ClientVersion.ERASURE_CODING_SUPPORT.isSupportedBy(request.getVersion())) {
       if (request.getCmdType() == GetContainer
+          || request.getCmdType() == GetExistingContainersInBatch
           || request.getCmdType() == ListContainer
           || request.getCmdType() == GetContainerWithPipeline
           || request.getCmdType() == GetContainerWithPipelineBatch
@@ -249,6 +254,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         switch (response.getCmdType()) {
         case GetContainer:
           disallowECReplicationConfigInGetContainerResponse(response);
+          break;
+        case GetExistingContainersInBatch:
+          for (HddsProtos.ContainerInfoProto container :
+              response.getGetExistingContainersInBatchResponse().getContainersList()) {
+            if (container.hasEcReplicationConfig()) {
+              throw new SCMException(ERROR_LIST_CONTAINS_EC_REPLICATION_CONFIG,
+                  SCMException.ResultCodes.INTERNAL_ERROR);
+            }
+          }
           break;
         case ListContainer:
           disallowECReplicationConfigInListContainerResponse(response);
@@ -435,6 +449,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetContainerResponse(
                 getContainer(request.getGetContainerRequest()))
+            .build();
+      case GetExistingContainersInBatch:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetExistingContainersInBatchResponse(
+                getExistingContainersInBatch(request.getGetExistingContainersInBatchRequest()))
             .build();
       case GetContainerToken:
         return ScmContainerLocationResponse.newBuilder()
@@ -849,6 +870,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         GetContainerWithPipelineBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
       builder.addContainerWithPipelines(container.getProtobuf(clientVersion, currentVersions(container)));
+    }
+    return builder.build();
+  }
+
+  public GetExistingContainersInBatchResponseProto getExistingContainersInBatch(
+      GetExistingContainersInBatchRequestProto request) throws IOException {
+    GetExistingContainersInBatchResponseProto.Builder builder = GetExistingContainersInBatchResponseProto.newBuilder();
+    for (ContainerInfo container : impl.getExistingContainersInBatch(request.getContainerIDsList())) {
+      builder.addContainers(container.getProtobuf());
     }
     return builder.build();
   }

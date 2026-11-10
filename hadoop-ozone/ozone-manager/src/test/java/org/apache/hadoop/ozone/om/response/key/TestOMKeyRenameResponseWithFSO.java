@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -26,7 +27,9 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMResponseTestUtils;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests TestOMKeyRenameResponseWithFSO.
@@ -39,6 +42,34 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
         .setObjectID(bucketId + 100)
         .setParentObjectID(bucketId + 101)
         .build();
+  }
+
+  /**
+   * Renames a directory twice in one batch in a snapshotted bucket. snapshotRenamedTable must keep the name the
+   * directory has in the snapshot.
+   */
+  @Test
+  public void testSecondDirectoryRenameInSameBatchKeepsSnapshotName() throws Exception {
+    OMRequestTestUtils.addSnapshotToTable(volumeName, bucketName, "snap", omMetadataManager);
+    OmKeyInfo fromDirInfo = getOmKeyInfo(UUID.randomUUID().toString());
+    OmKeyInfo midDirInfo = getOmKeyInfo(fromDirInfo, UUID.randomUUID().toString());
+    OmKeyInfo toDirInfo = getOmKeyInfo(fromDirInfo, UUID.randomUUID().toString());
+    String dbFromKey = OMRequestTestUtils.addDirKeyToDirTable(false, OMFileRequest.getDirectoryInfo(fromDirInfo),
+        volumeName, bucketName, txnLogId, omMetadataManager);
+
+    getDirectoryRenameResponse(fromDirInfo, midDirInfo).addToDBBatch(omMetadataManager, batchOperation);
+    getDirectoryRenameResponse(midDirInfo, toDirInfo).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    assertThat(omMetadataManager.getDirectoryTable().get(getDBKeyName(toDirInfo))).isNotNull();
+    String renameDbKey = omMetadataManager.getRenameKey(volumeName, bucketName, toDirInfo.getObjectID());
+    assertThat(omMetadataManager.getSnapshotRenamedTable().get(renameDbKey)).isEqualTo(dbFromKey);
+  }
+
+  private OMKeyRenameResponseWithFSO getDirectoryRenameResponse(OmKeyInfo fromDirInfo, OmKeyInfo toDirInfo)
+      throws IOException {
+    return new OMKeyRenameResponseWithFSO(getOkRenameResponse(), getDBKeyName(fromDirInfo),
+        getDBKeyName(toDirInfo), null, null, toDirInfo, null, true, getBucketLayout());
   }
 
   @Override

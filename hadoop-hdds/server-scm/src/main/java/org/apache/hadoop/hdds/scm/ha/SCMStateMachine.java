@@ -218,6 +218,10 @@ public class SCMStateMachine extends BaseStateMachine {
 
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
+      // Configuration writes must be readable when apply completes, with their matching transaction index.
+      if (request.getType() == RequestType.STATEFUL_SERVICE_CONFIG) {
+        transactionBuffer.flush();
+      }
       updateLastAppliedTermIndex(appliedTermIndex);
 
       transactionBuffer.flushIfPendingLimitReached();
@@ -363,12 +367,6 @@ public class SCMStateMachine extends BaseStateMachine {
     // isLeader() is now true -> start the datanode protocol server for the new
     // leader (a leader has applied all committed entries) and refresh safe mode.
     tryStartDNServerAndRefreshSafeMode();
-
-    try {
-      transactionBuffer.flush();
-    } catch (Exception ex) {
-      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
-    }
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
@@ -618,6 +616,18 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
+    // Transactions of the previous leader terms may be applied after notifyLeaderChanged, so the deleted blocks
+    // summary is reloaded here. This runs on the apply thread, so no transaction is applied between flush and
+    // reload.
+    try {
+      transactionBuffer.flush();
+    } catch (Exception ex) {
+      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
+    }
+    DeletedBlockLog deletedBlockLog = scm.getScmBlockManager().getDeletedBlockLog();
+    Preconditions.checkArgument(deletedBlockLog instanceof DeletedBlockLogImpl);
+    ((DeletedBlockLogImpl) deletedBlockLog).onLeaderReady();
+
     // On leader SCM once after it is ready, notify SCM services and also set
     // leader ready  in SCMContext.
     scm.getScmContext().setLeaderReady();
@@ -696,6 +706,14 @@ public class SCMStateMachine extends BaseStateMachine {
           shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
       stopDNServerStartRetry();
     } else if (!scm.isStopped()) {
+      // A removed SCM may only have received the joint configuration, which still lists it among the old peers.
+      boolean decommissioned = scm.getScmHAManager().getRatisServer().getDivision().getRaftConf()
+          .getCurrentPeers().stream().noneMatch(peer -> peer.getId().equals(RaftPeerId.valueOf(scm.getScmId())));
+      if (decommissioned) {
+        scm.stop();
+        ExitUtils.terminate(0, "SCM is decommissioned, terminate SCM", LOG);
+        return;
+      }
       scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
     }
   }

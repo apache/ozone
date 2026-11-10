@@ -49,8 +49,11 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -78,7 +81,11 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
   @TempDir
   private Path temporaryFolder;
+  private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconStorageContainerManagerFacade reconScm;
+  private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider reconReplicaHistoryDBProvider;
   private OMDBInsightEndpoint omdbInsightEndpoint;
   private static final String ROOT_PATH = "/";
   private static final String TEST_USER = "TestUser";
@@ -87,7 +94,7 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
   public void setUp() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 100);
-    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
+    omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("OmMetataDir")).toFile());
@@ -107,12 +114,34 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
     ReconNamespaceSummaryManager reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     omdbInsightEndpoint = reconTestInjector.getInstance(OMDBInsightEndpoint.class);
+    reconScm = (ReconStorageContainerManagerFacade) reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+    reconReplicaHistoryDBProvider = reconTestInjector.getInstance(ReconReplicaHistoryDBProvider.class);
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
             reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+    if (reconReplicaHistoryDBProvider != null) {
+      reconReplicaHistoryDBProvider.close();
+    }
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   /**

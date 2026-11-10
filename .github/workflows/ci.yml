@@ -41,11 +41,10 @@ env:
   # BUILD_ARGS and TEST_JAVA_VERSION are duplicated in populate-cache.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   TEST_JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
-  # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml and populate-cache.yml, please keep in sync
-  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
-  # Maven 3.9 downloads dependencies via maven-resolver-transport-http, which reads aether.* and ignores both maven.wagon.* and JDK-level http.*
+  # MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
-  OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
+  OZONE_WITH_COVERAGE: ${{ github.event_name != 'pull_request' }}
 
 permissions: { }
 
@@ -59,6 +58,7 @@ jobs:
       acceptance-versions: ${{ steps.acceptance-suites.outputs.versions }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
+      junit-modules: ${{ steps.junit-modules.outputs.modules }}
       kubernetes-suites: ${{ steps.kubernetes-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
@@ -73,25 +73,25 @@ jobs:
       java-version: ${{ env.TEST_JAVA_VERSION }}
       with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
-      - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
+      - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (${{ github.event_name }})"
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-        if: github.event_name  == 'push'
+        if: github.event_name != 'pull_request' && inputs.ref == ''
       - name: "Checkout ${{ github.sha }} with its parent (pull request)"
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
-        if: github.event_name  == 'pull_request'
-      - name: "Checkout ${{ inputs.ref }} given in workflow input (manual dispatch)"
+        if: github.event_name == 'pull_request'
+      - name: "Checkout ${{ inputs.ref }} given in workflow input (${{ github.event_name }})"
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-        if: github.event_name  == 'workflow_dispatch'
-      - name: Get SHA of ${{ inputs.ref || github.ref }}
+        if: github.event_name != 'pull_request' && inputs.ref != ''
+      - name: Get SHA
         id: get-sha
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
@@ -119,6 +119,9 @@ jobs:
       - name: Integration suites
         id: integration-suites
         run: dev-support/ci/integration_suites.sh
+      - name: Modules with Java tests
+        id: junit-modules
+        run: dev-support/ci/junit_modules.sh
       - name: Kubernetes suites
         id: kubernetes-suites
         run: dev-support/ci/kubernetes_suites.sh
@@ -149,10 +152,6 @@ jobs:
     needs:
       - build-info
       - build
-    if: |
-      needs.build-info.outputs.needs-build == 'true' &&
-      (github.repository != 'apache/ozone' || github.event_name == 'pull_request' ||
-       (github.event_name == 'push' && github.ref_name == 'master'))
     uses: $/.github/workflows/generate-config-doc.yml
     with:
       sha: ${{ needs.build-info.outputs.sha }}
@@ -161,7 +160,7 @@ jobs:
     needs:
       - generate-config-doc
     if: |
-      github.event_name == 'push' &&
+      github.event_name != 'pull_request' &&
       github.repository == 'apache/ozone' &&
       github.ref_name == 'master'
     uses: $/.github/workflows/update-ozone-site-config-doc.yml
@@ -184,7 +183,7 @@ jobs:
         include:
           - os: ubuntu-24.04
           - java: 21
-            os: macos-15
+            os: ${{ github.event_name == 'push' && 'ubuntu-24.04' || 'macos-15' }}
       fail-fast: false
     uses: $/.github/workflows/check.yml
     with:
@@ -196,7 +195,7 @@ jobs:
       script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dozone.java.version.server=${{ matrix.java }}"
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.java }}
-      timeout-minutes: 45
+      timeout-minutes: 60
       with-coverage: false
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
@@ -208,9 +207,10 @@ jobs:
     uses: $/.github/workflows/check.yml
     with:
       checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
-      java-version: ${{ needs.build-info.outputs.java-version }}
+      java-version: ${{ !contains('author,bats', matrix.check) && needs.build-info.outputs.java-version || '' }}
       needs-maven-cache: ${{ !contains('author,bats', matrix.check) }}
       ratis-args: ${{ inputs.ratis_args }}
+      runner: ${{ contains('author,bats', matrix.check) && 'ubuntu-slim' || 'ubuntu-26.04' }}
       script: ${{ matrix.check }}
       sha: ${{ needs.build-info.outputs.sha }}
       timeout-minutes: 30
@@ -221,7 +221,7 @@ jobs:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
         exclude:
           - check: errorprone
-      fail-fast: false
+      fail-fast: true
 
   errorprone:
     needs:
@@ -248,8 +248,9 @@ jobs:
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-maven-cache: false
       needs-ozone-binary-tarball: true
+      runner: ubuntu-slim
       script: dependency
       sha: ${{ needs.build-info.outputs.sha }}
       timeout-minutes: 5
@@ -320,18 +321,20 @@ jobs:
       java-version: 11 # Hadoop may not work with newer Java
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
+      runner: ubuntu-26.04
       script: acceptance
       script-args: ${{ matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.suite }}
-      timeout-minutes: 150
+      timeout-minutes: 60
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
         exclude:
-          - suite: compat-old
+          - suite: xcompat/test-old.sh
       fail-fast: false
+      max-parallel: 10
 
   # acceptance (compat-old), split by old Ozone version
   compat-old:
@@ -350,7 +353,7 @@ jobs:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: acceptance
-      script-args: compat-old ${{ matrix.version }}
+      script-args: xcompat/test-old.sh ${{ matrix.version }}
       sha: ${{ needs.build-info.outputs.sha }}
       split: compat-old-${{ matrix.version }}
       timeout-minutes: 30
@@ -359,6 +362,7 @@ jobs:
       matrix:
         version: ${{ fromJson(needs.build-info.outputs.acceptance-versions) }}
       fail-fast: false
+      max-parallel: 3
 
   kubernetes:
     needs:
@@ -384,7 +388,9 @@ jobs:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.kubernetes-suites) }}
       fail-fast: false
+      max-parallel: 3
 
+  # runs only ozone-integration-test, split by profiles
   integration:
     needs:
       - build-info
@@ -398,7 +404,7 @@ jobs:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
-      needs-ozone-repo: ${{ matrix.profile == 'filesystem' }}
+      needs-ozone-repo: true
       pre-script: sudo hostname localhost
       ratis-args: ${{ inputs.ratis_args }}
       script: integration
@@ -411,6 +417,36 @@ jobs:
       matrix:
         profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
       fail-fast: false
+
+  # same as integration, but runs tests in specific modules instead of profiles
+  junit:
+    needs:
+      - build-info
+      - build
+      - basic
+      - dependency
+      - license
+    if: needs.build-info.outputs.needs-integration-tests == 'true'
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      display-name: junit
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      pre-script: sudo hostname localhost
+      ratis-args: ${{ inputs.ratis_args }}
+      script: integration
+      script-args: -pl :${{ matrix.module }} -Pmodule-test -Phadoop-native-lib -Drocks_tools_native
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: ${{ matrix.module }}
+      timeout-minutes: 60
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    strategy:
+      matrix:
+        module: ${{ fromJson(needs.build-info.outputs.junit-modules) }}
+      fail-fast: false
+      max-parallel: 10
 
   # same as integration, but runs specific tests instead of profiles
   specific-tests:
@@ -440,12 +476,13 @@ jobs:
   coverage:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     needs:
       - build-info
       - acceptance
       - compat-old
       - integration
+      - junit
     steps:
       - name: Checkout project
         uses: actions/checkout@v7
