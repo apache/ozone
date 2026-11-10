@@ -79,13 +79,11 @@ public final class CompactDBUtil {
 
   public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
       OzoneConfiguration configuration) {
-    ManagedCompactRangeOptions.BottommostLevelCompaction blc =
-        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
+    ManagedCompactRangeOptions.BottommostLevelCompaction blc = ManagedCompactRangeOptions.BottommostLevelCompaction
+        .valueOf(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
 
     try {
-      blc = configuration.getEnum(
-          OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
-          OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+      blc = configuration.getEnum(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, blc);
     } catch (IllegalArgumentException e) {
       LOG.warn("Invalid value for bottommost level compaction configuration '{}'",
           configuration.get(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION), e);
