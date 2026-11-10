@@ -2629,6 +2629,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
+    if (args.getStoragePolicy() != null) {
+      keyArgsBuilder.setStoragePolicy(OzoneStoragePolicy.toProto(args.getStoragePolicy()));
+    }
     CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()
             .setKeyArgs(keyArgsBuilder.build())
             .setIsOverwrite(overWrite)

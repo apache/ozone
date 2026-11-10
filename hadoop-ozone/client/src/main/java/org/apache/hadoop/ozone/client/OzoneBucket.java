@@ -1299,6 +1299,30 @@ public class OzoneBucket extends WithMetadata {
             overWrite, recursive);
   }
 
+  /**
+   * OzoneFS api to create an output stream for a file.
+   *
+   * @param keyName   Key name
+   * @param overWrite if true existing file at the location will be overwritten
+   * @param recursive if true file would be created even if parent directories
+   *                    do not exist
+   * @param fileStoragePolicy The StoragePolicy of the file, or null to use the
+   *                          bucket's policy
+   * @throws OMException if given key is a directory
+   *                     if file exists and isOverwrite flag is false
+   *                     if an ancestor exists as a file
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  public OzoneOutputStream createFile(String keyName, long size,
+      ReplicationConfig replicationConfig, boolean overWrite,
+      boolean recursive, StoragePolicy fileStoragePolicy) throws IOException {
+    return proxy
+        .createFile(volumeName, name, keyName, size, replicationConfig,
+            overWrite, recursive, fileStoragePolicy);
+  }
+
   public OzoneDataStreamOutput createStreamFile(String keyName, long size,
       ReplicationConfig replicationConfig, boolean overWrite,
       boolean recursive) throws IOException {

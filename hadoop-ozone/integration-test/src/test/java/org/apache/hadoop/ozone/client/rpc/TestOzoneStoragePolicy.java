@@ -67,6 +67,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Verifies that a key honours its storage policy end to end: the policy is
@@ -186,6 +188,47 @@ public class TestOzoneStoragePolicy {
     assertKeyInfo(keyInfo, OzoneStoragePolicy.getDefaultPolicy());
     assertScmContainerAndPipeline(keyInfo,
         OzoneStoragePolicy.getDefaultPolicy().getCreationTier());
+  }
+
+  /**
+   * A file created with an explicit storage policy records that policy and lands
+   * on the policy's creation tier, in SCM and on the datanodes.
+   */
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
+  public void testFileStoragePolicyIsHonoured(BucketLayout bucketLayout) throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
+      OzoneBucket bucket = createBucket(null, bucketLayout);
+      OmKeyInfo keyInfo = createFileAndLookup(bucket, storagePolicy);
+
+      assertKeyInfo(keyInfo, storagePolicy);
+      assertScmContainerAndPipeline(keyInfo, storagePolicy.getCreationTier());
+      assertDatanodeContainerAndBlock(keyInfo, storagePolicy.getCreationTier());
+    }
+  }
+
+  /**
+   * A file created without a storage policy inherits the bucket's policy, and
+   * without a bucket policy either it gets the cluster default.
+   */
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
+  public void testFileWithoutPolicyInheritsBucketPolicyOrClusterDefault(BucketLayout bucketLayout) throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    OzoneStoragePolicy bucketPolicy = OzoneStoragePolicy.COLD;
+    OmKeyInfo inherited = createFileAndLookup(createBucket(bucketPolicy, bucketLayout), null);
+    assertKeyInfo(inherited, bucketPolicy);
+    assertScmContainerAndPipeline(inherited, bucketPolicy.getCreationTier());
+    assertDatanodeContainerAndBlock(inherited, bucketPolicy.getCreationTier());
+
+    OzoneStoragePolicy defaultPolicy = OzoneStoragePolicy.getDefaultPolicy();
+    OmKeyInfo defaulted = createFileAndLookup(createBucket(null, bucketLayout), null);
+    assertKeyInfo(defaulted, defaultPolicy);
+    assertScmContainerAndPipeline(defaulted, defaultPolicy.getCreationTier());
+    assertDatanodeContainerAndBlock(defaulted, defaultPolicy.getCreationTier());
   }
 
   /**
@@ -365,6 +408,17 @@ public class TestOzoneStoragePolicy {
       OzoneStoragePolicy storagePolicy) throws IOException {
     String keyName = UUID.randomUUID().toString();
     writeKey(bucket, keyName, storagePolicy);
+    return lookupKey(bucket, keyName);
+  }
+
+  private OmKeyInfo createFileAndLookup(OzoneBucket bucket,
+      OzoneStoragePolicy storagePolicy) throws IOException {
+    String keyName = UUID.randomUUID().toString();
+    byte[] data = UUID.randomUUID().toString().getBytes(UTF_8);
+    try (OzoneOutputStream out = bucket.createFile(keyName, data.length,
+        RATIS_THREE, false, false, storagePolicy)) {
+      out.write(data);
+    }
     return lookupKey(bucket, keyName);
   }
 

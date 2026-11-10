@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -141,8 +142,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now()).setType(type).setFactor(factor)
-        .setDataSize(requestedSize)
-        .setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
+        .setDataSize(requestedSize);
+    // Before finalization the storage policy must not be persisted: an OM without storage policy support would
+    // ignore the field and apply this request differently.
+    if (ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
+      newKeyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
+    }
 
     newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
         .map(info -> info.getProtobuf(
@@ -404,6 +409,26 @@ public class OMFileCreateRequest extends OMKeyRequest {
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = CreateFile
+  )
+  public static OMRequest disallowCreateFileWithStoragePolicy(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {
+      if (req.getCreateFileRequest().getKeyArgs().hasStoragePolicy()) {
+        throw new OMException("Cluster does not have the storage policy"
+            + " feature finalized yet, but the request contains storage"
+            + " policy arguments. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }

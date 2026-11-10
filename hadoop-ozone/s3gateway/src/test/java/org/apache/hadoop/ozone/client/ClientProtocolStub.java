@@ -733,6 +733,16 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createFile(String volumeName, String bucketName,
+                                      String keyName, long size,
+                                      ReplicationConfig replicationConfig,
+                                      boolean overWrite, boolean recursive,
+                                      StoragePolicy storagePolicy)
+      throws IOException {
+    return null;
+  }
+
+  @Override
   public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
                                           String keyName, boolean recursive,
                                           String startKey, long numEntries)

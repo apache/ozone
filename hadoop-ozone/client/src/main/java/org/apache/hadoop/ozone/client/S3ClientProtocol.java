@@ -666,6 +666,14 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createFile(String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, boolean overWrite, boolean recursive, StoragePolicy storagePolicy)
+      throws IOException {
+    return delegate.createFile(volumeName, bucketName, keyName, size, replicationConfig, overWrite, recursive,
+        storagePolicy);
+  }
+
+  @Override
   public OzoneDataStreamOutput createStreamFile(String volumeName, String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, boolean overWrite, boolean recursive) throws IOException {
     return delegate.createStreamFile(volumeName, bucketName, keyName, size, replicationConfig, overWrite, recursive);

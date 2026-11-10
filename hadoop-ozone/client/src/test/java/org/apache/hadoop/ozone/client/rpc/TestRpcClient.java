@@ -749,6 +749,77 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * A storage policy is sent only to an OM that supports it, and a request without one is never rejected.
+   */
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateFileWithStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
+      throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    RpcClient client = createRpcClient(createFileCapturingTransport(version, requests));
+    try {
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      IOException withoutPolicyError = assertThrows(IOException.class,
+          () -> client.createFile("vol", "bucket", "key", 1L, replication, false, false, null));
+      IOException withPolicyError = assertThrows(IOException.class,
+          () -> client.createFile("vol", "bucket", "key", 1L, replication, false, false, OzoneStoragePolicy.COLD));
+
+      assertThat(withoutPolicyError).hasMessage("captured");
+      assertThat(requests.get(0).hasStoragePolicy()).isFalse();
+      if (OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(version)) {
+        assertThat(withPolicyError).hasMessage("captured");
+        assertThat(requests).hasSize(2);
+        assertThat(requests.get(1).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+      } else {
+        assertThat(withPolicyError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(requests).hasSize(1);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * The client never picks a storage policy for the caller: the OM resolves it from the bucket.
+   */
+  @Test
+  public void testCreateFileWithoutStoragePolicyDoesNotSendOne() throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    RpcClient client = createRpcClient(createFileCapturingTransport(OzoneManagerVersion.SOFTWARE_VERSION, requests));
+    try {
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      assertThrows(IOException.class, () -> client.createFile("vol", "bucket", "key", 1L, replication, false, false));
+
+      assertThat(requests).hasSize(1);
+      assertThat(requests.get(0).hasStoragePolicy()).isFalse();
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * Reports {@code version} as the OM version, records the KeyArgs of every CreateFile request and fails it with
+   * "captured", since the mock transport cannot answer CreateFile.
+   */
+  private static OmTransport createFileCapturingTransport(OzoneManagerVersion version, List<KeyArgs> requests) {
+    return new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == Type.CreateFile) {
+          requests.add(request.getCreateFileRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+  }
+
   private static ServiceInfo om(OzoneManagerVersion version) {
     return new ServiceInfo.Builder()
         .setNodeType(HddsProtos.NodeType.OM)
