@@ -125,8 +125,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // Futures of the PutBlock(s) sent through the Ratis write API, i.e. committed by the Raft log.
   private Queue<CompletableFuture<ContainerCommandResponseProto>>
       putBlockFutures = new LinkedList<>();
-
-  // PutBlock(s) committed without the Raft log: mid-stream commands and the stream-close PutBlock.
+  
+  // PutBlock(s) on the data stream without a Raft log entry: mid-stream commandAsync PutBlocks
+  // (flush boundaries, hsync/flush) and the PutBlock on stream close.
   private final Queue<CompletableFuture<DataStreamReply>>
       putBlockCommandFutures = new LinkedList<>();
 
