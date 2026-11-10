@@ -107,7 +107,7 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
     assertStoragePolicyFinalized();
 
     // CreateBucket without storage policy options: the OM applies its configured default.
-    String defaultPolicyBucket = "bucket-" + UUID.randomUUID();
+    String defaultPolicyBucket = "buck-" + UUID.randomUUID();
     getClient().getObjectStore().getVolume(VOLUME_NAME).createBucket(defaultPolicyBucket);
     OmBucketInfo defaultedPolicyBucketInfo = getOmClient().getBucketInfo(VOLUME_NAME, defaultPolicyBucket);
     assertThat(defaultedPolicyBucketInfo.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
