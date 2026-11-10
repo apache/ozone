@@ -45,6 +45,7 @@ for test in $(find "$SCRIPT_DIR" -name test.sh | grep "${OZONE_TEST_SELECTOR:-""
   fi
 
   mv -fv "$TEST_DIR"/result "$ALL_RESULT_DIR"/"${TEST_NAME}" || true
+  mkdir -p "$ALL_RESULT_DIR"/"${TEST_NAME}"
   mv -fv "$TEST_DIR"/logs/*log "$ALL_RESULT_DIR"/"${TEST_NAME}"/ || true
 
   if [[ "${RESULT}" == "1" ]] && [[ "${FAIL_FAST:-}" == "true" ]]; then
