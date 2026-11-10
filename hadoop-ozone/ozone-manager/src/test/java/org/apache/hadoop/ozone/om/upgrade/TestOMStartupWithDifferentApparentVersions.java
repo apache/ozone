@@ -42,12 +42,18 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Ensures OM finalizes on startup when the DB records a higher apparent version than the VERSION file, and that it
- * fails startup when the VERSION file records an apparent version that is larger than the software version.
+ * fails startup when the VERSION file records an apparent version that the software version does not recognize.
  */
 public class TestOMStartupWithDifferentApparentVersions {
 
   @TempDir
   private Path folder;
+
+  @Test
+  public void testStartupFailsWhenApparentVersionBetweenLastLayoutFeatureAndZdu() throws Exception {
+    OMLayoutFeature[] features = OMLayoutFeature.values();
+    assertStartupFailsWithInvalidVersionMessage(features[features.length - 1].serialize() + 1);
+  }
 
   @Test
   public void testStartupFailsWhenApparentVersionBeyondLastKnownComponentVersion() throws Exception {
