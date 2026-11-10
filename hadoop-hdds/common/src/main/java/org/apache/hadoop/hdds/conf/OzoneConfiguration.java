@@ -239,6 +239,8 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     };
     for (String module : modules) {
       resourceFiles.add(module + "-default.xml");
+      // Generated from test sources; present only on test classpaths.
+      resourceFiles.add(module + "-test-default.xml");
     }
 
     // Non-generated configs

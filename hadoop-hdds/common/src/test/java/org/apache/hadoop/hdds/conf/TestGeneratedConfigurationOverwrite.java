@@ -35,9 +35,9 @@ import org.junit.jupiter.api.Test;
 public class TestGeneratedConfigurationOverwrite {
 
   private final Path generatedConfigurationPath =
-      Paths.get("target/test-classes/hdds-common-default.xml");
+      Paths.get("target/test-classes/hdds-common-test-default.xml");
   private final Path generatedConfigurationPathBak =
-      Paths.get("target/test-classes/hdds-common-default.xml.bak");
+      Paths.get("target/test-classes/hdds-common-test-default.xml.bak");
 
   private OzoneConfiguration conf;
 
