@@ -749,6 +749,57 @@ public class TestRpcClient {
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
+      names = {"LIST_STATUS_REJECTS_OBS", "S3_VOLUME_CONTEXT_RESOLUTION", "S3_IF_NONE_MATCH_ETAG"})
+  void testDeleteKeyWithNullVolume(OzoneManagerVersion version) throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      if (OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version)) {
+        client.deleteKey(null, "bucket", "key", false, "etag");
+
+        ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+        verify(om).deleteKey(args.capture());
+        assertThat(args.getValue().getVolumeName()).isEqualTo("s3v");
+        assertThat(args.getValue().getBucketName()).isEqualTo("bucket");
+        assertThat(args.getValue().getKeyName()).isEqualTo("key");
+        assertThat(args.getValue().isAssumeS3Context()).isTrue();
+        assertThat(args.getValue().getExpectedETag()).isEqualTo("etag");
+        assertThat(args.getValue().isRecursive()).isFalse();
+      } else {
+        assertThrows(NullPointerException.class, () -> client.deleteKey(null, "bucket", "key", false));
+        verifyNoInteractions(om);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"s3v", "tenant-volume"})
+  void testDeleteKeyPreservesExplicitVolume(String volumeName) throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      client.deleteKey(volumeName, "bucket", "key", true, "etag");
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      verify(om).deleteKey(args.capture());
+      assertThat(args.getValue().getVolumeName()).isEqualTo(volumeName);
+      assertThat(args.getValue().isAssumeS3Context()).isFalse();
+      assertThat(args.getValue().isRecursive()).isTrue();
+      assertThat(args.getValue().getExpectedETag()).isEqualTo("etag");
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
       names = {"LIST_STATUS_REJECTS_OBS", "S3_VOLUME_CONTEXT_RESOLUTION", "GET_KEY_INFO_REJECTS_OBS"})
   void testGetObjectTaggingWithNullVolume(OzoneManagerVersion version) throws Exception {
     RpcClient client = createRpcClient();

@@ -55,6 +55,16 @@ public class FinalizationStateManagerInvoker extends ScmInvoker<FinalizationStat
     return new FinalizationStateManager() {
 
       @Override
+      public void addFinalizingMark() throws IOException {
+        invoker.getImpl().addFinalizingMark();
+      }
+
+      @Override
+      public void finalizeLayoutFeature(Integer arg0) throws IOException {
+        invoker.getImpl().finalizeLayoutFeature(arg0);
+      }
+
+      @Override
       public void finalizeUpgrade() throws IOException {
         final Object[] args = {};
         invoker.invokeReplicateDirect(ReplicateMethod.finalizeUpgrade, args);
@@ -64,6 +74,11 @@ public class FinalizationStateManagerInvoker extends ScmInvoker<FinalizationStat
       public void reinitialize(Table arg0) throws IOException {
         invoker.getImpl().reinitialize(arg0);
       }
+
+      @Override
+      public void removeFinalizingMark() throws IOException {
+        invoker.getImpl().removeFinalizingMark();
+      }
     };
   }
 
@@ -71,13 +86,26 @@ public class FinalizationStateManagerInvoker extends ScmInvoker<FinalizationStat
   @Override
   public Message invokeLocal(String methodName, Object[] p) throws Exception {
     switch (methodName) {
+    case "addFinalizingMark":
+      getImpl().addFinalizingMark();
+      return Message.EMPTY;
+
+    case "finalizeLayoutFeature":
+      final Integer arg0 = p.length > 0 ? (Integer) p[0] : null;
+      getImpl().finalizeLayoutFeature(arg0);
+      return Message.EMPTY;
+
     case "finalizeUpgrade":
       getImpl().finalizeUpgrade();
       return Message.EMPTY;
 
     case "reinitialize":
-      final Table arg0 = p.length > 0 ? (Table) p[0] : null;
-      getImpl().reinitialize(arg0);
+      final Table arg1 = p.length > 0 ? (Table) p[0] : null;
+      getImpl().reinitialize(arg1);
+      return Message.EMPTY;
+
+    case "removeFinalizingMark":
+      getImpl().removeFinalizingMark();
       return Message.EMPTY;
 
     default:

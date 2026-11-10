@@ -1583,7 +1583,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private void checkIfNoneMatchETagSupport() throws IOException {
-    if (getOmVersion().compareTo(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) < 0) {
+    if (!OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support If-None-Match entity ETags for writes.");
     }
   }
@@ -1877,6 +1877,11 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive,
       String expectedETag) throws IOException {
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
@@ -1884,7 +1889,8 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRecursive(recursive);
+        .setRecursive(recursive)
+        .setAssumeS3Context(assumeS3Context);
     if (expectedETag != null) {
       keyArgs.setExpectedETag(expectedETag);
     }
@@ -1918,6 +1924,12 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void renameKey(String volumeName, String bucketName,
       String fromKeyName, String toKeyName) throws IOException {
+    renameKey(volumeName, bucketName, fromKeyName, toKeyName, false);
+  }
+
+  @Override
+  public void renameKey(String volumeName, String bucketName,
+      String fromKeyName, String toKeyName, boolean requireFileSystemOptimized) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     if (checkKeyNameEnabled) {
@@ -1928,6 +1940,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(fromKeyName)
+        .setRequireFileSystemOptimized(requireFileSystemOptimized)
         .build();
     ozoneManagerClient.renameKey(keyArgs, toKeyName);
   }

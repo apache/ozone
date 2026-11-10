@@ -1015,6 +1015,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize()).build();
     req.setKeyArgs(keyArgs);
     req.setToKeyName(toKeyName);
+    if (args.isRequireFileSystemOptimized()) {
+      req.setRequireFileSystemOptimized(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.RenameKey)
         .setRenameKeyRequest(req)
@@ -1042,11 +1045,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     req.setKeyArgs(keyArgs);
 
-    OMRequest omRequest = createOMRequest(Type.DeleteKey)
-        .setDeleteKeyRequest(req)
-        .build();
+    OMRequest.Builder omRequest = createOMRequest(Type.DeleteKey)
+        .setDeleteKeyRequest(req);
+    if (args.isAssumeS3Context()) {
+      omRequest.setAssumeS3Context(true);
+    }
 
-    handleError(submitRequest(omRequest));
+    handleError(submitRequest(omRequest.build()));
 
   }
 
