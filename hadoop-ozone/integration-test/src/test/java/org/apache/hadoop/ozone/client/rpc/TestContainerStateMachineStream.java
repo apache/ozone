@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.container.OzoneTestHelper.createStreamKey;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.getDatanodeService;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.getDatanodeServices;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.validateData;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForContainerClose;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -149,6 +150,34 @@ public abstract class TestContainerStateMachineStream implements ClusterForTests
 
       validateData(keyName, data, client.getObjectStore(), volumeName, bucketName);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testContainerClosedBeforeStreamCloseWithPutBlockWithoutRaft(boolean hsyncFirst) throws Exception {
+    final int size = 1000;
+    final OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    final OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(true);
+    conf.setFromObject(clientConfig);
+
+    final String keyName = "closed-" + hsyncFirst + "-" + UUID.randomUUID();
+    final byte[] data = ContainerTestHelper.generateData(size, true);
+    try (OzoneClient streamingClient = OzoneClientFactory.getRpcClient(conf);
+         OzoneDataStreamOutput key = createStreamKey(keyName, ReplicationType.RATIS, size,
+             streamingClient.getObjectStore(), volumeName, bucketName)) {
+      if (hsyncFirst) {
+        key.write(ByteBuffer.wrap(data, 0, size / 2));
+        assertInstanceOf(KeyDataStreamOutput.class, key.getByteBufStreamOutput()).hsync();
+        key.write(ByteBuffer.wrap(data, size / 2, size / 2));
+      } else {
+        key.write(ByteBuffer.wrap(data));
+      }
+      // The datanodes reject the PutBlock committed on stream close, so the client has to write the data again.
+      waitForContainerClose(key, cluster());
+    }
+
+    validateData(keyName, data, client.getObjectStore(), volumeName, bucketName);
   }
 
   @ParameterizedTest

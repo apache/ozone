@@ -48,6 +48,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
@@ -130,6 +131,29 @@ public class TestKeyValueStreamDataChannel {
     }
     assertEquals(data.length, tempFile.length());
     assertArrayEquals(data, Files.readAllBytes(tempFile.toPath()));
+  }
+
+  @Test
+  public void testClosePutBlockRejectedDoesNotLink() throws Exception {
+    final File tempFile = File.createTempFile("test-kv-close-reject", ".tmp");
+    tempFile.deleteOnExit();
+    final KeyValueStreamDataChannel channel = newChannel(
+        tempFile, proto -> {
+          throw new StorageContainerException("closed", ContainerProtos.Result.CLOSED_CONTAINER_IO);
+        });
+    final byte[] data = RandomUtils.secure().randomBytes(50);
+    final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
+        PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
+    final ByteBuffer protoLengthBuf = getProtoLength(putBlockBuf, PUT_BLOCK_REQUEST_LENGTH_MAX);
+
+    write(channel, data);
+    write(channel, putBlockBuf.duplicate());
+    write(channel, protoLengthBuf.duplicate());
+
+    final StorageContainerException e = assertThrows(StorageContainerException.class, channel::close);
+    assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO, e.getResult());
+    assertFalse(channel.isLinked());
+    assertFalse(channel.link());
   }
 
   @Test
@@ -483,6 +507,11 @@ public class TestKeyValueStreamDataChannel {
   private static KeyValueStreamDataChannel newChannel(
       File tempFile, boolean commitPutBlockOnClose,
       AtomicReference<ContainerCommandRequestProto> processed) throws Exception {
+    return newChannel(tempFile, commitPutBlockOnClose ? processed::set : null);
+  }
+
+  private static KeyValueStreamDataChannel newChannel(
+      File tempFile, CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock) throws Exception {
     HddsVolume mockVolume = mock(HddsVolume.class);
     when(mockVolume.getStorageID()).thenReturn("storageId");
     when(mockVolume.getCurrentUsage()).thenReturn(new SpaceUsageSource.Fixed(1000L, 1000L, 0L));
@@ -490,8 +519,6 @@ public class TestKeyValueStreamDataChannel {
     when(mockContainerData.getContainerID()).thenReturn(123L);
     when(mockContainerData.getVolume()).thenReturn(mockVolume);
     ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
-    CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock =
-        commitPutBlockOnClose ? processed::set : null;
     return new KeyValueStreamDataChannel(tempFile, mockContainerData, putBlock, mockMetrics);
   }
 
