@@ -84,6 +84,7 @@ public class TestSCMRatisServerImpl {
     ) {
       // given
       ConfigurationSource conf = mock(ConfigurationSource.class);
+      when(conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR)).thenReturn(tempDir.toString());
       StorageContainerManager scm = mock(StorageContainerManager.class);
       String clusterId = "CID-" + UUID.randomUUID();
       when(scm.getClusterId()).thenReturn(clusterId);
@@ -153,6 +154,7 @@ public class TestSCMRatisServerImpl {
         MockedStatic<RatisUtil> staticMockedRatisUtil = mockStatic(RatisUtil.class);
     ) {
       ConfigurationSource conf = mock(ConfigurationSource.class);
+      when(conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR)).thenReturn(tempDir.toString());
       StorageContainerManager scm = mock(StorageContainerManager.class);
       when(scm.getClusterId()).thenReturn("CID-" + UUID.randomUUID());
       SCMHADBTransactionBuffer dbTransactionBuffer = mock(SCMHADBTransactionBuffer.class);
@@ -201,6 +203,7 @@ public class TestSCMRatisServerImpl {
         MockedStatic<RatisUtil> staticMockedRatisUtil = mockStatic(RatisUtil.class);
     ) {
       ConfigurationSource conf = mock(ConfigurationSource.class);
+      when(conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR)).thenReturn(tempDir.toString());
       StorageContainerManager scm = mock(StorageContainerManager.class);
       when(scm.getClusterId()).thenReturn("CID-" + UUID.randomUUID());
       SCMHADBTransactionBuffer dbTransactionBuffer = mock(SCMHADBTransactionBuffer.class);
