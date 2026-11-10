@@ -261,6 +261,8 @@ public class FilePerChunkStrategy implements ChunkManager {
                   blockID.toString(), UNABLE_TO_FIND_CHUNK);
         }
       } catch (IOException e) {
+        // Report a missing chunks directory rather than the missing block.
+        ContainerUtils.getChunkDir(containerData);
         throw new StorageContainerException(
             "Cannot find block " + blockID.toString() + " for chunk " +
                 info.getChunkName(), UNABLE_TO_FIND_CHUNK);

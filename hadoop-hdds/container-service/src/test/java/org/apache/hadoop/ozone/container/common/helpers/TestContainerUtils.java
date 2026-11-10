@@ -93,11 +93,9 @@ public class TestContainerUtils {
 
     // getChunkDir validates on every call, so a write against a failed volume
     // is detected even after the directory was resolved once.
-    assertEquals(chunks.getAbsolutePath(),
-        ContainerUtils.getChunkDir(data).getAbsolutePath());
+    assertEquals(chunks.getAbsolutePath(), ContainerUtils.getChunkDir(data).getAbsolutePath());
     assertTrue(chunks.delete());
-    StorageContainerException e = assertThrows(StorageContainerException.class,
-        () -> ContainerUtils.getChunkDir(data));
+    StorageContainerException e = assertThrows(StorageContainerException.class, () -> ContainerUtils.getChunkDir(data));
     assertEquals(Result.UNABLE_TO_FIND_DATA_DIR, e.getResult());
   }
 
@@ -124,8 +122,7 @@ public class TestContainerUtils {
     File other = new File(dir, "chunks2");
     assertTrue(other.mkdirs());
     data.setChunksPath(other.getAbsolutePath());
-    assertEquals(other.getAbsolutePath(),
-        data.getChunksDirForRead().getAbsolutePath());
+    assertEquals(other.getAbsolutePath(), data.getChunksDirForRead().getAbsolutePath());
   }
 
   @Test
