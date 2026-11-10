@@ -85,6 +85,10 @@ public abstract class AbstractOMStoragePolicyUpgradeTest {
     return cluster;
   }
 
+  protected OzoneClient getClient() {
+    return client;
+  }
+
   protected OzoneManagerProtocol getOmClient() {
     return omClient;
   }
@@ -130,10 +134,7 @@ public abstract class AbstractOMStoragePolicyUpgradeTest {
   }
 
   /**
-   * Creates a bucket through {@link OzoneManagerProtocol} rather than the
-   * {@code OzoneBucket} API, because {@code RpcClient#createBucket} substitutes
-   * the default storage policy for null and so cannot express a request without
-   * the field.
+   * Creates a bucket through {@link OzoneManagerProtocol}.
    *
    * @return the name of the bucket created.
    */

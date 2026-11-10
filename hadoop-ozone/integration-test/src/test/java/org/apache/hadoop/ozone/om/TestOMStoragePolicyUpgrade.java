@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DEFAULT_STORAGE_POLICY_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.UUID;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -89,7 +90,8 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
     // Controls: the gate must not reject requests that carry no storage policy field
     createBucket(null, null);
     // The client API must not add a policy field on its own, or the gate rejects this request.
-    String clientCreated = createBucket(null, null);
+    String clientCreated = "buck-" + UUID.randomUUID();
+    getClient().getObjectStore().getVolume(VOLUME_NAME).createBucket(clientCreated);
     assertThat(getOmClient().getBucketInfo(VOLUME_NAME, clientCreated).getStoragePolicy()).isNull();
 
     getOmClient().setBucketProperty(OmBucketArgs.newBuilder()
@@ -105,7 +107,8 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
     assertStoragePolicyFinalized();
 
     // CreateBucket without storage policy options: the OM applies its configured default.
-    String defaultPolicyBucket = createBucket(null, null);
+    String defaultPolicyBucket = "bucket-" + UUID.randomUUID();
+    getClient().getObjectStore().getVolume(VOLUME_NAME).createBucket(defaultPolicyBucket);
     OmBucketInfo defaultedPolicyBucketInfo = getOmClient().getBucketInfo(VOLUME_NAME, defaultPolicyBucket);
     assertThat(defaultedPolicyBucketInfo.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
     assertThat(defaultedPolicyBucketInfo.getAllowFallbackStoragePolicy()).isTrue();
