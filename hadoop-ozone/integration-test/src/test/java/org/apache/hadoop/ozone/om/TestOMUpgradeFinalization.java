@@ -162,7 +162,8 @@ class TestOMUpgradeFinalization {
         assertEquals(OzoneManagerVersion.SOFTWARE_VERSION.serialize(), Integer.parseInt(dbVersion));
 
         // Confirm finalization happened via snapshot install, not log replay.
-        assertThat(versionManagerLogCapture.getOutput()).contains("New snapshot received with higher apparent version");
+        assertThat(versionManagerLogCapture.getOutput()).contains(
+            "Version file has lower apparent version (INITIAL_VERSION (0)) than DB");
         versionManagerLogCapture.stopCapturing();
       }
     }

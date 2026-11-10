@@ -33,7 +33,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,8 +64,7 @@ public class NodeDecommissionManager {
   private ContainerManager containerManager;
   private final SCMContext scmContext;
   private final boolean useHostnames;
-  private Integer maintenanceReplicaMinimum;
-  private Integer maintenanceRemainingRedundancy;
+  private final ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   // Decommissioning and Maintenance mode progress related metrics.
   private final NodeDecommissionMetrics metrics;
@@ -229,18 +227,16 @@ public class NodeDecommissionManager {
     if (dns.size() < 2) {
       return dns.isEmpty() ? null : dns.get(0);
     }
-    List<Pair<DatanodeDetails, Long>> dnsWithHeartbeat = dns.stream()
-        .map(dn -> Pair.of(dn, nodeManager.getLastHeartbeat(dn)))
-        .sorted(Comparator.comparingLong(Pair::getRight))
+    List<DatanodeHeartbeat> dnsWithHeartbeat = dns.stream()
+        .map(dn -> new DatanodeHeartbeat(dn, nodeManager.getLastHeartbeat(dn)))
+        .sorted(Comparator.comparingLong(DatanodeHeartbeat::lastHeartbeat))
         .collect(Collectors.toList());
     // The last element should have the largest (newest) heartbeat. But also
     // check it is not identical to the last but 1 element, as then we cannot
     // determine which node to decommission.
-    Pair<DatanodeDetails, Long> last = dnsWithHeartbeat.get(
-        dnsWithHeartbeat.size() - 1);
-    if (last.getRight() > dnsWithHeartbeat.get(
-        dnsWithHeartbeat.size() - 2).getRight()) {
-      return last.getLeft();
+    DatanodeHeartbeat last = dnsWithHeartbeat.get(dnsWithHeartbeat.size() - 1);
+    if (last.lastHeartbeat() > dnsWithHeartbeat.get(dnsWithHeartbeat.size() - 2).lastHeartbeat()) {
+      return last.datanode();
     }
     return null;
   }
@@ -262,6 +258,7 @@ public class NodeDecommissionManager {
     this.nodeManager = nm;
     this.containerManager = cm;
     this.scmContext = scmContext;
+    this.rmConf = rm.getConfig();
 
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder()
@@ -280,10 +277,6 @@ public class NodeDecommissionManager {
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    ReplicationManager.ReplicationManagerConfiguration rmConf = rm.getConfig();
-    setMaintenanceConfigs(rmConf.getMaintenanceReplicaMinimum(),
-        rmConf.getMaintenanceRemainingRedundancy());
 
     monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
         rm);
@@ -586,9 +579,9 @@ public class NodeDecommissionManager {
           if (replicationType.equals(HddsProtos.ReplicationType.EC)) {
             int reqNodes = cif.getReplicationConfig().getRequiredNodes();
             int data = ((ECReplicationConfig)cif.getReplicationConfig()).getData();
-            minInService = Math.min((data + maintenanceRemainingRedundancy), reqNodes);
+            minInService = Math.min((data + rmConf.getMaintenanceRemainingRedundancy()), reqNodes);
           } else {
-            minInService = maintenanceReplicaMinimum;
+            minInService = rmConf.getMaintenanceReplicaMinimum();
           }
           if ((inServiceTotal - healthyNodesEnteringMaintenance) < minInService) {
             final int unHealthyTotal = nodeManager.getAllNodeCount() - inServiceTotal;
@@ -640,20 +633,18 @@ public class NodeDecommissionManager {
   }
 
   @VisibleForTesting
-  public void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
-    synchronized (this) {
-      maintenanceRemainingRedundancy = remainingRedundancy;
-      maintenanceReplicaMinimum = replicaMinimum;
-    }
+  public int getMaintenanceReplicaMinimum() {
+    return rmConf.getMaintenanceReplicaMinimum();
   }
 
   @VisibleForTesting
-  public synchronized int getMaintenanceReplicaMinimum() {
-    return maintenanceReplicaMinimum;
+  public int getMaintenanceRemainingRedundancy() {
+    return rmConf.getMaintenanceRemainingRedundancy();
   }
 
-  @VisibleForTesting
-  public synchronized int getMaintenanceRemainingRedundancy() {
-    return maintenanceRemainingRedundancy;
-  }
+  /**
+   * A datanode paired with the time of its last heartbeat, used to pick the datanode
+   * with the most recent heartbeat to decommission.
+   */
+  private record DatanodeHeartbeat(DatanodeDetails datanode, long lastHeartbeat) { }
 }

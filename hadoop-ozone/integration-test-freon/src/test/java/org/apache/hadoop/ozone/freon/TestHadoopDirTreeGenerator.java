@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for HadoopDirTreeGenerator.
  */
-public abstract class TestHadoopDirTreeGenerator implements NonHATests.TestCase {
+public abstract class TestHadoopDirTreeGenerator implements ClusterForTests.TestCase {
 
   private static final int PAGE_SIZE = 10;
 
