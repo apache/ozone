@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.RocksTestUtils;
@@ -61,18 +60,17 @@ class TestManagedRawSSTFileIterator {
   @TempDir
   private Path tempDir;
 
-  private File createSSTFileWithKeys(
-      TreeMap<Pair<String, Integer>, String> keys) throws Exception {
+  private File createSSTFileWithKeys(TreeMap<KeyType, String> keys) throws Exception {
     File file = Files.createFile(tempDir.resolve("tmp_sst_file.sst")).toFile();
     try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedOptions managedOptions = new ManagedOptions();
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
       sstFileWriter.open(file.getAbsolutePath());
-      for (Map.Entry<Pair<String, Integer>, String> entry : keys.entrySet()) {
-        if (entry.getKey().getValue() == 0) {
-          sstFileWriter.delete(entry.getKey().getKey().getBytes(StandardCharsets.UTF_8));
+      for (Map.Entry<KeyType, String> entry : keys.entrySet()) {
+        if (entry.getKey().type() == 0) {
+          sstFileWriter.delete(entry.getKey().key().getBytes(StandardCharsets.UTF_8));
         } else {
-          sstFileWriter.put(entry.getKey().getKey().getBytes(StandardCharsets.UTF_8),
+          sstFileWriter.put(entry.getKey().key().getBytes(StandardCharsets.UTF_8),
               entry.getValue().getBytes(StandardCharsets.UTF_8));
         }
       }
@@ -113,8 +111,8 @@ class TestManagedRawSSTFileIterator {
   @MethodSource("keyValueFormatArgs")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat, String valueFormat, IteratorType type)
       throws Exception {
-    TreeMap<Pair<String, Integer>, String> keys = IntStream.range(0, 100).boxed().collect(Collectors.toMap(
-        i -> Pair.of(String.format(keyFormat, i), i % 2),
+    TreeMap<KeyType, String> keys = IntStream.range(0, 100).boxed().collect(Collectors.toMap(
+        i -> new KeyType(String.format(keyFormat, i), i % 2),
         i -> i % 2 == 0 ? "" : String.format(valueFormat, i),
         (v1, v2) -> v2, TreeMap::new));
     File file = createSSTFileWithKeys(keys);
@@ -122,25 +120,25 @@ class TestManagedRawSSTFileIterator {
          ManagedRawSSTFileReader reader = new ManagedRawSSTFileReader(
              options, file.getAbsolutePath(), 2 * 1024 * 1024)) {
       List<Optional<String>> testBounds = RocksTestUtils.getTestingBounds(keys.keySet().stream()
-          .collect(Collectors.toMap(Pair::getKey, Pair::getValue, (v1, v2) -> v1, TreeMap::new)));
+          .collect(Collectors.toMap(KeyType::key, KeyType::type, (v1, v2) -> v1, TreeMap::new)));
       for (Optional<String> keyStart : testBounds) {
         for (Optional<String> keyEnd : testBounds) {
-          Map<Pair<String, Integer>, String> expectedKeys = keys.entrySet().stream()
-              .filter(e -> keyStart.map(s -> e.getKey().getKey().compareTo(s) >= 0).orElse(true))
-              .filter(e -> keyEnd.map(s -> e.getKey().getKey().compareTo(s) < 0).orElse(true))
+          Map<KeyType, String> expectedKeys = keys.entrySet().stream()
+              .filter(e -> keyStart.map(s -> e.getKey().key().compareTo(s) >= 0).orElse(true))
+              .filter(e -> keyEnd.map(s -> e.getKey().key().compareTo(s) < 0).orElse(true))
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v1, TreeMap::new));
 
           Optional<ManagedSlice> lowerBound = keyStart.map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
           Optional<ManagedSlice> upperBound = keyEnd.map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
           try (ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> iterator =
                    reader.newIterator(Function.identity(), lowerBound.orElse(null), upperBound.orElse(null), type)) {
-            Iterator<Map.Entry<Pair<String, Integer>, String>> expectedKeyItr = expectedKeys.entrySet().iterator();
+            Iterator<Map.Entry<KeyType, String>> expectedKeyItr = expectedKeys.entrySet().iterator();
             while (iterator.hasNext()) {
               ManagedRawSSTFileIterator.KeyValue r = iterator.next();
               assertTrue(expectedKeyItr.hasNext());
-              Map.Entry<Pair<String, Integer>, String> expectedKey = expectedKeyItr.next();
+              Map.Entry<KeyType, String> expectedKey = expectedKeyItr.next();
               String key = r.getKey() == null ? null : StringCodec.get().fromCodecBuffer(r.getKey());
-              assertEquals(type.readKey() ? expectedKey.getKey().getKey() : null, key);
+              assertEquals(type.readKey() ? expectedKey.getKey().key() : null, key);
               assertEquals(type.readValue() ? expectedKey.getValue() : null,
                   type.readValue() ? StringCodec.get().fromCodecBuffer(r.getValue()) : r.getValue());
               expectedKeyItr.remove();
@@ -152,6 +150,21 @@ class TestManagedRawSSTFileIterator {
           }
         }
       }
+    }
+  }
+
+  /**
+   * SST key paired with its entry type (0 = delete, otherwise put),
+   * ordered by key then type so entries are written to the SST file in sorted order.
+   */
+  private record KeyType(String key, int type) implements Comparable<KeyType> {
+    @Override
+    public int compareTo(KeyType o) {
+      int cmp = key.compareTo(o.key);
+      if (cmp != 0) {
+        return cmp;
+      }
+      return Integer.compare(type, o.type);
     }
   }
 }

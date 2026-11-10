@@ -26,6 +26,9 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -35,6 +38,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,10 +60,13 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Unit test for Container Key mapper task.
@@ -77,6 +87,7 @@ public class TestContainerKeyMapperTask {
   private static final String BUCKET_NAME = "bucket1";
   private static final String VOLUME_NAME = "vol";
   private static final String FILE_NAME = "file7";
+  private static final String OTHER_FILE_NAME = "file8";
   private static final String INSERTED_KEY = "keyToBeInserted";
   private static final String DELETED_KEY = "keyToBeDeleted";
   private static final long KEY_ONE_OBJECT_ID = 3L; // 3 bytes
@@ -602,6 +613,147 @@ public class TestContainerKeyMapperTask {
     // we expect six distinct entries in container 1.
     keyPrefixesForContainer = reconContainerMetadataManager.getKeyPrefixesForContainer(1L);
     assertEquals(6, keyPrefixesForContainer.size());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
+  public void testOverwriteMovesKeyToOtherContainers(BucketLayout layout) throws Exception {
+    // The key has blocks in containers 1 and 2; another key keeps container 1 in use.
+    OmKeyInfo oldKeyInfo = writeKey(layout, FILE_NAME, 1L, 2L);
+    writeKey(layout, OTHER_FILE_NAME, 1L);
+    ReconOmTask task = getContainerKeyMapperTask(layout);
+    task.reprocess(reconOMMetadataManager);
+
+    // The overwrite moves the block in container 1 to container 3 and keeps the block in container 2.
+    String dbKey = getDbKey(layout, FILE_NAME);
+    OmKeyInfo newKeyInfo = buildOmKeyInfo(VOLUME_NAME, BUCKET_NAME, FILE_NAME, getLocationGroup(2L, 3L));
+    OMUpdateEventBatch batch = new OMUpdateEventBatch(new ArrayList<>(Collections.singletonList(
+        getUpdateEvent(layout, dbKey, oldKeyInfo, newKeyInfo))), 0L);
+    task.process(batch, Collections.emptyMap());
+
+    assertThat(getKeysInContainer(1L)).containsExactly(getDbKey(layout, OTHER_FILE_NAME));
+    assertThat(getKeysInContainer(2L)).containsExactly(dbKey);
+    assertThat(getKeysInContainer(3L)).containsExactly(dbKey);
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(1L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(2L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
+    assertEquals(3, reconContainerMetadataManager.getCountForContainers());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
+  public void testTwoOverwritesInOneBatch(BucketLayout layout) throws Exception {
+    // The key has a block in container 1; another key keeps container 1 in use.
+    OmKeyInfo oldKeyInfo = writeKey(layout, FILE_NAME, 1L);
+    writeKey(layout, OTHER_FILE_NAME, 1L);
+    ReconOmTask task = getContainerKeyMapperTask(layout);
+    task.reprocess(reconOMMetadataManager);
+
+    // Two overwrites in one batch move the key from container 1 to container 2, then to container 3.
+    String dbKey = getDbKey(layout, FILE_NAME);
+    OmKeyInfo firstKeyInfo = buildOmKeyInfo(VOLUME_NAME, BUCKET_NAME, FILE_NAME, getLocationGroup(2L));
+    OmKeyInfo secondKeyInfo = buildOmKeyInfo(VOLUME_NAME, BUCKET_NAME, FILE_NAME, getLocationGroup(3L));
+    OMUpdateEventBatch batch = new OMUpdateEventBatch(new ArrayList<>(Arrays.asList(
+        getUpdateEvent(layout, dbKey, oldKeyInfo, firstKeyInfo),
+        getUpdateEvent(layout, dbKey, firstKeyInfo, secondKeyInfo))), 0L);
+    task.process(batch, Collections.emptyMap());
+
+    assertThat(getKeysInContainer(1L)).containsExactly(getDbKey(layout, OTHER_FILE_NAME));
+    assertThat(getKeysInContainer(2L)).isEmpty();
+    assertThat(getKeysInContainer(3L)).containsExactly(dbKey);
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(1L));
+    assertEquals(0, reconContainerMetadataManager.getKeyCountForContainer(2L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
+  }
+
+  @Test
+  public void testConcurrentFsoAndObsUpdatesOfSameContainer() throws Exception {
+    // An FSO key has a block in container 1. One batch changes only its metadata and puts an OBS key in container 1.
+    OmKeyInfo fsoKeyInfo = writeKey(BucketLayout.FILE_SYSTEM_OPTIMIZED, FILE_NAME, 1L);
+    getContainerKeyMapperTask(BucketLayout.FILE_SYSTEM_OPTIMIZED).reprocess(reconOMMetadataManager);
+    String fsoDbKey = getDbKey(BucketLayout.FILE_SYSTEM_OPTIMIZED, FILE_NAME);
+    String obsDbKey = getDbKey(BucketLayout.OBJECT_STORE, OTHER_FILE_NAME);
+    OMDBUpdateEvent obsPut = new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmKeyInfo>()
+        .setKey(obsDbKey)
+        .setValue(buildOmKeyInfo(VOLUME_NAME, BUCKET_NAME, OTHER_FILE_NAME, getLocationGroup(1L)))
+        .setTable(omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).getName())
+        .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+        .build();
+    OMUpdateEventBatch batch = new OMUpdateEventBatch(new ArrayList<>(Arrays.asList(
+        getUpdateEvent(BucketLayout.FILE_SYSTEM_OPTIMIZED, fsoDbKey, fsoKeyInfo, fsoKeyInfo), obsPut)), 0L);
+
+    ReconContainerMetadataManager fsoContainerMetadataManager = spy(reconContainerMetadataManager);
+    ContainerKeyMapperTaskFSO fsoTask = new ContainerKeyMapperTaskFSO(fsoContainerMetadataManager, omConfiguration);
+    ContainerKeyMapperTaskOBS obsTask = new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
+    FutureTask<ReconOmTask.TaskResult> fsoProcess =
+        new FutureTask<>(() -> fsoTask.process(batch, Collections.emptyMap()));
+    FutureTask<ReconOmTask.TaskResult> obsProcess =
+        new FutureTask<>(() -> obsTask.process(batch, Collections.emptyMap()));
+    Thread obsThread = new Thread(obsProcess);
+    // The FSO task pauses after it reads the key count of container 1, until the OBS task is done or waits for it.
+    CountDownLatch fsoCountRead = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      Object count = invocation.callRealMethod();
+      fsoCountRead.countDown();
+      GenericTestUtils.waitFor(() -> obsProcess.isDone() || obsThread.getState() == Thread.State.BLOCKED, 10, 10000);
+      return count;
+    }).when(fsoContainerMetadataManager).getKeyCountForContainer(1L);
+
+    new Thread(fsoProcess).start();
+    assertTrue(fsoCountRead.await(10, TimeUnit.SECONDS));
+    obsThread.start();
+    assertTrue(fsoProcess.get(10, TimeUnit.SECONDS).isTaskSuccess());
+    assertTrue(obsProcess.get(10, TimeUnit.SECONDS).isTaskSuccess());
+
+    assertThat(getKeysInContainer(1L)).containsExactlyInAnyOrder(fsoDbKey, obsDbKey);
+    assertEquals(2, reconContainerMetadataManager.getKeyCountForContainer(1L));
+    assertEquals(1, reconContainerMetadataManager.getCountForContainers());
+  }
+
+  private ReconOmTask getContainerKeyMapperTask(BucketLayout layout) {
+    return layout == BucketLayout.FILE_SYSTEM_OPTIMIZED
+        ? new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration)
+        : new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
+  }
+
+  /** Returns the OM DB key of a file directly under the bucket. */
+  private String getDbKey(BucketLayout layout, String fileName) {
+    return layout == BucketLayout.FILE_SYSTEM_OPTIMIZED
+        ? omMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID, fileName)
+        : omMetadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, fileName);
+  }
+
+  /** Writes a file directly under the bucket, with one block in each of the given containers. */
+  private OmKeyInfo writeKey(BucketLayout layout, String fileName, long... containerIds) throws IOException {
+    writeKeyToOm(reconOMMetadataManager, fileName, BUCKET_NAME, VOLUME_NAME, fileName, KEY_ONE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID, VOL_OBJECT_ID,
+        Collections.singletonList(getLocationGroup(containerIds)), layout, KEY_ONE_SIZE);
+    return reconOMMetadataManager.getKeyTable(layout).get(getDbKey(layout, fileName));
+  }
+
+  private OmKeyLocationInfoGroup getLocationGroup(long... containerIds) {
+    Pipeline pipeline = getRandomPipeline();
+    List<OmKeyLocationInfo> locations = new ArrayList<>();
+    for (long containerId : containerIds) {
+      locations.add(getOmKeyLocationInfo(new BlockID(containerId, 1L), pipeline));
+    }
+    return new OmKeyLocationInfoGroup(0L, locations);
+  }
+
+  private List<String> getKeysInContainer(long containerId) throws IOException {
+    return reconContainerMetadataManager.getKeyPrefixesForContainer(containerId).keySet().stream()
+        .map(ContainerKeyPrefix::getKeyPrefix).collect(Collectors.toList());
+  }
+
+  private OMDBUpdateEvent getUpdateEvent(BucketLayout layout, String dbKey, OmKeyInfo oldKeyInfo,
+      OmKeyInfo newKeyInfo) {
+    return new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmKeyInfo>()
+        .setKey(dbKey)
+        .setOldValue(oldKeyInfo)
+        .setValue(newKeyInfo)
+        .setTable(omMetadataManager.getKeyTable(layout).getName())
+        .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+        .build();
   }
 
   private OmKeyInfo buildOmKeyInfo(String volume,
