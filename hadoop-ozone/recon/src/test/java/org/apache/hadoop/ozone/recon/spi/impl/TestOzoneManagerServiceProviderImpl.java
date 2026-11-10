@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
@@ -58,6 +59,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
@@ -91,6 +95,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.test.GenericTestUtils;
 import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -914,6 +919,42 @@ public class TestOzoneManagerServiceProviderImpl {
     response = serviceProvider.triggerTaskRebuild();
     assertEquals(OMDBReprocessResponse.Status.RETRY, response.getStatus());
     verify(noDbController, never()).queueReInitializationEvent(any());
+  }
+
+  @Test
+  public void testTriggerTaskRebuildWaitsForDeltaHandOff(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+    ReconOMMetadataManager omMetadataManager = stopAfterTest(getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(dirOmMetadata), dirReconMetadata));
+    DBUpdates dbUpdates = new DBUpdates();
+    dbUpdates.setCurrentSequenceNumber(0);
+    ReconTaskController reconTaskControllerMock = getMockTaskController();
+    OzoneManagerServiceProviderImpl serviceProvider = new OzoneManagerServiceProviderImpl(configuration,
+        omMetadataManager, reconTaskControllerMock, new ReconUtils(), getMockOzoneManagerClient(dbUpdates),
+        reconContext, getMockTaskStatusUpdaterManager());
+
+    AtomicBoolean handingOff = new AtomicBoolean();
+    AtomicBoolean queuedDuringHandOff = new AtomicBoolean();
+    when(reconTaskControllerMock.queueReInitializationEvent(any())).thenAnswer(invocation -> {
+      queuedDuringHandOff.compareAndSet(false, handingOff.get());
+      return ReconTaskController.ReInitializationResult.SUCCESS;
+    });
+    // Request a rebuild from another thread after the sync has applied a delta batch and before it hands it over.
+    CompletableFuture<OMDBReprocessResponse> rebuild = new CompletableFuture<>();
+    doAnswer(invocation -> {
+      handingOff.set(true);
+      Thread rebuildThread = new Thread(() -> rebuild.complete(serviceProvider.triggerTaskRebuild()));
+      rebuildThread.start();
+      GenericTestUtils.waitFor(() -> rebuild.isDone() || rebuildThread.getState() == Thread.State.WAITING, 10, 10000);
+      handingOff.set(false);
+      return null;
+    }).when(reconTaskControllerMock).updateOMMetadataManager(any(ReconOMMetadataManager.class));
+
+    assertTrue(serviceProvider.syncDataFromOM());
+    assertThat(rebuild.get(10, TimeUnit.SECONDS).getStatus()).isEqualTo(OMDBReprocessResponse.Status.ACCEPTED);
+    assertThat(queuedDuringHandOff).isFalse();
+    verify(reconTaskControllerMock, times(1)).queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD);
   }
 
   private <T extends OMMetadataManager> T stopAfterTest(T omMetadataManager) {
