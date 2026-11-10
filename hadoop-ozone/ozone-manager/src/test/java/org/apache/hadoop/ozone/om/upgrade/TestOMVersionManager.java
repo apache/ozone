@@ -57,7 +57,7 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.upgrade.AbstractComponentVersionManagerTest;
+import org.apache.hadoop.ozone.upgrade.AbstractRatisBasedVersionManagerTest;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +70,7 @@ import org.mockito.Mockito;
  * Tests for {@link OMVersionManager}. Shared abstract tests use an empty upgrade-action map; action behavior is
  * covered with map-based providers and a required classpath discovery test.
  */
-class TestOMVersionManager extends AbstractComponentVersionManagerTest {
+class TestOMVersionManager extends AbstractRatisBasedVersionManagerTest {
 
   private static final List<ComponentVersion> ALL_VERSIONS;
 
@@ -122,6 +122,12 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
   @Override
   protected ComponentVersion expectedSoftwareVersion() {
     return OzoneManagerVersion.SOFTWARE_VERSION;
+  }
+
+  @Override
+  protected ComponentVersion lastLayoutFeature() {
+    OMLayoutFeature[] features = OMLayoutFeature.values();
+    return features[features.length - 1];
   }
 
   @Override
