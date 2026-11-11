@@ -35,12 +35,12 @@ public class CompactionServiceConfig {
 
   @Config(key = Keys.ENABLED,
       defaultValue = "false",
-      type = ConfigType.BOOLEAN,
+      type = ConfigType.STRING,
       tags = {ConfigTag.OZONE, ConfigTag.OM, ConfigTag.PERFORMANCE},
       description = "Enable or disable a background job that periodically compacts rocksdb tables flagged for " +
           "compaction."
   )
-  private boolean enabled;
+  private String enabled = "false";
 
   @Config(key = Keys.RUN_INTERVAL,
       defaultValue = "6h",
@@ -82,7 +82,7 @@ public class CompactionServiceConfig {
   private String bottommostLevelCompaction;
 
   public boolean isEnabled() {
-    return enabled;
+    return Boolean.parseBoolean(enabled.trim());
   }
 
   public long getRunInterval() {

@@ -65,6 +65,14 @@ class TestCompactionServiceConfig {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {" true", "true ", " true ", "\ttrue\n", " TrUe "})
+  void testEnabledFlagWithWhitespace(String value) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set("ozone.om.compaction.service.enabled", value);
+    assertTrue(conf.getObject(CompactionServiceConfig.class).isEnabled());
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"kForce", " kForce", "kForce ", " kForce "})
   void testBottommostLevelCompaction(String value) {
     OzoneConfiguration conf = new OzoneConfiguration();
