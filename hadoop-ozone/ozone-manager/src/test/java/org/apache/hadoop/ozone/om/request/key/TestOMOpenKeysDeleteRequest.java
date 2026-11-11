@@ -47,6 +47,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -69,6 +71,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  * This class tests the OM Open Keys Delete Request.
  */
 public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
+
+  /** Transaction index of the hsync that lands before the open key cleanup is applied at 100. */
+  private static final long HSYNC_TRXN_INDEX = 50L;
 
   private BucketLayout bucketLayout;
 
@@ -285,16 +290,30 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
     OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket,
         omMetadataManager, getBucketLayout());
 
-    final List<Pair<Long, OmKeyInfo>> hsyncedKeys = new ArrayList<>();
+    final List<Pair<Long, OmKeyInfo>> openKeys = new ArrayList<>();
     for (Pair<Long, OmKeyInfo> openKey : makeOpenKeys(volume, bucket, 3)) {
       final OmKeyInfo keyInfo = openKey.getRight().toBuilder()
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0L, new ArrayList<>(), false)))
           .build();
-      hsyncedKeys.add(Pair.of(openKey.getLeft(), hsync(keyInfo, openKey.getLeft())));
+      openKeys.add(Pair.of(openKey.getLeft(), keyInfo));
     }
-    // a non-zero key size so that the keys have blocks that can be queued for deletion
-    addToOpenKeyTableDB(100L, hsyncedKeys);
+    // a non-zero key size so that the keys have blocks that can be queued for deletion.
+    // The DB copy carries no HSYNC_CLIENT_ID, which is why the cleanup scan selected these keys.
+    addToOpenKeyTableDB(100L, openKeys);
+
+    // the first hsync of each key is only in the open key table cache when the delete is applied
+    final List<String> dbKeyNames = getDBKeyNames(openKeys);
+    final List<Pair<Long, OmKeyInfo>> hsyncedKeys = new ArrayList<>(openKeys.size());
+    for (int i = 0; i < openKeys.size(); i++) {
+      final long clientId = openKeys.get(i).getLeft();
+      final OmKeyInfo hsyncedKeyInfo = hsync(openKeys.get(i).getRight(), clientId).toBuilder()
+          .setUpdateID(HSYNC_TRXN_INDEX)
+          .build();
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+          new CacheKey<>(dbKeyNames.get(i)), CacheValue.get(HSYNC_TRXN_INDEX, hsyncedKeyInfo));
+      hsyncedKeys.add(Pair.of(clientId, hsyncedKeyInfo));
+    }
     final List<Pair<Long, OmKeyInfo>> keysToKeep = hsyncedKeys.subList(0, 1);
     final List<Pair<Long, OmKeyInfo>> keysToDelete = hsyncedKeys.subList(1, 3);
 

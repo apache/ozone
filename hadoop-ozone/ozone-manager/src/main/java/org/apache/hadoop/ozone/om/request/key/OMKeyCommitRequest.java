@@ -289,6 +289,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           openKeyToDelete.setModificationTime(Time.now());
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
               dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
+        } else {
+          LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'",
+              dbOpenKeyToDeleteKey);
         }
       }
 

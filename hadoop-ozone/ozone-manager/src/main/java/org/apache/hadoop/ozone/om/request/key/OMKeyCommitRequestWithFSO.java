@@ -255,6 +255,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             .build();
         openKeyToDelete.setModificationTime(Time.now());
         prepared.openKeyToDelete = openKeyToDelete;
+      } else {
+        LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'",
+            prepared.dbOpenKeyToDeleteKey);
       }
       // The cache write for this overwritten open key is deferred to the Phase 2 mutation tail, so it
       // happens under the narrowed bucket write lock with the other mutations.
