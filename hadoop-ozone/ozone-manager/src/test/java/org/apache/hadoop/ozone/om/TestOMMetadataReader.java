@@ -46,6 +46,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.grpc.Context;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -55,7 +58,10 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -73,6 +79,7 @@ import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
@@ -151,6 +158,30 @@ public class TestOMMetadataReader {
     assertTrue(omMetadataReader.checkAcls(obj, contextWithoutSessionPolicyBuilder, true));
 
     verifySessionPolicyPassedToAuthorizer(accessAuthorizer, obj, sessionPolicy);
+  }
+
+  @Test
+  public void testCheckAccessIsTraced() throws Exception {
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+      final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+      final String spanName = accessAuthorizer.getClass().getSimpleName() + ".checkAccess";
+
+      assertTrue(omMetadataReader.checkAcls(createTestOzoneObj(), createTestRequestContextBuilder(), true));
+
+      collector.assertKind(spanName, SpanKind.INTERNAL);
+    }
+  }
+
+  @Test
+  public void testIsNativeIsNotTraced() throws Exception {
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      final OmMetadataReader omMetadataReader = createMetadataReader(OzoneAccessAuthorizer.get());
+
+      assertTrue(omMetadataReader.isNativeAuthorizerEnabled());
+
+      assertEquals(0, collector.getSpans().size(), () -> "spans: " + collector.getSpans());
+    }
   }
 
   @Test
@@ -1126,6 +1157,26 @@ public class TestOMMetadataReader {
     verify(keyManager).getKeyInfo(any(OmKeyArgs.class), any(ResolvedBucket.class), any());
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testAclResultIsRecordedOnSpan(boolean granted) throws Exception {
+    final IAccessAuthorizer accessAuthorizer = mock(IAccessAuthorizer.class);
+    when(accessAuthorizer.checkAccess(any(OzoneObj.class), any(RequestContext.class))).thenReturn(granted);
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        assertEquals(granted,
+            omMetadataReader.checkAcls(createTestOzoneObj(), createTestRequestContextBuilder(), false));
+      } finally {
+        span.end();
+      }
+
+      collector.assertAttribute("request", OmTracingAttributes.OM_ACL_GRANTED, granted);
+    }
+  }
+
   @Test
   public void getBucketInfoResolvesS3VolumeWhenAssumeS3Context() throws Exception {
     BucketManager bucketManager = mock(BucketManager.class);
@@ -1178,5 +1229,31 @@ public class TestOMMetadataReader {
 
   private static OmBucketInfo bucketInfo(String volumeName) {
     return OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(BUCKET_NAME).setOwner("owner").build();
+  }
+
+  @Test
+  public void testKeyArgsAuditFieldsAreRecordedOnSpan() {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("vol1")
+        .setBucketName("bucket1")
+        .setKeyName("key1")
+        .setOwnerName("owner1")
+        .setDataSize(1024)
+        .build();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        keyArgs.toAuditMap();
+      } finally {
+        span.end();
+      }
+
+      collector.assertAttribute("request", OzoneConsts.VOLUME, "vol1");
+      collector.assertAttribute("request", OzoneConsts.BUCKET, "bucket1");
+      collector.assertAttribute("request", OzoneConsts.KEY, "key1");
+      collector.assertAttribute("request", OzoneConsts.DATA_SIZE, 1024L);
+      collector.assertNoAttribute("request", OzoneConsts.OWNER);
+    }
   }
 }

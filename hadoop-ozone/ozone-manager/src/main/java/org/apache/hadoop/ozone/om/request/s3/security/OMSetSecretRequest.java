@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -143,6 +144,7 @@ public class OMSetSecretRequest extends OMClientRequest {
 
     final Map<String, String> auditMap = new HashMap<>();
     auditMap.put(OzoneConsts.S3_SETSECRET_USER, accessId);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.S3_SETSECRET_USER, accessId);
 
     // audit log
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(

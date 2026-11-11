@@ -27,14 +27,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -95,7 +98,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
 
-    this.handler = new OzoneManagerRequestHandler(impl);
+    this.handler = TracingUtil.createProxy(new OzoneManagerRequestHandler(impl), RequestHandler.class,
+        SpanKind.INTERNAL);
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
@@ -138,17 +142,22 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
   @VisibleForTesting
   public OMResponse processRequest(OMRequest request) throws ServiceException {
+    addRequestAttributesToCurrentSpan(request);
     OMResponse response = internalProcessRequest(request);
+    addResponseAttributesToCurrentSpan(response);
     if (response.hasOmLockDetails()) {
       Server.Call call = Server.getCurCall().get();
       if (call != null) {
         OzoneManagerProtocolProtos.OMLockDetailsProto lockDetails = response.getOmLockDetails();
         call.getProcessingDetails().add(
             Timing.LOCKWAIT, lockDetails.getWaitLockNanos(), TimeUnit.NANOSECONDS);
+        TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_LOCK_WAIT_NS, lockDetails.getWaitLockNanos());
         call.getProcessingDetails().add(
             Timing.LOCKSHARED, lockDetails.getReadLockNanos(), TimeUnit.NANOSECONDS);
+        TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_LOCK_READ_NS, lockDetails.getReadLockNanos());
         call.getProcessingDetails().add(
             Timing.LOCKEXCLUSIVE, lockDetails.getWriteLockNanos(), TimeUnit.NANOSECONDS);
+        TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_LOCK_WRITE_NS, lockDetails.getWriteLockNanos());
       }
     }
     return response;
@@ -193,6 +202,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
                 .clearDerivedKeyPiggyBacking()).build();
           }
         } catch (IOException ex) {
+          TracingUtil.recordExceptionInCurrentSpan(ex);
           return createErrorResponse(request, ex);
         }
       }
@@ -475,5 +485,24 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
   public static Logger getLog() {
     return LOG;
+  }
+
+  private static void addRequestAttributesToCurrentSpan(OMRequest request) {
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_CMD_TYPE, request.getCmdType().name());
+    if (!request.getClientId().isEmpty()) {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_CLIENT_ID, request.getClientId());
+    }
+    int callId = Server.getCallId();
+    if (callId >= 0) {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_CALL_ID, callId);
+    }
+  }
+
+  private static void addResponseAttributesToCurrentSpan(OMResponse response) {
+    if (response.getStatus() != OzoneManagerProtocolProtos.Status.OK) {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.STATUS, response.getStatus().name());
+    } else if (!response.getSuccess()) {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_SUCCESS, false);
+    }
   }
 }

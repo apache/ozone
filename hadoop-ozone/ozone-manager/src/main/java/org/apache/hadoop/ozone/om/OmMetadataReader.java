@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Collections;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -121,8 +123,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     this.audit = audit;
     this.metrics = omMetadataReaderMetrics;
     this.perfMetrics = ozoneManager.getPerfMetrics();
-    this.accessAuthorizer = accessAuthorizer != null ? accessAuthorizer
-        : OzoneAccessAuthorizer.get();
+    this.accessAuthorizer = TracingUtil.createProxy(
+        accessAuthorizer != null ? accessAuthorizer : OzoneAccessAuthorizer.get(),
+        IAccessAuthorizer.class, SpanKind.INTERNAL);
   }
 
   /**
@@ -413,8 +416,11 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.START_KEY, startKey);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.START_KEY, startKey);
     auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
     auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.KEY_PREFIX, keyPrefix);
 
     try {
       if (isAclEnabled) {
@@ -793,17 +799,21 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   private boolean checkAccessIncludingDependentS3Actions(OzoneObj obj, RequestContext context)
       throws OMException {
     if (!accessAuthorizer.checkAccess(obj, context)) {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_ACL_GRANTED, false);
       return false;
     }
     final String s3Action = context.getS3Action();
     if (s3Action == null || accessAuthorizer.isNative()) {
+      TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_ACL_GRANTED, true);
       return true;
     }
     for (String dependentAction : DEPENDENT_S3_ACTIONS.getOrDefault(s3Action, Collections.emptyList())) {
       if (!accessAuthorizer.checkAccess(obj, context.toBuilder().setS3Action(dependentAction).build())) {
+        TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_ACL_GRANTED, false);
         return false;
       }
     }
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_ACL_GRANTED, true);
     return true;
   }
 

@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -330,24 +331,33 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volumeName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, this.volumeName);
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.BUCKET_LAYOUT, String.valueOf(this.bucketLayout));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET_LAYOUT, String.valueOf(this.bucketLayout));
     auditMap.put(OzoneConsts.GDPR_FLAG,
         getMetadata().get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.ACLS,
         (this.acls != null) ? this.acls.toString() : null);
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
         String.valueOf(this.isVersionEnabled));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.IS_VERSION_ENABLED,
+        String.valueOf(this.isVersionEnabled));
     auditMap.put(OzoneConsts.STORAGE_TYPE,
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
     auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
         (bekInfo != null) ? bekInfo.getKeyName() : null);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET_ENCRYPTION_KEY,
+        (bekInfo != null) ? bekInfo.getKeyName() : null);
     auditMap.put(OzoneConsts.MODIFICATION_TIME,
         String.valueOf(this.modificationTime));
     if (isLink()) {
       auditMap.put(OzoneConsts.SOURCE_VOLUME, sourceVolume);
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.SOURCE_VOLUME, sourceVolume);
       auditMap.put(OzoneConsts.SOURCE_BUCKET, sourceBucket);
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.SOURCE_BUCKET, sourceBucket);
     }
     auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
     auditMap.put(OzoneConsts.USED_NAMESPACE,
@@ -358,12 +368,22 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     auditMap.put(OzoneConsts.REPLICATION_TYPE,
         (this.defaultReplicationConfig != null) ?
             String.valueOf(this.defaultReplicationConfig.getType()) : null);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_TYPE,
+        (this.defaultReplicationConfig != null) ?
+            String.valueOf(this.defaultReplicationConfig.getType()) : null);
     auditMap.put(OzoneConsts.REPLICATION_CONFIG,
         (this.defaultReplicationConfig != null) ?
             this.defaultReplicationConfig.getReplicationConfig()
                 .getReplication() : null);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_CONFIG,
+        (this.defaultReplicationConfig != null) ?
+            this.defaultReplicationConfig.getReplicationConfig()
+                .getReplication() : null);
     auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
     auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+        String.valueOf(this.quotaInNamespace));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_NAMESPACE,
         String.valueOf(this.quotaInNamespace));
     return auditMap;
   }

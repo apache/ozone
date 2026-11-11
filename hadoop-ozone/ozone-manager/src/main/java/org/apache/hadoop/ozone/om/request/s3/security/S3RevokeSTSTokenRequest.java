@@ -27,6 +27,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -107,6 +108,7 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
       final RevokeSTSTokenRequest revokeReq = validateReplicatedRevokeRequestFields(getOmRequest());
       final String originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
       auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, originalAccessKeyId);
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.S3_REVOKESTSTOKEN_USER, originalAccessKeyId);
       final long revocationTimeMillis = revokeReq.getRevocationTimeMillis();
 
       // All actual DB mutations are done in the response's addToDBBatch().

@@ -25,7 +25,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
@@ -247,6 +249,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     // link buckets.
     BucketLayout bucketLayout =
         getBucketLayout(omMetadataManager, volumeName, bucketName);
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_BUCKET_LAYOUT, bucketLayout.name());
 
     // Get the CmdType.
     Type requestType = omRequest.getCmdType();

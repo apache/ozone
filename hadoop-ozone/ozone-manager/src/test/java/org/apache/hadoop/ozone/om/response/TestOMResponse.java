@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc_.RPC;
@@ -34,16 +35,21 @@ import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -192,5 +198,132 @@ public class TestOMResponse {
     } finally {
       Server.getCurCall().remove();
     }
+  }
+
+  @Test
+  public void testVolumeNotFoundReadRecordsStatus() throws Exception {
+    OMExecutionFlow executionFlow = mockLinearizableRead();
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.InfoVolume)
+        .setClientId("test-client")
+        .build();
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(request.getCmdType())
+        .setStatus(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND)
+        .setSuccess(false)
+        .setMessage("Volume vol1 is not found")
+        .build();
+    when(executionFlow.submit(any(OMRequest.class), eq(false))).thenReturn(response);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      createTranslator(OMVersionManagerTestUtils.mockFinalizedOmVersionManager()).submitRequest(null, request);
+
+      collector.assertAttribute("InfoVolume", OmTracingAttributes.STATUS, "VOLUME_NOT_FOUND");
+    }
+  }
+
+  @Test
+  public void testSuccessfulRequestHasCommandAttributes() throws Exception {
+    OMExecutionFlow executionFlow = mockLinearizableRead();
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.ServiceList)
+        .setClientId("test-client")
+        .build();
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(request.getCmdType())
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setSuccess(true)
+        .build();
+    when(executionFlow.submit(any(OMRequest.class), eq(false))).thenReturn(response);
+
+    Server.Call call = new Server.Call(1, 0, null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER, new byte[0]);
+    Server.getCurCall().set(call);
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      createTranslator(OMVersionManagerTestUtils.mockFinalizedOmVersionManager()).submitRequest(null, request);
+
+      collector.assertNotError("ServiceList");
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_CMD_TYPE, "ServiceList");
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_CLIENT_ID, "test-client");
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_CALL_ID, 1L);
+      collector.assertNoAttribute("ServiceList", OmTracingAttributes.OM_SUCCESS);
+      collector.assertNoAttribute("ServiceList", OmTracingAttributes.STATUS);
+    } finally {
+      Server.getCurCall().remove();
+    }
+  }
+
+  @Test
+  public void testLockDetailsAreRecordedOnSpan() throws Exception {
+    OMExecutionFlow executionFlow = mockLinearizableRead();
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.ServiceList)
+        .setClientId("test-client")
+        .build();
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(request.getCmdType())
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setSuccess(true)
+        .setOmLockDetails(OzoneManagerProtocolProtos.OMLockDetailsProto.newBuilder()
+            .setWaitLockNanos(11)
+            .setReadLockNanos(22)
+            .setWriteLockNanos(33))
+        .build();
+    when(executionFlow.submit(any(OMRequest.class), eq(false))).thenReturn(response);
+
+    Server.Call call = new Server.Call(1, 0, null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER, new byte[0]);
+    Server.getCurCall().set(call);
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      createTranslator(OMVersionManagerTestUtils.mockFinalizedOmVersionManager()).submitRequest(null, request);
+
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_LOCK_WAIT_NS, 11L);
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_LOCK_READ_NS, 22L);
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_LOCK_WRITE_NS, 33L);
+    } finally {
+      Server.getCurCall().remove();
+    }
+  }
+
+  @Test
+  public void testOkWithoutSuccessIsNotError() throws Exception {
+    OMExecutionFlow executionFlow = mockLinearizableRead();
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.ServiceList)
+        .setClientId("test-client")
+        .build();
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(request.getCmdType())
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setSuccess(false)
+        .build();
+    when(executionFlow.submit(any(OMRequest.class), eq(false))).thenReturn(response);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      createTranslator(OMVersionManagerTestUtils.mockFinalizedOmVersionManager()).submitRequest(null, request);
+
+      collector.assertNotError("ServiceList");
+      collector.assertAttribute("ServiceList", OmTracingAttributes.OM_SUCCESS, false);
+      collector.assertNoAttribute("ServiceList", OmTracingAttributes.STATUS);
+    }
+  }
+
+  /** Routes reads on a ready leader through a mocked {@link OMExecutionFlow}, as with linearizable reads. */
+  private OMExecutionFlow mockLinearizableRead() {
+    OMExecutionFlow executionFlow = mock(OMExecutionFlow.class);
+    when(ozoneManager.getOmExecutionFlow()).thenReturn(executionFlow);
+    when(ozoneManager.getMetrics()).thenReturn(mock(OMMetrics.class));
+    when(ratisServer.getLeaderStatus()).thenReturn(RaftServerStatus.LEADER_AND_READY);
+    when(ratisServer.isLinearizableRead()).thenReturn(true);
+    return executionFlow;
+  }
+
+  /** @return a translator whose request validations and latency metrics work, as {@code submitRequest} needs. */
+  private OzoneManagerProtocolServerSideTranslatorPB createTranslator(OMVersionManager versionManager) {
+    OMPerformanceMetrics perfMetrics = mock(OMPerformanceMetrics.class);
+    when(perfMetrics.getValidateRequestLatencyNs()).thenReturn(mock(ConcurrentMutableRate.class));
+    when(perfMetrics.getValidateResponseLatencyNs()).thenReturn(mock(ConcurrentMutableRate.class));
+    when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
+    return new OzoneManagerProtocolServerSideTranslatorPB(ozoneManager, ratisServer,
+        mock(ProtocolMessageMetrics.class));
   }
 }

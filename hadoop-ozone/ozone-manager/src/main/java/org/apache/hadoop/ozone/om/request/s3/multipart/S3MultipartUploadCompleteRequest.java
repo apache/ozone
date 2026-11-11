@@ -37,6 +37,7 @@ import java.util.function.BiFunction;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -140,6 +141,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     } catch (IOException ex) {
       Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
       auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
       markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
           OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, ex, getOmRequest().getUserInfo()));
       throw ex;
@@ -163,6 +165,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         multipartUploadCompleteRequest.getPartsListList();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();

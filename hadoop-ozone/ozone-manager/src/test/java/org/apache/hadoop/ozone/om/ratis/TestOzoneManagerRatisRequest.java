@@ -31,22 +31,32 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCompleteFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
@@ -104,6 +114,61 @@ public class TestOzoneManagerRatisRequest {
   }
 
   @Test
+  public void testKeyRequestRecordsBucketLayout() throws Exception {
+    ozoneManager = mock(OzoneManager.class);
+    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS, folder.resolve("om").toAbsolutePath().toString());
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB("vol1", "fsoBucket", omMetadataManager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
+        .createCompleteMPURequest("vol1", "fsoBucket", "mpuKey", "mpuKeyID", new ArrayList<>());
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+      } finally {
+        span.end();
+      }
+
+      collector.assertAttribute("request", OmTracingAttributes.OM_BUCKET_LAYOUT, "FILE_SYSTEM_OPTIMIZED");
+    }
+  }
+
+  @Test
+  public void testKeyArgsAuditFieldsAreRecordedOnSpan() {
+    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade)
+        .setClientId("test-client-id")
+        .build();
+    OzoneManagerProtocolProtos.KeyArgs keyArgs = OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+        .setVolumeName("vol1")
+        .setBucketName("bucket1")
+        .setKeyName("key1")
+        .setDataSize(1024)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .build();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        new OMStartFinalizeUpgradeRequest(omRequest).buildKeyArgsAuditMap(keyArgs);
+      } finally {
+        span.end();
+      }
+
+      collector.assertAttribute("request", OzoneConsts.VOLUME, "vol1");
+      collector.assertAttribute("request", OzoneConsts.BUCKET, "bucket1");
+      collector.assertAttribute("request", OzoneConsts.KEY, "key1");
+      collector.assertAttribute("request", OzoneConsts.DATA_SIZE, 1024L);
+      collector.assertAttribute("request", OzoneConsts.REPLICATION_TYPE, "RATIS");
+      collector.assertAttribute("request", OzoneConsts.REPLICATION_FACTOR, "THREE");
+    }
+  }
+
+  @Test
   public void testStartFinalizeUpgradeRequestIsDispatched() throws IOException {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
@@ -114,6 +179,40 @@ public class TestOzoneManagerRatisRequest {
     OzoneManager mockOm = mock(OzoneManager.class);
     assertInstanceOf(OMStartFinalizeUpgradeRequest.class,
         OzoneManagerRatisUtils.createClientRequest(omRequest, mockOm));
+  }
+
+  @Test
+  public void testClientRequestStagesAreTraced() throws IOException {
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade)
+            .setClientId("test-client-id")
+            .build();
+    OzoneManager mockOm = mock(OzoneManager.class);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      IOMClientRequest request = OzoneManagerRatisUtils.createClientRequest(omRequest, mockOm);
+      request.handleRequestFailure(mockOm);
+
+      collector.assertKind("OMStartFinalizeUpgradeRequest.handleRequestFailure", SpanKind.INTERNAL);
+    }
+  }
+
+  @Test
+  public void testClientRequestAccessorsAreNotTraced() throws IOException {
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade)
+            .setClientId("test-client-id")
+            .build();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("test-om")) {
+      IOMClientRequest request = OzoneManagerRatisUtils.createClientRequest(omRequest, mock(OzoneManager.class));
+      assertEquals(omRequest, request.getOmRequest());
+      request.getAuditBuilder();
+
+      assertThat(collector.getSpans()).isEmpty();
+    }
   }
 
   @Test

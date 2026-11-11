@@ -24,6 +24,7 @@ import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -83,6 +84,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
         // Ensure audit log captures preExecute failures
         Map<String, String> auditMap = new LinkedHashMap<>();
         auditMap.put(OzoneConsts.VOLUME, volume);
+        TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, volume);
         auditMap.put(OzoneConsts.OWNER,
             setVolumePropertyRequest.getOwnerName());
         markForAudit(ozoneManager.getAuditLogger(),

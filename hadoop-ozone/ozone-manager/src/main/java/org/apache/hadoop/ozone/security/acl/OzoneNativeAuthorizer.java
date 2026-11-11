@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.OzoneBlacklist;
+import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -77,6 +78,7 @@ public class OzoneNativeAuthorizer implements OzoneManagerAuthorizer {
   }
 
   @Override
+  @SkipTracing
   public boolean isNative() {
     return true;
   }

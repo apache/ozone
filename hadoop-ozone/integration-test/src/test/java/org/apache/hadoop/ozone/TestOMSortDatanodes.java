@@ -23,28 +23,42 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -53,7 +67,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * {@link org.apache.hadoop.hdds.scm.server.TestSCMBlockProtocolServer}
  * sortDatanodes tests for
- * {@link org.apache.hadoop.ozone.om.KeyManagerImpl#sortDatanodes(List, String)}.
+ * {@link KeyManager#listStatus(OmKeyArgs, boolean, String, long, String)}.
  */
 public class TestOMSortDatanodes {
 
@@ -62,9 +76,12 @@ public class TestOMSortDatanodes {
   private static OzoneConfiguration config;
   private static StorageContainerManager scm;
   private static NodeManager nodeManager;
-  private static KeyManagerImpl keyManager;
+  private static KeyManager keyManager;
   private static OzoneManager om;
   private static final int NODE_COUNT = 10;
+  private static final String VOLUME = "vol";
+  private static final String BUCKET = "bucket";
+  private static final long CONTAINER_ID = 1;
   private static final Map<String, String> EDGE_NODES = ImmutableMap.of(
       "edge0", "/rack0",
       "edge1", "/rack1"
@@ -107,7 +124,23 @@ public class TestOMSortDatanodes {
         mockScmContainerClient);
     om = omTestManagers.getOzoneManager();
     ozoneClient = omTestManagers.getRpcClient();
-    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
+    keyManager = omTestManagers.getKeyManager();
+
+    // A key whose only block is in a pipeline of all datanodes, so listStatus sorts all of them for the client.
+    OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME, BUCKET, om.getMetadataManager(), BucketLayout.LEGACY);
+    Pipeline pipeline = MockPipeline.createPipeline(new ArrayList<>(nodeManager.getAllNodes()));
+    OmKeyLocationInfo location = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(CONTAINER_ID, 1))
+        .setPipeline(pipeline)
+        .build();
+    OMRequestTestUtils.addKeyToTable(false, false, false, VOLUME, BUCKET, "key", 0,
+        pipeline.getReplicationConfig(), 0, om.getMetadataManager(), Collections.singletonList(location), 0);
+    ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(CONTAINER_ID)
+        .setPipelineID(pipeline.getId())
+        .build();
+    when(mockScmContainerClient.getContainerWithPipelineBatch(any()))
+        .thenReturn(Collections.singletonList(new ContainerWithPipeline(container, pipeline)));
   }
 
   @AfterAll
@@ -125,11 +158,10 @@ public class TestOMSortDatanodes {
   }
 
   @Test
-  public void sortDatanodesRelativeToDatanode() {
+  public void sortDatanodesRelativeToDatanode() throws IOException {
     for (DatanodeDetails dn : nodeManager.getAllNodes()) {
       assertEquals(ROOT_LEVEL + 2, dn.getLevel());
-      List<? extends DatanodeDetails> sorted =
-          keyManager.sortDatanodes(nodeManager.getAllNodes(), nodeAddress(dn));
+      List<? extends DatanodeDetails> sorted = listStatusNodes(nodeAddress(dn));
       assertEquals(dn, sorted.get(0),
           "Source node should be sorted very first");
       assertRackOrder(dn.getNetworkLocation(), sorted);
@@ -137,33 +169,43 @@ public class TestOMSortDatanodes {
   }
 
   @Test
-  public void sortDatanodesRelativeToNonDatanode() {
+  public void sortDatanodesRelativeToNonDatanode() throws IOException {
     for (Map.Entry<String, String> entry : EDGE_NODES.entrySet()) {
-      assertRackOrder(entry.getValue(),
-          keyManager.sortDatanodes(nodeManager.getAllNodes(), entry.getKey()));
+      assertRackOrder(entry.getValue(), listStatusNodes(entry.getKey()));
     }
   }
 
   @Test
-  public void testSortDatanodes() {
-    List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
-
+  public void testSortDatanodes() throws IOException {
     // sort normal datanodes
     String client;
     client = nodeManager.getAllNodes().get(0).getIpAddress();
-    List<? extends DatanodeDetails> datanodeDetails =
-        keyManager.sortDatanodes(nodes, client);
+    List<? extends DatanodeDetails> datanodeDetails = listStatusNodes(client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 1
     client += "X";
-    datanodeDetails = keyManager.sortDatanodes(nodes, client);
+    datanodeDetails = listStatusNodes(client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 2
     client = "/default-rack";
-    datanodeDetails = keyManager.sortDatanodes(nodes, client);
+    datanodeDetails = listStatusNodes(client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
+  }
+
+  /** Lists the bucket for {@code clientAddress} and returns the key's pipeline nodes in the order OM sorted them. */
+  private static List<DatanodeDetails> listStatusNodes(String clientAddress) throws IOException {
+    OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME)
+        .setBucketName(BUCKET)
+        .setKeyName("")
+        .setSortDatanodesInPipeline(true)
+        .build();
+    List<OzoneFileStatus> statuses = keyManager.listStatus(args, false, "", 100, clientAddress);
+    assertEquals(1, statuses.size());
+    return statuses.get(0).getKeyInfo().getLatestVersionLocations().createLocationList().get(0)
+        .getPipeline().getNodesInOrder();
   }
 
   private static void assertRackOrder(String rack, List<? extends DatanodeDetails> list) {

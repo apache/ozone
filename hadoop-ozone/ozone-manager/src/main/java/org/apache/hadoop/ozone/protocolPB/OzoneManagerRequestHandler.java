@@ -36,7 +36,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
@@ -59,7 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
-import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -101,7 +100,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -203,7 +202,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
-  private FaultInjector injector;
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
@@ -476,6 +474,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       }
       responseBuilder.setSuccess(true);
     } catch (IOException ex) {
+      TracingUtil.recordExceptionInCurrentSpan(ex);
       responseBuilder.setSuccess(false);
       responseBuilder.setStatus(exceptionToResponseStatus(ex));
       if (ex.getMessage() != null) {
@@ -487,8 +486,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @Override
   public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context) throws IOException {
-    injectPause();
-    OMClientRequest omClientRequest =
+    IOMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
       OMClientResponse omClientResponse = captureLatencyNs(
@@ -502,27 +500,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, getOzoneManager(), context.getTermIndex(),
           th);
       throw th;
-    }
-  }
-
-  @VisibleForTesting
-  public void setInjector(FaultInjector injector) {
-    this.injector = injector;
-  }
-
-  @VisibleForTesting
-  public FaultInjector getInjector() {
-    return injector;
-  }
-
-  /**
-   * Inject pause for test only.
-   *
-   * @throws IOException
-   */
-  private void injectPause() throws IOException {
-    if (injector != null) {
-      injector.pause();
     }
   }
 

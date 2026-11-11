@@ -31,6 +31,7 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -393,6 +394,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     // Perform audit logging
     auditMap.put(OzoneConsts.TENANT, tenantId);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.TENANT, tenantId);
     // Note auditMap contains volume creation info
     markForAudit(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.CREATE_TENANT, auditMap, exception,

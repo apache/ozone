@@ -28,6 +28,7 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -122,6 +123,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         // Ensure audit log captures preExecute failures
         Map<String, String> auditMap = new HashMap<>();
         auditMap.put(OzoneConsts.TENANT, tenantId);
+        TracingUtil.addAttributesToCurrentSpan(OzoneConsts.TENANT, tenantId);
         markForAudit(ozoneManager.getAuditLogger(),
             buildAuditMessage(OMAction.DELETE_TENANT, auditMap, ex,
                 omRequest.getUserInfo()));
@@ -252,6 +254,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     // Perform audit logging
     auditMap.put(OzoneConsts.TENANT, tenantId);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.TENANT, tenantId);
     // Audit tenant deletion
     markForAudit(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.DELETE_TENANT,

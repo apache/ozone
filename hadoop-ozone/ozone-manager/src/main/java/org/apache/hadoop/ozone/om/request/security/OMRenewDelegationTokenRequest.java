@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -79,6 +80,9 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
           readProtoBuf(token.getIdentifier());
       auditMap.put(OzoneConsts.DELEGATION_TOKEN_RENEWER,
+          ozoneTokenIdentifier.getRenewer() == null ? "" :
+              ozoneTokenIdentifier.getRenewer().toString());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.DELEGATION_TOKEN_RENEWER,
           ozoneTokenIdentifier.getRenewer() == null ? "" :
               ozoneTokenIdentifier.getRenewer().toString());
 
@@ -155,6 +159,9 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
           readProtoBuf(ozoneTokenIdentifierToken.getIdentifier());
       auditMap.put(OzoneConsts.DELEGATION_TOKEN_RENEWER,
+          ozoneTokenIdentifier.getRenewer() == null ? "" :
+              ozoneTokenIdentifier.getRenewer().toString());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.DELEGATION_TOKEN_RENEWER,
           ozoneTokenIdentifier.getRenewer() == null ? "" :
               ozoneTokenIdentifier.getRenewer().toString());
 

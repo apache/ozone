@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -104,6 +105,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     } catch (IOException ex) {
       Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
       auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
       markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
           OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY, auditMap, ex, getOmRequest().getUserInfo()));
       throw ex;
@@ -123,6 +125,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -411,6 +414,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     // audit log
     // Add MPU related information.
     auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
+        String.valueOf(keyArgs.getMultipartNumber()));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
         String.valueOf(keyArgs.getMultipartNumber()));
     auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NAME, partName);
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(

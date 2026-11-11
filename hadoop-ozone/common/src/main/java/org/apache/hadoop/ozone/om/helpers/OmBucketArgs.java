@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
@@ -185,10 +186,14 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volumeName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, this.volumeName);
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.GDPR_FLAG,
         getMetadata().get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
+                String.valueOf(this.isVersionEnabled));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.IS_VERSION_ENABLED,
                 String.valueOf(this.isVersionEnabled));
     if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
@@ -200,20 +205,31 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         (this.quotaInBytes != OzoneConsts.QUOTA_RESET)) {
       auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
           String.valueOf(this.quotaInBytes));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_BYTES,
+          String.valueOf(this.quotaInBytes));
     }
     if (this.quotaInNamespaceSet && quotaInNamespace > 0 ||
         (this.quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
       auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
           String.valueOf(this.quotaInNamespace));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.QUOTA_IN_NAMESPACE,
+          String.valueOf(this.quotaInNamespace));
     }
     if (this.bekInfo != null) {
       auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
+          this.bekInfo.getKeyName());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET_ENCRYPTION_KEY,
           this.bekInfo.getKeyName());
     }
     if (this.defaultReplicationConfig != null) {
       auditMap.put(OzoneConsts.REPLICATION_TYPE, String.valueOf(
           this.defaultReplicationConfig.getType()));
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_TYPE, String.valueOf(
+          this.defaultReplicationConfig.getType()));
       auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+          this.defaultReplicationConfig.getReplicationConfig()
+              .getReplication());
+      TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_CONFIG,
           this.defaultReplicationConfig.getReplicationConfig()
               .getReplication());
     }

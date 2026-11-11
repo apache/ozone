@@ -29,10 +29,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -98,7 +100,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     boolean bucketLockAcquired = false;
     Result result;
     boolean isHSync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_KEY_HSYNC, isHSync);
     boolean isRecovery = commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();
+    TracingUtil.addAttributesToCurrentSpan(OmTracingAttributes.OM_KEY_RECOVERY, isRecovery);
     // isHsync = true, a commit request as a result of client side hsync call
     // isRecovery = true, a commit request as a result of client side recoverLease call
     // none of isHsync and isRecovery is true, a commit request as a result of client side normal

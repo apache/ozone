@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -228,11 +229,18 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volumeName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.VOLUME, this.volumeName);
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.KEY, this.keyName);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.KEY, this.keyName);
     auditMap.put(OzoneConsts.OWNER, this.ownerName);
     auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(this.dataSize));
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.DATA_SIZE, this.dataSize);
     auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+        (this.replicationConfig != null) ?
+            this.replicationConfig.toString() : null);
+    TracingUtil.addAttributesToCurrentSpan(OzoneConsts.REPLICATION_CONFIG,
         (this.replicationConfig != null) ?
             this.replicationConfig.toString() : null);
     return auditMap;

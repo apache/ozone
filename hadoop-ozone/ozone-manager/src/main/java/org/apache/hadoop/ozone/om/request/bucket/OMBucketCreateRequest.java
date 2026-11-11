@@ -29,6 +29,7 @@ import java.nio.file.InvalidPathException;
 import java.util.List;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -142,8 +143,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
         .clearSnapshotUsedNamespace();
 
     if (bucketInfo.hasBeinfo()) {
-      newBucketInfo.setBeinfo(
-          BekInfoUtils.getBekInfo(kmsProvider, bucketInfo.getBeinfo()));
+      newBucketInfo.setBeinfo(TracingUtil.executeInNewSpan("OM.kms.getBucketEncryptionKey",
+          () -> BekInfoUtils.getBekInfo(kmsProvider, bucketInfo.getBeinfo())));
     }
 
     boolean hasSourceVolume = bucketInfo.hasSourceVolume();
