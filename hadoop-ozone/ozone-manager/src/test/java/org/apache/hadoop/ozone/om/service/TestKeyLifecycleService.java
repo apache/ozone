@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.HSYNC_CLIENT_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
@@ -1812,6 +1813,45 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
+    void testHsyncKeyNotExpired(BucketLayout bucketLayout) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "dir1/key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(bucketLayout);
+      createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
+
+      // mark one key as hsync'ed, still open for write
+      Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(bucketLayout);
+      String hsyncKey = null;
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iter = keyTable.iterator()) {
+        while (iter.hasNext() && hsyncKey == null) {
+          Table.KeyValue<String, OmKeyInfo> kv = iter.next();
+          OmKeyInfo keyInfo = kv.getValue();
+          if (volumeName.equals(keyInfo.getVolumeName()) && bucketName.equals(keyInfo.getBucketName())) {
+            hsyncKey = kv.getKey();
+            keyTable.put(hsyncKey, keyInfo.toBuilder().addMetadata(HSYNC_CLIENT_ID, "1").build());
+          }
+        }
+      }
+      assertNotNull(hsyncKey);
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, "dir1/", null, date.toString(), true);
+
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT - 1, WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(1, getKeyCount(bucketLayout) - initialKeyCount);
+      assertTrue(keyTable.get(hsyncKey).isHsync());
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+        assertFalse(getDirectory(volumeName, bucketName, "dir1").getKeyInfo().isFile());
+      }
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
