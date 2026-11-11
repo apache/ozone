@@ -36,7 +36,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -47,6 +49,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
@@ -92,6 +95,7 @@ public class SCMStateMachine extends BaseStateMachine {
       Duration.ofSeconds(1);
   private static final Duration DN_SERVER_START_INITIAL_WARNING_DELAY = Duration.ofSeconds(30);
   private static final Duration DN_SERVER_START_WARNING_INTERVAL = Duration.ofMinutes(5);
+  private static final Duration RATIS_SHUTDOWN_WATCHDOG_INTERVAL = Duration.ofSeconds(1);
   private final Duration dnServerStartRetryInterval;
   private final LongSupplier monotonicClock;
 
@@ -108,6 +112,8 @@ public class SCMStateMachine extends BaseStateMachine {
   private List<ManagedSecretKey> installingSecretKeys = null;
 
   private AtomicBoolean isStateMachineReady = new AtomicBoolean();
+  private final AtomicBoolean ratisShutdownTimerStarted = new AtomicBoolean();
+  private ScheduledExecutorService ratisShutdownWatchdog;
 
   // The leader's committed index captured when this SCM (re)joins as a
   // follower. Catch-up is measured against this fixed target rather than the
@@ -144,6 +150,11 @@ public class SCMStateMachine extends BaseStateMachine {
     this.dnServerStartRetryExecutor = HadoopExecutors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder()
             .setNameFormat(scm.threadNamePrefix() + "SCMDNServerStartRetry-%d")
+            .setDaemon(true)
+            .build());
+    this.ratisShutdownWatchdog = HadoopExecutors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder()
+            .setNameFormat(scm.threadNamePrefix() + "SCMRatisShutdownWatchdog-%d")
             .setDaemon(true)
             .build());
     isInitialized = true;
@@ -187,6 +198,16 @@ public class SCMStateMachine extends BaseStateMachine {
       storage.init(raftStorage);
       LOG.info("{}: initialize {}", server.getId(), id);
     });
+    if (isInitialized) {
+      ratisShutdownWatchdog.scheduleWithFixedDelay(() -> {
+        try {
+          checkRatisDivisionClosing();
+        } catch (RuntimeException e) {
+          LOG.warn("Failed to check the SCM Ratis division state", e);
+        }
+      }, RATIS_SHUTDOWN_WATCHDOG_INTERVAL.toMillis(), RATIS_SHUTDOWN_WATCHDOG_INTERVAL.toMillis(),
+          TimeUnit.MILLISECONDS);
+    }
   }
 
   @Override
@@ -246,6 +267,68 @@ public class SCMStateMachine extends BaseStateMachine {
       RaftProtos.LogEntryProto failedEntry) {
     LOG.error("SCM statemachine appendLog failed, entry: {}", failedEntry);
     ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+  }
+
+  @Override
+  public void notifyServerShutdown(RaftProtos.RoleInfoProto roleInfo, boolean allServer) {
+    // If SCM is stopped, this shutdown originates from scm.stop(); otherwise it originates from Ratis.
+    if (!allServer || !isInitialized || scm.isStopped()) {
+      return;
+    }
+    startRatisShutdownTimer("SCM Ratis server is shut down by Ratis");
+  }
+
+  /**
+   * Ratis calls {@link #close()} and {@link #notifyServerShutdown} only after the state machine updater has applied
+   * every committed transaction, which can take arbitrarily long. Poll the division so the timer starts as soon as
+   * Ratis begins closing.
+   */
+  void checkRatisDivisionClosing() {
+    if (scm.isStopped() || ratisShutdownTimerStarted.get()) {
+      return;
+    }
+    SCMHAManager haManager = scm.getScmHAManager();
+    SCMRatisServer ratisServer = haManager == null ? null : haManager.getRatisServer();
+    if (ratisServer == null || ratisServer.isStopped()) {
+      return;
+    }
+    LifeCycle.State state = ratisServer.getDivision().getInfo().getLifeCycleState();
+    if (state == LifeCycle.State.CLOSING || state == LifeCycle.State.CLOSED) {
+      startRatisShutdownTimer("SCM Ratis division is " + state);
+    }
+  }
+
+  private void startRatisShutdownTimer(String reason) {
+    if (!ratisShutdownTimerStarted.compareAndSet(false, true)) {
+      return;
+    }
+    Duration timeout = scm.getConfiguration().getObject(ScmConfig.class).getRatisShutdownTimeout();
+    LOG.error("{}, terminating SCM in {}", reason, timeout);
+    // Run on a different thread, so that the Ratis server can finish closing.
+    CompletableFuture.runAsync(this::closeAfterRatisShutdown,
+        CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS));
+  }
+
+  private void closeAfterRatisShutdown() {
+    if (scm.isStopped()) {
+      return;
+    }
+    final String message = "scm statemachine is closed by ratis, terminate SCM";
+    // scm.stop() may block on the Ratis server that is still applying transactions, so bound it and force the exit.
+    final long stopTimeoutSeconds = Math.max(HddsUtils.getShutDownTimeOut(scm.getConfiguration()),
+        OzoneServiceConfig.OZONE_SHUTDOWN_TIMEOUT_MINIMUM);
+    final Thread shutdown = new Thread(() -> scm.shutDown(message), scm.threadNamePrefix() + "SCMRatisShutdown");
+    shutdown.setDaemon(true);
+    shutdown.start();
+    try {
+      shutdown.join(TimeUnit.SECONDS.toMillis(stopTimeoutSeconds));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    if (shutdown.isAlive()) {
+      LOG.error("SCM did not stop within {}s after the Ratis shutdown, forcing exit", stopTimeoutSeconds);
+      ExitUtils.terminate(1, message, LOG);
+    }
   }
 
   @Override
@@ -701,6 +784,7 @@ public class SCMStateMachine extends BaseStateMachine {
       HadoopExecutors.
           shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
       stopDNServerStartRetry();
+      ratisShutdownWatchdog.shutdownNow();
     } else if (!scm.isStopped()) {
       // A removed SCM may only have received the joint configuration, which still lists it among the old peers.
       boolean decommissioned = scm.getScmHAManager().getRatisServer().getDivision().getRaftConf()
@@ -710,7 +794,8 @@ public class SCMStateMachine extends BaseStateMachine {
         ExitUtils.terminate(0, "SCM is decommissioned, terminate SCM", LOG);
         return;
       }
-      scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
+      // Ratis calls notifyServerShutdown after this, which terminates SCM once the shutdown timeout elapses.
+      LOG.error("SCM statemachine is closed by ratis");
     }
   }
 
