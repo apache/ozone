@@ -71,7 +71,8 @@ public class TestCopyActionsAudit {
 
     final HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(bucketName + "/" + srcKey);
     when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn("0");
 
@@ -103,7 +104,8 @@ public class TestCopyActionsAudit {
 
     final HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(bucketName + "/" + srcKey);
     when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn("0");
 

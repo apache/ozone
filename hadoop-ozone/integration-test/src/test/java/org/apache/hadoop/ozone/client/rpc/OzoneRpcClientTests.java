@@ -200,6 +200,8 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocolPB.FaultInjectedOzoneManagerRequestHandler;
+import org.apache.hadoop.ozone.protocolPB.RequestHandler;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -713,6 +715,19 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertEquals(bucketName, bucket.getName());
     assertFalse(bucket.getCreationTime().isBefore(testStartTime));
     assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
+  }
+
+  @Test
+  public void testGetBucketDetailsResolvesDefaultS3Volume() throws IOException {
+    String bucketName = UUID.randomUUID().toString();
+    store.createS3Bucket(bucketName);
+
+    // A client not using multi-tenancy may pass null volume without S3 authentication: OM resolves the default
+    // S3 volume.
+    OzoneBucket bucket = store.getClientProxy().getBucketDetails(null, bucketName);
+
+    assertEquals(store.getS3Volume().getName(), bucket.getVolumeName());
+    assertEquals(bucketName, bucket.getName());
   }
 
   @Test
@@ -5456,7 +5471,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     OMRequestHandlerPauseInjector injector =
         new OMRequestHandlerPauseInjector();
-    omSM.getHandler().setInjector(injector);
+    RequestHandler handler = omSM.getHandler();
+    omSM.setHandler(new FaultInjectedOzoneManagerRequestHandler(handler, injector));
     thread1.start();
     thread2.start();
     // Wait long enough for createKey's preExecute to finish executing
@@ -5473,7 +5489,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       throw new RuntimeException(ex);
     }
 
-    omSM.getHandler().setInjector(null);
+    omSM.setHandler(handler);
     // Generate more write requests to OM
     String newBucketName = UUID.randomUUID().toString();
     volume.createBucket(newBucketName);
@@ -5662,6 +5678,34 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     assertEquals(tags.size(), tagsRetrieved.size());
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
+  }
+
+  @Test
+  public void testGetObjectTaggingWithS3Context() throws Exception {
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    Map<String, String> tags = singletonMap("tag-key", "tag-value");
+    byte[] value = string2Bytes("sample value");
+
+    store.createS3Bucket(bucketName);
+    OzoneBucket bucket = store.getS3Bucket(bucketName);
+    try (OzoneOutputStream out = bucket.createKey(keyName, value.length,
+        anyReplication(), new HashMap<>(), tags)) {
+      out.write(value);
+    }
+
+    String accessId = bucket.getOwner();
+    OzoneManager.setS3Auth(OzoneManagerProtocolProtos.S3Authentication
+        .newBuilder().setAccessId(accessId).build());
+    try {
+      Map<String, String> tagsRetrieved = ozoneManager.getObjectTagging(
+          new OmKeyArgs.Builder().setVolumeName(null).setBucketName(bucketName)
+              .setKeyName(keyName).setAssumeS3Context(true).build());
+
+      assertThat(tagsRetrieved).containsExactlyInAnyOrderEntriesOf(tags);
+    } finally {
+      OzoneManager.setS3Auth(null);
+    }
   }
 
   @ParameterizedTest

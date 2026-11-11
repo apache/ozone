@@ -244,7 +244,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public boolean checkAndRotate(boolean force) throws SCMSecretKeyException {
+  public boolean checkAndRotate(boolean force) throws IOException {
+    storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
     validateSecretKeyStatus();
     try {
       return secretKeyManager.checkAndRotate(force);

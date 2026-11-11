@@ -17,15 +17,15 @@
 
 package org.apache.ozone.test;
 
-import java.util.UUID;
 import org.apache.hadoop.fs.ozone.TestOzoneFsHAURLs;
 import org.apache.hadoop.hdds.scm.TestStorageContainerManagerHAWithAllRunning;
 import org.apache.hadoop.hdds.scm.container.TestScmApplyTransactionFailure;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.TestGetClusterTreeInformation;
 import org.apache.hadoop.ozone.container.metrics.TestDatanodeQueueMetrics;
 import org.apache.hadoop.ozone.shell.TestScmAdminHA;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
@@ -37,20 +37,16 @@ import org.junit.jupiter.api.TestInstance;
  * same cluster.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
+public abstract class HATests extends HACluster {
 
-  @Override
-  protected MiniOzoneHAClusterImpl.Builder newClusterBuilder() {
-    return MiniOzoneCluster.newHABuilder(createOzoneConfig())
-        .setOMServiceId("om-" + UUID.randomUUID())
-        .setNumOfOzoneManagers(3)
-        .setSCMServiceId("scm-" + UUID.randomUUID())
-        .setNumOfStorageContainerManagers(3);
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
   }
 
-  /** Test cases which need HA cluster should implement this. */
-  public interface TestCase {
-    MiniOzoneHAClusterImpl cluster();
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
   }
 
   @Nested

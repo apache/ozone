@@ -39,8 +39,8 @@
     <aspectj.java25.version>1.9.25.1</aspectj.java25.version>
     <aspectj.java8.version>1.9.7</aspectj.java8.version>
     <assertj.version>3.27.7</assertj.version>
-    <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
     <aws-java-sdk2.version>2.55.6</aws-java-sdk2.version>
+    <ban-rocksdb.skip>true</ban-rocksdb.skip>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.2</build-helper-maven-plugin.version>
@@ -95,7 +95,7 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <io.grpc.version>1.77.1</io.grpc.version>
+    <io.grpc.version>1.82.4</io.grpc.version>
     <jackson2-bom.version>2.21.8</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
@@ -188,10 +188,10 @@
     <protobuf.version>3.25.9</protobuf.version>
     <ranger.version>2.9.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
-    <ratis-thirdparty.grpc.version>1.82.1</ratis-thirdparty.grpc.version>
-    <ratis-thirdparty.netty.version>4.1.136.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.grpc.version>1.82.4</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.139.Final</ratis-thirdparty.netty.version>
     <ratis-thirdparty.protobuf.version>3.25.9</ratis-thirdparty.protobuf.version>
-    <ratis.thirdparty.version>1.1.0</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.1.1</ratis.thirdparty.version>
     <ratis.version>3.3.1</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
@@ -362,23 +362,6 @@
             <artifactId>mail</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.amazonaws</groupId>
-        <artifactId>aws-java-sdk-core</artifactId>
-        <version>${aws-java-sdk.version}</version>
-        <exclusions>
-          <exclusion>
-            <!-- depend on jcl-over-slf4j instead -->
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.amazonaws</groupId>
-        <artifactId>aws-java-sdk-s3</artifactId>
-        <version>${aws-java-sdk.version}</version>
       </dependency>
       <dependency>
         <groupId>com.bettercloud</groupId>
@@ -1214,11 +1197,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-docs</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-erasurecode</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -1403,6 +1381,11 @@
         <artifactId>ozone-integration-test</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-integration-test-utils</artifactId>
+        <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -2091,7 +2074,6 @@
                     <allowedImports>
                       <!-- Allow non-RocksObject classes. -->
                       <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
-                      <allowedImport>org.rocksdb.CompactRangeOptions.BottommostLevelCompaction</allowedImport>
                       <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
                       <allowedImport>org.rocksdb.KeyMayExist</allowedImport>
                       <allowedImport>org.rocksdb.HistogramData</allowedImport>
@@ -2123,6 +2105,42 @@
                       <exclusion>org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer</exclusion>
                     </exclusions>
                   </RestrictImports>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-aws-sdk-v1</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>com.amazonaws</exclude>
+                    </excludes>
+                    <message>AWS SDK for Java v1 is end of life, use AWS SDK for Java v2 (software.amazon.awssdk)</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-rocksdb</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <!-- enabled in client modules -->
+                <skip>${ban-rocksdb.skip}</skip>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>org.rocksdb:rocksdbjni</exclude>
+                    </excludes>
+                    <message>Ozone client artifacts must not depend on RocksDB, which adds about 85 MB of native libraries to them</message>
+                  </bannedDependencies>
                 </rules>
               </configuration>
             </execution>
@@ -2193,6 +2211,17 @@
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
                       <bannedImport>org.apache.hadoop.hdfs.DFSConfigKeys</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>AWS SDK for Java v1 is end of life, use AWS SDK for Java v2 (software.amazon.awssdk)</reason>
+                    <bannedImports>
+                      <bannedImport>com.amazonaws.**</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
@@ -2971,7 +3000,6 @@
         <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodepnpm>true</skip.installnodepnpm>
         <skip.pnpm>true</skip.pnpm>
-        <skipDocs>true</skipDocs>
         <test>void</test>
       </properties>
     </profile>
@@ -2986,6 +3014,21 @@
         <skip.installnodepnpm>true</skip.installnodepnpm>
         <skip.pnpm>true</skip.pnpm>
       </properties>
+    </profile>
+    <profile>
+      <!-- same excludedGroups as test-... profiles below -->
+      <id>module-test</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <excludedGroups>${unstable-test-groups}</excludedGroups>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
     <!-- The following profiles define test splits for CI -->
     <profile>
@@ -3124,23 +3167,6 @@
                 <!-- default excludes -->
                 <exclude>**/*$*</exclude>
               </excludes>
-              <excludedGroups>${unstable-test-groups}</excludedGroups>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>test-recon</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <includes>
-                <include>org.apache.hadoop.ozone.recon.**</include>
-              </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>

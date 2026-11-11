@@ -69,7 +69,8 @@ class TestCompactDBUtil {
   @Test
   void testDefaultConfigValueMapsToKSkip() {
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
-        OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+        ManagedCompactRangeOptions.BottommostLevelCompaction.valueOf(
+            OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
   }
 
   @ParameterizedTest

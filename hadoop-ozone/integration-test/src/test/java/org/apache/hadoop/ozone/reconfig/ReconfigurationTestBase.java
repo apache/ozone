@@ -26,7 +26,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 
@@ -34,7 +34,7 @@ import org.junit.jupiter.api.TestInstance;
  * Tests for Reconfiguration.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class ReconfigurationTestBase implements NonHATests.TestCase {
+abstract class ReconfigurationTestBase implements ClusterForTests.TestCase {
 
   private String currentUser;
 
