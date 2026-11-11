@@ -30,11 +30,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -265,7 +267,8 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     while (iterator.get().isValid() && withinLimit(globalCount)) {
       String fileNameTarget = recordsPerFile > 0 ? fileName + "." + fileSuffix++ :
           fileName;
-      try (PrintStream out = new PrintStream(Files.newOutputStream(Paths.get(fileNameTarget)))) {
+      Path path = Paths.get(fileNameTarget);
+      try (PrintStream out = new PrintStream(new BufferedOutputStream(Files.newOutputStream(path)), false, UTF_8)) {
         if (!displayTable(iterator, dbColumnFamilyDef, out, schemaV3)) {
           return false;
         }
