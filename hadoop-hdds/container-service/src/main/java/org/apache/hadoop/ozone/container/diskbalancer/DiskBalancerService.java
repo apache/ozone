@@ -545,7 +545,8 @@ public class DiskBalancerService extends BackgroundService {
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
         if (sourceVolume.getStorageType() != destVolume.getStorageType()) {
-          LOG.warn("Skipping disk balancing move for container {} from storage type {} to {}",
+          LOG.warn("Container {}: Source volume storage type ({}) differs from destination volume storage type ({}). "
+                  + "Skipping the disk balancing move.",
               containerId, sourceVolume.getStorageType(), destVolume.getStorageType());
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }

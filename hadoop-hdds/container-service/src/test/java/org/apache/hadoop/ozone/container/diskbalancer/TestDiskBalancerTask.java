@@ -346,6 +346,7 @@ public class TestDiskBalancerTask {
     doReturn(volumeType).when(sourceVolume).getStorageType();
     doReturn(volumeType).when(destVolume).getStorageType();
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    // Model a relabelled volume: a same-type move must preserve the replica's different recorded storage type.
     StorageType recordedType = volumeType == StorageType.SSD ? StorageType.DISK : StorageType.SSD;
     container.getContainerData().setStorageType(recordedType);
     ContainerDataYaml.createContainerFile(container.getContainerData(), container.getContainerFile());
