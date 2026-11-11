@@ -579,6 +579,11 @@ message SendContainerRequest {
   optional int64 size = 6;
   // StorageType the importing datanode should place the container on. Sent on
   // the first request only, alongside size. Absent from older senders.
+  // Carries the numeric value of StorageTypeProto from hdds.proto.
+  // This file uses Ratis-shaded protobuf, while hdds.proto uses unshaded
+  // protobuf; directly importing the enum produces incompatible Java descriptors.
+  // TODO: Reuse StorageTypeProto when protobuf generation is compatible,
+  // preserving wire compatibility.
   optional int32 storageTypeID = 7;
 }
 
