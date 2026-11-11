@@ -24,7 +24,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
@@ -307,10 +306,6 @@ public abstract class GenericTestUtils {
       } catch (UnsupportedEncodingException e) {
         throw new IllegalStateException(e);
       }
-    }
-
-    public PrintWriter asPrintWriter() {
-      return new PrintWriter(bytesPrintStream);
     }
 
     @Override
