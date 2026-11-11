@@ -137,6 +137,8 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
       // Update table cache.
       metadataManager.getLifecycleConfigurationTable().addCacheEntry(
           new CacheKey<>(bucketKey), CacheValue.get(transactionLogIndex));
+      metadataManager.getLifecycleScanStateTable().addCacheEntry(
+          new CacheKey<>(bucketKey), CacheValue.get(transactionLogIndex));
 
       omResponse.setDeleteLifecycleConfigurationResponse(
           DeleteLifecycleConfigurationResponse.newBuilder());
