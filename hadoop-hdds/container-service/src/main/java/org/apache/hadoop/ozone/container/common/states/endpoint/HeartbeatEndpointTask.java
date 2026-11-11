@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESO
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import java.io.IOException;
@@ -170,11 +171,15 @@ public class HeartbeatEndpointTask
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanodeDetailsProto)
           .setDatanodeVersion(versionInfo);
-      int reportCount = addNonCommandStatusReports(requestBuilder);
-      addContainerActions(requestBuilder);
-      addPipelineActions(requestBuilder);
-      addQueuedCommandCounts(requestBuilder);
-      commandStatusSelection = addCommandStatusReports(requestBuilder, maxReportsPerHB - reportCount);
+      SerializedSizeAccumulator heartbeatSize = new SerializedSizeAccumulator();
+      heartbeatSize.add(SCMHeartbeatRequestProto.DATANODEDETAILS_FIELD_NUMBER, datanodeDetailsProto);
+      heartbeatSize.add(SCMHeartbeatRequestProto.DATANODEVERSION_FIELD_NUMBER, versionInfo);
+      int reportCount = addNonCommandStatusReports(requestBuilder, heartbeatSize);
+      addContainerActions(requestBuilder, heartbeatSize);
+      addPipelineActions(requestBuilder, heartbeatSize);
+      addQueuedCommandCounts(requestBuilder, heartbeatSize);
+      commandStatusSelection = addCommandStatusReports(
+          requestBuilder, maxReportsPerHB - reportCount, heartbeatSize.get());
       SCMHeartbeatRequestProto request = requestBuilder.build();
       LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
@@ -241,8 +246,8 @@ public class HeartbeatEndpointTask
     context.putBackReports(reports, rpcEndpoint.getAddress());
   }
 
-  private int addNonCommandStatusReports(
-      SCMHeartbeatRequestProto.Builder requestBuilder) {
+  private int addNonCommandStatusReports(SCMHeartbeatRequestProto.Builder requestBuilder,
+      SerializedSizeAccumulator heartbeatSize) {
     int reportCount = 0;
     for (Message report :
         context.getAvailableNonCommandStatusReports(
@@ -258,6 +263,7 @@ public class HeartbeatEndpointTask
           } else {
             requestBuilder.setField(descriptor, report);
           }
+          heartbeatSize.add(descriptor.getNumber(), report);
           break;
         }
       }
@@ -267,8 +273,7 @@ public class HeartbeatEndpointTask
 
   private CommandStatusReportSelection addCommandStatusReports(
       SCMHeartbeatRequestProto.Builder requestBuilder,
-      int remainingReportCount) {
-    long currentHeartbeatSize = requestBuilder.build().getSerializedSize();
+      int remainingReportCount, long currentHeartbeatSize) {
     long remainingSafeBytes = Math.max(
         0, safeHeartbeatSize - currentHeartbeatSize);
     long commandStatusReportBudget = Math.min(maxCommandStatusReportBytes, remainingSafeBytes);
@@ -304,8 +309,8 @@ public class HeartbeatEndpointTask
    *
    * @param requestBuilder builder to which the report has to be added.
    */
-  private void addContainerActions(
-      SCMHeartbeatRequestProto.Builder requestBuilder) {
+  private void addContainerActions(SCMHeartbeatRequestProto.Builder requestBuilder,
+      SerializedSizeAccumulator heartbeatSize) {
     List<ContainerAction> actions = context.getPendingContainerAction(
         rpcEndpoint.getAddress(), maxContainerActionsPerHB);
     if (!actions.isEmpty()) {
@@ -313,6 +318,7 @@ public class HeartbeatEndpointTask
           .addAllContainerActions(actions)
           .build();
       requestBuilder.setContainerActions(cap);
+      heartbeatSize.add(SCMHeartbeatRequestProto.CONTAINERACTIONS_FIELD_NUMBER, cap);
     }
   }
 
@@ -321,8 +327,8 @@ public class HeartbeatEndpointTask
    *
    * @param requestBuilder builder to which the report has to be added.
    */
-  private void addPipelineActions(
-      SCMHeartbeatRequestProto.Builder requestBuilder) {
+  private void addPipelineActions(SCMHeartbeatRequestProto.Builder requestBuilder,
+      SerializedSizeAccumulator heartbeatSize) {
     List<PipelineAction> actions = context.getPendingPipelineAction(
         rpcEndpoint.getAddress(), maxPipelineActionsPerHB);
     if (!actions.isEmpty()) {
@@ -330,6 +336,7 @@ public class HeartbeatEndpointTask
           .addAllPipelineActions(actions)
           .build();
       requestBuilder.setPipelineActions(pap);
+      heartbeatSize.add(SCMHeartbeatRequestProto.PIPELINEACTIONS_FIELD_NUMBER, pap);
     }
   }
 
@@ -337,8 +344,8 @@ public class HeartbeatEndpointTask
    * Adds the count of all queued commands to the heartbeat.
    * @param requestBuilder Builder to which the details will be added.
    */
-  private void addQueuedCommandCounts(
-      SCMHeartbeatRequestProto.Builder requestBuilder) {
+  private void addQueuedCommandCounts(SCMHeartbeatRequestProto.Builder requestBuilder,
+      SerializedSizeAccumulator heartbeatSize) {
     EnumCounters<SCMCommandProto.Type> commandCount =
         context.getParent().getQueuedCommandCount();
     CommandQueueReportProto.Builder reportProto =
@@ -350,7 +357,21 @@ public class HeartbeatEndpointTask
             .addCount((int) count);
       }
     }
-    requestBuilder.setCommandQueueReport(reportProto.build());
+    CommandQueueReportProto commandQueueReport = reportProto.build();
+    requestBuilder.setCommandQueueReport(commandQueueReport);
+    heartbeatSize.add(SCMHeartbeatRequestProto.COMMANDQUEUEREPORT_FIELD_NUMBER, commandQueueReport);
+  }
+
+  private static final class SerializedSizeAccumulator {
+    private long size;
+
+    private void add(int fieldNumber, Message message) {
+      size += CodedOutputStream.computeMessageSize(fieldNumber, message);
+    }
+
+    private long get() {
+      return size;
+    }
   }
 
   /**
