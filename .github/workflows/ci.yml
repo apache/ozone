@@ -490,15 +490,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ needs.build-info.outputs.sha }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v6
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
@@ -508,9 +499,8 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Setup java ${{ env.TEST_JAVA_VERSION }}
-        uses: actions/setup-java@v6
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
