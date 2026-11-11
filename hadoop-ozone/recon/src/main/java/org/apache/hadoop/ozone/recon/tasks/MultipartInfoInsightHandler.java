@@ -23,9 +23,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.SortedMap;
 import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -36,7 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.slf4j.Logger;
@@ -335,26 +332,6 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
         "unreplicated");
     updateSize(replicatedSizeMap, getReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE), partReplicatedSize, add,
         "replicated");
-  }
-
-  /**
-   * Returns the (unreplicated, replicated) size of the committed parts of a single MPU, read from the embedded
-   * parts for legacy-schema MPUs and from {@code multipartPartsTable} for split-schema MPUs.
-   */
-  public static Pair<Long, Long> getCommittedPartsSize(OmMultipartKeyInfo multipartKeyInfo,
-      OMMetadataManager omMetadataManager) throws IOException {
-    if (isLegacySchema(multipartKeyInfo)) {
-      final MutablePair<Long, Long> sizes = MutablePair.of(0L, 0L);
-      forEachLegacyPart(multipartKeyInfo, (dataSize, replicatedSize) -> {
-        sizes.setLeft(sizes.getLeft() + dataSize);
-        sizes.setRight(sizes.getRight() + replicatedSize);
-      });
-      return sizes;
-    }
-    SortedMap<Integer, OmMultipartPartInfo> parts =
-        OMMultipartUploadUtils.scanParts(omMetadataManager, multipartKeyInfo.getUploadID());
-    long dataSize = parts.values().stream().mapToLong(OmMultipartPartInfo::getDataSize).sum();
-    return Pair.of(dataSize, OMMultipartUploadUtils.getReplicatedSize(parts, multipartKeyInfo.getReplicationConfig()));
   }
 
   /**

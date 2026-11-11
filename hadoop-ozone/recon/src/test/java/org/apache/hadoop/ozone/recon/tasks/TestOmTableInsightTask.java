@@ -649,6 +649,69 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
   }
 
+  /**
+   * Multipart open keys are tracked through the multipart info table, so they must not be counted as open keys.
+   * Open keys of parts being written are still counted.
+   */
+  @Test
+  public void testProcessExcludesMultipartOpenKeys() {
+    OmKeyInfo multipartOpenKey = getMultipartOpenKeyInfo("vol", "bucket", "mpu-key");
+    OmKeyInfo partOpenKey = getOmKeyInfo("vol", "bucket", "mpu-key", 2L, true);
+
+    for (String tableName : Arrays.asList(OPEN_KEY_TABLE, OPEN_FILE_TABLE)) {
+      long count = getCountForTable(tableName);
+      long unReplicatedSize = getUnReplicatedSizeForTable(tableName);
+      long replicatedSize = getReplicatedSizeForTable(tableName);
+
+      ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+      putEvents.add(getOMUpdateEvent("mpu-key/uploadId", multipartOpenKey, tableName, PUT, null));
+      putEvents.add(getOMUpdateEvent("mpu-key/clientId", partOpenKey, tableName, PUT, null));
+      omTableInsightTask.process(new OMUpdateEventBatch(putEvents, 0L), Collections.emptyMap());
+
+      assertEquals(count + 1, getCountForTable(tableName));
+      assertEquals(unReplicatedSize + 100L, getUnReplicatedSizeForTable(tableName));
+      assertEquals(replicatedSize + 100L, getReplicatedSizeForTable(tableName));
+
+      ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+      deleteEvents.add(getOMUpdateEvent("mpu-key/uploadId", multipartOpenKey, tableName, DELETE, null));
+      deleteEvents.add(getOMUpdateEvent("mpu-key/clientId", partOpenKey, tableName, DELETE, null));
+      omTableInsightTask.process(new OMUpdateEventBatch(deleteEvents, 0L), Collections.emptyMap());
+
+      assertEquals(count, getCountForTable(tableName));
+      assertEquals(unReplicatedSize, getUnReplicatedSizeForTable(tableName));
+      assertEquals(replicatedSize, getReplicatedSizeForTable(tableName));
+    }
+  }
+
+  @Test
+  public void testReprocessExcludesMultipartOpenKeys() throws Exception {
+    assertTrue(omTableInsightTask.reprocess(reconOMMetadataManager).isTaskSuccess());
+    long openKeyCount = getCountForTable(OPEN_KEY_TABLE);
+    long openFileCount = getCountForTable(OPEN_FILE_TABLE);
+
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.LEGACY)
+        .put("/vol/bucket/mpu-key/" + UUID.randomUUID(), getMultipartOpenKeyInfo("vol", "bucket", "mpu-key"));
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/1/2/2/mpu-file/" + UUID.randomUUID(), getMultipartOpenKeyInfo("vol", "fso", "mpu-file"));
+
+    assertTrue(omTableInsightTask.reprocess(reconOMMetadataManager).isTaskSuccess());
+    assertEquals(openKeyCount, getCountForTable(OPEN_KEY_TABLE));
+    assertEquals(openFileCount, getCountForTable(OPEN_FILE_TABLE));
+  }
+
+  private OmKeyInfo getMultipartOpenKeyInfo(String volumeName, String bucketName, String keyName) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFile(true)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(0L)
+        .setObjectID(1L)
+        .setOmKeyLocationInfos(Collections.singletonList(new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+        .build();
+  }
+
   @Test
   public void testProcessForDeletedTable() {
     // Prepare mock data size

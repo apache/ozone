@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.upgrade.AbstractComponentVersionManagerTest;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
@@ -171,6 +172,8 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
       assertInstanceOf(ReconTaskStatusTableUpgradeAction.class, taskStatusAction);
       assertInstanceOf(ReplicaHistoryDBUpgradeAction.class,
           versionManager.getUpgradeActionsForTesting().get(ReconVersion.REPLICA_HISTORY_DB));
+      assertInstanceOf(OpenKeysExcludeMultipartUploadsUpgradeAction.class,
+          versionManager.getUpgradeActionsForTesting().get(ReconVersion.OPEN_KEYS_EXCLUDE_MULTIPART_UPLOADS));
     }
 
     try (ReconVersionManager versionManager = createManager(
@@ -228,8 +231,8 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
 
       assertEquals(history.toProto(), historyProvider.getReplicaHistoryTable().get(1L).toProto());
       assertEquals(history.toProto(), REPLICA_HISTORY_V2.getTable(legacyStore).get(1L).toProto());
-      assertEquals(ReconVersion.REPLICA_HISTORY_DB, versionManager.getApparentVersion());
-      assertEquals(ReconVersion.REPLICA_HISTORY_DB.serialize(), versionManager.getPersistedApparentVersion());
+      assertEquals(ReconVersion.SOFTWARE_VERSION, versionManager.getApparentVersion());
+      assertEquals(ReconVersion.SOFTWARE_VERSION.serialize(), versionManager.getPersistedApparentVersion());
     }
   }
 
@@ -241,6 +244,7 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
     ReconReplicaHistoryDBProvider historyProvider = mock(ReconReplicaHistoryDBProvider.class);
     when(reconInjector.getInstance(ReconDBProvider.class)).thenReturn(sourceProvider);
     when(reconInjector.getInstance(ReconReplicaHistoryDBProvider.class)).thenReturn(historyProvider);
+    when(reconInjector.getInstance(ReconTaskController.class)).thenReturn(mock(ReconTaskController.class));
     doThrow(new IOException("Interrupted replica history migration")).doNothing()
         .when(historyProvider).migrateReplicaHistory(any());
 
@@ -255,7 +259,7 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
           versionManager.getPersistedApparentVersion());
 
       versionManager.finalizeUpgrade();
-      assertEquals(ReconVersion.REPLICA_HISTORY_DB.serialize(), versionManager.getPersistedApparentVersion());
+      assertEquals(ReconVersion.SOFTWARE_VERSION.serialize(), versionManager.getPersistedApparentVersion());
       verify(historyProvider, times(2)).migrateReplicaHistory(any());
     }
   }
@@ -275,6 +279,7 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
              ReconVersion.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX.serialize(), new ReconUpgradeActionProvider()));
          MockedStatic<ReconGuiceServletContextListener> listener = mockStatic(ReconGuiceServletContextListener.class)) {
       when(migrationInjector.getInstance(ReconReplicaHistoryDBProvider.class)).thenReturn(historyProvider);
+      when(migrationInjector.getInstance(ReconTaskController.class)).thenReturn(mock(ReconTaskController.class));
       listener.when(ReconGuiceServletContextListener::getGlobalInjector).thenReturn(migrationInjector);
       ContainerReplicaHistoryList history = legacyReplicaHistory();
       REPLICA_HISTORY_V2.getTable(legacyStore).put(1L, history);
@@ -290,7 +295,7 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
       clearInvocations(sourceStore);
       versionManager.finalizeUpgrade();
       verifyNoInteractions(sourceStore);
-      assertEquals(ReconVersion.REPLICA_HISTORY_DB.serialize(), versionManager.getPersistedApparentVersion());
+      assertEquals(ReconVersion.SOFTWARE_VERSION.serialize(), versionManager.getPersistedApparentVersion());
     }
   }
 
@@ -303,6 +308,7 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
         bind(OzoneConfiguration.class).toInstance(configuration);
         bind(ReconDBProvider.class).in(Singleton.class);
         bind(ReconReplicaHistoryDBProvider.class).in(Singleton.class);
+        bind(ReconTaskController.class).toInstance(mock(ReconTaskController.class));
       }
     });
   }
