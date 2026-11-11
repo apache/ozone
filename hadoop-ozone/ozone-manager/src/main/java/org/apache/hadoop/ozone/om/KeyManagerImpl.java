@@ -245,7 +245,7 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public void start(OzoneConfiguration configuration) {
-    startCompactionService(configuration.getObject(CompactionServiceConfig.class));
+    startCompactionService(configuration);
 
     boolean isSnapshotDeepCleaningEnabled = configuration.getBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED,
         OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT);
@@ -452,8 +452,9 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  private void startCompactionService(CompactionServiceConfig config) {
-    if (compactionService == null && config.isEnabled()) {
+  private void startCompactionService(OzoneConfiguration configuration) {
+    if (compactionService == null && configuration.getBoolean(CompactionServiceConfig.Keys.ENABLED, false)) {
+      CompactionServiceConfig config = configuration.getObject(CompactionServiceConfig.class);
       String[] tables = config.getColumnFamilies().split(",");
       compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
           config.getRunInterval(), config.getTimeout(), Arrays.asList(tables));
