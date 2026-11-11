@@ -17,10 +17,9 @@
 
 package org.apache.hadoop.ozone.om.service;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.service.CompactDBUtil.getBottommostLevelCompaction;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.BOTTOMMOST_LEVEL_COMPACTION;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -69,8 +68,7 @@ class TestCompactDBUtil {
   @Test
   void testDefaultConfigValueMapsToKSkip() {
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
-        ManagedCompactRangeOptions.BottommostLevelCompaction.valueOf(
-            OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
+        new OzoneConfiguration().getObject(CompactionServiceConfig.class).getBottommostLevelCompaction());
   }
 
   @ParameterizedTest
@@ -78,7 +76,7 @@ class TestCompactDBUtil {
   void testDefaultConfigKeyIsReadFromOzoneConfiguration(String compactionType) {
     // unset or invalid values should use the default value
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, compactionType);
+    conf.set(BOTTOMMOST_LEVEL_COMPACTION, compactionType);
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip, getBottommostLevelCompaction(conf));
   }
 
@@ -87,7 +85,7 @@ class TestCompactDBUtil {
   void testConfigKeyIsReadFromOzoneConfiguration(String compactionType) {
     // have trailing spaces in the config values to ensure they are trimmed and handled correctly
     OzoneConfiguration  conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, compactionType);
+    conf.set(BOTTOMMOST_LEVEL_COMPACTION, compactionType);
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce, getBottommostLevelCompaction(conf));
   }
 }

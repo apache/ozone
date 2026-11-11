@@ -42,14 +42,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_TIMEOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT;
@@ -172,6 +164,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.CompactionService;
+import org.apache.hadoop.ozone.om.service.CompactionServiceConfig;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
@@ -252,9 +245,7 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public void start(OzoneConfiguration configuration) {
-    boolean isCompactionEnabled = configuration.getBoolean(OZONE_OM_COMPACTION_SERVICE_ENABLED,
-        OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT);
-    startCompactionService(configuration, isCompactionEnabled);
+    startCompactionService(configuration.getObject(CompactionServiceConfig.class));
 
     boolean isSnapshotDeepCleaningEnabled = configuration.getBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED,
         OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT);
@@ -461,23 +452,11 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  private void startCompactionService(OzoneConfiguration configuration,
-                                      boolean isCompactionServiceEnabled) {
-    if (compactionService == null && isCompactionServiceEnabled) {
-      long compactionInterval = configuration.getTimeDuration(
-          OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL,
-          OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      long serviceTimeout = configuration.getTimeDuration(
-          OZONE_OM_COMPACTION_SERVICE_TIMEOUT,
-          OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      String compactionColumnFamilies = configuration.get(
-          OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES,
-          OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT);
-      String[] tables = compactionColumnFamilies.split(",");
+  private void startCompactionService(CompactionServiceConfig config) {
+    if (compactionService == null && config.isEnabled()) {
+      String[] tables = config.getColumnFamilies().split(",");
       compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
-          compactionInterval, serviceTimeout, Arrays.asList(tables));
+          config.getRunInterval(), config.getTimeout(), Arrays.asList(tables));
       compactionService.start();
     }
   }

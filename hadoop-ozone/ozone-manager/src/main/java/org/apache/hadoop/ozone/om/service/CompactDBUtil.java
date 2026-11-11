@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -79,17 +78,7 @@ public final class CompactDBUtil {
 
   public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
       OzoneConfiguration configuration) {
-    ManagedCompactRangeOptions.BottommostLevelCompaction blc = ManagedCompactRangeOptions.BottommostLevelCompaction
-        .valueOf(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
-
-    try {
-      blc = configuration.getEnum(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, blc);
-    } catch (IllegalArgumentException e) {
-      LOG.warn("Invalid value for bottommost level compaction configuration '{}'",
-          configuration.get(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION), e);
-    }
-
-    return blc;
+    return configuration.getObject(CompactionServiceConfig.class).getBottommostLevelCompaction();
   }
 
   /**
