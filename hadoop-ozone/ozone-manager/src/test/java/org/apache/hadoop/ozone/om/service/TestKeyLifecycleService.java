@@ -978,6 +978,73 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    public Stream<Arguments> changedExpiredDirectoryParameters() {
+      return Stream.of(
+          // a key is committed under the directory after the directory is evaluated as expired
+          arguments(true, "DIRECTORY_NOT_EMPTY"),
+          // the directory itself is modified after it is evaluated as expired
+          arguments(false, "UPDATE_ID_NOT_MATCH")
+      );
+    }
+
+    /**
+     * The lifecycle scan evaluates a directory without holding the bucket lock, so the deletion of an expired
+     * directory must be rejected if the directory got a new child or was modified before the deletion is applied.
+     */
+    @ParameterizedTest
+    @MethodSource("changedExpiredDirectoryParameters")
+    void testExpiredDirectoryChangedBeforeDeletion(boolean addChildKey, String expectedStatus) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String dirName = "dir1";
+      long initialDeletedDirCount = getDeletedDirectoryCount();
+
+      keyLifecycleService.suspend();
+      // the injector before the deletion is only reached on the direct deletion path
+      keyLifecycleService.setMoveToTrashEnabled(false);
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      createDirectory(volumeName, bucketName, dirName);
+      awaitDirCacheDrained(volumeName, bucketName);
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(LONG_EXPIRE_SECONDS);
+      OmLCFilter.Builder filter = getOmLCFilterBuilder("", null, null);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, null, filter.build(), date.toString(), true);
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      FaultInjectorImpl beforeDelete = new FaultInjectorImpl();
+      installInjectors(taskStart, beforeDelete, new FaultInjectorImpl());
+      keyLifecycleService.resume();
+      taskStart.awaitPaused(10000);
+      deleteLifecyclePolicy(volumeName, bucketName);
+      taskStart.release();
+      // dir1 is evaluated as expired, and the scan waits before sending the deletion requests
+      beforeDelete.awaitPaused(10000);
+      if (addChildKey) {
+        createAndCommitKey(volumeName, bucketName, dirName + OM_KEY_PREFIX + "key0", 1, null);
+      } else {
+        OzoneObj dirObj = new OzoneObjInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(dirName)
+            .setResType(OzoneObj.ResourceType.KEY)
+            .setStoreType(OzoneObj.StoreType.OZONE)
+            .build();
+        writeClient.addAcl(dirObj, OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, "user1", ACCESS,
+            IAccessAuthorizer.ACLType.READ));
+      }
+      beforeDelete.release();
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+          WAIT_CHECK_INTERVAL, 10000);
+
+      assertThat(logCapturer.getOutput()).contains("DeleteKey request failed for directory " + volumeName + "/" +
+          bucketName + "/" + dirName + ", status: " + expectedStatus);
+      assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
+      assertNotNull(getDirectory(volumeName, bucketName, dirName).getKeyInfo());
+    }
+
     @ParameterizedTest
     @MethodSource("parameters1")
     void testOneKeyExpired(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
@@ -2488,7 +2555,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
-      long initialRenamedDirCount = metrics.getNumDirRenamed().value();
+      long initialDeletedDirCount = metrics.getNumDirDeleted().value();
       // create keys
       String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
       List<OmKeyArgs> keyList =
@@ -2517,9 +2584,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
             (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 5000);
         assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
         if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-          // Legacy bucket doesn't have dir concept
+          // Legacy bucket doesn't have dir concept. Expired directories are deleted instead of moved to trash.
           GenericTestUtils.waitFor(() ->
-                  metrics.getNumDirRenamed().value() - initialRenamedDirCount == (prefix.contains(OM_KEY_PREFIX) ?
+                  metrics.getNumDirDeleted().value() - initialDeletedDirCount == (prefix.contains(OM_KEY_PREFIX) ?
                       1 : 0), WAIT_CHECK_INTERVAL, 5000);
         }
 
