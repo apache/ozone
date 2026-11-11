@@ -110,7 +110,7 @@ public final class MergeJoinSnapDiffWriter {
       }
       if (dependencyOrderingEnabledRef[0]) {
         long orderStart = Time.monotonicNow();
-        orderAndWriteReport(store, nodeCount, reportProgress);
+        dependencyOrderingEnabledRef[0] = orderAndWriteReport(store, nodeCount, reportProgress);
         LOG.info("SnapDiff job {} ordering stage elapsed: {}ms", store.getJobId(),
             Time.monotonicNow() - orderStart);
       } else if (reportProgress != null) {
@@ -521,11 +521,21 @@ public final class MergeJoinSnapDiffWriter {
     return new SnapDiffDependencyEntry(objectId, sourceParentId, targetParentId, reportEntry);
   }
 
-  private static void orderAndWriteReport(SnapDiffJobStore store, int nodeCount,
+  /**
+   * Writes the dependency nodes in dependency order, or in node order when the graph has a cycle.
+   *
+   * @return whether the report was written in dependency order
+   */
+  private static boolean orderAndWriteReport(SnapDiffJobStore store, int nodeCount,
       DoubleConsumer reportProgress) throws IOException {
     List<Integer> orderedNodeIds;
     try (SnapDiffJobStore.DependencyNodeIterator dependencyEntries = store.dependencyNodeIterator()) {
       orderedNodeIds = buildOrderedNodeIds(store.getJobId(), dependencyEntries);
+    }
+    if (orderedNodeIds == null) {
+      // Node indices are 1-based, so this flushes nodes 1..nodeCount.
+      flushUnorderedDependencyNodes(store, nodeCount + 1);
+      return false;
     }
     int writeBatchSize = store.getWriteBatchSize();
     long orderDenominator = Math.max(1, nodeCount);
@@ -545,17 +555,22 @@ public final class MergeJoinSnapDiffWriter {
     if (reportProgress != null) {
       reportProgress.accept(FSO_ORDER_END);
     }
+    return true;
   }
 
+  /**
+   * @return the node ids in dependency order, or null if the graph has a cycle
+   */
   private static List<Integer> buildOrderedNodeIds(String jobId,
-      java.util.Iterator<SnapDiffDependencyEntry> dependencyEntries) throws IOException {
+      java.util.Iterator<SnapDiffDependencyEntry> dependencyEntries) {
     SnapDiffDependencyGraph graph = new SnapDiffDependencyGraph(dependencyEntries);
     try {
       return graph.getOrderedNodeIds();
     } catch (IllegalStateException e) {
       if (e.getMessage() != null && e.getMessage().contains("Cycle detected")) {
-        LOG.error("SnapDiff job {} dependency graph cycle: {}", jobId, e.getMessage());
-        throw new IOException("Dependency graph cycle for job " + jobId, e);
+        LOG.warn("SnapDiff job {} dependency graph cycle, falling back to unordered report: {}",
+            jobId, e.getMessage());
+        return null;
       }
       throw e;
     }
