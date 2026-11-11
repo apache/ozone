@@ -666,6 +666,70 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    /**
+     * A task evaluates objects against the lifecycle configuration read when it was scheduled, so it must stop
+     * sending requests once the configuration is deleted or updated while it runs.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testPolicyChangedDuringScan(boolean deletePolicy) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(OBJECT_STORE);
+
+      keyLifecycleService.suspend();
+      List<OmKeyArgs> keyList = createKeys(volumeName, bucketName, OBJECT_STORE, KEY_COUNT, 1, "key", null);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(OBJECT_STORE) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(LONG_EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, "key", null, date.toString(), true);
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      FaultInjectorImpl beforeDelete = new FaultInjectorImpl();
+      FaultInjectorImpl exceptionInjector = new FaultInjectorImpl();
+      installInjectors(taskStart, beforeDelete, exceptionInjector);
+      keyLifecycleService.resume();
+      taskStart.awaitPaused(10000);
+      // Hold the next task at its start, so it cannot run with the updated configuration
+      FaultInjectorImpl nextTaskStart = new FaultInjectorImpl();
+      installInjectors(nextTaskStart, beforeDelete, exceptionInjector);
+      taskStart.release();
+      // The expired keys are found, and the task waits before sending the deletion request
+      beforeDelete.awaitPaused(10000);
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      if (deletePolicy) {
+        deleteLifecyclePolicy(bucketKey);
+      } else {
+        OmLifecycleConfiguration policy = metadataManager.getLifecycleConfigurationTable().get(bucketKey);
+        putLifecyclePolicy(volumeName, bucketName, policy.toBuilder().setUpdateID(policy.getUpdateID() + 1).build(),
+            false);
+      }
+      beforeDelete.release();
+      if (deletePolicy) {
+        GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+            WAIT_CHECK_INTERVAL, 10000);
+      } else {
+        // BackgroundService waits for the previous batch, so the next task reaching its start means the task is done
+        nextTaskStart.awaitPaused(10000);
+      }
+
+      assertThat(logCapturer.getOutput())
+          .contains("Lifecycle configuration of bucket " + bucketKey + " is deleted or updated, stopping task");
+      assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
+      assertEquals(KEY_COUNT, getKeyCount(OBJECT_STORE) - initialKeyCount);
+      // A scan state may be saved before the configuration changes, but the scan is never saved as finished
+      OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+      assertTrue(scanState == null || scanState.getScanEndTime() == null);
+      if (!deletePolicy) {
+        deleteLifecyclePolicy(bucketKey);
+        nextTaskStart.release();
+      }
+    }
+
     @ParameterizedTest
     @MethodSource("parameters1")
     void testBucketScanWithScanEndTime(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
@@ -2819,20 +2883,23 @@ class TestKeyLifecycleService extends OzoneTestBase {
               () -> new TrashOzoneFileSystem(om));
       keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
 
+      OmLCRule.Builder ruleBuilder = new OmLCRule.Builder()
+          .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
+          .setPrefix("")
+          .setAction(new OmLCExpiration.Builder()
+              .setDate(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS).toString())
+              .build());
       OmLifecycleConfiguration policy = new OmLifecycleConfiguration.Builder()
           .setVolume(volumeName)
           .setBucket(bucketName)
           .setBucketLayout(FILE_SYSTEM_OPTIMIZED)
           .setBucketObjectID(bucketObjectID)
-          .setRules(Collections.singletonList(new OmLCRule.Builder()
-              .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
-              .setEnabled(true)
-              .setPrefix("")
-              .setAction(new OmLCExpiration.Builder()
-                  .setDate(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS).toString())
-                  .build())
-              .build()))
+          .setRules(Collections.singletonList(ruleBuilder.setEnabled(true).build()))
           .build();
+      // The task stops if its configuration is not stored. The stored copy has its rule disabled, so the service
+      // doesn't schedule its own task for this bucket while this test runs the task directly.
+      putLifecyclePolicy(volumeName, bucketName, policy.toBuilder()
+          .setRules(Collections.singletonList(ruleBuilder.setEnabled(false).build())).build(), false);
 
       String expectedTrashRoot = new Path(TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner, CURRENT).toString();
       OzoneManager omSpy = spy(om);
@@ -3625,20 +3692,27 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
   }
 
-  // Runs exactly one scan: without dropping the policy first, the next scan starts SERVICE_INTERVAL
-  // later and deletes the objects the caller expects to remain.
+  // Runs exactly one scan: without dropping the policy, the next scan starts SERVICE_INTERVAL later and deletes
+  // the objects the caller expects to remain. The policy cannot be dropped while the scan runs, as the scan stops
+  // once its policy is deleted, so the next scan is held at its start until the policy is dropped.
   private void runSingleLifecycleScan(String volume, String bucket)
       throws IOException, TimeoutException, InterruptedException {
     FaultInjectorImpl taskStart = new FaultInjectorImpl();
     FaultInjectorImpl firstDelete = new FaultInjectorImpl();
     // The third injector is only read for an injected exception, but the scan expects it to exist
-    installInjectors(taskStart, firstDelete, new FaultInjectorImpl());
+    FaultInjectorImpl exceptionInjector = new FaultInjectorImpl();
+    installInjectors(taskStart, firstDelete, exceptionInjector);
     keyLifecycleService.resume();
     // The in-flight list is filled at schedule time, so wait for the task to reach the injector
     taskStart.awaitPaused(10000);
-    deleteLifecyclePolicy(volume, bucket);
+    FaultInjectorImpl nextTaskStart = new FaultInjectorImpl();
+    installInjectors(nextTaskStart, firstDelete, exceptionInjector);
     taskStart.release();
     firstDelete.release();
+    // BackgroundService waits for the previous batch, so the next task reaching its start means the scan is done
+    nextTaskStart.awaitPaused(10000);
+    deleteLifecyclePolicy(volume, bucket);
+    nextTaskStart.release();
     GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
         WAIT_CHECK_INTERVAL, 10000);
   }
