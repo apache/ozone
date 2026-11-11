@@ -216,7 +216,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
   void sstFilteringServiceInterval() throws ReconfigurationException {
     // Tests reconfiguration of SST filtering service interval
     final OzoneManager om = cluster().getOzoneManager();
-    final KeyManager keyManagerImpl = om.getKeyManager();
+    final KeyManager keyManager = om.getKeyManager();
 
     // Get the original interval value
     String originalValue = om.getConfiguration().get(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);
@@ -233,7 +233,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     assertEquals(newIntervalValue, om.getConfiguration()
         .get(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL));
     // Verify the service is still enabled with the new interval
-    assertNotNull(keyManagerImpl.getSnapshotSstFilteringService(),
+    assertNotNull(keyManager.getSnapshotSstFilteringService(),
         "SstFilteringService should not be null with new interval");
     // Verify the new interval is applied (30 seconds = 30000 milliseconds)
     long newInterval = om.getConfiguration().getTimeDuration(
@@ -246,7 +246,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     getSubject().reconfigureProperty(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, disableValue);
     assertEquals(disableValue, om.getConfiguration().get(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL));
     // Verify that the SstFilteringService is stopped
-    assertNull(keyManagerImpl.getSnapshotSstFilteringService(),
+    assertNull(keyManager.getSnapshotSstFilteringService(),
         "SstFilteringService should be null when disabled");
 
     // Set the interval back to the original value
@@ -254,7 +254,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     getSubject().reconfigureProperty(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, originalValue);
     assertEquals(originalValue, om.getConfiguration().get(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL));
     // Verify that the SstFilteringService is running again
-    assertNotNull(keyManagerImpl.getSnapshotSstFilteringService(),
+    assertNotNull(keyManager.getSnapshotSstFilteringService(),
         "SstFilteringService should not be null when enabled");
   }
 

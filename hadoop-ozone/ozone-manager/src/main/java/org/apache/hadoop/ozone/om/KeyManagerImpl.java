@@ -423,7 +423,9 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public void restartSnapshotSstFilteringService(OzoneConfiguration conf) {
-    stopSnapshotSstFilteringService();
+    if (snapshotSstFilteringService != null) {
+      stopSnapshotSstFilteringService();
+    }
     startSnapshotSstFilteringService(conf);
   }
 
