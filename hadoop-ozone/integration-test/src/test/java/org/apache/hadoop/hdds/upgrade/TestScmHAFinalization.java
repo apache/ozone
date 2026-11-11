@@ -201,8 +201,8 @@ public class TestScmHAFinalization {
     HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         inactiveScm, 0);
 
-    // Use log to verify a snapshot was installed.
-    assertThat(logCapture.getOutput()).contains("New snapshot received with higher apparent version " +
-        HDDSVersion.SOFTWARE_VERSION + ". Attempting to finalize to that version.");
+    // Use log to verify a snapshot was installed and triggered finalization.
+    assertThat(logCapture.getOutput()).contains("Version file has lower apparent version (INITIAL_VERSION (0)) than " +
+        "DB (" + HDDSVersion.SOFTWARE_VERSION + "). Finalizing to the DB version.");
   }
 }

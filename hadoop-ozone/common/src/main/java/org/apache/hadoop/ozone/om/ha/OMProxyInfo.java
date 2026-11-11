@@ -344,14 +344,6 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
       return ordering.get(nodeID);
     }
 
-    boolean contains(String nodeId, String address) {
-      if (nodeId == null || address == null) {
-        return false;
-      }
-      final OMProxyInfo<P> p = get(nodeId);
-      return p != null && address.equals(p.getAddressString());
-    }
-
     @Override
     public String toString() {
       return proxies.toString();
