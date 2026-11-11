@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -57,13 +58,86 @@ public final class TestContainerBalancerClusterAnalyzer {
     assertEquals(70, snapshot.getBytesToMove());
     assertFalse(snapshot.hasIncompleteStorageTypeUsage());
     for (StorageType type : Arrays.asList(StorageType.SSD, StorageType.DISK)) {
-      ContainerBalancerClusterSnapshot tier = snapshot.getStorageTypeSnapshots().get(type);
-      assertEquals(0.5, tier.getClusterAvgUtilization());
+      StorageTypeSnapshot tier = snapshot.getStorageTypeSnapshots().get(type);
+      assertEquals(0.5, tier.getAverageUtilization());
       assertEquals(1, tier.getSourceCount());
       assertEquals(1, tier.getTargetCount());
       assertEquals(35, tier.getBytesToMove());
       assertEquals(type, tier.getTopSourceNodes().get(0).getStorageType());
     }
+  }
+
+  @Test
+  void testDatanodeIsCountedOnceWhenSourceForMultipleStorageTypes() {
+    DatanodeUsageInfoProto source = typedProto("a", 5, 60);
+    String sourceId = DatanodeDetails.getFromProtoBuf(source.getNode()).getID().toString();
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        Arrays.asList(source, typedProto("b", 20, 80), typedProto("c", 35, 100)),
+        THRESHOLD, Collections.emptySet(), Collections.emptySet());
+
+    // A is above both upper limits: SSD 95% > 90%, and DISK 40% > 30%.
+    for (StorageType type : Arrays.asList(StorageType.SSD, StorageType.DISK)) {
+      StorageTypeSnapshot typeSnapshot = snapshot.getStorageTypeSnapshots().get(type);
+      assertEquals(1, typeSnapshot.getSourceCount());
+      assertEquals(Collections.singleton(sourceId), typeSnapshot.getSourceDatanodes());
+      assertEquals(1, typeSnapshot.getTopSourceNodes().size());
+      NodeUtilization typeSource = typeSnapshot.getTopSourceNodes().get(0);
+      assertEquals(sourceId, typeSource.getDatanodeId());
+      assertEquals(type, typeSource.getStorageType());
+    }
+
+    assertEquals(1, snapshot.getSourceCount());
+    assertEquals(Collections.singleton(sourceId), snapshot.getSourceDatanodes());
+    assertEquals(1, snapshot.getTopSourceNodesAcrossStorageTypes().size());
+    NodeUtilization topSource = snapshot.getTopSourceNodesAcrossStorageTypes().get(0);
+    assertEquals("a", topSource.getHostname());
+    assertEquals(sourceId, topSource.getDatanodeId());
+    assertEquals(StorageType.SSD, topSource.getStorageType());
+    assertEquals(0.95, topSource.getUtilization(), 0.0001);
+  }
+
+  @Test
+  void testClusterUtilizationIsSeparateFromMostImbalancedStorageType() {
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        Arrays.asList(typedProto("first", 5, 50), typedProto("second", 35, 90)),
+        THRESHOLD, Collections.emptySet(), Collections.emptySet());
+
+    // Whole-datanode utilization is 72.5% and 37.5%; DISK is 50%/10% and SSD is 95%/65%.
+    assertEquals(0.55, snapshot.getClusterAvgUtilization(), 0.0001);
+    assertEquals(0.725, snapshot.getMaxUtilization(), 0.0001);
+    assertEquals(0.375, snapshot.getMinUtilization(), 0.0001);
+    assertEquals(0.35, snapshot.getImbalance(), 0.0001);
+    assertEquals(0.40, snapshot.getMaxImbalance(), 0.0001);
+    assertEquals(StorageType.DISK, snapshot.getMostImbalancedStorageType());
+    StorageTypeSnapshot disk = snapshot.getStorageTypeSnapshots().get(StorageType.DISK);
+    assertEquals(0.50, disk.getMaxUtilization(), 0.0001);
+    assertEquals(0.10, disk.getMinUtilization(), 0.0001);
+    assertEquals(0.40, disk.getImbalance(), 0.0001);
+    StorageTypeSnapshot ssd = snapshot.getStorageTypeSnapshots().get(StorageType.SSD);
+    assertEquals(0.95, ssd.getMaxUtilization(), 0.0001);
+    assertEquals(0.65, ssd.getMinUtilization(), 0.0001);
+    assertEquals(0.30, ssd.getImbalance(), 0.0001);
+    assertEquals(disk.getBytesToMove() + ssd.getBytesToMove(), snapshot.getTotalBytesToMove());
+    assertEquals(1, snapshot.getSourceCount());
+    assertEquals(1, snapshot.getTargetCount());
+    NodeUtilization source = snapshot.getTopSourceNodesAcrossStorageTypes().get(0);
+    assertEquals(StorageType.SSD, source.getStorageType());
+    assertEquals(0.95, source.getUtilization(), 0.0001);
+    NodeUtilization target = snapshot.getBottomTargetNodesAcrossStorageTypes().get(0);
+    assertEquals(StorageType.DISK, target.getStorageType());
+    assertEquals(0.10, target.getUtilization(), 0.0001);
+  }
+
+  @Test
+  void testEqualStorageTypeImbalancesSelectTypeInEnumOrder() {
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        Arrays.asList(typedProto("first", 5, 95), typedProto("second", 95, 5)),
+        THRESHOLD, Collections.emptySet(), Collections.emptySet());
+
+    assertEquals(snapshot.getStorageTypeSnapshots().keySet().iterator().next(),
+        snapshot.getMostImbalancedStorageType());
+    assertEquals(0.90, snapshot.getMaxImbalance(), 0.0001);
+    assertEquals(0, snapshot.getImbalance(), 0.0001);
   }
 
   @Test
@@ -137,6 +211,8 @@ public final class TestContainerBalancerClusterAnalyzer {
     assertTrue(snapshot.getStorageTypeSnapshots().isEmpty());
     assertFalse(snapshot.hasIncompleteStorageTypeUsage());
     assertEquals(10, snapshot.getBytesToMove());
+    assertEquals(snapshot.getImbalance(), snapshot.getMaxImbalance());
+    assertNull(snapshot.getMostImbalancedStorageType());
   }
 
   @Test

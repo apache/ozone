@@ -28,6 +28,8 @@ import org.apache.hadoop.fs.StorageType;
 
 /**
  * Point-in-time cluster imbalance view built from datanode usage protos.
+ * Utilization and limits describe whole datanodes. When storage-type reports are available,
+ * movement totals and source/target datanode sets combine the per-type results; a datanode is counted once.
  */
 public final class ContainerBalancerClusterSnapshot {
 
@@ -44,11 +46,13 @@ public final class ContainerBalancerClusterSnapshot {
   private final long totalUnderUtilizedBytes;
 
   // Legacy snapshots use totalOverUtilizedBytes. Typed snapshots exclude storage types without a source/target pair.
-  private final long bytesToMove;
+  private final long totalBytesToMove;
   private final double imbalance;
-  private final List<NodeUtilization> topSourceNodes;
-  private final List<NodeUtilization> bottomTargetNodes;
-  private final Map<StorageType, ContainerBalancerClusterSnapshot> storageTypeSnapshots;
+  private final double maxImbalance;
+  private final StorageType mostImbalancedStorageType;
+  private final List<NodeUtilization> topSourceNodesAcrossStorageTypes;
+  private final List<NodeUtilization> bottomTargetNodesAcrossStorageTypes;
+  private final Map<StorageType, StorageTypeSnapshot> storageTypeSnapshots;
   private final Set<String> sourceDatanodes;
   private final Set<String> targetDatanodes;
   private final boolean incompleteStorageTypeUsage;
@@ -65,13 +69,15 @@ public final class ContainerBalancerClusterSnapshot {
     this.targetCount = b.targetCount;
     this.totalOverUtilizedBytes = b.totalOverUtilizedBytes;
     this.totalUnderUtilizedBytes = b.totalUnderUtilizedBytes;
-    this.bytesToMove = b.bytesToMove == null ? b.totalOverUtilizedBytes : b.bytesToMove;
+    this.totalBytesToMove = b.totalBytesToMove == null ? b.totalOverUtilizedBytes : b.totalBytesToMove;
     this.imbalance = b.imbalance;
-    this.topSourceNodes = Collections.unmodifiableList(
-        Objects.requireNonNull(b.topSourceNodes));
-    this.bottomTargetNodes = Collections.unmodifiableList(
-        Objects.requireNonNull(b.bottomTargetNodes));
-    Map<StorageType, ContainerBalancerClusterSnapshot> byType = new EnumMap<>(StorageType.class);
+    this.maxImbalance = b.maxImbalance == null ? b.imbalance : b.maxImbalance;
+    this.mostImbalancedStorageType = b.mostImbalancedStorageType;
+    this.topSourceNodesAcrossStorageTypes = Collections.unmodifiableList(
+        Objects.requireNonNull(b.topSourceNodesAcrossStorageTypes));
+    this.bottomTargetNodesAcrossStorageTypes = Collections.unmodifiableList(
+        Objects.requireNonNull(b.bottomTargetNodesAcrossStorageTypes));
+    Map<StorageType, StorageTypeSnapshot> byType = new EnumMap<>(StorageType.class);
     byType.putAll(b.storageTypeSnapshots);
     this.storageTypeSnapshots = Collections.unmodifiableMap(byType);
     this.sourceDatanodes = Collections.unmodifiableSet(new HashSet<>(b.sourceDatanodes));
@@ -123,23 +129,49 @@ public final class ContainerBalancerClusterSnapshot {
     return totalUnderUtilizedBytes;
   }
 
+  /** Returns the combined movement total; retained for existing callers. */
   public long getBytesToMove() {
-    return bytesToMove;
+    return getTotalBytesToMove();
   }
 
+  public long getTotalBytesToMove() {
+    return totalBytesToMove;
+  }
+
+  /** Returns the largest per-type imbalance, or whole-datanode imbalance for legacy reports. */
+  public double getMaxImbalance() {
+    return maxImbalance;
+  }
+
+  /** Returns the storage type with the largest imbalance, or null for legacy reports. */
+  public StorageType getMostImbalancedStorageType() {
+    return mostImbalancedStorageType;
+  }
+
+  /** Returns the difference between the highest and lowest whole-datanode utilization. */
   public double getImbalance() {
     return imbalance;
   }
 
+  /** Returns source nodes across storage types, or whole-datanode sources for legacy reports. */
   public List<NodeUtilization> getTopSourceNodes() {
-    return topSourceNodes;
+    return getTopSourceNodesAcrossStorageTypes();
   }
 
+  public List<NodeUtilization> getTopSourceNodesAcrossStorageTypes() {
+    return topSourceNodesAcrossStorageTypes;
+  }
+
+  /** Returns target nodes across storage types, or whole-datanode targets for legacy reports. */
   public List<NodeUtilization> getBottomTargetNodes() {
-    return bottomTargetNodes;
+    return getBottomTargetNodesAcrossStorageTypes();
   }
 
-  public Map<StorageType, ContainerBalancerClusterSnapshot> getStorageTypeSnapshots() {
+  public List<NodeUtilization> getBottomTargetNodesAcrossStorageTypes() {
+    return bottomTargetNodesAcrossStorageTypes;
+  }
+
+  public Map<StorageType, StorageTypeSnapshot> getStorageTypeSnapshots() {
     return storageTypeSnapshots;
   }
 
@@ -175,12 +207,14 @@ public final class ContainerBalancerClusterSnapshot {
     private long totalOverUtilizedBytes;
     private long totalUnderUtilizedBytes;
     private double imbalance;
-    private List<NodeUtilization> topSourceNodes = Collections.emptyList();
-    private List<NodeUtilization> bottomTargetNodes = Collections.emptyList();
-    private Map<StorageType, ContainerBalancerClusterSnapshot> storageTypeSnapshots = Collections.emptyMap();
+    private Double maxImbalance;
+    private StorageType mostImbalancedStorageType;
+    private List<NodeUtilization> topSourceNodesAcrossStorageTypes = Collections.emptyList();
+    private List<NodeUtilization> bottomTargetNodesAcrossStorageTypes = Collections.emptyList();
+    private Map<StorageType, StorageTypeSnapshot> storageTypeSnapshots = Collections.emptyMap();
     private Set<String> sourceDatanodes = Collections.emptySet();
     private Set<String> targetDatanodes = Collections.emptySet();
-    private Long bytesToMove;
+    private Long totalBytesToMove;
     private boolean incompleteStorageTypeUsage;
 
     private Builder() {
@@ -241,18 +275,36 @@ public final class ContainerBalancerClusterSnapshot {
       return this;
     }
 
+    public Builder setMaxImbalance(double maxImbalance) {
+      this.maxImbalance = maxImbalance;
+      return this;
+    }
+
+    public Builder setMostImbalancedStorageType(StorageType storageType) {
+      this.mostImbalancedStorageType = storageType;
+      return this;
+    }
+
     public Builder setImbalance(double imbalance) {
       this.imbalance = imbalance;
       return this;
     }
 
-    public Builder setTopSourceNodes(List<NodeUtilization> topSourceNodes) {
-      this.topSourceNodes = topSourceNodes;
+    public Builder setTopSourceNodes(List<NodeUtilization> nodes) {
+      return setTopSourceNodesAcrossStorageTypes(nodes);
+    }
+
+    public Builder setTopSourceNodesAcrossStorageTypes(List<NodeUtilization> topSourceNodesAcrossStorageTypes) {
+      this.topSourceNodesAcrossStorageTypes = topSourceNodesAcrossStorageTypes;
       return this;
     }
 
-    public Builder setBottomTargetNodes(List<NodeUtilization> bottomTargetNodes) {
-      this.bottomTargetNodes = bottomTargetNodes;
+    public Builder setBottomTargetNodes(List<NodeUtilization> nodes) {
+      return setBottomTargetNodesAcrossStorageTypes(nodes);
+    }
+
+    public Builder setBottomTargetNodesAcrossStorageTypes(List<NodeUtilization> bottomTargetNodesAcrossStorageTypes) {
+      this.bottomTargetNodesAcrossStorageTypes = bottomTargetNodesAcrossStorageTypes;
       return this;
     }
 
@@ -260,7 +312,7 @@ public final class ContainerBalancerClusterSnapshot {
       return new ContainerBalancerClusterSnapshot(this);
     }
 
-    public Builder setStorageTypeSnapshots(Map<StorageType, ContainerBalancerClusterSnapshot> snapshots) {
+    public Builder setStorageTypeSnapshots(Map<StorageType, StorageTypeSnapshot> snapshots) {
       this.storageTypeSnapshots = snapshots;
       return this;
     }
@@ -276,7 +328,11 @@ public final class ContainerBalancerClusterSnapshot {
     }
 
     public Builder setBytesToMove(long bytes) {
-      this.bytesToMove = bytes;
+      return setTotalBytesToMove(bytes);
+    }
+
+    public Builder setTotalBytesToMove(long bytes) {
+      this.totalBytesToMove = bytes;
       return this;
     }
 

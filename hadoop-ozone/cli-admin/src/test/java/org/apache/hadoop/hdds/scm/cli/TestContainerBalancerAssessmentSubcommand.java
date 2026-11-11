@@ -24,6 +24,8 @@ import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -65,7 +67,8 @@ class TestContainerBalancerAssessmentSubcommand {
     runAssessment(scmClient);
 
     assertThat(out.get()).contains("Storage type: SSD", "Storage type: DISK", "35 B", "70 B",
-        "All storage types (shared iteration limits):").doesNotContain("WARNING");
+        "All storage types (shared iteration limits):", "of SSD capacity", "of DISK capacity", "of cluster capacity")
+        .doesNotContain("WARNING");
   }
 
   @Test
@@ -76,7 +79,73 @@ class TestContainerBalancerAssessmentSubcommand {
     runAssessment(scmClient, "--json");
 
     assertThat(out.get()).contains("\"storageTypes\"", "\"SSD\"", "\"DISK\"",
-        "\"bytesToMove\" : 70", "\"count\" : 2", "\"incompleteStorageTypeUsage\" : false");
+        "\"totalBytesToMove\" : 70", "\"count\" : 2", "\"incompleteStorageTypeUsage\" : false");
+  }
+
+  @Test
+  void testAssessmentIdentifiesMostImbalancedTypeSeparatelyFromOverallUtilization() {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("first", 5, 50), typedProto("second", 35, 90)));
+
+    runAssessment(scmClient);
+
+    assertThat(out.get()).contains("Overall datanode drift", "35.0% (max utilization 72.5% - min utilization 37.5%)",
+        "Maximum storage-type drift: 40.0% (DISK, max utilization 50.0% - min utilization 10.0%)",
+        "30.0% (max utilization 95.0% - min utilization 65.0%)");
+  }
+
+  @Test
+  void testJsonSeparatesOverallUtilizationFromStorageTypeMovement() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("first", 5, 50), typedProto("second", 35, 90)));
+
+    runAssessment(scmClient, "--json");
+
+    JsonNode report = new ObjectMapper().readTree(out.get());
+    assertThat(report.path("clusterAvgUtilizationPercentage").asDouble()).isEqualTo(55.0);
+    assertThat(report.path("maxUtilizationPercentage").asDouble()).isEqualTo(72.5);
+    assertThat(report.path("minUtilizationPercentage").asDouble()).isEqualTo(37.5);
+    assertThat(report.path("driftPercentage").asDouble()).isEqualTo(35.0);
+    assertThat(report.path("maxStorageTypeImbalancePercentage").asDouble()).isEqualTo(40.0);
+    assertThat(report.path("mostImbalancedStorageType").asText()).isEqualTo("DISK");
+    JsonNode source = report.path("sourceNodesAcrossStorageTypes");
+    assertThat(source.path("count").asInt()).isEqualTo(1);
+    assertThat(source.path("nodes").get(0).path("storageType").asText()).isEqualTo("SSD");
+    assertThat(source.path("nodes").get(0).path("utilizationPercentage").asDouble()).isEqualTo(95.0);
+    JsonNode target = report.path("targetNodesAcrossStorageTypes");
+    assertThat(target.path("count").asInt()).isEqualTo(1);
+    assertThat(target.path("nodes").get(0).path("storageType").asText()).isEqualTo("DISK");
+    assertThat(target.path("nodes").get(0).path("utilizationPercentage").asDouble()).isEqualTo(10.0);
+    JsonNode disk = report.path("storageTypes").path("DISK");
+    assertThat(disk.path("maxUtilizationPercentage").asDouble()).isEqualTo(50.0);
+    assertThat(disk.path("minUtilizationPercentage").asDouble()).isEqualTo(10.0);
+    JsonNode ssd = report.path("storageTypes").path("SSD");
+    assertThat(ssd.path("maxUtilizationPercentage").asDouble()).isEqualTo(95.0);
+    assertThat(ssd.path("minUtilizationPercentage").asDouble()).isEqualTo(65.0);
+    assertThat(report.path("totalBytesToMove").asLong()).isEqualTo(
+        disk.path("bytesToMove").asLong() + ssd.path("bytesToMove").asLong());
+    assertThat(report.has("sourceNodes")).isFalse();
+    assertThat(report.has("targetNodes")).isFalse();
+    assertThat(report.has("bytesToMove")).isFalse();
+  }
+
+  @Test
+  void testLegacyJsonKeepsAggregateFields() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, sampleNodes());
+
+    runAssessment(scmClient, "--json");
+
+    JsonNode report = new ObjectMapper().readTree(out.get());
+    assertThat(report.path("maxUtilizationPercentage").asDouble()).isEqualTo(90.0);
+    assertThat(report.path("minUtilizationPercentage").asDouble()).isEqualTo(50.0);
+    assertThat(report.path("driftPercentage").asDouble()).isEqualTo(40.0);
+    assertThat(report.path("sourceNodes").path("count").asInt()).isEqualTo(1);
+    assertThat(report.path("targetNodes").path("count").asInt()).isEqualTo(1);
+    assertThat(report.path("bytesToMove").asLong()).isEqualTo(10);
+    assertThat(report.has("storageTypes")).isFalse();
+    assertThat(report.has("mostImbalancedStorageType")).isFalse();
+    assertThat(report.has("totalBytesToMove")).isFalse();
   }
 
   @Test

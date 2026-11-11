@@ -170,8 +170,9 @@ public final class ContainerBalancerClusterAnalyzer {
     if (byType.isEmpty()) {
       return overall;
     }
-    Map<StorageType, ContainerBalancerClusterSnapshot> snapshots = new EnumMap<>(StorageType.class);
-    byType.forEach((type, usages) -> snapshots.put(type, analyzeAggregate(usages, thresholdRatio, topNodeLimit, type)));
+    Map<StorageType, StorageTypeSnapshot> snapshots = new EnumMap<>(StorageType.class);
+    byType.forEach((type, usages) -> snapshots.put(type,
+        new StorageTypeSnapshot(type, analyzeAggregate(usages, thresholdRatio, topNodeLimit, type))));
     return combineStorageTypes(overall, snapshots, topNodeLimit, incomplete);
   }
 
@@ -237,24 +238,26 @@ public final class ContainerBalancerClusterAnalyzer {
         .setTargetCount(targets.size())
         .setTotalOverUtilizedBytes(totalOverUtilizedBytes)
         .setTotalUnderUtilizedBytes(totalUnderUtilizedBytes)
-        .setBytesToMove(storageType != null && (sources.isEmpty() || targets.isEmpty()) ? 0 : totalOverUtilizedBytes)
+        .setTotalBytesToMove(
+            storageType != null && (sources.isEmpty() || targets.isEmpty()) ? 0 : totalOverUtilizedBytes)
         .setSourceDatanodes(sourceDatanodes)
         .setTargetDatanodes(targetDatanodes)
         .setImbalance(imbalance)
-        .setTopSourceNodes(topNodes(sources, topNodeLimit))
-        .setBottomTargetNodes(topNodes(targets, topNodeLimit))
+        .setTopSourceNodesAcrossStorageTypes(topNodes(sources, topNodeLimit))
+        .setBottomTargetNodesAcrossStorageTypes(topNodes(targets, topNodeLimit))
         .build();
   }
 
   private static ContainerBalancerClusterSnapshot combineStorageTypes(ContainerBalancerClusterSnapshot overall,
-      Map<StorageType, ContainerBalancerClusterSnapshot> snapshots, int topNodeLimit, boolean incomplete) {
+      Map<StorageType, StorageTypeSnapshot> snapshots, int topNodeLimit, boolean incomplete) {
     Set<String> sources = new HashSet<>();
     Set<String> targets = new HashSet<>();
     Map<String, NodeUtilization> topSources = new HashMap<>();
     Map<String, NodeUtilization> bottomTargets = new HashMap<>();
     long overBytes = 0, underBytes = 0, bytesToMove = 0;
-    double max = 0, min = 0, imbalance = -1;
-    for (ContainerBalancerClusterSnapshot snapshot : snapshots.values()) {
+    double maxImbalance = -1;
+    StorageType mostImbalancedStorageType = null;
+    for (StorageTypeSnapshot snapshot : snapshots.values()) {
       sources.addAll(snapshot.getSourceDatanodes());
       targets.addAll(snapshot.getTargetDatanodes());
       for (NodeUtilization node : snapshot.getTopSourceNodes()) {
@@ -268,10 +271,9 @@ public final class ContainerBalancerClusterAnalyzer {
       overBytes += snapshot.getTotalOverUtilizedBytes();
       underBytes += snapshot.getTotalUnderUtilizedBytes();
       bytesToMove += snapshot.getBytesToMove();
-      if (snapshot.getImbalance() > imbalance) {
-        max = snapshot.getMaxUtilization();
-        min = snapshot.getMinUtilization();
-        imbalance = snapshot.getImbalance();
+      if (snapshot.getImbalance() > maxImbalance) {
+        maxImbalance = snapshot.getImbalance();
+        mostImbalancedStorageType = snapshot.getStorageType();
       }
     }
     List<NodeUtilization> sourceNodes = new ArrayList<>(topSources.values());
@@ -285,12 +287,14 @@ public final class ContainerBalancerClusterAnalyzer {
         .setClusterAvgUtilization(overall.getClusterAvgUtilization())
         .setClusterCapacityBytes(overall.getClusterCapacityBytes())
         .setUpperLimit(overall.getUpperLimit()).setLowerLimit(overall.getLowerLimit())
-        .setMaxUtilization(max).setMinUtilization(min).setImbalance(imbalance)
+        .setMaxUtilization(overall.getMaxUtilization()).setMinUtilization(overall.getMinUtilization())
+        .setImbalance(overall.getImbalance()).setMaxImbalance(maxImbalance)
+        .setMostImbalancedStorageType(mostImbalancedStorageType)
         .setSourceCount(sources.size()).setTargetCount(targets.size())
         .setSourceDatanodes(sources).setTargetDatanodes(targets)
-        .setTotalOverUtilizedBytes(overBytes).setTotalUnderUtilizedBytes(underBytes).setBytesToMove(bytesToMove)
-        .setTopSourceNodes(topNodes(sourceNodes, topNodeLimit))
-        .setBottomTargetNodes(topNodes(targetNodes, topNodeLimit))
+        .setTotalOverUtilizedBytes(overBytes).setTotalUnderUtilizedBytes(underBytes).setTotalBytesToMove(bytesToMove)
+        .setTopSourceNodesAcrossStorageTypes(topNodes(sourceNodes, topNodeLimit))
+        .setBottomTargetNodesAcrossStorageTypes(topNodes(targetNodes, topNodeLimit))
         .setStorageTypeSnapshots(snapshots).setIncompleteStorageTypeUsage(incomplete).build();
   }
 
@@ -385,8 +389,8 @@ public final class ContainerBalancerClusterAnalyzer {
         .setTotalOverUtilizedBytes(0)
         .setTotalUnderUtilizedBytes(0)
         .setImbalance(0)
-        .setTopSourceNodes(Collections.emptyList())
-        .setBottomTargetNodes(Collections.emptyList())
+        .setTopSourceNodesAcrossStorageTypes(Collections.emptyList())
+        .setBottomTargetNodesAcrossStorageTypes(Collections.emptyList())
         .build();
   }
 }

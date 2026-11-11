@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerClusterAnalyzer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerClusterSnapshot;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
+import org.apache.hadoop.hdds.scm.container.balancer.StorageTypeSnapshot;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -129,24 +130,37 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
       if (snapshot.hasIncompleteStorageTypeUsage()) {
         System.out.println("WARNING: Missing or incomplete storage-type usage; storage-type assessment is partial.");
       }
-      for (Map.Entry<StorageType, ContainerBalancerClusterSnapshot> entry
+      StorageTypeSnapshot mostImbalanced = snapshot.getStorageTypeSnapshots().get(
+          snapshot.getMostImbalancedStorageType());
+      System.out.printf("Maximum storage-type drift: %s (%s, max utilization %s - min utilization %s)%n",
+          formatPercent(snapshot.getMaxImbalance()), mostImbalanced.getStorageType(),
+          formatPercent(mostImbalanced.getMaxUtilization()), formatPercent(mostImbalanced.getMinUtilization()));
+      for (Map.Entry<StorageType, StorageTypeSnapshot> entry
           : snapshot.getStorageTypeSnapshots().entrySet()) {
-        ContainerBalancerClusterSnapshot type = entry.getValue();
+        StorageTypeSnapshot typeSnapshot = entry.getValue();
         System.out.println("Storage type: " + entry.getKey());
-        System.out.println(getSummaryPrettyString(type, thresholdRatio));
-        System.out.println(getSourceNodesPrettyString(type, nodeLimit));
-        System.out.println(getTargetNodesPrettyString(type, nodeLimit));
-        System.out.println(getMovementSummaryPrettyString(type));
+        System.out.println(getStorageTypeSummaryPrettyString(typeSnapshot, thresholdRatio));
+        System.out.println(getSourceNodesPrettyString(typeSnapshot.getSourceCount(), typeSnapshot.getTopSourceNodes(),
+            typeSnapshot.getAverageUtilization(), nodeLimit));
+        System.out.println(getTargetNodesPrettyString(typeSnapshot.getTargetCount(),
+            typeSnapshot.getBottomTargetNodes(), typeSnapshot.getAverageUtilization(), nodeLimit));
+        System.out.println(getMovementSummaryPrettyString(
+            typeSnapshot.getBytesToMove(), typeSnapshot.getCapacityBytes(),
+            typeSnapshot.getStorageType() + " capacity"));
       }
       System.out.println("All storage types (shared iteration limits):");
-      System.out.println(getMovementSummaryPrettyString(snapshot));
+      System.out.println(getMovementSummaryPrettyString(
+          snapshot.getTotalBytesToMove(), snapshot.getClusterCapacityBytes(), "cluster capacity"));
       return;
     }
-    System.out.println(getSourceNodesPrettyString(snapshot, nodeLimit));
+    System.out.println(getSourceNodesPrettyString(snapshot.getSourceCount(),
+        snapshot.getTopSourceNodesAcrossStorageTypes(), snapshot.getClusterAvgUtilization(), nodeLimit));
     System.out.println();
-    System.out.println(getTargetNodesPrettyString(snapshot, nodeLimit));
+    System.out.println(getTargetNodesPrettyString(snapshot.getTargetCount(),
+        snapshot.getBottomTargetNodesAcrossStorageTypes(), snapshot.getClusterAvgUtilization(), nodeLimit));
     System.out.println();
-    System.out.println(getMovementSummaryPrettyString(snapshot));
+    System.out.println(getMovementSummaryPrettyString(
+        snapshot.getTotalBytesToMove(), snapshot.getClusterCapacityBytes(), "cluster capacity"));
   }
 
   private static String getSummaryPrettyString(ContainerBalancerClusterSnapshot snapshot,
@@ -171,11 +185,11 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
             "%-50s %s%n" +
             "%-50s %s%n", "Key", "Value",
         "Threshold", formatPercent(thresholdRatio),
-        "Upper utilization limit", snapshot.getStorageTypeSnapshots().isEmpty()
-            ? formatPercent(snapshot.getUpperLimit()) : "See storage-type sections",
-        "Lower utilization limit", snapshot.getStorageTypeSnapshots().isEmpty()
-            ? formatPercent(snapshot.getLowerLimit()) : "See storage-type sections",
-        snapshot.getStorageTypeSnapshots().isEmpty() ? "Drift" : "Maximum storage-type drift",
+        snapshot.getStorageTypeSnapshots().isEmpty() ? "Upper utilization limit" : "Overall upper utilization limit",
+        formatPercent(snapshot.getUpperLimit()),
+        snapshot.getStorageTypeSnapshots().isEmpty() ? "Lower utilization limit" : "Overall lower utilization limit",
+        formatPercent(snapshot.getLowerLimit()),
+        snapshot.getStorageTypeSnapshots().isEmpty() ? "Drift" : "Overall datanode drift",
         String.format(Locale.US, "%s (max utilization %s - min utilization %s)",
             formatPercent(snapshot.getImbalance()),
             formatPercent(snapshot.getMaxUtilization()),
@@ -184,33 +198,59 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
         formatPercent(snapshot.getClusterAvgUtilization()),
         "Eligible datanodes", snapshot.getTotalEligibleDatanodes() + " datanode"
             + (snapshot.getTotalEligibleDatanodes() == 1 ? "" : "s"),
-        "Category", formatCategory(snapshot));
+        snapshot.getStorageTypeSnapshots().isEmpty() ? "Category" : "Category (maximum storage-type imbalance)",
+        formatCategory(snapshot));
   }
 
-  private static String getSourceNodesPrettyString(ContainerBalancerClusterSnapshot snapshot, int nodeLimit) {
+  private static String getStorageTypeSummaryPrettyString(StorageTypeSnapshot snapshot, double thresholdRatio) {
+    return String.format("%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n", "Key", "Value",
+        "Threshold", formatPercent(thresholdRatio),
+        "Upper utilization limit", formatPercent(snapshot.getUpperLimit()),
+        "Lower utilization limit", formatPercent(snapshot.getLowerLimit()),
+        "Drift", String.format(Locale.US, "%s (max utilization %s - min utilization %s)",
+            formatPercent(snapshot.getImbalance()), formatPercent(snapshot.getMaxUtilization()),
+            formatPercent(snapshot.getMinUtilization())),
+        "Mean Utilization", formatPercent(snapshot.getAverageUtilization()),
+        "Eligible datanodes", snapshot.getEligibleDatanodes() + " datanode"
+            + (snapshot.getEligibleDatanodes() == 1 ? "" : "s"),
+        "Category", formatClusterSize(snapshot.getEligibleDatanodes()) + ", "
+            + formatImbalance(snapshot.getImbalance()) + ", "
+            + formatMovementRatio(snapshot.getBytesToMove(), snapshot.getCapacityBytes()));
+  }
+
+  private static String getSourceNodesPrettyString(int sourceCount,
+      List<ContainerBalancerClusterSnapshot.NodeUtilization> nodes, double averageUtilization, int nodeLimit) {
     StringBuilder builder = new StringBuilder();
     builder.append("Source Nodes (over-utilized):").append(System.lineSeparator())
-        .append(String.format("%-50s %s%n", "Datanodes above threshold", snapshot.getSourceCount()));
-    appendNodeList(builder, snapshot.getTopSourceNodes(), snapshot.getClusterAvgUtilization(), true, nodeLimit);
+        .append(String.format("%-50s %s%n", "Datanodes above threshold", sourceCount));
+    appendNodeList(builder, nodes, averageUtilization, true, nodeLimit);
     return builder.toString();
   }
 
-  private static String getTargetNodesPrettyString(ContainerBalancerClusterSnapshot snapshot, int nodeLimit) {
+  private static String getTargetNodesPrettyString(int targetCount,
+      List<ContainerBalancerClusterSnapshot.NodeUtilization> nodes, double averageUtilization, int nodeLimit) {
     StringBuilder builder = new StringBuilder();
     builder.append("Target Nodes (under-utilized):").append(System.lineSeparator())
-        .append(String.format("%-50s %s%n", "Datanodes below threshold", snapshot.getTargetCount()));
-    appendNodeList(builder, snapshot.getBottomTargetNodes(), snapshot.getClusterAvgUtilization(), false, nodeLimit);
+        .append(String.format("%-50s %s%n", "Datanodes below threshold", targetCount));
+    appendNodeList(builder, nodes, averageUtilization, false, nodeLimit);
     return builder.toString();
   }
 
-  private static String getMovementSummaryPrettyString(ContainerBalancerClusterSnapshot snapshot) {
-    double movementRatio = snapshot.getClusterCapacityBytes() == 0 ? 0
-        : (double) snapshot.getBytesToMove() / snapshot.getClusterCapacityBytes();
+  private static String getMovementSummaryPrettyString(
+      long bytesToMove, long capacityBytes, String capacityDescription) {
+    double movementRatio = capacityBytes == 0 ? 0 : (double) bytesToMove / capacityBytes;
     return String.format("Movement Summary:%n" +
             "%-50s %s%n" +
-            "%-50s %s%n", "Total bytes to move", byteDesc(snapshot.getBytesToMove()),
+            "%-50s %s%n", "Total bytes to move", byteDesc(bytesToMove),
         "Movement ratio",
-        formatPercent(movementRatio) + " of cluster capacity");
+        formatPercent(movementRatio) + " of " + capacityDescription);
   }
 
   private static void appendNodeList(StringBuilder builder,
@@ -244,8 +284,8 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
 
   private static String formatCategory(ContainerBalancerClusterSnapshot snapshot) {
     return formatClusterSize(snapshot.getTotalEligibleDatanodes()) + ", "
-        + formatImbalance(snapshot.getImbalance()) + ", "
-        + formatMovementRatio(snapshot);
+        + formatImbalance(snapshot.getMaxImbalance()) + ", "
+        + formatMovementRatio(snapshot.getTotalBytesToMove(), snapshot.getClusterCapacityBytes());
   }
 
   private static String formatClusterSize(int eligibleDatanodes) {
@@ -268,11 +308,11 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
     return "Low imbalance";
   }
 
-  private static String formatMovementRatio(ContainerBalancerClusterSnapshot snapshot) {
-    if (snapshot.getClusterCapacityBytes() == 0) {
+  private static String formatMovementRatio(long bytesToMove, long capacityBytes) {
+    if (capacityBytes == 0) {
       return "Low movement ratio";
     }
-    double ratio = (double) snapshot.getBytesToMove() / snapshot.getClusterCapacityBytes();
+    double ratio = (double) bytesToMove / capacityBytes;
     if (ratio >= 0.05) {
       return "High movement ratio";
     }
@@ -298,48 +338,61 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
     result.put("upperLimitPercentage", toJsonPercent(snapshot.getUpperLimit()));
     result.put("lowerLimitPercentage", toJsonPercent(snapshot.getLowerLimit()));
 
-    Map<String, Object> sourceNodes = new LinkedHashMap<>();
-    sourceNodes.put("count", snapshot.getSourceCount());
-    sourceNodes.put("nodes", snapshot.getTopSourceNodes().stream()
-        .map(node -> {
-          Map<String, Object> nodeMap = new LinkedHashMap<>();
-          nodeMap.put("hostname", node.getHostname());
-          nodeMap.put("utilizationPercentage", toJsonPercent(node.getUtilization()));
-          if (node.getStorageType() != null) {
-            nodeMap.put("storageType", node.getStorageType().name());
-          }
-          return nodeMap;
-        })
-        .collect(Collectors.toList()));
-    result.put("sourceNodes", sourceNodes);
-
-    Map<String, Object> targetNodes = new LinkedHashMap<>();
-    targetNodes.put("count", snapshot.getTargetCount());
-    targetNodes.put("nodes", snapshot.getBottomTargetNodes().stream()
-        .map(node -> {
-          Map<String, Object> nodeMap = new LinkedHashMap<>();
-          nodeMap.put("hostname", node.getHostname());
-          nodeMap.put("utilizationPercentage", toJsonPercent(node.getUtilization()));
-          if (node.getStorageType() != null) {
-            nodeMap.put("storageType", node.getStorageType().name());
-          }
-          return nodeMap;
-        })
-        .collect(Collectors.toList()));
-    result.put("targetNodes", targetNodes);
+    boolean typed = !snapshot.getStorageTypeSnapshots().isEmpty();
+    result.put(typed ? "sourceNodesAcrossStorageTypes" : "sourceNodes",
+        jsonNodes(snapshot.getSourceCount(), snapshot.getTopSourceNodesAcrossStorageTypes()));
+    result.put(typed ? "targetNodesAcrossStorageTypes" : "targetNodes",
+        jsonNodes(snapshot.getTargetCount(), snapshot.getBottomTargetNodesAcrossStorageTypes()));
 
     double movementRatio = snapshot.getClusterCapacityBytes() == 0 ? 0
-        : (double) snapshot.getBytesToMove() / snapshot.getClusterCapacityBytes();
-    result.put("bytesToMove", snapshot.getBytesToMove());
+        : (double) snapshot.getTotalBytesToMove() / snapshot.getClusterCapacityBytes();
+    result.put(typed ? "totalBytesToMove" : "bytesToMove", snapshot.getTotalBytesToMove());
     result.put("movementRatioPercentage", toJsonPercent(movementRatio));
 
     if (!snapshot.getStorageTypeSnapshots().isEmpty()) {
+      result.put("maxStorageTypeImbalancePercentage", toJsonPercent(snapshot.getMaxImbalance()));
+      result.put("mostImbalancedStorageType", snapshot.getMostImbalancedStorageType().name());
       Map<String, Object> storageTypes = new LinkedHashMap<>();
       snapshot.getStorageTypeSnapshots().forEach((type, usage) ->
           storageTypes.put(type.name(), jsonReport(usage, thresholdRatio)));
       result.put("storageTypes", storageTypes);
       result.put("incompleteStorageTypeUsage", snapshot.hasIncompleteStorageTypeUsage());
     }
+    return result;
+  }
+
+  private static Map<String, Object> jsonReport(StorageTypeSnapshot snapshot, double thresholdRatio) {
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("totalEligibleDatanodes", snapshot.getEligibleDatanodes());
+    result.put("thresholdPercentage", toJsonPercent(thresholdRatio));
+    result.put("averageUtilizationPercentage", toJsonPercent(snapshot.getAverageUtilization()));
+    result.put("driftPercentage", toJsonPercent(snapshot.getImbalance()));
+    result.put("maxUtilizationPercentage", toJsonPercent(snapshot.getMaxUtilization()));
+    result.put("minUtilizationPercentage", toJsonPercent(snapshot.getMinUtilization()));
+    result.put("upperLimitPercentage", toJsonPercent(snapshot.getUpperLimit()));
+    result.put("lowerLimitPercentage", toJsonPercent(snapshot.getLowerLimit()));
+    result.put("sourceNodes", jsonNodes(snapshot.getSourceCount(), snapshot.getTopSourceNodes()));
+    result.put("targetNodes", jsonNodes(snapshot.getTargetCount(), snapshot.getBottomTargetNodes()));
+    result.put("bytesToMove", snapshot.getBytesToMove());
+    double movementRatio = snapshot.getCapacityBytes() == 0 ? 0
+        : (double) snapshot.getBytesToMove() / snapshot.getCapacityBytes();
+    result.put("movementRatioPercentage", toJsonPercent(movementRatio));
+    return result;
+  }
+
+  private static Map<String, Object> jsonNodes(int count,
+      List<ContainerBalancerClusterSnapshot.NodeUtilization> nodes) {
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("count", count);
+    result.put("nodes", nodes.stream().map(node -> {
+      Map<String, Object> nodeMap = new LinkedHashMap<>();
+      nodeMap.put("hostname", node.getHostname());
+      nodeMap.put("utilizationPercentage", toJsonPercent(node.getUtilization()));
+      if (node.getStorageType() != null) {
+        nodeMap.put("storageType", node.getStorageType().name());
+      }
+      return nodeMap;
+    }).collect(Collectors.toList()));
     return result;
   }
 
