@@ -153,6 +153,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.export.ContainerExportStatus;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -1502,7 +1503,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       try {
         healthState = ContainerHealthState.valueOf(request.getHealthState());
       } catch (IllegalArgumentException e) {
-        throw new IOException("Unknown health state: " + request.getHealthState(), e);
+        throw new NonRetriableException("Unknown health state: " + request.getHealthState());
       }
     }
     final String jobId = impl.submitContainerIdExport(

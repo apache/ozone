@@ -95,6 +95,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -1766,7 +1767,7 @@ public class SCMClientProtocolServer implements
       return jobId;
     } catch (IllegalArgumentException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.EXPORT_CONTAINER_IDS, auditMap, ex));
-      throw new IOException(ex.getMessage(), ex);
+      throw new NonRetriableException(ex.getMessage());
     } catch (IOException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.EXPORT_CONTAINER_IDS, auditMap, ex));
       throw ex;
@@ -1780,7 +1781,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("jobId", jobId);
     final ContainerExportStatus status = scm.getContainerExportManager().getContainerExportStatus(jobId);
     if (status == null) {
-      final IOException ex = new IOException("Container ID export job not found: " + jobId
+      final IOException ex = new NonRetriableException("Container ID export job not found: " + jobId
           + ". It may have been evicted, or SCM may have restarted.");
       AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_CONTAINER_ID_EXPORT_STATUS, auditMap, ex));
       throw ex;
