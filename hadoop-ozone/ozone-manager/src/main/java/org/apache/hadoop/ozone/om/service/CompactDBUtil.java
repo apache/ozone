@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
@@ -74,11 +73,6 @@ public final class CompactDBUtil {
         throw new CompletionException("Compaction failed for column family: " + tableName, e);
       }
     });
-  }
-
-  public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
-      OzoneConfiguration configuration) {
-    return configuration.getObject(CompactionServiceConfig.class).getBottommostLevelCompaction();
   }
 
   /**

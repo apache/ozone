@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om;
 
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.ENABLED;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.TIMEOUT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -149,10 +152,10 @@ class TestKeyManagerUnit extends OzoneTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ozone.om.compaction.service.run.interval", "ozone.om.compaction.service.timeout"})
+  @ValueSource(strings = {RUN_INTERVAL, TIMEOUT})
   void testDisabledCompactionIgnoresInvalidConfiguration(String property) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.om.compaction.service.enabled", false);
+    conf.setBoolean(ENABLED, false);
     conf.set(property, "invalid");
 
     assertDoesNotThrow(() -> keyManager.start(conf));
@@ -160,10 +163,10 @@ class TestKeyManagerUnit extends OzoneTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ozone.om.compaction.service.run.interval", "ozone.om.compaction.service.timeout"})
+  @ValueSource(strings = {RUN_INTERVAL, TIMEOUT})
   void testEnabledCompactionRejectsInvalidConfiguration(String property) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.om.compaction.service.enabled", true);
+    conf.setBoolean(ENABLED, true);
     conf.set(property, "invalid");
 
     assertThrows(ConfigurationException.class, () -> keyManager.start(conf));

@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.BOTTOMMOST_LEVEL_COMPACTION;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.COLUMN_FAMILIES;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.ENABLED;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,27 +41,27 @@ class TestCompactionServiceConfig {
   @Test
   void testDefaults() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    assertEquals("false", conf.get("ozone.om.compaction.service.enabled"));
-    assertEquals("6h", conf.get("ozone.om.compaction.service.run.interval"));
-    assertEquals("10m", conf.get("ozone.om.compaction.service.timeout"));
-    assertEquals("kSkip", conf.get("ozone.om.compaction.service.bottommost-level-compaction"));
+    assertEquals("false", conf.get(ENABLED));
+    assertEquals("6h", conf.get(RUN_INTERVAL));
+    assertEquals("10m", conf.get(TIMEOUT));
+    assertEquals("kSkip", conf.get(BOTTOMMOST_LEVEL_COMPACTION));
     CompactionServiceConfig config = conf.getObject(CompactionServiceConfig.class);
     assertFalse(config.isEnabled());
     assertEquals(TimeUnit.HOURS.toMillis(6), config.getRunInterval());
     assertEquals(TimeUnit.MINUTES.toMillis(10), config.getTimeout());
     assertEquals("keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable",
         config.getColumnFamilies());
-    assertEquals(config.getColumnFamilies(), conf.get("ozone.om.compaction.service.columnfamilies"));
+    assertEquals(config.getColumnFamilies(), conf.get(COLUMN_FAMILIES));
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip, config.getBottommostLevelCompaction());
   }
 
   @Test
   void testConfiguredValues() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.om.compaction.service.enabled", true);
-    conf.set("ozone.om.compaction.service.run.interval", "30s");
-    conf.set("ozone.om.compaction.service.timeout", "2m");
-    conf.set("ozone.om.compaction.service.columnfamilies", "keyTable,fileTable");
+    conf.setBoolean(ENABLED, true);
+    conf.set(RUN_INTERVAL, "30s");
+    conf.set(TIMEOUT, "2m");
+    conf.set(COLUMN_FAMILIES, "keyTable,fileTable");
     CompactionServiceConfig config = conf.getObject(CompactionServiceConfig.class);
     assertTrue(config.isEnabled());
     assertEquals(30000, config.getRunInterval());
@@ -68,7 +73,7 @@ class TestCompactionServiceConfig {
   @ValueSource(strings = {" true", "true ", " true ", "\ttrue\n", " TrUe "})
   void testEnabledFlagWithWhitespace(String value) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("ozone.om.compaction.service.enabled", value);
+    conf.set(ENABLED, value);
     assertTrue(conf.getObject(CompactionServiceConfig.class).isEnabled());
   }
 
@@ -76,7 +81,7 @@ class TestCompactionServiceConfig {
   @ValueSource(strings = {"kForce", " kForce", "kForce ", " kForce "})
   void testBottommostLevelCompaction(String value) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("ozone.om.compaction.service.bottommost-level-compaction", value);
+    conf.set(BOTTOMMOST_LEVEL_COMPACTION, value);
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce,
         conf.getObject(CompactionServiceConfig.class).getBottommostLevelCompaction());
   }
@@ -85,7 +90,7 @@ class TestCompactionServiceConfig {
   @ValueSource(strings = {"", "kForceeee"})
   void testInvalidBottommostLevelCompaction(String value) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("ozone.om.compaction.service.bottommost-level-compaction", value);
+    conf.set(BOTTOMMOST_LEVEL_COMPACTION, value);
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
         conf.getObject(CompactionServiceConfig.class).getBottommostLevelCompaction());
   }
@@ -93,8 +98,8 @@ class TestCompactionServiceConfig {
   @Test
   void testEmptyColumnFamiliesAndZeroTimeout() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("ozone.om.compaction.service.columnfamilies", "");
-    conf.set("ozone.om.compaction.service.timeout", "0ms");
+    conf.set(COLUMN_FAMILIES, "");
+    conf.set(TIMEOUT, "0ms");
     CompactionServiceConfig config = conf.getObject(CompactionServiceConfig.class);
     assertEquals("", config.getColumnFamilies());
     assertEquals(0, config.getTimeout());

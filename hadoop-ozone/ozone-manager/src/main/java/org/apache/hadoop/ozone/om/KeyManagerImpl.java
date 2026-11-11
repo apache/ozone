@@ -84,7 +84,6 @@ import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -455,9 +454,7 @@ public class KeyManagerImpl implements KeyManager {
   private void startCompactionService(OzoneConfiguration configuration) {
     if (compactionService == null && configuration.getBoolean(CompactionServiceConfig.Keys.ENABLED, false)) {
       CompactionServiceConfig config = configuration.getObject(CompactionServiceConfig.class);
-      String[] tables = config.getColumnFamilies().split(",");
-      compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
-          config.getRunInterval(), config.getTimeout(), Arrays.asList(tables));
+      compactionService = new CompactionService(ozoneManager, config);
       compactionService.start();
     }
   }

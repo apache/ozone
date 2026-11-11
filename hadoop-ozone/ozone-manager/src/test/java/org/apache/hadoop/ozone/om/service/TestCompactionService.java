@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.BOTTOMMOST_LEVEL_COMPACTION;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.COLUMN_FAMILIES;
 import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.ENABLED;
 import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -192,8 +194,12 @@ class TestCompactionService {
   }
 
   private CompactionService getCompactionService(List<String> compactTables) {
-    CompactionService compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
-        TimeUnit.SECONDS.toMillis(SERVICE_INTERVAL), TimeUnit.SECONDS.toMillis(60), compactTables) {
+    OzoneConfiguration conf = new OzoneConfiguration(ozoneManager.getConfiguration());
+    conf.set(COLUMN_FAMILIES, String.join(",", compactTables));
+    conf.setTimeDuration(RUN_INTERVAL, SERVICE_INTERVAL, TimeUnit.SECONDS);
+    conf.setTimeDuration(TIMEOUT, 60, TimeUnit.SECONDS);
+    CompactionService compactionService = new CompactionService(ozoneManager,
+        conf.getObject(CompactionServiceConfig.class)) {
 
       @Override
       public void compactFully(String tableName) throws IOException {
