@@ -26,15 +26,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.AdditionalAnswers.delegatesTo;
-import static org.mockito.Mockito.mock;
 
 import com.google.protobuf.ServiceException;
-import io.grpc.ManagedChannel;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.stub.StreamObserver;
-import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -53,9 +46,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadCon
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
+import org.apache.ratis.thirdparty.io.grpc.stub.ServerCalls;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -65,7 +61,7 @@ import org.slf4j.LoggerFactory;
  * Tests for GrpcOmTransport client.
  */
 public class TestS3GrpcOmTransport {
-  private final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
+  private final GrpcTestServers grpcServers = new GrpcTestServers();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestS3GrpcOmTransport.class);
@@ -90,38 +86,24 @@ public class TestS3GrpcOmTransport {
   private UserGroupInformation ugi;
   private ManagedChannel channel;
 
-  private String serverName;
+  private int serverPort;
 
-  private final OzoneManagerServiceGrpc.OzoneManagerServiceImplBase
-      serviceImpl =
-      mock(OzoneManagerServiceGrpc.OzoneManagerServiceImplBase.class,
-          delegatesTo(
-              new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
-                @Override
-                public void submitRequest(org.apache.hadoop.ozone.protocol.proto
-                                              .OzoneManagerProtocolProtos
-                                              .OMRequest request,
-                                          io.grpc.stub.StreamObserver<org.apache
-                                              .hadoop.ozone.protocol.proto
-                                              .OzoneManagerProtocolProtos
-                                              .OMResponse>
-                                              responseObserver) {
-                  try {
-                    if (doFailover) {
-                      if (completeFailover) {
-                        doFailover = false;
-                      }
-                      failoverCount++;
-                      throw createNotLeaderException();
-                    } else {
-                      responseObserver.onNext(omResponse);
-                      responseObserver.onCompleted();
-                    }
-                  } catch (Throwable e) {
-                    responseObserver.onError(OMGrpcError.toStatusRuntimeException(e.getCause()));
-                  }
-                }
-              }));
+  private final ServerCalls.UnaryMethod<OMRequest, OMResponse> serviceImpl = (request, responseObserver) -> {
+    try {
+      if (doFailover) {
+        if (completeFailover) {
+          doFailover = false;
+        }
+        failoverCount++;
+        throw createNotLeaderException();
+      } else {
+        responseObserver.onNext(omResponse);
+        responseObserver.onCompleted();
+      }
+    } catch (Throwable e) {
+      responseObserver.onError(OMGrpcError.toStatusRuntimeException(e.getCause()));
+    }
+  };
 
   private GrpcOmTransport client;
 
@@ -137,26 +119,18 @@ public class TestS3GrpcOmTransport {
   @BeforeEach
   public void setUp() throws Exception {
     failoverCount = 0;
-    // Generate a unique in-process server name.
-    serverName = InProcessServerBuilder.generateName();
-
-    // Create a server, add service, start,
-    // and register for automatic graceful shutdown.
-    grpcCleanup.register(InProcessServerBuilder
-        .forName(serverName)
-        .directExecutor()
-        .addService(serviceImpl)
-        .build()
-        .start());
-
-    // Create a client channel and register for automatic graceful shutdown.
-    channel = grpcCleanup.register(
-        InProcessChannelBuilder.forName(serverName).directExecutor().build());
+    serverPort = grpcServers.start(serviceImpl);
+    channel = grpcServers.connect(NettyChannelBuilder.forAddress("localhost", serverPort));
 
     omServiceId = "";
     conf = new OzoneConfiguration();
     ugi = UserGroupInformation.getCurrentUser();
     doFailover = false;
+  }
+
+  @AfterEach
+  public void tearDown() throws InterruptedException {
+    grpcServers.close();
   }
 
   @Test
@@ -266,19 +240,16 @@ public class TestS3GrpcOmTransport {
     client = new GrpcOmTransport(conf, ugi, omServiceId);
     int maxSize = conf.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
         OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
-    channel = grpcCleanup.register(
-        InProcessChannelBuilder
-            .forName(serverName)
-            .maxInboundMetadataSize(maxSize)
-            .directExecutor().build());
+    channel = grpcServers.connect(NettyChannelBuilder.forAddress("localhost", serverPort)
+        .maxInboundMessageSize(maxSize));
     client.startClient(channel);
 
-    doFailover = true;
-    // GrpcOMFailoverProvider returns Fail retry due to mesg response
-    // len > 0, causing RESOURCE_EXHAUSTED exception.
+    // The response is longer than the 1-byte limit, causing a
+    // RESOURCE_EXHAUSTED exception from the client channel.
     // This exception should cause failover to NOT retry,
     // rather to fail.
     assertThrows(Exception.class, () -> client.submitRequest(omRequest));
+    assertEquals(0, failoverCount);
   }
 
   @Test
@@ -625,50 +596,27 @@ public class TestS3GrpcOmTransport {
   private ManagedChannel createNodeChannel(String nodeId,
       AtomicInteger requestCount, AtomicReference<OMRequest> lastRequest)
       throws IOException {
-    String nodeServerName = InProcessServerBuilder.generateName();
-    grpcCleanup.register(InProcessServerBuilder
-        .forName(nodeServerName)
-        .directExecutor()
-        .addService(new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
-          @Override
-          public void submitRequest(OMRequest request,
-              StreamObserver<OMResponse> responseObserver) {
-            requestCount.incrementAndGet();
-            lastRequest.set(request);
-            responseObserver.onNext(newSuccessResponse(nodeId, request));
-            responseObserver.onCompleted();
-          }
-        })
-        .build()
-        .start());
-    return grpcCleanup.register(
-        InProcessChannelBuilder.forName(nodeServerName).directExecutor().build());
+    return grpcServers.startAndConnect((request, responseObserver) -> {
+      requestCount.incrementAndGet();
+      lastRequest.set(request);
+      responseObserver.onNext(newSuccessResponse(nodeId, request));
+      responseObserver.onCompleted();
+    });
   }
 
   /** An OM leader that is not ready for its first {@code notReadyCount} requests. */
   private ManagedChannel createNotReadyLeaderNodeChannel(String nodeId, int notReadyCount,
       List<OMRequest> requests) throws IOException {
-    String nodeServerName = InProcessServerBuilder.generateName();
-    grpcCleanup.register(InProcessServerBuilder
-        .forName(nodeServerName)
-        .directExecutor()
-        .addService(new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
-          @Override
-          public void submitRequest(OMRequest request, StreamObserver<OMResponse> responseObserver) {
-            requests.add(request);
-            if (requests.size() <= notReadyCount) {
-              responseObserver.onError(OMGrpcError.toStatusRuntimeException(
-                  new OMLeaderNotReadyException(nodeId + " is not ready")));
-              return;
-            }
-            responseObserver.onNext(newSuccessResponse(nodeId, request));
-            responseObserver.onCompleted();
-          }
-        })
-        .build()
-        .start());
-    return grpcCleanup.register(
-        InProcessChannelBuilder.forName(nodeServerName).directExecutor().build());
+    return grpcServers.startAndConnect((request, responseObserver) -> {
+      requests.add(request);
+      if (requests.size() <= notReadyCount) {
+        responseObserver.onError(OMGrpcError.toStatusRuntimeException(
+            new OMLeaderNotReadyException(nodeId + " is not ready")));
+        return;
+      }
+      responseObserver.onNext(newSuccessResponse(nodeId, request));
+      responseObserver.onCompleted();
+    });
   }
 
   private static OMResponse newSuccessResponse(String nodeId, OMRequest request) {
@@ -682,22 +630,10 @@ public class TestS3GrpcOmTransport {
 
   private ManagedChannel createNotLeaderNodeChannel(AtomicInteger requestCount,
       OMNotLeaderException notLeaderException) throws IOException {
-    String nodeServerName = InProcessServerBuilder.generateName();
-    grpcCleanup.register(InProcessServerBuilder
-        .forName(nodeServerName)
-        .directExecutor()
-        .addService(new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
-          @Override
-          public void submitRequest(OMRequest request,
-              StreamObserver<OMResponse> responseObserver) {
-            requestCount.incrementAndGet();
-            responseObserver.onError(OMGrpcError.toStatusRuntimeException(notLeaderException));
-          }
-        })
-        .build()
-        .start());
-    return grpcCleanup.register(
-        InProcessChannelBuilder.forName(nodeServerName).directExecutor().build());
+    return grpcServers.startAndConnect((request, responseObserver) -> {
+      requestCount.incrementAndGet();
+      responseObserver.onError(OMGrpcError.toStatusRuntimeException(notLeaderException));
+    });
   }
 
   private static OMRequest arbitraryOmRequest() {
