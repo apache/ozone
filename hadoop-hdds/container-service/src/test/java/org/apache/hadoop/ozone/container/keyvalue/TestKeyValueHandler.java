@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +52,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -100,6 +102,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -291,7 +294,7 @@ public class TestKeyValueHandler {
     KeyValueHandler
         .dispatchRequest(handler, getBlockRequest, container, null);
     verify(handler, times(1)).handleGetBlock(
-        any(ContainerCommandRequestProto.class), any());
+        any(ContainerCommandRequestProto.class), any(), any());
 
     // Block Deletion is handled by BlockDeletingService and need not be
     // tested here.
@@ -1357,10 +1360,11 @@ public class TestKeyValueHandler {
       assertCounter("localBytesGetBlock", 0L, containerMetrics);
 
       ContainerCommandRequestProto shortCircuitRequest = newGetBlockRequest(containerID, blockID, true);
-      response = getBlockDispatcher.dispatch(shortCircuitRequest, null);
+      DispatcherContext shortCircuitContext = newShortCircuitContext();
+      response = getBlockDispatcher.dispatch(shortCircuitRequest, shortCircuitContext);
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       assertTrue(response.getGetBlock().getShortCircuitAccessGranted());
-      try (RandomAccessFile blockFile = kvHandler.getBlockFile(shortCircuitRequest)) {
+      try (RandomAccessFile blockFile = shortCircuitContext.getShortCircuitBlockFile()) {
         assertNotNull(blockFile);
       }
 
@@ -1371,6 +1375,78 @@ public class TestKeyValueHandler {
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testShortCircuitGetBlockHandsFileToOwnContext() throws Exception {
+    Path testDir = Files.createTempDirectory("testShortCircuitGetBlockHandsFileToOwnContext");
+    try {
+      conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir,
+          mockOzoneContainerWithSCDomainSocket());
+      HddsDispatcher getBlockDispatcher = createGetBlockDispatcher(handlerWithVolume);
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainer container = createOpenContainer(containerID, handlerWithVolume.getVolumeSet(),
+          handlerWithVolume.getContainerSet());
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      writeTestBlockForGetBlock(handlerWithVolume.getHandler(), container, blockID);
+      ContainerCommandRequestProto shortCircuitRequest = newGetBlockRequest(containerID, blockID, true);
+
+      // Without a short-circuit context (gRPC) only the block data is returned.
+      ContainerCommandResponseProto response = getBlockDispatcher.dispatch(shortCircuitRequest, null);
+      assertThat(response.getResult()).isEqualTo(ContainerProtos.Result.SUCCESS);
+      assertThat(response.getGetBlock().getShortCircuitAccessGranted()).isFalse();
+      assertCounter("localBytesGetBlock", 0L, getMetrics(ContainerMetrics.STORAGE_CONTAINER_METRICS));
+
+      // A short-circuit context without the access flag gets no file either.
+      DispatcherContext withoutFlag = newShortCircuitContext();
+      response = getBlockDispatcher.dispatch(newGetBlockRequest(containerID, blockID, false), withoutFlag);
+      assertThat(response.getResult()).isEqualTo(ContainerProtos.Result.SUCCESS);
+      assertThat(response.getGetBlock().getShortCircuitAccessGranted()).isFalse();
+      assertThat(withoutFlag.getShortCircuitBlockFile()).isNull();
+
+      // Requests with identical ids each get their own file in their own context.
+      DispatcherContext first = newShortCircuitContext();
+      DispatcherContext second = newShortCircuitContext();
+      ContainerCommandResponseProto firstResponse = getBlockDispatcher.dispatch(shortCircuitRequest, first);
+      ContainerCommandResponseProto secondResponse = getBlockDispatcher.dispatch(shortCircuitRequest, second);
+      assertThat(firstResponse.getGetBlock().getShortCircuitAccessGranted()).isTrue();
+      assertThat(secondResponse.getGetBlock().getShortCircuitAccessGranted()).isTrue();
+      try (RandomAccessFile firstFile = first.getShortCircuitBlockFile();
+           RandomAccessFile secondFile = second.getShortCircuitBlockFile()) {
+        assertThat(firstFile).isNotNull().isNotSameAs(secondFile);
+        assertThat(secondFile).isNotNull();
+        assertThat(firstFile.getFD().valid()).isTrue();
+        assertThat(secondFile.getFD().valid()).isTrue();
+      }
+    } finally {
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+  }
+
+  private static DispatcherContext newShortCircuitContext() {
+    return DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ).build();
+  }
+
+  @Test
+  public void testReadBlockCancellationIsNotAContainerFailure() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, 1024);
+      ContainerCommandRequestProto request = ContainerCommandRequestProto.newBuilder()
+          .setCmdType(ContainerProtos.Type.ReadBlock)
+          .setContainerID(fixture.container.getContainerData().getContainerID())
+          .setDatanodeUuid(DATANODE_UUID)
+          .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+              .setBlockID(fixture.blockID.getDatanodeBlockIDProtobuf()).setOffset(0).setLength(1024))
+          .build();
+      @SuppressWarnings("unchecked")
+      StreamObserver<ContainerCommandResponseProto> observer = mock(StreamObserver.class);
+      doThrow(Status.CANCELLED.asRuntimeException()).when(observer).onNext(any());
+
+      assertThrows(StatusRuntimeException.class,
+          () -> fixture.kvHandler.readBlock(request, fixture.container, fixture.blockFile, observer));
     }
   }
 
@@ -1596,6 +1672,27 @@ public class TestKeyValueHandler {
       ReadBlockResult result = fixture.read(0, blockSize, 2 * unit);
       assertResponses(result, 0, blockSize);
       assertEquals(unit + 20, result.getDataResponses().get(0).getReadBlock().getData().size());
+    }
+  }
+
+  @Test
+  public void testReadBlockResponseDataSizeIsBounded() throws Exception {
+    final int defaultSize = 1 << 20;
+    assertEquals(defaultSize, KeyValueHandler.boundResponseDataSize(0));
+    // uint32 values above Integer.MAX_VALUE arrive negative
+    assertEquals(defaultSize, KeyValueHandler.boundResponseDataSize(-1));
+    assertEquals(1024, KeyValueHandler.boundResponseDataSize(1024));
+    assertEquals(KeyValueHandler.MAX_READ_BLOCK_RESPONSE_DATA_SIZE,
+        KeyValueHandler.boundResponseDataSize(KeyValueHandler.MAX_READ_BLOCK_RESPONSE_DATA_SIZE));
+    assertEquals(KeyValueHandler.MAX_READ_BLOCK_RESPONSE_DATA_SIZE,
+        KeyValueHandler.boundResponseDataSize(Integer.MAX_VALUE));
+    assertThat(KeyValueHandler.MAX_READ_BLOCK_RESPONSE_DATA_SIZE).isLessThan(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      assertResponses(fixture.read(0, BLOCK_SIZE, 0), 0, BLOCK_SIZE);
+      assertResponses(fixture.read(0, BLOCK_SIZE, -1), 0, BLOCK_SIZE);
+      assertResponses(fixture.read(0, BLOCK_SIZE, Integer.MAX_VALUE), 0, BLOCK_SIZE);
     }
   }
 

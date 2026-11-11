@@ -370,7 +370,9 @@ public class OzoneClientConfig {
       defaultValue = "1048576",
       type = ConfigType.INT,
       tags = {ConfigTag.CLIENT},
-      description = "Chunk size of streaming read responses from datanodes.")
+      description = "Amount of block data the datanode sends in each streaming read response. "
+          + "A response must fit in the 32 MB gRPC message limit, and 1 MB of that is reserved for metadata "
+          + "such as checksums, so the datanode caps this value at 31 MB.")
   private int streamReadResponseDataSize = 1 << 20;
 
   @Config(key = "ozone.client.stream.read.timeout",

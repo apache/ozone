@@ -96,7 +96,6 @@ public class TestClientRetryContainerStateMachineFailures {
     conf.setFromObject(raftClientConfig);
 
     conf.setLong(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
-    conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);

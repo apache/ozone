@@ -43,7 +43,7 @@ describe('Namespace Usage metadata', () => {
   });
   afterAll(() => server.close());
 
-  test('hides quota rows and reports initialization once when both responses are initializing', async () => {
+  test('hides summary and quota rows without notifying when both responses are initializing', async () => {
     server.use(
       http.get('/api/v1/namespace/summary', () => HttpResponse.json(mockResponses.InitializingSummaryResponse)),
       http.get('/api/v1/namespace/quota', () => HttpResponse.json({
@@ -51,14 +51,14 @@ describe('Namespace Usage metadata', () => {
       }))
     );
 
-    render(<NUMetadata path='/' />);
+    const { container } = render(<NUMetadata path='/' />);
 
-    await waitFor(() => expect(showDataFetchError).toHaveBeenCalledWith(
-      'The metadata is currently initializing. Please wait a moment and try again later'
-    ));
+    await waitFor(() => expect(container.querySelector('.ant-spin-spinning')).not.toBeInTheDocument());
+    expect(screen.queryByText('Entity Type')).not.toBeInTheDocument();
+    expect(screen.queryByText('Volumes')).not.toBeInTheDocument();
     expect(screen.queryByText('Quota Allowed')).not.toBeInTheDocument();
     expect(screen.queryByText('Quota Used')).not.toBeInTheDocument();
-    expect(showDataFetchError).toHaveBeenCalledTimes(1);
+    expect(showDataFetchError).not.toHaveBeenCalled();
   });
 
   test.each([

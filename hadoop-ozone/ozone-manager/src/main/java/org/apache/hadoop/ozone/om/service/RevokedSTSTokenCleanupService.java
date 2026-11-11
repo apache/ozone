@@ -57,8 +57,11 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
   // Use a single thread
   private static final int REVOKED_STS_TOKEN_CLEANER_CORE_POOL_SIZE = 1;
   private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
-  // Keep revocation entries until max STS token lifetime after the cutoff was captured.
-  private static final long CLEANUP_THRESHOLD = TimeUnit.SECONDS.toMillis(S3STSUtils.MAX_DURATION_SECONDS); // 12 hours
+  // Allow for the purging OM's clock being ahead of a validating OM's clock.
+  private static final long CLOCK_SKEW_MARGIN = TimeUnit.MINUTES.toMillis(30);
+  // Keep revocation entries until max STS token lifetime plus clock skew margin after the cutoff was captured.
+  private static final long CLEANUP_THRESHOLD =
+      TimeUnit.SECONDS.toMillis(S3STSUtils.MAX_DURATION_SECONDS) + CLOCK_SKEW_MARGIN; // 12 hours+0.5 hour = 12.5 hours
 
   private final OzoneManager ozoneManager;
   private final AtomicBoolean suspended;
@@ -133,10 +136,13 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
 
       final long startTime = Time.monotonicNow();
       runCount.incrementAndGet();
+      final long purgeBeforeMillis = CLOCK.millis() - CLEANUP_THRESHOLD;
       // Read the metadata manager on every run, since installing a checkpoint replaces it
       final Table<String, Long> revokedStsTokenTable = ozoneManager.getMetadataManager().getS3RevokedStsTokenTable();
 
-      long deletedInRun = 0;
+      // This is called submittedInRun because a submitted originalAccessKeyId might not actually get deleted if its
+      // cutoff is no longer older than purgeBeforeMillis when the request is applied.
+      long submittedInRun = 0;
       final List<String> batch = new ArrayList<>();
 
       try (Table.KeyValueIterator<String, Long> iterator = revokedStsTokenTable.iterator()) {
@@ -146,18 +152,18 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
           final String originalAccessKeyId = entry.getKey();
           final Long revocationTimeMillis = entry.getValue();
 
-          if (shouldCleanup(revocationTimeMillis)) {
+          if (shouldCleanup(revocationTimeMillis, purgeBeforeMillis)) {
             // Calculate the size this originalAccessKeyId would add to the protobuf message.
             // Make a copy of the batch to do the size check
             final List<String> batchCopyWithCandidate = new ArrayList<>(batch);
             batchCopyWithCandidate.add(originalAccessKeyId);
-            int batchWithCandidateSize = getBatchSerializedSize(batchCopyWithCandidate);
+            int batchWithCandidateSize = getBatchSerializedSize(batchCopyWithCandidate, purgeBeforeMillis);
 
             // If adding this originalAccessKeyId would exceed the limit, submit the current batch
             if (batchWithCandidateSize > ratisByteLimit) {
               if (!batch.isEmpty()) {
-                if (submitCleanupRequest(batch)) {
-                  deletedInRun += batch.size();
+                if (submitCleanupRequest(batch, purgeBeforeMillis)) {
+                  submittedInRun += batch.size();
                 } else {
                   LOG.warn("Failed to submit batch of {} revoked tokens.", batch.size());
                 }
@@ -167,7 +173,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
                 // to check if it exceeds the limit by itself.
                 final List<String> singleCandidateBatch = new ArrayList<>();
                 singleCandidateBatch.add(originalAccessKeyId);
-                batchWithCandidateSize = getBatchSerializedSize(singleCandidateBatch);
+                batchWithCandidateSize = getBatchSerializedSize(singleCandidateBatch, purgeBeforeMillis);
               }
 
               // Check if the single key exceeds the limit (either strictly single or after flush)
@@ -183,46 +189,44 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
         }
       } catch (IOException e) {
         LOG.error("Failure while scanning s3RevokedStsTokenTable.  It will be retried in the next interval", e);
-        if (deletedInRun == 0) {
+        if (submittedInRun == 0) {
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
       }
 
       // Submit any remaining tokens
       if (!batch.isEmpty()) {
-        if (submitCleanupRequest(batch)) {
-          deletedInRun += batch.size();
+        if (submitCleanupRequest(batch, purgeBeforeMillis)) {
+          submittedInRun += batch.size();
         } else {
           LOG.warn("Failed to submit final batch of {} revoked tokens.", batch.size());
         }
       }
 
       // Update stats
-      if (deletedInRun > 0) {
-        submittedDeletedEntryCount.addAndGet(deletedInRun);
-        LOG.info("Found and removed {} revoked STS token entries.", deletedInRun);
+      if (submittedInRun > 0) {
+        submittedDeletedEntryCount.addAndGet(submittedInRun);
+        LOG.info("Submitted {} revoked STS token entries for deletion.", submittedInRun);
       }
 
       final long elapsed = Time.monotonicNow() - startTime;
-      LOG.info("RevokedSTSTokenCleanupService run completed. deletedEntriesInRun={}, totalDeletedEntries={}, " +
-          "callIdCount={}, elapsedTimeMs={}", deletedInRun, submittedDeletedEntryCount.get(), callIdCount.get(),
+      LOG.info("RevokedSTSTokenCleanupService run completed. submittedEntriesInRun={}, totalSubmittedEntries={}, " +
+          "callIdCount={}, elapsedTimeMs={}", submittedInRun, submittedDeletedEntryCount.get(), callIdCount.get(),
           elapsed);
 
-      final long resultCount = deletedInRun;
+      final long resultCount = submittedInRun;
       return () -> (int) resultCount;
     }
 
     /**
-     * Returns true if the revocation cutoff is older than the cleanup threshold.
+     * Returns true if the revocation cutoff is older than the purge threshold.
      */
-    private boolean shouldCleanup(long revocationTimeMillis) {
-      final long now = CLOCK.millis();
-
-      if (now - revocationTimeMillis > CLEANUP_THRESHOLD) {
+    private boolean shouldCleanup(long revocationTimeMillis, long purgeBeforeMillis) {
+      if (revocationTimeMillis < purgeBeforeMillis) {
         if (LOG.isDebugEnabled()) {
           LOG.debug(
-              "Revoked STS token cutoff at {} is older than {} ms, will clean up. Current time: {}",
-              revocationTimeMillis, CLEANUP_THRESHOLD, now);
+              "Revoked STS token cutoff at {} is older than purge threshold {}, will clean up.",
+              revocationTimeMillis, purgeBeforeMillis);
         }
         return true;
       }
@@ -230,11 +234,13 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     }
 
     /**
-     * Builds and submits an OMRequest to delete the provided originalAccessKeyId revocation entries.
+     * Builds and submits an OMRequest to delete the provided originalAccessKeyId revocation entries, each only if its
+     * cutoff is still older than the purge threshold.
      */
-    private boolean submitCleanupRequest(List<String> originalAccessKeyIds) {
+    private boolean submitCleanupRequest(List<String> originalAccessKeyIds, long purgeBeforeMillis) {
       final DeleteRevokedSTSTokensRequest request = DeleteRevokedSTSTokensRequest.newBuilder()
           .addAllOriginalAccessKeyId(originalAccessKeyIds)
+          .setPurgeBeforeMillis(purgeBeforeMillis)
           .build();
 
       final OMRequest omRequest = OMRequest.newBuilder()
@@ -254,9 +260,10 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
       }
     }
 
-    private int getBatchSerializedSize(List<String> originalAccessKeyIdBatch) {
+    private int getBatchSerializedSize(List<String> originalAccessKeyIdBatch, long purgeBeforeMillis) {
       final DeleteRevokedSTSTokensRequest request = DeleteRevokedSTSTokensRequest.newBuilder()
           .addAllOriginalAccessKeyId(originalAccessKeyIdBatch)
+          .setPurgeBeforeMillis(purgeBeforeMillis)
           .build();
 
       return request.getSerializedSize();
