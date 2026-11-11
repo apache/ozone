@@ -130,6 +130,59 @@ class TestContainerBalancerAssessmentSubcommand {
   }
 
   @Test
+  void testJsonCombinedNodesAreEmptyWhenNoStorageTypeHasMovement() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(
+        typedProto("first", 0, 100), typedProto("second", 40, 60), typedProto("third", 40, 60)));
+
+    runAssessment(scmClient, "--json", "-t", "20");
+
+    JsonNode report = new ObjectMapper().readTree(out.get());
+    assertThat(report.path("totalBytesToMove").asLong()).isZero();
+    assertThat(report.path("sourceNodesAcrossStorageTypes").path("count").asInt()).isZero();
+    assertThat(report.path("sourceNodesAcrossStorageTypes").path("nodes").size()).isZero();
+    assertThat(report.path("targetNodesAcrossStorageTypes").path("count").asInt()).isZero();
+    assertThat(report.path("targetNodesAcrossStorageTypes").path("nodes").size()).isZero();
+    assertThat(report.path("maxStorageTypeImbalancePercentage").asDouble()).isEqualTo(40.0);
+    JsonNode ssd = report.path("storageTypes").path("SSD");
+    assertThat(ssd.path("sourceNodes").path("count").asInt()).isEqualTo(1);
+    assertThat(ssd.path("sourceNodes").path("nodes").get(0).path("hostname").asText()).isEqualTo("first");
+    assertThat(ssd.path("targetNodes").path("count").asInt()).isZero();
+    assertThat(ssd.path("bytesToMove").asLong()).isZero();
+    JsonNode disk = report.path("storageTypes").path("DISK");
+    assertThat(disk.path("sourceNodes").path("count").asInt()).isZero();
+    assertThat(disk.path("targetNodes").path("count").asInt()).isEqualTo(1);
+    assertThat(disk.path("targetNodes").path("nodes").get(0).path("hostname").asText()).isEqualTo("first");
+    assertThat(disk.path("bytesToMove").asLong()).isZero();
+  }
+
+  @Test
+  void testJsonCombinedNodesExcludeUnpairedStorageType() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(
+        typedProto("first", 0, 20), typedProto("second", 40, 60), typedProto("third", 40, 100)));
+
+    runAssessment(scmClient, "--json", "-t", "20");
+
+    JsonNode report = new ObjectMapper().readTree(out.get());
+    JsonNode source = report.path("sourceNodesAcrossStorageTypes");
+    assertThat(source.path("count").asInt()).isEqualTo(1);
+    assertThat(source.path("nodes").size()).isEqualTo(1);
+    assertThat(source.path("nodes").get(0).path("storageType").asText()).isEqualTo("DISK");
+    assertThat(source.path("nodes").get(0).path("utilizationPercentage").asDouble()).isEqualTo(80.0);
+    JsonNode target = report.path("targetNodesAcrossStorageTypes");
+    assertThat(target.path("count").asInt()).isEqualTo(1);
+    assertThat(target.path("nodes").size()).isEqualTo(1);
+    assertThat(target.path("nodes").get(0).path("storageType").asText()).isEqualTo("DISK");
+    assertThat(target.path("nodes").get(0).path("hostname").asText()).isEqualTo("third");
+    JsonNode ssd = report.path("storageTypes").path("SSD");
+    assertThat(ssd.path("sourceNodes").path("nodes").get(0).path("utilizationPercentage").asDouble()).isEqualTo(100.0);
+    assertThat(ssd.path("bytesToMove").asLong()).isZero();
+    assertThat(report.path("totalBytesToMove").asLong()).isPositive().isEqualTo(
+        report.path("storageTypes").path("DISK").path("bytesToMove").asLong());
+  }
+
+  @Test
   void testLegacyJsonKeepsAggregateFields() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     mockUsageInfo(scmClient, sampleNodes());

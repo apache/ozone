@@ -258,15 +258,18 @@ public final class ContainerBalancerClusterAnalyzer {
     double maxImbalance = -1;
     StorageType mostImbalancedStorageType = null;
     for (StorageTypeSnapshot snapshot : snapshots.values()) {
-      sources.addAll(snapshot.getSourceDatanodes());
-      targets.addAll(snapshot.getTargetDatanodes());
-      for (NodeUtilization node : snapshot.getTopSourceNodes()) {
-        topSources.merge(node.getDatanodeId(), node,
-            (a, b) -> a.getUtilization() >= b.getUtilization() ? a : b);
-      }
-      for (NodeUtilization node : snapshot.getBottomTargetNodes()) {
-        bottomTargets.merge(node.getDatanodeId(), node,
-            (a, b) -> a.getUtilization() <= b.getUtilization() ? a : b);
+      // Combined node summaries describe the types contributing to the movement estimate.
+      if (snapshot.getBytesToMove() > 0) {
+        sources.addAll(snapshot.getSourceDatanodes());
+        targets.addAll(snapshot.getTargetDatanodes());
+        for (NodeUtilization node : snapshot.getTopSourceNodes()) {
+          topSources.merge(node.getDatanodeId(), node,
+              (a, b) -> a.getUtilization() >= b.getUtilization() ? a : b);
+        }
+        for (NodeUtilization node : snapshot.getBottomTargetNodes()) {
+          bottomTargets.merge(node.getDatanodeId(), node,
+              (a, b) -> a.getUtilization() <= b.getUtilization() ? a : b);
+        }
       }
       overBytes += snapshot.getTotalOverUtilizedBytes();
       underBytes += snapshot.getTotalUnderUtilizedBytes();

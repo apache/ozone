@@ -148,10 +148,63 @@ public final class TestContainerBalancerClusterAnalyzer {
     ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
         nodes, 0.2, Collections.emptySet(), Collections.emptySet());
 
+    assertEquals(0, snapshot.getSourceCount());
+    assertEquals(0, snapshot.getTargetCount());
+    assertTrue(snapshot.getSourceDatanodes().isEmpty());
+    assertTrue(snapshot.getTargetDatanodes().isEmpty());
+    assertTrue(snapshot.getTopSourceNodesAcrossStorageTypes().isEmpty());
+    assertTrue(snapshot.getBottomTargetNodesAcrossStorageTypes().isEmpty());
+    assertTrue(snapshot.getTotalOverUtilizedBytes() > 0);
+    assertTrue(snapshot.getTotalUnderUtilizedBytes() > 0);
+    assertEquals(0, snapshot.getBytesToMove());
+    assertEquals(0.40, snapshot.getMaxImbalance(), 0.0001);
+
+    Set<String> firstNode = Collections.singleton(DatanodeDetails.getFromProtoBuf(nodes.get(0).getNode())
+        .getID().toString());
+    StorageTypeSnapshot ssd = snapshot.getStorageTypeSnapshots().get(StorageType.SSD);
+    assertEquals(1, ssd.getSourceCount());
+    assertEquals(firstNode, ssd.getSourceDatanodes());
+    assertEquals(1, ssd.getTopSourceNodes().size());
+    assertEquals(0, ssd.getTargetCount());
+    assertEquals(0, ssd.getBytesToMove());
+    StorageTypeSnapshot disk = snapshot.getStorageTypeSnapshots().get(StorageType.DISK);
+    assertEquals(0, disk.getSourceCount());
+    assertEquals(1, disk.getTargetCount());
+    assertEquals(firstNode, disk.getTargetDatanodes());
+    assertEquals(1, disk.getBottomTargetNodes().size());
+    assertEquals(0, disk.getBytesToMove());
+  }
+
+  @Test
+  void testCombinedNodesExcludeUnpairedTypeOnSameDatanode() {
+    List<DatanodeUsageInfoProto> nodes = Arrays.asList(
+        typedProto("first", 0, 20), typedProto("second", 40, 60), typedProto("third", 40, 100));
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        nodes, 0.2, Collections.emptySet(), Collections.emptySet());
+
+    // First is a source for both types, but only DISK has a target. Its SSD entry must remain per-type only.
+    StorageTypeSnapshot ssd = snapshot.getStorageTypeSnapshots().get(StorageType.SSD);
+    StorageTypeSnapshot disk = snapshot.getStorageTypeSnapshots().get(StorageType.DISK);
+    assertEquals(1, ssd.getSourceCount());
+    assertEquals(0, ssd.getTargetCount());
+    assertEquals(0, ssd.getBytesToMove());
+    assertEquals(1.0, ssd.getTopSourceNodes().get(0).getUtilization(), 0.0001);
+    assertTrue(disk.getBytesToMove() > 0);
+    assertEquals(disk.getBytesToMove(), snapshot.getTotalBytesToMove());
     assertEquals(1, snapshot.getSourceCount());
     assertEquals(1, snapshot.getTargetCount());
-    assertTrue(snapshot.getTotalOverUtilizedBytes() > 0);
-    assertEquals(0, snapshot.getBytesToMove());
+    assertEquals(disk.getSourceDatanodes(), snapshot.getSourceDatanodes());
+    assertEquals(disk.getTargetDatanodes(), snapshot.getTargetDatanodes());
+    assertEquals(1, snapshot.getTopSourceNodesAcrossStorageTypes().size());
+    assertEquals(1, snapshot.getBottomTargetNodesAcrossStorageTypes().size());
+    NodeUtilization source = snapshot.getTopSourceNodesAcrossStorageTypes().get(0);
+    assertEquals("first", source.getHostname());
+    assertEquals(StorageType.DISK, source.getStorageType());
+    assertEquals(0.8, source.getUtilization(), 0.0001);
+    NodeUtilization target = snapshot.getBottomTargetNodesAcrossStorageTypes().get(0);
+    assertEquals("third", target.getHostname());
+    assertEquals(StorageType.DISK, target.getStorageType());
+    assertEquals(0, target.getUtilization(), 0.0001);
   }
 
   @Test

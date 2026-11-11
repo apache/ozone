@@ -60,13 +60,24 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
+  void testEstimateRejectsStorageTypesWithoutSourceTargetPairs() {
+    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ContainerBalancerAdvisor.estimate(new OzoneConfiguration(), new ContainerBalancerAdvisor.AdvisorRequest()
+            .setNodes(Arrays.asList(typedProto("first", 0, 100), typedProto("second", 40, 60),
+                typedProto("third", 40, 60))).setThresholdPercent(20.0)));
+    assertThat(ex).hasMessageContaining("No bytes to move").hasMessageContaining("same storage type");
+  }
+
+  @Test
   void testEstimateDoesNotCountIncompatibleSourcesAndTargetsAsExtraThroughput() {
     List<DatanodeUsageInfoProto> nodes = new ArrayList<>(Arrays.asList(
         typedProto("first", 0, 100), typedProto("second", 40, 60), typedProto("third", 40, 60)));
-    // Only ARCHIVE has a compatible source/target pair at the 20% threshold.
+    // ARCHIVE and PROVIDED share one source/target pair; SSD and DISK have no pairs at the 20% threshold.
     for (long remaining : new long[]{50, 950}) {
-      nodes.add(proto("archive-" + remaining, 1000L * OzoneConsts.GB, remaining * OzoneConsts.GB).toBuilder()
+      nodes.add(proto("paired-" + remaining, 2000L * OzoneConsts.GB, 2 * remaining * OzoneConsts.GB).toBuilder()
           .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.ARCHIVE)
+              .setCapacity(1000L * OzoneConsts.GB).setRemaining(remaining * OzoneConsts.GB))
+          .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.PROVIDED)
               .setCapacity(1000L * OzoneConsts.GB).setRemaining(remaining * OzoneConsts.GB)).build());
     }
     ContainerBalancerEstimation estimate = ContainerBalancerAdvisor.estimate(new OzoneConfiguration(),
@@ -74,7 +85,8 @@ public final class TestContainerBalancerAdvisor {
             .setMaxDatanodesPercentageToInvolvePerIteration(100)).get(0);
 
     assertThat(estimate.succeeded()).isTrue();
-    assertEquals(250L * OzoneConsts.GB, estimate.getBytesToMove());
+    assertEquals(500L * OzoneConsts.GB, estimate.getBytesToMove());
+    // Unpaired nodes must not inflate the shared send/receive limits of the one participating datanode pair.
     assertEquals(26L * OzoneConsts.GB, estimate.getPerIterationBytes());
   }
 

@@ -260,6 +260,10 @@ public final class ContainerBalancerAdvisor {
       throw new IllegalArgumentException("Per-storage-type estimates require storage-type usage from all eligible "
           + "datanodes. Some datanodes report missing or incomplete storage-type usage.");
     }
+    if (!snapshot.getStorageTypeSnapshots().isEmpty() && snapshot.getTotalBytesToMove() <= 0) {
+      throw new IllegalArgumentException(
+          "No bytes to move between source and target datanodes of the same storage type.");
+    }
     if (snapshot.getSourceCount() < 1) {
       throw new IllegalArgumentException("No over-utilized datanodes (sources) found.");
     }

@@ -30,6 +30,8 @@ import org.apache.hadoop.fs.StorageType;
  * Point-in-time cluster imbalance view built from datanode usage protos.
  * Utilization and limits describe whole datanodes. When storage-type reports are available,
  * movement totals and source/target datanode sets combine the per-type results; a datanode is counted once.
+ * Combined source/target counts and lists include only types with a positive movement estimate.
+ * Per-type snapshots retain all nodes outside their utilization limits.
  */
 public final class ContainerBalancerClusterSnapshot {
 

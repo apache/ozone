@@ -340,9 +340,9 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
 
     boolean typed = !snapshot.getStorageTypeSnapshots().isEmpty();
     result.put(typed ? "sourceNodesAcrossStorageTypes" : "sourceNodes",
-        jsonNodes(snapshot.getSourceCount(), snapshot.getTopSourceNodesAcrossStorageTypes()));
+        jsonNodesSummary(snapshot.getSourceCount(), snapshot.getTopSourceNodesAcrossStorageTypes()));
     result.put(typed ? "targetNodesAcrossStorageTypes" : "targetNodes",
-        jsonNodes(snapshot.getTargetCount(), snapshot.getBottomTargetNodesAcrossStorageTypes()));
+        jsonNodesSummary(snapshot.getTargetCount(), snapshot.getBottomTargetNodesAcrossStorageTypes()));
 
     double movementRatio = snapshot.getClusterCapacityBytes() == 0 ? 0
         : (double) snapshot.getTotalBytesToMove() / snapshot.getClusterCapacityBytes();
@@ -371,8 +371,8 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
     result.put("minUtilizationPercentage", toJsonPercent(snapshot.getMinUtilization()));
     result.put("upperLimitPercentage", toJsonPercent(snapshot.getUpperLimit()));
     result.put("lowerLimitPercentage", toJsonPercent(snapshot.getLowerLimit()));
-    result.put("sourceNodes", jsonNodes(snapshot.getSourceCount(), snapshot.getTopSourceNodes()));
-    result.put("targetNodes", jsonNodes(snapshot.getTargetCount(), snapshot.getBottomTargetNodes()));
+    result.put("sourceNodes", jsonNodesSummary(snapshot.getSourceCount(), snapshot.getTopSourceNodes()));
+    result.put("targetNodes", jsonNodesSummary(snapshot.getTargetCount(), snapshot.getBottomTargetNodes()));
     result.put("bytesToMove", snapshot.getBytesToMove());
     double movementRatio = snapshot.getCapacityBytes() == 0 ? 0
         : (double) snapshot.getBytesToMove() / snapshot.getCapacityBytes();
@@ -380,7 +380,7 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
     return result;
   }
 
-  private static Map<String, Object> jsonNodes(int count,
+  private static Map<String, Object> jsonNodesSummary(int count,
       List<ContainerBalancerClusterSnapshot.NodeUtilization> nodes) {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("count", count);
