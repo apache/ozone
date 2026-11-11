@@ -182,13 +182,16 @@ class TestS3ClientProtocol {
             .setOwnerName("owner").setAdminName("admin").build(), "owner"));
 
     client.getObjectTagging(null, "bucket", "key");
+    client.deleteObjectTagging(null, "bucket", "key");
 
     if (version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION) {
       verify(delegate).getObjectTagging(null, "bucket", "key");
+      verify(delegate).deleteObjectTagging(null, "bucket", "key");
       verify(delegate, never()).getS3VolumeContext();
     } else {
       verify(delegate).getObjectTagging("tenant-volume", "bucket", "key");
-      verify(delegate).getS3VolumeContext();
+      verify(delegate).deleteObjectTagging("tenant-volume", "bucket", "key");
+      verify(delegate, times(2)).getS3VolumeContext();
     }
   }
 
