@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -33,8 +35,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests S3 Multipart Upload Complete request.
@@ -54,6 +59,27 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
   protected long getNamespaceCount() {
     // parent directory count which is also created
     return 5L;
+  }
+
+  @Test
+  public void testFailedCompleteDoesNotLeaveMissingParentsInCache() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    addVolumeAndBucket(volumeName, bucketName);
+
+    // The upload was never initiated and none of the parent directories exist.
+    OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName, bucketName, keyName,
+        UUID.randomUUID().toString(), new ArrayList<>());
+    OMClientResponse omClientResponse =
+        getS3MultipartUploadCompleteReq(completeMultipartRequest).validateAndUpdateCache(ozoneManager, 3L);
+
+    assertThat(omClientResponse.getOMResponse().getStatus()).isEqualTo(Status.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+    // The next request must not find the parent directories or an open file of the failed complete.
+    assertThat(OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName, keyName,
+        Paths.get(keyName)).getMissingParents()).containsExactly(OzoneFSUtils.getParentDir(keyName).split("/"));
+    assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout()).cacheIterator()).toIterable()
+        .allSatisfy(entry -> assertThat(entry.getValue().getCacheValue()).isNull());
   }
 
   @Override
