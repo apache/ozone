@@ -794,8 +794,8 @@ public class KeyLifecycleService extends BackgroundService {
             try {
               stack.push(item);
             } catch (CapacityFullException e) {
-              LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, currentDirPath, e);
-              return;
+              LOG.warn("Skip evaluate {}/{} at {}: {}", volumeName, bucketName, currentDirPath, e.getMessage());
+              continue;
             }
 
             // depth first evaluation, push subDirs into stack
@@ -807,8 +807,11 @@ public class KeyLifecycleService extends BackgroundService {
                 stack.push(new PendingEvaluateDirectory(subDir, subDirSummary.getSubDirKeyList().get(i),
                     subDirPath, null));
               } catch (CapacityFullException e) {
-                LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, subDirPath, e);
-                return;
+                // The stack stays full until an entry is popped, so the remaining siblings cannot be pushed either.
+                // Skipped sub directories are not expired, which also keeps their parent from being expired.
+                LOG.warn("Skip evaluate {}/{} at {} and its {} following sibling directories: {}", volumeName,
+                    bucketName, subDirPath, subDirSummary.getSubDirCount() - i - 1, e.getMessage());
+                break;
               }
             }
             newSubDirPushed = true;
@@ -1736,6 +1739,11 @@ public class KeyLifecycleService extends BackgroundService {
     this.keyDeleteBatchSize = size;
   }
 
+  @VisibleForTesting
+  public void setCachedDirMaxCount(long count) {
+    this.cachedDirMaxCount = count;
+  }
+
   // Returns the test-injected OzoneTrash if set, otherwise the live instance
   // from OzoneManager. This is needed because startTrashEmptier() runs after
   // keyManager.start() in all OzoneManager startup paths, so the field cannot
@@ -2190,7 +2198,7 @@ public class KeyLifecycleService extends BackgroundService {
         }
       }
       if (parent == null) {
-        // e.g,  dir1 and dir2, dir2 should ahead of dir2, given the depth-first and dir's RocksDB key order
+        // e.g, dir1 and dir2, dir2 should ahead of dir1, given the depth-first and dir's RocksDB key order
         return dirList2.get(0).getName().compareTo(dirList1.get(0).getName());
       } else {
         long parentID = parent.getObjectID();

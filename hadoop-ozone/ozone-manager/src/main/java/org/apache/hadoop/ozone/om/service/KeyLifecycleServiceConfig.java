@@ -96,8 +96,8 @@ public class KeyLifecycleServiceConfig extends ReconfigurableConfig {
       reconfigurable = true,
       tags = {ConfigTag.OM, ConfigTag.OZONE},
       description = "Max numbers of directory objects held in memory stack for recursive FSO bucket evaluating " +
-          "for a lifecycle evaluating task. Once the cached directory objects exceeds this limit, the evaluation " +
-          "of the involved directories will abort."
+          "for a lifecycle evaluating task. Once the cached directory objects exceeds this limit, the directories " +
+          "which cannot be cached are skipped in this evaluation, and the evaluation continues with the cached ones."
   )
   private long cachedDirMaxCount = Defaults.DELETE_CACHED_DIRECTORY_MAX_COUNT;
 

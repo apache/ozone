@@ -568,7 +568,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertNotNull(state);
 
       // resume the service
-      runSingleLifecycleScan(volumeName, bucketName);
+      runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
 
       // it should skip the first 3 keys (index 0, 1, 2) since we set lastScannedDbKey as index 2.
       // So it deletes only the last 2 keys (index 3 and 4).
@@ -979,6 +979,99 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    public Stream<Arguments> cachedDirLimitParameters() {
+      return Stream.of(
+          // Root evaluation pushes itself, dir1 and dir2, then overflows at dir3 so dir3 and dir30 are skipped.
+          // dir1 evaluation pushes itself and dir4, then overflows at dir1/dir5 so dir5 is skipped.
+          // Only dir1/dir4's keys are expired. dir2 and dir4 are expired as empty or fully expired directories,
+          // while dir1 is kept since its skipped sub directory dir5 is not expired.
+          arguments(3L, 2, 2,
+              new String[]{"dir3 and its 1 following sibling", "dir1/dir5 and its 0 following sibling"}),
+          // Root evaluation pushes itself, then overflows at its first sub directory, so nothing is evaluated
+          arguments(1L, 0, 0, new String[]{"dir1 and its 3 following sibling"})
+      );
+    }
+
+    /**
+     * When the in-memory DFS directory stack exceeds DELETE_CACHED_DIRECTORY_MAX_COUNT, the directory which
+     * cannot be pushed is skipped with its whole subtree and the following siblings, and the evaluation
+     * continues with the directories already on the stack.
+     */
+    @ParameterizedTest
+    @MethodSource("cachedDirLimitParameters")
+    void testFSOScanSkipsDirectoriesWhenCachedDirectoryMaxCountExceeded(long cachedDirLimit,
+        int expectedDeletedKeys, int expectedDeletedDirs, String[] skippedDirs) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final int testKeyCount = 8;
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialDeletedDirCount = getDeletedDirectoryCount();
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+
+      keyLifecycleService.suspend();
+      keyLifecycleService.setCachedDirMaxCount(cachedDirLimit);
+
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      List<OmKeyArgs> keyList = new ArrayList<>();
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/dir4/key0", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/dir4/key1", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/dir5/key2", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/dir5/key3", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir3/dir6/dir8/key5", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir3/dir6/dir8/key6", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir3/dir6/dir9/key7", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir3/dir6/dir9/key8", 1, null));
+      createDirectory(volumeName, bucketName, "dir2");
+      createDirectory(volumeName, bucketName, "dir3/dir7");
+      createDirectory(volumeName, bucketName, "dir30");
+
+      assertEquals(testKeyCount, keyList.size());
+      GenericTestUtils.waitFor(
+          () -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == testKeyCount, WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(FILE_SYSTEM_OPTIMIZED, volumeName, bucketName);
+      awaitDirCacheDrained(volumeName, bucketName);
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(LONG_EXPIRE_SECONDS);
+      OmLCFilter.Builder filter = getOmLCFilterBuilder("", null, null);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, null, filter.build(), date.toString(), true);
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
+
+      String output = logCapturer.getOutput();
+      assertThat(output).contains("LimitedSizeStack has reached maximum size " + cachedDirLimit);
+      for (String skippedDir : skippedDirs) {
+        assertThat(output).contains("Skip evaluate " + volumeName + "/" + bucketName + " at " + skippedDir);
+      }
+
+      GenericTestUtils.waitFor(() -> getDeletedKeyCount() - initialDeletedKeyCount == expectedDeletedKeys,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(testKeyCount - expectedDeletedKeys, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      GenericTestUtils.waitFor(() -> getDeletedDirectoryCount() - initialDeletedDirCount == expectedDeletedDirs,
+          WAIT_CHECK_INTERVAL, 10000);
+      // The scan still completes, so the next scan starts from the beginning instead of resuming
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          OmLifecycleScanState state = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+          return state != null && state.getScanEndTime() != null;
+        } catch (IOException e) {
+          return false;
+        }
+      }, WAIT_CHECK_INTERVAL, 10000);
+
+      keyLifecycleService.setCachedDirMaxCount(KeyLifecycleServiceConfig.Defaults.DELETE_CACHED_DIRECTORY_MAX_COUNT);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, null, filter.build(), date.toString(),
+          true);
+      runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
+
+      GenericTestUtils.waitFor(() -> (getDeletedKeyCount() - initialDeletedKeyCount) == testKeyCount,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+    }
+
     @ParameterizedTest
     @MethodSource("parameters1")
     void testOneKeyExpired(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
@@ -1089,7 +1182,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
           LoggerFactory.getLogger(KeyLifecycleService.class));
       // Resume the service
-      runSingleLifecycleScan(volumeName, bucketName);
+      runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
@@ -1172,7 +1265,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
           LoggerFactory.getLogger(KeyLifecycleService.class));
-      runSingleLifecycleScan(volumeName, bucketName);
+      runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
 
       // dir2 is skipped since dir2 > dir1. dir1 is fully evaluated only when lastScannedKey does not
       // belong to it, otherwise the scan seeks past its last key and nothing is left to expire.
@@ -1234,7 +1327,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       Table<String, OmLifecycleScanState> spyTable = spy(originalTable);
       tableField.set(metadataManager, spyTable);
       try {
-        runSingleLifecycleScan(volumeName, bucketName);
+        runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
 
         GenericTestUtils.waitFor(() ->
             (getDeletedKeyCount() - initialDeletedKeyCount) == 3, WAIT_CHECK_INTERVAL, 10000);
@@ -1308,7 +1401,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
           CacheValue.get(1L, scanState));
           
-      runSingleLifecycleScan(volumeName, bucketName);
+      runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
 
       // It should seek to key2. key1 is skipped, key2 is skipped too.
       // So key1 and key2 are skipped, key3 is deleted.
@@ -3674,6 +3767,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         keyLifecycleService.setMoveToTrashEnabled(true);
         keyLifecycleService.setKeyDeleteBatchSize(conf.getInt(KeyLifecycleServiceConfig.Keys.DELETE_BATCH_SIZE,
             KeyLifecycleServiceConfig.Defaults.DELETE_BATCH_SIZE));
+        keyLifecycleService.setCachedDirMaxCount(KeyLifecycleServiceConfig.Defaults.DELETE_CACHED_DIRECTORY_MAX_COUNT);
         keyLifecycleService.resume();
       }
     }
@@ -3681,7 +3775,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   // Runs exactly one scan: without dropping the policy first, the next scan starts SERVICE_INTERVAL
   // later and deletes the objects the caller expects to remain.
-  private void runSingleLifecycleScan(String volume, String bucket)
+  private void runSingleLifecycleScanAndDeleteConfiguration(String volume, String bucket)
       throws IOException, TimeoutException, InterruptedException {
     FaultInjectorImpl taskStart = new FaultInjectorImpl();
     FaultInjectorImpl firstDelete = new FaultInjectorImpl();
