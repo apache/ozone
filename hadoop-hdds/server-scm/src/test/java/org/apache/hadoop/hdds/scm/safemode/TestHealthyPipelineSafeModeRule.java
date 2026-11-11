@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,15 +30,18 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -475,6 +479,71 @@ public class TestHealthyPipelineSafeModeRule {
 
       // Ensure the rule is NOT satisfied due to unhealthy DN
       assertFalse(healthyPipelineSafeModeRule.validate());
+    } finally {
+      scmMetadataStore.getStore().close();
+    }
+  }
+
+  @Test
+  public void testOpenPipelinesWithUnregisteredNodesBlockRule() throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
+    List<ContainerInfo> containers = new ArrayList<>(HddsTestUtils.getContainerInfo(1));
+
+    OzoneConfiguration config = new OzoneConfiguration();
+    MockNodeManager nodeManager = new MockNodeManager(true, 12);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
+    config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    // MockNodeManager does not set up racks for the default EC placement policy.
+    config.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY, SCMContainerPlacementRandom.class.getName());
+
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
+    try {
+      PipelineManagerImpl pipelineManager =
+          PipelineManagerImpl.newPipelineManager(
+              config,
+              SCMHAManagerStub.getInstance(true),
+              nodeManager,
+              scmMetadataStore.getPipelineTable(),
+              eventQueue,
+              scmContext,
+              serviceManager,
+              Clock.system(ZoneOffset.UTC));
+      PipelineProvider mockRatisProvider =
+          new MockRatisPipelineProvider(nodeManager, pipelineManager.getStateManager(), config);
+      pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS, mockRatisProvider);
+
+      Pipeline ratisPipeline = pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
+          ReplicationFactor.THREE));
+      pipelineManager.openPipeline(ratisPipeline.getId());
+      ratisPipeline = pipelineManager.getPipeline(ratisPipeline.getId());
+      MockRatisPipelineProvider.markPipelineHealthy(ratisPipeline);
+      Pipeline ecPipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
+      pipelineManager.openPipeline(ecPipeline.getId());
+
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
+
+      HealthyPipelineSafeModeRule rule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+      firePipelineEvent(ratisPipeline, eventQueue);
+      GenericTestUtils.waitFor(rule::validate, 100, 5000);
+
+      // "Unregister" a node of the EC pipeline.
+      DatanodeDetails unregisteredNode = nodeManager.getNode(ecPipeline.getNodes().get(0).getID());
+      nodeManager.getClusterNetworkTopologyMap().remove(unregisteredNode);
+      assertFalse(rule.validate());
+      assertThat(rule.getStatusText()).contains("open pipelines with unregistered datanodes (=")
+          .contains(ecPipeline.getId().toString());
+
+      // Once the node registers again, the rule can pass again.
+      nodeManager.getClusterNetworkTopologyMap().add(unregisteredNode);
+      assertTrue(rule.validate());
+      assertThat(rule.getStatusText()).contains("open pipelines with unregistered datanodes (=0)");
     } finally {
       scmMetadataStore.getStore().close();
     }

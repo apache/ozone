@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -593,6 +594,53 @@ public class TestPipelineManagerImpl {
     pipeline = pipelineManager.getPipeline(pipeline.getId());
     assertEquals(Pipeline.PipelineState.CLOSED,
         pipeline.getPipelineState());
+  }
+
+  @Test
+  public void testScrubContinuesAfterPipelineFailure() throws Exception {
+    LogCapturer creatorLogs = LogCapturer.captureLogs(BackgroundPipelineCreator.class);
+    PipelineManagerImpl pipelineManager = spy(createPipelineManager(true));
+    Pipeline failingPipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
+    pipelineManager.openPipeline(failingPipeline.getId());
+    Pipeline otherPipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
+    pipelineManager.openPipeline(otherPipeline.getId());
+
+    // "Unregister" a node from each pipeline.
+    for (Pipeline p : Arrays.asList(failingPipeline, otherPipeline)) {
+      DatanodeDetails dn = nodeManager.getNode(p.getNodes().get(0).getID());
+      if (dn != null) {
+        nodeManager.getClusterNetworkTopologyMap().remove(dn);
+      }
+    }
+    doThrow(new IOException("Injected failure")).when(pipelineManager).closePipeline(failingPipeline.getId());
+
+    pipelineManager.scrubPipelines();
+
+    // The failure on one pipeline does not stop the other from being scrubbed.
+    assertEquals(OPEN, pipelineManager.getPipeline(failingPipeline.getId()).getPipelineState());
+    assertEquals(Pipeline.PipelineState.CLOSED, pipelineManager.getPipeline(otherPipeline.getId()).getPipelineState());
+    // Replacement pipelines are requested after the scrubber closes pipelines.
+    assertThat(creatorLogs.getOutput()).contains("trigger a one-shot run");
+    pipelineManager.close();
+  }
+
+  @Test
+  public void testScrubOnlyDeletingClosedPipelinesDoesNotTriggerCreator() throws Exception {
+    conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 50, TimeUnit.SECONDS);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    Pipeline pipeline = pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    pipelineManager.openPipeline(pipeline.getId());
+    pipelineManager.closePipeline(pipeline.getId());
+    testClock.set(Instant.now());
+    testClock.fastForward(60000);
+
+    LogCapturer creatorLogs = LogCapturer.captureLogs(BackgroundPipelineCreator.class);
+    pipelineManager.scrubPipelines();
+
+    // Deleting an already closed pipeline does not free up any pipeline limit.
+    assertFalse(pipelineManager.containsPipeline(pipeline.getId()));
+    assertThat(creatorLogs.getOutput()).doesNotContain("trigger a one-shot run");
+    pipelineManager.close();
   }
 
   @Test

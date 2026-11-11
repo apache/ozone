@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
 import org.slf4j.Logger;
@@ -50,6 +51,12 @@ import org.slf4j.LoggerFactory;
  * This rule defines percentage of healthy pipelines need to be reported.
  * Once safe mode exit happens, this rules take care of writes can go
  * through in a cluster.
+ *
+ * The rule also requires that no open pipeline of any replication type has a
+ * datanode which is not registered with SCM, so that unregistered datanodes are
+ * not handed out for reads or writes after safe mode exit. Such pipelines are
+ * closed by the pipeline scrubber while SCM is in safe mode. This check applies
+ * even when the RATIS/THREE healthy pipeline threshold is disabled.
  */
 public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
@@ -70,13 +77,17 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
       HddsProtos.ReplicationFactor.THREE_VALUE;
   private final String targetReplicationLabel =
       targetReplicationConfig.configFormat();
+  // Whether the RATIS/THREE healthy pipeline threshold applies.
+  private final boolean ratisThreeRuleEnabled;
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
-      ConfigurationSource configuration, NodeManager nodeManager) {
+      ConfigurationSource configuration, NodeManager nodeManager,
+      boolean ratisThreeRuleEnabled) {
     super(manager, eventQueue);
     this.pipelineManager = pipelineManager;
     this.nodeManager = nodeManager;
+    this.ratisThreeRuleEnabled = ratisThreeRuleEnabled;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
@@ -117,10 +128,30 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected synchronized boolean validate() {
-    if (!validateBasedOnReportProcessing()) {
-      return validateHealthyPipelineSafeModeRuleUsingPipelineManager();
+    if (ratisThreeRuleEnabled) {
+      final boolean ratisThreePipelinesValid;
+      if (validateBasedOnReportProcessing()) {
+        ratisThreePipelinesValid = currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+      } else {
+        ratisThreePipelinesValid = validateHealthyPipelineSafeModeRuleUsingPipelineManager();
+      }
+      if (!ratisThreePipelinesValid) {
+        return false;
+      }
     }
-    return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+    return getOpenPipelinesWithUnregisteredNodes(1).isEmpty();
+  }
+
+  /**
+   * @param limit The maximum number of pipelines to return
+   * @return IDs of open pipelines of any replication type which have a datanode that is not registered with SCM.
+   */
+  private List<PipelineID> getOpenPipelinesWithUnregisteredNodes(int limit) {
+    return pipelineManager.getPipelines().stream()
+        .filter(p -> PipelineManagerImpl.isOpenWithUnregisteredNodes(p, nodeManager))
+        .map(Pipeline::getId)
+        .limit(limit)
+        .collect(Collectors.toList());
   }
 
   @Override
@@ -209,6 +240,10 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   private synchronized void initializeRule(boolean refresh) {
+    if (!ratisThreeRuleEnabled) {
+      healthyPipelineThresholdCount = 0;
+      return;
+    }
     unProcessedPipelineSet.addAll(pipelineManager.getPipelines(
             targetReplicationConfig,
             Pipeline.PipelineState.OPEN).stream().map(Pipeline::getId)
@@ -307,13 +342,29 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   public String getStatusText() {
-    String status = String.format(
-        "healthy %s pipelines (=%d) >= healthyPipelineThresholdCount" +
-            " (=%d)", targetReplicationLabel,
-        getCurrentHealthyPipelineCount(),
-        getHealthyPipelineThresholdCount());
-    status = updateStatusTextWithSamplePipelines(status);
+    String status = "";
+    if (ratisThreeRuleEnabled) {
+      status = String.format(
+          "healthy %s pipelines (=%d) >= healthyPipelineThresholdCount" +
+              " (=%d)", targetReplicationLabel,
+          getCurrentHealthyPipelineCount(),
+          getHealthyPipelineThresholdCount());
+      status = updateStatusTextWithSamplePipelines(status).concat("\n");
+    }
+    List<PipelineID> unregisteredNodePipelines = getOpenPipelinesWithUnregisteredNodes(Integer.MAX_VALUE);
+    status = status.concat(String.format("open pipelines with unregistered datanodes (=%d) == 0",
+        unregisteredNodePipelines.size()));
+    if (!unregisteredNodePipelines.isEmpty()) {
+      status = status.concat("\nSample pipelines with unregistered datanodes : "
+          + unregisteredNodePipelines.subList(0, Math.min(SAMPLE_PIPELINE_DISPLAY_LIMIT,
+          unregisteredNodePipelines.size())));
+    }
     return status;
+  }
+
+  @VisibleForTesting
+  boolean isRatisThreeRuleEnabled() {
+    return ratisThreeRuleEnabled;
   }
 
   private synchronized String updateStatusTextWithSamplePipelines(
