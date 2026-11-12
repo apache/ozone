@@ -309,6 +309,10 @@ abstract class ContainerStateMachineTests {
       assertEquals(ContainerProtos.Result.MALFORMED_REQUEST, sce.getResult());
     }
     verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
+
+    stream.onCommand(newPutBlockCommand(), 0).get();
+    verify(dispatcher).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
+        argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_COMMAND));
   }
 
   @Test
