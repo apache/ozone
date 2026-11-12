@@ -18,9 +18,6 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
 
 import java.io.IOException;
@@ -225,7 +222,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           pathInfo.getDirectoryResult();
 
       // Check if a file or directory exists with same key name.
-      checkDirectoryResult(keyName, isOverWrite, omDirectoryResult);
+      OMFileRequest.checkDirectoryResult(keyName, isOverWrite, omDirectoryResult);
 
       if (!isRecursive) {
         checkAllParentsExist(keyArgs, pathInfo);
@@ -338,32 +335,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
-  }
-
-  /**
-   * Verify om directory result.
-   *
-   * @param keyName           key name
-   * @param isOverWrite       flag represents whether file can be overwritten
-   * @param omDirectoryResult directory result
-   * @throws OMException if file or directory or file exists in the given path
-   */
-  protected void checkDirectoryResult(String keyName, boolean isOverWrite,
-      OMFileRequest.OMDirectoryResult omDirectoryResult) throws OMException {
-    if (omDirectoryResult == FILE_EXISTS) {
-      if (!isOverWrite) {
-        throw new OMException("File " + keyName + " already exists",
-            OMException.ResultCodes.FILE_ALREADY_EXISTS);
-      }
-    } else if (omDirectoryResult == DIRECTORY_EXISTS) {
-      throw new OMException("Can not write to directory: " + keyName,
-          OMException.ResultCodes.NOT_A_FILE);
-    } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-      throw new OMException(
-          "Can not create file: " + keyName + " as there " +
-              "is already file in the given path",
-          OMException.ResultCodes.NOT_A_FILE);
-    }
   }
 
   /**
