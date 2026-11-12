@@ -224,6 +224,15 @@ public final class TracingUtil {
     if (!tracingEnabled) {
       // Application-aware only: spans are created only under a valid parent, which most client processes never have.
       // Build Ozone's SDK (exporter, export thread, global registration) when the first such span needs it.
+      // Check its configuration now, so that a bad one leaves tracing inactive as an eager build would.
+      try {
+        validateSdkConfig(cfg);
+      } catch (RuntimeException e) {
+        LOG.error("Failed to initialize tracing", e);
+        pendingSdkServiceName = null;
+        pendingSdkConfig = null;
+        return;
+      }
       pendingSdkServiceName = serviceName;
       pendingSdkConfig = cfg;
       return;
@@ -331,6 +340,14 @@ public final class TracingUtil {
       return false;
     }
     return Span.current().getSpanContext().isValid();
+  }
+
+  /**
+   * Fails like {@link #buildSdkTracerProvider} would on an invalid endpoint, without building the exporter or its
+   * export thread. (The sampler ratio needs no check: {@link TracingConfig} keeps it in range.)
+   */
+  private static void validateSdkConfig(TracingConfig tracingConfig) {
+    OtlpGrpcSpanExporter.builder().setEndpoint(tracingConfig.getTracingEndpoint());
   }
 
   /**
