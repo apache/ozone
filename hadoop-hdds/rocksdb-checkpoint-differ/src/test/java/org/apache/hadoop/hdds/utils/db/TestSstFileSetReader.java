@@ -36,7 +36,6 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.RocksTestUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
@@ -118,10 +117,10 @@ class TestSstFileSetReader {
    * contains a subset of the total key space for testing overlapping scenarios.
    *
    * @param numberOfFiles Number of SST files to create
-   * @return Pair containing the complete sorted key map and list of SST file paths
+   * @return DummyData containing the complete sorted key map and list of SST file paths
    * @throws RocksDBException if there's an error during SST file creation
    */
-  private Pair<SortedMap<String, Integer>, List<Path>> createDummyData(int numberOfFiles) throws RocksDBException {
+  private DummyData createDummyData(int numberOfFiles) throws RocksDBException {
     List<Path> files = new ArrayList<>();
     int numberOfKeysPerFile = 10;
     TreeMap<String, Integer> keys =
@@ -139,7 +138,7 @@ class TestSstFileSetReader {
       Path tmpSSTFile = createRandomSSTFile(fileKeys);
       files.add(tmpSSTFile);
     }
-    return Pair.of(keys, files);
+    return new DummyData(keys, files);
   }
 
   /**
@@ -153,9 +152,9 @@ class TestSstFileSetReader {
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStream(int numberOfFiles)
       throws RocksDBException, CodecException {
-    Pair<SortedMap<String, Integer>, List<Path>> data = createDummyData(numberOfFiles);
-    List<Path> files = data.getRight();
-    SortedMap<String, Integer> keys = data.getLeft();
+    DummyData data = createDummyData(numberOfFiles);
+    List<Path> files = data.files();
+    SortedMap<String, Integer> keys = data.keys();
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
@@ -195,10 +194,9 @@ class TestSstFileSetReader {
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, CodecException {
     assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
-    Pair<SortedMap<String, Integer>, List<Path>> data =
-        createDummyData(numberOfFiles);
-    List<Path> files = data.getRight();
-    SortedMap<String, Integer> keys = data.getLeft();
+    DummyData data = createDummyData(numberOfFiles);
+    List<Path> files = data.files();
+    SortedMap<String, Integer> keys = data.keys();
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
@@ -360,4 +358,9 @@ class TestSstFileSetReader {
         "Should have correct total number of distinct keys");
   }
 
+  /**
+   * The complete sorted key map paired with the SST files holding those keys,
+   * used to verify reads across multiple SST files.
+   */
+  private record DummyData(SortedMap<String, Integer> keys, List<Path> files) { }
 }

@@ -250,12 +250,12 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT = 5000;
 
   public static final String OZONE_REPLICATION = "ozone.replication";
-  public static final String OZONE_REPLICATION_DEFAULT =
-      ReplicationFactor.THREE.toString();
+  public static final ReplicationFactor OZONE_REPLICATION_DEFAULT_FACTOR = ReplicationFactor.THREE;
+  public static final String OZONE_REPLICATION_DEFAULT = OZONE_REPLICATION_DEFAULT_FACTOR.name();
 
   public static final String OZONE_REPLICATION_TYPE = "ozone.replication.type";
-  public static final String OZONE_REPLICATION_TYPE_DEFAULT =
-      ReplicationType.RATIS.toString();
+  public static final ReplicationType OZONE_REPLICATION_TYPE_DEFAULT_TYPE = ReplicationType.RATIS;
+  public static final String OZONE_REPLICATION_TYPE_DEFAULT = OZONE_REPLICATION_TYPE_DEFAULT_TYPE.name();
 
   /**
    * Configuration property to configure the cache size of client list calls.
@@ -606,6 +606,10 @@ public final class OzoneConfigKeys {
       "ozone.client.key.latest.version.location";
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
+
+  public static final String OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL =
+      "ozone.client.om.version.refresh.interval";
+  public static final long OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT = TimeUnit.MINUTES.toMillis(10);
 
   public static final String OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS =
       "ozone.client.server-defaults.validity.period.ms";

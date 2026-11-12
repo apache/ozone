@@ -752,13 +752,16 @@ public class ContainerStateMachine extends BaseStateMachine {
    * @return the serialized {@link ContainerCommandResponseProto},
    *         which is identical on all the peers of the pipeline.
    */
-  ByteBuffer streamCommand(ByteBuffer command) throws IOException {
+  ByteBuffer streamCommand(ByteBuffer command, DataChannel channel) throws IOException {
     // unsafeWrap is okay since the command buffer can be modified after this method has returned.
     final ContainerCommandRequestProto request = ContainerCommandRequestMessage.toProto(
         UnsafeByteOperations.unsafeWrap(command), getGroupId());
     if (request.getCmdType() != Type.PutBlock) {
       throw new StorageContainerException("Unexpected stream command " + request.getCmdType()
           + ", expected " + Type.PutBlock, ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    if (request.getPutBlock().getSync()) {
+      channel.force(false);
     }
     final DispatcherContext context = DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_COMMAND)
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
@@ -787,7 +790,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         final DataChannel channel = getStreamDataChannel(requestProto, context);
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
-        return new LocalStream(channel, chunkExecutor, this::streamCommand);
+        return new LocalStream(channel, chunkExecutor, command -> streamCommand(command, channel));
       } catch (IOException e) {
         throw new CompletionException("Failed to create data stream", e);
       }
