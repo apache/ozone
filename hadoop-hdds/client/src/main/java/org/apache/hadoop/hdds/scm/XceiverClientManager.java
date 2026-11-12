@@ -309,10 +309,7 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     DatanodeDetails dn = null;
     if (pipeline.getType() == HddsProtos.ReplicationType.EC) {
-      // EC write uses a single-node pipeline per replica, all with the ID of the EC pipeline.
-      Preconditions.checkArgument(pipeline.getNodes().size() == 1,
-          "EC pipeline must have a single node: %s", pipeline);
-      dn = pipeline.getFirstNode();
+      dn = pipeline.getNodes().size() == 1 ? pipeline.getFirstNode() : pipeline.getClosestNode();
     } else if (topologyAware) {
       // Ratis streaming write: the client is created with the closest node as primary datanode.
       dn = pipeline.getClosestNode();
