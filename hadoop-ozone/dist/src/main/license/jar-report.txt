@@ -12,9 +12,6 @@ share/ozone/lib/asm-util.jar
 share/ozone/lib/asm.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/avro.jar
-share/ozone/lib/aws-java-sdk-core.jar
-share/ozone/lib/aws-java-sdk-kms.jar
-share/ozone/lib/aws-java-sdk-s3.jar
 share/ozone/lib/bcpkix-jdk18on.jar
 share/ozone/lib/bcprov-jdk18on.jar
 share/ozone/lib/bcutil-jdk18on.jar
@@ -96,7 +93,6 @@ share/ozone/lib/j2objc-annotations.jar
 share/ozone/lib/jackson-annotations.jar
 share/ozone/lib/jackson-core.jar
 share/ozone/lib/jackson-databind.jar
-share/ozone/lib/jackson-dataformat-cbor.jar
 share/ozone/lib/jackson-dataformat-xml.jar
 share/ozone/lib/jackson-datatype-jsr310.jar
 share/ozone/lib/jackson-jaxrs-base.jar
@@ -160,7 +156,6 @@ share/ozone/lib/jgrapht-ext.jar
 share/ozone/lib/jgraphx.jar
 share/ozone/lib/jheaps.jar
 share/ozone/lib/jline.jar
-share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jnr-a64asm.jar
 share/ozone/lib/jnr-constants.jar
 share/ozone/lib/jnr-ffi.jar

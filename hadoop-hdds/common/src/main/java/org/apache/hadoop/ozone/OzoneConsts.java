@@ -198,11 +198,6 @@ public final class OzoneConsts {
   public static final long OLD_QUOTA_DEFAULT = -2;
 
   /**
-   * Object ID to identify reclaimable uncommitted blocks.
-   */
-  public static final long OBJECT_ID_RECLAIM_BLOCKS = 0L;
-
-  /**
    * Default SCM Datanode ID file name.
    */
   public static final String OZONE_SCM_DATANODE_ID_FILE_DEFAULT = "datanode.id";

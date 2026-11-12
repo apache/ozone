@@ -35,4 +35,15 @@ class TestReconfigurableConfig {
 
     assertEquals("updated", subject.getDynamic());
   }
+
+  @Test
+  void testUnsetPropertyRestoresDefault() {
+    ConfigurationExample subject = new InMemoryConfigurationForTesting()
+        .getObject(ConfigurationExample.class);
+    subject.reconfigureProperty("ozone.test.config.dynamic", "updated");
+
+    subject.reconfigureProperty("ozone.test.config.dynamic", null);
+
+    assertEquals("original", subject.getDynamic());
+  }
 }

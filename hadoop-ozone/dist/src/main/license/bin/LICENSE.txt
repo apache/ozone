@@ -266,15 +266,10 @@ Apache License 2.0
 =====================
 
    ch.qos.reload4j:reload4j
-   com.amazonaws:aws-java-sdk-core
-   com.amazonaws:aws-java-sdk-kms
-   com.amazonaws:aws-java-sdk-s3
-   com.amazonaws:jmespath-java
    com.carrotsearch:hppc
    com.fasterxml.jackson.core:jackson-annotations
    com.fasterxml.jackson.core:jackson-core
    com.fasterxml.jackson.core:jackson-databind
-   com.fasterxml.jackson.dataformat:jackson-dataformat-cbor
    com.fasterxml.jackson.dataformat:jackson-dataformat-xml
    com.fasterxml.jackson.datatype:jackson-datatype-jsr310
    com.fasterxml.jackson.jaxrs:jackson-jaxrs-base

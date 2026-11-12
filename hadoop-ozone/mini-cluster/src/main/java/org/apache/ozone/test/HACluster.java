@@ -15,28 +15,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.freon;
+package org.apache.ozone.test;
 
-import com.amazonaws.Request;
-import com.amazonaws.handlers.RequestHandler2;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
-import io.opentelemetry.context.Context;
+import java.util.UUID;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 
-/**
- * Adds W3C trace context headers to each outgoing S3 request so the S3 Gateway
- * can attach its spans to the Freon task span, using {@link W3CTraceContextPropagator}.
- */
-public final class FreonS3TraceContextRequestHandler extends RequestHandler2 {
-
+/** Cluster for HA tests. */
+public abstract class HACluster extends ClusterForTests<MiniOzoneHAClusterImpl> {
   @Override
-  public void beforeRequest(Request<?> request) {
-    if (!Span.current().getSpanContext().isValid()) {
-      return;
-    }
-    W3CTraceContextPropagator.getInstance().inject(
-        Context.current(),
-        request,
-        (carrier, key, value) -> carrier.addHeader(key, value));
+  protected MiniOzoneHAClusterImpl.Builder newClusterBuilder() {
+    return MiniOzoneCluster.newHABuilder(createOzoneConfig())
+        .setOMServiceId("om-" + UUID.randomUUID())
+        .setNumOfOzoneManagers(3)
+        .setSCMServiceId("scm-" + UUID.randomUUID())
+        .setNumOfStorageContainerManagers(3);
+  }
+
+  /** Test cases which need HA cluster should implement this. */
+  public interface TestCase extends ClusterForTests.TestCase {
+    @Override
+    MiniOzoneHAClusterImpl cluster();
   }
 }
