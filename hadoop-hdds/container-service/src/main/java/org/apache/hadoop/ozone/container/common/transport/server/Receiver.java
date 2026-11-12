@@ -77,18 +77,22 @@ final class Receiver implements Runnable {
   private DataInputStream input;
   // Responses wait here for this connection's writer thread, so a client that stops reading holds no executor thread.
   private final BlockingQueue<TaskEntry> responses = new LinkedBlockingQueue<>();
-  // Requests of this connection that are on the executor or in responses. It bounds the block files held open for
-  // the connection, and with the executor's size as the limit one connection keeps all of the executor's parallelism.
+  // Requests of this connection that are on the executor or in responses. With the executor's size as the limit, one
+  // connection keeps all of the executor's parallelism.
   private final Semaphore inFlight;
+  // Shared by all connections of the server; bounds the block files and responses held for clients that do not read.
+  private final Semaphore responseSlots;
   private volatile boolean closed;
 
   public static Receiver create(DomainPeer peer, ConfigurationSource conf, XceiverServerDomainSocket server,
-      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, ContainerMetrics metrics) throws IOException {
-    return new Receiver(peer, conf, server, dispatcher, executor, metrics);
+      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, Semaphore responseSlots, ContainerMetrics metrics)
+      throws IOException {
+    return new Receiver(peer, conf, server, dispatcher, executor, responseSlots, metrics);
   }
   
   private Receiver(DomainPeer peer, ConfigurationSource conf, XceiverServerDomainSocket server,
-      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, ContainerMetrics metrics) throws IOException {
+      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, Semaphore responseSlots, ContainerMetrics metrics)
+      throws IOException {
     this.peer = peer;
     this.socketIn = peer.getInputStream();
     this.socketOut = peer.getOutputStream();
@@ -96,6 +100,7 @@ final class Receiver implements Runnable {
     this.dispatcher = dispatcher;
     this.readExecutors = executor;
     this.inFlight = new Semaphore(executor.getMaximumPoolSize());
+    this.responseSlots = responseSlots;
     this.metrics = metrics;
     this.bufferSize = conf.getObject(OzoneClientConfig.class).getShortCircuitBufferSize();
   }
@@ -109,7 +114,8 @@ final class Receiver implements Runnable {
     try {
       domainSocketServer.addPeer(peer, Thread.currentThread(), this);
       input = new DataInputStream(new BufferedInputStream(socketIn, bufferSize));
-      writer = new Daemon(this::writeResponses);
+      Thread receiver = Thread.currentThread();
+      writer = new Daemon(() -> writeResponses(receiver));
       writer.setName(Thread.currentThread().getName() + "-writer");
       writer.start();
 
@@ -128,6 +134,7 @@ final class Receiver implements Runnable {
         }
 
         inFlight.acquire();
+        responseSlots.acquire();
         readExecutors.submit(new ProcessRequestTask(entry, opsHandled));
         ++opsReceived;
         // reset request variable
@@ -239,7 +246,7 @@ final class Receiver implements Runnable {
         LOG.error("Failed to processRequest {} {} {}", type, request.getClientId(), request.getCallId(), e);
         // no response is sent for this request
         closeFile(entry);
-        inFlight.release();
+        releaseSlot();
       } finally {
         span.end();
         counter.incrementAndGet();
@@ -256,7 +263,7 @@ final class Receiver implements Runnable {
   }
 
   /** Runs on this connection's writer thread until the connection is closed. **/
-  private void writeResponses() {
+  private void writeResponses(Thread receiver) {
     try {
       while (!closed) {
         TaskEntry entry = responses.take();
@@ -267,12 +274,17 @@ final class Receiver implements Runnable {
             sendResponse(entry);
           }
         } finally {
-          inFlight.release();
+          releaseSlot();
         }
       }
     } catch (InterruptedException e) {
       // the connection is closed
     } finally {
+      if (!closed) {
+        // the writer failed on a live connection; close it, or the Receiver would wait for slots that never return
+        IOUtils.closeStream(peer);
+        receiver.interrupt();
+      }
       closeQueued();
     }
   }
@@ -281,8 +293,13 @@ final class Receiver implements Runnable {
     TaskEntry entry;
     while ((entry = responses.poll()) != null) {
       closeFile(entry);
-      inFlight.release();
+      releaseSlot();
     }
+  }
+
+  private void releaseSlot() {
+    responseSlots.release();
+    inFlight.release();
   }
 
   void sendResponse(TaskEntry entry) {

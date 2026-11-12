@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.XceiverClientShortCircuit.vintPrefixed;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.MAX_ECHO_PAYLOAD_SIZE;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +63,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -1004,11 +1006,10 @@ public class TestXceiverServerDomainSocket {
           createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, containerMetrics));
       server.start();
       // larger than the socket buffers, so writing a response waits until the client reads it
-      int payloadSize = 1024 * 1024;
       unread = factory.createSocket(readTimeout, writeTimeout, localhost);
       DataOutputStream unreadOutput = new DataOutputStream(unread.getOutputStream());
-      sendRequest(unreadOutput, getEchoRequest(payloadSize));
-      sendRequest(unreadOutput, getEchoRequest(payloadSize));
+      sendRequest(unreadOutput, getEchoRequest(MAX_ECHO_PAYLOAD_SIZE));
+      sendRequest(unreadOutput, getEchoRequest(MAX_ECHO_PAYLOAD_SIZE));
       GenericTestUtils.waitFor(() -> containerMetrics.getContainerLocalOpsMetrics(ContainerProtos.Type.Echo) > 0,
           10, 5000);
 
@@ -1081,24 +1082,14 @@ public class TestXceiverServerDomainSocket {
         conf, null, executor, metrics, factory);
     DomainSocket sock = null;
     try {
-      ContainerDispatcher realDispatcher = createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics);
       List<RandomAccessFile> files = Collections.synchronizedList(new ArrayList<>());
-      ContainerDispatcher dispatcher = mock(ContainerDispatcher.class);
-      when(dispatcher.dispatch(any(), any())).thenAnswer(invocation -> {
-        DispatcherContext context = invocation.getArgument(1);
-        ContainerProtos.ContainerCommandResponseProto response =
-            realDispatcher.dispatch(invocation.getArgument(0), context);
-        if (context.getShortCircuitBlockFile() != null) {
-          files.add(context.getShortCircuitBlockFile());
-        }
-        return response;
-      });
-      server.setContainerDispatcher(dispatcher);
+      server.setContainerDispatcher(recordBlockFiles(
+          createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics), files, () -> null));
       server.start();
       sock = factory.createSocket(readTimeout, writeTimeout, localhost);
       DataOutputStream outputStream = new DataOutputStream(sock.getOutputStream());
       // the server is writing this response, which is larger than the socket buffers, once part of it is readable
-      sendRequest(outputStream, getEchoRequest(1024 * 1024));
+      sendRequest(outputStream, getEchoRequest(MAX_ECHO_PAYLOAD_SIZE));
       DomainSocket echoSock = sock;
       GenericTestUtils.waitFor(() -> available(echoSock) > 0, 10, 5000);
       sendRequest(outputStream, getBlockRequest(1, true));
@@ -1113,6 +1104,102 @@ public class TestXceiverServerDomainSocket {
       server.stop();
       executor.shutdownNow();
     }
+  }
+
+  /**
+   * A block file opened by a GetBlock whose connection closes while it is being dispatched is closed as well.
+   */
+  @Test
+  public void testBlockFileClosedWhenDispatchOutlivesConnection() throws Exception {
+    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+        conf, null, readExecutors, metrics, factory);
+    DomainSocket sock = null;
+    try {
+      List<RandomAccessFile> files = Collections.synchronizedList(new ArrayList<>());
+      CountDownLatch entered = new CountDownLatch(1);
+      CountDownLatch proceed = new CountDownLatch(1);
+      server.setContainerDispatcher(recordBlockFiles(
+          createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics), files, () -> {
+            entered.countDown();
+            return proceed.await(10, TimeUnit.SECONDS);
+          }));
+      server.start();
+      sock = factory.createSocket(readTimeout, writeTimeout, localhost);
+      sendRequest(new DataOutputStream(sock.getOutputStream()), getBlockRequest(1, true));
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+
+      // the connection's threads are gone before the dispatch finishes
+      sock.close();
+      GenericTestUtils.waitFor(() -> Thread.getAllStackTraces().keySet().stream()
+          .noneMatch(t -> t.getName().contains(XceiverServerDomainSocket.class.getSimpleName() + "@")), 10, 5000);
+      proceed.countDown();
+      GenericTestUtils.waitFor(() -> files.size() == 1, 10, 5000);
+      FileDescriptor fd = files.get(0).getFD();
+      GenericTestUtils.waitFor(() -> !fd.valid(), 10, 5000);
+    } finally {
+      factory.close();
+      IOUtils.closeQuietly(sock);
+      server.stop();
+    }
+  }
+
+  /**
+   * The responses held for connections that do not read are bounded for the whole server, at twice the executor
+   * size. Once they take every slot, other connections wait until one of those responses is read.
+   */
+  @Test
+  public void testResponsesHeldForUnreadConnectionsAreBounded() throws Exception {
+    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+    ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+        conf, null, readExecutors, containerMetrics, factory);
+    List<DomainSocket> socks = new ArrayList<>();
+    try {
+      server.setContainerDispatcher(
+          createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, containerMetrics));
+      server.start();
+      // the executor has one thread, so two connections that do not read take both slots
+      for (int i = 0; i < 2; i++) {
+        DomainSocket unread = factory.createSocket(readTimeout, writeTimeout, localhost);
+        socks.add(unread);
+        sendRequest(new DataOutputStream(unread.getOutputStream()), getEchoRequest(MAX_ECHO_PAYLOAD_SIZE));
+      }
+      GenericTestUtils.waitFor(() -> containerMetrics.getContainerLocalOpsMetrics(ContainerProtos.Type.Echo) == 2,
+          10, 5000);
+
+      DomainSocket other = factory.createSocket(readTimeout, writeTimeout, localhost);
+      socks.add(other);
+      sendRequest(new DataOutputStream(other.getOutputStream()), getBlockRequest(1, false));
+      DataInputStream otherInput = new DataInputStream(other.getInputStream());
+      assertThatThrownBy(() -> receiveResponse(otherInput)).isInstanceOf(SocketTimeoutException.class);
+
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          receiveResponse(new DataInputStream(socks.get(0).getInputStream())).getResult());
+      assertEquals(ContainerProtos.Result.SUCCESS, receiveResponse(otherInput).getResult());
+    } finally {
+      factory.close();
+      socks.forEach(IOUtils::closeQuietly);
+      server.stop();
+    }
+  }
+
+  /** Wraps a dispatcher to collect the block files it opens, running beforeDispatch first. */
+  private static ContainerDispatcher recordBlockFiles(ContainerDispatcher dispatcher, List<RandomAccessFile> files,
+      Callable<?> beforeDispatch) {
+    ContainerDispatcher recording = mock(ContainerDispatcher.class);
+    when(recording.dispatch(any(), any())).thenAnswer(invocation -> {
+      beforeDispatch.call();
+      DispatcherContext context = invocation.getArgument(1);
+      ContainerProtos.ContainerCommandResponseProto response = dispatcher.dispatch(invocation.getArgument(0), context);
+      if (context.getShortCircuitBlockFile() != null) {
+        files.add(context.getShortCircuitBlockFile());
+      }
+      return response;
+    });
+    return recording;
   }
 
   private static int available(DomainSocket sock) {
