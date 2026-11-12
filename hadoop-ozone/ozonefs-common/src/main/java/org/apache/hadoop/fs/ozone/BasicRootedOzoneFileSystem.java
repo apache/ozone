@@ -93,7 +93,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -188,9 +187,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     String host = hostAndPort.getHost();
 
     try {
-      uri = new URIBuilder().setScheme(OZONE_OFS_URI_SCHEME)
-          .setHost(authority)
-          .build();
+      uri = new URI(OZONE_OFS_URI_SCHEME + "://" + authority);
       LOG.trace("Ozone URI for OFS initialization is " + uri);
 
       ConfigurationSource source = getConfSource();
