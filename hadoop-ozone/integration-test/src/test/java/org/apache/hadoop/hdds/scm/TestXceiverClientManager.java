@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
-import com.google.common.cache.Cache;
+import com.github.benmanes.caffeine.cache.Cache;
 import java.io.IOException;
 import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -111,7 +111,7 @@ public abstract class TestXceiverClientManager implements ClusterForTests.TestCa
       clientManager.releaseClient(client1, true);
       clientManager.releaseClient(client2, true);
       clientManager.releaseClient(client3, true);
-      assertEquals(0, clientManager.getClientCache().size());
+      assertEquals(0, clientManager.getClientCache().estimatedSize());
     }
   }
 
