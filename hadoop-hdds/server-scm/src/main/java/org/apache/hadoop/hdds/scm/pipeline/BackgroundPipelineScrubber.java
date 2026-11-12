@@ -115,7 +115,20 @@ public class BackgroundPipelineScrubber implements SCMService {
   private void run() {
     while (running.get()) {
       try {
-        if (shouldRun()) {
+        final boolean shouldRun;
+        final long waitInMillis;
+        serviceLock.lock();
+        try {
+          // Decide whether to run and how long to wait from one check, so the safe mode run delay cannot elapse in
+          // between and leave the service waiting for a full interval. While the delay is pending, wake up as soon as
+          // it elapses instead of waiting for the full interval.
+          final long remainingDelay = getRemainingSafeModeRunDelayInMillis();
+          shouldRun = (serviceStatus == ServiceStatus.RUNNING) && (remainingDelay <= 0);
+          waitInMillis = remainingDelay > 0 ? Math.min(intervalInMillis, remainingDelay) : intervalInMillis;
+        } finally {
+          serviceLock.unlock();
+        }
+        if (shouldRun) {
           try {
             scrubTask.run();
           } catch (Throwable e) {
@@ -125,7 +138,7 @@ public class BackgroundPipelineScrubber implements SCMService {
         }
         synchronized (monitor) {
           if (!runImmediately) {
-            monitor.wait(getNextWaitInMillis());
+            monitor.wait(waitInMillis);
           }
           runImmediately = false;
         }
@@ -199,19 +212,6 @@ public class BackgroundPipelineScrubber implements SCMService {
       return 0;
     }
     return safeModeRunDelayInMillis - (clock.millis() - createdTimeInMillis);
-  }
-
-  /**
-   * Wakes up as soon as the safe mode run delay elapses, instead of waiting for the full interval.
-   */
-  private long getNextWaitInMillis() {
-    serviceLock.lock();
-    try {
-      final long remaining = getRemainingSafeModeRunDelayInMillis();
-      return remaining > 0 ? Math.min(intervalInMillis, remaining) : intervalInMillis;
-    } finally {
-      serviceLock.unlock();
-    }
   }
 
   /**

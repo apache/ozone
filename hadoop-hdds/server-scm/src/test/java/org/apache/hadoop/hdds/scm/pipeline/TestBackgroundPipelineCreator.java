@@ -119,7 +119,7 @@ public class TestBackgroundPipelineCreator {
   @Test
   public void testScrubberClosedPipelinesTriggerOneShotRunInSafeMode() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    // The one-shot run should trigger even pipeline creation even if background creation is disabled in safemode.
+    // The one-shot run should trigger pipeline creation even if background creation is disabled in safemode.
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     SCMContext scmContext = mock(SCMContext.class);
     when(scmContext.isLeader()).thenReturn(true);
