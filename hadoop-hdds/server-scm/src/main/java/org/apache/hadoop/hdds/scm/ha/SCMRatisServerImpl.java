@@ -171,16 +171,19 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       return;
     }
     for (File child : children) {
-      final String name = child.getName();
+      final RaftGroupId childGroupId;
       try {
-        if (!RaftGroupId.valueOf(UUID.fromString(name)).equals(groupId)) {
-          throw new IOException("Found stal Raft group directory " + child + " in the SCM Ratis storage directory "
-              + ratisDir + (groupId == null ? "" : ", expected only group " + groupId)
-              + ". Remove it if it was left by a previous cluster and retry.");
-        }
+        childGroupId = RaftGroupId.valueOf(UUID.fromString(child.getName()));
       } catch (IllegalArgumentException e) {
         // not a Raft group directory, ignore
+        continue;
       }
+      if (childGroupId.equals(groupId)) {
+        continue;
+      }
+      throw new IOException("Found stale Raft group directory " + child + " in the SCM Ratis storage directory "
+          + ratisDir + (groupId == null ? "" : ", expected only group " + groupId)
+          + ". Remove it if it was left by a previous cluster and retry.");
     }
   }
 
