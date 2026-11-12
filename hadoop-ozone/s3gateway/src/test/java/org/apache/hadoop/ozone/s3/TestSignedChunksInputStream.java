@@ -342,7 +342,12 @@ public class TestSignedChunksInputStream {
         Arguments.of(TrailerHeader.CRC32C, "4waSgw=="),
         Arguments.of(TrailerHeader.CRC64NVME, "rosUhgp5mIg="),
         Arguments.of(TrailerHeader.SHA1, "98O8HYCOBHMq32eZZczDTKeuNEE="),
-        Arguments.of(TrailerHeader.SHA256, "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="))
+        Arguments.of(TrailerHeader.SHA256, "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="),
+        Arguments.of("SHA512",
+            "2eZ2LdHI6vbWGzxhkvxAjU1tXxF20MKRabwk5xw/J0rSf81YEbMT1oH35V7ALXPUmclUVba1u1A6z1dPuo/+hQ=="),
+        Arguments.of("XXHASH64", "jLhB20DmroM="),
+        Arguments.of("XXHASH3", "ctyxi2ehff8="),
+        Arguments.of("XXHASH128", "MxGUd+3l3NXpcWQnaB1YYA=="))
         .flatMap(args -> Stream.of(false, true).flatMap(buffered -> Stream.of(false, true)
             .map(verify -> Arguments.of(args.get()[0], args.get()[1], buffered, verify))));
   }
@@ -482,7 +487,9 @@ public class TestSignedChunksInputStream {
 
   @ParameterizedTest
   @CsvSource({"x-amz-checksum-crc32,CRC32", "x-amz-checksum-crc32c,CRC32C", "x-amz-checksum-crc64nvme,CRC64NVME",
-      "x-amz-checksum-sha1,SHA1", "x-amz-checksum-sha256,SHA256", "' X-AMZ-CHECKSUM-CRC32C ',CRC32C"})
+      "x-amz-checksum-sha1,SHA1", "x-amz-checksum-sha256,SHA256", "x-amz-checksum-sha512,SHA512",
+      "x-amz-checksum-xxhash64,XXHASH64", "x-amz-checksum-xxhash3,XXHASH3", "x-amz-checksum-xxhash128,XXHASH128",
+      "' X-AMZ-CHECKSUM-CRC32C ',CRC32C"})
   void parsesTrailerHeader(String header, TrailerHeader expected) {
     assertThat(TrailerHeader.fromHeader(header, KEY_PATH)).isEqualTo(expected);
   }

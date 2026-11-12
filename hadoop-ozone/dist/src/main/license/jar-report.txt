@@ -64,6 +64,7 @@ share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-mapreduce-client-core.jar
 share/ozone/lib/hadoop-shaded-guava.jar
 share/ozone/lib/hadoop-shaded-protobuf_3_25.jar
+share/ozone/lib/hash4j.jar
 share/ozone/lib/hdds-cli-common.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar

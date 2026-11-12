@@ -267,6 +267,7 @@ Apache License 2.0
 
    ch.qos.reload4j:reload4j
    com.carrotsearch:hppc
+   com.dynatrace.hash4j:hash4j
    com.fasterxml.jackson.core:jackson-annotations
    com.fasterxml.jackson.core:jackson-core
    com.fasterxml.jackson.core:jackson-databind
@@ -578,3 +579,7 @@ licenses/LICENSE-ozone-recon.txt for the detailed list of the dependencies and l
 --------------------------------------------------------------------------------
 ratis-thirdparty-misc is a shaded dependency which includes additional 3rd party dependencies in shaded form.
 For the detailed list of the dependencies and the associated licenses see licenses/LICENSE-ratis-thirdparty-misc.txt.
+
+--------------------------------------------------------------------------------
+hash4j includes ports of hash algorithms with additional third-party license notices.
+See licenses/LICENSE-com.dynatrace.hash4j-hash4j.txt for these notices.
