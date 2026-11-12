@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
 
 import java.io.IOException;
@@ -28,7 +25,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -63,14 +59,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
         OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
             omBucketInfo.getVolumeName(), omBucketInfo.getBucketName(),
             keyName, keyPath);
-    if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {
-      throw new OMException("Can not Complete MPU for file: " + keyName +
-          " as there is already directory in the given path",
-          NOT_A_FILE);
-    } else if (pathInfoFSO.getDirectoryResult() == FILE_EXISTS_IN_GIVENPATH) {
-      throw new OMException("Can not Complete MPU for file: " + keyName + " as there is already file in the given path",
-          NOT_A_FILE);
-    }
+    OMFileRequest.checkDirectoryResult(keyName, true, pathInfoFSO.getDirectoryResult());
   }
 
   @Override

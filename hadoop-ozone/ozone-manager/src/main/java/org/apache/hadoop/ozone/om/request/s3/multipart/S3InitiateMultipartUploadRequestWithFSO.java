@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -34,7 +32,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -113,7 +110,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
               keyName, Paths.get(keyName));
 
       // check if the directory already existed in OM
-      checkDirectoryResult(keyName, pathInfoFSO.getDirectoryResult());
+      OMFileRequest.checkDirectoryResult(keyName, true, pathInfoFSO.getDirectoryResult());
 
       final OmBucketInfo bucketInfo = getBucketInfoForUpdate(omMetadataManager,
           volumeName, bucketName);
@@ -249,23 +246,5 @@ public class S3InitiateMultipartUploadRequestWithFSO
             bucketName, keyName, exception, result);
 
     return omClientResponse;
-  }
-
-  /**
-   * Verify om directory result.
-   *
-   * @param keyName           key name
-   * @param omDirectoryResult directory result
-   * @throws OMException if file or directory or file exists in the given path
-   */
-  private void checkDirectoryResult(String keyName,
-      OMFileRequest.OMDirectoryResult omDirectoryResult) throws OMException {
-    if (omDirectoryResult == DIRECTORY_EXISTS) {
-      throw new OMException("Can not write to directory: " + keyName,
-              OMException.ResultCodes.NOT_A_FILE);
-    } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-      throw new OMException("Can not create file: " + keyName + " as there is already file in the given path",
-          OMException.ResultCodes.NOT_A_FILE);
-    }
   }
 }
