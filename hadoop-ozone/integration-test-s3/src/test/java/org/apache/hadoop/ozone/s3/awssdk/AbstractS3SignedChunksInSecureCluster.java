@@ -102,6 +102,7 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
   private static final String BUCKET = "signed-chunks";
   private static final String CRC32C_TRAILER = "x-amz-checksum-crc32c";
   private static final String WRONG_CHECKSUM = "AAAAAA==";
+  /** Two data chunks at the SDK's 128 KiB chunk size, then the final empty chunk. */
   private static final byte[] DATA = new byte[128 * 1024 + 1024];
 
   static {
