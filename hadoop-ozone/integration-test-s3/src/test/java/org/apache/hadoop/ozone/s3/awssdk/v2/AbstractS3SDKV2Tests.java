@@ -576,15 +576,26 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     final String keyName = getKeyName();
     s3Client.createBucket(b -> b.bucket(bucketName));
     List<SdkHttpRequest> requests = new ArrayList<>();
+    ExecutionInterceptor recorder = new ExecutionInterceptor() {
+      @Override
+      public void beforeTransmission(Context.BeforeTransmission context, ExecutionAttributes executionAttributes) {
+        requests.add(context.httpRequest());
+      }
+    };
 
     PutObjectResponse response = s3AsyncClient.putObject(b -> b.bucket(bucketName).key(keyName)
             .checksumAlgorithm(algorithm)
             .overrideConfiguration(o -> o.addPlugin(c -> c.overrideConfiguration(
-                overrides -> overrides.addExecutionInterceptor(requestRecorder(requests))))),
+                overrides -> overrides.addExecutionInterceptor(recorder)))),
         AsyncRequestBody.fromString(content))
         .get(30, TimeUnit.SECONDS);
 
-    assertChecksumTrailers(requests, algorithm, S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER);
+    assertThat(requests).isNotEmpty().allSatisfy(request -> {
+      assertThat(request.firstMatchingHeader(S3Consts.X_AMZ_TRAILER))
+          .contains("x-amz-checksum-" + algorithm.toString().toLowerCase(Locale.ROOT));
+      assertThat(request.firstMatchingHeader(S3Consts.X_AMZ_CONTENT_SHA256))
+          .contains(S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER);
+    });
     assertThat(response.eTag()).isNotEmpty();
     assertThat(s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String()).isEqualTo(content);
   }
@@ -606,23 +617,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
         .multipartUpload(CompletedMultipartUpload.builder().parts(part).build()));
 
     assertThat(s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String()).isEqualTo(content);
-  }
-
-  private static ExecutionInterceptor requestRecorder(List<SdkHttpRequest> requests) {
-    return new ExecutionInterceptor() {
-      @Override
-      public void beforeTransmission(Context.BeforeTransmission context, ExecutionAttributes executionAttributes) {
-        requests.add(context.httpRequest());
-      }
-    };
-  }
-
-  private static void assertChecksumTrailers(List<SdkHttpRequest> requests, ChecksumAlgorithm algorithm, String mode) {
-    assertThat(requests).isNotEmpty().allSatisfy(request -> {
-      assertThat(request.firstMatchingHeader(S3Consts.X_AMZ_TRAILER))
-          .contains("x-amz-checksum-" + algorithm.toString().toLowerCase(Locale.ROOT));
-      assertThat(request.firstMatchingHeader(S3Consts.X_AMZ_CONTENT_SHA256)).contains(mode);
-    });
   }
 
   @ParameterizedTest
