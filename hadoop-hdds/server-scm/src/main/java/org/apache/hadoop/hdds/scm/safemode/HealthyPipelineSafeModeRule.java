@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -55,8 +56,9 @@ import org.slf4j.LoggerFactory;
  * The rule also requires that no open pipeline of any replication type has a
  * datanode which is not registered with SCM, so that unregistered datanodes are
  * not handed out for reads or writes after safe mode exit. Such pipelines are
- * closed by the pipeline scrubber while SCM is in safe mode. This check applies
- * even when the RATIS/THREE healthy pipeline threshold is disabled.
+ * closed by the pipeline scrubber on the leader SCM while it is in safe mode,
+ * so followers wait for the leader to close them. This check applies even when
+ * the RATIS/THREE healthy pipeline threshold is disabled.
  */
 public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
@@ -71,6 +73,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final int minHealthyPipelines;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
   private final NodeManager nodeManager;
+  private final SCMContext scmContext;
   private final RatisReplicationConfig targetReplicationConfig =
       RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
   private final int targetRequiredNodes =
@@ -82,11 +85,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
-      ConfigurationSource configuration, NodeManager nodeManager,
+      ConfigurationSource configuration, NodeManager nodeManager, SCMContext scmContext,
       boolean ratisThreeRuleEnabled) {
     super(manager, eventQueue);
     this.pipelineManager = pipelineManager;
     this.nodeManager = nodeManager;
+    this.scmContext = scmContext;
     this.ratisThreeRuleEnabled = ratisThreeRuleEnabled;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
@@ -355,6 +359,10 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     status = status.concat(String.format("open pipelines with unregistered datanodes (=%d) == 0",
         unregisteredNodePipelines.size()));
     if (!unregisteredNodePipelines.isEmpty()) {
+      // Only the leader's pipeline scrubber closes these pipelines.
+      if (!scmContext.isLeader()) {
+        status = status.concat("\nWaiting for the leader SCM to close the pipelines with unregistered datanodes");
+      }
       status = status.concat("\nSample pipelines with unregistered datanodes : "
           + unregisteredNodePipelines.subList(0, Math.min(SAMPLE_PIPELINE_DISPLAY_LIMIT,
           unregisteredNodePipelines.size())));

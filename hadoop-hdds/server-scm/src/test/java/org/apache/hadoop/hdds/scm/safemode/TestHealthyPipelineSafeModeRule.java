@@ -557,12 +557,21 @@ public class TestHealthyPipelineSafeModeRule {
       nodeManager.getClusterNetworkTopologyMap().remove(unregisteredNode);
       assertFalse(rule.validate());
       assertThat(rule.getStatusText()).contains("open pipelines with unregistered datanodes (=")
+          .contains(pipeline.getId().toString())
+          .doesNotContain("Waiting for the leader SCM");
+
+      // A follower notes that it is waiting for the leader to close the pipelines.
+      scmContext.updateLeaderAndTerm(false, 0);
+      assertFalse(rule.validate());
+      assertThat(rule.getStatusText())
+          .contains("Waiting for the leader SCM to close the pipelines with unregistered datanodes")
           .contains(pipeline.getId().toString());
 
       // Once the node registers again, the rule can pass again.
       nodeManager.getClusterNetworkTopologyMap().add(unregisteredNode);
       assertTrue(rule.validate());
-      assertThat(rule.getStatusText()).contains("open pipelines with unregistered datanodes (=0)");
+      assertThat(rule.getStatusText()).contains("open pipelines with unregistered datanodes (=0)")
+          .doesNotContain("Waiting for the leader SCM");
     } finally {
       scmMetadataStore.getStore().close();
     }
