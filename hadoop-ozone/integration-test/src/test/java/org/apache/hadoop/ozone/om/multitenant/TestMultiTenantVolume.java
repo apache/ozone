@@ -180,6 +180,7 @@ public class TestMultiTenantVolume {
     }
 
     assertS3KeyDeletion(store, store.getS3Bucket(bucketName), bucketName);
+    assertS3TagDeletion(store, store.getS3Bucket(bucketName), bucketName);
 
     // Delete bucket.
     store.deleteS3Bucket(bucketName);
@@ -202,6 +203,7 @@ public class TestMultiTenantVolume {
     OzoneBucket bucket = store.getS3Bucket(BUCKET_NAME);
     assertEquals(TENANT_ID, bucket.getVolumeName());
     assertS3KeyDeletion(store, bucket, BUCKET_NAME);
+    assertS3TagDeletion(store, bucket, BUCKET_NAME);
 
     // OM resolves the tenant volume and the user principal in the same InfoBucket call.
     try (OzoneClient s3Client = newS3Client()) {
@@ -255,6 +257,7 @@ public class TestMultiTenantVolume {
     assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
 
     assertS3KeyDeletion(store, sourceBucket, linkBucketName);
+    assertS3TagDeletion(store, sourceBucket, linkBucketName);
 
     store.deleteS3Bucket(linkBucketName);
     sourceVolume.deleteBucket(sourceBucketName);
@@ -291,18 +294,29 @@ public class TestMultiTenantVolume {
     String keyName = "delete-key";
     bucket.createKey(keyName, 0).close();
 
-    try (OzoneClient s3Client = newS3Client()) {
+    try (OzoneClient s3Client = newS3Client(store)) {
       assertThat(OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(s3Client.getProxy().getOmVersion()))
           .isTrue();
-      S3Auth auth = store.getClientProxy().getThreadLocalS3Auth();
-      if (auth != null) {
-        s3Client.getProxy().setThreadLocalS3Auth(auth);
-      }
       s3Client.getProxy().deleteKey(null, s3BucketName, keyName, false);
     }
 
     OMException exception = assertThrows(OMException.class, () -> bucket.getKey(keyName));
     assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.KEY_NOT_FOUND);
+  }
+
+  private void assertS3TagDeletion(ObjectStore store, OzoneBucket bucket, String s3BucketName) throws Exception {
+    String keyName = "delete-tagging-key";
+    bucket.createKey(keyName, 0).close();
+    bucket.putObjectTagging(keyName, Collections.singletonMap("tag", "value"));
+
+    try (OzoneClient s3Client = newS3Client(store)) {
+      assertThat(OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(s3Client.getProxy().getOmVersion()))
+          .isTrue();
+      s3Client.getProxy().deleteObjectTagging(null, s3BucketName, keyName);
+    }
+
+    assertThat(bucket.getKey(keyName).getTags()).isEmpty();
+    bucket.deleteKey(keyName);
   }
 
   /**
@@ -350,6 +364,16 @@ public class TestMultiTenantVolume {
     OzoneConfiguration conf = new OzoneConfiguration(cluster.getOzoneManager().getConfiguration());
     conf.setBoolean(S3Auth.S3_AUTH_CHECK, true);
     return OzoneClientFactory.getRpcClient(conf);
+  }
+
+  /** Creates an S3 client that sends requests as the S3 user of {@code store}, if it has one. */
+  private static OzoneClient newS3Client(ObjectStore store) throws IOException {
+    OzoneClient s3Client = newS3Client();
+    S3Auth auth = store.getClientProxy().getThreadLocalS3Auth();
+    if (auth != null) {
+      s3Client.getProxy().setThreadLocalS3Auth(auth);
+    }
+    return s3Client;
   }
 
   @Test

@@ -31,8 +31,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -181,7 +181,8 @@ public class TestScmClient {
         .thenThrow(runtimeException);
     RuntimeException actualRt = assertThrows(RuntimeException.class,
         () -> scmClient.getContainerLocations(newHashSet(2L), false));
-    assertEquals(runtimeException, actualRt.getCause());
+    // the cache does not wrap an unchecked exception of the loader
+    assertEquals(runtimeException, actualRt);
   }
 
   @Test
@@ -197,7 +198,7 @@ public class TestScmClient {
   @Test
   public void testDatanodeDetailsCacheUpdatesIpAddressChange() {
     Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
-        CacheBuilder.newBuilder().build();
+        Caffeine.newBuilder().build();
     DatanodeDetails original = randomDatanode();
     String originalIp = original.getIpAddress();
     DatanodeDetails updated = DatanodeDetails.newBuilder()
@@ -268,7 +269,7 @@ public class TestScmClient {
 
   @Test
   public void testDatanodeDetailsCacheUpdatesCurrentVersionChange() {
-    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = CacheBuilder.newBuilder().build();
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = Caffeine.newBuilder().build();
     DatanodeDetails original = randomDatanode();
     original.setCurrentVersion(HDDSVersion.STREAM_BLOCK_SUPPORT);
     DatanodeDetails upgraded = DatanodeDetails.newBuilder()
@@ -287,7 +288,7 @@ public class TestScmClient {
 
   @Test
   public void testDatanodeDetailsCacheUpdatesKnownVersionToUnknownWireVersion() {
-    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = CacheBuilder.newBuilder().build();
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = Caffeine.newBuilder().build();
     DatanodeDetails original = randomDatanode();
     original.setCurrentVersion(HDDSVersion.SHORT_CIRCUIT_READS);
     DatanodeDetails upgraded = sameNodeWithWireVersion(original, UNKNOWN_WIRE_VERSION_A);
@@ -306,7 +307,7 @@ public class TestScmClient {
 
   @Test
   public void testDatanodeDetailsCacheUpdatesDifferentUnknownWireVersions() {
-    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = CacheBuilder.newBuilder().build();
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = Caffeine.newBuilder().build();
     DatanodeDetails original = sameNodeWithWireVersion(randomDatanode(), UNKNOWN_WIRE_VERSION_A);
     DatanodeDetails upgraded = sameNodeWithWireVersion(original, UNKNOWN_WIRE_VERSION_B);
 

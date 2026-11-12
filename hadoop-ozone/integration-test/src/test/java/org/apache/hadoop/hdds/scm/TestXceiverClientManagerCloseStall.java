@@ -154,7 +154,7 @@ public class TestXceiverClientManagerCloseStall {
       ContainerProtocolCalls.createContainer(client, CONTAINER_ID.incrementAndGet(), null);
       manager.releaseClient(client, false);
     }
-    assertThat(manager.getClientCache().size()).isEqualTo(pipelines.size());
+    assertThat(manager.getClientCache().estimatedSize()).isEqualTo(pipelines.size());
     return manager;
   }
 

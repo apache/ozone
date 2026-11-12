@@ -699,34 +699,6 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT = 10;
 
   /**
-   * Configuration properties for Compaction Service.
-   */
-  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.om.compaction.service.enabled";
-  public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = false;
-  public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
-      "ozone.om.compaction.service.run.interval";
-  public static final long OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.HOURS.toMillis(6);
-
-  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT
-      = "ozone.om.compaction.service.timeout";
-  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
-  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
-      = "ozone.om.compaction.service.columnfamilies";
-  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
-      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
-
-  /**
-   * Bottommost level compaction type for manual compaction.
-   * Invalid values will default to kSkip.
-   * Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
-   * Refer to {@code org.rocksdb.CompactRangeOptions.BottommostLevelCompaction}.
-   */
-  public static final String OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION =
-      "ozone.om.compaction.service.bottommost-level-compaction";
-  public static final String OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT = "kSkip";
-
-  /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
    */
   public static final String OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES = 

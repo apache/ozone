@@ -3004,11 +3004,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setKeyArgs(keyArgs)
             .build();
 
-    OMRequest omRequest = createOMRequest(Type.DeleteObjectTagging)
-        .setDeleteObjectTaggingRequest(req)
-        .build();
+    OMRequest.Builder omRequest = createOMRequest(Type.DeleteObjectTagging)
+        .setDeleteObjectTaggingRequest(req);
+    if (args.isAssumeS3Context()) {
+      omRequest.setAssumeS3Context(true);
+    }
 
-    OMResponse omResponse = submitRequest(omRequest);
+    OMResponse omResponse = submitRequest(omRequest.build());
     handleError(omResponse);
   }
 
