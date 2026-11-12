@@ -37,12 +37,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -74,8 +74,10 @@ class TestReconStorageContainerManagerFacade {
   void tearDown() throws Exception {
     metricsToUnregister.forEach(ReconScmContainerSyncMetrics::unRegister);
     metricsToUnregister.clear();
-    ReconTestUtils.closeReconResources(reconScmFacade, reconDBProvider, replicaHistoryDBProvider,
-        reconOMMetadataManager, omMetadataManager);
+    if (reconScmFacade != null) {
+      reconScmFacade.stop();
+    }
+    IOUtils.closeQuietly(replicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, omMetadataManager);
   }
 
   @Test

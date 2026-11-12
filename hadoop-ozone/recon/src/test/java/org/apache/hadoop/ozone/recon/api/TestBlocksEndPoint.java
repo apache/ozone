@@ -42,12 +42,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerBlocksInfoWrapper;
-import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -143,8 +143,10 @@ public class TestBlocksEndPoint {
 
   @AfterEach
   public void tearDown() throws Exception {
-    ReconTestUtils.closeReconResources(reconStorageContainerManager, reconDBProvider, reconReplicaHistoryDBProvider,
-        reconOMMetadataManager, omMetadataManager);
+    if (reconStorageContainerManager != null) {
+      reconStorageContainerManager.stop();
+    }
+    IOUtils.closeQuietly(reconReplicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, omMetadataManager);
   }
 
   @Test

@@ -99,6 +99,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
@@ -598,8 +599,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @AfterEach
   public void tearDown() throws Exception {
-    ReconTestUtils.closeReconResources(reconScm, reconDBProvider, reconReplicaHistoryDBProvider, reconOMMetadataManager,
-        testOmMetadataManager);
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+    IOUtils.closeQuietly(reconReplicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, testOmMetadataManager);
   }
 
   private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)
