@@ -30,4 +30,7 @@ export COMPOSE_FILE=docker-compose.yaml:vault.yaml
 
 start_docker_env
 
-execute_robot_test scm s3
+# some S3 tests are independent of the bucket type, only need to be run once, in ozonesecure-ha/test-haproxy-s3g.sh
+exclude="--exclude no-bucket-type"
+bucket=link
+execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3

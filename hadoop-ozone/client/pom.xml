@@ -25,11 +25,18 @@
   <packaging>jar</packaging>
   <name>Apache Ozone Client</name>
   <description>Apache Ozone Client</description>
+  <properties>
+    <ban-rocksdb.skip>false</ban-rocksdb.skip>
+  </properties>
 
   <dependencies>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.stephenc.jcip</groupId>

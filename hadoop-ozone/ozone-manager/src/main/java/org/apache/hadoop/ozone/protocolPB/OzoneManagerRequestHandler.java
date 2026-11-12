@@ -36,7 +36,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
@@ -59,7 +58,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
-import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -71,6 +69,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -139,6 +138,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVol
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
@@ -201,7 +201,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
-  private FaultInjector injector;
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
@@ -236,8 +235,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setListVolumeResponse(listVolumeResponse);
         break;
       case InfoBucket:
-        InfoBucketResponse infoBucketResponse = infoBucket(
-            request.getInfoBucketRequest());
+        InfoBucketResponse infoBucketResponse = infoBucket(request, responseBuilder);
         responseBuilder.setInfoBucketResponse(infoBucketResponse);
         break;
       case ListBuckets:
@@ -441,7 +439,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case GetObjectTagging:
         OzoneManagerProtocolProtos.GetObjectTaggingResponse getObjectTaggingResponse =
-            getObjectTagging(request.getGetObjectTaggingRequest());
+            getObjectTagging(request.getGetObjectTaggingRequest(),
+                request.getAssumeS3Context());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
       case GetLifecycleConfiguration:
@@ -485,7 +484,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @Override
   public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context) throws IOException {
-    injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
@@ -500,27 +498,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, getOzoneManager(), context.getTermIndex(),
           th);
       throw th;
-    }
-  }
-
-  @VisibleForTesting
-  public void setInjector(FaultInjector injector) {
-    this.injector = injector;
-  }
-
-  @VisibleForTesting
-  public FaultInjector getInjector() {
-    return injector;
-  }
-
-  /**
-   * Inject pause for test only.
-   *
-   * @throws IOException
-   */
-  private void injectPause() throws IOException {
-    if (injector != null) {
-      injector.pause();
     }
   }
 
@@ -683,13 +660,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private InfoBucketResponse infoBucket(InfoBucketRequest request)
+  private InfoBucketResponse infoBucket(OMRequest request, OMResponse.Builder responseBuilder)
       throws IOException {
+    InfoBucketRequest infoBucketRequest = request.getInfoBucketRequest();
     InfoBucketResponse.Builder resp =
         InfoBucketResponse.newBuilder();
-    OmBucketInfo omBucketInfo = impl.getBucketInfo(
-        request.getVolumeName(), request.getBucketName());
-    resp.setBucketInfo(omBucketInfo.getProtobuf());
+    boolean assumeS3Context = request.hasAssumeS3Context() && request.getAssumeS3Context();
+    BucketInfoWithS3Context context = impl.getBucketInfo(
+        infoBucketRequest.getVolumeName(), infoBucketRequest.getBucketName(), assumeS3Context);
+    resp.setBucketInfo(context.getBucketInfo().getProtobuf());
+    if (assumeS3Context) {
+      context.getUserPrincipal().ifPresent(responseBuilder::setUserPrincipal);
+    }
 
     return resp.build();
   }
@@ -1029,6 +1011,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setPurgeableKeys(bytes.getPurgeableKeys())
         .setSnapshotTrappedDirs(bytes.getSnapshotTrappedDirs())
         .setPurgeableDirs(bytes.getPurgeableDirs())
+        .setPurgeableKeyBytes(bytes.getPurgeableKeyBytes())
+        .setPurgeableDirBytes(bytes.getPurgeableDirBytes())
         .build();
   }
 
@@ -1325,6 +1309,60 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupKey
+  )
+  public static OMResponse disallowLookupKeyWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasLookupKeyResponse() || !hasMultipartPartIv(resp.getLookupKeyResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getLookupKeyResponse().getKeyInfo(), resp.toBuilder().clearLookupKeyResponse());
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.GetKeyInfo
+  )
+  public static OMResponse disallowGetKeyInfoWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasGetKeyInfoResponse() || !hasMultipartPartIv(resp.getGetKeyInfoResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getGetKeyInfoResponse().getKeyInfo(),
+        resp.toBuilder().clearGetKeyInfoResponse());
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupFile
+  )
+  public static OMResponse disallowLookupFileWithMultipartPartIv(
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
+    if (!resp.hasLookupFileResponse() || !hasMultipartPartIv(resp.getLookupFileResponse().getKeyInfo())) {
+      return resp;
+    }
+    return disallowMultipartPartIv(resp.getLookupFileResponse().getKeyInfo(),
+        resp.toBuilder().clearLookupFileResponse());
+  }
+
+  private static boolean hasMultipartPartIv(KeyInfo keyInfo) {
+    return keyInfo.getKeyLocationListList().stream()
+        .anyMatch(list -> list.getKeyLocationsList().stream().anyMatch(KeyLocation::hasPartIv));
+  }
+
+  private static OMResponse disallowMultipartPartIv(KeyInfo keyInfo, OMResponse.Builder resp) {
+    return resp.setStatus(Status.NOT_SUPPORTED_OPERATION)
+        .setMessage("Key " + keyInfo.getVolumeName() + "/" + keyInfo.getBucketName() + "/" + keyInfo.getKeyName()
+            + " is a multipart key whose parts have their own encryption IV, which the client can not read."
+            + " Please upgrade the client before trying to read the key.")
+        .build();
+  }
+
   private ListStatusResponse listStatus(
       ListStatusRequest request, ClientVersion clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
@@ -1614,7 +1652,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             submitSnapshotDiffRequest.getFromSnapshot(),
             submitSnapshotDiffRequest.getToSnapshot(),
             submitSnapshotDiffRequest.getForceFullDiff(),
-            submitSnapshotDiffRequest.getDisableNativeDiff());
+            submitSnapshotDiffRequest.getDisableNativeDiff(),
+            submitSnapshotDiffRequest.getOrdered());
 
     SubmitSnapshotDiffResponse.Builder builder = SubmitSnapshotDiffResponse
         .newBuilder();
@@ -1773,13 +1812,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
   }
 
-  private GetObjectTaggingResponse getObjectTagging(GetObjectTaggingRequest request)
-      throws IOException {
+  private GetObjectTaggingResponse getObjectTagging(
+      GetObjectTaggingRequest request, boolean assumeS3Context) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
     GetObjectTaggingResponse.Builder resp =

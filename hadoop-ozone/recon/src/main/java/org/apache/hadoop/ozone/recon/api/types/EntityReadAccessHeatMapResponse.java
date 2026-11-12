@@ -89,8 +89,8 @@ public class EntityReadAccessHeatMapResponse {
   private long maxAccessCount;
 
   @JsonProperty("color")
-  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-  private double color;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Double color;
 
   public EntityReadAccessHeatMapResponse() {
     this.children = new ArrayList<>();
@@ -152,7 +152,7 @@ public class EntityReadAccessHeatMapResponse {
     this.maxAccessCount = maxAccessCount;
   }
 
-  public double getColor() {
+  public Double getColor() {
     return color;
   }
 
