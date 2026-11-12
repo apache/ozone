@@ -22,8 +22,7 @@ REPORT_NAME=${1:-current.txt}
 
 cd "$SCRIPTDIR/../../.." || exit 1
 
-OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
-DIST_DIR="$SCRIPTDIR/../../../target/ozone-$OZONE_VERSION"
+DIST_DIR="$(find target -mindepth 1 -maxdepth 1 -type d -name 'ozone-[0-9]*' | sort | head -1)"
 : ${OZONE_DIST_DIR:=$DIST_DIR}
 
 cd "$OZONE_DIST_DIR"

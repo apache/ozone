@@ -37,6 +37,7 @@ import java.io.RandomAccessFile;
 import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Objects;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -51,7 +52,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.util.LimitInputStream;
 import org.apache.ratis.thirdparty.com.google.protobuf.CodedInputStream;
 import org.slf4j.Logger;
@@ -70,21 +71,23 @@ final class Receiver implements Runnable {
   private final InputStream socketIn;
   private OutputStream socketOut;
   private final int bufferSize;
+  private final ThreadPoolExecutor readExecutors;
   private DataInputStream input;
   private Lock lock = new ReentrantLock();
 
   public static Receiver create(DomainPeer peer, ConfigurationSource conf, XceiverServerDomainSocket server,
-      ContainerDispatcher dispatcher, ContainerMetrics metrics) throws IOException {
-    return new Receiver(peer, conf, server, dispatcher, metrics);
+      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, ContainerMetrics metrics) throws IOException {
+    return new Receiver(peer, conf, server, dispatcher, executor, metrics);
   }
   
   private Receiver(DomainPeer peer, ConfigurationSource conf, XceiverServerDomainSocket server,
-      ContainerDispatcher dispatcher, ContainerMetrics metrics) throws IOException {
+      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, ContainerMetrics metrics) throws IOException {
     this.peer = peer;
     this.socketIn = peer.getInputStream();
     this.socketOut = peer.getOutputStream();
     this.domainSocketServer = server;
     this.dispatcher = dispatcher;
+    this.readExecutors = executor;
     this.metrics = metrics;
     this.bufferSize = conf.getObject(OzoneClientConfig.class).getShortCircuitBufferSize();
   }
@@ -112,8 +115,7 @@ final class Receiver implements Runnable {
           throw e;
         }
 
-        // Processed on this connection's thread, so a response that waits for its reader holds no shared thread.
-        new ProcessRequestTask(entry, opsHandled).run();
+        readExecutors.submit(new ProcessRequestTask(entry, opsHandled));
         ++opsReceived;
         // reset request variable
         entry = null;
@@ -196,17 +198,19 @@ final class Receiver implements Runnable {
           request.getTraceID());
       try (Scope ignore = span.makeCurrent()) {
         ContainerCommandResponseProto responseProto;
+        final DispatcherContext context =
+            DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ).build();
         if (isSupportedCmdType(type)) {
-          responseProto = dispatcher.dispatch(request, null);
+          responseProto = dispatcher.dispatch(request, context);
         } else {
           responseProto = getContainerCommandResponse(request, ContainerProtos.Result.UNSUPPORTED_REQUEST,
               "This command is not supported through DomainSocket channel.")
               .build();
         }
-        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock) {
+        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock
+            && responseProto.getGetBlock().getShortCircuitAccessGranted()) {
           // get FileDescriptor
-          Handler handler = dispatcher.getHandler(ContainerProtos.ContainerType.KeyValueContainer);
-          RandomAccessFile file = handler.getBlockFile(request);
+          RandomAccessFile file = context.getShortCircuitBlockFile();
           Objects.requireNonNull(file,
               "Failed to get block file for block " + request.getGetBlock().getBlockID());
           entry.setFile(file);
@@ -253,13 +257,17 @@ final class Receiver implements Runnable {
       }
     } catch (Throwable e) {
       LOG.error("Failed to send response {} {}", responseProto.getCmdType(), peer.getDomainSocket(), e);
+      // A partial response frame may already be on the wire; close the peer so the next response is not appended to it.
+      IOUtils.closeStream(peer);
     } finally {
       lock.unlock();
       entry.setSendFinishTimeNs();
-      try {
-        entry.getFile().close();
-      } catch (IOException e) {
-        LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+      if (entry.getFile() != null) {
+        try {
+          entry.getFile().close();
+        } catch (IOException e) {
+          LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+        }
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Request {} {}:{}, receive {} ns, in queue {} ns, " +

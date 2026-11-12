@@ -21,7 +21,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
-import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.runTestOzoneContainerViaDataNode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -135,9 +135,9 @@ public class TestReconAsPassiveScm {
     XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
     runTestOzoneContainerViaDataNode(containerID, client);
 
-    // Verify Recon picked up the new container that was created.
-    assertEquals(scmContainerManager.getContainers(),
-        reconContainerManager.getContainers());
+    // Wait for Recon to pick up the new container, the datanode reports it to Recon on the next Recon heartbeat.
+    GenericTestUtils.waitFor(() -> scmContainerManager.getContainers().equals(reconContainerManager.getContainers()),
+        100, 20000);
 
     LogCapturer logCapturer = LogCapturer.captureLogs(ReconNodeManager.class);
     GenericTestUtils.setLogLevel(ReconNodeManager.class, Level.DEBUG);

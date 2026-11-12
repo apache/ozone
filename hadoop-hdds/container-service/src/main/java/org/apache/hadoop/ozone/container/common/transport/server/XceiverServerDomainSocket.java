@@ -24,6 +24,7 @@ import java.nio.channels.AsynchronousCloseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -72,13 +73,15 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   private final ConcurrentHashMap<DomainPeer, Receiver> peersReceiver = new ConcurrentHashMap<>();
   private int readTimeoutMs;
   private int writeTimeoutMs;
+  private final ThreadPoolExecutor readExecutors;
   private FaultInjector injector;
 
   /**
    * Constructs a DomainSocket server class, used to listen for requests from local clients.
    */
   public XceiverServerDomainSocket(DatanodeDetails datanodeDetails, ConfigurationSource conf,
-      ContainerDispatcher dispatcher, ContainerMetrics metrics, DomainSocketFactory domainSocketFactory) {
+      ContainerDispatcher dispatcher, ThreadPoolExecutor executor,
+      ContainerMetrics metrics, DomainSocketFactory domainSocketFactory) {
     Objects.requireNonNull(conf);
     this.port = conf.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
@@ -93,6 +96,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
     this.maxXceiverCount = threadCountPerDisk * numberOfDisks * 5;
     this.xceriverCount = new AtomicInteger(0);
     this.dispatcher = dispatcher;
+    this.readExecutors = executor;
     this.metrics = metrics;
     LOG.info("Max allowed {} xceiver", maxXceiverCount);
     this.threadPrefix = datanodeDetails.threadNamePrefix() + XceiverServerDomainSocket.class.getSimpleName();
@@ -202,9 +206,12 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   public void run() {
     while (isRunning.get()) {
       DomainPeer peer = null;
+      // true while this loop holds the count of an accepted connection that no Receiver owns yet
+      boolean releaseCount = false;
       try {
         DomainSocket connSock = domainSocket.accept();
         xceriverCount.incrementAndGet();
+        releaseCount = true;
         peer = new DomainPeer(connSock);
         peer.setReadTimeout(readTimeoutMs);
         peer.setWriteTimeout(writeTimeoutMs);
@@ -214,18 +221,30 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         if (xceriverCount.get() > maxXceiverCount) {
           throw new IOException("Xceiver count exceeds the limit " + maxXceiverCount);
         }
-        Daemon daemon = new Daemon(Receiver.create(peer, config, this, dispatcher, metrics));
+        Daemon daemon = new Daemon(Receiver.create(peer, config, this, dispatcher, readExecutors, metrics));
         daemon.setName(threadPrefix + "@" + peer.getDomainSocket().toString());
         daemon.start();
+        // the Receiver releases the count in closePeer
+        releaseCount = false;
       } catch (SocketTimeoutException ignored) {
         // wake up to see if should continue to run
       } catch (AsynchronousCloseException ace) {
         // another thread closed our listener socket - that's expected during shutdown, but not in other circumstances
         LOG.info("XceiverServerDomainSocket is closed", ace);
       } catch (IOException ie) {
-        // usually when the xceiver count limit is hit.
-        LOG.warn("Got an exception. Peer {}", peer, ie);
-        IOUtils.closeQuietly(peer);
+        if (peer == null) {
+          // accept() itself failed, for example with no file descriptor left, and would fail again right away
+          LOG.warn("accept() failed. Will retry after 1 second.", ie);
+          try {
+            Thread.sleep(TimeUnit.SECONDS.toMillis(1L));
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        } else {
+          // usually when the xceiver count limit is hit.
+          LOG.warn("Got an exception. Peer {}", peer, ie);
+          IOUtils.closeQuietly(peer);
+        }
       } catch (OutOfMemoryError ie) {
         IOUtils.closeQuietly(peer);
         // DataNode can run out of memory if there is too many transfers.
@@ -239,6 +258,10 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         }
       } catch (Throwable te) {
         LOG.error("XceiverServerDomainSocket: Exiting.", te);
+      } finally {
+        if (releaseCount) {
+          xceriverCount.decrementAndGet();
+        }
       }
     }
 
@@ -306,6 +329,11 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   @VisibleForTesting
   public void setContainerDispatcher(ContainerDispatcher containerDispatcher) {
     this.dispatcher = containerDispatcher;
+  }
+
+  @VisibleForTesting
+  public int getXceiverCount() {
+    return xceriverCount.get();
   }
 
   @VisibleForTesting

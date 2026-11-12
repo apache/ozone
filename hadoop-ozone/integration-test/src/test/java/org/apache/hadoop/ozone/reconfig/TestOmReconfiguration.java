@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
@@ -45,6 +46,8 @@ import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleServiceConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -74,6 +77,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_BLACKLIST_GROUPS)
         .add(OZONE_READ_BLACKLIST_USERS)
         .add(OZONE_READ_BLACKLIST_GROUPS)
+        .addAll(new KeyLifecycleServiceConfig().reconfigurableProperties())
         .build();
 
     assertProperties(getSubject(), expected);
@@ -258,6 +262,53 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         "SstFilteringService should be enabled after restoring original interval");
     assertNotNull(keyManagerImpl.getSnapshotSstFilteringService(),
         "SstFilteringService should not be null when enabled");
+  }
+
+  @Test
+  void keyLifecycleService() throws ReconfigurationException {
+    final OzoneManager om = cluster().getOzoneManager();
+    final KeyLifecycleService service = om.getKeyManager().getKeyLifecycleService();
+    final boolean originalEnabled = service.status().getIsEnabled();
+    final String originalEnabledValue = om.getConfiguration().get(KeyLifecycleServiceConfig.Keys.ENABLED);
+    final String originalInterval = om.getConfiguration().get(KeyLifecycleServiceConfig.Keys.INTERVAL);
+    final String originalWorkers = om.getConfiguration().get(KeyLifecycleServiceConfig.Keys.WORKERS);
+
+    // All changed properties are applied together once reconfiguration completes
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.ENABLED, String.valueOf(!originalEnabled));
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.INTERVAL, "30s");
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.WORKERS, "3");
+    assertEquals("30s", om.getConfiguration().get(KeyLifecycleServiceConfig.Keys.INTERVAL));
+    service.reconfigure(om.getKeyLifecycleServiceConfig());
+    assertEquals(!originalEnabled, service.status().getIsEnabled());
+    assertEquals(!originalEnabled, om.getLifecycleServiceStatus().getIsEnabled());
+    assertEquals(30000, service.getIntervalMillis());
+    assertEquals(3, service.getExecutorService().getCorePoolSize());
+
+    // Invalid values are rejected and the configuration is left unchanged
+    assertThrows(ReconfigurationException.class,
+        () -> getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.DELETE_BATCH_SIZE, "0"));
+    assertThrows(ReconfigurationException.class,
+        () -> getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.INTERVAL, "-1"));
+    assertEquals("30s", om.getConfiguration().get(KeyLifecycleServiceConfig.Keys.INTERVAL));
+    service.reconfigure(om.getKeyLifecycleServiceConfig());
+    assertEquals(30000, service.getIntervalMillis());
+
+    // Unset properties fall back to their defaults
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.ENABLED, null);
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.INTERVAL, null);
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.WORKERS, null);
+    assertNull(om.getConfiguration().get(KeyLifecycleServiceConfig.Keys.INTERVAL));
+    service.reconfigure(om.getKeyLifecycleServiceConfig());
+    assertEquals(KeyLifecycleServiceConfig.Defaults.ENABLED, service.status().getIsEnabled());
+    assertEquals(om.getConfiguration().getObject(KeyLifecycleServiceConfig.class).getIntervalMs(),
+        service.getIntervalMillis());
+    assertEquals(KeyLifecycleServiceConfig.Defaults.WORKERS, service.getExecutorService().getCorePoolSize());
+
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.ENABLED, originalEnabledValue);
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.INTERVAL, originalInterval);
+    getSubject().reconfigureProperty(KeyLifecycleServiceConfig.Keys.WORKERS, originalWorkers);
+    service.reconfigure(om.getKeyLifecycleServiceConfig());
+    assertEquals(originalEnabled, service.status().getIsEnabled());
   }
 
 }
