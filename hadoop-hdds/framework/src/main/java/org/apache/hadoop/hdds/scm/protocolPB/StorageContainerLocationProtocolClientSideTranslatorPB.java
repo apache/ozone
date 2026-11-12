@@ -142,7 +142,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.export.ContainerExportStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
@@ -1383,36 +1382,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public ContainerExportStatus getContainerIdExportStatus(String jobId) throws IOException {
+  public GetContainerIdExportStatusResponseProto getContainerIdExportStatus(String jobId) throws IOException {
     final GetContainerIdExportStatusRequestProto request = GetContainerIdExportStatusRequestProto.newBuilder()
         .setJobId(jobId)
         .build();
-    return toExportStatus(submitRequest(Type.GetContainerIdExportStatus,
-        builder -> builder.setGetContainerIdExportStatusRequest(request)).getGetContainerIdExportStatusResponse());
-  }
-
-  private static ContainerExportStatus toExportStatus(GetContainerIdExportStatusResponseProto response) {
-    final ContainerExportStatus.Builder status = ContainerExportStatus.newBuilder()
-        .setJobId(response.getJobId())
-        .setState(ContainerExportStatus.State.valueOf(response.getState().name()))
-        .setMaxRows(response.getMaxRows())
-        .setBatchSize(response.getBatchSize())
-        .setPartSize(response.getPartSize())
-        .setIdsWritten(response.getIdsWritten())
-        .setElapsedMs(response.getElapsedMs());
-    if (response.hasLifecycleState()) {
-      status.setLifeCycleState(response.getLifecycleState());
-    }
-    if (response.hasHealthState()) {
-      status.setHealthState(ContainerHealthState.valueOf(response.getHealthState()));
-    }
-    if (response.hasTarPath()) {
-      status.setTarPath(response.getTarPath());
-    }
-    if (response.hasErrorMessage()) {
-      status.setErrorMessage(response.getErrorMessage());
-    }
-    return status.build();
+    return submitRequest(Type.GetContainerIdExportStatus,
+        builder -> builder.setGetContainerIdExportStatusRequest(request)).getGetContainerIdExportStatusResponse();
   }
 
   /**

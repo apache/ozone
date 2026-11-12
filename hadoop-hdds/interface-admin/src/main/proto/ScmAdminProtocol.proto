@@ -784,14 +784,14 @@ message GetContainerIdExportStatusRequestProto {
 }
 
 message GetContainerIdExportStatusResponseProto {
-  enum State {
+  enum ExecutionState {
     RUNNING = 1;
     SUCCEEDED = 2;
     FAILED = 3;
   }
 
   optional string jobId = 1;
-  optional State state = 2;
+  optional ExecutionState state = 2;
   optional LifeCycleState lifecycleState = 3;
   optional string healthState = 4;
   optional int64 maxRows = 5;

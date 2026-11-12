@@ -154,7 +154,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.export.ContainerExportStatus;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
@@ -1542,27 +1541,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetContainerIdExportStatusResponseProto getContainerIdExportStatus(
       GetContainerIdExportStatusRequestProto request) throws IOException {
-    final ContainerExportStatus status = impl.getContainerIdExportStatus(request.getJobId());
-    final GetContainerIdExportStatusResponseProto.Builder builder = GetContainerIdExportStatusResponseProto.newBuilder()
-        .setJobId(status.getJobId())
-        .setState(GetContainerIdExportStatusResponseProto.State.valueOf(status.getState().name()))
-        .setMaxRows(status.getMaxRows())
-        .setBatchSize(status.getBatchSize())
-        .setPartSize(status.getPartSize())
-        .setIdsWritten(status.getIdsWritten())
-        .setElapsedMs(status.getElapsedMs());
-    if (status.getLifeCycleState() != null) {
-      builder.setLifecycleState(status.getLifeCycleState());
-    }
-    if (status.getHealthState() != null) {
-      builder.setHealthState(status.getHealthState().name());
-    }
-    if (status.getTarPath() != null) {
-      builder.setTarPath(status.getTarPath());
-    }
-    if (status.getErrorMessage() != null) {
-      builder.setErrorMessage(status.getErrorMessage());
-    }
-    return builder.build();
+    return impl.getContainerIdExportStatus(request.getJobId());
   }
 }

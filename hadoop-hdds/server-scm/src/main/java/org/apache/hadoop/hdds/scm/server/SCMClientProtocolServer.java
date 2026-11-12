@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
@@ -89,7 +90,6 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerStatusInfo
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.export.ContainerExportStatus;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -1801,11 +1801,12 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public ContainerExportStatus getContainerIdExportStatus(String jobId) throws IOException {
+  public GetContainerIdExportStatusResponseProto getContainerIdExportStatus(String jobId) throws IOException {
     getScm().checkAdminAccess(getRemoteUser(), true);
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("jobId", jobId);
-    final ContainerExportStatus status = scm.getContainerExportManager().getContainerExportStatus(jobId);
+    final GetContainerIdExportStatusResponseProto status =
+        scm.getContainerExportManager().getContainerExportStatus(jobId);
     if (status == null) {
       final IOException ex = new NonRetriableException("Container ID export job not found: " + jobId
           + ". It may have been evicted, or SCM may have restarted.");

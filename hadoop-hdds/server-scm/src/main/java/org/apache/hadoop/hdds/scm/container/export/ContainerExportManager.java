@@ -39,10 +39,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusResponseProto;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,7 +155,7 @@ public class ContainerExportManager {
     final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
     final ExportJob job = new ExportJob(scope, start, sizing);
     if (!runningJob.compareAndSet(null, job)) {
-      throw new IOException("Another container ID export is already running");
+      throw new NonRetriableException("Another container ID export is already running");
     }
 
     jobMap.put(job.getId(), job);
@@ -170,33 +172,39 @@ public class ContainerExportManager {
   }
 
   /**
-   * Returns the status of a job in the form reported to clients.
+   * Returns the status of a job as sent to clients.
    *
    * @return the status, or {@code null} if the job is unknown, for example because it was evicted or SCM restarted
    */
-  public ContainerExportStatus getContainerExportStatus(String jobId) {
+  public GetContainerIdExportStatusResponseProto getContainerExportStatus(String jobId) {
     final ExportJob job = jobMap.get(ExportJob.Id.of(jobId));
     if (job == null) {
       return null;
     }
     final ExportJob.Status status = job.getStatus();
-    final ContainerExportStatus.Builder builder = ContainerExportStatus.newBuilder()
+    final GetContainerIdExportStatusResponseProto.Builder builder = GetContainerIdExportStatusResponseProto
+        .newBuilder()
         .setJobId(jobId)
-        .setLifeCycleState(job.getLifeCycleState())
-        .setHealthState(job.getHealthState())
         .setMaxRows(job.getMaxRows())
         .setBatchSize(job.getBatchSize())
         .setPartSize(job.getPartSize())
         .setElapsedMs(status.getElapsedMs());
+    if (job.getLifeCycleState() != null) {
+      builder.setLifecycleState(job.getLifeCycleState());
+    }
+    if (job.getHealthState() != null) {
+      builder.setHealthState(job.getHealthState().name());
+    }
     if (!status.isDone()) {
-      return builder.setState(ContainerExportStatus.State.RUNNING).build();
+      return builder.setState(GetContainerIdExportStatusResponseProto.ExecutionState.RUNNING).build();
     }
     final Throwable failure = status.getException();
     if (failure != null) {
-      return builder.setState(ContainerExportStatus.State.FAILED)
+      return builder.setState(GetContainerIdExportStatusResponseProto.ExecutionState.FAILED)
           .setErrorMessage(failure.getMessage() != null ? failure.getMessage() : failure.toString()).build();
     }
-    builder.setState(ContainerExportStatus.State.SUCCEEDED).setIdsWritten(status.getIdsWritten());
+    builder.setState(GetContainerIdExportStatusResponseProto.ExecutionState.SUCCEEDED)
+        .setIdsWritten(status.getIdsWritten());
     if (status.getIdsWritten() > 0) {
       builder.setTarPath(fileManager.getArchivePath(job.getFileName()));
     }
