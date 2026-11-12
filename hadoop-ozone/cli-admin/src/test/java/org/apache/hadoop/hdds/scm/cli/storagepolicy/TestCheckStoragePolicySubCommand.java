@@ -257,8 +257,7 @@ public class TestCheckStoragePolicySubCommand {
 
     // The result is computed even without --show-replicas: a mismatch must print NO.
     assertThat(report).isEqualTo(lines(
-        KEY_HEADER,
-        "  HOT{Creation Tier: [SSD x 3], Fallback Tier: [DISK x 3]}",
+        KEY_HEADER + " HOT",
         "  Key Match Storage Policy: NO"));
     assertThat(report).doesNotContain("Container ID");
   }
@@ -290,10 +289,11 @@ public class TestCheckStoragePolicySubCommand {
     String report = cmd.buildReport(keyDetails(OzoneStoragePolicy.HOT, RATIS_THREE, 12L), scmClient, true);
 
     assertThat(report).isEqualTo(lines(
-        KEY_HEADER,
-        "  HOT{Creation Tier: [SSD x 3], Fallback Tier: [DISK x 3]}",
+        KEY_HEADER + " HOT",
         "  Key Match Storage Policy: NO",
         "Container ID: 12",
+        "  Replica: {[SSD x 2], [DISK x 1]}, Volumes: {[SSD x 2], [DISK x 1]}",
+        "  Container Match Storage Policy: NO",
         "  Datanode: " + dn1.getUuidString() + " (dn1.example.com, /rack1)",
         "  Replica Storage Type: SSD",
         "  Volume Storage Type: DISK",
@@ -305,8 +305,36 @@ public class TestCheckStoragePolicySubCommand {
         "  Datanode: " + dn3.getUuidString() + " (dn3.example.com, /rack3)",
         "  Replica Storage Type: SSD",
         "  Volume Storage Type: SSD",
-        "  Replica Match: YES",
-        "  Container Match Storage Policy: NO"));
+        "  Replica Match: YES"));
+  }
+
+  /**
+   * The summary line groups the replicas of a container by type, in the order of the StorageType enum (SSD before
+   * DISK), and not by count or by the order in which SCM lists them. Here the storage types are DISK, SSD, SSD and
+   * the volume types are DISK, DISK, SSD.
+   */
+  @Test
+  public void testReplicaSummaryGroupsByTypeInEnumOrder() throws IOException {
+    scmReturns(12L,
+        replica(12L, StorageType.DISK, StorageType.DISK),
+        replica(12L, StorageType.SSD, StorageType.DISK),
+        replica(12L, StorageType.SSD, StorageType.SSD));
+
+    String report = cmd.buildReport(keyDetails(OzoneStoragePolicy.HOT, RATIS_THREE, 12L), scmClient, true);
+
+    assertThat(report).contains("  Replica: {[SSD x 2], [DISK x 1]}, Volumes: {[SSD x 1], [DISK x 2]}");
+  }
+
+  /** SCM may not know the type of a replica (null). The summary line prints it as UNKNOWN, after the known types. */
+  @Test
+  public void testReplicaSummaryShowsUnknownForNullType() throws IOException {
+    scmReturns(12L,
+        replica(12L, null, StorageType.SSD),
+        replica(12L, StorageType.SSD, null));
+
+    String report = cmd.buildReport(keyDetails(OzoneStoragePolicy.HOT, RATIS_THREE, 12L), scmClient, true);
+
+    assertThat(report).contains("  Replica: {[SSD x 1], [UNKNOWN x 1]}, Volumes: {[SSD x 1], [UNKNOWN x 1]}");
   }
 
   /**
@@ -337,10 +365,11 @@ public class TestCheckStoragePolicySubCommand {
     command.execute(scmClient);
 
     assertThat(outContent.toString(ENCODING)).isEqualToNormalizingNewlines(lines(
-        KEY_HEADER,
-        "  HOT{Creation Tier: [SSD x 3], Fallback Tier: [DISK x 3]}",
+        KEY_HEADER + " HOT",
         "  Key Match Storage Policy: YES",
         "Container ID: 12",
+        "  Replica: {[SSD x 3]}, Volumes: {[SSD x 3]}",
+        "  Container Match Storage Policy: YES",
         "  Datanode: " + dn1.getUuidString() + " (dn1.example.com, /rack1)",
         "  Replica Storage Type: SSD",
         "  Volume Storage Type: SSD",
@@ -352,8 +381,7 @@ public class TestCheckStoragePolicySubCommand {
         "  Datanode: " + dn3.getUuidString() + " (dn3.example.com, /rack3)",
         "  Replica Storage Type: SSD",
         "  Volume Storage Type: SSD",
-        "  Replica Match: YES",
-        "  Container Match Storage Policy: YES", ""));
+        "  Replica Match: YES", ""));
   }
 
   /** When both types are wrong, the detailed report joins the two reasons on one line with "; ". */
@@ -367,7 +395,10 @@ public class TestCheckStoragePolicySubCommand {
         + "volumeStorageType ARCHIVE != expected SSD)");
   }
 
-  /** A container with no replicas prints a "No replicas reported by SCM" line, and the container and key are NO. */
+  /**
+   * A container with no replicas prints empty replica and volume summary, and a "No replicas reported by SCM" line.
+   * The container and the key are NO.
+   */
   @Test
   public void testDetailedReportOfContainerWithoutReplicas() throws IOException {
     scmReturns(12L);
@@ -376,8 +407,9 @@ public class TestCheckStoragePolicySubCommand {
 
     assertThat(report).endsWith(lines(
         "Container ID: 12",
-        "  No replicas reported by SCM",
-        "  Container Match Storage Policy: NO"));
+        "  Replica: {}, Volumes: {}",
+        "  Container Match Storage Policy: NO",
+        "  No replicas reported by SCM"));
     assertThat(report).contains("  Key Match Storage Policy: NO");
   }
 
@@ -394,43 +426,23 @@ public class TestCheckStoragePolicySubCommand {
     assertThat(report).contains("  Container Match Storage Policy: YES", "  Container Match Storage Policy: NO");
   }
 
-  /**
-   * The policy line shows the creation tier and the fallback tier. HOT falls back to DISK; WARM and COLD have no
-   * fallback and print "[disable]".
-   */
+  /** The header of the report names the policy of the key: HOT, WARM or COLD. */
   @ParameterizedTest
-  @CsvSource(delimiter = '|', value = {
-      "HOT|SSD|[DISK x 3]",
-      "WARM|DISK|[disable]",
-      "COLD|ARCHIVE|[disable]"})
-  public void testSummaryLineShowsCreationAndFallbackTier(OzoneStoragePolicy policy, StorageType creation,
-      String fallback) throws IOException {
+  @CsvSource({"HOT,SSD", "WARM,DISK", "COLD,ARCHIVE"})
+  public void testHeaderShowsPolicyName(OzoneStoragePolicy policy, StorageType creation) throws IOException {
     scmReturns(1L, replicas(1L, 3, creation, creation));
 
     String report = cmd.buildReport(keyDetails(policy, RATIS_THREE, 1L), scmClient, false);
 
-    assertThat(report.split("\n")[1]).isEqualTo(
-        "  " + policy.name() + "{Creation Tier: [" + creation + " x 3], Fallback Tier: " + fallback + "}");
+    assertThat(report.split("\n")[0]).isEqualTo(KEY_HEADER + " " + policy.name());
   }
 
-  /** The tier count on the policy line is the number of nodes the key needs: an EC(3,2) key shows "x 5". */
-  @Test
-  public void testSummaryLineUsesRequiredNodesOfReplicationConfig() throws IOException {
-    ReplicationConfig ec = new ECReplicationConfig(3, 2);
-    scmReturns(1L, replicas(1L, 5, StorageType.SSD, StorageType.SSD));
-
-    String report = cmd.buildReport(keyDetails(OzoneStoragePolicy.HOT, ec, 1L), scmClient, false);
-
-    assertThat(report.split("\n")[1])
-        .isEqualTo("  HOT{Creation Tier: [SSD x 5], Fallback Tier: [DISK x 5]}");
-  }
-
-  /** A key with no storage policy prints a notice only. There is nothing to compare, so SCM is not called. */
+  /** A key with no storage policy prints the header with UNKNOWN only. SCM is not called: nothing to compare. */
   @Test
   public void testKeyWithoutStoragePolicyPrintsNoticeAndSkipsScm() throws IOException {
     String report = cmd.buildReport(keyDetails(null, RATIS_THREE, 1L), scmClient, true);
 
-    assertThat(report).isEqualTo(lines(KEY_HEADER, "  Storage Policy: none recorded for this key"));
+    assertThat(report).isEqualTo(KEY_HEADER + " UNKNOWN");
     verifyNoInteractions(scmClient);
   }
 
@@ -440,8 +452,7 @@ public class TestCheckStoragePolicySubCommand {
     String report = cmd.buildReport(keyDetails(OzoneStoragePolicy.WARM, RATIS_THREE), scmClient, true);
 
     assertThat(report).isEqualTo(lines(
-        KEY_HEADER,
-        "  WARM{Creation Tier: [DISK x 3], Fallback Tier: [disable]}",
+        KEY_HEADER + " WARM",
         "  Key Match Storage Policy: YES (key has no data blocks)"));
     verifyNoInteractions(scmClient);
   }

@@ -20,13 +20,14 @@ package org.apache.hadoop.hdds.scm.cli.storagepolicy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -84,19 +85,14 @@ public class CheckStoragePolicySubCommand extends ScmSubcommand {
    */
   public String buildReport(OzoneKeyDetails keyDetails, ScmClient scmClient, boolean withReplicas)
       throws IOException {
+    OzoneStoragePolicy policy = (OzoneStoragePolicy) keyDetails.getStoragePolicy();
     List<String> lines = new ArrayList<>();
     lines.add("Storage Policy for key '" + keyDetails.getVolumeName() + "/" + keyDetails.getBucketName() + "/"
-        + keyDetails.getName() + "':");
+        + keyDetails.getName() + "': " + (policy == null ? "UNKNOWN" : policy.name()));
 
-    OzoneStoragePolicy policy = (OzoneStoragePolicy) keyDetails.getStoragePolicy();
     if (policy == null) {
-      lines.add("  Storage Policy: none recorded for this key");
       return String.join("\n", lines);
     }
-
-    int nodes = keyDetails.getReplicationConfig().getRequiredNodes();
-    lines.add("  " + policy.name() + "{Creation Tier: " + describeTier(policy.getCreationTier(), nodes)
-        + ", Fallback Tier: " + describeTier(policy.getCreationFallbackTier(), nodes) + "}");
 
     List<ContainerCheck> containerChecks = evaluate(keyDetails, scmClient);
     boolean keyMatches = keyMatches(containerChecks);
@@ -146,6 +142,15 @@ public class CheckStoragePolicySubCommand extends ScmSubcommand {
 
   private static void describeContainer(ContainerCheck containerCheck, List<String> lines) {
     lines.add("Container ID: " + containerCheck.getContainerId());
+    List<StorageType> storageTypes = new ArrayList<>();
+    List<StorageType> volumeStorageTypes = new ArrayList<>();
+    for (ReplicaCheck replicaCheck : containerCheck.getReplicaChecks()) {
+      storageTypes.add(replicaCheck.getReplica().getStorageType());
+      volumeStorageTypes.add(replicaCheck.getReplica().getVolumeStorageType());
+    }
+    lines.add("  Replica: " + describeStorageTypes(storageTypes)
+        + ", Volumes: " + describeStorageTypes(volumeStorageTypes));
+    lines.add("  Container Match Storage Policy: " + (containerCheck.matches() ? "YES" : "NO"));
     if (containerCheck.getReplicaChecks().isEmpty()) {
       lines.add("  No replicas reported by SCM");
     }
@@ -159,12 +164,28 @@ public class CheckStoragePolicySubCommand extends ScmSubcommand {
       lines.add("  Replica Match: " + (replicaCheck.matches() ? "YES"
           : "NO (" + String.join("; ", replicaCheck.getMismatchReasons()) + ")"));
     }
-    lines.add("  Container Match Storage Policy: " + (containerCheck.matches() ? "YES" : "NO"));
   }
 
-  /** Prints a tier as {@code [SSD x 3]}. The EMPTY tier means the policy has no fallback. */
-  private static String describeTier(StorageTier tier, int nodes) {
-    return tier == StorageTier.EMPTY ? "[disable]" : "[" + tier.getUniformStorageType() + " x " + nodes + "]";
+  /**
+   * Counts the types and prints them as {@code {[SSD x 2], [DISK x 1]}}, in the order of the StorageType enum.
+   * A null type (SCM does not know it) prints as UNKNOWN, after the known types. No types print {@code {}}.
+   */
+  private static String describeStorageTypes(List<StorageType> types) {
+    Map<StorageType, Integer> counts = new EnumMap<>(StorageType.class);
+    int unknown = 0;
+    for (StorageType type : types) {
+      if (type == null) {
+        unknown++;
+      } else {
+        counts.merge(type, 1, Integer::sum);
+      }
+    }
+    List<String> groups = new ArrayList<>();
+    counts.forEach((type, count) -> groups.add("[" + type + " x " + count + "]"));
+    if (unknown > 0) {
+      groups.add("[UNKNOWN x " + unknown + "]");
+    }
+    return "{" + String.join(", ", groups) + "}";
   }
 
   /**
