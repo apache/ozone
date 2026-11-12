@@ -308,10 +308,7 @@ public class XceiverClientManager extends XceiverClientCreator {
         .append(pipeline.getId().getId()).append('-').append(pipeline.getType());
 
     DatanodeDetails dn = null;
-    if (pipeline.getType() == HddsProtos.ReplicationType.EC) {
-      dn = pipeline.getClosestNode();
-    } else if (topologyAware) {
-      // Ratis streaming write: the client is created with the closest node as primary datanode.
+    if (pipeline.getType() == HddsProtos.ReplicationType.EC || topologyAware) {
       dn = pipeline.getClosestNode();
     }
     if (dn != null) {
