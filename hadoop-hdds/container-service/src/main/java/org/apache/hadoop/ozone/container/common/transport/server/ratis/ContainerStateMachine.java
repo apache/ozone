@@ -55,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -732,11 +734,30 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
     dispatchCommand(requestProto, context);  // stream init
     final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock
-        = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? this::streamPutBlock : null;
+        = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? r -> streamPutBlock(requestProto, r) : null;
     return dispatcher.getStreamDataChannel(requestProto, putBlock);
   }
 
-  void streamPutBlock(ContainerCommandRequestProto request) throws IOException {
+  /** A PutBlock sent on a data stream must be a PutBlock for the block the stream was opened for. */
+  private static void checkStreamPutBlock(ContainerCommandRequestProto streamInit,
+      ContainerCommandRequestProto request) throws StorageContainerException {
+    if (request.getCmdType() != Type.PutBlock) {
+      throw new StorageContainerException("Unexpected stream PutBlock request type " + request.getCmdType()
+          + ", expected " + Type.PutBlock, ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    final ContainerBlockID streamBlock = BlockID.getFromProtobuf(streamInit.getWriteChunk().getBlockID())
+        .getContainerBlockID();
+    final ContainerBlockID block = BlockID.getFromProtobuf(request.getPutBlock().getBlockData().getBlockID())
+        .getContainerBlockID();
+    if (request.getContainerID() != streamInit.getContainerID() || !block.equals(streamBlock)) {
+      throw new StorageContainerException("PutBlock for " + block + " in container " + request.getContainerID()
+          + " does not match the stream block " + streamBlock, ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+  }
+
+  void streamPutBlock(ContainerCommandRequestProto streamInit, ContainerCommandRequestProto request)
+      throws IOException {
+    checkStreamPutBlock(streamInit, request);
     final DispatcherContext context = DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_LINK)
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
@@ -752,14 +773,12 @@ public class ContainerStateMachine extends BaseStateMachine {
    * @return the serialized {@link ContainerCommandResponseProto},
    *         which is identical on all the peers of the pipeline.
    */
-  ByteBuffer streamCommand(ByteBuffer command, DataChannel channel) throws IOException {
+  ByteBuffer streamCommand(ContainerCommandRequestProto streamInit, ByteBuffer command, DataChannel channel)
+      throws IOException {
     // unsafeWrap is okay since the command buffer can be modified after this method has returned.
     final ContainerCommandRequestProto request = ContainerCommandRequestMessage.toProto(
         UnsafeByteOperations.unsafeWrap(command), getGroupId());
-    if (request.getCmdType() != Type.PutBlock) {
-      throw new StorageContainerException("Unexpected stream command " + request.getCmdType()
-          + ", expected " + Type.PutBlock, ContainerProtos.Result.MALFORMED_REQUEST);
-    }
+    checkStreamPutBlock(streamInit, request);
     if (request.getPutBlock().getSync()) {
       channel.force(false);
     }
@@ -790,7 +809,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         final DataChannel channel = getStreamDataChannel(requestProto, context);
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
-        return new LocalStream(channel, chunkExecutor, command -> streamCommand(command, channel));
+        return new LocalStream(channel, chunkExecutor, command -> streamCommand(requestProto, command, channel));
       } catch (IOException e) {
         throw new CompletionException("Failed to create data stream", e);
       }

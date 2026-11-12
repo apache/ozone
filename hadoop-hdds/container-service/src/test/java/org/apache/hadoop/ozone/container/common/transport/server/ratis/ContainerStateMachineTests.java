@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -68,6 +69,7 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -295,13 +297,54 @@ abstract class ContainerStateMachineTests {
     verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
   }
 
+  @Test
+  public void testStreamCommandPutBlockNotMatchingStreamBlockIsRejected() throws Exception {
+    final StateMachine.DataStream stream = setUpStream(mock(KeyValueStreamDataChannel.class));
+
+    for (ContainerProtos.ContainerCommandRequestProto putBlock : newPutBlocksNotMatchingStreamBlock()) {
+      final ByteBuffer command = ContainerCommandRequestMessage.toMessage(putBlock, null).getContent()
+          .asReadOnlyByteBuffer();
+      final ExecutionException e = assertThrows(ExecutionException.class, () -> stream.onCommand(command, 0).get());
+      final StorageContainerException sce = assertInstanceOf(StorageContainerException.class, e.getCause());
+      assertEquals(ContainerProtos.Result.MALFORMED_REQUEST, sce.getResult());
+    }
+    verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
+  }
+
+  @Test
+  public void testStreamClosePutBlockNotMatchingStreamBlockIsRejected() throws Exception {
+    final AtomicReference<CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException>> closePutBlock
+        = new AtomicReference<>();
+    setUpStream(mock(KeyValueStreamDataChannel.class), ContainerProtos.Type.StreamInitWithPutBlock, closePutBlock);
+
+    for (ContainerProtos.ContainerCommandRequestProto request : newPutBlocksNotMatchingStreamBlock()) {
+      final StorageContainerException e = assertThrows(StorageContainerException.class,
+          () -> closePutBlock.get().accept(request));
+      assertEquals(ContainerProtos.Result.MALFORMED_REQUEST, e.getResult());
+    }
+    verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
+
+    closePutBlock.get().accept(newPutBlock(1, newBlockID()));
+    verify(dispatcher).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
+        argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_LINK));
+  }
+
   private StateMachine.DataStream setUpStream(StateMachine.DataChannel channel) throws Exception {
+    return setUpStream(channel, ContainerProtos.Type.StreamInit, new AtomicReference<>());
+  }
+
+  private StateMachine.DataStream setUpStream(StateMachine.DataChannel channel, ContainerProtos.Type streamInitType,
+      AtomicReference<CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException>> closePutBlock)
+      throws Exception {
     when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
         .setCmdType(ContainerProtos.Type.PutBlock).setResult(ContainerProtos.Result.SUCCESS).build());
-    when(dispatcher.getStreamDataChannel(any(), any())).thenReturn(channel);
+    when(dispatcher.getStreamDataChannel(any(), any())).thenAnswer(invocation -> {
+      closePutBlock.set(invocation.getArgument(1));
+      return channel;
+    });
     final ContainerProtos.ContainerCommandRequestProto streamInit = ContainerProtos.ContainerCommandRequestProto
         .newBuilder()
-        .setCmdType(ContainerProtos.Type.StreamInit)
+        .setCmdType(streamInitType)
         .setWriteChunk(ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(newBlockID()).build())
         .setContainerID(1)
         .setDatanodeUuid(UUID.randomUUID().toString())
@@ -328,8 +371,31 @@ abstract class ContainerStateMachineTests {
     return ContainerCommandRequestMessage.toMessage(putBlock, null).getContent().asReadOnlyByteBuffer();
   }
 
+  private static ContainerProtos.ContainerCommandRequestProto newPutBlock(long containerID,
+      ContainerProtos.DatanodeBlockID blockID) {
+    return ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(ContainerProtos.BlockData.newBuilder().setBlockID(blockID).build()))
+        .setContainerID(containerID)
+        .setDatanodeUuid(UUID.randomUUID().toString())
+        .build();
+  }
+
+  /** PutBlocks that do not match the stream block (container 1, local ID 1). */
+  private static List<ContainerProtos.ContainerCommandRequestProto> newPutBlocksNotMatchingStreamBlock() {
+    return Arrays.asList(
+        newPutBlock(1, newBlockID(1, 2)),
+        newPutBlock(2, newBlockID(2, 1)),
+        newPutBlock(2, newBlockID()));
+  }
+
   private static ContainerProtos.DatanodeBlockID newBlockID() {
-    return ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build();
+    return newBlockID(1, 1);
+  }
+
+  private static ContainerProtos.DatanodeBlockID newBlockID(long containerID, long localID) {
+    return ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerID).setLocalID(localID).build();
   }
 
   private void setUpMockDispatcherReturn(boolean failWithException) {

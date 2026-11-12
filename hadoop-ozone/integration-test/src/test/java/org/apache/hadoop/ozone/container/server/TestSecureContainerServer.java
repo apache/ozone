@@ -43,9 +43,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -65,12 +67,15 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
+import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -85,6 +90,7 @@ import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -102,6 +108,8 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.client.api.DataStreamOutput;
+import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
@@ -215,6 +223,80 @@ public class TestSecureContainerServer {
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf, dispatcher,
         new ContainerController(newContainerSet(), Maps.newHashMap()),
         caClient, null);
+  }
+
+  @Test
+  public void testStreamPutBlocksWithTokenForStreamBlock() throws Exception {
+    RatisTestHelper.initRatisConf(GRPC, CONF);
+    final Pipeline pipeline = MockPipeline.createPipeline(3);
+    final List<XceiverServerSpi> servers = new ArrayList<>();
+    try {
+      for (DatanodeDetails dn : pipeline.getNodes()) {
+        final XceiverServerSpi server = newXceiverServerRatis(dn, CONF);
+        servers.add(server);
+        server.start();
+      }
+      // Add the Raft group only after every server has bound its data stream port.
+      for (DatanodeDetails dn : pipeline.getNodes()) {
+        RatisTestHelper.initXceiverServerRatis(GRPC, dn, pipeline);
+      }
+      try (XceiverClientRatis client = XceiverClientRatis.newXceiverClientRatis(pipeline, CONF)) {
+        client.connect();
+        final long containerID = getTestContainerID();
+        ContainerProtocolCalls.createContainer(client, containerID, getToken(ContainerID.valueOf(containerID)));
+        final BlockID blockID = getTestBlockID(containerID);
+        final String token = blockTokenSecretManager.generateToken(blockID,
+            EnumSet.allOf(AccessModeProto.class), RandomUtils.secure().randomLong()).encodeToUrlString();
+
+        final ContainerCommandRequestProto streamInit = ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.StreamInitWithPutBlock)
+            .setContainerID(containerID)
+            .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
+            .setWriteChunk(ContainerProtos.WriteChunkRequestProto.newBuilder()
+                .setBlockID(blockID.getDatanodeBlockIDProtobuf()))
+            .setWritePipelineVersion(pipeline.getWriteVersion())
+            .setEncodedToken(token)
+            .build();
+        final DataStreamOutput out = client.getDataStreamApi().stream(
+            toByteBuffer(streamInit), RatisHelper.getRoutingTable(pipeline));
+
+        // PutBlock in the middle of the stream, as BlockDataStreamOutput sends it on flush
+        out.writeAsync(ByteBuffer.wrap(new byte[16])).get();
+        final DataStreamReply commandReply = out.commandAsync(toByteBuffer(ContainerProtocolCalls.getPutBlockRequest(
+            pipeline, newBlockData(blockID, 16), false, false, token))).get();
+        assertEquals(SUCCESS, ContainerCommandResponseProto.parseFrom(commandReply.nioBuffer()).getResult());
+
+        // PutBlock at stream close
+        out.writeAsync(ByteBuffer.wrap(new byte[16])).get();
+        final ContainerProtos.PutBlockRequestProto.Builder putBlock = ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(newBlockData(blockID, 32));
+        final DataStreamReply closeReply = BlockDataStreamOutput.executePutBlockClose(
+            ContainerProtocolCalls.getPutBlockRequest(pipeline, putBlock.getBlockData(), false, true, token),
+            BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX, out).get();
+        assertThat(closeReply.isSuccess()).isTrue();
+
+        final ContainerCommandRequestProto.Builder getLength = newGetCommittedBlockLengthBuilder(pipeline, putBlock);
+        getLength.setEncodedToken(token);
+        assertEquals(32, client.sendCommand(getLength.build()).getGetCommittedBlockLength().getBlockLength());
+      }
+    } finally {
+      servers.forEach(XceiverServerSpi::stop);
+    }
+  }
+
+  private static ByteBuffer toByteBuffer(ContainerCommandRequestProto request) {
+    return ContainerCommandRequestMessage.toMessage(request, null).getContent().asReadOnlyByteBuffer();
+  }
+
+  /** Block data with one chunk of {@code length} bytes at offset 0. */
+  private static ContainerProtos.BlockData newBlockData(BlockID blockID, long length) throws IOException {
+    final BlockData data = new BlockData(blockID);
+    data.setChunks(Collections.singletonList(ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName(blockID.getLocalID() + "_chunk_1").setOffset(0).setLen(length)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.NONE).setBytesPerChecksum(1024))
+        .build()));
+    return data.getProtoBufMessage();
   }
 
   private void runTestClientServerRatis(RpcType rpc, int numNodes)
