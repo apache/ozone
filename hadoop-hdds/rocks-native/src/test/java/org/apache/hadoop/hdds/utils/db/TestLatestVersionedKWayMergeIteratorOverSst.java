@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,7 +38,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
-import org.apache.hadoop.hdds.utils.db.TestRawSstFileRecords.SourceRecord;
+import org.apache.hadoop.hdds.utils.db.RawSstFileRecords.SourceRecord;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -111,7 +112,7 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
       }
     }
 
-    List<List<SourceRecord>> perSource = TestRawSstFileRecords.readFiles(sstFiles);
+    List<List<SourceRecord>> perSource = RawSstFileRecords.readFiles(sstFiles);
     long k1VersionsAcrossFiles = perSource.stream()
         .flatMap(List::stream)
         .filter(record -> Arrays.equals(record.getUserKey(), keyBytes("k1")))
@@ -127,7 +128,7 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
     assertEquals(3, distinctK1Sequences,
         "k1 versions across SST files should carry distinct RocksDB sequence numbers");
 
-    List<MergedKeyValue> actual = mergeSstFiles(sstFiles.toArray(new Path[0]));
+    List<MergedKeyValue> actual = mergeSstFiles(sstFiles, null, null);
     assertEquals(3, actual.size(), "expected k1 winner plus k2 tombstone and recreate value");
 
     MergedKeyValue k1Winner = actual.get(0);
@@ -145,6 +146,50 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
     assertArrayEquals(valueBytes("v25"), k2Value.getValue());
     assertTrue(k2Value.getSequence() > k2Tombstone.getSequence(),
         "recreate value must be newer than the tombstone");
+  }
+
+  @Test
+  void testMergeRespectsUserKeyPrefixBounds() throws Exception {
+    String bucketPrefixA = "/vol/buckA/";
+    String bucketPrefixB = "/vol/buckB/";
+    Path dbDir = tempDir.resolve("prefix-bounds-db");
+    Files.createDirectories(dbDir);
+    Set<String> knownSstFiles = new HashSet<>();
+    List<Path> sstFiles = new ArrayList<>(2);
+
+    try (ManagedDBOptions dbOptions = new ManagedDBOptions();
+         ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
+         FlushOptions flushOptions = new FlushOptions()) {
+      dbOptions.setCreateIfMissing(true);
+      List<ColumnFamilyDescriptor> columnFamilyDescriptors = Collections.singletonList(
+          new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
+      List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+      try (ManagedRocksDB db = ManagedRocksDB.open(
+          dbOptions, dbDir.toString(), columnFamilyDescriptors, columnFamilyHandles);
+           ColumnFamilyHandle cf = columnFamilyHandles.get(0)) {
+
+        rocksPut(db, cf, bucketPrefixA + "file1", "a1");
+        rocksPut(db, cf, bucketPrefixB + "file1", "b1");
+        rocksPut(db, cf, bucketPrefixA + "file2", "a2");
+        sstFiles.add(flushAndCopySst(db, dbDir, cf, flushOptions, knownSstFiles, "first"));
+
+        rocksPut(db, cf, bucketPrefixB + "file2", "b2");
+        rocksDelete(db, cf, bucketPrefixA + "file1");
+        sstFiles.add(flushAndCopySst(db, dbDir, cf, flushOptions, knownSstFiles, "second"));
+      }
+    }
+
+    byte[] lowerBound = keyBytes(bucketPrefixA);
+    byte[] upperBoundExclusive = keyBytes(getLexicographicallyHigherString(bucketPrefixA));
+    List<MergedKeyValue> bucketAOnly = mergeSstFiles(sstFiles, lowerBound, upperBoundExclusive);
+    List<String> userKeys = bucketAOnly.stream()
+        .map(kv -> new String(kv.getUserKey(), StandardCharsets.UTF_8))
+        .collect(Collectors.toList());
+
+    assertEquals(2, userKeys.size());
+    assertTrue(userKeys.contains(bucketPrefixA + "file1"));
+    assertTrue(userKeys.contains(bucketPrefixA + "file2"));
+    assertTrue(userKeys.stream().noneMatch(key -> key.startsWith(bucketPrefixB)));
   }
 
   private Path flushAndCopySst(ManagedRocksDB db, Path dbDir, ColumnFamilyHandle cf,
@@ -172,10 +217,12 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
     }
   }
 
-  private List<MergedKeyValue> mergeSstFiles(Path... sstFiles) throws Exception {
+  private List<MergedKeyValue> mergeSstFiles(List<Path> sstFiles, byte[] fromUserKeyInclusive,
+      byte[] toUserKeyExclusive) {
     List<MergedKeyValue> results = new ArrayList<>();
     try (LatestVersionedKWayMergeIterator iterator =
-             LatestVersionedKWayMergeIterator.overRawSstFiles(Arrays.asList(sstFiles))) {
+             LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(
+                 sstFiles, 0L, fromUserKeyInclusive, toUserKeyExclusive)) {
       while (iterator.hasNext()) {
         results.add(iterator.next());
       }

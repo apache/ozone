@@ -89,12 +89,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -388,6 +390,23 @@ public class BasicRootedOzoneClientAdapterImpl
         config);
     String key = ofsPath.getKeyName();
     try {
+      // An empty bucket name takes the getBucket path, which reports it as FileNotFoundException.
+      if (!ofsPath.getBucketName().isEmpty()
+          && OzoneManagerVersion.GET_KEY_INFO_REJECTS_OBS.isSupportedBy(proxy.getOmVersion())) {
+        // Ask OM to reject an OBJECT_STORE bucket (HDDS-16948), so read without fetching the bucket first.
+        try {
+          return proxy.readFile(ofsPath.getVolumeName(), ofsPath.getBucketName(), key, true).getInputStream();
+        } catch (OMException e) {
+          if (e.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+            // Surface it as IllegalArgumentException, matching the client-side
+            // layout check of the fallback path below.
+            throw new IllegalArgumentException(e.getMessage());
+          }
+          throw e;
+        }
+      }
+      // Older OM has no server-side OBJECT_STORE check; validate the bucket
+      // layout on the client, matching pre-HDDS-16948 behavior.
       OzoneBucket bucket = getBucket(ofsPath, false);
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
@@ -516,6 +535,27 @@ public class BasicRootedOzoneClientAdapterImpl
     String key = ofsPath.getKeyName();
     String newKey = ofsNewPath.getKeyName();
     bucket.renameKey(key, newKey);
+  }
+
+  /**
+   * Whether OM rejects a rename that requires a FILE_SYSTEM_OPTIMIZED bucket on any other layout (HDDS-16951), so a
+   * file system rename can be sent without fetching the bucket to learn its layout.
+   */
+  boolean isRenameRequiringFileSystemOptimizedSupported() {
+    return OzoneManagerVersion.RENAME_KEY_REJECTS_NON_FSO.isSupportedBy(proxy.getOmVersion());
+  }
+
+  /**
+   * Like {@link #rename(OzoneBucket, String, String)} without a fetched bucket: one RenameKey that OM accepts only
+   * on a FILE_SYSTEM_OPTIMIZED bucket, and rejects with NOT_SUPPORTED_OPERATION on any other layout.
+   */
+  void renameRequiringFileSystemOptimized(String path, String newPath) throws IOException {
+    OFSPath ofsPath = new OFSPath(path, config);
+    OFSPath ofsNewPath = new OFSPath(newPath, config);
+    // No same-bucket policy check here since this call path is controlled
+    proxy.renameKey(ofsPath.getVolumeName(), ofsPath.getBucketName(), ofsPath.getKeyName(),
+        ofsNewPath.getKeyName(), true);
+    incrementCounter(Statistic.OBJECTS_RENAMED, 1);
   }
 
   /**
@@ -721,8 +761,7 @@ public class BasicRootedOzoneClientAdapterImpl
             volume, bucket, uri);
       } else {
         OzoneFileStatus status;
-        if (proxy.getOmVersion()
-            .compareTo(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS) >= 0) {
+        if (OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS.isSupportedBy(proxy.getOmVersion())) {
           status = proxy.getOzoneFileStatus(ofsPath.getVolumeName(),
               ofsPath.getBucketName(), key, headOp);
         } else {
@@ -940,6 +979,19 @@ public class BasicRootedOzoneClientAdapterImpl
   public List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
       String startPath, long numEntries, URI uri,
       Path workingDir, String username, boolean lite) throws IOException {
+    return listStatusPage(pathStr, recursive, startPath, numEntries, uri, workingDir, username, lite)
+        .getStatuses();
+  }
+
+  /**
+   * {@link #listStatus} that also returns whether OM reported that no entries follow. Only listings inside a
+   * bucket can report it; root, volume and snapshot listings do not.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  @Override
+  public ListStatusResult<FileStatusAdapter> listStatusPage(String pathStr, boolean recursive,
+      String startPath, long numEntries, URI uri,
+      Path workingDir, String username, boolean lite) throws IOException {
 
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     // Remove authority from startPath if it exists
@@ -957,40 +1009,84 @@ public class BasicRootedOzoneClientAdapterImpl
 
     OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot()) {
-      return listStatusRoot(
-          recursive, startPath, numEntries, uri, workingDir, username, lite);
+      return ListStatusResult.unknown(listStatusRoot(
+          recursive, startPath, numEntries, uri, workingDir, username, lite));
     }
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     if (ofsPath.isVolume()) {
       String startBucketPath = ofsStartPath.getNonKeyPath();
-      return listStatusVolume(ofsPath.getVolumeName(),
-          recursive, startBucketPath, numEntries, uri, workingDir, username, lite);
+      return ListStatusResult.unknown(listStatusVolume(ofsPath.getVolumeName(),
+          recursive, startBucketPath, numEntries, uri, workingDir, username, lite));
     }
 
     if (ofsPath.isSnapshotPath()) {
-      return listStatusBucketSnapshot(ofsPath.getVolumeName(),
-          ofsPath.getBucketName(), uri, ofsStartPath.getSnapshotName(), numEntries);
+      return ListStatusResult.unknown(listStatusBucketSnapshot(ofsPath.getVolumeName(),
+          ofsPath.getBucketName(), uri, ofsStartPath.getSnapshotName(), numEntries));
     }
     List<FileStatusAdapter> result = new ArrayList<>();
     String keyName = ofsPath.getKeyName();
     // Internally we need startKey to be passed into bucket.listStatus
     String startKey = ofsStartPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
       List<OzoneFileStatus> statuses = Collections.emptyList();
       List<OzoneFileStatusLight> lightStatuses = Collections.emptyList();
-      if (bucket.isSourcePathExist()) {
-        if (lite) {
-          lightStatuses = bucket.listStatusLight(keyName, recursive, startKey, numEntries);
-        } else {
-          statuses = bucket.listStatus(keyName, recursive, startKey, numEntries);
+      boolean complete = false;
+      if (OzoneManagerVersion.LIST_STATUS_REJECTS_OBS.isSupportedBy(proxy.getOmVersion())) {
+        // Ask OM to reject an OBJECT_STORE bucket (HDDS-16760), so list without
+        // fetching the bucket first. The bucket is fetched only when the listing
+        // fails because a bucket is missing, to tell an orphan link bucket
+        // (empty listing) from a bucket that does not exist.
+        ListStatusLightOptions options = ListStatusLightOptions.builder()
+            .setVolumeName(ofsPath.getVolumeName())
+            .setBucketName(ofsPath.getBucketName())
+            .setKeyName(keyName)
+            .setRecursive(recursive)
+            .setStartKey(startKey)
+            .setNumEntries(numEntries)
+            .setRequireFileSystemLayout(true)
+            .build();
+        try {
+          if (lite) {
+            ListStatusResult<OzoneFileStatusLight> page = proxy.listStatusLightPage(options);
+            lightStatuses = page.getStatuses();
+            complete = page.isComplete();
+          } else {
+            ListStatusResult<OzoneFileStatus> page = proxy.listStatusPage(options);
+            statuses = page.getStatuses();
+            complete = page.isComplete();
+          }
+        } catch (OMException e) {
+          if (e.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+            // Surface it as IllegalArgumentException, matching the client-side
+            // layout check of the fallback path below.
+            throw new IllegalArgumentException(e.getMessage());
+          }
+          if (e.getResult() != OMException.ResultCodes.BUCKET_NOT_FOUND
+              && e.getResult() != OMException.ResultCodes.VOLUME_NOT_FOUND) {
+            throw e;
+          }
+          // Rethrows as before if the bucket itself does not exist.
+          OzoneBucket bucket = getBucket(ofsPath, false);
+          if (bucket.isSourcePathExist()) {
+            throw e;
+          }
+          logOrphanLinkBucket(bucket);
         }
-
       } else {
-        LOG.warn("Source Bucket does not exist, link bucket {} is orphan " +
-            "and returning empty list of files inside it", bucket.getName());
+        // Older OM has no server-side OBJECT_STORE check; validate the bucket
+        // layout on the client, matching pre-HDDS-16760 behavior.
+        OzoneBucket bucket = getBucket(ofsPath, false);
+        if (bucket.isSourcePathExist()) {
+          if (lite) {
+            lightStatuses = bucket.listStatusLight(keyName, recursive, startKey, numEntries);
+          } else {
+            statuses = bucket.listStatus(keyName, recursive, startKey, numEntries);
+          }
+        } else {
+          logOrphanLinkBucket(bucket);
+        }
       }
-      
+
       // Note: result in statuses above doesn't have volume/bucket path since
       //  they are from the server.
       String ofsPathPrefix = ofsPath.getNonKeyPath();
@@ -1005,13 +1101,18 @@ public class BasicRootedOzoneClientAdapterImpl
         }
       }
 
-      return result;
+      return complete ? ListStatusResult.of(result, false) : ListStatusResult.unknown(result);
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
         throw new FileNotFoundException(e.getMessage());
       }
       throw e;
     }
+  }
+
+  private static void logOrphanLinkBucket(OzoneBucket bucket) {
+    LOG.warn("Source Bucket does not exist, link bucket {} is orphan " +
+        "and returning empty list of files inside it", bucket.getName());
   }
 
   @Override
@@ -1172,13 +1273,13 @@ public class BasicRootedOzoneClientAdapterImpl
 
     OmKeyLocationInfoGroup omKeyLocationInfoGroup =
         keyInfo.getLatestVersionLocations();
-    BlockLocation[] blockLocations = new BlockLocation[
-        omKeyLocationInfoGroup.getBlocksLatestVersionOnly().size()];
+    List<OmKeyLocationInfo> blocks =
+        omKeyLocationInfoGroup.getBlocksLatestVersionOnly();
+    BlockLocation[] blockLocations = new BlockLocation[blocks.size()];
 
     int i = 0;
     long offsetOfBlockInFile = 0L;
-    for (OmKeyLocationInfo omKeyLocationInfo :
-        omKeyLocationInfoGroup.getBlocksLatestVersionOnly()) {
+    for (OmKeyLocationInfo omKeyLocationInfo : blocks) {
       List<String> hostList = new ArrayList<>();
       List<String> nameList = new ArrayList<>();
       omKeyLocationInfo.getPipeline().getNodes()
@@ -1377,13 +1478,44 @@ public class BasicRootedOzoneClientAdapterImpl
       return null;
     }
     OFSPath ofsPath = new OFSPath(keyName, config);
-    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-    OzoneBucket bucket = getBucket(ofsPath, false);
-    return OzoneClientUtils.getFileChecksumWithCombineMode(
-        volume, bucket, ofsPath.getKeyName(),
-        length, combineMode,
-        ozoneClient.getObjectStore().getClientProxy());
-
+    if (ofsPath.getBucketName().isEmpty()) {
+      // throw FileNotFoundException in this case to make Hadoop common happy
+      throw new FileNotFoundException(
+          "getFileChecksum: Invalid argument: given bucket string is empty.");
+    }
+    // OM LookupFile rejects OBJECT_STORE buckets (HDDS-15951), so the volume and
+    // bucket no longer have to be fetched up front. During a rolling upgrade a new
+    // client can talk to an older OM that lacks that check, so when the negotiated
+    // OM version predates LOOKUP_FILE_REJECTS_OBS, fall back to LookupKey and
+    // validate the bucket layout client-side as before.
+    boolean omRejectsObs = OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS.isSupportedBy(proxy.getOmVersion());
+    if (!omRejectsObs) {
+      // Called for its layout validation side effect; the bucket itself is not needed.
+      getBucket(ofsPath, false);
+    }
+    try {
+      return OzoneClientUtils.getFileChecksumWithCombineMode(
+          ofsPath.getVolumeName(), ofsPath.getBucketName(), ofsPath.getKeyName(),
+          length, combineMode,
+          ozoneClient.getObjectStore().getClientProxy(), omRejectsObs);
+    } catch (OMException e) {
+      if (e.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+        // OM rejects LookupFile on an OBJECT_STORE bucket (no file system
+        // semantics). Surface it as IllegalArgumentException, matching the
+        // pre-HDDS-15951 client-side layout check.
+        throw new IllegalArgumentException(e.getMessage());
+      } else if (e.getResult() == OMException.ResultCodes.NOT_A_FILE
+          || e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
+          || e.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
+          || e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
+        // A checksum only exists for an existing file, so report the missing
+        // path the same way HDFS and getFileStatusForKeyOrSnapshot do.
+        // LookupFile reports a directory as NOT_A_FILE and a missing key as
+        // FILE_NOT_FOUND; the LookupKey fallback reports KEY_NOT_FOUND.
+        throw new FileNotFoundException(e.getMessage());
+      }
+      throw e;
+    }
   }
 
   @Override
@@ -1480,6 +1612,11 @@ public class BasicRootedOzoneClientAdapterImpl
       Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
     }
     return snapshotDiffResponse.getSnapshotDiffReport();
+  }
+
+  @Override
+  public void setVerifyChecksum(boolean verifyChecksum) {
+    proxy.setVerifyChecksum(verifyChecksum);
   }
 
   @Override

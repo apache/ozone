@@ -22,14 +22,13 @@ import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeC
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.newVolumeFixedUsage;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
@@ -59,7 +58,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
   private static final ThreadLocal<Cache<HddsVolume, Iterator<Container<?>>>> CACHE =
       ThreadLocal.withInitial(
-          () -> CacheBuilder.newBuilder().recordStats().expireAfterAccess(1, HOURS).build());
+          () -> Caffeine.newBuilder().recordStats().expireAfterAccess(1, HOURS).build());
 
   private final ReentrantLock lock;
 
@@ -165,13 +164,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   private ContainerData chooseContainer(OzoneContainer ozoneContainer,
       HddsVolume src, HddsVolume dst, VolumeFixedUsage dstUsage,
       Set<ContainerID> inProgressContainerIDs, double upperThreshold, Set<State> movableContainerStates) {
-    final Iterator<Container<?>> itr;
-    try {
-      itr = CACHE.get().get(src, () -> ozoneContainer.getController().getContainers(src));
-    } catch (ExecutionException e) {
-      LOG.warn("Failed to get container iterator for volume {}", src, e);
-      return null;
-    }
+    final Iterator<Container<?>> itr = CACHE.get().get(src, v -> ozoneContainer.getController().getContainers(v));
 
     final SpaceUsageSource.Fixed dstSpaceUsage = dstUsage.getUsage();
     final long dstCommittedBytes = dst.getCommittedBytes();

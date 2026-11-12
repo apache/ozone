@@ -117,7 +117,8 @@ public class DeletedBlockLogImpl
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
-            containerManager, metrics, scmCommandTimeoutMs);
+            containerManager, () -> scm.getReplicationManager().getContainerReplicaPendingOps(), metrics,
+            scmCommandTimeoutMs);
     int limit = (int) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
@@ -215,6 +216,14 @@ public class DeletedBlockLogImpl
    */
   public void onBecomeLeader() {
     transactionStatusManager.onBecomeLeader();
+  }
+
+  /**
+   * Called in SCMStateMachine#notifyLeaderReady after the transaction buffer is flushed, when all transactions
+   * of the previous leader terms are applied.
+   */
+  public void onLeaderReady() {
+    transactionStatusManager.onLeaderReady();
   }
 
   /**
@@ -414,7 +423,11 @@ public class DeletedBlockLogImpl
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
               if (!checkInadequateReplica(replicas, txn, dnList)) {
-                getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
+                if (transactionStatusManager.isPurgeableWithoutAck(txn.getTxID(), id)) {
+                  txIDs.add(txn.getTxID());
+                } else {
+                  getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
+                }
               } else {
                 metrics.incrSkippedTransaction();
               }
@@ -530,7 +543,7 @@ public class DeletedBlockLogImpl
           metrics.incrDNCommandsFailure(dnId, 1);
         } else {
           LOG.debug("Delete Block Command {} is not executed on the Datanode" +
-              " {}.", commandStatus.getCmdId(), dnId);
+              " {}.", commandStatus.getCmdId(), details);
         }
 
         getSCMDeletedBlockTransactionStatusManager()

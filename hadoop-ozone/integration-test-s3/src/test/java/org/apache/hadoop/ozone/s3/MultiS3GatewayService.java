@@ -34,6 +34,18 @@ public class MultiS3GatewayService implements MiniOzoneCluster.Service {
 
   private static final Logger LOG = LoggerFactory.getLogger(MultiS3GatewayService.class);
 
+  /**
+   * Test-only config key holding the comma-separated {@code host:port} http
+   * addresses of the individual backend gateways behind the proxy. The proxy
+   * overwrites {@link S3GatewayConfigKeys#OZONE_S3G_HTTP_ADDRESS_KEY} with its
+   * own address, hiding the gateways; a test that needs to reach a single
+   * gateway's connector directly (the proxy uses lenient LEGACY URI compliance
+   * and would mask connector-level URI rejection) reads a backend address from
+   * this key.
+   */
+  public static final String BACKEND_HTTP_ADDRESSES_KEY =
+      "ozone.test.s3g.backend.http.addresses";
+
   private final List<S3GatewayService> gatewayServices = new ArrayList<>();
   private ProxyServer proxyServer;
   private OzoneConfiguration configuration;
@@ -47,14 +59,19 @@ public class MultiS3GatewayService implements MiniOzoneCluster.Service {
   @Override
   public void start(OzoneConfiguration conf) throws Exception {
     List<String> urls = new ArrayList<>();
+    List<String> backendAddresses = new ArrayList<>();
     for (S3GatewayService service : gatewayServices) {
       service.start(conf);
-      String redirectUrl = "http://" + service.getConf().get(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY);
-      urls.add(redirectUrl);
+      String backendAddress = service.getConf().get(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY);
+      backendAddresses.add(backendAddress);
+      urls.add("http://" + backendAddress);
     }
 
     String url = localhostWithFreePort();
     conf.set(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY, url);
+    // The proxy address above hides the individual gateways; expose them so a
+    // test can target a single gateway's connector directly.
+    conf.set(BACKEND_HTTP_ADDRESSES_KEY, String.join(",", backendAddresses));
     URI proxyUri = new URI("http://" + url);
     proxyServer = new ProxyServer(urls, proxyUri.getHost(), proxyUri.getPort());
     proxyServer.start();

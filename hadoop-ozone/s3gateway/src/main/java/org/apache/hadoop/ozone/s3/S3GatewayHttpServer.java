@@ -34,11 +34,24 @@ public class S3GatewayHttpServer extends BaseHttpServer {
   public S3GatewayHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
     super(conf, name);
+    if (isEnabled()) {
+      WeldCdiIntegration.enable(getWebAppContext());
+    }
   }
 
   @Override
   protected boolean shouldAddDefaultApps() {
     return false;
+  }
+
+  @Override
+  protected boolean shouldAllowAmbiguousUri() {
+    return true;
+  }
+
+  @Override
+  protected boolean shouldAllowEncodedDotSegments() {
+    return true;
   }
 
   @Override

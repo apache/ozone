@@ -21,11 +21,13 @@ import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.AWS4_SIGNING_ALGORITHM;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.UnsupportedEncodingException;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
@@ -93,7 +95,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
         .setAlgorithm(queryParameters.get("X-Amz-Algorithm"))
         .setService(credential.getAwsService())
         .setSignPayload(false)
-        .setPayloadHash("UNSIGNED-PAYLOAD")
+        .setPayloadHash(UNSIGNED_PAYLOAD)
         .build();
   }
 
@@ -136,7 +138,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
     final Long expires = Long.parseLong(expiresString);
     if (expires >= X_AMZ_EXPIRES_MIN && expires <= X_AMZ_EXPIRES_MAX) {
       if (ZonedDateTime.parse(dateString, StringToSignProducer.TIME_FORMATTER)
-          .plus(expires, SECONDS).isBefore(ZonedDateTime.now())) {
+          .plus(expires, SECONDS).isBefore(ZonedDateTime.now(ZoneOffset.UTC))) {
         // An expired pre-signed URL is an authorization failure (403), not a
         // malformed header (400).
         throw new AccessDeniedResourceException("Pre-signed S3 url is expired. "
@@ -170,10 +172,12 @@ public class AuthorizationV4QueryParser implements SignatureParser {
       throw new MalformedResourceException(
           "AWS service is empty. credential:" + credential);
     }
-    // Date should not be empty and should be properly formatted.
+    // Date should not be empty, properly formatted, and match X-Amz-Date.
     if (!credential.getDate().isEmpty()) {
       try {
         LocalDate.parse(credential.getDate(), DATE_FORMATTER);
+        Credential.validateScopeDateMatchesAmzDate(credential.getDate(),
+            queryParameters.get("X-Amz-Date"), credential.getCredential());
       } catch (DateTimeParseException ex) {
         throw new MalformedResourceException(
             "AWS date format is invalid. credential:" + credential);

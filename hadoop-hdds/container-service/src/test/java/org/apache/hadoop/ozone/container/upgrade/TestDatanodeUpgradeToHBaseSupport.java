@@ -83,7 +83,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
+        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
@@ -97,8 +97,8 @@ public class TestDatanodeUpgradeToHBaseSupport {
     // close container to allow upgrade.
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
-    dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.HBASE_SUPPORT));
+    dsm.getVersionManager().finalizeUpgrade();
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.HBASE_SUPPORT));
     // open a new container after finalization
     final long containerID2 = UpgradeTestHelper.addContainer(dispatcher, pipeline);
     // incremental chunk list should work after finalizing.
@@ -118,7 +118,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
+        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
@@ -134,8 +134,8 @@ public class TestDatanodeUpgradeToHBaseSupport {
     // close container to allow upgrade.
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
-    dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.HBASE_SUPPORT));
+    dsm.getVersionManager().finalizeUpgrade();
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.HBASE_SUPPORT));
     final long containerID2 = UpgradeTestHelper.addContainer(dispatcher, pipeline);
     ContainerProtos.WriteChunkRequestProto writeChunk2 =
         UpgradeTestHelper.putBlock(dispatcher, containerID2, pipeline, false);

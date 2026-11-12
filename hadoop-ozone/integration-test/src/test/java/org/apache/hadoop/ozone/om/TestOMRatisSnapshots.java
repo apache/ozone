@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -37,8 +38,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -86,6 +91,7 @@ import org.junit.jupiter.api.Test;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 /**
@@ -626,9 +632,10 @@ public class TestOMRatisSnapshots {
         "Simulated backup move failure for test"));
     followerOM.setExitManagerForTesting(new DummyExitManager());
     try {
-      TermIndex termIndex = followerOM.installCheckpoint(
-          leaderOMNodeId, leaderCheckpointLocation, leaderCheckpointTrxnInfo);
-      assertNull(termIndex, "Install should have been reported as failed");
+      IOException exception = assertThrows(IOException.class, () ->
+          followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation,
+              leaderCheckpointTrxnInfo));
+      assertThat(exception).hasMessageContaining("Cannot replace DB");
 
       // Everything present before the aborted install must still be present.
       assertThat(topLevelNames(followerMetaDir)).containsAll(namesBefore);
@@ -639,6 +646,86 @@ public class TestOMRatisSnapshots {
       assertEquals(dbInodeBefore, getINode(followerDbDir),
           OM_DB_NAME + " was replaced rather than restored");
     } finally {
+      followerOM.setCheckpointBackupInjector(null);
+      cluster.setupExitManagerForTesting();
+    }
+  }
+
+  /**
+   * An apply offered while installCheckpoint has the state machine paused is rejected, and Ratis moves
+   * past it. If the install then fails, the old DB is kept and Ratis does not reload the state machine,
+   * so the entry would never be applied: the OM must exit instead of resuming applies, so that a restart
+   * replays it from the Raft log. A failed install with no such entry must not exit.
+   *
+   * The install is called directly on a follower that keeps receiving entries, which is wider than a
+   * Ratis driven install: there the follower refuses appendEntries, so only entries already committed in
+   * its log but not yet applied can be rejected.
+   */
+  @Test
+  public void testFailedInstallExitsAfterApplyRejectedDuringPause() throws Exception {
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    // The active follower, so it keeps receiving entries while it installs.
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (!cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    writeKeys(1);
+    DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore().getCheckpoint(true);
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    assertNotNull(leaderCheckpointLocation);
+    Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
+    Files.createDirectory(omDbDir);
+    moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
+    TransactionInfo trxnInfo = OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf, omDbDir);
+    // The follower is caught up, so claim a newer checkpoint to let the replacement start. It fails
+    // at the first backup move, before anything from the checkpoint is installed.
+    TransactionInfo aheadTrxnInfo = TransactionInfo.valueOf(trxnInfo.getTerm(), trxnInfo.getTransactionIndex() + 1000);
+
+    DummyExitManager exitManager = new DummyExitManager();
+    followerOM.setExitManagerForTesting(exitManager);
+    LogCapturer updaterLog =
+        LogCapturer.captureLogs(LoggerFactory.getLogger("org.apache.ratis.server.impl.StateMachineUpdater"));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    BlockThenThrowFaultInjector injector = new BlockThenThrowFaultInjector();
+    try {
+      // Nothing left to apply on the follower, so this install fails with no entry rejected.
+      long leaderIndex = leaderOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+      GenericTestUtils.waitFor(
+          () -> followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex() >= leaderIndex, 100, 30_000);
+      followerOM.setCheckpointBackupInjector(new ThrowOnNthPauseFaultInjector(1, "Simulated backup move failure"));
+      IOException exception = assertThrows(IOException.class,
+          () -> followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation, aheadTrxnInfo));
+      assertThat(exception).hasMessageContaining("Cannot replace DB");
+      assertThat(exitManager.messages).isEmpty();
+
+      followerOM.setCheckpointBackupInjector(injector);
+      Future<TermIndex> install = executor.submit(
+          () -> followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation, aheadTrxnInfo));
+      assertTrue(injector.paused.await(60, TimeUnit.SECONDS));
+      String key = createKey(ozoneBucket);
+      OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).setBucketName(bucketName)
+          .setKeyName(key).build();
+      long keyIndex = leaderOM.lookupKey(keyArgs).getUpdateID();
+      // Ratis logs the rejected apply of the key's commit on the follower.
+      String follower = followerNodeId + "@";
+      String index = "applying txn index=" + keyIndex + ",";
+      GenericTestUtils.waitFor(() -> Arrays.stream(updaterLog.getOutput().split("\n"))
+          .anyMatch(line -> line.contains(follower) && line.contains(index)), 100, 30_000);
+      injector.resume();
+      ExecutionException installException = assertThrows(ExecutionException.class,
+          () -> install.get(60, TimeUnit.SECONDS));
+      assertThat(installException.getCause()).isInstanceOf(IOException.class).hasMessageContaining("Cannot replace DB");
+
+      assertThat(exitManager.messages)
+          .as("follower resumed applies on its old DB after the entry at index %d was skipped", keyIndex)
+          .singleElement().asString().contains("rejected while the state machine was paused");
+    } finally {
+      injector.resume();
+      executor.shutdownNow();
+      updaterLog.stopCapturing();
       followerOM.setCheckpointBackupInjector(null);
       cluster.setupExitManagerForTesting();
     }
@@ -870,10 +957,37 @@ public class TestOMRatisSnapshots {
   }
 
   private static class DummyExitManager extends ExitManager {
+    private final List<String> messages = new CopyOnWriteArrayList<>();
+
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
         Logger log) {
+      messages.add(throwable == null ? message : message + " " + throwable.getMessage());
       log.error("System Exit: " + message, throwable);
+    }
+  }
+
+  /**
+   * FaultInjector that blocks pause() until resume(), then throws IOException.
+   */
+  private static class BlockThenThrowFaultInjector extends FaultInjector {
+    private final CountDownLatch paused = new CountDownLatch(1);
+    private final CountDownLatch released = new CountDownLatch(1);
+
+    @Override
+    public void pause() throws IOException {
+      paused.countDown();
+      try {
+        released.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      throw new IOException("Simulated backup move failure");
+    }
+
+    @Override
+    public void resume() {
+      released.countDown();
     }
   }
 

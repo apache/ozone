@@ -25,14 +25,17 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import picocli.CommandLine;
 
 /**
- * Handler of ozone admin om finalizationstatus command.
+ * Handler of `ozone admin om finalizationstatus` command for new clients to finalize old servers that do not support
+ * the current `ozone admin upgrade status` command.
  */
 @CommandLine.Command(
     name = "finalizationstatus",
     description = "Get the finalization status of om cluster.",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class
+    versionProvider = HddsVersionProvider.class,
+    hidden = true
 )
+@Deprecated
 public class FinalizationStatusSubCommand implements Callable<Void> {
 
   @CommandLine.Mixin

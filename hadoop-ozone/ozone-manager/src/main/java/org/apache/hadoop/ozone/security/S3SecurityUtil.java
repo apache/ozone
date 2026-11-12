@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
@@ -71,6 +72,12 @@ public final class S3SecurityUtil {
       if (omRequest.getS3Authentication().hasSessionToken()) {
         final String token = omRequest.getS3Authentication().getSessionToken();
         if (!token.isEmpty()) {
+          // The revocation checks below read this OM's local metadata, and OzoneManagerProtocolServerSideTranslatorPB
+          // skips its own leader check for any request carrying S3 authentication. A follower can be arbitrarily
+          // behind the leader, so it may not yet know that a token, or the principal that created it, was revoked.
+          // The non-STS path below gets this check from OzoneDelegationTokenSecretManager.retrievePassword.
+          OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
+
           final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
               token, ozoneManager.getSecretKeyClient(), CLOCK);
 

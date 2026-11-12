@@ -79,7 +79,7 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     // to revoke its temporary STS credentials.
     final String originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
 
-    final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(originalAccessKeyId);
+    final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(ozoneManager, originalAccessKeyId);
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(ozoneManager, ugi, originalAccessKeyId);
 
     if (!ozoneManager.getS3SecretManager().hasS3Secret(originalAccessKeyId)) {

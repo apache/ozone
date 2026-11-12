@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.slf4j.event.Level.INFO;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,6 +51,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -105,6 +109,66 @@ public class TestContainerBalancerSelectionCriteria {
             false, false, false));
 
     assertTrue(criteria.shouldBeExcluded(containerID, source, 0L));
+  }
+
+  @Test
+  public void shouldLogUnhealthyContainersAtInfo() throws Exception {
+    when(replicationManager.getContainerReplicationHealth(eq(containerInfo), anySet())).thenReturn(
+        new ContainerHealthResult.UnderReplicatedHealthResult(containerInfo, 1,
+            false, false, false));
+
+    GenericTestUtils.setLogLevel(ContainerBalancerSelectionCriteria.class, INFO);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ContainerBalancerSelectionCriteria.class);
+    try {
+      assertTrue(criteria.shouldBeExcluded(containerID, source, 0L));
+      assertThat(logCapturer.getOutput()).isEmpty();
+
+      ContainerID secondContainerID = mockUnhealthyContainer(2L);
+      balancerConfiguration.setIncludeNonStandardContainers(true);
+      assertTrue(criteria.shouldBeExcluded(secondContainerID, source, 0L));
+      assertTrue(criteria.shouldBeExcluded(containerID, source, 0L));
+      criteria.logExcludedContainersDueToHealth();
+
+      assertThat(logCapturer.getOutput())
+          .contains("Excluded 2 containers because of their health state",
+              "#1=UNDER_REPLICATED", "#2=UNDER_REPLICATED");
+    } finally {
+      logCapturer.stopCapturing();
+    }
+  }
+
+  @Test
+  public void shouldLimitUnhealthyContainersLoggedAtInfo() throws Exception {
+    GenericTestUtils.setLogLevel(ContainerBalancerSelectionCriteria.class, INFO);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ContainerBalancerSelectionCriteria.class);
+    try {
+      for (long id = 1; id <= 51; id++) {
+        assertTrue(criteria.shouldBeExcluded(mockUnhealthyContainer(id), source, 0L));
+      }
+
+      criteria.logExcludedContainersDueToHealth();
+
+      assertThat(logCapturer.getOutput())
+          .containsOnlyOnce("Excluded 51 containers because of their health state")
+          .contains("Logging the first 50", "#50=UNDER_REPLICATED")
+          .doesNotContain("#51=UNDER_REPLICATED");
+    } finally {
+      logCapturer.stopCapturing();
+    }
+  }
+
+  private ContainerID mockUnhealthyContainer(long id) throws Exception {
+    ContainerInfo unhealthyContainer = ReplicationTestUtil.createContainerInfo(
+        RatisReplicationConfig.getInstance(THREE), id, HddsProtos.LifeCycleState.CLOSED, 1L, OzoneConsts.GB);
+    ContainerID unhealthyContainerID = unhealthyContainer.containerID();
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createContainerReplica(unhealthyContainerID, 0, IN_SERVICE, CLOSED,
+        1L, OzoneConsts.GB, source, source.getID()));
+    when(containerManager.getContainer(unhealthyContainerID)).thenReturn(unhealthyContainer);
+    when(containerManager.getContainerReplicas(unhealthyContainerID)).thenReturn(replicas);
+    when(replicationManager.getContainerReplicationHealth(eq(unhealthyContainer), anySet())).thenReturn(
+        new ContainerHealthResult.UnderReplicatedHealthResult(unhealthyContainer, 1, false, false, false));
+    return unhealthyContainerID;
   }
 
   @Test

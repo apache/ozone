@@ -18,14 +18,18 @@
 package org.apache.hadoop.ozone.s3;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
+import com.google.common.net.InetAddresses;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
 import javax.annotation.Priority;
 import javax.inject.Inject;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.PreMatching;
@@ -33,8 +37,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.ext.Provider;
-import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,9 +81,10 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
     String domain = getDomainName(host);
 
     if (domain == null) {
-      throw getException("Invalid S3 Gateway request {" + requestContext
-          .getUriInfo().getRequestUri().toString() + " }: No matching domain " +
-          "{" + Arrays.toString(domains) + "} for the host {" + host  + "}");
+      // The domain list and request URI go to the log only, not to the unauthenticated client.
+      LOG.debug("Invalid S3 Gateway request {}: no matching domain {} for the host {}",
+          requestContext.getUriInfo().getRequestUri(), Arrays.toString(domains), host);
+      throw getException("No matching domain for the host {" + host + "}");
     }
 
     LOG.debug("Http header host name is {}", host);
@@ -93,9 +98,7 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
 
       if (!bucketName.endsWith(".")) {
         //Checking this as the virtual host style pattern is http://bucket.host/
-        throw getException("Invalid S3 Gateway request {" + requestContext
-            .getUriInfo().getRequestUri().toString() + "}:" + " Host: {" + host
-            + " is in invalid format");
+        throw getException("Host {" + host + "} is in invalid format");
       } else {
         bucketName = bucketName.substring(0, bucketName.length() - 1);
       }
@@ -117,8 +120,9 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
     }
   }
 
-  private InvalidRequestException getException(String message) {
-    return new InvalidRequestException(message);
+  private WebApplicationException getException(String message) {
+    // A 400 S3 error, not a 500, so that S3 clients fail fast instead of retrying.
+    return wrapOS3Exception(S3ErrorTable.newError(INVALID_REQUEST).withMessage(message));
   }
 
   @VisibleForTesting
@@ -127,12 +131,29 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   }
 
   /**
-   * This method finds the longest match with the domain name.
+   * This method finds the longest match with the domain name, except for a host
+   * that still holds a colon once its port is stripped, which has to be one of
+   * the configured domains itself, compared as an address rather than as text.
    * @param host
    * @return domain name matched with the host. if none of them are matching,
    * return null.
    */
   private String getDomainName(String host) {
+    // A colon at this point means an IPv6 literal (or a Host header malformed
+    // enough that checkHostWithoutPort returned it as it came), and neither can
+    // carry a bucket prefix. Matched by suffix, 2001:db8::1 would match the
+    // domain ::1 and be read as a request for a bucket named "2001:db8".
+    if (host.indexOf(':') >= 0) {
+      for (String domainVal : domains) {
+        if (isSameAddress(host, domainVal)) {
+          // The host itself, so that the caller sees nothing left in front of
+          // the domain to read as a bucket, however the two spell the address.
+          return host;
+        }
+      }
+      return null;
+    }
+
     String match = null;
     int length = 0;
     for (String domainVal : domains) {
@@ -164,6 +185,32 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
       // than failing with an internal error.
       return host;
     }
+  }
+
+  /**
+   * Compares a host with a configured domain by address rather than by
+   * spelling, so that a client writing the gateway's address in a form other
+   * than the configured one still reaches it: ::1 and 0:0:0:0:0:0:0:1 are the
+   * same address, and hexadecimal digits may be in either case. A zone names an
+   * interface of the node holding the address and must not be sent on the wire
+   * (RFC 9844), so one the operator wrote in the domain is dropped before
+   * comparing, while a Host header carrying one names no gateway. Neither is
+   * ever resolved: Guava accepts a scoped literal as a valid address but throws
+   * on parsing one whose interface this node does not have.
+   */
+  private static boolean isSameAddress(String host, String domain) {
+    if (host.indexOf('%') >= 0) {
+      return false;
+    }
+    String domainAddress = stripZone(domain);
+    return host.equals(domainAddress)
+        || (InetAddresses.isInetAddress(host) && InetAddresses.isInetAddress(domainAddress)
+            && InetAddresses.forString(host).equals(InetAddresses.forString(domainAddress)));
+  }
+
+  private static String stripZone(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? host : host.substring(0, mark);
   }
 
   /**

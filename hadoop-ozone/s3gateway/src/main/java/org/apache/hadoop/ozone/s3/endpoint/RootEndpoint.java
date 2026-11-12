@@ -114,7 +114,7 @@ public class RootEndpoint extends EndpointBase {
       String accountId = S3Owner.DEFAULT_S3OWNER_ID;
       int count = 0;
       String lastBucketName = null;
-      while (bucketIterator.hasNext() && count < maxDirectoryBuckets) {
+      while (count < maxDirectoryBuckets && bucketIterator.hasNext()) {
         OzoneBucket bucket = bucketIterator.next();
         if (!bucket.getBucketLayout().isFileSystemOptimized()) {
           continue;
@@ -130,7 +130,7 @@ public class RootEndpoint extends EndpointBase {
         count++;
       }
 
-      if (lastBucketName != null && bucketIterator.hasNext()) {
+      if (count == maxDirectoryBuckets && lastBucketName != null && bucketIterator.hasNext()) {
         response.setContinuationToken(
             new ContinueToken(lastBucketName, null).encodeToString());
       }
@@ -182,7 +182,7 @@ public class RootEndpoint extends EndpointBase {
 
       int count = 0;
       String lastBucketName = null;
-      while (bucketIterator.hasNext() && count < maxBuckets) {
+      while (count < maxBuckets && bucketIterator.hasNext()) {
         OzoneBucket next = bucketIterator.next();
         BucketMetadata bucketMetadata = new BucketMetadata();
         bucketMetadata.setName(next.getName());
@@ -192,7 +192,7 @@ public class RootEndpoint extends EndpointBase {
         count++;
       }
 
-      if (paginated && lastBucketName != null && bucketIterator.hasNext()) {
+      if (paginated && count == maxBuckets && lastBucketName != null && bucketIterator.hasNext()) {
         response.setContinuationToken(
             new ContinueToken(lastBucketName, null).encodeToString());
       }

@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
@@ -52,6 +54,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -74,11 +77,11 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
@@ -119,8 +122,8 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -191,6 +194,8 @@ class TestKeyDeletingService extends OzoneTestBase {
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
         200, TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED, true);
+    conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     conf.setQuietMode(false);
   }
 
@@ -253,6 +258,8 @@ class TestKeyDeletingService extends OzoneTestBase {
           () -> getDeletedKeyCount() >= initialDeletedCount + keyCount,
           100, 10000);
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
+      // deletedKeyCount is updated once the purge request is applied, before the double buffer flushes it to the DB.
+      om.awaitDoubleBufferFlush();
       try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
           keyManager, om.getMetadataManager().getLock())) {
@@ -433,6 +440,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 100000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
+      om.awaitDoubleBufferFlush();
       try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
           keyManager, om.getMetadataManager().getLock())) {
@@ -659,7 +667,6 @@ class TestKeyDeletingService extends OzoneTestBase {
        of Snap3 should be empty.
      */
     @Test
-    @Flaky("HDDS-13880")
     void testSnapshotDeepClean() throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
@@ -721,23 +728,29 @@ class TestKeyDeletingService extends OzoneTestBase {
       keyDeletingService.resume();
       directoryDeletingService.resume();
 
+      // Hold the snap3 DB handle only while its tables are read: the handle keeps a snapshot DB read lock, and the
+      // OMDoubleBuffer flush thread needs a colliding write lock on the same stripe to purge snap2 below.
       try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
                om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
-        OmSnapshot snapshot3 = rcOmSnapshot.get();
-
         Table<String, RepeatedOmKeyInfo> snap3deletedTable =
-            snapshot3.getMetadataManager().getDeletedTable();
-
+            rcOmSnapshot.get().getMetadataManager().getDeletedTable();
         // 5 keys can be deep cleaned as it was stuck previously
         assertTableRowCount(snap3deletedTable, initialDeletedCount + 10, metadataManager);
-
-        writeClient.deleteSnapshot(volumeName, bucketName, snap2);
-        assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
-
-        assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
-        assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
-        checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       }
+
+      writeClient.deleteSnapshot(volumeName, bucketName, snap2);
+      assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
+
+      // Re-fetch the deleted table: SnapshotCache may have closed and reloaded snap3 while no handle was held.
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
+               om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
+        Table<String, RepeatedOmKeyInfo> snap3deletedTable =
+            rcOmSnapshot.get().getMetadataManager().getDeletedTable();
+        assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
+      }
+
+      assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
+      checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       sstFilteringService.resume();
     }
 
@@ -776,6 +789,67 @@ class TestKeyDeletingService extends OzoneTestBase {
       kds.runPeriodicalTaskNow();
       clearInvocations(omSnapshotManager);
       verify(omSnapshotManager, Mockito.never()).getActiveSnapshot(any(), any(), any());
+    }
+
+    /**
+     * A file is hsync'ed with blocks A and B and captured by a snapshot. The writer replaces B with block C and hsyncs,
+     * a second snapshot captures A and C, and the file is closed, which releases B as an uncommitted block. B is not
+     * reclaimed until the first snapshot is deleted, even while the previous snapshot is the one that does not list it.
+     */
+    @Test
+    void testUncommittedBlockOfHsyncedKeyRetainedBySnapshot() throws Exception {
+      keyDeletingService.suspend();
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String keyName = uniqueObjectName("key");
+      createVolumeAndBucket(volumeName, bucketName, false);
+      OmKeyArgs keyArg = newKeyArgs(volumeName, bucketName, keyName);
+      OpenKeySession session = writeClient.openKey(keyArg);
+      OmKeyLocationInfo locationA =
+          session.getKeyInfo().getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
+      OmKeyLocationInfo locationB = writeClient.allocateBlock(keyArg, session.getId(), new ExcludeList());
+      keyArg.setLocationInfoList(Arrays.asList(locationA, locationB));
+      keyArg.setDataSize(locationA.getLength() + locationB.getLength());
+      writeClient.hsyncKey(keyArg, session.getId());
+      String snap1 = uniqueObjectName("snap");
+      writeClient.createSnapshot(volumeName, bucketName, snap1);
+      OmKeyLocationInfo locationC = writeClient.allocateBlock(keyArg, session.getId(), new ExcludeList());
+      keyArg.setLocationInfoList(Arrays.asList(locationA, locationC));
+      keyArg.setDataSize(locationA.getLength() + locationC.getLength());
+      writeClient.hsyncKey(keyArg, session.getId());
+      String snap2 = uniqueObjectName("snap");
+      writeClient.createSnapshot(volumeName, bucketName, snap2);
+      writeClient.commitKey(keyArg, session.getId());
+      om.awaitDoubleBufferFlush();
+      ContainerBlockID blockA = locationA.getBlockID().getContainerBlockID();
+      ContainerBlockID blockB = locationB.getBlockID().getContainerBlockID();
+      ContainerBlockID blockC = locationC.getBlockID().getContainerBlockID();
+      assertThat(Arrays.asList(blockA, blockB, blockC)).doesNotHaveDuplicates();
+
+      String dbKey = metadataManager.getOzoneKey(volumeName, bucketName, keyName);
+      assertThat(getSnapshotKeyBlocks(volumeName, bucketName, snap1, dbKey)).containsExactly(blockA, blockB);
+      assertThat(getSnapshotKeyBlocks(volumeName, bucketName, snap2, dbKey)).containsExactly(blockA, blockC);
+      assertThat(getBlocksPendingDeletion(dbKey)).containsExactly(blockB);
+
+      // The previous snapshot does not list B, but it holds an hsync'ed version of the key, so an older one may.
+      long runCount = getRunCount();
+      keyDeletingService.resume();
+      GenericTestUtils.waitFor(() -> getRunCount() > runCount + 5, 100, 10000);
+      assertThat(getBlocksPendingDeletion(dbKey)).containsExactly(blockB);
+
+      // The first snapshot references B.
+      Table<String, SnapshotInfo> snapshotInfoTable = metadataManager.getSnapshotInfoTable();
+      long snapshotCount = metadataManager.countRowsInTable(snapshotInfoTable);
+      writeClient.deleteSnapshot(volumeName, bucketName, snap2);
+      assertTableRowCount(snapshotInfoTable, snapshotCount - 1, metadataManager);
+      long runCountWithoutSnap2 = getRunCount();
+      GenericTestUtils.waitFor(() -> getRunCount() > runCountWithoutSnap2 + 5, 100, 10000);
+      assertThat(getBlocksPendingDeletion(dbKey)).containsExactly(blockB);
+
+      writeClient.deleteSnapshot(volumeName, bucketName, snap1);
+      GenericTestUtils.waitFor(() -> getBlocksPendingDeletion(dbKey).isEmpty(), 1000, 120000);
+      assertThat(getBlockIds(metadataManager.getKeyTable(BucketLayout.DEFAULT).get(dbKey)))
+          .containsExactly(blockA, blockC);
     }
 
     @Test
@@ -1368,6 +1442,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // wait for AOS deleted keys to be reclaimed and
       // snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 10, 100, 10000);
       // Verify last run AOS deletion metrics.
@@ -1386,6 +1461,8 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Delete snap1. Which also sets the snap2 to be deep cleaned.
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
+      // SnapshotDeletingService silently skips snap1 until its delete is flushed, and the 1h interval never retries.
+      om.awaitDoubleBufferFlush();
       keyManager.getSnapshotDeletingService().runPeriodicalTaskNow();
       // Wait for changes to the snap2 to be flushed.
       GenericTestUtils.waitFor(
@@ -1400,6 +1477,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // wait for snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 20, 100, 10000);
 
@@ -1635,6 +1713,19 @@ class TestKeyDeletingService extends OzoneTestBase {
     writeClient.renameKey(keyArg, toKeyName);
   }
 
+  private static OmKeyArgs newKeyArgs(String volumeName, String bucketName, String keyName) {
+    return new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setAcls(Collections.emptyList())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setDataSize(1000L)
+        .setLocationInfoList(new ArrayList<>())
+        .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
+        .build();
+  }
+
   private OmKeyArgs createAndCommitKey(String volumeName,
       String bucketName, String keyName, int numBlocks) throws IOException {
     return createAndCommitKey(volumeName, bucketName, keyName, numBlocks, 0, this.writeClient);
@@ -1649,16 +1740,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       String bucketName, String keyName, int numBlocks, int numUncommitted,
       OzoneManagerProtocol customWriteClient) throws IOException {
 
-    OmKeyArgs keyArg = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setAcls(Collections.emptyList())
-        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-        .setDataSize(1000L)
-        .setLocationInfoList(new ArrayList<>())
-        .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
-        .build();
+    OmKeyArgs keyArg = newKeyArgs(volumeName, bucketName, keyName);
 
     // Open and Commit the Key in the Key Manager.
     OpenKeySession session = customWriteClient.openKey(keyArg);
@@ -1692,6 +1774,33 @@ class TestKeyDeletingService extends OzoneTestBase {
     keyArg.setDataSize(size);
     customWriteClient.commitKey(keyArg, session.getId());
     return keyArg;
+  }
+
+  private static List<ContainerBlockID> getBlockIds(OmKeyInfo keyInfo) {
+    return keyInfo.getLatestVersionLocations().createLocationList().stream()
+        .map(location -> location.getBlockID().getContainerBlockID()).collect(Collectors.toList());
+  }
+
+  private List<ContainerBlockID> getSnapshotKeyBlocks(String volumeName, String bucketName, String snapshotName,
+      String dbKey) throws IOException {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+        om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snapshotName)) {
+      return getBlockIds(snapshot.get().getMetadataManager().getKeyTable(BucketLayout.DEFAULT).get(dbKey));
+    }
+  }
+
+  /**
+   * Returns the blocks in the deleted table entries of the given key.
+   */
+  private List<ContainerBlockID> getBlocksPendingDeletion(String dbKey) {
+    try {
+      return metadataManager.getDeletedTable().getRangeKVs(null, 10, dbKey).stream()
+          .flatMap(kv -> kv.getValue().getOmKeyInfoList().stream())
+          .flatMap(keyInfo -> getBlockIds(keyInfo).stream())
+          .collect(Collectors.toList());
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   private long getDeletedKeyCount() {

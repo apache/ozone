@@ -49,6 +49,8 @@ public interface SCMHADBTransactionBuffer
 
   boolean shouldFlush(long snapshotWaitTime);
 
+  boolean flushIfPendingLimitReached() throws RocksDatabaseException, CodecException;
+
   void init() throws RocksDatabaseException, CodecException;
 
   void beginApplyingTransaction();

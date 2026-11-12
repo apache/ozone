@@ -20,6 +20,7 @@ package org.apache.ozone.rocksdiff;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static org.apache.commons.io.FilenameUtils.getBaseName;
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
@@ -42,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -53,6 +55,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.MutableGraph;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -75,6 +78,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -88,10 +92,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
@@ -115,7 +120,6 @@ import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotVersion;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -956,11 +960,12 @@ public class TestRocksDBCheckpointDiffer {
    * Does actual DB write, flush, compaction.
    */
   @Test
-  @Flaky("HDDS-15209")
   void testDifferWithDB() throws Exception {
     writeKeysAndCheckpointing();
     readRocksDBInstance(ACTIVE_DB_DIR_NAME, activeRocksDB, null,
         rocksDBCheckpointDiffer);
+
+    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000, 10000);
 
     if (LOG.isDebugEnabled()) {
       printAllSnapshots();
@@ -971,24 +976,12 @@ public class TestRocksDBCheckpointDiffer {
         rocksDBCheckpointDiffer.getForwardCompactionDAG());
 
     diffAllSnapshots(rocksDBCheckpointDiffer);
+    assertCompactionSstBackups(rocksDBCheckpointDiffer);
 
-    // Confirm correct links created
-    try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
-      List<String> actualLinks = sstPathStream.map(Path::getFileName)
-              .map(Object::toString).sorted().collect(Collectors.toList());
-      assertThat(actualLinks).hasSize(7);
-      assertThat(actualLinks).allMatch(link -> link.matches("\\d{6}\\.sst"));
-      for (String linkName : actualLinks) {
-        assertTrue(Files.size(sstBackUpDir.toPath().resolve(linkName)) > 0,
-            "SST link should not be empty: " + linkName);
-      }
-    }
     rocksDBCheckpointDiffer.getForwardCompactionDAG().nodes().stream().forEach(compactionNode -> {
       Assertions.assertNotNull(compactionNode.getStartKey());
       Assertions.assertNotNull(compactionNode.getEndKey());
     });
-    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000,
-        10000);
     if (LOG.isDebugEnabled()) {
       rocksDBCheckpointDiffer.dumpCompactionNodeTable();
     }
@@ -1006,34 +999,27 @@ public class TestRocksDBCheckpointDiffer {
   void diffAllSnapshots(RocksDBCheckpointDiffer differ)
       throws IOException {
     final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
+    Set<String> allTables = allTablesForDiff();
     boolean sawNonEmptyDiff = false;
-    for (DifferSnapshotInfo snap : snapshots) {
-      // Returns a list of SST files to be fed into RocksCheckpointDiffer Dag.
-      List<String> tablesToTrack = new ArrayList<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
-      // Add some invalid index.
-      tablesToTrack.add("compactionLogTable");
 
-      // Baseline diff when tracking every table. A subset's diff must equal
-      // this baseline filtered to the subset's column families (files with no
-      // column family are always kept). This relationship is deterministic and
-      // stable across RocksDB versions, unlike hard-coded SST file names.
-      Set<String> allTables = new HashSet<>(tablesToTrack);
-      List<SstFileInfo> baseline = differ.getSSTDiffList(
+    // Each test snapshot only stores SST metadata for checkpoint version 0 (see createCheckpoint).
+    for (DifferSnapshotInfo snap : snapshots) {
+      List<SstFileInfo> fullDagDiff = differ.getSSTDiffList(
           new DifferSnapshotVersion(src, 0, allTables),
           new DifferSnapshotVersion(snap, 0, allTables),
-          null, allTables, true).orElse(Collections.emptyList());
-      sawNonEmptyDiff = sawNonEmptyDiff || !baseline.isEmpty();
+          null, allTables, true).orElseThrow();
+      sawNonEmptyDiff = sawNonEmptyDiff || !fullDagDiff.isEmpty();
 
-      // Independent structural oracle, not derived from getSSTDiffList's own
-      // output: a snapshot diffed against itself must have no differing SST
-      // files. Together with the sawNonEmptyDiff guard below, this bounds a
-      // systematically broken diff in both directions (returning nothing, or
-      // returning files even for identical snapshots).
+      // Independent structural oracle: a snapshot diffed against itself must have no
+      // differing SST files. Together with sawNonEmptyDiff below, this bounds a broken
+      // diff in both directions (returning nothing, or returning files for identical snapshots).
       if (snap == src) {
-        assertThat(baseline)
+        assertThat(fullDagDiff)
             .as("diff of a snapshot against itself must be empty")
             .isEmpty();
       }
+
+      List<String> tablesToTrack = new ArrayList<>(allTables);
 
       Set<String> tableToLookUp = new HashSet<>();
       for (int i = 0; i < Math.pow(2, tablesToTrack.size()); i++) {
@@ -1046,15 +1032,12 @@ public class TestRocksDBCheckpointDiffer {
         }
         DifferSnapshotVersion srcSnapVersion = new DifferSnapshotVersion(src, 0, tableToLookUp);
         DifferSnapshotVersion destSnapVersion = new DifferSnapshotVersion(snap, 0, tableToLookUp);
-        List<SstFileInfo> sstDiffList = differ.getSSTDiffList(srcSnapVersion, destSnapVersion, null,
-                tableToLookUp, true).orElse(Collections.emptyList());
+        List<SstFileInfo> sstDiffList = differ.getSSTDiffList(
+            srcSnapVersion, destSnapVersion, null, tableToLookUp, true).orElseThrow();
         LOG.info("SST diff list from '{}' to '{}': {} tables: {}",
             src.getDbPath(0), snap.getDbPath(0), sstDiffList, tableToLookUp);
 
-        // Expected files: baseline entries whose column family is untracked
-        // (null) or included in this subset. getSSTDiffList returns the values
-        // of a HashMap, so its ordering is not guaranteed; compare as sets.
-        List<String> expectedFiles = baseline.stream()
+        List<String> expectedFiles = fullDagDiff.stream()
             .filter(sstFileInfo -> sstFileInfo.getColumnFamily() == null
                 || tableToLookUp.contains(sstFileInfo.getColumnFamily()))
             .map(SstFileInfo::getFileName)
@@ -1065,10 +1048,53 @@ public class TestRocksDBCheckpointDiffer {
         assertThat(actualFiles).containsExactlyInAnyOrderElementsOf(expectedFiles);
       }
     }
-    // Guard against getSSTDiffList silently returning nothing for every input.
     assertThat(sawNonEmptyDiff)
         .as("expected at least one non-empty SST diff across snapshots")
         .isTrue();
+  }
+
+  private Set<String> allTablesForDiff() {
+    Set<String> tables = new HashSet<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
+    tables.add("compactionLogTable");
+    return tables;
+  }
+
+  private void assertCompactionSstBackups(RocksDBCheckpointDiffer differ) throws IOException {
+    Set<String> tablesToLookup = allTablesForDiff();
+    DifferSnapshotInfo firstSnapshot = snapshots.get(0);
+    DifferSnapshotInfo lastSnapshot = snapshots.get(snapshots.size() - 1);
+    List<SstFileInfo> diffSinceFirst = differ.getSSTDiffList(
+        new DifferSnapshotVersion(lastSnapshot, 0, tablesToLookup),
+        new DifferSnapshotVersion(firstSnapshot, 0, tablesToLookup),
+        null, tablesToLookup, true).orElseThrow();
+    // Version 0 is the only RocksDB checkpoint layer we record for each snapshot in this test.
+    Set<String> lastSnapshotFileNames = lastSnapshot.getSstFiles(0, tablesToLookup).stream()
+        .map(SstFileInfo::getFileName)
+        .collect(Collectors.toSet());
+    Set<String> diffNotInLastSnapshot = diffSinceFirst.stream()
+        .map(SstFileInfo::getFileName)
+        .filter(name -> !lastSnapshotFileNames.contains(name))
+        .collect(Collectors.toSet());
+    ConcurrentMap<String, CompactionNode> compactionNodes = differ.getCompactionNodeMap();
+    Set<String> backupBaseNames;
+    try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
+      List<Path> backupPaths = sstPathStream.collect(Collectors.toList());
+      backupBaseNames = backupPaths.stream()
+          .map(path -> getBaseName(path.getFileName().toString()))
+          .collect(Collectors.toSet());
+      assertThat(backupBaseNames).hasSizeGreaterThanOrEqualTo(7);
+      assertThat(backupPaths).allMatch(path -> path.getFileName().toString().matches("\\d+\\.sst"));
+      for (Path path : backupPaths) {
+        assertTrue(Files.size(path) > 0, "SST link should not be empty: " + path);
+      }
+    }
+    assertThat(backupBaseNames)
+        .as("SSTs compacted away since the first snapshot should be backed up")
+        .containsAll(diffNotInLastSnapshot);
+    for (String backupName : backupBaseNames) {
+      assertTrue(compactionNodes.containsKey(backupName),
+          () -> "Backup " + backupName + " should match a tracked compaction SST");
+    }
   }
 
   /**
@@ -1094,6 +1120,7 @@ public class TestRocksDBCheckpointDiffer {
     List<ColumnFamilyHandle> colHandle = new ArrayList<>();
     try (ManagedRocksDB rdb = ManagedRocksDB.openReadOnly(cpPath, getColumnFamilyDescriptors(), colHandle)) {
       TreeMap<Integer, List<SstFileInfo>> versionSstFilesMap = new TreeMap<>();
+      // OM snapshots can track multiple linked DB checkpoints; this test builds just one (version 0).
       versionSstFilesMap.put(0, rdb.getLiveMetadataForSSTFiles().values().stream().map(SstFileInfo::new)
           .collect(Collectors.toList()));
       final DifferSnapshotInfo currentSnapshot = new DifferSnapshotInfo((version) -> Paths.get(cpPath),
@@ -1581,6 +1608,72 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   /**
+   * A prune task can still be running when close() returns, because the scheduler wait is bounded, and RDBStore
+   * frees the DB right after close(). Such a task must not use the DB any more.
+   */
+  @Test
+  public void testPruneTasksDoNotUseDbAfterClose() throws Exception {
+    long oldCompactionTime = System.currentTimeMillis() - MINUTES.toMillis(20);
+    byte[] prunedKey = rocksDBCheckpointDiffer.addToCompactionLogTable(new CompactionLogEntry(1, oldCompactionTime,
+        Collections.singletonList(new CompactionFileInfo("000011", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        Collections.singletonList(new CompactionFileInfo("000012", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        null));
+    rocksDBCheckpointDiffer.pruneOlderSnapshotsWithCompactionHistory();
+    assertThat(activeRocksDB.get().get(compactionLogTableCFHandle, prunedKey)).isNull();
+
+    byte[] key = rocksDBCheckpointDiffer.addToCompactionLogTable(new CompactionLogEntry(2, oldCompactionTime,
+        Collections.singletonList(new CompactionFileInfo("000013", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        Collections.singletonList(new CompactionFileInfo("000014", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        null));
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+    SSTFilePruningMetrics pruningMetrics = rocksDBCheckpointDiffer.getPruningMetrics();
+    assertThat(pruningMetrics.getPruneQueueSize()).isEqualTo(1L);
+
+    rocksDBCheckpointDiffer.close();
+    rocksDBCheckpointDiffer.pruneSstFileValues();
+    rocksDBCheckpointDiffer.pruneOlderSnapshotsWithCompactionHistory();
+
+    assertThat(activeRocksDB.get().get(compactionLogTableCFHandle, key)).isNotNull();
+    assertThat(pruningMetrics.getPruneQueueSize()).isEqualTo(1L);
+  }
+
+  /**
+   * A prune task that waits for the differ lock while close() runs cannot be interrupted, so close() must not hold
+   * that lock while it waits for the tasks to end.
+   */
+  @Test
+  public void testCloseDoesNotWaitForTaskBlockedOnDifferLock(@TempDir Path dir) throws Exception {
+    ConfigurationSource config = mock(ConfigurationSource.class);
+    when(config.getTimeDuration(eq(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL), anyLong(), any()))
+        .thenReturn(TimeUnit.HOURS.toMillis(1));
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(dir.toString(), SST_BACK_UP_DIR_NAME,
+        COMPACTION_LOG_DIR_NAME, dir.resolve("db").toString(), config, readLock -> () -> { });
+    Scheduler scheduler = (Scheduler) FieldUtils.readField(differ, "scheduler", true);
+
+    CountDownLatch taskStarted = new CountDownLatch(1);
+    CountDownLatch closing = new CountDownLatch(1);
+    CountDownLatch taskDone = new CountDownLatch(1);
+    // Stands in for a prune task that reaches synchronized (this) between two entries while close() runs.
+    scheduler.schedule(() -> {
+      taskStarted.countDown();
+      Uninterruptibles.awaitUninterruptibly(closing);
+      synchronized (differ) {
+        taskDone.countDown();
+      }
+    }, 0, TimeUnit.MILLISECONDS);
+    assertThat(taskStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+    Thread closer = new Thread(differ::close);
+    closer.start();
+    GenericTestUtils.waitFor(scheduler::isClosed, 10, 10000);
+    closing.countDown();
+    closer.join(TimeUnit.SECONDS.toMillis(10));
+
+    assertThat(closer.isAlive()).as("close() still waiting").isFalse();
+    assertThat(taskDone.getCount()).isZero();
+  }
+
+  /**
    * Test cases for testGetSSTDiffListWithoutDB.
    */
   private static Stream<Arguments> casesGetSSTDiffListWithoutDB2() {
@@ -1646,10 +1739,10 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(0L, sstFilePruningMetrics.getCompactionsProcessed());
     assertEquals(0L, sstFilePruningMetrics.getFilesRemovedTotal());
 
-    List<Pair<String, Integer>> keys = new ArrayList<Pair<String, Integer>>();
-    keys.add(Pair.of("key1", Integer.valueOf(1)));
-    keys.add(Pair.of("key2", Integer.valueOf(0)));
-    keys.add(Pair.of("key3", Integer.valueOf(1)));
+    List<KeyType> keys = new ArrayList<KeyType>();
+    keys.add(new KeyType("key1", Integer.valueOf(1)));
+    keys.add(new KeyType("key2", Integer.valueOf(0)));
+    keys.add(new KeyType("key3", Integer.valueOf(1)));
 
     String inputFile78 = "000078";
     String inputFile73 = "000073";
@@ -1683,10 +1776,10 @@ public class TestRocksDBCheckpointDiffer {
         MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
             ManagedRawSSTFileReader.class, (mock, context) -> {
               ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
-              Iterator<Pair<CodecBuffer, Integer>> keyItr = keys.stream().map(i -> {
+              Iterator<RocksDBCheckpointDiffer.CodecBufferAndType> keyItr = keys.stream().map(i -> {
                 keyCodecBuffer.clear();
-                keyCodecBuffer.put(ByteBuffer.wrap(i.getKey().getBytes(UTF_8)));
-                return Pair.of(keyCodecBuffer, i.getValue());
+                keyCodecBuffer.put(ByteBuffer.wrap(i.key().getBytes(UTF_8)));
+                return new RocksDBCheckpointDiffer.CodecBufferAndType(keyCodecBuffer, i.type());
               }).iterator();
               doAnswer(i -> keyItr.hasNext()).when(mockedRawSSTFileItr).hasNext();
               doAnswer(i -> keyItr.next()).when(mockedRawSSTFileItr).next();
@@ -1737,16 +1830,16 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(1L, sstFilePruningMetrics.getFilesRemovedTotal());
   }
 
-  private void createSSTFileWithKeys(File file, List<Pair<String, Integer>> keys) throws RocksDatabaseException {
+  private void createSSTFileWithKeys(File file, List<KeyType> keys) throws RocksDatabaseException {
     byte[] value = "dummyValue".getBytes(UTF_8);
     try (RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(file)) {
-      Iterator<Pair<String, Integer>> itr = keys.iterator();
+      Iterator<KeyType> itr = keys.iterator();
       while (itr.hasNext()) {
-        Pair<String, Integer> entry = itr.next();
-        if (entry.getValue() == 0) {
-          sstFileWriter.delete(entry.getKey().getBytes(UTF_8));
+        KeyType entry = itr.next();
+        if (entry.type() == 0) {
+          sstFileWriter.delete(entry.key().getBytes(UTF_8));
         } else {
-          sstFileWriter.put(entry.getKey().getBytes(UTF_8), value);
+          sstFileWriter.put(entry.key().getBytes(UTF_8), value);
         }
       }
     }
@@ -1981,4 +2074,10 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(expectedResult, rocksDBCheckpointDiffer
         .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
   }
+
+  /**
+   * An SST key paired with its entry type (0 = delete, otherwise put),
+   * used to build SST files containing both puts and deletes.
+   */
+  private record KeyType(String key, int type) { }
 }

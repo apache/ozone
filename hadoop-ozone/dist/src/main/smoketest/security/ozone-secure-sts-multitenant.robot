@@ -144,41 +144,41 @@ Get S3 Credentials for Principals, Create Buckets, and Upload Files to Buckets
     # Kinit OM_ADMIN_USER that has access to all volumes/buckets per Ranger default policies
     Kinit test user               ${OM_ADMIN_USER}              ${OM_ADMIN_USER}.keytab
 
-    # Tenant 1 data
-    Execute                       ozone sh bucket create /${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}
     Create File                   ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
-    Execute                       ozone sh key put /${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
-
-    # Tenant 2 data and linked bucket
-    Execute                       ozone sh bucket create /${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}
-    Execute                       ozone sh key put /${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
-    Execute                       ozone sh bucket create /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
     Create File                   ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
-    Execute                       ozone sh key put /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}/${ANOTHER_BUCKET_TESTFILE} ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
-    # Link ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET} to ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
-    Execute                       ozone sh bucket link /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} /${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}
-    Execute                       ozone sh key put /${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}/${ANOTHER_BUCKET_TESTFILE} ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
 
+    # Tenant 1 data
+    Ozone Shell Batch
+    ...    bucket create /${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}
+    ...    key put /${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
+    # Tenant 2 data and linked bucket
+    ...    bucket create /${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}
+    ...    key put /${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
+    ...    bucket create /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
+    ...    key put /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}/${ANOTHER_BUCKET_TESTFILE} ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
+    # Link ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET} to ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
+    ...    bucket link /${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} /${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}
+    ...    key put /${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}/${ANOTHER_BUCKET_TESTFILE} ${TEMP_DIR}/${ANOTHER_BUCKET_TESTFILE}
     # Tenant 3 data
-    Execute                       ozone sh bucket create /${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}
-    Execute                       ozone sh key put /${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
+    ...    bucket create /${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}
+    ...    key put /${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}/${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/${ICEBERG_BUCKET_TESTFILE}
 
 Create Role-Scoped Tokens for All Three Tenants
     Set Global Variable           ${ROLE_ARN}                   arn:aws:iam::123456789012:role/${TENANT_ONE_ROLE}
-    # Waiting for Ranger policy cache refresh - ${USER_A} needs to be able to assume role
+    # Waiting for Ranger policy cache refresh - each user needs to be able to assume its role
     Wait Until Keyword Succeeds   60s   5s                      Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_A_T1_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_A_T1_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
     Set Global Variable           ${USER_A_T1_STS_ACCESS_KEY_ID}  ${STS_ACCESS_KEY_ID}
     Set Global Variable           ${USER_A_T1_STS_SECRET_KEY}   ${STS_SECRET_KEY}
     Set Global Variable           ${USER_A_T1_STS_SESSION_TOKEN}  ${STS_SESSION_TOKEN}
 
     Set Global Variable           ${ROLE_ARN}                   arn:aws:iam::123456789012:role/${TENANT_TWO_ROLE}
-    Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_A_T2_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_A_T2_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
+    Wait Until Keyword Succeeds   60s   5s                      Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_A_T2_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_A_T2_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
     Set Global Variable           ${USER_A_T2_STS_ACCESS_KEY_ID}  ${STS_ACCESS_KEY_ID}
     Set Global Variable           ${USER_A_T2_STS_SECRET_KEY}   ${STS_SECRET_KEY}
     Set Global Variable           ${USER_A_T2_STS_SESSION_TOKEN}  ${STS_SESSION_TOKEN}
 
     Set Global Variable           ${ROLE_ARN}                   arn:aws:iam::123456789012:role/${TENANT_THREE_ROLE}
-    Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_B_T3_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_B_T3_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
+    Wait Until Keyword Succeeds   60s   5s                      Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_B_T3_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_B_T3_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
     Set Global Variable           ${USER_B_T3_STS_ACCESS_KEY_ID}  ${STS_ACCESS_KEY_ID}
     Set Global Variable           ${USER_B_T3_STS_SECRET_KEY}   ${STS_SECRET_KEY}
     Set Global Variable           ${USER_B_T3_STS_SESSION_TOKEN}  ${STS_SESSION_TOKEN}
@@ -188,6 +188,9 @@ Verify Role-Scoped Token Accesses
 
     # This token should be able to read from ${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET} but not ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}
     # nor ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}.  Also verify that it can write to ${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}.
+    # Wait for all role policies to reach the Ranger plugin cache before checking the access matrix.
+    # Reading via ${TENANT_ONE_LINKED_BUCKET} needs the ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} key policy, which is created last.
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_ONE_LINKED_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}
     Get Object Should Succeed     ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
@@ -207,7 +210,7 @@ Verify Role-Scoped Token Accesses
     # nor ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} nor ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}
     # nor ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}.
     # Also verify that it can write to ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}.
-    Get Object Should Succeed     ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Get Object Should Fail        ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
@@ -220,7 +223,7 @@ Verify Role-Scoped Token Accesses
     # nor ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET} nor ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
     # nor ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}.
     # Also verify that it can write to ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}.
-    Get Object Should Succeed     ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
@@ -268,7 +271,7 @@ Verify Limited-Scoped Token Accesses
     Get Object Should Fail        ${TENANT_ONE_LINKED_BUCKET}   ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Put Object Should Fail        ${TENANT_ONE_LINKED_BUCKET}   ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
-    Put Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
+    Put Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
 
     Configure STS Profile         ${USER_A_T2_STS_ACCESS_KEY_ID}  ${USER_A_T2_STS_SECRET_KEY}  ${USER_A_T2_STS_SESSION_TOKEN}
 
@@ -320,6 +323,17 @@ Multitenant Revocation Scenarios
     Kinit test user               ${OM_ADMIN_USER}              ${OM_ADMIN_USER}.keytab
     ${output} =                   Execute                       ozone tenant --verbose user revoke '${TENANT_ONE}$${USER_A}'
     Should contain                ${output}                     Revoked accessId '${TENANT_ONE}$${USER_A}'.
+    Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+    # Reassign the same access ID: the old token must stay revoked, while a new token must work.
+    ${accessKeyId}  ${secretKey} =  Assign User To Tenant And Get Credentials  ${USER_A}  ${TENANT_ONE}
+    Should Be Equal               ${accessKeyId}                ${USER_A_T1_PERM_ACCESS_KEY_ID}
+    Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+    Refresh Ranger Policy Cache
+    Assume Role And Get Temporary Credentials                   perm_access_key_id=${accessKeyId}  perm_secret_key=${secretKey}  role_arn=${ROLE_ARN}
+    Configure STS Profile         ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  ${STS_SESSION_TOKEN}
+    Get Object Should Succeed     ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    Configure STS Profile         ${USER_A_T1_STS_ACCESS_KEY_ID}  ${USER_A_T1_STS_SECRET_KEY}  ${USER_A_T1_STS_SESSION_TOKEN}
     Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
 
     Configure STS Profile         ${USER_A_T2_STS_ACCESS_KEY_ID}  ${USER_A_T2_STS_SECRET_KEY}  ${USER_A_T2_STS_SESSION_TOKEN}

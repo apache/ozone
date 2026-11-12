@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.security;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
-
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -27,7 +25,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -35,7 +32,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 /**
  * Response for GetS3Secret request.
  */
-@CleanupTableInfo(cleanupTables = {S3_SECRET_TABLE})
 public class S3GetSecretResponse extends OMClientResponse {
 
   private final S3SecretValue s3SecretValue;

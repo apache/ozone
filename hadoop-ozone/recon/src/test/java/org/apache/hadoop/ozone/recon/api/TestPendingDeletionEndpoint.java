@@ -27,7 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsProgressResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
@@ -52,13 +52,13 @@ public class TestPendingDeletionEndpoint {
   private PendingDeletionEndpoint pendingDeletionEndpoint;
   private ReconGlobalMetricsService reconGlobalMetricsService;
   private DataNodeMetricsService dataNodeMetricsService;
-  private StorageContainerLocationProtocol scmClient;
+  private StorageContainerLocationInternalInterface scmClient;
 
   @BeforeEach
   public void setup() {
     reconGlobalMetricsService = mock(ReconGlobalMetricsService.class);
     dataNodeMetricsService = mock(DataNodeMetricsService.class);
-    scmClient = mock(StorageContainerLocationProtocol.class);
+    scmClient = mock(StorageContainerLocationInternalInterface.class);
     pendingDeletionEndpoint = new PendingDeletionEndpoint(
         reconGlobalMetricsService, dataNodeMetricsService, scmClient);
   }

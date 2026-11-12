@@ -24,18 +24,17 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATIO
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
-import com.google.common.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.CacheLoader;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -45,7 +44,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
+import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 
 /**
@@ -54,16 +54,28 @@ import org.apache.hadoop.ozone.util.CacheMetrics;
 public class ScmClient {
 
   private final ScmBlockLocationProtocol blockClient;
-  private final StorageContainerLocationProtocol containerClient;
+  private final StorageContainerLocationInternalInterface containerClient;
+  private final SCMFailoverProxyProviderBase<?> blockProxyProvider;
+  private final SCMFailoverProxyProviderBase<?> containerProxyProvider;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
   private final CacheMetrics datanodeDetailsCacheMetrics;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
-            StorageContainerLocationProtocol containerClient,
+            StorageContainerLocationInternalInterface containerClient,
+            OzoneConfiguration configuration) {
+    this(blockClient, containerClient, null, null, configuration);
+  }
+
+  ScmClient(ScmBlockLocationProtocol blockClient,
+            StorageContainerLocationInternalInterface containerClient,
+            SCMFailoverProxyProviderBase<?> blockProxyProvider,
+            SCMFailoverProxyProviderBase<?> containerProxyProvider,
             OzoneConfiguration configuration) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
+    this.blockProxyProvider = blockProxyProvider;
+    this.containerProxyProvider = containerProxyProvider;
     Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
         createDatanodeDetailsCache(configuration);
     this.containerLocationCache =
@@ -77,7 +89,7 @@ public class ScmClient {
 
   static LoadingCache<Long, Pipeline> createContainerLocationCache(
       OzoneConfiguration configuration,
-      StorageContainerLocationProtocol containerClient,
+      StorageContainerLocationInternalInterface containerClient,
       Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache) {
     int maxSize = configuration.getInt(OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE,
         OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT);
@@ -85,7 +97,7 @@ public class ScmClient {
     long ttl = configuration.getTimeDuration(
         OZONE_OM_CONTAINER_LOCATION_CACHE_TTL,
         OZONE_OM_CONTAINER_LOCATION_CACHE_TTL_DEFAULT.getDuration(), unit);
-    return CacheBuilder.newBuilder()
+    return Caffeine.newBuilder()
         .maximumSize(maxSize)
         .expireAfterWrite(ttl, unit)
         .recordStats()
@@ -119,7 +131,7 @@ public class ScmClient {
         OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE,
         OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT);
 
-    return CacheBuilder.newBuilder()
+    return Caffeine.newBuilder()
         .maximumSize(datanodeCacheMaxSize)
         .recordStats()
         .build();
@@ -132,8 +144,11 @@ public class ScmClient {
     for (DatanodeDetails node : pipeline.getNodes()) {
       DatanodeDetails datanodeDetails =
           datanodeDetailsCache.getIfPresent(node.getID());
-      // Call compareNodeValues to handle IP / hostname changes
-      if (datanodeDetails != null && node.compareNodeValues(datanodeDetails)) {
+      // Use the cached entry only when it matches on both network identity
+      // (compareNodeValues: hostname / IP / ports) and wire-protocol capability
+      // version (compareNodeVersions: currentVersion).
+      if (datanodeDetails != null && node.compareNodeValues(datanodeDetails)
+          && node.compareNodeVersions(datanodeDetails)) {
         nodes.add(datanodeDetails);
       } else {
         datanodeDetailsCache.put(node.getID(), node);
@@ -144,11 +159,34 @@ public class ScmClient {
     return builder.build();
   }
 
+  /**
+   * Reloads block/container SCM proxies on reconfiguration without an OM restart.
+   * No-op if providers are unavailable (e.g., test mocks).
+   */
+  public void reloadScmNodes() {
+    if (blockProxyProvider != null) {
+      blockProxyProvider.changeConfig();
+    }
+    if (containerProxyProvider != null) {
+      containerProxyProvider.changeConfig();
+    }
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getBlockProxyProvider() {
+    return blockProxyProvider;
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getContainerProxyProvider() {
+    return containerProxyProvider;
+  }
+
   public ScmBlockLocationProtocol getBlockClient() {
     return this.blockClient;
   }
 
-  public StorageContainerLocationProtocol getContainerClient() {
+  public StorageContainerLocationInternalInterface getContainerClient() {
     return this.containerClient;
   }
 
@@ -173,6 +211,8 @@ public class ScmClient {
       containerLocationCache.invalidateAll(containerIds);
     }
     try {
+      // A container not found in SCM is missing from the result, so only the available ones are returned,
+      // instead of propagating an exception to client code.
       Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
 
       for (Map.Entry<Long, Pipeline> entry : result.entrySet()) {
@@ -182,30 +222,14 @@ public class ScmClient {
       }
 
       return result;
-    } catch (ExecutionException e) {
-      return handleCacheExecutionException(e);
-    } catch (InvalidCacheLoadException e) {
-      // this is thrown when a container is not found from SCM.
-      // In this case, return  available, instead of propagating the
-      // exception to client code.
-      Map<Long, Pipeline> result = new HashMap<>();
-      for (Long containerId : containerIds) {
-        Pipeline p = containerLocationCache.getIfPresent(containerId);
-        if (p != null) {
-          result.put(containerId, p);
-        }
+    } catch (CompletionException e) {
+      // a checked exception of the loader
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
       }
-      return result;
+      throw new IllegalStateException("Unexpected exception accessing " +
+          "container location", e.getCause());
     }
-  }
-
-  private <T> T handleCacheExecutionException(ExecutionException e)
-      throws IOException {
-    if (e.getCause() instanceof IOException) {
-      throw (IOException) e.getCause();
-    }
-    throw new IllegalStateException("Unexpected exception accessing " +
-        "container location", e.getCause());
   }
 
   public void close() {

@@ -112,9 +112,11 @@ public final class ContainerBalancerConfiguration {
   private long moveReplicationTimeout = Duration.ofMinutes(50).toMillis();
 
   @Config(key = "hdds.container.balancer.balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
-      "The interval period between each iteration of Container Balancer.")
-  private long balancingInterval = Duration.ofMinutes(70).toMillis();
+      defaultValue = "3m", tags = {ConfigTag.BALANCER}, description =
+      "The interval to wait between Container Balancer iterations. " +
+      "Container Balancer runs iterations continuously and waits only briefly " +
+      "so SCM can receive refreshed datanode usage information before the next iteration starts..")
+  private long balancingInterval = Duration.ofMinutes(3).toMillis();
 
   @Config(key = "hdds.container.balancer.include.datanodes", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
@@ -261,7 +263,21 @@ public final class ContainerBalancerConfiguration {
    * @return maximum datanodes that may be involved in one iteration
    */
   public int computeMaxDatanodesToInvolvePerIteration(int eligibleDatanodeCount) {
-    return (int) (getMaxDatanodesRatioToInvolvePerIteration() * eligibleDatanodeCount);
+    return computeMaxDatanodesToInvolvePerIteration(
+        getMaxDatanodesRatioToInvolvePerIteration(), eligibleDatanodeCount);
+  }
+
+  /**
+   * Computes the maximum number of datanodes that may be involved in an
+   * iteration for the given percentage and eligible datanode count.
+   *
+   * @param maxDatanodesPercentage percentage of eligible datanodes to involve
+   * @param eligibleDatanodeCount number of healthy, in-service datanodes
+   * @return maximum datanodes that may be involved in one iteration
+   */
+  public static int computeMaxDatanodesToInvolvePerIteration(
+      double maxDatanodesPercentage, int eligibleDatanodeCount) {
+    return (int) (maxDatanodesPercentage * eligibleDatanodeCount);
   }
 
   /**

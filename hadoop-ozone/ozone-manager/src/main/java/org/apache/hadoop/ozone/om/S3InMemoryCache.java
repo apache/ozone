@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +32,7 @@ public class S3InMemoryCache implements S3SecretCache {
   private final Cache<String, S3SecretValue> cache;
 
   public S3InMemoryCache() {
-    cache = CacheBuilder.newBuilder()
+    cache = Caffeine.newBuilder()
         .build();
   }
 

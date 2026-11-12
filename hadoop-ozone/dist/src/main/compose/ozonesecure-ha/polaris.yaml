@@ -20,7 +20,7 @@
 
 services:
   polaris:
-    image: ${POLARIS_IMAGE}
+    image: ${POLARIS_IMAGE}:${POLARIS_IMAGE_VERSION}
     hostname: polaris
     dns_search: .
     ports:
@@ -44,7 +44,7 @@ services:
         ipv4_address: 172.25.0.124
 
   polaris-setup:
-    image: alpine/curl:8.19.0
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     dns_search: .
     depends_on:
       polaris:
@@ -67,7 +67,7 @@ services:
       ozone_net: {}
 
   spark-sql:
-    image: ${SPARK_SQL_IMAGE}
+    image: ${SPARK_SQL_IMAGE}:${SPARK_SQL_IMAGE_VERSION}
     user: "0:0"
     dns_search: .
     volumes:

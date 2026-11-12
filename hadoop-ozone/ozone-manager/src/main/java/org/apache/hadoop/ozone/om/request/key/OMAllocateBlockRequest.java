@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -131,7 +132,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
     // Add allocated block info.
     newAllocatedBlockRequest.setKeyLocation(
-        omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
+        omKeyLocationInfoList.get(0).getProtobuf(
+            ClientVersion.deserialize(getOmRequest().getVersion())));
 
     return getOmRequest().toBuilder().setUserInfo(userInfo)
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();

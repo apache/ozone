@@ -60,7 +60,8 @@ public final class PositionedReadTestHelper {
         final int threadId = t;
         futures.add(pool.submit((Callable<Void>) () -> {
           for (int i = 0; i < ITERATIONS; i++) {
-            int offset = (threadId * 1000 + i * 17) % (source.length - BUFFER_SIZE);
+            int offset = (int) (((long) threadId * source.length / THREAD_COUNT + i * 17L)
+                % (source.length - BUFFER_SIZE));
             ByteBuffer buf = ByteBuffer.allocate(BUFFER_SIZE);
             action.readAtOffset(offset, buf);
             buf.flip();

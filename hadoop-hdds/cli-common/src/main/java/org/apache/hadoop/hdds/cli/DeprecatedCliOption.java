@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.cli;
 
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -84,7 +84,7 @@ public final class DeprecatedCliOption {
    * If {@code arg} is a deprecated option (with or without {@code =value} part),
    * print a warning to stderr and return with the recommended replacement option.
    */
-  public static String toNonDeprecated(String arg, PrintWriter err) {
+  public static String toNonDeprecated(String arg, PrintStream err) {
     if (arg == null || arg.isEmpty()) {
       return arg;
     }
@@ -104,7 +104,7 @@ public final class DeprecatedCliOption {
     return result;
   }
 
-  private static void warn(PrintWriter err, String deprecated, String replacement) {
+  private static void warn(PrintStream err, String deprecated, String replacement) {
     err.printf("WARNING: Option '%s' is deprecated. Use '%s' instead.%n",
         deprecated, replacement);
   }

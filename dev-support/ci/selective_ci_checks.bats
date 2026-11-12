@@ -17,21 +17,12 @@
 # This script confirms that selective_ci_checks.sh works correctly
 # against some known commits.
 #
-# Prerequisites:
-#
-# 1. Install bats-core, see:
-#    https://bats-core.readthedocs.io/en/stable/installation.html
-#
-# 2. Clone libraries into dev-support/ci:
-#    cd dev-support/ci
-#    git clone https://github.com/bats-core/bats-assert
-#    git clone https://github.com/bats-core/bats-support
-#
 # Usage:
-#    bats dev-support/ci/selective_ci_checks.bats
+#     hadoop-ozone/dev-support/checks/bats.sh dev-support/ci/selective_ci_checks.bats
 
-load bats-support/load.bash
-load bats-assert/load.bash
+: ${TOOLS_DIR:="${BATS_ROOT}/../.."}
+load ${TOOLS_DIR}/bats/bats-support/load.bash
+load ${TOOLS_DIR}/bats/bats-assert/load.bash
 
 @test "checkstyle and bats" {
   run dev-support/ci/selective_ci_checks.sh 11b098430
@@ -108,6 +99,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "integration and unit: java change" {
@@ -117,8 +109,9 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/fs/ozone/TestOzoneFileInterfaces.java,org/apache/hadoop/fs/ozone/TestOzoneFileInterfacesWithFSO.java,org/apache/hadoop/ozone/om/request/key/TestOMKeyCreateRequestWithFSO.java
 }
 
 @test "integration and unit: script change" {
@@ -130,6 +123,31 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
+}
+
+@test "integration and unit: test-only change" {
+  run dev-support/ci/selective_ci_checks.sh bf59f31a7e5fcad1acc85e1228d77c22ee7f036c
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","errorprone","findbugs","pmd"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/ozone/container/TestContainerReportHandling.java,org/apache/hadoop/ozone/container/TestContainerReportHandlingWithHA.java,org/apache/hadoop/ozone/container/TestHelper.java
+}
+
+@test "contract test" {
+  run dev-support/ci/selective_ci_checks.sh c0a6ffd6dda7432f57e38bcf3f5ababdd7999e26
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","errorprone","findbugs","pmd"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/fs/ozone/contract/Test*
 }
 
 @test "script change including javadoc.sh" {
@@ -152,6 +170,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "unit only" {
@@ -161,8 +180,9 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetOwnerRequest.java,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetOwnerRequestWithFSO.java,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetQuotaRequest.java,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetQuotaRequestWithFSO.java
 }
 
 @test "unit helper" {
@@ -174,6 +194,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "integration only" {
@@ -183,8 +204,9 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/ozone/om/TestOMRatisSnapshots.java
 }
 
 @test "mini-cluster" {
@@ -196,6 +218,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "test-utils" {
@@ -207,6 +230,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "native only" {
@@ -227,8 +251,9 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/ozone/om/snapshot/TestOmSnapshotFsoWithNativeLib.java
 }
 
 @test "kubernetes only" {
@@ -240,17 +265,6 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=true
-}
-
-@test "docs only" {
-  run dev-support/ci/selective_ci_checks.sh 474457cb3
-
-  assert_output -p 'basic-checks=["rat","docs"]'
-  assert_output -p needs-build=false
-  assert_output -p needs-compile=false
-  assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=false
-  assert_output -p needs-kubernetes-tests=false
 }
 
 @test "main/java change" {
@@ -289,7 +303,7 @@ load bats-assert/load.bash
 @test "java and docs change" {
   run dev-support/ci/selective_ci_checks.sh 2c0adac26
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","docs","errorprone","findbugs","pmd"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","errorprone","findbugs","pmd"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -311,7 +325,7 @@ load bats-assert/load.bash
 @test "CI lib change" {
   run dev-support/ci/selective_ci_checks.sh ceb79acaa
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","errorprone","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -322,7 +336,7 @@ load bats-assert/load.bash
 @test "CI workflow change" {
   run dev-support/ci/selective_ci_checks.sh 90a8d7c01
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","errorprone","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -345,7 +359,7 @@ load bats-assert/load.bash
 @test "CI workflow change (check.yml)" {
   run dev-support/ci/selective_ci_checks.sh 1468af02067ec75b255f605816c32f8bf4dfaabf
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","errorprone","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -356,7 +370,7 @@ load bats-assert/load.bash
 @test "CI workflow change (ci.yaml)" {
   run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","errorprone","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true

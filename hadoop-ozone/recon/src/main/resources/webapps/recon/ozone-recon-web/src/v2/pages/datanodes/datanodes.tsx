@@ -178,7 +178,8 @@ const Datanodes: React.FC<{}> = () => {
           setupTime: datanode.setupTime,
           revision: datanode.revision,
           buildDate: datanode.buildDate,
-          networkLocation: datanode.networkLocation
+          networkLocation: datanode.networkLocation,
+          disks: datanode.disks
         })
       );
 
@@ -191,14 +192,6 @@ const Datanodes: React.FC<{}> = () => {
   }, [decommissionAPI.loading, datanodesAPI.loading, decommissionAPI.data, datanodesAPI.data]);
 
   const autoReload = useAutoReload(loadData);
-
-  useEffect(() => {
-    autoReload.startPolling();
-
-    return (() => {
-      autoReload.stopPolling();
-    });
-  }, []);
 
   function handleSelectionChange(rows: React.Key[]) {
     setSelectedRows(rows);

@@ -41,6 +41,9 @@ public class S3STSHttpServer extends BaseHttpServer {
 
   S3STSHttpServer(MutableConfigurationSource conf, String name) throws IOException {
     super(conf, name);
+    if (isEnabled()) {
+      WeldCdiIntegration.enable(getWebAppContext());
+    }
   }
 
   @Override

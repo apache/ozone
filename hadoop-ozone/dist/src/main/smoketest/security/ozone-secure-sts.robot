@@ -45,6 +45,7 @@ ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}       partial-list-all-buckets-vol-lis
 ${PARTIAL_BUCKET_READ_ROLE}                     partial-bucket-read
 ${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}       partial-bucket-read-upload-prefix
 ${PARTIAL_BUCKET_LIST_ROLE}                     partial-bucket-list
+${PARTIAL_BUCKET_WRITE_ROLE}                    partial-bucket-write
 ${PARTIAL_BUCKET_READ_ACL_ROLE}                 partial-bucket-read-acl
 ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}           partial-put-object-key-create
 ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}            partial-put-object-key-write
@@ -58,6 +59,7 @@ ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE_ARN}   arn:aws:iam::123456789012:role/$
 ${PARTIAL_BUCKET_READ_ROLE_ARN}                 arn:aws:iam::123456789012:role/${PARTIAL_BUCKET_READ_ROLE}
 ${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE_ARN}   arn:aws:iam::123456789012:role/${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}
 ${PARTIAL_BUCKET_LIST_ROLE_ARN}                 arn:aws:iam::123456789012:role/${PARTIAL_BUCKET_LIST_ROLE}
+${PARTIAL_BUCKET_WRITE_ROLE_ARN}                arn:aws:iam::123456789012:role/${PARTIAL_BUCKET_WRITE_ROLE}
 ${PARTIAL_BUCKET_READ_ACL_ROLE_ARN}             arn:aws:iam::123456789012:role/${PARTIAL_BUCKET_READ_ACL_ROLE}
 ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE_ARN}       arn:aws:iam::123456789012:role/${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}
 ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE_ARN}        arn:aws:iam::123456789012:role/${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}
@@ -75,9 +77,9 @@ ${STS_LINK_BUCKET_CHAIN_SOURCE}         sts-chain-source
 ${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}   s3v-sts-chain-intermediate
 ${STS_LINK_BUCKET_CHAIN_FINAL}          s3v-sts-chain-final
 ${STS_LINK_BUCKET_CHAIN_TESTFILE}       chain-link-testfile.txt
+${STS_BUCKET_TO_DELETE}                 sts-bucket-to-delete
 ${TEST_USER_ADMIN}                      testuser
 ${TEST_USER_NON_ADMIN}                  testuser2
-@{ICEBERG_OBJECT_KEYS}                  file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt
 @{ICEBERG_LISTABLE_OBJECT_KEYS_OBS}     file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt    zeroByteFile    zeroByteFolder/
 @{ICEBERG_LISTABLE_OBJECT_KEYS_FSO}     file1.txt    file1again.txt    folder/    folder/pepper.txt    folder/salt.txt    userA/    userA/userA.txt    userAfile.txt    userB/    userB/userB.txt    zeroByteFile    zeroByteFolder
 @{ICEBERG_PREFIX_USERA_OBS}             userA/userA.txt
@@ -86,39 +88,51 @@ ${TEST_USER_NON_ADMIN}                  testuser2
 @{ICEBERG_PREFIX_USERA_STAR_FSO}        userA/    userA/userA.txt
 @{ICEBERG_PREFIX_USER_OBS}              userA/userA.txt    userB/userB.txt    userAfile.txt
 @{ICEBERG_PREFIX_USER_FSO}              userA/    userA/userA.txt    userB/    userB/userB.txt    userAfile.txt
+${STS_BUCKET_TAGGING_JSON}              {"TagSet":[{"Key":"sts-tag","Value":"sts-value"}]}
+${STS_LIFECYCLE_JSON}                   {"Rules":[{"ID":"sts-lifecycle-rule","Prefix":"sts-lifecycle-unused/","Status":"Enabled","Expiration":{"Days":1}}]}
 
 *** Keywords ***
 Populate Iceberg Bucket
-    [Arguments]                   ${bucket}
-    FOR    ${key}    IN    @{ICEBERG_OBJECT_KEYS}
-        ${parent} =               Evaluate                      __import__('os').path.dirname($key)
-        Run Keyword If            '${parent}' != ''             Execute    mkdir -p ${TEMP_DIR}/${parent}
-        ${local_path} =           Set Variable                  ${TEMP_DIR}/${key}
-        Create File               ${local_path}                 iceberg test content
-        Execute                   ozone sh key put /s3v/${bucket}/${key} ${local_path}
-    END
-    Create File                   ${TEMP_DIR}/zeroByteFile
-    Execute                       ozone sh key put /s3v/${bucket}/zeroByteFile ${TEMP_DIR}/zeroByteFile
+    [Arguments]    ${bucket}    ${layout}
+
+    ${local_path} =    Set Variable    ${TEMP_DIR}/iceberg-test-content
+
+    Create File    ${local_path}    iceberg test content
+    Create File    ${TEMP_DIR}/zeroByteFile
+
+    Ozone Shell Batch
+    ...    bucket create --layout ${layout} /s3v/${bucket}
+    ...    key put /s3v/${bucket}/file1.txt ${local_path}
+    ...    key put /s3v/${bucket}/file1again.txt ${local_path}
+    ...    key put /s3v/${bucket}/folder/pepper.txt ${local_path}
+    ...    key put /s3v/${bucket}/folder/salt.txt ${local_path}
+    ...    key put /s3v/${bucket}/userA/userA.txt ${local_path}
+    ...    key put /s3v/${bucket}/userB/userB.txt ${local_path}
+    ...    key put /s3v/${bucket}/userAfile.txt ${local_path}
+    ...    key put /s3v/${bucket}/zeroByteFile ${TEMP_DIR}/zeroByteFile
     # Upload an explicit folder marker object to match AWS semantics.
-    Create File                   ${TEMP_DIR}/zero-byte-marker
-    Execute                       ozone sh key put /s3v/${bucket}/zeroByteFolder/ ${TEMP_DIR}/zero-byte-marker
+    ...    key put /s3v/${bucket}/zeroByteFolder/ ${TEMP_DIR}/zeroByteFile
 
-Setup Same Volume Link Bucket
-    # Create a source bucket and a same-volume linked bucket (s3v/source -> s3v/s3v-source).
-    Kinit test user               hdfs                          hdfs.keytab
-    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_SOURCE}
+Setup Test Data
+
+    Populate Iceberg Bucket       ${ICEBERG_BUCKET_OBS}    ${ICEBERG_LAYOUT_OBS}
+    Populate Iceberg Bucket       ${ICEBERG_BUCKET_FSO}    ${ICEBERG_LAYOUT_FSO}
+
     Create File                   ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}    link bucket test content
-    Execute                       ozone sh key put /s3v/${STS_LINK_BUCKET_SOURCE}/${STS_LINK_BUCKET_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}
-    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_SOURCE} /s3v/${STS_LINK_BUCKET_LINKED}
-
-Setup Chained Same Volume Link Buckets
-    # Create source <- intermediate <- final chained links in s3v.
-    Kinit test user               hdfs                          hdfs.keytab
-    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}
     Create File                   ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}    chained link test content
-    Execute                       ozone sh key put /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}/${STS_LINK_BUCKET_CHAIN_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}
-    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE} /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}
-    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE} /s3v/${STS_LINK_BUCKET_CHAIN_FINAL}
+
+    Ozone Shell Batch
+    # Create a source bucket and a same-volume linked bucket (s3v/source -> s3v/s3v-source).
+    ...    bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_SOURCE}
+    ...    key put /s3v/${STS_LINK_BUCKET_SOURCE}/${STS_LINK_BUCKET_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}
+    ...    bucket link /s3v/${STS_LINK_BUCKET_SOURCE} /s3v/${STS_LINK_BUCKET_LINKED}
+    # Create source <- intermediate <- final chained links in s3v.
+    ...    bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}
+    ...    key put /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}/${STS_LINK_BUCKET_CHAIN_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}
+    ...    bucket link /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE} /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}
+    ...    bucket link /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE} /s3v/${STS_LINK_BUCKET_CHAIN_FINAL}
+    # Create bucket for DeleteBucket scenario
+    ...    bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_BUCKET_TO_DELETE}
 
 Head Bucket Should Succeed
     [Arguments]                   ${bucket}  ${profile}=sts
@@ -393,24 +407,24 @@ Create STS Link Bucket Access Policies
     Refresh Ranger Policy Cache
 
 Create Partial Access Roles in Ranger
-    FOR    ${role}    IN    ${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}    ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}    ${PARTIAL_BUCKET_READ_ROLE}    ${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}    ${PARTIAL_BUCKET_LIST_ROLE}    ${PARTIAL_BUCKET_READ_ACL_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}
+    FOR    ${role}    IN    ${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}    ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}    ${PARTIAL_BUCKET_READ_ROLE}    ${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}    ${PARTIAL_BUCKET_LIST_ROLE}    ${PARTIAL_BUCKET_WRITE_ROLE}    ${PARTIAL_BUCKET_READ_ACL_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}
         ${role_json} =            Set Variable                  { "name": "${role}", "description": "Partial access role" }
         Create Ranger Role        ${role_json}
     END
 
 Create Partial Access Assume Role Policies
-    FOR    ${role}    IN    ${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}    ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}    ${PARTIAL_BUCKET_READ_ROLE}    ${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}    ${PARTIAL_BUCKET_LIST_ROLE}    ${PARTIAL_BUCKET_READ_ACL_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}
+    FOR    ${role}    IN    ${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}    ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}    ${PARTIAL_BUCKET_READ_ROLE}    ${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}    ${PARTIAL_BUCKET_LIST_ROLE}    ${PARTIAL_BUCKET_WRITE_ROLE}    ${PARTIAL_BUCKET_READ_ACL_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}
         Create Ranger Assume Role Policy  ${role}              ${ICEBERG_SVC_CATALOG_USER}
     END
 
 Create Partial Access Volume Policies
     # Append partial-role items to existing "iceberg volume access" policy to avoid duplicate resourceSignature conflicts.
-    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "list", "isAllowed": true } ], "roles": [ "${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_ROLE}", "${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}", "${PARTIAL_BUCKET_LIST_ROLE}", "${PARTIAL_BUCKET_READ_ACL_ROLE}", "${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}", "${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}" ], "delegateAdmin": false } ]
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "list", "isAllowed": true } ], "roles": [ "${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_ROLE}", "${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}", "${PARTIAL_BUCKET_LIST_ROLE}", "${PARTIAL_BUCKET_WRITE_ROLE}", "${PARTIAL_BUCKET_READ_ACL_ROLE}", "${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}", "${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}" ], "delegateAdmin": false } ]
     Update Ranger Policy Items    iceberg volume access         ${policy_items}
 
 Create Partial Access Bucket Policies
     # Append partial-role items to existing "iceberg ${ICEBERG_BUCKET_OBS} bucket access" policy.
-    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "list", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_LIST_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read_acl", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_ACL_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}", "${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}" ], "delegateAdmin": false } ]
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "list", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_LIST_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "write", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_WRITE_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read_acl", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_ACL_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}", "${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}" ], "delegateAdmin": false } ]
     Update Ranger Policy Items    iceberg ${ICEBERG_BUCKET_OBS} bucket access  ${policy_items}
 
 Create Partial Access Table Policies
@@ -453,7 +467,7 @@ Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Up
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
 
     # Waiting for Ranger policy cache refresh - ${ICEBERG_SVC_CATALOG_USER} needs to be able to read s3v volume
-    Wait Until Keyword Succeeds    30s    5s                    Execute    ozone sh volume info s3v
+    Wait Until Keyword Succeeds    30s    1s                    Execute    ozone sh volume info s3v
 
     ${output} =                   Execute                       ozone s3 getsecret
     ${accessKeyId} =              Get Regexp Matches            ${output}     (?<=awsAccessKey=).*
@@ -463,22 +477,14 @@ Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Up
     Set Global Variable           ${PERMANENT_ACCESS_KEY_ID}    ${accessKeyId}
     Set Global Variable           ${PERMANENT_SECRET_KEY}       ${secretKey}
 
+    # Long-lived 15-minute STS credential to test STS token expiration and proper error message
+    Assume Role And Store Expired STS Token Credentials         perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+
     # Create buckets as a different user so the permanent credential principal isn't the bucket owner.
     # Otherwise Ranger's default owner privileges can mask missing READ/LIST permissions in STS tests.
     # Populate the buckets as this user as well.
     Kinit test user               hdfs                          hdfs.keytab
-    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${ICEBERG_BUCKET_OBS}
-    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_FSO} /s3v/${ICEBERG_BUCKET_FSO}
-    Populate Iceberg Bucket       ${ICEBERG_BUCKET_OBS}
-    Populate Iceberg Bucket       ${ICEBERG_BUCKET_FSO}
-    Setup Same Volume Link Bucket
-    Setup Chained Same Volume Link Buckets
-
-    # Switch back to the service catalog principal for running S3/STS requests.
-    Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
-
-    # Long-lived 15-minute STS credential to test STS token expiration and proper error message
-    Assume Role And Store Expired STS Token Credentials         perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    Setup Test Data
 
 Assume Role for Limited-Scope Token
     # All access role is limited to read-only via session policy
@@ -735,6 +741,14 @@ Assume Role Should Fail For Too Short Role Arn
 Assume Role Should Fail For Too Short Role Session Name
     Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  role_session_name=a
 
+Assume Role Should Fail For Invalid Duration
+    # AWS CLI rejects out-of-range DurationSeconds before the request is sent, so use curl.
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=43201  expected_message=must be a number between 900 and 43200 seconds
+    # Check duration that overflows integer as well
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=43200100000  expected_message=must be a number between 900 and 43200 seconds
+    # Whitespace-only DurationSeconds must be rejected
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=${SPACE}${SPACE}${SPACE}${SPACE}${SPACE}  expected_message=must be a number between 900 and 43200 seconds
+
 Assume Role With ExternalId Should Fail As UnsupportedOperation
     Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_cli_args=--external-id test-external-id
 
@@ -802,6 +816,37 @@ STS session policy ListBucketMultipartUploads must require bucket READ and LIST
     # Negative B: missing READ
     Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_LIST_ROLE_ARN}
     ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-multipart-uploads --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+STS session policy ListBucketVersions must require bucket READ and LIST
+    # Positive control
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListBucketVersions","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    # A ListBucket grant must not authorize ListObjectVersions
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # A ListBucketVersions grant must not authorize ListObjects nor ListObjectsV2
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListBucketVersions","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-objects --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-objects-v2 --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative A: missing LIST (prefix upload so key READ is satisfied and only bucket LIST is denied)
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --prefix upload --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_LIST_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --profile sts
     Should Contain                ${output}                     AccessDenied
 
 STS session policy GetBucketAcl must require bucket READ and READ_ACL
@@ -909,24 +954,20 @@ STS session policy CreateBucket must require bucket CREATE
     Should Not Contain            ${output}                     AccessDenied
 
 STS session policy DeleteBucket must require bucket DELETE
-    ${bucket_suffix} =            Generate Random String        8   [LOWER]
-    ${bucket} =                   Set Variable                  sts-bucket-${bucket_suffix}
-    ${delete_policy} =            Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:DeleteBucket","Resource":"arn:aws:s3:::${bucket}"}]}
+    ${delete_policy} =            Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:DeleteBucket","Resource":"arn:aws:s3:::${STS_BUCKET_TO_DELETE}"}]}
 
-    # Prepare the bucket as a different principal so bucket-owner privileges
+    # Bucket was created as a different principal so bucket-owner privileges
     # do not mask missing DELETE permissions in the negative case.
-    Kinit test user               hdfs                          hdfs.keytab
-    ${output} =                   Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${bucket}
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   svc-iceberg-rest-catalog.keytab
 
     # Negative: missing DELETE
     Assume Role And Configure STS Profile                       policy_json=${delete_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${READ_ONLY_ROLE_OBS_ARN} 
-    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${STS_BUCKET_TO_DELETE} --profile sts
     Should Contain                ${output}                     AccessDenied
 
     # Positive control
     Assume Role And Configure STS Profile                       policy_json=${delete_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_TEMP_BUCKET_ROLE_ARN}
-    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${STS_BUCKET_TO_DELETE} --profile sts
     Should Not Contain            ${output}                     AccessDenied
 
 STS session policy PutBucketAcl must require bucket WRITE_ACL
@@ -941,6 +982,154 @@ STS session policy PutBucketAcl must require bucket WRITE_ACL
     Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_READ_ROLE_ARN}
     ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-acl --bucket ${ICEBERG_BUCKET_OBS} --grant-read "" --profile sts
     Should Contain                ${output}                     AccessDenied
+
+STS session policy GetBucketTagging must require bucket READ
+    ${put_tag_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutBucketTagging","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${get_tag_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetBucketTagging","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${delete_tag_policy} =        Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutBucketTagging","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+
+    Assume Role And Configure STS Profile                       policy_json=${put_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --tagging '${STS_BUCKET_TAGGING_JSON}' --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    # Positive control
+    Assume Role And Configure STS Profile                       policy_json=${get_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     sts-tag
+
+    # Negative: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${get_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_LIST_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    Assume Role And Configure STS Profile                       policy_json=${delete_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+STS session policy PutBucketTagging must require bucket READ and WRITE
+    ${put_tag_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutBucketTagging","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${delete_tag_policy} =        Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutBucketTagging","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+
+    # Positive control
+    Assume Role And Configure STS Profile                       policy_json=${put_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --tagging '${STS_BUCKET_TAGGING_JSON}' --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    # Negative A: missing WRITE
+    Assume Role And Configure STS Profile                       policy_json=${put_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_READ_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --tagging '${STS_BUCKET_TAGGING_JSON}' --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${put_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_WRITE_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --tagging '${STS_BUCKET_TAGGING_JSON}' --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    Assume Role And Configure STS Profile                       policy_json=${delete_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+STS session policy PutBucketTagging must authorize DeleteBucketTagging with bucket READ and WRITE
+    ${put_tag_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutBucketTagging","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${delete_tag_policy} =        Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutBucketTagging","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${get_tag_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetBucketTagging","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+
+    Assume Role And Configure STS Profile                       policy_json=${put_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --tagging '${STS_BUCKET_TAGGING_JSON}' --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    # Negative A: missing WRITE
+    Assume Role And Configure STS Profile                       policy_json=${delete_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_READ_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${delete_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_WRITE_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Positive control
+    Assume Role And Configure STS Profile                       policy_json=${delete_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    Assume Role And Configure STS Profile                       policy_json=${get_tag_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     NoSuchTagSet
+
+STS session policy GetLifecycleConfiguration must require bucket READ
+    ${put_lifecycle_policy} =     Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutLifecycleConfiguration","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${get_lifecycle_policy} =     Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetLifecycleConfiguration","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${delete_lifecycle_policy} =  Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutLifecycleConfiguration","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+
+    Assume Role And Configure STS Profile                       policy_json=${put_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --lifecycle-configuration '${STS_LIFECYCLE_JSON}' --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    # Positive control
+    Assume Role And Configure STS Profile                       policy_json=${get_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     sts-lifecycle-rule
+
+    # Negative: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${get_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_LIST_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    Assume Role And Configure STS Profile                       policy_json=${delete_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-lifecycle --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+STS session policy PutLifecycleConfiguration must require bucket READ and WRITE
+    ${put_lifecycle_policy} =     Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutLifecycleConfiguration","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${delete_lifecycle_policy} =  Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutLifecycleConfiguration","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+
+    # Positive control
+    Assume Role And Configure STS Profile                       policy_json=${put_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --lifecycle-configuration '${STS_LIFECYCLE_JSON}' --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    # Negative A: missing WRITE
+    Assume Role And Configure STS Profile                       policy_json=${put_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_READ_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --lifecycle-configuration '${STS_LIFECYCLE_JSON}' --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${put_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_WRITE_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --lifecycle-configuration '${STS_LIFECYCLE_JSON}' --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    Assume Role And Configure STS Profile                       policy_json=${delete_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-lifecycle --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+STS session policy PutLifecycleConfiguration must authorize DeleteBucketLifecycle with bucket READ and WRITE
+    ${put_lifecycle_policy} =     Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutLifecycleConfiguration","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${delete_lifecycle_policy} =  Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutLifecycleConfiguration","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    ${get_lifecycle_policy} =     Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetLifecycleConfiguration","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+
+    Assume Role And Configure STS Profile                       policy_json=${put_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --lifecycle-configuration '${STS_LIFECYCLE_JSON}' --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    # Negative A: missing WRITE
+    Assume Role And Configure STS Profile                       policy_json=${delete_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_READ_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-lifecycle --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${delete_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_WRITE_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-lifecycle --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Positive control
+    Assume Role And Configure STS Profile                       policy_json=${delete_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket-lifecycle --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Not Contain            ${output}                     AccessDenied
+
+    Assume Role And Configure STS Profile                       policy_json=${get_lifecycle_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain                ${output}                     NoSuchLifecycleConfiguration
 
 STS session policy GetObjectTagging must require key READ
     ${key_suffix} =               Generate Random String        8   [LOWER]
@@ -1100,6 +1289,39 @@ STS session policy AbortMultipartUpload must require key WRITE
     Assume Role And Configure STS Profile                       policy_json=${abort_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
     ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} abort-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --upload-id ${upload_id} --profile sts
     Should Not Contain            ${output}                     AccessDenied
+
+STS session policy GetObjectAttributes must require GetObject and GetObjectAttributes with key READ
+    ${key_suffix} =               Generate Random String        8   [LOWER]
+    ${key} =                      Set Variable                  sts-object-${key_suffix}.txt
+    ${local_path} =               Set Variable                  ${TEMP_DIR}/${key}
+    Create File                   ${local_path}                 get-object-attributes content
+    ${put_policy} =               Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${key}"}]}
+    ${get_attrs_policy} =         Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:GetObjectAttributes"],"Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${key}"}]}
+    ${get_object_only_policy} =   Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${key}"}]}
+    ${get_attrs_only_policy} =    Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObjectAttributes","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${key}"}]}
+
+    Assume Role And Configure STS Profile                       policy_json=${put_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    Put Object Should Succeed     ${ICEBERG_BUCKET_OBS}  ${key}  ${local_path}
+
+    # Positive control
+    Assume Role And Configure STS Profile                       policy_json=${get_attrs_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-object-attributes --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --object-attributes ETag --profile sts
+    Should Contain                ${output}                     ETag
+
+    # Negative A: session policy with only GetObjectAttributes
+    Assume Role And Configure STS Profile                       policy_json=${get_attrs_only_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-object-attributes --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --object-attributes ETag --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: session policy with only GetObject
+    Assume Role And Configure STS Profile                       policy_json=${get_object_only_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-object-attributes --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --object-attributes ETag --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative C: missing key READ
+    Assume Role And Configure STS Profile                       policy_json=${get_attrs_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_READ_ROLE_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-object-attributes --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --object-attributes ETag --profile sts
+    Should Contain                ${output}                     AccessDenied
 
 STS session policy containing only GetObject must deny GetObjectTagging
     ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${ICEBERG_BUCKET_TESTFILE}"}]}
@@ -1411,6 +1633,7 @@ Expired STS temporary credentials must return ExpiredToken on S3 APIs
     Execute S3api Expect Expired Token Head Operation           head-bucket --bucket ${ICEBERG_BUCKET_OBS}    HeadBucket
     Execute S3api Expect Expired Token                          list-objects-v2 --bucket ${ICEBERG_BUCKET_OBS} --output json
     Execute S3api Expect Expired Token                          list-objects --bucket ${ICEBERG_BUCKET_OBS} --output json
+    Execute S3api Expect Expired Token                          list-object-versions --bucket ${ICEBERG_BUCKET_OBS} --output json
     Execute S3api Expect Expired Token                          get-object --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/expired-sts-token-get-object.out
 
     Create File                   ${TEMP_DIR}/expired-sts-token-put-object-body.txt    expired sts token put body
@@ -1438,8 +1661,17 @@ Expired STS temporary credentials must return ExpiredToken on S3 APIs
     Execute S3api Expect Expired Token                          get-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE}
     Execute S3api Expect Expired Token                          put-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} --tagging '{"TagSet":[{"Key":"tag-key-expired-sts-token","Value":"tag-value-expired-sts-token"}]}'
     Execute S3api Expect Expired Token                          delete-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE}
+    Execute S3api Expect Expired Token                          get-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS}
+    Execute S3api Expect Expired Token                          put-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS} --tagging '${STS_BUCKET_TAGGING_JSON}'
+    Execute S3api Expect Expired Token                          delete-bucket-tagging --bucket ${ICEBERG_BUCKET_OBS}
+    Execute S3api Expect Expired Token                          get-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS}
+    Execute S3api Expect Expired Token                          put-bucket-lifecycle-configuration --bucket ${ICEBERG_BUCKET_OBS} --lifecycle-configuration '${STS_LIFECYCLE_JSON}'
+    Execute S3api Expect Expired Token                          delete-bucket-lifecycle --bucket ${ICEBERG_BUCKET_OBS}
+    Execute S3api Expect Expired Token                          get-object-attributes --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} --object-attributes ETag
 
 Revoking Permanent User Must Revoke Existing Session Token
+    [Teardown]    Run Keywords    Kinit test user    ${ICEBERG_SVC_CATALOG_USER}    ${ICEBERG_SVC_CATALOG_USER}.keytab
+    ...    AND    Execute    ozone s3 revokesecret -y -u ${PERMANENT_ACCESS_KEY_ID} ${OM_HA_PARAM}
     # Create session tokens for both buckets, verify they work, then revoke permanent user secret and verify both fail.
     Assume Role And Get Temporary Credentials                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
     Set Test Variable             ${OBS_STS_ACCESS_KEY_ID}      ${STS_ACCESS_KEY_ID}
@@ -1464,3 +1696,20 @@ Revoking Permanent User Must Revoke Existing Session Token
     Get Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
     Configure STS Profile         ${FSO_STS_ACCESS_KEY_ID}  ${FSO_STS_SECRET_KEY}  ${FSO_STS_SESSION_TOKEN}
     Get Object Should Fail        ${ICEBERG_BUCKET_FSO}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+    # Recreating the permanent secret must not restore the existing session tokens.
+    ${output} =                   Execute                       ozone s3 getsecret -u ${PERMANENT_ACCESS_KEY_ID} ${OM_HA_PARAM}
+    ${secretKey} =                Get Regexp Matches            ${output}     (?<=awsSecret=).*
+    Set Test Variable             ${PERMANENT_SECRET_KEY}       ${secretKey[0]}
+    Configure STS Profile         ${OBS_STS_ACCESS_KEY_ID}  ${OBS_STS_SECRET_KEY}  ${OBS_STS_SESSION_TOKEN}
+    Get Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+    Configure STS Profile         ${FSO_STS_ACCESS_KEY_ID}  ${FSO_STS_SECRET_KEY}  ${FSO_STS_SESSION_TOKEN}
+    Get Object Should Fail        ${ICEBERG_BUCKET_FSO}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+    # Newly issued session tokens must work with the recreated permanent secret.
+    FOR    ${bucket}    ${role_arn}    IN
+    ...    ${ICEBERG_BUCKET_OBS}    ${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ...    ${ICEBERG_BUCKET_FSO}    ${ICEBERG_ALL_ACCESS_ROLE_FSO_ARN}
+        Assume Role And Configure STS Profile                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
+        Get Object Should Succeed    ${bucket}  ${ICEBERG_BUCKET_TESTFILE}
+    END

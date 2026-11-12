@@ -193,6 +193,9 @@ public class ContainerBalancerTask implements Runnable {
         Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
       }
       balance();
+    } catch (InterruptedException e) {
+      LOG.info("Container Balancer was interrupted during the delayed start.");
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
       recordStopReason(ContainerBalancerStopReason.ERROR,
@@ -291,6 +294,7 @@ public class ContainerBalancerTask implements Runnable {
       }
 
       IterationResult currentIterationResult = doIteration();
+      selectionCriteria.logExcludedContainersDueToHealth();
       ContainerBalancerTaskIterationStatusInfo iterationStatistic =
           getIterationStatistic(i + 1, currentIterationResult, getCurrentIterationDuration());
       iterationsStatistic.offer(iterationStatistic);
