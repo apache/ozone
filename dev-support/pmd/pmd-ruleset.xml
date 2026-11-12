@@ -28,7 +28,13 @@
 
   <rule ref="category/java/bestpractices.xml/AvoidStringBufferField" />
   <rule ref="category/java/bestpractices.xml/ForLoopCanBeForeach"/>
-  <rule ref="category/java/bestpractices.xml/MissingOverride"/>
+  <rule ref="category/java/bestpractices.xml/MissingOverride">
+    <properties>
+      <!-- OMClientRequest#preExecute is the root implementation; checkstyle requires @Override preExecute to call super. -->
+      <property name="violationSuppressXPath"
+                value="./ancestor-or-self::MethodDeclaration[@Name='preExecute'][parent::ClassBody/parent::ClassDeclaration[@SimpleName='OMClientRequest']]"/>
+    </properties>
+  </rule>
   <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
   <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
   <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty" />

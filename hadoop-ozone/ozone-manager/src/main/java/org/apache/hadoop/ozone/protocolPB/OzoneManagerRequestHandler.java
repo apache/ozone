@@ -99,7 +99,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -484,7 +484,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @Override
   public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context) throws IOException {
-    OMClientRequest omClientRequest =
+    IOMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
       OMClientResponse omClientResponse = captureLatencyNs(
