@@ -185,7 +185,6 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
 
   @Test
   void testSubmitContainerIdExportRejectsUnknownHealthStateWithoutRetry() throws Exception {
-    StorageContainerLocationProtocolClientSideTranslatorPB client = metadataClient();
     SubmitContainerIdExportRequestProto bad = SubmitContainerIdExportRequestProto.newBuilder()
         .setHealthState("NOT_A_STATE").build();
     ScmContainerLocationRequest request = ScmContainerLocationRequest.newBuilder()
@@ -198,7 +197,6 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
     assertThat(e.getCause()).isInstanceOf(NonRetriableException.class);
     assertThat(e.getCause().getMessage()).contains("NOT_A_STATE");
     verify(impl, never()).submitContainerIdExport(any(), any(), any(), anyLong(), anyInt(), anyInt());
-    assertThat(client).isNotNull();
   }
 
   @Test
