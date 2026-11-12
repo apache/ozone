@@ -313,6 +313,11 @@ public abstract class GenericTestUtils {
       return getOutput();
     }
 
+    @Override
+    public String toString() {
+      return getOutput();
+    }
+
     public String getOutput() {
       try {
         return bytes.toString(UTF_8.name());
@@ -326,7 +331,7 @@ public abstract class GenericTestUtils {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
       IOUtils.closeQuietly(bytesPrintStream);
       restore.accept(old);
     }

@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -129,7 +128,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     conf = new OzoneConfiguration();
     File dbFile = new File(dbPath);
 
-    try (PrintWriter writer = out()) {
+    try {
       omDbStore = DBStoreBuilder.newBuilder(conf, OMDBDefinition.get(), dbFile.getName(),
           dbFile.getParentFile().toPath())
           .setOpenReadOnly(true)
@@ -145,7 +144,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       multipartInfoTable = OMDBDefinition.MULTIPART_INFO_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
       multipartPartsTable = OMDBDefinition.MULTIPART_PARTS_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
 
-      retrieve(dbPath, writer, containerIDs);
+      retrieve(dbPath, containerIDs);
     } catch (Exception e) {
       err().println("Failed to open RocksDB: " + e);
       throw e;
@@ -184,7 +183,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void retrieve(String dbPath, PrintWriter writer, Set<Long> containerIds) {
+  private void retrieve(String dbPath, Set<Long> containerIds) {
     Map<Long, Pair<Long, String>> bucketVolMap = new HashMap<>();
     // Build dir tree for FSO keys only if we need full paths
     if (!onlyFileNames) {
@@ -221,7 +220,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     processFSOKeys(containerIds, containerToKeysMap, unreferencedCountMap, bucketVolMap);
     // Process OBS keys (keyTable)
     processOBSKeys(containerIds, containerToKeysMap);
-    jsonOutput(writer, containerToKeysMap, containerToOpenKeysMap, unreferencedCountMap);
+    jsonOutput(containerToKeysMap, containerToOpenKeysMap, unreferencedCountMap);
   }
 
   private void processFSOKeys(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap,
@@ -504,7 +503,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void jsonOutput(PrintWriter writer, Map<Long, List<String>> containerToKeysMap,
+  private void jsonOutput(Map<Long, List<String>> containerToKeysMap,
       Map<Long, List<String>> containerToOpenKeysMap, Map<Long, Long> unreferencedCountMap) {
     try {
       ObjectMapper mapper = new ObjectMapper();
@@ -550,8 +549,8 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       }
 
       root.set("containers", containersNode);
-      writer.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root));
-      writer.flush();
+      out().println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root));
+      out().flush();
     } catch (Exception e) {
       err().println("Error writing JSON output: " + e.getMessage());
     }
