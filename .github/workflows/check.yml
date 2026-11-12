@@ -51,12 +51,6 @@ on:
         default: ''
         required: false
 
-      needs-maven-cache:
-        type: boolean
-        description: "Whether to restore Maven cache before run (default: yes)"
-        default: true
-        required: false
-
       needs-npm-cache:
         type: boolean
         description: "Whether to restore NPM cache before run (default: no)"
