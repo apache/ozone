@@ -602,10 +602,15 @@ public class TestPipelineManagerImpl {
   public void testScrubContinuesAfterPipelineFailure() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     BackgroundPipelineCreator creator = mockBackgroundPipelineCreator(pipelineManager);
-    Pipeline failingPipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
-    pipelineManager.openPipeline(failingPipeline.getId());
-    Pipeline otherPipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
-    pipelineManager.openPipeline(otherPipeline.getId());
+    for (int i = 0; i < 2; i++) {
+      Pipeline pipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
+      pipelineManager.openPipeline(pipeline.getId());
+    }
+    // scrubPipelines iterates in this order, so the failing pipeline comes before the one that should be scrubbed.
+    List<Pipeline> pipelines = pipelineManager.getPipelines();
+    assertEquals(2, pipelines.size());
+    Pipeline failingPipeline = pipelines.get(0);
+    Pipeline otherPipeline = pipelines.get(1);
 
     // "Unregister" a node from each pipeline.
     for (Pipeline p : Arrays.asList(failingPipeline, otherPipeline)) {
