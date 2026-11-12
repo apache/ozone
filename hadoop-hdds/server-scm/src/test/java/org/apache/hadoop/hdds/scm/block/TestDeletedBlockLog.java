@@ -297,8 +297,13 @@ public class TestDeletedBlockLog {
 
   private List<DeletedBlocksTransaction> getTransactions(
       int maximumAllowedBlocksNum) throws IOException {
+    return getTransactions(maximumAllowedBlocksNum, false);
+  }
+
+  private List<DeletedBlocksTransaction> getTransactions(
+      int maximumAllowedBlocksNum, boolean retryOnly) throws IOException {
     DatanodeDeletedBlockTransactions transactions =
-        deletedBlockLog.getTransactions(maximumAllowedBlocksNum, new HashSet<>(dnList));
+        deletedBlockLog.getTransactions(maximumAllowedBlocksNum, new HashSet<>(dnList), retryOnly);
     List<DeletedBlocksTransaction> txns = new LinkedList<>();
     for (DatanodeDetails dn : dnList) {
       txns.addAll(Optional.ofNullable(
@@ -514,6 +519,42 @@ public class TestDeletedBlockLog {
     assertEquals(0, getTransactions(BLOCKS_PER_TXN * THREE).size());
     assertEquals(0, deletedBlockLog.getNumOfValidTransactions());
     assertEquals(0, deletedBlockLog.getTransactionToDNsCommitMapSize());
+  }
+
+  private int commitMapSize() {
+    return deletedBlockLog.getTransactionToDNsCommitMapSize();
+  }
+
+  @Test
+  public void testRetryOnlyResendsOnlyTransactionsInCommitMap() throws Exception {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    addTransactions(generateData(50), true);
+    mockContainerHealthResult(true);
+    // 20 transactions are sent, the commands to the first DN get lost.
+    List<DeletedBlocksTransaction> sent = getTransactions(20 * BLOCKS_PER_TXN * THREE);
+    assertEquals(20 * THREE, sent.size());
+    commitTransactions(sent, dnList.get(1), dnList.get(2));
+    assertEquals(20, commitMapSize());
+
+    // Still in flight: nothing to retry yet, and no new transaction either.
+    assertTrue(getTransactions(Integer.MAX_VALUE, true).isEmpty());
+
+    // Timed out: only the first DN gets them again, the other 30
+    // transactions are held back and the map does not grow.
+    deletedBlockLog.setScmCommandTimeoutMs(-1L);
+    List<DeletedBlocksTransaction> retried = getTransactions(Integer.MAX_VALUE, true);
+    assertEquals(20, retried.size());
+    assertEquals(sent.stream().map(DeletedBlocksTransaction::getTxID).collect(Collectors.toSet()),
+        retried.stream().map(DeletedBlocksTransaction::getTxID).collect(Collectors.toSet()));
+    assertEquals(20, commitMapSize());
+
+    // The retried commands are acknowledged and the map drains.
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    commitTransactions(retried, dnList.get(0));
+    assertEquals(0, commitMapSize());
+
+    // Normal mode picks up the remaining transactions.
+    assertEquals(30 * THREE, getTransactions(Integer.MAX_VALUE).size());
   }
 
   private void recordScmCommandToStatusManager(

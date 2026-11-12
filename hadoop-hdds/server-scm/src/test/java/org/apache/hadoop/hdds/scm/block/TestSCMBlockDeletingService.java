@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.block;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.eq;
@@ -66,6 +67,7 @@ public class TestSCMBlockDeletingService {
   private OzoneConfiguration conf;
   private NodeManager nodeManager;
   private ScmBlockDeletingServiceMetrics metrics;
+  private DeletedBlockLog mockDeletedBlockLog;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -90,9 +92,9 @@ public class TestSCMBlockDeletingService {
     ddbt.addTransactionToDN(datanode1.getID(), tx1);
     ddbt.addTransactionToDN(datanode2.getID(), tx1);
     ddbt.addTransactionToDN(datanode3.getID(), tx1);
-    DeletedBlockLog mockDeletedBlockLog = mock(DeletedBlockLog.class);
+    mockDeletedBlockLog = mock(DeletedBlockLog.class);
     when(mockDeletedBlockLog.getTransactions(
-        anyInt(), anySet())).thenReturn(ddbt);
+        anyInt(), anySet(), anyBoolean())).thenReturn(ddbt);
 
     service = spy(new SCMBlockDeletingService(
         mockDeletedBlockLog, nodeManager, eventPublisher, scmContext,
@@ -131,6 +133,20 @@ public class TestSCMBlockDeletingService {
     // Echo Command has one Transaction
     assertEquals(datanodeDetails.size() * 1,
         metrics.getNumBlockDeletionTransactionsOnDatanodes());
+  }
+
+  @Test
+  public void testFullCommitMapOnlyRetries() throws Exception {
+    int limit = conf.getObject(ScmConfig.class).getTransactionToDNsCommitMapLimit();
+    when(mockDeletedBlockLog.getTransactionToDNsCommitMapSize()).thenReturn(limit - 1);
+    callDeletedBlockTransactionScanner();
+    verify(mockDeletedBlockLog).getTransactions(anyInt(), anySet(), eq(false));
+
+    // Over the limit the scan still runs, so already sent transactions are
+    // retried instead of waiting for their ACKs forever.
+    when(mockDeletedBlockLog.getTransactionToDNsCommitMapSize()).thenReturn(limit);
+    callDeletedBlockTransactionScanner();
+    verify(mockDeletedBlockLog).getTransactions(anyInt(), anySet(), eq(true));
   }
 
   private void callDeletedBlockTransactionScanner() throws Exception {

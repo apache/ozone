@@ -472,6 +472,11 @@ public class SCMDeletedBlockTransactionStatusManager {
     scmDeleteBlocksCommandStatusManager.onDatanodeDead(dnId);
   }
 
+  /** @return true if the transaction has been sent and not purged yet */
+  boolean isInCommitMap(long txId) {
+    return transactionToDNsCommitMap.containsKey(txId);
+  }
+
   boolean isDuplication(DatanodeID datanodeID, long tx, Map<DatanodeID, Map<Long, CmdStatus>> commandStatus) {
     if (alreadyExecuted(datanodeID, tx)) {
       return true;
