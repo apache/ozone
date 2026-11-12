@@ -985,10 +985,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
           // dir1 evaluation pushes itself and dir4, then overflows at dir1/dir5 so dir5 is skipped.
           // Only dir1/dir4's keys are expired. dir2 and dir4 are expired as empty or fully expired directories,
           // while dir1 is kept since its skipped sub directory dir5 is not expired.
-          arguments(3L, 2, 2,
-              new String[]{"dir3 and its 1 following sibling", "dir1/dir5 and its 0 following sibling"}),
+          arguments(3L, 2, 2, 3L),
           // Root evaluation pushes itself, then overflows at its first sub directory, so nothing is evaluated
-          arguments(1L, 0, 0, new String[]{"dir1 and its 3 following sibling"})
+          arguments(1L, 0, 0, 4L)
       );
     }
 
@@ -1000,7 +999,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @ParameterizedTest
     @MethodSource("cachedDirLimitParameters")
     void testFSOScanSkipsDirectoriesWhenCachedDirectoryMaxCountExceeded(long cachedDirLimit,
-        int expectedDeletedKeys, int expectedDeletedDirs, String[] skippedDirs) throws Exception {
+        int expectedDeletedKeys, int expectedDeletedDirs, long expectedSkippedDirectories) throws Exception {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       final int testKeyCount = 8;
@@ -1041,10 +1040,11 @@ class TestKeyLifecycleService extends OzoneTestBase {
       runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
 
       String output = logCapturer.getOutput();
-      assertThat(output).contains("LimitedSizeStack has reached maximum size " + cachedDirLimit);
-      for (String skippedDir : skippedDirs) {
-        assertThat(output).contains("Skip evaluate " + volumeName + "/" + bucketName + " at " + skippedDir);
-      }
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      assertThat(output).contains("Lifecycle evaluate for " + bucketKey + " skipped "
+          + expectedSkippedDirectories + " directories because in-memory directory stack exceeded limit "
+          + cachedDirLimit);
+      assertThat(output).doesNotContain("Skip evaluate " + volumeName + "/" + bucketName);
 
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() - initialDeletedKeyCount == expectedDeletedKeys,
           WAIT_CHECK_INTERVAL, 10000);
@@ -1052,7 +1052,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(() -> getDeletedDirectoryCount() - initialDeletedDirCount == expectedDeletedDirs,
           WAIT_CHECK_INTERVAL, 10000);
       // The scan still completes, so the next scan starts from the beginning instead of resuming
-      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
       GenericTestUtils.waitFor(() -> {
         try {
           OmLifecycleScanState state = metadataManager.getLifecycleScanStateTable().get(bucketKey);

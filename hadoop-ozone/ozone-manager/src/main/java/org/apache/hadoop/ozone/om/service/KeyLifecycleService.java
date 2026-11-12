@@ -320,6 +320,7 @@ public class KeyLifecycleService extends BackgroundService {
     private long lastStateSaveTime = Time.monotonicNow();
     private long lastStateSaveKeyCount = 0;
     private boolean scanAborted;
+    private long stackCapacitySkippedDirectories = 0;
 
     private boolean shouldSaveState() {
       if ((Time.monotonicNow() - lastStateSaveTime) > stateSaveIntervalMs ||
@@ -680,7 +681,7 @@ public class KeyLifecycleService extends BackgroundService {
           stack.push(new PendingEvaluateDirectory(null, "", "", null));
         }
       } catch (CapacityFullException e) {
-        LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, directoryPath != null ? directoryPath : "", e);
+        stackCapacitySkippedDirectories++;
         return;
       }
 
@@ -794,7 +795,7 @@ public class KeyLifecycleService extends BackgroundService {
             try {
               stack.push(item);
             } catch (CapacityFullException e) {
-              LOG.warn("Skip evaluate {}/{} at {}: {}", volumeName, bucketName, currentDirPath, e.getMessage());
+              stackCapacitySkippedDirectories++;
               continue;
             }
 
@@ -809,8 +810,7 @@ public class KeyLifecycleService extends BackgroundService {
               } catch (CapacityFullException e) {
                 // The stack stays full until an entry is popped, so the remaining siblings cannot be pushed either.
                 // Skipped sub directories are not expired, which also keeps their parent from being expired.
-                LOG.warn("Skip evaluate {}/{} at {} and its {} following sibling directories: {}", volumeName,
-                    bucketName, subDirPath, subDirSummary.getSubDirCount() - i - 1, e.getMessage());
+                stackCapacitySkippedDirectories += subDirSummary.getSubDirCount() - i;
                 break;
               }
             }
@@ -1372,6 +1372,10 @@ public class KeyLifecycleService extends BackgroundService {
               "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
           numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
           numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
+      if (stackCapacitySkippedDirectories > 0) {
+        LOG.info("Lifecycle evaluate for {} skipped {} directories because in-memory directory stack "
+            + "exceeded limit {}", bucketName, stackCapacitySkippedDirectories, cachedDirMaxCount);
+      }
     }
 
     private void onSuccess(String bucketName) {
@@ -1388,6 +1392,10 @@ public class KeyLifecycleService extends BackgroundService {
               "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
           numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
           numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
+      if (stackCapacitySkippedDirectories > 0) {
+        LOG.info("Lifecycle evaluate for {} skipped {} directories because in-memory directory stack "
+            + "exceeded limit {}", bucketName, stackCapacitySkippedDirectories, cachedDirMaxCount);
+      }
     }
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList,
