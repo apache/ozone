@@ -1816,12 +1816,20 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    public Stream<Arguments> hsyncKeyParameters() {
+      return Stream.of(
+          arguments(FILE_SYSTEM_OPTIMIZED, false),
+          arguments(OBJECT_STORE, false),
+          arguments(FILE_SYSTEM_OPTIMIZED, true));
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
-    void testHsyncKeyNotExpired(BucketLayout bucketLayout) throws Exception {
+    @MethodSource("hsyncKeyParameters")
+    void testHsyncKeyNotExpired(BucketLayout bucketLayout, boolean hsyncInCache) throws Exception {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String keyPrefix = "dir1/key";
+      // keys are under dir1/dir2, so dir2 is not the rule's prefix directory and can expire by itself
+      String keyPrefix = "dir1/dir2/key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
@@ -1836,7 +1844,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
           OmKeyInfo keyInfo = kv.getValue();
           if (volumeName.equals(keyInfo.getVolumeName()) && bucketName.equals(keyInfo.getBucketName())) {
             hsyncKey = kv.getKey();
-            keyTable.put(hsyncKey, keyInfo.toBuilder().addMetadata(HSYNC_CLIENT_ID, "1").build());
+            OmKeyInfo hsyncKeyInfo = keyInfo.toBuilder().addMetadata(HSYNC_CLIENT_ID, "1").build();
+            if (hsyncInCache) {
+              // The max epoch keeps the double buffer from evicting the cache entry before the scan.
+              keyTable.addCacheEntry(new CacheKey<>(hsyncKey), CacheValue.get(Long.MAX_VALUE, hsyncKeyInfo));
+            } else {
+              keyTable.put(hsyncKey, hsyncKeyInfo);
+            }
           }
         }
       }
@@ -1850,7 +1864,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(1, getKeyCount(bucketLayout) - initialKeyCount);
       assertTrue(keyTable.get(hsyncKey).isHsync());
       if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-        assertFalse(getDirectory(volumeName, bucketName, "dir1").getKeyInfo().isFile());
+        assertFalse(getDirectory(volumeName, bucketName, "dir1/dir2").getKeyInfo().isFile());
       }
       deleteLifecyclePolicy(volumeName, bucketName);
     }
