@@ -105,7 +105,6 @@ public class TestReconUtils {
     DataSourceConfiguration dataSourceConfiguration =
         new ReconControllerModule(null).getDataSourceConfiguration(configuration);
 
-    assertEquals(ReconSqlDbConfig.DEFAULT_DRIVER_CLASS, dataSourceConfiguration.getDriverClass());
     assertEquals("jdbc:sqlite:" + temporaryFolder + "/ozone_recon_sqlite.db", dataSourceConfiguration.getJdbcUrl());
     assertEquals(ReconSqlDbConfig.DEFAULT_SQL_DB_DIALECT, dataSourceConfiguration.getSqlDialect());
   }

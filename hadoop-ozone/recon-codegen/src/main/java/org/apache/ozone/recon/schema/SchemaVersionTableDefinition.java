@@ -42,7 +42,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   public static final String SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DataSource dataSource;
-  private int softwareVersion;
+  private int freshInstallVersion;
 
   @Inject
   public SchemaVersionTableDefinition(DataSource dataSource) {
@@ -61,7 +61,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
         createSchemaVersionTable(localDslContext);
 
         if (isFreshInstall) {
-          insertApparentVersion(localDslContext, softwareVersion);
+          insertApparentVersion(localDslContext, freshInstallVersion);
         }
       }
     }
@@ -88,7 +88,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
     LOG.info("Inserted initial apparent version '{}' into SchemaVersion table.", apparentVersion);
   }
 
-  public void setSoftwareVersion(int version) {
-    this.softwareVersion = version;
+  public void setFreshInstallVersion(int version) {
+    this.freshInstallVersion = version;
   }
 }

@@ -60,7 +60,7 @@ public class ReconSchemaManager {
           .findFirst()
           .ifPresent(schemaDefinition -> {
             SchemaVersionTableDefinition schemaVersionTable = (SchemaVersionTableDefinition) schemaDefinition;
-            schemaVersionTable.setSoftwareVersion(freshInstallVersion.serialize());
+            schemaVersionTable.setFreshInstallVersion(freshInstallVersion.serialize());
             try {
               schemaVersionTable.initializeSchema();
             } catch (SQLException e) {

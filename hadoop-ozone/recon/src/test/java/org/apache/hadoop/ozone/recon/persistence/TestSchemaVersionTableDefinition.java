@@ -153,7 +153,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize the schema
     SchemaVersionTableDefinition schemaVersionTable = new SchemaVersionTableDefinition(getDataSource());
-    schemaVersionTable.setSoftwareVersion(3);
+    schemaVersionTable.setFreshInstallVersion(3);
     schemaVersionTable.initializeSchema();
 
     // Verify that the SchemaVersionTable is created
@@ -236,7 +236,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize the schema
     SchemaVersionTableDefinition schemaVersionTable = new SchemaVersionTableDefinition(getDataSource());
-    schemaVersionTable.setSoftwareVersion(3);
+    schemaVersionTable.setFreshInstallVersion(3);
     schemaVersionTable.initializeSchema();
 
     try (ReconVersionManager versionManager = new ReconVersionManager(getDataSource())) {

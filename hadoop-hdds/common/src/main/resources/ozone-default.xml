@@ -3578,6 +3578,7 @@
       Number of rows the Recon SQL DB returns per JDBC round-trip when streaming unhealthy
       container records during a CSV export. Higher values reduce round-trip
       overhead at the cost of slightly more memory per fetch batch.
+      SQLite, the default Recon SQL DB, ignores this setting.
     </description>
   </property>
   <property>

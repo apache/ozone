@@ -39,6 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.slf4j.event.Level.INFO;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -564,6 +566,33 @@ public class TestReconWithOzoneManager {
       assertEquals(ReconVersion.SOFTWARE_VERSION.serialize(), getReconSchemaVersion(jdbcUrl));
       assertReplicaHistory(containerID, expected);
       assertThat(logs.getOutput()).doesNotContain(migrationMessage);
+    } finally {
+      if (recon.getReconServer() == null) {
+        recon.start(conf);
+      }
+    }
+  }
+
+  @Test
+  public void testUpgradeActionsRunOnNewSqlDbForExistingInstall() throws Exception {
+    OzoneConfiguration conf = cluster.getConf();
+    String jdbcUrl = ReconGuiceServletContextListener.getGlobalInjector()
+        .getInstance(DataSourceConfiguration.class).getJdbcUrl();
+    String sqlDbFile = jdbcUrl.substring("jdbc:sqlite:".length());
+
+    try (LogCapturer logs = LogCapturer.captureLogs(LoggerFactory.getLogger("org.apache"))) {
+      recon.stop();
+      // Same as the first start after the move from Derby: Recon is initialized, but its SQL DB is new.
+      for (String suffix : new String[] {"", "-wal", "-shm"}) {
+        Files.deleteIfExists(Paths.get(sqlDbFile + suffix));
+      }
+
+      logs.clearOutput();
+      recon.start(conf);
+      assertEquals(ReconVersion.SOFTWARE_VERSION.serialize(), getReconSchemaVersion(jdbcUrl));
+      assertThat(logs.getOutput())
+          .contains("Inserted initial apparent version '" + ReconVersion.INITIAL_VERSION.serialize() + "'")
+          .contains("Updated apparent version to '" + ReconVersion.TASK_STATUS_STATISTICS.serialize() + "'.");
     } finally {
       if (recon.getReconServer() == null) {
         recon.start(conf);

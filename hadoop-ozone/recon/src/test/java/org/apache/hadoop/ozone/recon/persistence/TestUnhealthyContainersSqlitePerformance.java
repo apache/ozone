@@ -75,9 +75,8 @@ import org.slf4j.LoggerFactory;
  *
  * <h2>Performance settings applied in this test</h2>
  * <ul>
- *   <li><b>JDBC fetch size</b>: set to {@value #READ_PAGE_SIZE} on each query
- *       so the driver pre-buffers a full page of rows per JDBC round-trip instead
- *       of the default 1-row-at-a-time fetch.</li>
+ *   <li><b>JDBC fetch size</b>: set to {@value #READ_PAGE_SIZE} on each query,
+ *       but sqlite-jdbc ignores it and reads rows one at a time.</li>
  *   <li><b>Large page size</b>: {@value #READ_PAGE_SIZE} rows per SQL fetch
  *       reduces the number of SQL round-trips from 200 (@ 1 K rows) to 40
  *       (@ 5 K rows) per 200 K-row state scan.</li>
@@ -175,9 +174,8 @@ public class TestUnhealthyContainersSqlitePerformance {
    *
    * <p>5,000 rows per page means only 40 SQL round-trips to scan 200,000
    * records for a single state, compared to 200 trips at the old 1,000-row
-   * page size.  Combined with {@code query.fetchSize(READ_PAGE_SIZE)} this
-   * cuts round-trip overhead by 80% while keeping per-page heap usage well
-   * below 1 MB.</p>
+   * page size.  This cuts round-trip overhead by 80% while keeping per-page
+   * heap usage well below 1 MB.</p>
    */
   private static final int READ_PAGE_SIZE = 5_000;
 
