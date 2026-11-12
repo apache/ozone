@@ -460,17 +460,28 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void closePipeline(PipelineID pipelineID) throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
-    // close containers.
-    closeContainersForPipeline(pipelineID);
-    if (!getPipeline(pipelineID).isClosed()) {
-      acquireWriteLock();
-      try {
-        stateManager.updatePipelineState(pipelineIDProtobuf,
-            HddsProtos.PipelineState.PIPELINE_CLOSED);
-      } finally {
-        releaseWriteLock();
+    try {
+      // close containers.
+      closeContainersForPipeline(pipelineID);
+      if (!getPipeline(pipelineID).isClosed()) {
+        acquireWriteLock();
+        try {
+          stateManager.updatePipelineState(pipelineIDProtobuf,
+              HddsProtos.PipelineState.PIPELINE_CLOSED);
+        } finally {
+          releaseWriteLock();
+        }
+        LOG.info("Pipeline {} moved to CLOSED state", pipelineID);
       }
-      LOG.info("Pipeline {} moved to CLOSED state", pipelineID);
+    } catch (PipelineNotFoundException e) {
+      // There is no pipeline left to close.
+      throw e;
+    } catch (IOException e) {
+      // Followers are expected to fail with not-leader errors, so they are not counted as close failures.
+      if (!(e instanceof SCMException && ((SCMException) e).getResult() == SCMException.ResultCodes.SCM_NOT_LEADER)) {
+        metrics.incNumPipelineCloseFailed();
+      }
+      throw e;
     }
 
     metrics.removePipelineMetrics(pipelineID);

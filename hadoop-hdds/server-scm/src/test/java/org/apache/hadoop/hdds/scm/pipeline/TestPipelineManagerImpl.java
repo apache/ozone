@@ -616,12 +616,16 @@ public class TestPipelineManagerImpl {
     }
     // Closing the pipeline fails because SCM does not know about its container.
     pipelineManager.addContainerToPipeline(failingPipeline.getId(), ContainerID.valueOf(1));
+    long numPipelineCloseFailed = getLongCounter("NumPipelineCloseFailed",
+        getMetrics(SCMPipelineMetrics.class.getSimpleName()));
 
     pipelineManager.scrubPipelines();
 
     // The failure on one pipeline does not stop the other from being scrubbed.
     assertEquals(OPEN, pipelineManager.getPipeline(failingPipeline.getId()).getPipelineState());
     assertEquals(Pipeline.PipelineState.CLOSED, pipelineManager.getPipeline(otherPipeline.getId()).getPipelineState());
+    assertEquals(numPipelineCloseFailed + 1, getLongCounter("NumPipelineCloseFailed",
+        getMetrics(SCMPipelineMetrics.class.getSimpleName())));
     // Replacement pipelines are requested after the scrubber closes pipelines.
     verify(creator).notifyEventTriggered(Event.SCRUBBER_CLOSED_PIPELINES);
     pipelineManager.close();
