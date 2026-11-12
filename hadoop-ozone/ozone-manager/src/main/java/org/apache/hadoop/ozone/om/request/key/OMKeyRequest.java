@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
@@ -157,6 +156,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
     keyArgs = bucket.update(keyArgs);
     return keyArgs;
+  }
+
+  protected KeyArgs resolveBucketLinkForAudit(OzoneManager ozoneManager,
+      KeyArgs keyArgs) {
+    try {
+      return resolveBucketLink(ozoneManager, keyArgs);
+    } catch (IOException e) {
+      return keyArgs;
+    }
   }
 
   protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
@@ -775,22 +783,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
             omMetadataManager.getBucketKey(volumeName,
                 bucketName));
 
-        // If bucket is symlink, resolveBucketLink to figure out real
-        // volume/bucket.
-        if (bucketInfo.isLink()) {
-          ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-              Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-
-          bucketInfo = omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(resolvedBucket.realVolume(),
-                  resolvedBucket.realBucket()));
-        }
-
       } finally {
         if (acquireLock) {
           mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(
               BUCKET_LOCK, volumeName, bucketName));
         }
+      }
+
+      // If bucket is symlink, resolveBucketLink to figure out real
+      // volume/bucket. It takes the lock of each bucket it reads, so it must be called without holding a bucket lock.
+      if (bucketInfo != null && bucketInfo.isLink()) {
+        final ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+            Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+
+        bucketInfo = omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(resolvedBucket.realVolume(), resolvedBucket.realBucket()));
       }
 
       // Don't throw exception of bucket not found when bucketinfo is
@@ -817,26 +824,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
       KeyArgs.Builder newKeyArgs, OzoneManager ozoneManager)
       throws IOException {
 
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-
-    boolean acquireLock = false;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     newKeyArgs.clearPartIv();
 
     if (ozoneManager.getKmsProvider() != null) {
-      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
-          BUCKET_LOCK, volumeName, bucketName));
-      acquireLock = getOmLockDetails().isLockAcquired();
+      // Resolved before taking a bucket lock, see generateRequiredEncryptionInfo.
+      final ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+      final String realVolume = resolvedBucket.realVolume();
+      final String realBucket = resolvedBucket.realBucket();
+      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK, realVolume, realBucket));
+      final boolean acquireLock = getOmLockDetails().isLockAcquired();
       try {
-        ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-            Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-
         // Get the DB key name for looking up keyInfo in OpenKeyTable with
         // resolved volume/bucket.
         String dbMultipartOpenKey =
-            getDBMultipartOpenKey(resolvedBucket.realVolume(),
-                resolvedBucket.realBucket(), keyArgs.getKeyName(),
+            getDBMultipartOpenKey(realVolume, realBucket, keyArgs.getKeyName(),
                 keyArgs.getMultipartUploadID(), omMetadataManager);
 
         OmKeyInfo omKeyInfo =
@@ -862,8 +865,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       } finally {
         if (acquireLock) {
-          mergeOmLockDetails(omMetadataManager.getLock()
-              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
+          mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, realVolume, realBucket));
         }
       }
     }
@@ -1247,11 +1249,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
-    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder()
-        .setObjectID(OBJECT_ID_RECLAIM_BLOCKS)
-        .build();
-    // This is a special marker to indicate that SnapshotDeletingService
-    // can reclaim this key's blocks unconditionally.
+    // The pseudo key keeps the object ID and the hsync metadata of the key, so callers wrap before they remove the
+    // latter. A block committed by an earlier hsync may be referenced by a snapshot, and key deletion retains the
+    // pseudo key while the previous snapshot holds an hsync'ed version of the key with this object ID. That version
+    // may not list the block itself, as an hsync between two snapshots can drop a block that the older one references.
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder().build();
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,

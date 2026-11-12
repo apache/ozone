@@ -600,6 +600,38 @@ public class OMDBInsightEndpoint {
   }
 
   /**
+   * Retrieves data pending deletion grouped by bucket, largest first.
+   * Keys are taken from the deletedTable and directories from the deletedDirTable; directory sizes come from
+   * NSSummary. All sizes are replicated bytes.
+   *
+   * Example response:
+   *   [
+   *     {
+   *       "volumeName": "vol1",
+   *       "bucketName": "bucket1",
+   *       "pendingDeletionKeys": 10,
+   *       "pendingDeletionKeyBytes": 31457280,
+   *       "pendingDeletionDirs": 2,
+   *       "pendingDeletionDirBytes": 3145728,
+   *       "totalPendingDeletionBytes": 34603008
+   *     }
+   *   ]
+   *
+   * @param limit maximum number of buckets to return.
+   */
+  @GET
+  @Path("/deletePending/buckets")
+  public Response getBucketPendingDeletion(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit) {
+    try {
+      return Response.ok(reconGlobalMetricsService.getBucketPendingDeletion(limit)).build();
+    } catch (IOException e) {
+      LOG.error("Error while aggregating pending deletion data per bucket", e);
+      return createInternalServerErrorResponse("Error aggregating pending deletion per bucket: " + e.getMessage());
+    }
+  }
+
+  /**
    * This API will list out limited 'count' number of keys after applying below filters in API parameters:
    * Default Values of API param filters:
    *    -- replicationType - empty string and filter will not be applied, so list out all keys irrespective of

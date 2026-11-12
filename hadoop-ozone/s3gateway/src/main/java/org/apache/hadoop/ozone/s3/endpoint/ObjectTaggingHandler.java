@@ -82,7 +82,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     }
     try {
       rejectVersionId(keyName);
-      getClientProtocol().deleteObjectTagging(context.getVolume().getName(), context.getBucketName(), keyName);
+      getClientProtocol().deleteObjectTagging(context.getCachedVolumeName(), context.getBucketName(), keyName);
       getMetrics().updateDeleteObjectTaggingSuccessStats(context.getStartNanos());
       return Response.noContent().build();
     } catch (OMException ex) {

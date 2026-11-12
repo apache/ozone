@@ -221,7 +221,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteBucket(String volumeName, String bucketName)
       throws IOException {
-
+    objectStoreStub.getVolume(volumeName).deleteBucket(bucketName);
   }
 
   @Override
@@ -233,7 +233,10 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(String volumeName, String bucketName)
       throws IOException {
-    return null;
+    if (volumeName == null) {
+      return objectStoreStub.getS3Volume().getBucket(bucketName);
+    }
+    return objectStoreStub.getVolume(volumeName).getBucket(bucketName);
   }
 
   @Override
@@ -382,6 +385,9 @@ public class ClientProtocolStub implements ClientProtocol {
 
   private OzoneBucket getBucket(String volumeName, String bucketName)
       throws IOException {
+    if (volumeName == null) {
+      return objectStoreStub.getS3Bucket(bucketName);
+    }
     return objectStoreStub.getVolume(volumeName).getBucket(bucketName);
   }
 
@@ -417,6 +423,11 @@ public class ClientProtocolStub implements ClientProtocol {
                         String fromKeyName, String toKeyName)
       throws IOException {
 
+  }
+
+  @Override
+  public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName,
+      boolean requireFileSystemOptimized) throws IOException {
   }
 
   @Override

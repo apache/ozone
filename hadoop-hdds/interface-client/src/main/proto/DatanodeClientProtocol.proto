@@ -342,6 +342,8 @@ message PutBlockRequestProto {
   required BlockData blockData = 1;
   optional bool eof = 2;
   optional bool containerAutoCreate = 3;
+  // Set by hsync; the datanode syncs the block file and the PutBlock to disk before replying.
+  optional bool sync = 4;
 }
 
 message PutBlockResponseProto {

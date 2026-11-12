@@ -67,7 +67,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
@@ -1099,10 +1098,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     if (!shouldRun()) {
       return;
     }
-    Pair<Set<String>, List<byte[]>> fileNodeToKeyPair =
-        getOlderFileNodes();
-    Set<String> lastCompactionSstFiles = fileNodeToKeyPair.getLeft();
-    List<byte[]> keysToRemove = fileNodeToKeyPair.getRight();
+    CompactionKeys compactionKeys = getOlderFileNodes();
+    Set<String> lastCompactionSstFiles = compactionKeys.compactionNodes();
+    List<byte[]> keysToRemove = compactionKeys.keysToRemove();
 
     Set<String> sstFileNodesRemoved =
         pruneSstFileNodesFromDag(lastCompactionSstFiles);
@@ -1124,9 +1122,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Returns the list of input files from the compaction entries which are
    * older than the maximum allowed in the compaction DAG.
    */
-  private synchronized Pair<Set<String>, List<byte[]>> getOlderFileNodes() {
+  private synchronized CompactionKeys getOlderFileNodes() {
     if (closed) {
-      return Pair.of(Collections.emptySet(), Collections.emptyList());
+      return new CompactionKeys(Collections.emptySet(), Collections.emptyList());
     }
     long compactionLogPruneStartTime = System.currentTimeMillis();
     Set<String> compactionNodes = new HashSet<>();
@@ -1156,7 +1154,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       // TODO: Handle this properly before merging the PR.
       throw new RuntimeException(exception);
     }
-    return Pair.of(compactionNodes, keysToRemove);
+    return new CompactionKeys(compactionNodes, keysToRemove);
   }
 
   private synchronized void removeKeyFromCompactionLogTable(
@@ -1420,16 +1418,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private void removeValueFromSSTFile(ManagedOptions options, String sstFilePath, File prunedFile) throws IOException {
     try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(options, sstFilePath, SST_READ_AHEAD_SIZE);
-         ManagedRawSSTFileIterator<Pair<CodecBuffer, Integer>> itr = sstFileReader.newIterator(
-             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
+         ManagedRawSSTFileIterator<CodecBufferAndType> itr = sstFileReader.newIterator(
+             keyValue -> new CodecBufferAndType(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
          RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(prunedFile);
          CodecBuffer emptyCodecBuffer = CodecBuffer.getEmptyBuffer()) {
       while (itr.hasNext()) {
-        Pair<CodecBuffer, Integer> keyValue = itr.next();
-        if (keyValue.getValue() == 0) {
-          sstFileWriter.delete(keyValue.getKey());
+        CodecBufferAndType keyValue = itr.next();
+        if (keyValue.type() == 0) {
+          sstFileWriter.delete(keyValue.buffer());
         } else {
-          sstFileWriter.put(keyValue.getKey(), emptyCodecBuffer);
+          sstFileWriter.put(keyValue.buffer(), emptyCodecBuffer);
         }
       }
     }
@@ -1519,4 +1517,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public SSTFilePruningMetrics getPruningMetrics() {
     return sstFilePruningMetrics;
   }
+
+  /**
+   * The old compaction SST file nodes paired with the compaction log keys to remove,
+   * used to prune older snapshots from the compaction DAG.
+   */
+  private record CompactionKeys(Set<String> compactionNodes, List<byte[]> keysToRemove) { }
+
+  /**
+   * An SST key buffer paired with its entry type (0 = delete, otherwise put),
+   * used to rewrite SST files without values when pruning.
+   */
+  record CodecBufferAndType(CodecBuffer buffer, int type) { }
 }

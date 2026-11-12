@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -121,43 +122,90 @@ public class TestXceiverClientGrpc {
   }
 
   @Test
-  public void testGetBlockRetryAlNodes() {
-    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
-    assertThat(allDNs.size()).isGreaterThan(1);
-    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
-      @Override
-      public XceiverClientReply sendCommandAsync(
-          ContainerProtos.ContainerCommandRequestProto request,
-          DatanodeDetails dn) throws IOException {
-        allDNs.remove(dn);
-        throw new IOException("Failed " + dn);
-      }
-    }) {
-      invokeXceiverClientGetBlock(client);
-    } catch (IOException e) {
-      e.printStackTrace();
+  public void testGetBlockRetryAlNodes() throws IOException {
+    final List<DatanodeDetails> seenDNs = new ArrayList<>();
+    try (XceiverClientGrpc client = failingClient(seenDNs)) {
+      assertThrows(IOException.class, () -> invokeXceiverClientGetBlock(client));
     }
-    assertEquals(0, allDNs.size());
+    // Each datanode is tried exactly once, not once per datanode tried.
+    assertThat(seenDNs).containsExactlyInAnyOrderElementsOf(dns);
   }
 
   @Test
-  public void testReadChunkRetryAllNodes() {
-    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
-    assertThat(allDNs.size()).isGreaterThan(1);
+  public void testGetBlockUsesCachedDatanodeAfterFailover() throws IOException {
+    conf.setBoolean(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, false);
+    final List<DatanodeDetails> seenDNs = new ArrayList<>();
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
       public XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
           DatanodeDetails dn) throws IOException {
-        allDNs.remove(dn);
-        throw new IOException("Failed " + dn);
+        seenDNs.add(dn);
+        // The first datanode tried, i.e. the leader, always fails.
+        if (dn.equals(seenDNs.get(0))) {
+          throw new IOException("Failed " + dn);
+        }
+        return buildValidResponse();
       }
     }) {
-      invokeXceiverClientReadChunk(client);
-    } catch (IOException e) {
-      e.printStackTrace();
+      invokeXceiverClientGetBlock(client);
+      assertEquals(2, seenDNs.size());
+      final DatanodeDetails cached = seenDNs.get(1);
+
+      // The next GetBlock goes to the cached datanode instead of retrying the failed leader.
+      invokeXceiverClientGetBlock(client);
+      assertEquals(3, seenDNs.size());
+      assertEquals(cached, seenDNs.get(2));
     }
-    assertEquals(0, allDNs.size());
+  }
+
+  @Test
+  public void testReadChunkRetryAllNodes() throws IOException {
+    final List<DatanodeDetails> seenDNs = new ArrayList<>();
+    try (XceiverClientGrpc client = failingClient(seenDNs)) {
+      assertThrows(IOException.class, () -> invokeXceiverClientReadChunk(client));
+    }
+    // Each datanode is tried exactly once, not once per datanode tried.
+    assertThat(seenDNs).containsExactlyInAnyOrderElementsOf(dns);
+  }
+
+  @Test
+  public void testReadChunkRetryNextNodeOnShortRead() throws IOException {
+    final int chunkLen = 10;
+    final List<DatanodeDetails> seenDNs = new ArrayList<>();
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) {
+        seenDNs.add(dn);
+        // The first datanode returns less data than requested.
+        return buildReadChunkResponse(request, seenDNs.size() == 1 ? chunkLen - 1 : chunkLen);
+      }
+    }) {
+      ContainerProtos.ReadChunkResponseProto response =
+          invokeXceiverClientReadChunk(client, chunkLen);
+      assertEquals(chunkLen, response.getData().size());
+    }
+    assertEquals(2, seenDNs.size());
+    assertNotEquals(seenDNs.get(0), seenDNs.get(1));
+  }
+
+  /**
+   * @return a client failing all commands, recording the target datanodes
+   */
+  private XceiverClientGrpc failingClient(List<DatanodeDetails> seenDNs) {
+    return new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) throws IOException {
+        seenDNs.add(dn);
+        // The request must be addressed to the datanode it is sent to.
+        assertEquals(dn.getUuidString(), request.getDatanodeUuid());
+        throw new IOException("Failed " + dn);
+      }
+    };
   }
 
   @Test
@@ -281,20 +329,40 @@ public class TestXceiverClientGrpc {
 
   private void invokeXceiverClientReadChunk(XceiverClientSpi client)
       throws IOException {
+    invokeXceiverClientReadChunk(client, -1);
+  }
+
+  private ContainerProtos.ReadChunkResponseProto invokeXceiverClientReadChunk(
+      XceiverClientSpi client, long len) throws IOException {
     BlockID bid = new BlockID(1, 1);
     bid.setBlockCommitSequenceId(1);
-    ContainerProtocolCalls.readChunk(client,
+    return ContainerProtocolCalls.readChunk(client,
         ContainerProtos.ChunkInfo.newBuilder()
             .setChunkName("Anything")
             .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
                 .setBytesPerChecksum(512)
                 .setType(ContainerProtos.ChecksumType.CRC32)
                 .build())
-            .setLen(-1)
+            .setLen(len)
             .setOffset(0)
             .build(),
         bid.getDatanodeBlockIDProtobuf(),
         null, null);
+  }
+
+  private XceiverClientReply buildReadChunkResponse(
+      ContainerProtos.ContainerCommandRequestProto request, int len) {
+    ContainerProtos.ReadChunkRequestProto readChunk = request.getReadChunk();
+    ContainerProtos.ContainerCommandResponseProto resp =
+        ContainerProtos.ContainerCommandResponseProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.ReadChunk)
+            .setResult(ContainerProtos.Result.SUCCESS)
+            .setReadChunk(ContainerProtos.ReadChunkResponseProto.newBuilder()
+                .setBlockID(readChunk.getBlockID())
+                .setChunkData(readChunk.getChunkData())
+                .setData(ByteString.copyFrom(new byte[len])))
+            .build();
+    return new XceiverClientReply(CompletableFuture.completedFuture(resp));
   }
 
   private void invokeXceiverClientReadSmallFile(XceiverClientSpi client)
