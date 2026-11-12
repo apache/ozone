@@ -152,7 +152,7 @@ public final class HAUtils {
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
         new ScmBlockLocationProtocolClientSideTranslatorPB(proxyProvider, conf);
     return TracingUtil
-        .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
+        .createClientProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
   }
 
@@ -170,7 +170,7 @@ public final class HAUtils {
       ConfigurationSource conf,
       SCMContainerLocationFailoverProxyProvider proxyProvider) {
     StorageContainerLocationInternalInterface scmContainerClient =
-        TracingUtil.createProxy(
+        TracingUtil.createClientProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
                 proxyProvider), StorageContainerLocationInternalInterface.class, conf);
     return scmContainerClient;
@@ -200,7 +200,7 @@ public final class HAUtils {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf, ugi);
     StorageContainerLocationInternalInterface scmContainerClient =
-        TracingUtil.createProxy(
+        TracingUtil.createClientProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
                 proxyProvider, targetScmNode), StorageContainerLocationInternalInterface.class, conf);
     return scmContainerClient;

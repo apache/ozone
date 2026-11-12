@@ -28,7 +28,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import javax.crypto.spec.SecretKeySpec;
-import org.apache.kerby.util.Hex;
+import org.apache.hadoop.util.StringUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -58,16 +58,17 @@ class TestHmacSha256 {
   @ParameterizedTest
   @MethodSource("signatures")
   void matchesKnownSignatures(byte[] key, String message, String expected) throws Exception {
-    assertEquals(expected, Hex.encode(HmacSha256.sign(new SecretKeySpec(key, "HmacSHA256"), message)));
+    assertEquals(expected, StringUtils.byteToHexString(HmacSha256.sign(new SecretKeySpec(key, "HmacSHA256"), message)));
   }
 
   @Test
   void reinitializesForDifferentKeys() throws Exception {
     SecretKeySpec first = new SecretKeySpec(firstKey(), "HmacSHA256");
     SecretKeySpec second = new SecretKeySpec("Jefe".getBytes(UTF_8), "HmacSHA256");
-    assertEquals(FIRST_SIGNATURE, Hex.encode(HmacSha256.sign(first, "Hi There")));
-    assertEquals(SECOND_SIGNATURE, Hex.encode(HmacSha256.sign(second, "what do ya want for nothing?")));
-    assertEquals(FIRST_SIGNATURE, Hex.encode(HmacSha256.sign(first, "Hi There")));
+    assertEquals(FIRST_SIGNATURE, StringUtils.byteToHexString(HmacSha256.sign(first, "Hi There")));
+    assertEquals(SECOND_SIGNATURE,
+        StringUtils.byteToHexString(HmacSha256.sign(second, "what do ya want for nothing?")));
+    assertEquals(FIRST_SIGNATURE, StringUtils.byteToHexString(HmacSha256.sign(first, "Hi There")));
   }
 
   @Test
@@ -95,7 +96,7 @@ class TestHmacSha256 {
     SecretKeySpec signingKey = new SecretKeySpec(key, "HmacSHA256");
     for (int i = 0; i < 100; i++) {
       barrier.await(10, TimeUnit.SECONDS);
-      assertEquals(expected, Hex.encode(HmacSha256.sign(signingKey, message)));
+      assertEquals(expected, StringUtils.byteToHexString(HmacSha256.sign(signingKey, message)));
     }
   }
 }

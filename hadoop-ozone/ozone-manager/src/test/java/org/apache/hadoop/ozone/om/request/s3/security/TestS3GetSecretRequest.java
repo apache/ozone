@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static org.apache.hadoop.hdds.security.exception.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -31,15 +33,23 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ipc_.Server.Call;
@@ -81,12 +91,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.security.S3SecurityUtil;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Test S3GetSecretRequest.
@@ -311,6 +325,130 @@ public class TestS3GetSecretRequest {
     // they should not be the same.
     assertNotEquals(originalS3Secret,
         s3GetSecretResponse.getS3SecretValue().getAwsSecret());
+  }
+
+  @Test
+  public void testRecreatedSecretDoesNotRestoreRevokedStsToken() throws Exception {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+    processSuccessSecretRequest(USER_ALICE, 1, true);
+
+    final STSTokenIdentifier token = mock(STSTokenIdentifier.class);
+    when(token.getOriginalAccessKeyId()).thenReturn(USER_ALICE);
+    when(token.getCreationTime()).thenReturn(Instant.EPOCH);
+    final OMRequest revokeRequest = new S3RevokeSecretRequest(revokeSecretRequest(USER_ALICE)).preExecute(ozoneManager);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        applyAndFlush(new S3RevokeSecretRequest(revokeRequest), 2).getOMResponse().getStatus());
+    processSuccessSecretRequest(USER_ALICE, 3, true);
+    assertTrue(ozoneManager.getS3SecretManager().hasS3Secret(USER_ALICE));
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.CreateVolume)
+        .setS3Authentication(OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+            .setAccessId("temporary-access-id")
+            .setStringToSign("string-to-sign")
+            .setSignature("signature")
+            .setSessionToken("session-token"))
+        .build();
+    // Isolate revocation from token decryption and expiry validation.
+    try (MockedStatic<STSSecurityUtil> securityUtil = mockStatic(STSSecurityUtil.class)) {
+      securityUtil.when(() -> STSSecurityUtil.constructValidateAndDecryptSTSToken(
+          any(), any(), any(Clock.class))).thenReturn(token);
+      final OMException exception = assertThrows(OMException.class,
+          () -> S3SecurityUtil.validateS3Credential(request, ozoneManager));
+      assertEquals(ResultCodes.REVOKED_TOKEN, exception.getResult());
+    }
+  }
+
+  @Test
+  public void testRevokeSecretRecordsStsRevocationCutoff() throws IOException {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    processSuccessSecretRequest(USER_ALICE, 1, true);
+
+    final OMRequest revokeRequest = new S3RevokeSecretRequest(revokeSecretRequest(USER_ALICE)).preExecute(ozoneManager);
+    final long cutoff = revokeRequest.getRevokeSTSTokenRequest().getRevocationTimeMillis();
+    assertThat(cutoff).isPositive();
+    final OMClientResponse response = applyAndFlush(new S3RevokeSecretRequest(revokeRequest), 2);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+
+    final Table<String, Long> revokedStsTokenTable = omMetadataManager.getS3RevokedStsTokenTable();
+    assertEquals(cutoff, revokedStsTokenTable.getSkipCache(USER_ALICE));
+
+    // The cutoff does not depend on the secret: a new secret for the same access id leaves it in place.
+    processSuccessSecretRequest(USER_ALICE, 3, true);
+    assertEquals(cutoff, revokedStsTokenTable.get(USER_ALICE));
+  }
+
+  @Test
+  public void testRevokeSecretKeepsLaterStsRevocationCutoff() throws IOException {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    processSuccessSecretRequest(USER_ALICE, 1, true);
+
+    final OMRequest revokeRequest = new S3RevokeSecretRequest(revokeSecretRequest(USER_ALICE)).preExecute(ozoneManager);
+    final long laterCutoff = revokeRequest.getRevokeSTSTokenRequest().getRevocationTimeMillis() + 60_000;
+    final Table<String, Long> revokedStsTokenTable = omMetadataManager.getS3RevokedStsTokenTable();
+    revokedStsTokenTable.addCacheEntry(new CacheKey<>(USER_ALICE), CacheValue.get(1, laterCutoff));
+
+    applyAndFlush(new S3RevokeSecretRequest(revokeRequest), 2);
+    assertEquals(laterCutoff, revokedStsTokenTable.get(USER_ALICE));
+    assertEquals(laterCutoff, revokedStsTokenTable.getSkipCache(USER_ALICE));
+  }
+
+  @Test
+  public void testRevokeSecretWithoutAttachedCutoffRecordsNone() throws IOException {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    processSuccessSecretRequest(USER_ALICE, 1, true);
+
+    // A log entry that did not go through preExecute carries no cutoff and is applied as before.
+    final OMClientResponse response = applyAndFlush(new S3RevokeSecretRequest(revokeSecretRequest(USER_ALICE)), 2);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertThat(ozoneManager.getS3SecretManager().hasS3Secret(USER_ALICE)).isFalse();
+
+    final Table<String, Long> revokedStsTokenTable = omMetadataManager.getS3RevokedStsTokenTable();
+    assertNull(revokedStsTokenTable.get(USER_ALICE));
+    assertNull(revokedStsTokenTable.getSkipCache(USER_ALICE));
+  }
+
+  @Test
+  public void testRevokeMissingSecretRecordsNoStsRevocationCutoff() throws IOException {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+
+    final OMRequest revokeRequest = new S3RevokeSecretRequest(revokeSecretRequest(USER_CAROL)).preExecute(ozoneManager);
+    final OMClientResponse response = applyAndFlush(new S3RevokeSecretRequest(revokeRequest), 1);
+    assertEquals(OzoneManagerProtocolProtos.Status.S3_SECRET_NOT_FOUND, response.getOMResponse().getStatus());
+
+    final Table<String, Long> revokedStsTokenTable = omMetadataManager.getS3RevokedStsTokenTable();
+    assertNull(revokedStsTokenTable.get(USER_CAROL));
+    assertNull(revokedStsTokenTable.getSkipCache(USER_CAROL));
+  }
+
+  @Test
+  public void testGetSecretStringOfRevokedSecret() throws IOException {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    S3Secret secret = processSuccessSecretRequest(USER_ALICE, 1, true);
+    S3SecretManager secretManager = ozoneManager.getS3SecretManager();
+    assertEquals(secret.getAwsSecret(), secretManager.getSecretString(USER_ALICE));
+    // Keep the persisted secret until the revoke is flushed.
+    omMetadataManager.storeSecret(USER_ALICE, S3SecretValue.of(USER_ALICE, secret.getAwsSecret()));
+
+    OMRequest revokeRequest = OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeS3Secret)
+        .setRevokeS3SecretRequest(OzoneManagerProtocolProtos.RevokeS3SecretRequest.newBuilder()
+            .setKerberosID(USER_ALICE))
+        .build();
+    OMClientRequest request = new S3RevokeSecretRequest(revokeRequest);
+    request = new S3RevokeSecretRequest(request.preExecute(ozoneManager));
+    OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 2);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+
+    assertTrue(secretManager.cache().get(USER_ALICE).isDeleted());
+    assertNotNull(omMetadataManager.getSecret(USER_ALICE));
+    assertNull(secretManager.getSecret(USER_ALICE));
+    OzoneSecurityException exception = assertThrows(OzoneSecurityException.class,
+        () -> secretManager.getSecretString(USER_ALICE));
+    assertEquals(S3_SECRET_NOT_FOUND, exception.getResult());
   }
 
   @Test
@@ -615,6 +753,24 @@ public class TestS3GetSecretRequest {
     }
     return null;
 
+  }
+
+  private static OMRequest revokeSecretRequest(String accessId) {
+    return OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeS3Secret)
+        .setRevokeS3SecretRequest(OzoneManagerProtocolProtos.RevokeS3SecretRequest.newBuilder().setKerberosID(accessId))
+        .build();
+  }
+
+  /** Applies the request and commits its response to the DB, as the double buffer does. */
+  private OMClientResponse applyAndFlush(OMClientRequest request, long index) throws IOException {
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, index);
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+    return response;
   }
 
   private void processFailedSecretRequest(String userPrincipalId)

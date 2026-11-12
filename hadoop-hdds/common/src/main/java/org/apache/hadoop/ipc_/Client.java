@@ -97,6 +97,14 @@ public class Client implements AutoCloseable {
     retryCount.set(rc);
   }
 
+  /**
+   * Clear a call id and retry count set for the next call but never consumed by a {@link Call}.
+   */
+  public static void clearCallIdAndRetryCount() {
+    callId.remove();
+    retryCount.remove();
+  }
+
   private final ConcurrentMap<ConnectionId, Connection> connections =
       new ConcurrentHashMap<>();
   private final Object putLock = new Object();
@@ -217,6 +225,33 @@ public class Client implements AutoCloseable {
 
   Call createCall(RPC.RpcKind rpcKind, Writable rpcRequest) {
     return new Call(rpcKind, rpcRequest);
+  }
+
+  /**
+   * Returns a local address of {@code host} to bind the client socket to, in the address family of
+   * {@code server}, or null if there is none. On a dual-stack host the first address of the host can be
+   * of the other family, and binding to it would make the connection fail.
+   */
+  static InetAddress getLocalBindAddress(String host, InetAddress server) throws SocketException {
+    InetAddress localAddr = NetUtils.getLocalInetAddress(host);
+    if (localAddr == null || localAddr.getClass() == server.getClass()) {
+      return localAddr;
+    }
+    try {
+      return getLocalAddressOfFamily(InetAddress.getAllByName(host), server);
+    } catch (UnknownHostException e) {
+      return null;
+    }
+  }
+
+  /** Returns the first local address in {@code candidates} in the address family of {@code server}. */
+  static InetAddress getLocalAddressOfFamily(InetAddress[] candidates, InetAddress server) throws SocketException {
+    for (InetAddress candidate : candidates) {
+      if (candidate.getClass() == server.getClass() && NetworkInterface.getByInetAddress(candidate) != null) {
+        return candidate;
+      }
+    }
+    return null;
   }
 
   /** 
@@ -592,13 +627,13 @@ public class Client implements AutoCloseable {
               String principal = ticket.getUserName();
               String host = SecurityUtil.getHostFromPrincipal(principal);
               // If host name is a valid local address then bind socket to it
-              InetAddress localAddr = NetUtils.getLocalInetAddress(host);
+              InetAddress localAddr = getLocalBindAddress(host, server.getAddress());
               if (localAddr != null) {
                 this.socket.setReuseAddress(true);
                 InetAddress bindTo = bindToWildCardAddress ? null : localAddr;
                 LOG.debug("Binding {} to {}", principal,
                     (bindToWildCardAddress) ? "0.0.0.0" : localAddr);
-                this.socket.bind(new InetSocketAddress(localAddr, 0));
+                this.socket.bind(new InetSocketAddress(bindTo, 0));
               }
             }
           }
