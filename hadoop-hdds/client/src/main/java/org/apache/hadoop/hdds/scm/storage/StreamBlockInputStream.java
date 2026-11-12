@@ -102,16 +102,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final Set<DatanodeID> failedStreamingDatanodes = ConcurrentHashMap.newKeySet();
 
   public StreamBlockInputStream(
-      BlockID blockID, long length, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token,
-      XceiverClientFactory xceiverClientFactory,
-      Function<BlockID, BlockLocationInfo> refreshFunction,
-      OzoneClientConfig config) throws IOException {
-    this(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(length).build(),
-        pipeline, token, xceiverClientFactory, refreshFunction, config);
-  }
-
-  public StreamBlockInputStream(
       BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
@@ -384,6 +374,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private synchronized void closeReader(String reason) {
     readBuffer = null;
+    // Requested-but-unreceived data dies with the stream; a fresh stream must re-request from position.
+    requestedLength = position;
     if (streamingReader == null) {
       return;
     }
@@ -454,8 +446,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     while (needUpdateBlockLength) {
       try {
         acquireClient();
-        blockLength = ContainerProtocolCalls.getBlock(xceiverClient, blockID, tokenRef.get(), pipelineRef.get())
-            .getBlockData().getSize();
+        blockLength = getBlockDataUsingGRPCClient(xceiverClient, pipelineRef.get(), tokenRef.get()).getSize();
         needUpdateBlockLength = false;
         retries = 0;
         LOG.debug("{}: Updated block length to {} for block {}", name, blockLength, blockID);

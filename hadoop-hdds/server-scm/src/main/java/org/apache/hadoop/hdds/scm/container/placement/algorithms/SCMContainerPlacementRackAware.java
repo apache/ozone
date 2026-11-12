@@ -465,6 +465,7 @@ public final class SCMContainerPlacementRackAware
       steps.add(new Step(null, 0, true));
     }
 
+    boolean outOfRetries = false;
     for (Step step : steps) {
       int retries = MAX_RETRY;
       while (retries > 0) {
@@ -490,15 +491,16 @@ public final class SCMContainerPlacementRackAware
         }
         retries--;
       }
-      // Decommissioned and maintenance nodes stay in the topology, so a rack can use up all its tries on them.
-      // If that happens on an affinity node's rack, move on to the next place. Anywhere else, give up.
-      if (retries == 0 && step.affinityNode == null) {
-        String errMsg = "No writable datanode with enough space was found. "
-            + "metadata size required: " + metadataSizeRequired +
-            " data size required: " + dataSizeRequired;
-        LOG.info(errMsg);
-        throw new SCMException(errMsg, null);
-      }
+      // Decommissioned and maintenance nodes stay in the topology, so a place can use up all its tries on them,
+      // e.g. the only other rack while a whole rack is being decommissioned. Then move on to the next place.
+      outOfRetries |= retries == 0;
+    }
+    if (outOfRetries) {
+      String errMsg = "No writable datanode with enough space was found. "
+          + "metadata size required: " + metadataSizeRequired +
+          " data size required: " + dataSizeRequired;
+      LOG.info(errMsg);
+      throw new SCMException(errMsg, null);
     }
     throw new SCMException("No satisfied datanode to meet the excludedNodes and affinityNode constrains.", null);
   }

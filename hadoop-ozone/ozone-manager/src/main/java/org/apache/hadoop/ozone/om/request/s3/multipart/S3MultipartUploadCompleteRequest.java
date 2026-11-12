@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -124,17 +123,23 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         super.preExecute(ozoneManager).getCompleteMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
-    if (keyArgs.hasExcludedETag()) {
-      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
-    }
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
 
     KeyArgs newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath).build();
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,
-        ozoneManager, ACLType.WRITE);
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs, ozoneManager, ACLType.WRITE);
+    } catch (IOException ex) {
+      Map<String, String> auditMap = buildKeyArgsAuditMap(newKeyArgs);
+      auditMap.put(OzoneConsts.UPLOAD_ID, newKeyArgs.getMultipartUploadID());
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
+          OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
 
     return getOmRequest().toBuilder().setCompleteMultiPartUploadRequest(
         multipartUploadCompleteRequest.toBuilder().setKeyArgs(
@@ -186,6 +191,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       // parts are validated, so a complete that fails with INVALID_PART must not leak it.
       OmBucketInfo omBucketInfo = getBucketInfoForUpdate(omMetadataManager,
           volumeName, bucketName);
+      // Before the cache updates below, and before getDBOzoneKey, which cannot resolve a path through a file.
+      checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName, omMetadataManager);
 
       List<OmDirectoryInfo> missingParentInfos;
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
@@ -266,11 +273,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       String dbOzoneKey =
           getDBOzoneKey(omMetadataManager, volumeName, bucketName, keyName);
 
-      // Check for directory exists with same name for the LEGACY_FS,
-      // if it exists throw error.
-      checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName,
-          omMetadataManager);
-
       if (multipartKeyInfo == null) {
         throw new OMException(
             failureMessage(requestedVolume, requestedBucket, keyName),
@@ -320,7 +322,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         OmKeyInfo omKeyInfo =
             getOmKeyInfo(trxnLogIndex, keyArgs, volumeName,
                 bucketName, keyName, dbMultipartOpenKey, omMetadataManager,
-                dbOzoneKey, partKeyInfoMap, partLocationInfos, dataSize);
+                dbOzoneKey, partKeyInfoMap, partsList, partLocationInfos, dataSize);
 
         long usedBytesDiff = 0;
         //Find all unused parts.
@@ -493,6 +495,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       KeyArgs keyArgs, String volumeName, String bucketName, String keyName,
       String multipartOpenKey, OMMetadataManager omMetadataManager,
       String ozoneKey, OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap,
+      List<OzoneManagerProtocolProtos.Part> partsList,
       List<OmKeyLocationInfo> partLocationInfos, long dataSize)
           throws IOException {
     OzoneManagerProtocolProtos.KeyInfo partKeyInfo =
@@ -523,7 +526,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .setOmKeyLocationInfos(
               Collections.singletonList(keyLocationInfoGroup))
           .addMetadata(OzoneConsts.ETAG,
-              multipartUploadedKeyHash(partKeyInfoMap))
+              multipartUploadedKeyHash(partKeyInfoMap, partsList))
           .setOwnerName(keyArgs.getOwnerName());
     } else {
       OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
@@ -545,7 +548,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
-      final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
+      final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap, partsList);
       builder = omKeyInfo.toBuilder();
       if (dbOpenKeyInfo.getMetadata() != null) {
         // make modifiable because ETAG needs to be added
@@ -803,9 +806,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   private String multipartUploadedKeyHash(
-      OmMultipartKeyInfo.PartKeyInfoMap partsList) {
+      OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap, List<OzoneManagerProtocolProtos.Part> partsList) {
     StringBuffer keysConcatenated = new StringBuffer();
-    for (PartKeyInfo partKeyInfo: partsList) {
+    for (OzoneManagerProtocolProtos.Part part : partsList) {
+      PartKeyInfo partKeyInfo = partKeyInfoMap.get(part.getPartNumber());
       String partPropertyToComputeHash = KeyValueUtil.getFromProtobuf(partKeyInfo.getPartKeyInfo().getMetadataList())
           .get(OzoneConsts.ETAG);
       if (partPropertyToComputeHash == null) {

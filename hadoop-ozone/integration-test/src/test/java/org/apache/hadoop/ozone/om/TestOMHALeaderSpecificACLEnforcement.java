@@ -148,6 +148,8 @@ public class TestOMHALeaderSpecificACLEnforcement {
     
     // Step 4: Force leadership transfer to another OM node
     OzoneManager newLeader = cluster.transferOMLeadershipToAnotherNode(currentLeader);
+    assertEquals(NUM_OF_OMS, cluster.getOzoneManagersList().size(),
+        "Leadership transfer must preserve the cluster's OM list");
     assertNotEquals(leaderNodeId, newLeader.getOMNodeId(), 
         "Leadership should have transferred to a different node");
     

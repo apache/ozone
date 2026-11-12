@@ -189,40 +189,40 @@ class TestOzoneManagerDoubleBuffer {
             1L, 2L, 1L, 2L, 2L, 2.0F),
         Arguments.of(Arrays.asList(omSnapshotCreateResponse1,
                 omSnapshotCreateResponse2),
-            2L, 2L, 3L, 4L, 1L, 1.333F),
+            2L, 2L, 2L, 2L, 1L, 1.0F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omBucketCreateResponse,
                 omSnapshotCreateResponse1,
                 omSnapshotCreateResponse2),
-            3L, 4L, 6L, 8L, 2L, 1.333F),
+            3L, 4L, 3L, 4L, 2L, 1.333F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omSnapshotCreateResponse1,
                 omBucketCreateResponse,
                 omSnapshotCreateResponse2),
-            4L, 4L, 10L, 12L, 1L, 1.200F),
+            4L, 4L, 4L, 4L, 1L, 1.0F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omSnapshotCreateResponse1,
                 omSnapshotCreateResponse2,
                 omBucketCreateResponse),
-            4L, 4L, 14L, 16L, 1L, 1.142F),
+            4L, 4L, 4L, 4L, 1L, 1.0F),
         Arguments.of(Arrays.asList(omSnapshotPurgeResponse1,
                 omSnapshotPurgeResponse2),
-            2L, 2L, 16L, 18L, 1L, 1.125F),
+            2L, 2L, 2L, 2L, 1L, 1.0F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omBucketCreateResponse,
                 omSnapshotPurgeResponse1,
                 omSnapshotPurgeResponse2),
-            3L, 4L, 19L, 22L, 2L, 1.157F),
+            3L, 4L, 3L, 4L, 2L, 1.333F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omSnapshotPurgeResponse1,
                 omBucketCreateResponse,
                 omSnapshotPurgeResponse2),
-            4L, 4L, 23L, 26L, 1L, 1.1300F),
+            4L, 4L, 4L, 4L, 1L, 1.0F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omSnapshotPurgeResponse1,
                 omSnapshotPurgeResponse2,
                 omBucketCreateResponse),
-            4L, 4L, 27L, 30L, 1L, 1.111F),
+            4L, 4L, 4L, 4L, 1L, 1.0F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omBucketCreateResponse,
                 omSnapshotPurgeResponse1,
@@ -230,7 +230,7 @@ class TestOzoneManagerDoubleBuffer {
                 omSnapshotPurgeResponse2,
                 omBucketCreateResponse,
                 omSnapshotCreateResponse2),
-            6L, 7L, 33L, 37L, 2L, 1.121F)
+            6L, 7L, 6L, 7L, 2L, 1.167F)
 
         );
   }
@@ -242,9 +242,7 @@ class TestOzoneManagerDoubleBuffer {
    * @param expectedFlushCounts, Total flush count per OzoneManagerDoubleBuffer.
    * @param expectedFlushedTransactionCount, Total transaction count per
    *                                         OzoneManagerDoubleBuffer.
-   * @param expectedFlushCountsInMetric, Overall flush count, and it is not
-   *                                     same as expectedFlushCounts because
-   *                                     metric static and shared object.
+   * @param expectedFlushCountsInMetric, Total flush count in the metrics for this double buffer.
    * @param expectedFlushedTransactionCountInMetric, Overall transaction count.
    * @param expectedMaxNumberOfTransactionsFlushedInMetric, Overall max
    *                                                        transaction count

@@ -37,10 +37,12 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -184,6 +186,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
+      Set<String> resolvedKeys = new HashSet<>();
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
@@ -224,6 +227,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysAclCheckLatency);
           OzoneFileStatus fileStatus = getOzoneKeyStatus(
               ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
+          // Different FSO path spellings can resolve to the same entry. Release its quota only once.
+          if (!resolvedKeys.add(getBucketLayout().isFileSystemOptimized() ? omKeyInfo.getPath() : objectKey)) {
+            deleteKeys.remove(keyName);
+            continue;
+          }
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
               fileStatus);
           deleteKeysInfo.add(omKeyInfo);

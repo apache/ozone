@@ -53,8 +53,12 @@ import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -66,8 +70,20 @@ import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
+import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateRenewDelegationTokenRequest;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.SecretManager;
@@ -406,6 +422,85 @@ public class TestOzoneDelegationTokenSecretManager {
         .startsWith("rougeUser is not authorized to cancel the token"));
   }
 
+  /**
+   * A renew that was validated while the token existed must not restore the token when a cancel is applied first.
+   */
+  @Test
+  public void testRenewAppliedAfterCancelDoesNotRestoreToken() throws Exception {
+    Token<OzoneTokenIdentifier> token = createTokenForApply();
+    OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
+    long newExpiryTime = secretManager.renewToken(token, TEST_USER.toString());
+
+    OMClientResponse cancel = applyCancel(token, 1);
+    OMClientResponse renew = applyRenew(token, newExpiryTime, 2);
+    commitToDB(cancel, renew);
+
+    assertThat(cancel.getOMResponse().getStatus()).isEqualTo(Status.OK);
+    assertThat(renew.getOMResponse().getStatus()).isEqualTo(Status.TOKEN_ERROR_OTHER);
+    Table<OzoneTokenIdentifier, Long> table = om.getMetadataManager().getDelegationTokenTable();
+    assertThat(table.get(id)).isNull();
+    assertThat(table.getSkipCache(id)).isNull();
+    assertThrows(SecretManager.InvalidToken.class, () -> secretManager.retrievePassword(id));
+  }
+
+  /**
+   * The expired token remover deletes tokens outside Ratis, at a different time on each OM. A renew applied after
+   * such a removal, for example while a restarted OM catches up, must be applied as it is on the other OMs.
+   */
+  @Test
+  public void testRenewAppliedAfterRemovalOutsideRatisIsApplied() throws Exception {
+    Token<OzoneTokenIdentifier> token = createTokenForApply();
+    OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
+    long newExpiryTime = secretManager.renewToken(token, TEST_USER.toString());
+    Table<OzoneTokenIdentifier, Long> table = om.getMetadataManager().getDelegationTokenTable();
+    table.delete(id);
+    secretManager.stop();
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME, TOKEN_MAX_LIFETIME / 2, TOKEN_REMOVER_SCAN_INTERVAL);
+    secretManager.start(certificateClient);
+    mockRequestDependencies();
+
+    assertThat(applyRenew(token, newExpiryTime, 1).getOMResponse().getStatus()).isEqualTo(Status.OK);
+    assertThat(table.get(id)).isEqualTo(newExpiryTime);
+    assertThat(secretManager.retrievePassword(id)).isEqualTo(token.getPassword());
+  }
+
+  /**
+   * A renew applied with an earlier expiry than the stored one must not shorten the token's lifetime.
+   */
+  @Test
+  public void testRenewAppliedWithEarlierExpiryKeepsStoredExpiry() throws Exception {
+    Token<OzoneTokenIdentifier> token = createTokenForApply();
+    OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
+    Table<OzoneTokenIdentifier, Long> table = om.getMetadataManager().getDelegationTokenTable();
+    long earlier = table.get(id) + 1000;
+    long later = earlier + 1000;
+
+    assertThat(applyRenew(token, later, 1).getOMResponse().getStatus()).isEqualTo(Status.OK);
+    assertThat(table.get(id)).isEqualTo(later);
+    assertThat(applyRenew(token, earlier, 2).getOMResponse().getStatus()).isEqualTo(Status.OK);
+    assertThat(table.get(id)).isEqualTo(later);
+    assertThat(secretManager.retrievePassword(id)).isEqualTo(token.getPassword());
+  }
+
+  /**
+   * A renew never extends the stored expiry past the token's max date, even if the stored expiry was beyond it.
+   */
+  @Test
+  public void testRenewAppliedCapsExpiryAtMaxDate() throws Exception {
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME, expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
+    secretManager.start(certificateClient);
+    mockRequestDependencies();
+    Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER, TEST_USER, TEST_USER);
+    addToTokenStore(token);
+    OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
+    Table<OzoneTokenIdentifier, Long> table = om.getMetadataManager().getDelegationTokenTable();
+    assertThat(table.get(id)).isGreaterThan(id.getMaxDate());
+
+    long newExpiryTime = secretManager.renewToken(token, TEST_USER.toString());
+    assertThat(applyRenew(token, newExpiryTime, 1).getOMResponse().getStatus()).isEqualTo(Status.OK);
+    assertThat(table.get(id)).isEqualTo(newExpiryTime).isLessThanOrEqualTo(id.getMaxDate());
+  }
+
   @Test
   public void testVerifySignatureSuccess() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
@@ -550,5 +645,63 @@ public class TestOzoneDelegationTokenSecretManager {
         readProtoBuf(token.getIdentifier());
     long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
     om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
+  }
+
+  private void mockRequestDependencies() {
+    when(om.getDelegationTokenMgr()).thenReturn(secretManager);
+    when(om.getAuditLogger()).thenReturn(new AuditLogger(AuditLoggerType.OMLOGGER));
+  }
+
+  /**
+   * Creates a token whose renew interval is shorter than its max lifetime and stores it like an applied
+   * GetDelegationToken request does.
+   */
+  private Token<OzoneTokenIdentifier> createTokenForApply() throws IOException {
+    long renewInterval = TOKEN_MAX_LIFETIME / 2;
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME, renewInterval, TOKEN_REMOVER_SCAN_INTERVAL);
+    secretManager.start(certificateClient);
+    mockRequestDependencies();
+    Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER, TEST_USER, TEST_USER);
+    OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
+    long renewDate = secretManager.updateToken(token, id, renewInterval);
+    om.getMetadataManager().getDelegationTokenTable().put(id, renewDate);
+    return token;
+  }
+
+  private OMClientResponse applyCancel(Token<OzoneTokenIdentifier> token, long index) {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CancelDelegationToken)
+        .setClientId(UUID.randomUUID().toString())
+        .setCancelDelegationTokenRequest(CancelDelegationTokenRequestProto.newBuilder()
+            .setToken(OMPBHelper.protoFromToken(token)))
+        .build();
+    return new OMCancelDelegationTokenRequest(request).validateAndUpdateCache(om, index);
+  }
+
+  /**
+   * Applies a renew as the leader submits it, carrying the expiry the leader computed when it validated the renew.
+   */
+  private OMClientResponse applyRenew(Token<OzoneTokenIdentifier> token, long newExpiryTime, long index) {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.RenewDelegationToken)
+        .setClientId(UUID.randomUUID().toString())
+        .setUpdatedRenewDelegationTokenRequest(UpdateRenewDelegationTokenRequest.newBuilder()
+            .setRenewDelegationTokenRequest(RenewDelegationTokenRequestProto.newBuilder()
+                .setToken(OMPBHelper.protoFromToken(token)))
+            .setRenewDelegationTokenResponse(RenewDelegationTokenResponseProto.newBuilder()
+                .setResponse(SecurityProtos.RenewDelegationTokenResponseProto.newBuilder()
+                    .setNewExpiryTime(newExpiryTime))))
+        .build();
+    return new OMRenewDelegationTokenRequest(request).validateAndUpdateCache(om, index);
+  }
+
+  private void commitToDB(OMClientResponse... responses) throws IOException {
+    OMMetadataManager metadataManager = om.getMetadataManager();
+    try (BatchOperation batch = metadataManager.getStore().initBatchOperation()) {
+      for (OMClientResponse response : responses) {
+        response.checkAndUpdateDB(metadataManager, batch);
+      }
+      metadataManager.getStore().commitBatchOperation(batch);
+    }
   }
 }
