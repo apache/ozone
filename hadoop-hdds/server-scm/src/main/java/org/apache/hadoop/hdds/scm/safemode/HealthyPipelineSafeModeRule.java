@@ -132,18 +132,20 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected synchronized boolean validate() {
-    if (ratisThreeRuleEnabled) {
-      final boolean ratisThreePipelinesValid;
-      if (validateBasedOnReportProcessing()) {
-        ratisThreePipelinesValid = currentHealthyPipelineCount >= healthyPipelineThresholdCount;
-      } else {
-        ratisThreePipelinesValid = validateHealthyPipelineSafeModeRuleUsingPipelineManager();
-      }
-      if (!ratisThreePipelinesValid) {
-        return false;
-      }
+    return validateRatisThreePipelines() && getOpenPipelinesWithUnregisteredNodes(1).isEmpty();
+  }
+
+  /**
+   * @return True if the RATIS/THREE healthy pipeline threshold is met or disabled.
+   */
+  private synchronized boolean validateRatisThreePipelines() {
+    if (!ratisThreeRuleEnabled) {
+      return true;
     }
-    return getOpenPipelinesWithUnregisteredNodes(1).isEmpty();
+    if (validateBasedOnReportProcessing()) {
+      return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+    }
+    return validateHealthyPipelineSafeModeRuleUsingPipelineManager();
   }
 
   /**
@@ -181,7 +183,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
     // Skip already processed ones.
     if (processedPipelineIDs.contains(pipeline.getId())) {
-      LOG.info("Skipping pipeline safemode report processing check as pipeline: {} is already recorded.",
+      LOG.debug("Skipping pipeline safemode report processing check as pipeline: {} is already recorded.",
           pipeline.getId());
       return;
     }
@@ -237,7 +239,9 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     if (forceRefresh) {
       initializeRule(true);
     } else {
-      if (!validate()) {
+      // Only the RATIS/THREE threshold depends on the rule's initialized state. Open pipelines with unregistered
+      // datanodes are checked against the current pipelines on each validation.
+      if (!validateRatisThreePipelines()) {
         initializeRule(true);
       }
     }
