@@ -749,7 +749,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         .getContainerBlockID();
     final ContainerBlockID block = BlockID.getFromProtobuf(request.getPutBlock().getBlockData().getBlockID())
         .getContainerBlockID();
-    if (request.getContainerID() != streamInit.getContainerID() || !block.equals(streamBlock)) {
+    if (!(request.getContainerID() == streamInit.getContainerID() && block.equals(streamBlock))) {
       throw new StorageContainerException("PutBlock for " + block + " in container " + request.getContainerID()
           + " does not match the stream block " + streamBlock, ContainerProtos.Result.MALFORMED_REQUEST);
     }
