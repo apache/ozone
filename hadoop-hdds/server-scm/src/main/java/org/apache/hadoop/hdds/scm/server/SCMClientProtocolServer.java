@@ -93,6 +93,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -418,6 +419,27 @@ public class SCMClientProtocolServer implements
         Collections.singletonMap("containerIDs", strContainerIDs.toString())));
 
     return cpList;
+  }
+
+  @Override
+  public List<ContainerInfo> getExistingContainersInBatch(List<Long> containerIDs) throws IOException {
+    Map<String, String> auditMap = Collections.singletonMap("containerIDs", containerIDs.toString());
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), true);
+      List<ContainerInfo> containers = new ArrayList<>();
+      for (Long containerID : containerIDs) {
+        try {
+          containers.add(scm.getContainerManager().getContainer(ContainerID.valueOf(containerID)));
+        } catch (ContainerNotFoundException ex) {
+          LOG.debug("Container {} no longer exists in SCM.", containerID);
+        }
+      }
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.GET_CONTAINER_BATCH, auditMap));
+      return containers;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_CONTAINER_BATCH, auditMap, ex));
+      throw ex;
+    }
   }
 
   @Override
@@ -1441,11 +1463,15 @@ public class SCMClientProtocolServer implements
       // get datanodes by ip or uuid
       List<DatanodeDetails> nodes = new ArrayList<>();
       if (!Strings.isNullOrEmpty(uuid)) {
-        nodes.add(scm.getScmNodeManager().getNode(DatanodeID.fromUuidString(uuid)));
+        DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.fromUuidString(uuid));
+        if (node == null) {
+          throw new NonRetriableException("Datanode " + uuid + " not found");
+        }
+        nodes.add(node);
       } else if (!Strings.isNullOrEmpty(address)) {
         nodes = scm.getScmNodeManager().getNodesByAddress(address);
       } else {
-        throw new IOException(
+        throw new NonRetriableException(
             "Could not get datanode with the specified parameters."
         );
       }

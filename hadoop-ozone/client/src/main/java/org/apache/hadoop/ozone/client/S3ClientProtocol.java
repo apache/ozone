@@ -369,13 +369,13 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive) throws IOException {
-    delegate.deleteKey(volumeName, bucketName, keyName, recursive);
+    delegate.deleteKey(resolveVolumeName(volumeName), bucketName, keyName, recursive);
   }
 
   @Override
   public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive, String expectedETag)
       throws IOException {
-    delegate.deleteKey(volumeName, bucketName, keyName, recursive, expectedETag);
+    delegate.deleteKey(resolveVolumeName(volumeName), bucketName, keyName, recursive, expectedETag);
   }
 
   @Override
@@ -392,6 +392,12 @@ final class S3ClientProtocol implements ClientProtocol {
   @Override
   public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName) throws IOException {
     delegate.renameKey(volumeName, bucketName, fromKeyName, toKeyName);
+  }
+
+  @Override
+  public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName,
+      boolean requireFileSystemOptimized) throws IOException {
+    delegate.renameKey(volumeName, bucketName, fromKeyName, toKeyName, requireFileSystemOptimized);
   }
 
   @Override
@@ -911,7 +917,7 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    delegate.deleteObjectTagging(volumeName, bucketName, keyName);
+    delegate.deleteObjectTagging(resolveVolumeName(volumeName), bucketName, keyName);
   }
 
   @Override

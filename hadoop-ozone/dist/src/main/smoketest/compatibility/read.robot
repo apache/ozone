@@ -187,9 +187,15 @@ Snapshots Can Be Diffed
 
     # old client does not support --get-report
     # The snapshot diff command should return the report, submitting a job if necessary.
-    ${output} =    Wait For Snapshot diff  ${FSO_BUCKET}  ${SNAPSHOT1}  ${SNAPSHOT2}  ${SNAPSHOT_KEY1}
-    # Legacy Snapshot Diff Report Omits Dependency Metadata
-    Should Not Contain    ${output}    Report is dependency
+    Wait For Snapshot diff  ${FSO_BUCKET}  ${SNAPSHOT1}  ${SNAPSHOT2}  ${SNAPSHOT_KEY1}
+
+Legacy Client Can Read --ordered Snapshot Diff
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'    Cluster does not support snapshots
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Client does not support snapshots
+    Pass Execution If    '${CLIENT_VERSION}' >= '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Tested elsewhere with --get-report
+    Pass Execution If    '${DATA_VERSION}' < '${SNAPSHOT_DIFF_ORDERED_VERSION}'    Skipped write test case
+
+    Wait For Snapshot diff  ${FSO_BUCKET}  ${SNAPSHOT1}  ${SNAPSHOT3}  ${SNAPSHOT_KEY1}  ${SNAPSHOT_KEY2}
 
 Can --get-report of Snapshot Diff
     Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'    Cluster does not support snapshots
@@ -203,4 +209,7 @@ Can --get-report of --ordered Snapshot Diff
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client does not support snapshot diff --get-report
     Pass Execution If    '${DATA_VERSION}' < '${SNAPSHOT_DIFF_ORDERED_VERSION}'    Skipped write test case
 
-    Wait For Snapshot diff --get-report  ${FSO_BUCKET}  ${SNAPSHOT1}  ${SNAPSHOT3}  ${SNAPSHOT_KEY1}  ${SNAPSHOT_KEY2}
+    ${output} =    Wait For Snapshot diff --get-report  ${FSO_BUCKET}  ${SNAPSHOT1}  ${SNAPSHOT3}  ${SNAPSHOT_KEY1}  ${SNAPSHOT_KEY2}
+    IF    '${CLUSTER_VERSION}' >= '${SNAPSHOT_DIFF_ORDERED_VERSION}' and '${CLIENT_VERSION}' >= '${SNAPSHOT_DIFF_ORDERED_VERSION}'
+        Should Contain    ${output}    Report is dependency ordered
+    END

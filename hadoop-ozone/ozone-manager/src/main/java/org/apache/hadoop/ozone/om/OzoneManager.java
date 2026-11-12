@@ -61,8 +61,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
@@ -319,6 +317,7 @@ import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleServiceConfig;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
@@ -434,6 +433,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private OmConfig config;
+  private KeyLifecycleServiceConfig keyLifecycleServiceConfig;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
@@ -565,13 +565,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Objects.requireNonNull(conf, "conf == null");
-    setConfiguration(conf);
     TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
     TracingReconfigurationCallback tracingReconfigurationCallback =
         TracingReconfigurationCallback.init("OzoneManager", tracingConfig);
     // Load HA related configurations
-    OMHANodeDetails omhaNodeDetails =
-        OMHANodeDetails.loadOMHAConfig(configuration);
+    OMHANodeDetails omhaNodeDetails = OMHANodeDetails.loadOMHAConfig(conf);
+    setConfiguration(conf);
 
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
@@ -596,9 +595,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_BLACKLIST_GROUPS, this::reconfOzoneBlacklistGroups)
             .register(OZONE_READ_BLACKLIST_USERS, this::reconfOzoneReadBlacklistUsers)
             .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
-    KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES.forEach(property ->
-        reconfigurationHandler.register(property, newVal -> validateKeyLifecycleProperty(property, newVal)));
-    reconfigurationHandler.registerCompleteCallback(this::reconfKeyLifecycleService);
+    reconfigurationHandler.register(keyLifecycleServiceConfig)
+        .registerCompleteCallback(this::reconfKeyLifecycleService);
 
     // Allow dynamic SCM node/address reconfiguration without restarting OM.
     // Address keys use prefix matching to discover new nodes added after startup.
@@ -1160,7 +1158,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     updateActiveSnapshotMetrics();
 
     if (withNewSnapshot) {
-      versionManager.finalizeFromSnapshotIfRequired(metadataManager.getMetaTable());
+      versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
     }
   }
 
@@ -1586,7 +1584,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(conf, omNodeRpcAddr, omService,
+    return startRpcServer(conf, config.getRpcBindAddress(omNodeRpcAddr), omService,
         omInterService, omAdminService, reconfigureService);
   }
 
@@ -3709,8 +3707,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     KeyLifecycleService keyLifecycleService = keyManager.getKeyLifecycleService();
     if (keyLifecycleService == null) {
       return GetLifecycleServiceStatusResponse.newBuilder()
-          .setIsEnabled(getConfiguration().getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
-              OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT))
+          .setIsEnabled(keyLifecycleServiceConfig.isEnabled())
           .build();
     }
     return keyLifecycleService.status();
@@ -4718,6 +4715,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       termIndex = installCheckpoint(leaderId, checkpointLocation);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
+      throw new IOException("Failed to install snapshot from Leader " + leaderId, ex);
     } finally {
       cleanupCheckpoint(omDBCheckpoint);
     }
@@ -4774,6 +4772,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long startTime = Time.monotonicNow();
     File oldDBLocation = metadataManager.getStore().getDbLocation();
     Path omDbPath = Paths.get(checkpointLocation.toString(), OM_DB_NAME);
+    IOException installFailure = null;
     try {
       // Stop Background services
       keyManager.stop();
@@ -4783,20 +4782,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Pause the State Machine. It flushes the transactions already applied and rejects new ones until unpause.
       omRatisServer.getOmStateMachine().pause();
     } catch (Exception e) {
-      LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
-          "installing the new checkpoint.");
       // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
       startSecretManagerIfNecessary();
       startTrashEmptier(configuration);
-      throw e;
+      throw new IOException("Failed to install checkpoint " + checkpointTrxnInfo + ": Cannot stop/pause services.", e);
     }
-
     File dbBackup = null;
     TermIndex termIndex = omRatisServer.getLastAppliedTermIndex();
     long term = termIndex.getTerm();
     long lastAppliedIndex = termIndex.getIndex();
-
     // Check if current applied log index is smaller than the downloaded
     // checkpoint transaction index. If yes, proceed by stopping the ratis
     // server so that the OM state can be re-initialized. If no then do not
@@ -4838,6 +4833,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.error("Failed to install Snapshot from {} as OM failed to replace" +
             " DB with downloaded checkpoint. Reloading old OM state.",
             leaderId, e);
+        installFailure = new IOException("Failed to install checkpoint " + checkpointTrxnInfo
+            + ": Cannot replace DB.", e);
       }
     } else {
       LOG.warn("Cannot proceed with InstallSnapshot as OM is at TermIndex {} " +
@@ -4905,13 +4902,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to delete the backup of the original DB {}",
           dbBackup, e);
     }
-
+    if (installFailure != null) {
+      throw installFailure;
+    }
     if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
-      // Install Snapshot failed and old state was reloaded. Return null to
-      // Ratis to indicate that installation failed.
+      // An older checkpoint was skipped. Return null to Ratis to indicate that no snapshot was installed.
       return null;
     }
-
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
     TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
@@ -5158,10 +5155,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return config;
   }
 
+  public KeyLifecycleServiceConfig getKeyLifecycleServiceConfig() {
+    return keyLifecycleServiceConfig;
+  }
+
   @VisibleForTesting
   public void setConfiguration(OzoneConfiguration conf) {
     this.configuration = conf;
     config = conf.getObject(OmConfig.class);
+    keyLifecycleServiceConfig = conf.getObject(KeyLifecycleServiceConfig.class);
   }
 
   public OzoneConfiguration reloadConfiguration() {
@@ -6294,43 +6296,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return newVal;
   }
 
-  private String validateKeyLifecycleProperty(String property, String newVal) {
-    OzoneConfiguration newConf = new OzoneConfiguration(getConfiguration());
-    if (newVal == null) {
-      newConf.unset(property);
-    } else {
-      newConf.set(property, newVal);
-    }
-    KeyLifecycleService.validate(newConf);
-    return newVal;
-  }
-
   /**
    * Apply all changed KeyLifecycleService properties at once, after each of them is validated and stored
-   * in the OM configuration.
+   * in {@link KeyLifecycleServiceConfig}.
    */
   private void reconfKeyLifecycleService(Map<String, Boolean> changedKeys, Configuration newConf) {
     KeyLifecycleService keyLifecycleService = getKeyManager().getKeyLifecycleService();
     // If the service is not running, the new values are picked up from the configuration when it is started.
     if (keyLifecycleService != null
-        && changedKeys.keySet().stream().anyMatch(KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES::contains)) {
-      keyLifecycleService.reconfigure(getConfiguration());
+        && changedKeys.keySet().stream().anyMatch(keyLifecycleServiceConfig.reconfigurableProperties()::contains)) {
+      keyLifecycleService.reconfigure(keyLifecycleServiceConfig);
     }
   }
 
   private String reconfOzoneSnapshotSSTFilteringServiceInterval(String newVal) {
-    boolean wasSstFilteringSvcEnabled = ((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled();
     getConfiguration().set(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
 
     if (this.isFilesystemSnapshotEnabled()) {
-      if (wasSstFilteringSvcEnabled) {
-        // Sanity check
-        Objects.requireNonNull(keyManager.getSnapshotSstFilteringService(),
-            "sstFilteringService should not be null when SST filtering service is enabled.");
-        ((KeyManagerImpl) keyManager).stopSnapshotSstFilteringService();
-      }
-      // Note startSnapshotSstFilteringService checks whether the config is set to a value that enables the service
-      ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
+      keyManager.restartSnapshotSstFilteringService(getConfiguration());
     } else {
       LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);
@@ -6371,6 +6354,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
   }
 
+  /**
+   * Test hook that lets a test make this OM reject a feature it supports, by listing the feature in
+   * {@link OMConfigKeys#OZONE_OM_FEATURES_DISABLED}.
+   * <p>
+   * This is not a version gate: it reads only the config, not the OM version.
+   * New features do not need to call it; add a call only for a feature that a test disables.
+   */
   public void checkFeatureEnabled(OzoneManagerVersion feature) throws OMException {
     String disabledFeatures = configuration.get(OMConfigKeys.OZONE_OM_FEATURES_DISABLED, "");
     if (disabledFeatures.contains(feature.name())) {
