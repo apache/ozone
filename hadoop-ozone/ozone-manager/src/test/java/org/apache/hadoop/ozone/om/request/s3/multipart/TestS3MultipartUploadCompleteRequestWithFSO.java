@@ -174,6 +174,8 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
     assertEquals(OzoneManagerProtocolProtos.Status.NOT_A_FILE, response.getOMResponse().getStatus());
     assertEquals(openKeyInfo, omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
+    assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(omMetadataManager.getMultipartKey(volumeId, bucketId, bucketId, "b", uploadId)));
   }
 
   @Test

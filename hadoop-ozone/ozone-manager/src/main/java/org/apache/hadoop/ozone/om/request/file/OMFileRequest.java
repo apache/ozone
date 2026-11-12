@@ -161,7 +161,8 @@ public final class OMFileRequest {
    * @param keyName           key name
    * @param isOverWrite       flag represents whether file can be overwritten
    * @param omDirectoryResult directory result
-   * @throws OMException if file or directory or file exists in the given path
+   * @throws OMException NOT_A_FILE if a directory exists at the key or a file exists in its parent path,
+   *     FILE_ALREADY_EXISTS if a file exists at the key and isOverWrite is false
    */
   public static void checkDirectoryResult(String keyName, boolean isOverWrite,
       OMDirectoryResult omDirectoryResult) throws OMException {
