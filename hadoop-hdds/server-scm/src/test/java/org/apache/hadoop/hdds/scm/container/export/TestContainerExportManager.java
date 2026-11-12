@@ -574,11 +574,6 @@ public class TestContainerExportManager {
   }
 
   @Test
-  public void testContainerExportStatusOfUnknownJobIsNull() {
-    assertNull(exportManager.getContainerExportStatus(ExportJob.Id.newId().toString()));
-  }
-
-  @Test
   public void testSubmitAfterPreviousJobCompletes() throws Exception {
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))

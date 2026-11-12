@@ -23,9 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
@@ -47,16 +52,22 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistingContainersInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SubmitContainerIdExportRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -155,6 +166,83 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
         .build();
 
     assertThrows(ServiceException.class, () -> service.submitRequest(null, request));
+  }
+
+  @Test
+  void testSubmitContainerIdExportRoundTrip() throws Exception {
+    when(impl.submitContainerIdExport(any(), any(), any(), anyLong(), anyInt(), anyInt())).thenReturn("job-1");
+    StorageContainerLocationProtocolClientSideTranslatorPB client = metadataClient();
+
+    assertEquals("job-1", client.submitContainerIdExport(
+        ContainerID.valueOf(7), LifeCycleState.CLOSED, ContainerHealthState.MISSING, 1000, 20, 30));
+    verify(impl).submitContainerIdExport(
+        ContainerID.valueOf(7), LifeCycleState.CLOSED, ContainerHealthState.MISSING, 1000, 20, 30);
+
+    // Every optional argument left out reaches the server as null / 0.
+    client.submitContainerIdExport(null, null, ContainerHealthState.EMPTY, 0, 0, 0);
+    verify(impl).submitContainerIdExport(isNull(), isNull(), eq(ContainerHealthState.EMPTY), eq(0L), eq(0), eq(0));
+  }
+
+  @Test
+  void testSubmitContainerIdExportRejectsUnknownHealthStateWithoutRetry() throws Exception {
+    StorageContainerLocationProtocolClientSideTranslatorPB client = metadataClient();
+    SubmitContainerIdExportRequestProto bad = SubmitContainerIdExportRequestProto.newBuilder()
+        .setHealthState("NOT_A_STATE").build();
+    ScmContainerLocationRequest request = ScmContainerLocationRequest.newBuilder()
+        .setCmdType(Type.SubmitContainerIdExport)
+        .setVersion(ClientVersion.CURRENT.serialize())
+        .setSubmitContainerIdExportRequest(bad)
+        .build();
+
+    ServiceException e = assertThrows(ServiceException.class, () -> service.submitRequest(null, request));
+    assertThat(e.getCause()).isInstanceOf(NonRetriableException.class);
+    assertThat(e.getCause().getMessage()).contains("NOT_A_STATE");
+    verify(impl, never()).submitContainerIdExport(any(), any(), any(), anyLong(), anyInt(), anyInt());
+    assertThat(client).isNotNull();
+  }
+
+  @Test
+  void testGetContainerIdExportStatusRoundTrip() throws Exception {
+    GetContainerIdExportStatusResponseProto succeeded = GetContainerIdExportStatusResponseProto.newBuilder()
+        .setJobId("job-1")
+        .setState(GetContainerIdExportStatusResponseProto.ExecutionState.SUCCEEDED)
+        .setLifecycleState(LifeCycleState.OPEN)
+        .setHealthState(ContainerHealthState.UNDER_REPLICATED.name())
+        .setMaxRows(5).setBatchSize(2).setPartSize(3)
+        .setIdsWritten(4).setElapsedMs(1234)
+        .setTarPath("/data/exports/job-1.tar.gz")
+        .build();
+    GetContainerIdExportStatusResponseProto failed = GetContainerIdExportStatusResponseProto.newBuilder()
+        .setJobId("job-2")
+        .setState(GetContainerIdExportStatusResponseProto.ExecutionState.FAILED)
+        .setHealthState(ContainerHealthState.MISSING.name())
+        .setErrorMessage("SCM lost leadership")
+        .build();
+    when(impl.getContainerIdExportStatus("job-1")).thenReturn(succeeded);
+    when(impl.getContainerIdExportStatus("job-2")).thenReturn(failed);
+    StorageContainerLocationProtocolClientSideTranslatorPB client = metadataClient();
+
+    assertEquals(succeeded, client.getContainerIdExportStatus("job-1"));
+    GetContainerIdExportStatusResponseProto actual = client.getContainerIdExportStatus("job-2");
+    assertEquals(failed, actual);
+    assertThat(actual.hasLifecycleState()).isFalse();
+    assertThat(actual.hasTarPath()).isFalse();
+  }
+
+  @Test
+  void testGetContainerIdExportStatusOfUnknownJobFailsWithoutRetry() throws Exception {
+    when(impl.getContainerIdExportStatus("gone")).thenThrow(new NonRetriableException("job not found: gone"));
+    ScmContainerLocationRequest request = ScmContainerLocationRequest.newBuilder()
+        .setCmdType(Type.GetContainerIdExportStatus)
+        .setVersion(ClientVersion.CURRENT.serialize())
+        .setGetContainerIdExportStatusRequest(
+            GetContainerIdExportStatusRequestProto.newBuilder().setJobId("gone"))
+        .build();
+
+    ServiceException e = assertThrows(ServiceException.class, () -> service.submitRequest(null, request));
+    // The wrapped type is what makes the client's retry policy give up at once.
+    assertThat(e.getCause()).isInstanceOf(NonRetriableException.class);
+    assertThat(e.getCause().getMessage()).contains("gone");
   }
 
   private StorageContainerLocationProtocolClientSideTranslatorPB metadataClient() throws Exception {
