@@ -26,7 +26,9 @@ on:
     paths:
       - 'pom.xml'
       - '**/pom.xml'
+      - '.github/actions/setup-java-with-cache/action.yml'
       - '.github/workflows/populate-cache.yml'
+      - '.mvn/extensions.xml'
   workflow_call:
   workflow_dispatch:
 
