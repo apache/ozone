@@ -156,8 +156,9 @@ public class ContainerExportManager {
     final ExportJob job = new ExportJob(scope, start, sizing);
     if (!runningJob.compareAndSet(null, job)) {
       // The running job may finish right after the failed compareAndSet, so the slot can already be empty here.
-      final ExportJob running = runningJob.get() == null ? null : runningJob.get();
-      throw new NonRetriableException("Another container ID export is already running: " + running);
+      final ExportJob running = runningJob.get();
+      throw new NonRetriableException("Another container ID export is already running"
+          + (running != null ? ": " + running.getId() : ""));
     }
 
     jobMap.put(job.getId(), job);
