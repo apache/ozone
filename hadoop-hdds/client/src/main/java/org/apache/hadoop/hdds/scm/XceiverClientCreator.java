@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
 /**
@@ -38,7 +37,6 @@ public class XceiverClientCreator implements XceiverClientFactory {
   private static ErrorInjector errorInjector;
 
   private final ConfigurationSource conf;
-  private final boolean topologyAwareRead;
   private final ClientTrustManager trustManager;
   private final boolean securityEnabled;
   private boolean shortCircuitEnabled;
@@ -51,9 +49,6 @@ public class XceiverClientCreator implements XceiverClientFactory {
   public XceiverClientCreator(ConfigurationSource conf, ClientTrustManager trustManager) {
     this.conf = conf;
     this.securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
-    topologyAwareRead = conf.getBoolean(
-        OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
-        OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
     this.trustManager = trustManager;
     if (securityEnabled) {
       Objects.requireNonNull(trustManager, "trustManager == null");
@@ -137,7 +132,7 @@ public class XceiverClientCreator implements XceiverClientFactory {
 
   @Override
   public void releaseClientForReadData(XceiverClientSpi xceiverClient, boolean invalidateClient) {
-    releaseClient(xceiverClient, invalidateClient, topologyAwareRead);
+    releaseClient(xceiverClient, invalidateClient, false);
   }
 
   @Override
