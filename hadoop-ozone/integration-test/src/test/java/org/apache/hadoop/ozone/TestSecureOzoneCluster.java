@@ -94,11 +94,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
+import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -292,6 +295,7 @@ class TestSecureOzoneCluster extends KerberosTests {
     assertScmIssuesCertificateOnlyToServiceUserOfRole();
     assertScmAdminProtocolDeniesNonAdminUser();
     assertScmAdminProtocolRejectsNonKerberosUser();
+    assertScmSecretKeyRotationRequiresAdmin();
     assertScmSecurityProtocolRequiresAdminForScmRoleCertificate();
 
     // Secure OM initialization against the shared SCM.
@@ -437,6 +441,34 @@ class TestSecureOzoneCluster extends KerberosTests {
         scmRpcClient::forceExitSafeMode);
     assertThat(adminException)
         .hasMessageContaining(CANNOT_AUTHENTICATE_MESSAGE);
+  }
+
+  /** SCM secret key protocol - rotation requires SCM admin access. */
+  private void assertScmSecretKeyRotationRequiresAdmin() throws Exception {
+    GenericTestUtils.waitFor(() -> scm.getSecretKeyManager().isInitialized(), 100, 10_000);
+    UserGroupInformation testUser = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+        getTestUserPrincipal(), getTestUserKeytab().getCanonicalPath());
+    UUID currentKeyId = scm.getSecretKeyManager().getCurrentSecretKey().getId();
+    try (SecretKeyProtocolClientSideTranslatorPB secretKeyClient = getSecretKeyClientForScm(testUser)) {
+      for (boolean force : new boolean[]{false, true}) {
+        IOException denied = assertThrows(IOException.class, () -> secretKeyClient.checkAndRotate(force));
+        assertThat(denied).hasMessageContaining("Access denied");
+        assertEquals(currentKeyId, scm.getSecretKeyManager().getCurrentSecretKey().getId());
+      }
+    }
+
+    UserGroupInformation scmUser = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+        conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY), conf.get(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY));
+    try (SecretKeyProtocolClientSideTranslatorPB secretKeyClient = getSecretKeyClientForScm(scmUser)) {
+      assertThat(secretKeyClient.checkAndRotate(true)).isTrue();
+      assertNotEquals(currentKeyId, scm.getSecretKeyManager().getCurrentSecretKey().getId());
+    }
+  }
+
+  private SecretKeyProtocolClientSideTranslatorPB getSecretKeyClientForScm(UserGroupInformation ugi) {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider<>(conf, ugi, SecretKeyProtocolScmPB.class),
+        SecretKeyProtocolScmPB.class);
   }
 
   /**

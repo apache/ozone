@@ -917,7 +917,7 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    delegate.deleteObjectTagging(volumeName, bucketName, keyName);
+    delegate.deleteObjectTagging(resolveVolumeName(volumeName), bucketName, keyName);
   }
 
   @Override

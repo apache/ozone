@@ -373,6 +373,13 @@ public final class OzoneManagerRatisUtils {
       break;
     case DeleteObjectTagging:
       keyArgs = omRequest.getDeleteObjectTaggingRequest().getKeyArgs();
+      if (omRequest.getAssumeS3Context()) {
+        // Resolve before choosing the bucket layout and write the resolved volume to Ratis.
+        keyArgs = keyArgs.toBuilder().setVolumeName(
+            ozoneManager.getS3VolumeContext().getOmVolumeArgs().getVolume()).build();
+        omRequest = omRequest.toBuilder().setDeleteObjectTaggingRequest(
+            omRequest.getDeleteObjectTaggingRequest().toBuilder().setKeyArgs(keyArgs)).build();
+      }
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;

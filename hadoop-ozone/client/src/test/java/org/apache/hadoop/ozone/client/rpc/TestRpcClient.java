@@ -750,7 +750,7 @@ public class TestRpcClient {
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
       names = {"LIST_STATUS_REJECTS_OBS", "S3_VOLUME_CONTEXT_RESOLUTION", "GET_KEY_INFO_REJECTS_OBS"})
-  void testGetObjectTaggingWithNullVolume(OzoneManagerVersion version) throws Exception {
+  void testObjectTaggingWithNullVolume(OzoneManagerVersion version) throws Exception {
     RpcClient client = createRpcClient();
     try {
       OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
@@ -759,15 +759,38 @@ public class TestRpcClient {
 
       if (OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version)) {
         client.getObjectTagging(null, "bucket", "key");
+        client.deleteObjectTagging(null, "bucket", "key");
 
         ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
         verify(om).getObjectTagging(args.capture());
         assertThat(args.getValue().isAssumeS3Context()).isTrue();
+        verify(om).deleteObjectTagging(args.capture());
+        assertThat(args.getValue().isAssumeS3Context()).isTrue();
+        assertThat(args.getValue().getVolumeName()).isEqualTo("s3v");
       } else {
         // An older OM would ignore assumeS3Context and look up the key in the default S3 volume.
         assertThrows(NullPointerException.class, () -> client.getObjectTagging(null, "bucket", "key"));
+        assertThrows(NullPointerException.class, () -> client.deleteObjectTagging(null, "bucket", "key"));
         verifyNoInteractions(om);
       }
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  void testDeleteObjectTaggingPreservesExplicitVolume() throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      client.deleteObjectTagging("s3v", "bucket", "key");
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      verify(om).deleteObjectTagging(args.capture());
+      assertThat(args.getValue().getVolumeName()).isEqualTo("s3v");
+      assertThat(args.getValue().isAssumeS3Context()).isFalse();
     } finally {
       client.close();
     }
