@@ -77,7 +77,7 @@ public enum TrailerHeader {
     } catch (IllegalArgumentException ignored) {
       // Invalid Base64 and incorrect decoded length are both malformed checksum values.
     }
-    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, resource);
+    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.MALFORMED_TRAILER_ERROR, resource);
     ex.setErrorMessage("Value for " + headerName + " header is invalid");
     throw ex;
   }

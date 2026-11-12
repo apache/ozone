@@ -387,7 +387,7 @@ public class TestPartUpload {
     String body = (content.isEmpty() ? "" : "f\r\n" + content + "\r\n")
         + "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n";
 
-    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+    assertErrorResponse(S3ErrorTable.INCOMPLETE_BODY,
         () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, body));
     assertNoParts(uploadID, keyName);
   }
