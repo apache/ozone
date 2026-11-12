@@ -343,11 +343,11 @@ public class TestSignedChunksInputStream {
         Arguments.of(TrailerHeader.CRC64NVME, "rosUhgp5mIg="),
         Arguments.of(TrailerHeader.SHA1, "98O8HYCOBHMq32eZZczDTKeuNEE="),
         Arguments.of(TrailerHeader.SHA256, "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="),
-        Arguments.of("SHA512",
+        Arguments.of(TrailerHeader.SHA512,
             "2eZ2LdHI6vbWGzxhkvxAjU1tXxF20MKRabwk5xw/J0rSf81YEbMT1oH35V7ALXPUmclUVba1u1A6z1dPuo/+hQ=="),
-        Arguments.of("XXHASH64", "jLhB20DmroM="),
-        Arguments.of("XXHASH3", "ctyxi2ehff8="),
-        Arguments.of("XXHASH128", "MxGUd+3l3NXpcWQnaB1YYA=="))
+        Arguments.of(TrailerHeader.XXHASH64, "jLhB20DmroM="),
+        Arguments.of(TrailerHeader.XXHASH3, "ctyxi2ehff8="),
+        Arguments.of(TrailerHeader.XXHASH128, "MxGUd+3l3NXpcWQnaB1YYA=="))
         .flatMap(args -> Stream.of(false, true).flatMap(buffered -> Stream.of(false, true)
             .map(verify -> Arguments.of(args.get()[0], args.get()[1], buffered, verify))));
   }
