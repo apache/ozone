@@ -55,7 +55,7 @@ public class BackgroundPipelineScrubber implements SCMService {
 
   private final Runnable scrubTask;
   private final SCMContext scmContext;
-  private final Clock clock;
+  private volatile Clock clock;
   private final long intervalInMillis;
   private final long safeModeRunDelayInMillis;
   private final long createdTimeInMillis;
@@ -214,8 +214,17 @@ public class BackgroundPipelineScrubber implements SCMService {
     }
   }
 
+  /**
+   * Replaces the clock used to check the safe mode run delay, and wakes up the service to check it again. The delay is
+   * still measured from the time the service was created.
+   */
   @VisibleForTesting
-  public void runImmediately() {
+  public void setClock(Clock clock) {
+    this.clock = clock;
+    runImmediately();
+  }
+
+  private void runImmediately() {
     synchronized (monitor) {
       runImmediately = true;
       monitor.notifyAll();

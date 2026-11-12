@@ -63,7 +63,7 @@ public class TestBackgroundPipelineScrubber {
   }
 
   @Test
-  public void testRunsInSafeModeAfterEventAndDelay() {
+  public void testRunsInSafeModeWhenEventArrivesBeforeDelay() {
     SCMContext scmContext = SCMContext.emptyContext();
     scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     scrubber = newScrubber(scmContext);
@@ -83,6 +83,22 @@ public class TestBackgroundPipelineScrubber {
     // Exiting safe mode does not add another wait.
     scmContext.updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
     scrubber.notifyStatusChanged();
+    assertTrue(scrubber.shouldRun());
+  }
+
+  @Test
+  public void testRunsInSafeModeWhenEventArrivesAfterDelay() {
+    SCMContext scmContext = SCMContext.emptyContext();
+    scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
+    scrubber = newScrubber(scmContext);
+    scrubber.notifyStatusChanged();
+
+    // The stale node interval elapsing alone does not let the service run in safe mode.
+    clock.fastForward(HddsServerUtil.getStaleNodeInterval(conf));
+    assertFalse(scrubber.shouldRun());
+
+    // Once the container safe mode rules pass, it runs without any further wait.
+    scrubber.notifyEventTriggered(Event.CONTAINER_SAFE_MODE_RULES_VALIDATED);
     assertTrue(scrubber.shouldRun());
   }
 

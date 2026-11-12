@@ -29,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -44,16 +46,19 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.BackgroundPipelineScrubber;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -69,9 +74,6 @@ public class TestSCMSafeModeWithPipelineRules {
   public void setup(int numDatanodes) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     configureTestCluster(conf);
-    // The pipeline scrubber starts in safe mode once this interval has elapsed
-    // since SCM started. Keep it long enough for the checks made before then.
-    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 60, SECONDS);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numDatanodes)
@@ -154,9 +156,13 @@ public class TestSCMSafeModeWithPipelineRules {
     // Two datanodes of the 2nd pipeline are still unregistered. Once the
     // container rules pass and the stale node interval elapses, the scrubber
     // closes the open pipelines containing them while SCM is in safe mode,
-    // and then SCM exits safe mode.
-    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 1000,
-        120000);
+    // and then SCM exits safe mode. Skip ahead past the stale node interval
+    // instead of waiting for it.
+    BackgroundPipelineScrubber scrubber = ((PipelineManagerImpl) pipelineManager).getBackgroundPipelineScrubber();
+    MockClock clock = new MockClock(Instant.now(), ZoneOffset.UTC);
+    clock.fastForward(HddsServerUtil.getStaleNodeInterval(cluster.getConf()));
+    scrubber.setClock(clock);
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 1000, 60000);
 
     // No open pipeline has unregistered datanodes at safe mode exit.
     NodeManager nodeManager = cluster.getStorageContainerManager().getScmNodeManager();

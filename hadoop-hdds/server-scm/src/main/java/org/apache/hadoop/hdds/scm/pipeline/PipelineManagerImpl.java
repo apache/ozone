@@ -918,7 +918,8 @@ public class PipelineManagerImpl implements PipelineManager {
     return scmhaManager;
   }
 
-  private void setBackgroundPipelineCreator(
+  @VisibleForTesting
+  void setBackgroundPipelineCreator(
       BackgroundPipelineCreator backgroundPipelineCreator) {
     this.backgroundPipelineCreator = backgroundPipelineCreator;
   }

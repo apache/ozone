@@ -45,6 +45,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -88,6 +89,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -598,8 +600,8 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testScrubContinuesAfterPipelineFailure() throws Exception {
-    LogCapturer creatorLogs = LogCapturer.captureLogs(BackgroundPipelineCreator.class);
-    PipelineManagerImpl pipelineManager = spy(createPipelineManager(true));
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    BackgroundPipelineCreator creator = mockBackgroundPipelineCreator(pipelineManager);
     Pipeline failingPipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
     pipelineManager.openPipeline(failingPipeline.getId());
     Pipeline otherPipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
@@ -612,7 +614,8 @@ public class TestPipelineManagerImpl {
         nodeManager.getClusterNetworkTopologyMap().remove(dn);
       }
     }
-    doThrow(new IOException("Injected failure")).when(pipelineManager).closePipeline(failingPipeline.getId());
+    // Closing the pipeline fails because SCM does not know about its container.
+    pipelineManager.addContainerToPipeline(failingPipeline.getId(), ContainerID.valueOf(1));
 
     pipelineManager.scrubPipelines();
 
@@ -620,7 +623,7 @@ public class TestPipelineManagerImpl {
     assertEquals(OPEN, pipelineManager.getPipeline(failingPipeline.getId()).getPipelineState());
     assertEquals(Pipeline.PipelineState.CLOSED, pipelineManager.getPipeline(otherPipeline.getId()).getPipelineState());
     // Replacement pipelines are requested after the scrubber closes pipelines.
-    assertThat(creatorLogs.getOutput()).contains("trigger a one-shot run");
+    verify(creator).notifyEventTriggered(Event.SCRUBBER_CLOSED_PIPELINES);
     pipelineManager.close();
   }
 
@@ -628,19 +631,29 @@ public class TestPipelineManagerImpl {
   public void testScrubOnlyDeletingClosedPipelinesDoesNotTriggerCreator() throws Exception {
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 50, TimeUnit.SECONDS);
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    BackgroundPipelineCreator creator = mockBackgroundPipelineCreator(pipelineManager);
     Pipeline pipeline = pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     pipelineManager.openPipeline(pipeline.getId());
     pipelineManager.closePipeline(pipeline.getId());
     testClock.set(Instant.now());
     testClock.fastForward(60000);
 
-    LogCapturer creatorLogs = LogCapturer.captureLogs(BackgroundPipelineCreator.class);
     pipelineManager.scrubPipelines();
 
     // Deleting an already closed pipeline does not free up any pipeline limit.
     assertFalse(pipelineManager.containsPipeline(pipeline.getId()));
-    assertThat(creatorLogs.getOutput()).doesNotContain("trigger a one-shot run");
+    verify(creator, never()).notifyEventTriggered(Event.SCRUBBER_CLOSED_PIPELINES);
     pipelineManager.close();
+  }
+
+  /**
+   * Replaces the pipeline manager's background pipeline creator with a mock, after stopping the real one.
+   */
+  private BackgroundPipelineCreator mockBackgroundPipelineCreator(PipelineManagerImpl pipelineManager) {
+    pipelineManager.getBackgroundPipelineCreator().stop();
+    BackgroundPipelineCreator creator = mock(BackgroundPipelineCreator.class);
+    pipelineManager.setBackgroundPipelineCreator(creator);
+    return creator;
   }
 
   @Test

@@ -50,9 +50,10 @@ OZONE-SITE.XML_ozone.hbase.enhancements.allowed=true
 # a CLOSED state so the datanodes can progress with finalization.
 #
 # This config sets the amount of time SCM will wait after safemode exit to
-# start the replication manager and pipeline scrubber. The default of 5 minutes
-# is fine in real clusters to prevent unnecessary over-replication,
-# but it is too long for this test.
+# start the replication manager. Older versions also delay the pipeline
+# scrubber by this amount; newer versions start it without this delay.
+# The default of 5 minutes is fine in real clusters to prevent unnecessary
+# over-replication, but it is too long for this test.
 OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=5s
 # If datanodes take too long to close pipelines during finalization, let the
 # scrubber force close them to move the test forward.
