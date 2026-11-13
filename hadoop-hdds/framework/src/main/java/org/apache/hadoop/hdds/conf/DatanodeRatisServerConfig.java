@@ -132,6 +132,17 @@ public class DatanodeRatisServerConfig {
   )
   private long logAppenderWaitTimeMin;
 
+  /** @see RaftServerConfigKeys.Log#APPEND_ENTRIES_COMPOSE_ENABLED_KEY */
+  @Config(key = "hdds.ratis.raft.server.log.append-entries.compose.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
+      description = "Whether a follower composes the log append of an appendEntries request with the " +
+          "in-flight appends of earlier requests, so that it can accept a request before the previous " +
+          "entries are written to the Raft log."
+  )
+  private boolean appendEntriesComposeEnabled;
+
   public long getRequestTimeOut() {
     return requestTimeOut;
   }
@@ -210,5 +221,13 @@ public class DatanodeRatisServerConfig {
 
   public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
     this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
+  }
+
+  public boolean isAppendEntriesComposeEnabled() {
+    return appendEntriesComposeEnabled;
+  }
+
+  public void setAppendEntriesComposeEnabled(boolean appendEntriesComposeEnabled) {
+    this.appendEntriesComposeEnabled = appendEntriesComposeEnabled;
   }
 }

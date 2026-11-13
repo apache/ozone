@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -85,11 +87,13 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Test ContainerReader class which loads containers from disks.
@@ -728,6 +732,85 @@ public class TestContainerReader {
         assertEquals(baseCount, store.getMetadataTable()
             .getEstimatedKeyCount());
       }
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testLeftoverContainerImportFilesCleared(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+    Path copyDir = Files.createDirectories(ContainerImporter.getUntarDirectory(hddsVolume));
+    Path tarball = Files.write(copyDir.resolve(ContainerUtils.getContainerTarName(5)), new byte[1024]);
+    Path untarDir = Files.createDirectories(copyDir.resolve("5").resolve("chunks"));
+    Files.write(untarDir.resolve("5.block"), new byte[1024]);
+
+    // The debug CLI must leave interrupted imports alone.
+    new ContainerReader(volumeSet, hddsVolume, newContainerSet(), conf, false).run();
+    assertThat(tarball).exists();
+    assertThat(untarDir).isNotEmptyDirectory();
+
+    // Startup removes interrupted imports and still loads completed containers.
+    new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true).run();
+    assertThat(copyDir).isEmptyDirectory();
+    assertNotNull(containerSet.getContainer(0));
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerImportCleanupLogsEachFailedFile(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+    Path copyDir = Files.createDirectories(ContainerImporter.getUntarDirectory(hddsVolume));
+    Path first = Files.createFile(copyDir.resolve("5.tar"));
+    Path second = Files.createFile(copyDir.resolve("6.tar"));
+    Path removable = Files.createDirectories(copyDir.resolve("7").resolve("chunks"));
+    Files.createFile(removable.resolve("7.block"));
+
+    LogCapturer logs = LogCapturer.captureLogs(ContainerReader.class);
+    try (MockedStatic<org.apache.commons.io.FileUtils> mocked =
+        mockStatic(org.apache.commons.io.FileUtils.class, invocation -> {
+          if ("forceDelete".equals(invocation.getMethod().getName())) {
+            File file = invocation.getArgument(0);
+            if (file.equals(first.toFile()) || file.equals(second.toFile())) {
+              throw new IOException("simulated deletion failure");
+            }
+          }
+          return invocation.callRealMethod();
+        })) {
+
+      new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true).run();
+
+      assertThat(first).exists();
+      assertThat(second).exists();
+      assertThat(copyDir.resolve("7")).doesNotExist();
+      assertNotNull(containerSet.getContainer(0));
+      assertThat(logs.getOutput()).contains("Failed to remove leftover container import file " + first);
+      assertThat(logs.getOutput()).contains("Failed to remove leftover container import file " + second);
+      assertThat(logs.getOutput()).doesNotContain("java.io.IOException: simulated deletion failure");
+    } finally {
+      logs.stopCapturing();
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerImportCleanupFailureDoesNotPreventLoading(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+    Path copyDir = ContainerImporter.getUntarDirectory(hddsVolume);
+    Files.createDirectories(copyDir.getParent());
+    // A file in place of the directory makes cleanup fail on every platform.
+    Files.createFile(copyDir);
+
+    LogCapturer logs = LogCapturer.captureLogs(ContainerReader.class);
+    try {
+      new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true).run();
+      assertNotNull(containerSet.getContainer(0));
+      assertThat(logs.getOutput()).contains("Failed to list files in container import directory: " + copyDir);
+      assertThat(logs.getOutput()).doesNotContain("Failed to remove leftover container import files under",
+          "java.io.IOException");
+      assertThat(logs.getOutput()).contains(copyDir.toString());
+    } finally {
+      logs.stopCapturing();
     }
   }
 

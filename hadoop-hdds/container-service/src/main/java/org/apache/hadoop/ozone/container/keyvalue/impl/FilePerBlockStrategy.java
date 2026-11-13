@@ -26,10 +26,10 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limi
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.verifyChunkFileExists;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -39,7 +39,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -357,25 +356,19 @@ public class FilePerBlockStrategy implements ChunkManager {
   private static final class OpenFiles {
 
     private static final RemovalListener<String, OpenFile> ON_REMOVE =
-        event -> close(event.getKey(), event.getValue());
+        (filename, openFile, cause) -> close(filename, openFile);
 
-    private final Cache<String, OpenFile> files = CacheBuilder.newBuilder()
+    private final Cache<String, OpenFile> files = Caffeine.newBuilder()
         .expireAfterAccess(Duration.ofMinutes(10))
+        // close the removed files on the calling thread, so that close(File) has closed the file when it returns
+        .executor(Runnable::run)
         .removalListener(ON_REMOVE)
         .build();
 
     public FileChannel getChannel(File file, boolean sync)
         throws StorageContainerException {
-      try {
-        return files.get(file.getPath(),
-            () -> open(file, sync)).getChannel();
-      } catch (ExecutionException e) {
-        if (e.getCause() instanceof IOException) {
-          throw new UncheckedIOException((IOException) e.getCause());
-        }
-        throw new StorageContainerException(e.getCause(),
-            ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
-      }
+      // open throws UncheckedIOException, which the cache does not wrap
+      return files.get(file.getPath(), path -> open(file, sync)).getChannel();
     }
 
     private static OpenFile open(File file, boolean sync) {
