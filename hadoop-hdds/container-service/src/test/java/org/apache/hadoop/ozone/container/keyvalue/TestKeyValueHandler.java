@@ -70,6 +70,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -80,6 +81,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
@@ -1676,6 +1678,25 @@ public class TestKeyValueHandler {
   }
 
   @Test
+  void testReadBlockBufferIsAtMostTheRequestedRange() throws Exception {
+    final int unit = (int) BYTES_PER_CHECKSUM;
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, 4 * unit);
+      fixture.appendChunk("chunk2", 4 * unit, 20);
+      assertResponses(fixture.read(unit + 1, 1, 1 << 20), unit, unit);
+      assertResponses(fixture.read(4 * unit + 5, 100, 1 << 20), 4 * unit, 20);
+      ReadBlockResult twoResponses = fixture.read(0, 4 * unit + 20, 3 * unit);
+      assertResponses(twoResponses, 0, 4 * unit + 20);
+      assertEquals(2, twoResponses.getDataResponses().size());
+
+      ArgumentCaptor<ByteBuffer> buffers = ArgumentCaptor.forClass(ByteBuffer.class);
+      verify(fixture.blockFile, times(4)).read(buffers.capture());
+      assertEquals(Arrays.asList(unit, 20, 3 * unit, 3 * unit),
+          buffers.getAllValues().stream().map(ByteBuffer::capacity).collect(Collectors.toList()));
+    }
+  }
+
+  @Test
   public void testReadBlockResponseDataSizeIsBounded() throws Exception {
     final int defaultSize = 1 << 20;
     assertEquals(defaultSize, KeyValueHandler.boundResponseDataSize(0));
@@ -1732,7 +1753,7 @@ public class TestKeyValueHandler {
     private final KeyValueContainer container;
     private final BlockID blockID;
     private final BlockData blockData;
-    private final RandomAccessFileChannel blockFile = new RandomAccessFileChannel();
+    private final RandomAccessFileChannel blockFile = spy(new RandomAccessFileChannel());
 
     StreamFixture() throws Exception {
       try {
