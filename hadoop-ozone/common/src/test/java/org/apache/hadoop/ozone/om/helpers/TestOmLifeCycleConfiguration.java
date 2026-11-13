@@ -35,8 +35,8 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter.Tag;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.junit.jupiter.api.Test;
 
@@ -157,7 +157,7 @@ public class TestOmLifeCycleConfiguration {
     rules.add(new OmLCRule.Builder()
         .setId("rule2")
         .setEnabled(true)
-        .setFilter(getOmLCFilterBuilder(null, Pair.of("temporary", "true"), null).build())
+        .setFilter(getOmLCFilterBuilder(null, new Tag("temporary", "true"), null).build())
         .setAction(new OmLCExpiration.Builder()
             .setDate(getFutureDateString(100))
             .build())

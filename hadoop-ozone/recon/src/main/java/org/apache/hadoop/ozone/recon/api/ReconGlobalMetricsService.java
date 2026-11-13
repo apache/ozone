@@ -238,7 +238,7 @@ public class ReconGlobalMetricsService {
           continue;
         }
         getOrCreateBucketEntry(buckets, repeatedOmKeyInfo.getOmKeyInfoList().get(0)).addKeys(
-            repeatedOmKeyInfo.getOmKeyInfoList().size(), repeatedOmKeyInfo.getTotalSize().getRight());
+            repeatedOmKeyInfo.getOmKeyInfoList().size(), repeatedOmKeyInfo.getTotalSize().getReplicatedSize());
       }
     }
 

@@ -35,8 +35,6 @@ import java.util.Objects;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -1834,7 +1832,7 @@ public class OzoneBucket extends WithMetadata {
    */
   private class KeyIteratorWithFSO extends KeyIterator {
 
-    private Stack<Pair<String, String>> stack;
+    private Stack<KeyPrefixAndStartKey> stack;
     private String removeStartKey = "";
 
     /**
@@ -1863,13 +1861,12 @@ public class OzoneBucket extends WithMetadata {
      * @param seekPaths list of seek paths between keyPrefix and startKey
      */
     private void getSeekPathsBetweenKeyPrefixAndStartKey(String keyPrefix,
-        String startKey, List<Pair<String, String>> seekPaths) {
+        String startKey, List<KeyPrefixAndStartKey> seekPaths) {
 
       String parentStartKeyPath = OzoneFSUtils.getParentDir(startKey);
-
       if (StringUtils.isNotBlank(startKey)) {
         if (StringUtils.compare(parentStartKeyPath, keyPrefix) >= 0) {
-          seekPaths.add(new ImmutablePair<>(parentStartKeyPath, startKey));
+          seekPaths.add(new KeyPrefixAndStartKey(parentStartKeyPath, startKey));
 
           // recursively fetch all the sub-paths between keyPrefix and prevKey
           getSeekPathsBetweenKeyPrefixAndStartKey(keyPrefix, parentStartKeyPath,
@@ -1877,7 +1874,7 @@ public class OzoneBucket extends WithMetadata {
         } else if (StringUtils.compare(startKey, keyPrefix) >= 0) {
           // Both keyPrefix and startKey reached at the same level.
           // Adds partial keyPrefix and startKey for seek.
-          seekPaths.add(new ImmutablePair<>(keyPrefix, startKey));
+          seekPaths.add(new KeyPrefixAndStartKey(keyPrefix, startKey));
         }
       }
     }
@@ -1912,9 +1909,8 @@ public class OzoneBucket extends WithMetadata {
       // seek pointer to next level(depth) in FS tree.
       // case: startKey is non-empty
       while (!stack.isEmpty()) {
-        Pair<String, String> keyPrefixPath = stack.pop();
-        if (getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
-            keysResultList)) {
+        KeyPrefixAndStartKey keyPrefixPath = stack.pop();
+        if (getChildrenKeys(keyPrefixPath.getKeyPrefix(), keyPrefixPath.getStartKey(), keysResultList)) {
           // reached limit batch size.
           break;
         }
@@ -1944,9 +1940,8 @@ public class OzoneBucket extends WithMetadata {
         } else {
           // Case: startKey is non-empty
           while (!stack.isEmpty()) {
-            Pair<String, String> keyPrefixPath = stack.pop();
-            getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
-                firstKeyResult);
+            KeyPrefixAndStartKey keyPrefixPath = stack.pop();
+            getChildrenKeys(keyPrefixPath.getKeyPrefix(), keyPrefixPath.getStartKey(), firstKeyResult);
             if (!firstKeyResult.isEmpty()) {
               break;
             }
@@ -2041,7 +2036,7 @@ public class OzoneBucket extends WithMetadata {
           //             |-------------------------------------|
           //      bottom | < a1, a1/b2 >                       |
           //             --------------------------------------|
-          List<Pair<String, String>> seekPaths = new ArrayList<>();
+          List<KeyPrefixAndStartKey> seekPaths = new ArrayList<>();
 
           if (StringUtils.isNotBlank(getKeyPrefix())) {
             // If the prev key is a dir then seek its sub-paths
@@ -2057,7 +2052,7 @@ public class OzoneBucket extends WithMetadata {
           // 2. Push elements in reverse order so that the FS tree traversal
           // will occur in left-to-right fashion[Depth-First Search]
           for (int index = seekPaths.size() - 1; index >= 0; index--) {
-            Pair<String, String> seekDirPath = seekPaths.get(index);
+            KeyPrefixAndStartKey seekDirPath = seekPaths.get(index);
             stack.push(seekDirPath);
           }
         } else if (StringUtils.isNotBlank(getKeyPrefix())) {
@@ -2065,7 +2060,7 @@ public class OzoneBucket extends WithMetadata {
             // Case-1 - compare: keyPrefix="a1/b2", startKey="a1/b123Invalid" or "a0/b123Invalid"
             // Since startKey is lexographically behind keyPrefix,
             // the seek precedence goes to keyPrefix.
-            stack.push(new ImmutablePair<>(getKeyPrefix(), ""));
+            stack.push(new KeyPrefixAndStartKey(getKeyPrefix(), ""));
           } else if (!OzoneFSUtils.isAncestorPath(getKeyPrefix(), prevKey)) {
             // Case-2 - sibling: keyPrefix="a1/b2", startKey="a2/b1"
             // Skip traversing, if the startKey is not a sibling.
@@ -2095,15 +2090,12 @@ public class OzoneBucket extends WithMetadata {
       return keyPrefixStatus != null;
     }
 
-    private void addPrevDirectoryToSeekPath(String prevKey,
-        List<Pair<String, String>> seekPaths)
-        throws IOException {
+    private void addPrevDirectoryToSeekPath(String prevKey, List<KeyPrefixAndStartKey> seekPaths) throws IOException {
       try {
-        OzoneFileStatus prevStatus =
-            proxy.getOzoneFileStatus(volumeName, name, prevKey);
+        OzoneFileStatus prevStatus = proxy.getOzoneFileStatus(volumeName, name, prevKey);
         if (prevStatus != null) {
           if (prevStatus.isDirectory()) {
-            seekPaths.add(new ImmutablePair<>(prevKey, ""));
+            seekPaths.add(new KeyPrefixAndStartKey(prevKey, ""));
           }
         }
       } catch (OMException ome) {
@@ -2193,17 +2185,17 @@ public class OzoneBucket extends WithMetadata {
         if (status.isDirectory()) {
           // Adding in-progress keyPath back to the stack to make sure
           // all the siblings will be fetched.
-          stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+          stack.push(new KeyPrefixAndStartKey(keyPrefix, keyInfo.getKeyName()));
           // Adding current directory to the stack, so that this dir will be
           // the top element. Moving seek pointer to fetch sub-paths
-          stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
+          stack.push(new KeyPrefixAndStartKey(keyInfo.getKeyName(), ""));
           // Return it so that the next iteration will be
           // started using the stacked items.
           return true;
         } else if (indx == statuses.size() - 1) {
           // The last element is a FILE and reaches the listCacheSize.
           // Now, sets next seek key to this element
-          stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+          stack.push(new KeyPrefixAndStartKey(keyPrefix, keyInfo.getKeyName()));
           // Return it so that the next iteration will be
           // started using the stacked items.
           return true;
@@ -2314,5 +2306,27 @@ public class OzoneBucket extends WithMetadata {
 
   public ReplicationConfig getReplicationConfig() {
     return this.defaultReplication;
+  }
+
+  /**
+   * A key prefix paired with the start key to seek from under it,
+   * used as a pending directory listing position by the FSO key iterator.
+   */
+  private static final class KeyPrefixAndStartKey {
+    private final String keyPrefix;
+    private final String startKey;
+
+    private KeyPrefixAndStartKey(String keyPrefix, String startKey) {
+      this.keyPrefix = keyPrefix;
+      this.startKey = startKey;
+    }
+
+    private String getKeyPrefix() {
+      return keyPrefix;
+    }
+
+    private String getStartKey() {
+      return startKey;
+    }
   }
 }

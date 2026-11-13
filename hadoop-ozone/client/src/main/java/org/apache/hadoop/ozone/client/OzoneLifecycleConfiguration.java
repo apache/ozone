@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter.Tag;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 
@@ -104,10 +104,10 @@ public class OzoneLifecycleConfiguration {
    */
   public static final class OzoneLCFilter {
     private final String prefix;
-    private final Pair<String, String> tag;
+    private final Tag tag;
     private final LifecycleAndOperator andOperator;
 
-    public OzoneLCFilter(String prefix, Pair<String, String> tag,
+    public OzoneLCFilter(String prefix, Tag tag,
                          LifecycleAndOperator andOperator) {
       this.prefix = prefix;
       this.tag = tag;
@@ -118,7 +118,7 @@ public class OzoneLifecycleConfiguration {
       return prefix;
     }
 
-    public Pair<String, String> getTag() {
+    public Tag getTag() {
       return tag;
     }
 

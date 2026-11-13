@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateTrashP
 import jakarta.annotation.Nullable;
 import java.util.Collections;
 import net.jcip.annotations.Immutable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilter;
@@ -114,9 +113,9 @@ public final class OmLCFilter {
   }
 
   @Nullable
-  public Pair<String, String> getTag() {
+  public Tag getTag() {
     if (hasTag()) {
-      return Pair.of(tagKey, tagValue);
+      return new Tag(tagKey, tagValue);
     }
     return null;
   }
@@ -230,6 +229,27 @@ public final class OmLCFilter {
 
     public OmLCFilter build() {
       return new OmLCFilter(this);
+    }
+  }
+
+  /**
+   * A tag key paired with its tag value, used as the tag condition of a lifecycle rule filter.
+   */
+  public static final class Tag {
+    private final String key;
+    private final String value;
+
+    public Tag(String key, String value) {
+      this.key = key;
+      this.value = value;
+    }
+
+    public String getKey() {
+      return key;
+    }
+
+    public String getValue() {
+      return value;
     }
   }
 }
