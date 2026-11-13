@@ -33,6 +33,9 @@ Generate prefix
 
 Test ozone shell
     [arguments]     ${protocol}         ${server}       ${volume}
+
+    Kinit test user
+
     ${result} =     Execute and checkrc    ozone sh volume info ${protocol}${server}/${volume}      255
                     Should contain      ${result}       VOLUME_NOT_FOUND
     ${result} =     Execute             ozone sh volume create ${protocol}${server}/${volume} --space-quota 100TB --namespace-quota 100
