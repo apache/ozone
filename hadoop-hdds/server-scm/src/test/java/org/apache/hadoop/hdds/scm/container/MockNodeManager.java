@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -845,6 +846,11 @@ public class MockNodeManager implements NodeManager {
   public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
+  }
+
+  @Override
+  public void setDatanodeRemovedCallback(Consumer<DatanodeDetails> callback) {
+    // This mock does not implement datanode removal.
   }
 
   @Override

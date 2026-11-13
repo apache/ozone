@@ -308,6 +308,32 @@ class TestSCMDatanodeProtocolServer {
   }
 
   @Test
+  void testDeferredRegistrationRejectsUnleasedHeartbeatWithoutDroppingOtherReports() throws Exception {
+    versionManager.finalizeUpgrade();
+    register(ContainerReportsProto.newBuilder().setFullContainerReportDeferred(true).build());
+    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+    SCMHeartbeatResponseProto response = server.sendHeartbeat(request.toBuilder()
+        .clearRequestFullContainerReportLease().setContainerReport(ContainerReportsProto.getDefaultInstance())
+        .setNodeReport(NodeReportProto.getDefaultInstance())
+        .addIncrementalContainerReport(IncrementalContainerReportProto.getDefaultInstance()).build());
+
+    assertTrue(response.getFullContainerReportLeaseRejected());
+    verify(publisher, never()).fireEvent(eq(CONTAINER_REPORT), any());
+    verify(publisher).fireEvent(eq(NODE_REPORT), any());
+    verify(publisher).fireEvent(eq(INCREMENTAL_CONTAINER_REPORT), any());
+    FullContainerReportLeaseProto lease = server.sendHeartbeat(request).getFullContainerReportLease();
+    assertFalse(server.sendHeartbeat(request.toBuilder().clearRequestFullContainerReportLease()
+        .setContainerReport(ContainerReportsProto.newBuilder().setFullContainerReportLease(lease)).build())
+        .getFullContainerReportLeaseRejected());
+    ArgumentCaptor<ContainerReportFromDatanode> report = ArgumentCaptor.forClass(ContainerReportFromDatanode.class);
+    verify(publisher).fireEvent(eq(CONTAINER_REPORT), report.capture());
+    assertTrue(report.getValue().isRegistrationReport());
+    assertTrue(report.getValue().startProcessing());
+    report.getValue().complete(true);
+  }
+
+  @Test
   void testLegacyRegistrationAcceptedBeforeFinalization() throws Exception {
     assertEquals(SCMRegisteredResponseProto.ErrorCode.success,
         register(ContainerReportsProto.getDefaultInstance()).getErrorCode());

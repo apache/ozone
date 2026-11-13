@@ -48,7 +48,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -81,6 +87,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -88,6 +95,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test the behaviour of the ContainerReportHandler.
@@ -213,8 +221,88 @@ public class TestContainerReportHandler {
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
 
-    verify(claim).complete(false);
+    verify(claim, never()).complete(anyBoolean());
     verify(containerManager, never()).notifyContainerReportProcessing(anyBoolean(), anyBoolean());
+  }
+
+  @Test
+  public void testConcurrentInvocationsDoNotCompleteAnotherInvocationLease() throws Exception {
+    List<DatanodeDetails> datanodes = nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    DatanodeDetails datanode = datanodes.get(0);
+    DatanodeDetails secondDatanode = datanodes.get(1);
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    long leaseId = leases.requestLease(datanode).getAsLong();
+    LeaseClaim claim = spy(leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new));
+    ContainerReportFromDatanode report =
+        new ContainerReportFromDatanode(datanode, ContainerReportsProto.getDefaultInstance(), claim);
+    CountDownLatch processingStarted = new CountDownLatch(1);
+    CountDownLatch finishProcessing = new CountDownLatch(1);
+    MockNodeManager blockingNodeManager = spy(nodeManager);
+    doAnswer(invocation -> {
+      processingStarted.countDown();
+      Assertions.assertTrue(finishProcessing.await(10, TimeUnit.SECONDS), "Report processing was not released");
+      return invocation.callRealMethod();
+    }).when(blockingNodeManager).getContainers(any(DatanodeDetails.class));
+    ContainerReportHandler handler = new ContainerReportHandler(blockingNodeManager, containerManager);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> firstInvocation = executor.submit(() -> handler.onMessage(report, publisher));
+      Assertions.assertTrue(processingStarted.await(10, TimeUnit.SECONDS), "First invocation did not start processing");
+      Assertions.assertFalse(leases.requestLease(secondDatanode).isPresent());
+
+      Future<?> secondInvocation = executor.submit(() -> handler.onMessage(report, publisher));
+      secondInvocation.get(10, TimeUnit.SECONDS);
+      verify(claim, times(2)).startProcessing();
+      OptionalLong secondLease = leases.requestLease(secondDatanode);
+
+      finishProcessing.countDown();
+      firstInvocation.get(10, TimeUnit.SECONDS);
+      Assertions.assertAll(
+          () -> Assertions.assertFalse(secondLease.isPresent(), "Non-owner must not release the processing lease"),
+          () -> verify(claim, never()).complete(false),
+          () -> verify(claim).complete(true),
+          () -> Assertions.assertTrue(leases.requestLease(secondDatanode).isPresent()));
+      verify(containerManager).notifyContainerReportProcessing(true, true);
+    } finally {
+      finishProcessing.countDown();
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Report invocations did not terminate");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testStaleRegistrationReportDoesNotEmitRegistrationEvent(boolean registrationDuringProcessing)
+      throws NodeNotFoundException {
+    DatanodeDetails datanode = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    leases.markFullContainerReportDeferred(datanode);
+    long leaseId = leases.requestLease(datanode).getAsLong();
+    LeaseClaim claim = spy(leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new));
+    ContainerReportFromDatanode report =
+        new ContainerReportFromDatanode(datanode, ContainerReportsProto.getDefaultInstance(), claim);
+    Assertions.assertTrue(report.isRegistrationReport());
+
+    if (registrationDuringProcessing) {
+      nodeManager = spy(nodeManager);
+      doAnswer(invocation -> {
+        leases.markFullContainerReportDeferred(datanode);
+        return invocation.callRealMethod();
+      }).when(nodeManager).getContainers(any(DatanodeDetails.class));
+    } else {
+      leases.markFullContainerReportDeferred(datanode);
+    }
+
+    new ContainerReportHandler(nodeManager, containerManager).onMessage(report, publisher);
+
+    verify(claim).complete(true);
+    verify(containerManager).notifyContainerReportProcessing(true, true);
+    long nextLeaseId = leases.requestLease(datanode).getAsLong();
+    LeaseClaim nextClaim = leases.claimLease(datanode, nextLeaseId).orElseThrow(AssertionError::new);
+    ContainerReportFromDatanode nextReport =
+        new ContainerReportFromDatanode(datanode, ContainerReportsProto.getDefaultInstance(), nextClaim);
+    Assertions.assertTrue(nextReport.isRegistrationReport(), "Newer registration must remain pending");
+    verify(publisher, never()).fireEvent(eq(SCMEvents.CONTAINER_REGISTRATION_REPORT), any());
   }
 
   private static LeaseClaim claimLease(DatanodeDetails datanode) {

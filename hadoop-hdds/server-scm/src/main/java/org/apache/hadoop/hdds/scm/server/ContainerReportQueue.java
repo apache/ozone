@@ -88,7 +88,7 @@ public class ContainerReportQueue
             dataList.remove(i);
             --capacity;
             droppedCount.incrementAndGet();
-            reportInfo.complete(false);
+            reportInfo.onDropped();
             isReportRemoved = true;
             break;
           }
@@ -317,7 +317,7 @@ public class ContainerReportQueue
     synchronized (this) {
       dataMap.values().stream()
           .flatMap(Collection::stream)
-          .forEach(report -> report.complete(false));
+          .forEach(ContainerReport::onDropped);
       orderingQueue.clear();
       dataMap.clear();
       capacity = 0;

@@ -29,20 +29,36 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
@@ -50,6 +66,7 @@ import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.util.MetricUtil;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -136,6 +153,184 @@ class TestStorageContainerManager {
     } finally {
       scm.stop();
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @SuppressWarnings("unchecked")
+  void testRemovalDoesNotLeaveGrantOrBlockConcurrentRegistration(boolean registerDuringRemoval, @TempDir File tempDir)
+      throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    conf.setInt(OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES, 1);
+    StorageContainerManager scm = HddsTestUtils.getScm(conf);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    CountDownLatch callbackStarted = new CountDownLatch(1);
+    CountDownLatch finishRemoval = new CountDownLatch(1);
+    try {
+      SCMNodeManager nodes = (SCMNodeManager) scm.getScmNodeManager();
+      DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+      nodes.register(datanode, NodeReportProto.getDefaultInstance(), PipelineReportsProto.getDefaultInstance(),
+          defaultVersionProto());
+      SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+          .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+      assertTrue(scm.getDatanodeProtocolServer().sendHeartbeat(request).hasFullContainerReportLease());
+      Consumer<DatanodeDetails> callback = (Consumer<DatanodeDetails>)
+          HddsWhiteboxTestUtils.getInternalState(nodes, "datanodeRemovedCallback");
+      nodes.setDatanodeRemovedCallback(removed -> {
+        if (!registerDuringRemoval) {
+          callback.accept(removed);
+        }
+        callbackStarted.countDown();
+        try {
+          assertTrue(finishRemoval.await(10, TimeUnit.SECONDS));
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(ex);
+        }
+        if (registerDuringRemoval) {
+          callback.accept(removed);
+        }
+      });
+      Future<?> removal = executor.submit(() -> {
+        datanode.setPersistedOpState(NodeOperationalState.DECOMMISSIONED);
+        nodes.removeNode(datanode);
+        return null;
+      });
+      assertTrue(callbackStarted.await(10, TimeUnit.SECONDS));
+      assertFalse(nodes.isNodeRegistered(datanode), "Node state must be removed before its callback");
+      if (!registerDuringRemoval) {
+        assertFalse(scm.getDatanodeProtocolServer().sendHeartbeat(request).hasFullContainerReportLease());
+        finishRemoval.countDown();
+        removal.get(10, TimeUnit.SECONDS);
+        assertFalse(scm.getDatanodeProtocolServer().sendHeartbeat(request).hasFullContainerReportLease());
+      }
+      register(scm, datanode, true);
+      if (registerDuringRemoval) {
+        finishRemoval.countDown();
+        removal.get(10, TimeUnit.SECONDS);
+      }
+      assertTrue(nodes.isNodeRegistered(datanode));
+      assertTrue(scm.getDatanodeProtocolServer().sendHeartbeat(request).hasFullContainerReportLease());
+    } finally {
+      finishRemoval.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+      scm.stop();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDelayedRegistrationCannotUndoCompletedRemoval(boolean deferred, @TempDir File tempDir) throws Exception {
+    StorageContainerManager scm = HddsTestUtils.getScm(SCMTestUtils.getConf(tempDir));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    CountDownLatch registered = new CountDownLatch(1);
+    CountDownLatch finishRegistration = new CountDownLatch(1);
+    try {
+      SCMNodeManager nodes = spy((SCMNodeManager) scm.getScmNodeManager());
+      HddsWhiteboxTestUtils.setInternalState(scm, "scmNodeManager", nodes);
+      AtomicBoolean pause = new AtomicBoolean(true);
+      doAnswer(invocation -> {
+        Object response = invocation.callRealMethod();
+        if (pause.getAndSet(false)) {
+          registered.countDown();
+          assertTrue(finishRegistration.await(10, TimeUnit.SECONDS));
+        }
+        return response;
+      }).when(nodes).register(any(), any(), any(), any());
+      DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+      Future<?> registration = executor.submit(() -> register(scm, datanode, deferred));
+      assertTrue(registered.await(10, TimeUnit.SECONDS));
+      datanode.setPersistedOpState(NodeOperationalState.DECOMMISSIONED);
+      nodes.removeNode(datanode);
+      assertFalse(nodes.isNodeRegistered(datanode));
+
+      finishRegistration.countDown();
+
+      ExecutionException failure = assertThrows(ExecutionException.class,
+          () -> registration.get(10, TimeUnit.SECONDS));
+      assertTrue(failure.getCause() instanceof IOException);
+      SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+          .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+      assertFalse(scm.getDatanodeProtocolServer().sendHeartbeat(request).hasFullContainerReportLease());
+      register(scm, datanode, deferred);
+      assertTrue(scm.getDatanodeProtocolServer().sendHeartbeat(request).hasFullContainerReportLease());
+    } finally {
+      finishRegistration.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+      scm.stop();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @SuppressWarnings("unchecked")
+  void testRegistrationPresenceCheckIsAtomicWithRemovalTracking(boolean deferred, @TempDir File tempDir)
+      throws Exception {
+    StorageContainerManager scm = HddsTestUtils.getScm(SCMTestUtils.getConf(tempDir));
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch checked = new CountDownLatch(1);
+    CountDownLatch removed = new CountDownLatch(1);
+    CountDownLatch finishCheck = new CountDownLatch(1);
+    try {
+      SCMNodeManager nodes = spy((SCMNodeManager) scm.getScmNodeManager());
+      HddsWhiteboxTestUtils.setInternalState(scm, "scmNodeManager", nodes);
+      AtomicReference<Thread> registeringThread = new AtomicReference<>();
+      AtomicBoolean nodeUpdated = new AtomicBoolean();
+      AtomicBoolean pause = new AtomicBoolean(true);
+      doAnswer(invocation -> {
+        Object response = invocation.callRealMethod();
+        nodeUpdated.set(true);
+        return response;
+      }).when(nodes).register(any(), any(), any(), any());
+      doAnswer(invocation -> {
+        Object result = invocation.callRealMethod();
+        if (nodeUpdated.get() && Thread.currentThread() == registeringThread.get() && pause.getAndSet(false)) {
+          checked.countDown();
+          assertTrue(finishCheck.await(10, TimeUnit.SECONDS));
+        }
+        return result;
+      }).when(nodes).isNodeRegistered(any());
+      Consumer<DatanodeDetails> callback = (Consumer<DatanodeDetails>)
+          HddsWhiteboxTestUtils.getInternalState(nodes, "datanodeRemovedCallback");
+      nodes.setDatanodeRemovedCallback(datanode -> {
+        removed.countDown();
+        callback.accept(datanode);
+      });
+      DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+      Future<?> registration = executor.submit(() -> {
+        registeringThread.set(Thread.currentThread());
+        return register(scm, datanode, deferred);
+      });
+      assertTrue(checked.await(10, TimeUnit.SECONDS));
+      Future<?> removal = executor.submit(() -> {
+        datanode.setPersistedOpState(NodeOperationalState.DECOMMISSIONED);
+        nodes.removeNode(datanode);
+        return null;
+      });
+      assertTrue(removed.await(10, TimeUnit.SECONDS));
+      finishCheck.countDown();
+      registration.get(10, TimeUnit.SECONDS);
+      removal.get(10, TimeUnit.SECONDS);
+
+      assertFalse(scm.getDatanodeProtocolServer().sendHeartbeat(SCMHeartbeatRequestProto.newBuilder()
+          .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build())
+          .hasFullContainerReportLease());
+    } finally {
+      finishCheck.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+      scm.stop();
+    }
+  }
+
+  private static SCMRegisteredResponseProto register(StorageContainerManager scm, DatanodeDetails datanode,
+      boolean deferred) throws IOException {
+    return scm.getDatanodeProtocolServer().register(datanode.getExtendedProtoBufMessage(),
+        NodeReportProto.getDefaultInstance(),
+        ContainerReportsProto.newBuilder().setFullContainerReportDeferred(deferred).build(),
+        PipelineReportsProto.getDefaultInstance(), defaultVersionProto());
   }
 
   @Test

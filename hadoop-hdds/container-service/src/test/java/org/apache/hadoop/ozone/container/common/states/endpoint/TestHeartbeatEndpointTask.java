@@ -241,6 +241,59 @@ public class TestHeartbeatEndpointTask {
   }
 
   @Test
+  void testRejectedUnleasedFCRRemainsPendingForLeaseRetry() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanode = mockDatanodeStateMachine();
+    ContainerReportsProto report = ContainerReportsProto.newBuilder()
+        .addReports(ContainerReplicaProto.newBuilder().setContainerID(1).setState(ContainerReplicaProto.State.CLOSED))
+        .build();
+    stubFullContainerReport(datanode, report);
+    when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    DatanodeVersionManager versionManager = datanode.getVersionManager();
+    when(versionManager.isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(false);
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    context.refreshFullReport(report);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> requests = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(requests.capture())).thenAnswer(invocation -> {
+      SCMHeartbeatRequestProto request = invocation.getArgument(0);
+      SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
+          .setDatanodeUUID(request.getDatanodeDetails().getUuid());
+      if (requests.getAllValues().size() == 1) {
+        response.setFullContainerReportLeaseRejected(true);
+      } else if (request.getRequestFullContainerReportLease()) {
+        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99));
+      }
+      return response.build();
+    });
+    try (EndpointStateMachine endpoint = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "")) {
+      endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
+      HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
+          .setEndpointStateMachine(endpoint).build();
+
+      task.call();
+
+      assertEquals(report, requests.getValue().getContainerReport());
+      assertFalse(requests.getValue().getContainerReport().hasFullContainerReportLease());
+      assertTrue(context.isFullContainerReportReady(TEST_SCM_ENDPOINT));
+      when(versionManager.isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(true);
+
+      task.call();
+
+      assertEquals(3, requests.getAllValues().size());
+      SCMHeartbeatRequestProto leaseRequest = requests.getAllValues().get(1);
+      assertTrue(leaseRequest.getRequestFullContainerReportLease());
+      assertFalse(leaseRequest.hasContainerReport());
+      assertEquals(report.getReportsList(), requests.getValue().getContainerReport().getReportsList());
+      assertEquals(99, requests.getValue().getContainerReport().getFullContainerReportLease().getId());
+      assertFalse(context.isFullContainerReportReady(TEST_SCM_ENDPOINT));
+      assertFalse(endpoint.hasFullContainerReportLease());
+    }
+  }
+
+  @Test
   void testFinalizationDoesNotSendOlderICRsAfterFCR() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanode = mockDatanodeStateMachine();

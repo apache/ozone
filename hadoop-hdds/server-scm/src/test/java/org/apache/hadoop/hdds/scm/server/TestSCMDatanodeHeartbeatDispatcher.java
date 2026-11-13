@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -40,6 +41,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -62,6 +64,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrat
 import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -72,6 +75,68 @@ import org.junit.jupiter.params.provider.ValueSource;
  * This class tests the behavior of SCMDatanodeHeartbeatDispatcher.
  */
 public class TestSCMDatanodeHeartbeatDispatcher {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPublicationFailureDoesNotReleaseProcessingLease(boolean processingStarted) throws Exception {
+    DatanodeDetails datanode = randomDatanodeDetails();
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    long id = leases.requestLease(datanode).getAsLong();
+    LeaseClaim claim = leases.claimLease(datanode, id).orElseThrow(AssertionError::new);
+    ContainerReportFromDatanode report =
+        new ContainerReportFromDatanode(datanode, ContainerReportsProto.getDefaultInstance(), claim);
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(nodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
+    EventPublisher publisher = mock(EventPublisher.class);
+    doAnswer(invocation -> {
+      if (processingStarted) {
+        assertTrue(report.startProcessing());
+      }
+      throw new IllegalStateException("Publication failed");
+    }).when(publisher).fireEvent(eq(CONTAINER_REPORT), any());
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage()).setContainerReport(report.getReport()).build();
+
+    assertThrows(IllegalStateException.class,
+        () -> new SCMDatanodeHeartbeatDispatcher(nodeManager, publisher).dispatch(heartbeat, report));
+
+    assertEquals(!processingStarted, leases.requestLease(randomDatanodeDetails()).isPresent());
+    if (processingStarted) {
+      report.complete(true);
+      assertTrue(leases.requestLease(randomDatanodeDetails()).isPresent());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testDroppedEventReleasesLease(boolean closed) throws Exception {
+    DatanodeDetails datanode = randomDatanodeDetails();
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    leases.markFullContainerReportDeferred(datanode);
+    long id = leases.requestLease(datanode).getAsLong();
+    LeaseClaim claim = leases.claimLease(datanode, id).orElseThrow(AssertionError::new);
+    ContainerReportFromDatanode report =
+        new ContainerReportFromDatanode(datanode, ContainerReportsProto.getDefaultInstance(), claim);
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(nodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
+    try (EventQueue queue = new EventQueue()) {
+      queue.setSilent(true);
+      if (closed) {
+        queue.close();
+      }
+      new SCMDatanodeHeartbeatDispatcher(nodeManager, queue).dispatch(SCMHeartbeatRequestProto.newBuilder()
+          .setDatanodeDetails(datanode.getProtoBufMessage()).setContainerReport(report.getReport()).build(), report);
+
+      DatanodeDetails other = randomDatanodeDetails();
+      OptionalLong otherLease = leases.requestLease(other);
+      assertTrue(otherLease.isPresent(), "Discarded event must release its lease capacity");
+      long otherId = otherLease.getAsLong();
+      leases.claimLease(other, otherId).orElseThrow(AssertionError::new).complete(true);
+      long retryId = leases.requestLease(datanode).getAsLong();
+      assertTrue(leases.claimLease(datanode, retryId).orElseThrow(AssertionError::new).isRegistrationReport());
+    }
+  }
 
   @Test
   public void testNodeReportDispatcher() throws IOException, NodeNotFoundException {

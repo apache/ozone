@@ -537,12 +537,11 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Sets the callback for datanode removal.
    *
-   * <p>{@link SCMNodeManager} invokes it synchronously under the node-manager write lock, before removing node state.
+   * <p>{@link SCMNodeManager} invokes it synchronously after successful removal, outside the node-manager write lock.
    *
    * @param callback datanode removal callback
    */
-  default void setDatanodeRemovedCallback(Consumer<DatanodeDetails> callback) {
-  }
+  void setDatanodeRemovedCallback(Consumer<DatanodeDetails> callback);
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
 

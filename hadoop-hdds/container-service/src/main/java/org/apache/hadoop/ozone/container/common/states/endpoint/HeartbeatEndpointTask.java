@@ -194,9 +194,7 @@ public class HeartbeatEndpointTask
 
   private static boolean isFullContainerReportLeaseRejected(SCMHeartbeatRequestProto request,
       SCMHeartbeatResponseProto response) {
-    return response.getFullContainerReportLeaseRejected()
-        && request.hasContainerReport()
-        && request.getContainerReport().hasFullContainerReportLease();
+    return response.getFullContainerReportLeaseRejected() && request.hasContainerReport();
   }
 
   /**

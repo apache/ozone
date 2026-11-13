@@ -21,13 +21,16 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.apache.ozone.test.HddsWhiteboxTestUtils.getInternalState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -82,6 +85,8 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.stubbing.Answer;
 
 /**
  * Test class for Datanode StateContext.
@@ -255,6 +260,167 @@ public class TestStateContext {
 
     assertTrue(context.isFullContainerReportReady(scm1));
     assertFalse(context.isFullContainerReportReady(scm2));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testRefreshFullReportDuringEndpointReconfiguration(boolean addEndpoint) throws Exception {
+    StateContext context = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9002);
+    HostAndPort scm3 = new HostAndPort("scm3", 9003);
+    context.addEndpoint(scm1);
+    context.addEndpoint(scm2);
+    CountDownLatch refreshStarted = new CountDownLatch(1);
+    CountDownLatch releaseRefresh = new CountDownLatch(1);
+    AtomicBoolean firstReport = new AtomicBoolean(true);
+    @SuppressWarnings("unchecked")
+    Map<HostAndPort, Map<String, AtomicBoolean>> readiness =
+        (Map<HostAndPort, Map<String, AtomicBoolean>>) getInternalState(context, "isFullReportReadyToBeSent");
+    // Instrument both entries so the pause does not depend on the outer map's iteration order.
+    for (Map<String, AtomicBoolean> reports : readiness.values()) {
+      AtomicBoolean ready = spy(new AtomicBoolean(false));
+      doAnswer(invocation -> {
+        if (firstReport.compareAndSet(true, false)) {
+          refreshStarted.countDown();
+          assertTrue(releaseRefresh.await(5, TimeUnit.SECONDS), "Full report refresh was not released");
+        }
+        return invocation.callRealMethod();
+      }).when(ready).set(true);
+      reports.put(StateContext.CONTAINER_REPORTS_PROTO_NAME, ready);
+    }
+    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> refresh = executor.submit(() -> context.refreshFullReport(report));
+      assertTrue(refreshStarted.await(5, TimeUnit.SECONDS), "Full report refresh did not start");
+      Future<?> reconfiguration = executor.submit(() -> {
+        if (addEndpoint) {
+          context.addEndpoint(scm3);
+        } else {
+          context.removeEndpoint(scm2);
+        }
+      });
+      reconfiguration.get(5, TimeUnit.SECONDS);
+      // There is still a second entry to visit after the structural change.
+      releaseRefresh.countDown();
+
+      refresh.get(5, TimeUnit.SECONDS);
+
+      assertTrue(context.isFullContainerReportReady(scm1));
+      assertEquals(Collections.singletonList(report), context.getFullReports(scm1, Integer.MAX_VALUE));
+      if (addEndpoint) {
+        assertTrue(context.isFullContainerReportReady(scm2));
+        assertTrue(context.isFullContainerReportReady(scm3));
+        assertEquals(Collections.singletonList(report), context.getFullReports(scm3, Integer.MAX_VALUE));
+      } else {
+        assertFalse(context.isFullContainerReportReady(scm2));
+        assertTrue(context.getFullReports(scm2, Integer.MAX_VALUE).isEmpty());
+      }
+    } finally {
+      releaseRefresh.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "Full report executor did not terminate");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"read", "mark", "heartbeat", "generate"})
+  public void testFullContainerReportDuringEndpointReplacement(String operation) throws Exception {
+    StateContext context = createSubject();
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
+    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    List<Message> reports = Arrays.asList(report, newMockReport(StateContext.NODE_REPORT_PROTO_NAME),
+        newMockReport(StateContext.PIPELINE_REPORTS_PROTO_NAME));
+    reports.forEach(context::refreshFullReport);
+    context.getFullReports(scm, Integer.MAX_VALUE);
+    AtomicBoolean ready = spy(new AtomicBoolean(!"mark".equals(operation)));
+    @SuppressWarnings("unchecked")
+    Map<HostAndPort, Map<String, AtomicBoolean>> readiness =
+        (Map<HostAndPort, Map<String, AtomicBoolean>>) getInternalState(context, "isFullReportReadyToBeSent");
+    readiness.get(scm).put(StateContext.CONTAINER_REPORTS_PROTO_NAME, ready);
+    CountDownLatch operationStarted = new CountDownLatch(1);
+    CountDownLatch releaseOperation = new CountDownLatch(1);
+    Answer<Object> pause = invocation -> {
+      operationStarted.countDown();
+      assertTrue(releaseOperation.await(5, TimeUnit.SECONDS), "Full report operation was not released");
+      return invocation.callRealMethod();
+    };
+    switch (operation) {
+    case "read":
+    case "heartbeat":
+      doAnswer(pause).when(ready).get();
+      break;
+    case "mark":
+      doAnswer(pause).when(ready).set(true);
+      break;
+    case "generate":
+      doAnswer(pause).when(ready).compareAndSet(true, false);
+      break;
+    default:
+      throw new IllegalArgumentException("Unknown full report operation: " + operation);
+    }
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> fullReport = executor.submit(() -> {
+        switch (operation) {
+        case "read":
+          return context.isFullContainerReportReady(scm);
+        case "mark":
+          context.markFullContainerReportPending(scm);
+          return null;
+        case "heartbeat":
+          return context.getFullReports(scm, Integer.MAX_VALUE);
+        case "generate":
+          return context.getFullContainerReportDiscardPendingICR(scm);
+        default:
+          throw new IllegalArgumentException("Unknown full report operation: " + operation);
+        }
+      });
+      assertTrue(operationStarted.await(5, TimeUnit.SECONDS), "Full report operation did not start");
+      Future<?> reconfiguration = executor.submit(() -> {
+        context.removeEndpoint(scm);
+        assertFalse(context.isFullContainerReportReady(scm));
+        context.markFullContainerReportPending(scm);
+        assertNull(context.getFullContainerReportDiscardPendingICR(scm));
+        assertTrue(context.getFullReports(scm, Integer.MAX_VALUE).isEmpty());
+        context.addEndpoint(scm);
+        return null;
+      });
+      reconfiguration.get(5, TimeUnit.SECONDS);
+      assertTrue(context.isFullContainerReportReady(scm));
+      List<Message> publishedReports = context.getFullReports(scm, Integer.MAX_VALUE);
+      assertEquals(reports.size(), publishedReports.size());
+      assertTrue(publishedReports.containsAll(reports));
+      assertFalse(context.isFullContainerReportReady(scm));
+      releaseOperation.countDown();
+
+      Object result = fullReport.get(5, TimeUnit.SECONDS);
+
+      switch (operation) {
+      case "read":
+        assertEquals(Boolean.TRUE, result);
+        break;
+      case "mark":
+        assertNull(result);
+        assertTrue(ready.get());
+        break;
+      case "heartbeat":
+        assertEquals(Collections.singletonList(report), result);
+        break;
+      case "generate":
+        assertEquals(report, result);
+        break;
+      default:
+        throw new IllegalArgumentException("Unknown full report operation: " + operation);
+      }
+      assertFalse(context.isFullContainerReportReady(scm));
+    } finally {
+      releaseOperation.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "Full report executor did not terminate");
+    }
   }
 
   @Test

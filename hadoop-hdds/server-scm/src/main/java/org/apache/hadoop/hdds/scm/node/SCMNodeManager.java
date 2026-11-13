@@ -2109,11 +2109,11 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
    */
   @Override
   public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
+    boolean removed = false;
     writeLock().lock();
     try {
       NodeStatus nodeStatus = this.getNodeStatus(datanodeDetails);
       if (datanodeDetails.isDecommissioned() || nodeStatus.isDead()) {
-        datanodeRemovedCallback.accept(datanodeDetails);
         if (clusterMap.contains(datanodeDetails)) {
           clusterMap.remove(datanodeDetails);
         }
@@ -2121,11 +2121,16 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
         removeFromDnsToDnIdMap(datanodeDetails.getID(), datanodeDetails.getIpAddress());
         final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getID());
         LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
+        removed = true;
       } else {
         LOG.warn("Node not decommissioned or dead, cannot remove: {}", datanodeDetails);
       }
     } finally {
       writeLock().unlock();
+    }
+    if (removed) {
+      // Callers may acquire the lease-manager monitor or register a datanode from the callback.
+      datanodeRemovedCallback.accept(datanodeDetails);
     }
   }
 

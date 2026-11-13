@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -451,6 +452,11 @@ public class SimpleMockNodeManager implements NodeManager {
   public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
+  }
+
+  @Override
+  public void setDatanodeRemovedCallback(Consumer<DatanodeDetails> callback) {
+    // This mock does not implement datanode removal.
   }
 
   @Override

@@ -473,7 +473,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     fcrLeaseMetrics = SCMFullContainerReportLeaseMetrics.create(getScmId());
     fcrLeaseManager = createFCRLeaseManager(conf);
-    scmNodeManager.setDatanodeRemovedCallback(fcrLeaseManager::removeDatanode);
+    scmNodeManager.setDatanodeRemovedCallback(datanode -> {
+      synchronized (fcrLeaseManager) {
+        // A registration that already replaced the removed node must not be invalidated by a late callback.
+        if (!scmNodeManager.isNodeRegistered(datanode)) {
+          fcrLeaseManager.removeDatanode(datanode);
+        }
+      }
+    });
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this, eventQueue, scmContext, fcrLeaseManager);
     reconfigurationHandler.register(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED,
         this::reconfigureFCRRateLimit);

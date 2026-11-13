@@ -203,7 +203,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       return commands;
     } finally {
       if (containerReport != null && !containerReportDispatched) {
-        containerReport.complete(false);
+        containerReport.onDropped();
       }
     }
   }
@@ -288,7 +288,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
   /**
    * Container report payload base reference.
    */
-  public interface ContainerReport {
+  public interface ContainerReport extends IEventInfo {
     DatanodeDetails getDatanodeDetails();
 
     ContainerReportType getType();
@@ -327,9 +327,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   public static class ContainerReportFromDatanode
       extends ReportFromDatanode<ContainerReportsProto>
-      implements ContainerReport, IEventInfo {
+      implements ContainerReport {
     private long createTime = Time.monotonicNow();
-    private final boolean registrationReport;
+    private volatile boolean registrationReport;
     // Null for reports that do not use an FCR lease.
     @Nullable
     private final LeaseClaim leaseClaim;
@@ -397,7 +397,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
     @Override
     public void complete(boolean processed) {
       if (completed.compareAndSet(false, true) && leaseClaim != null) {
-        leaseClaim.complete(processed);
+        registrationReport = leaseClaim.complete(processed);
+      }
+    }
+
+    @Override
+    public void onDropped() {
+      // An active handler owns completion; only an unprocessed claim can be discarded.
+      if (leaseClaim == null || leaseClaim.startProcessing()) {
+        complete(false);
       }
     }
 
@@ -416,7 +424,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   public static class IncrementalContainerReportFromDatanode
       extends ReportFromDatanode<IncrementalContainerReportProto>
-      implements ContainerReport, IEventInfo {
+      implements ContainerReport {
     private long createTime = Time.monotonicNow();
     
     public IncrementalContainerReportFromDatanode(

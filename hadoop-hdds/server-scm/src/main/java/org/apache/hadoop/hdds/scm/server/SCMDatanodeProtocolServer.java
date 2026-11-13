@@ -123,8 +123,9 @@ import org.slf4j.LoggerFactory;
  * independently of whether its registration FCR has been processed.</li>
  * <li>A heartbeat requests a grant from {@link SCMFullContainerReportLeaseManager}, when allowed by SCM leadership
  * and upgrade state.</li>
- * <li>An incoming leased FCR is validated and claimed before dispatch; unleased reports retain legacy behavior.
- * Invalid leased FCRs are rejected without suppressing other heartbeat reports.</li>
+ * <li>An incoming leased FCR is validated and claimed before dispatch. Unleased reports retain legacy behavior only
+ * when no deferred registration is pending. Missing leases for deferred registrations and invalid leases are rejected
+ * without suppressing other heartbeat reports.</li>
  * <li>The dispatcher transfers an accepted report to the queue. Processing or discard completes its claim and releases
  * capacity; container SafeMode rules receive container IDs only after successful registration FCR processing.</li>
  * </ol>
@@ -279,13 +280,20 @@ public class SCMDatanodeProtocolServer implements
     }
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
-      // A deferred FCR does not describe an empty datanode; record it for a later leased heartbeat.
-      if (containerReportsProto.getFullContainerReportDeferred()) {
-        fcrLeaseManager.markFullContainerReportDeferred(datanodeDetails);
-      } else {
-        if (fcrLeaseManager != null) {
-          fcrLeaseManager.clearFullContainerReportDeferred(datanodeDetails);
+      if (fcrLeaseManager != null) {
+        synchronized (fcrLeaseManager) {
+          if (!scm.getScmNodeManager().isNodeRegistered(datanodeDetails)) {
+            throw new IOException("Datanode was removed during registration: " + datanodeDetails.getUuidString());
+          }
+          // A deferred FCR does not describe an empty datanode; record it for a later leased heartbeat.
+          if (containerReportsProto.getFullContainerReportDeferred()) {
+            fcrLeaseManager.markFullContainerReportDeferred(datanodeDetails);
+          } else {
+            fcrLeaseManager.clearFullContainerReportDeferred(datanodeDetails);
+          }
         }
+      }
+      if (!containerReportsProto.getFullContainerReportDeferred()) {
         eventPublisher.fireEvent(CONTAINER_REPORT,
             new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
                 datanodeDetails, containerReportsProto, true));
@@ -365,6 +373,9 @@ public class SCMDatanodeProtocolServer implements
         } else {
           leasedReportRejected = true;
         }
+      } else if (fcrLeaseManager != null && fcrLeaseManager.isFullContainerReportDeferred(datanodeDetails)) {
+        leasedReportRejected = true;
+        fcrLeaseManager.incrementInvalidLeaseReports();
       } else {
         containerReport = new ContainerReportFromDatanode(datanodeDetails, report);
       }

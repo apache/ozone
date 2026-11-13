@@ -176,7 +176,7 @@ message SCMHeartbeatResponseProto {
   // Same as term in SCMCommandProto
   optional int64 term = 3;
   optional FullContainerReportLeaseProto fullContainerReportLease = 4;
-  // Rejects an incoming leased FCR, not a request for a lease. Other heartbeat fields are still processed.
+  // Rejects an incoming FCR with a missing or invalid lease, not a lease request. Other heartbeat fields are processed.
   optional bool fullContainerReportLeaseRejected = 5 [default = false];
 }
 

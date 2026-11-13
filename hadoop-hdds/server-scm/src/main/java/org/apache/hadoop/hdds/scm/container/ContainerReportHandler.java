@@ -135,11 +135,11 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
                         final EventPublisher publisher) {
     final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
+    if (!reportFromDatanode.startProcessing()) {
+      return;
+    }
     boolean processed = false;
     try {
-      if (!reportFromDatanode.startProcessing()) {
-        return;
-      }
       final DatanodeInfo datanodeInfo = getNodeManager().getNode(dnFromReport.getID());
       if (datanodeInfo == null) {
         getLogger().warn("Datanode not found: {}", dnFromReport);
@@ -194,13 +194,14 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         // list
         processMissingReplicas(datanodeDetails, expectedContainersInDatanode);
         getContainerManager().notifyContainerReportProcessing(true, true);
+        processed = true;
+        reportFromDatanode.complete(true);
         // Container SafeMode rules advance only after the actual registration FCR has been processed.
         if (reportFromDatanode.isRegistrationReport()) {
           publisher.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT,
               new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanodeDetails,
               reportFromDatanode.getReport()));
         }
-        processed = true;
       }
     } catch (NodeNotFoundException ex) {
       getContainerManager().notifyContainerReportProcessing(true, false);

@@ -194,7 +194,7 @@ public class StateContext {
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
     lastHeartbeatSent = new AtomicLong(0);
-    isFullReportReadyToBeSent = new HashMap<>();
+    isFullReportReadyToBeSent = new ConcurrentHashMap<>();
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
     this.threadNamePrefix = threadNamePrefix;

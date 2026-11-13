@@ -44,7 +44,7 @@ public final class SCMFullContainerReportLeaseMetrics {
   private @Metric MutableCounterLong numFCRLeaseRequests;
   private @Metric MutableCounterLong numFCRLeasesGranted;
   private @Metric MutableCounterLong numFCRLeasesRejected;
-  private @Metric MutableCounterLong numFCRLeaseExpired;
+  private @Metric MutableCounterLong numFCRLeasesExpired;
   private @Metric MutableCounterLong numFCRReportsRejectedInvalidLease;
   private @Metric MutableCounterLong numFCRReportsProcessedWithLease;
   private @Metric MutableGaugeLong numFCRLeasesOutstanding;
@@ -79,8 +79,8 @@ public final class SCMFullContainerReportLeaseMetrics {
     numFCRLeasesRejected.incr();
   }
 
-  public void incNumFCRLeaseExpired() {
-    numFCRLeaseExpired.incr();
+  public void incNumFCRLeasesExpired() {
+    numFCRLeasesExpired.incr();
   }
 
   public void incNumFCRReportsRejectedInvalidLease() {
@@ -111,8 +111,8 @@ public final class SCMFullContainerReportLeaseMetrics {
     return numFCRLeasesRejected.value();
   }
 
-  public long getNumFCRLeaseExpired() {
-    return numFCRLeaseExpired.value();
+  public long getNumFCRLeasesExpired() {
+    return numFCRLeasesExpired.value();
   }
 
   public long getNumFCRReportsRejectedInvalidLease() {

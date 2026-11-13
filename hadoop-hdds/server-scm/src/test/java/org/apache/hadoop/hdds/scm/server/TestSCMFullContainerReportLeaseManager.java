@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -42,6 +43,119 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class TestSCMFullContainerReportLeaseManager {
+  @Test
+  void shouldPreserveValidGrantWhenRenewalExceedsReenabledLimit() {
+    SCMFullContainerReportLeaseManager leases =
+        new SCMFullContainerReportLeaseManager(1, 5_000L, false, () -> 0L, null);
+    DatanodeDetails first = randomDatanodeDetails();
+    DatanodeDetails second = randomDatanodeDetails();
+    long firstId = requireLease(leases, first);
+    long secondId = requireLease(leases, second);
+    leases.setRateLimitEnabled(true);
+
+    assertThat(leases.requestLease(first)).isEmpty();
+    requireClaim(leases, first, firstId).complete(true);
+    requireClaim(leases, second, secondId).complete(true);
+    assertThat(leases.requestLease(randomDatanodeDetails())).isPresent();
+  }
+
+  @Test
+  void shouldRejectRemovedDatanodeUntilRegistration() {
+    SCMFullContainerReportLeaseManager leases =
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    DatanodeDetails datanode = randomDatanodeDetails();
+    requireLease(leases, datanode);
+    leases.removeDatanode(datanode);
+
+    assertThat(leases.requestLease(datanode)).isEmpty();
+    leases.markFullContainerReportDeferred(datanode);
+    long deferredId = requireLease(leases, datanode);
+    requireClaim(leases, datanode, deferredId).complete(true);
+    leases.removeDatanode(datanode);
+    assertThat(leases.requestLease(datanode)).isEmpty();
+    leases.clearFullContainerReportDeferred(datanode);
+    assertThat(leases.requestLease(datanode)).isPresent();
+  }
+
+  @Test
+  void shouldNotClassifySupersededRegistrationReportAsCurrent() {
+    SCMFullContainerReportLeaseManager leases =
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    DatanodeDetails datanode = randomDatanodeDetails();
+    leases.markFullContainerReportDeferred(datanode);
+    long id = requireLease(leases, datanode);
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), requireClaim(leases, datanode, id));
+    assertThat(report.startProcessing()).isTrue();
+    leases.markFullContainerReportDeferred(datanode);
+
+    report.complete(true);
+
+    assertThat(report.isRegistrationReport()).isFalse();
+    long nextId = requireLease(leases, datanode);
+    assertThat(requireClaim(leases, datanode, nextId).isRegistrationReport()).isTrue();
+  }
+
+  @Test
+  void shouldExposePluralExpiredLeaseCounter() {
+    SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create("scm");
+    String source = MetricUtil.getMetricsSourceName(SCMFullContainerReportLeaseMetrics.class.getSimpleName(), "scm");
+    try {
+      AtomicLong now = new AtomicLong();
+      SCMFullContainerReportLeaseManager leases =
+          new SCMFullContainerReportLeaseManager(1, 100L, true, now::get, metrics);
+      requireLease(leases, randomDatanodeDetails());
+      now.set(100L);
+      requireLease(leases, randomDatanodeDetails());
+      assertThat(getLongCounter("NumFCRLeasesExpired", getMetrics(source))).isEqualTo(1L);
+    } finally {
+      metrics.unregister();
+    }
+  }
+
+  @Test
+  void shouldPruneOnlyExpiredGrantsAfterClaimAndReplacement() {
+    AtomicLong now = new AtomicLong(1_000L);
+    SCMFullContainerReportLeaseManager leases =
+        new SCMFullContainerReportLeaseManager(3, 100L, false, now::get, null);
+    DatanodeDetails claimedDn = randomDatanodeDetails();
+    DatanodeDetails renewedDn = randomDatanodeDetails();
+    DatanodeDetails expiredDn = randomDatanodeDetails();
+    SCMFullContainerReportLeaseManager.LeaseClaim claim =
+        requireClaim(leases, claimedDn, requireLease(leases, claimedDn));
+    requireLease(leases, renewedDn);
+    long expiredId = requireLease(leases, expiredDn);
+    now.set(1_050L);
+    long renewedId = requireLease(leases, renewedDn);
+    now.set(1_100L);
+
+    requireLease(leases, randomDatanodeDetails());
+
+    assertThat(leases.claimLease(expiredDn, expiredId)).isEmpty();
+    assertThat(leases.claimLease(renewedDn, renewedId)).isPresent();
+    assertThat(claim.startProcessing()).isTrue();
+    claim.complete(true);
+  }
+
+  @Test
+  void shouldNotDiscardReportOwnedByAnActiveHandler() {
+    SCMFullContainerReportLeaseManager leases =
+        new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    DatanodeDetails datanode = randomDatanodeDetails();
+    long id = requireLease(leases, datanode);
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), requireClaim(leases, datanode, id));
+    assertThat(report.startProcessing()).isTrue();
+    ContainerReportQueue queue = new ContainerReportQueue();
+    queue.add(report);
+
+    queue.clear();
+    report.onDropped();
+
+    assertThat(leases.requestLease(randomDatanodeDetails())).isEmpty();
+    report.complete(true);
+    assertThat(leases.requestLease(randomDatanodeDetails())).isPresent();
+  }
 
   @Test
   void shouldRejectInvalidConfiguration() {
@@ -523,6 +637,8 @@ class TestSCMFullContainerReportLeaseManager {
     assertThat(nextLease).isNotZero();
     requireClaim(leaseManager, nextDn, nextLease).complete(true);
 
+    assertThat(leaseManager.requestLease(removedDn)).isEmpty();
+    leaseManager.clearFullContainerReportDeferred(removedDn);
     long newLease = requireLease(leaseManager, removedDn);
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
         requireClaim(leaseManager, removedDn, newLease);
