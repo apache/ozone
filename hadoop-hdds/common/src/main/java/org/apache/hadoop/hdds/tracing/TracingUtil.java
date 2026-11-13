@@ -602,6 +602,13 @@ public final class TracingUtil {
     }
   }
 
+  public static void addAttributesToCurrentSpan(String key, Object value) {
+    Span span = Span.current();
+    if (value != null && span.isRecording()) {
+      span.setAttribute(key, value.toString());
+    }
+  }
+
   public static void addAttributesToCurrentSpan(String key, String value) {
     Span span = Span.current();
     if (value != null && span.isRecording()) {

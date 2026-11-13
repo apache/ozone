@@ -167,8 +167,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
     if (containerInfo != null) {
       TracingUtil.addAttributesToCurrentSpan(ScmTracingAttributes.HDDS_CONTAINER_ID, containerInfo.getContainerID());
-      TracingUtil.addAttributesToCurrentSpan(ScmTracingAttributes.PIPELINE_ID,
-          containerInfo.getPipelineID().toString());
+      TracingUtil.addAttributesToCurrentSpan(ScmTracingAttributes.PIPELINE_ID, containerInfo.getPipelineID());
       return newBlock(containerInfo);
     }
     // we have tried all strategies we know and but somehow we are not able
