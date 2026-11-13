@@ -19,6 +19,7 @@ package org.apache.hadoop.fs.ozone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -33,6 +34,13 @@ import org.junit.jupiter.api.Test;
 public class TestOFSPath {
 
   private OzoneConfiguration conf = new OzoneConfiguration();
+
+  @Test
+  public void testRejectsSchemesOtherThanOfs() {
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> new OFSPath("o3fs://bucket.volume.om/key", conf));
+    assertEquals("Can't parse schemes other than ofs.", e.getMessage());
+  }
 
   @Test
   public void testParsingPathWithSpace() {

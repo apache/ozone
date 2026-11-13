@@ -72,6 +72,7 @@ public class WritableRatisContainerProvider
     */
 
     String failureReason = null;
+    PipelineNotFoundException missingPipeline = null;
 
     //TODO we need to continue the refactor to use repConfig everywhere
     //in downstream managers.
@@ -109,6 +110,12 @@ public class WritableRatisContainerProvider
         try {
           pipelineManager
                   .waitOnePipelineReady(allocatedPipelineIDs, 0);
+        } catch (PipelineNotFoundException e) {
+          LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
+                  allocatedPipelineIDs, e);
+          failureReason = "Waiting for one of pipelines to be OPEN failed. "
+              + e.getMessage();
+          missingPipeline = e;
         } catch (IOException e) {
           LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
                   allocatedPipelineIDs, e);
@@ -136,9 +143,12 @@ public class WritableRatisContainerProvider
     LOG.error(
         "Unable to allocate a block for the size: {}, repConfig: {}",
         size, repConfig);
-    throw new IOException(
-        "Unable to allocate a container to the block of size: " + size
-            + ", replicationConfig: " + repConfig + ". " + failureReason);
+    String message = "Unable to allocate a container to the block of size: " + size
+        + ", replicationConfig: " + repConfig + ". " + failureReason;
+    if (missingPipeline != null) {
+      throw new SCMException(message, missingPipeline, SCMException.ResultCodes.PIPELINE_NOT_FOUND);
+    }
+    throw new IOException(message);
   }
 
   @Nullable

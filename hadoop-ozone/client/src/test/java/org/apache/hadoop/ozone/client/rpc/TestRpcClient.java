@@ -698,8 +698,59 @@ public class TestRpcClient {
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
+      names = {"LIST_STATUS_REJECTS_OBS", "S3_VOLUME_CONTEXT_RESOLUTION", "S3_IF_NONE_MATCH_ETAG"})
+  void testDeleteKeyWithNullVolume(OzoneManagerVersion version) throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      if (OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version)) {
+        client.deleteKey(null, "bucket", "key", false, "etag");
+
+        ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+        verify(om).deleteKey(args.capture());
+        assertThat(args.getValue().getVolumeName()).isEqualTo("s3v");
+        assertThat(args.getValue().getBucketName()).isEqualTo("bucket");
+        assertThat(args.getValue().getKeyName()).isEqualTo("key");
+        assertThat(args.getValue().isAssumeS3Context()).isTrue();
+        assertThat(args.getValue().getExpectedETag()).isEqualTo("etag");
+        assertThat(args.getValue().isRecursive()).isFalse();
+      } else {
+        assertThrows(NullPointerException.class, () -> client.deleteKey(null, "bucket", "key", false));
+        verifyNoInteractions(om);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"s3v", "tenant-volume"})
+  void testDeleteKeyPreservesExplicitVolume(String volumeName) throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      client.deleteKey(volumeName, "bucket", "key", true, "etag");
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      verify(om).deleteKey(args.capture());
+      assertThat(args.getValue().getVolumeName()).isEqualTo(volumeName);
+      assertThat(args.getValue().isAssumeS3Context()).isFalse();
+      assertThat(args.getValue().isRecursive()).isTrue();
+      assertThat(args.getValue().getExpectedETag()).isEqualTo("etag");
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
       names = {"LIST_STATUS_REJECTS_OBS", "S3_VOLUME_CONTEXT_RESOLUTION", "GET_KEY_INFO_REJECTS_OBS"})
-  void testGetObjectTaggingWithNullVolume(OzoneManagerVersion version) throws Exception {
+  void testObjectTaggingWithNullVolume(OzoneManagerVersion version) throws Exception {
     RpcClient client = createRpcClient();
     try {
       OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
@@ -708,15 +759,38 @@ public class TestRpcClient {
 
       if (OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version)) {
         client.getObjectTagging(null, "bucket", "key");
+        client.deleteObjectTagging(null, "bucket", "key");
 
         ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
         verify(om).getObjectTagging(args.capture());
         assertThat(args.getValue().isAssumeS3Context()).isTrue();
+        verify(om).deleteObjectTagging(args.capture());
+        assertThat(args.getValue().isAssumeS3Context()).isTrue();
+        assertThat(args.getValue().getVolumeName()).isEqualTo("s3v");
       } else {
         // An older OM would ignore assumeS3Context and look up the key in the default S3 volume.
         assertThrows(NullPointerException.class, () -> client.getObjectTagging(null, "bucket", "key"));
+        assertThrows(NullPointerException.class, () -> client.deleteObjectTagging(null, "bucket", "key"));
         verifyNoInteractions(om);
       }
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  void testDeleteObjectTaggingPreservesExplicitVolume() throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      client.deleteObjectTagging("s3v", "bucket", "key");
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      verify(om).deleteObjectTagging(args.capture());
+      assertThat(args.getValue().getVolumeName()).isEqualTo("s3v");
+      assertThat(args.getValue().isAssumeS3Context()).isFalse();
     } finally {
       client.close();
     }
@@ -962,6 +1036,89 @@ public class TestRpcClient {
     } finally {
       client.close();
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {"S3_DERIVED_KEY", "CONDITIONAL_DELETE"})
+  public void testConditionalDeleteOmVersion(OzoneManagerVersion version) throws IOException {
+    List<OMRequest> requests = new ArrayList<>();
+    RpcClient client = createConditionalRequestClient(requests, version);
+    try {
+      for (String etag : Arrays.asList(null, "etag")) {
+        requests.clear();
+        IOException error = assertThrows(IOException.class,
+            () -> client.deleteKey("vol", "bucket", "key", false, etag));
+        if (etag == null || OzoneManagerVersion.CONDITIONAL_DELETE.isSupportedBy(version)) {
+          assertThat(error).hasMessage("request sent");
+          assertThat(requests).hasSize(1);
+          KeyArgs args = requests.get(0).getDeleteKeyRequest().getKeyArgs();
+          assertThat(args.hasExpectedETag()).isEqualTo(etag != null);
+          if (etag != null) {
+            assertThat(args.getExpectedETag()).isEqualTo(etag);
+          }
+        } else {
+          assertThat(error).hasMessage("OzoneManager does not support conditional key deletion.");
+          assertThat(requests).isEmpty();
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"S3_LIST_MULTIPART_UPLOADS_PAGINATION", "ATOMIC_CREATE_IF_NOT_EXISTS"})
+  public void testConditionalCompleteMpuOmVersion(OzoneManagerVersion version) throws IOException {
+    List<OMRequest> requests = new ArrayList<>();
+    RpcClient client = createConditionalRequestClient(requests, version);
+    try {
+      for (Long generation : Arrays.asList(null, 0L)) {
+        for (String etag : Arrays.asList(null, "etag")) {
+          requests.clear();
+          IOException error = assertThrows(IOException.class, () -> client.completeMultipartUpload(
+              "vol", "bucket", "key", "upload", Collections.emptyMap(), generation, etag));
+          if ((generation == null && etag == null)
+              || OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(version)) {
+            assertThat(error).hasMessage("request sent");
+            assertThat(requests).hasSize(1);
+            KeyArgs args = requests.get(0).getCompleteMultiPartUploadRequest().getKeyArgs();
+            assertThat(args.hasExpectedETag()).isEqualTo(etag != null);
+            assertThat(args.hasExpectedDataGeneration()).isEqualTo(generation != null);
+            if (etag != null) {
+              assertThat(args.getExpectedETag()).isEqualTo(etag);
+            }
+            if (generation != null) {
+              assertThat(args.getExpectedDataGeneration()).isEqualTo(generation);
+            }
+          } else {
+            assertThat(error).hasMessage("OzoneManager does not support conditional multipart upload completion.");
+            assertThat(requests).isEmpty();
+          }
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  private static RpcClient createConditionalRequestClient(List<OMRequest> requests, OzoneManagerVersion version)
+      throws IOException {
+    return createRpcClient(new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == Type.DeleteKey || request.getCmdType() == Type.CompleteMultiPartUpload) {
+          requests.add(request);
+          throw new IOException("request sent");
+        }
+        return super.submitRequest(request);
+      }
+    });
   }
 
   private static ServiceInfo om(OzoneManagerVersion version) {

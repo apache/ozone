@@ -30,7 +30,6 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
@@ -450,7 +449,7 @@ public class TestSignedChunksInputStream {
         new ByteArrayInputStream((trailerBody() + "extra").getBytes(UTF_8)), KEY_PATH,
         TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
-    assertInvalidBody(is, "Unexpected data after trailing signature");
+    assertInvalidBody(is, "Unexpected data after trailer terminator");
   }
 
   @Test

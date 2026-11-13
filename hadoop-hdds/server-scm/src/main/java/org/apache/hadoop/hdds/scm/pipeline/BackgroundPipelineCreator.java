@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.S
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.SCRUBBER_CLOSED_PIPELINES;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -67,7 +68,8 @@ public class BackgroundPipelineCreator implements SCMService {
    * 1) after leaving safe mode, BackgroundPipelineCreator needs to
    *    wait for a while before really take effect.
    * 2) NewNodeHandler, NodeAddressUpdateHandler,
-   *    NonHealthyToHealthyNodeHandler, PreCheckComplete
+   *    NonHealthyToHealthyNodeHandler, PreCheckComplete,
+   *    BackgroundPipelineScrubber closing pipelines
    *    will trigger a one-shot run of BackgroundPipelineCreator,
    *    no matter in safe mode or not.
    */
@@ -315,7 +317,8 @@ public class BackgroundPipelineCreator implements SCMService {
     if (event == NEW_NODE_HANDLER_TRIGGERED
             || event == NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED
             || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
-            || event == PRE_CHECK_COMPLETED) {
+            || event == PRE_CHECK_COMPLETED
+            || event == SCRUBBER_CLOSED_PIPELINES) {
       LOG.info("trigger a one-shot run on {}.", threadName);
 
       serviceLock.lock();

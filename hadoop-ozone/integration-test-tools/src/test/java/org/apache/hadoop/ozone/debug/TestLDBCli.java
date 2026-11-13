@@ -31,8 +31,6 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,6 +47,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -63,6 +62,9 @@ import org.apache.hadoop.ozone.debug.ldb.DBScanner;
 import org.apache.hadoop.ozone.debug.ldb.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemErrCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
@@ -85,8 +87,7 @@ public class TestLDBCli {
   private DBStore dbStore;
   @TempDir
   private File tempDir;
-  private StringWriter stdout, stderr;
-  private PrintWriter pstdout, pstderr;
+  private PrintStreamCapturer stdout, stderr;
   private CommandLine cmd;
   private NavigableMap<String, Map<String, ?>> dbMap;
   private String keySeparatorSchemaV3 =
@@ -94,29 +95,19 @@ public class TestLDBCli {
           .getContainerSchemaV3KeySeparator();
 
   @BeforeEach
-  public void setup() throws IOException {
+  public void setup() {
     conf = new OzoneConfiguration();
-    stdout = new StringWriter();
-    pstdout = new PrintWriter(stdout);
-    stderr = new StringWriter();
-    pstderr = new PrintWriter(stderr);
+    stdout = new SystemOutCapturer();
+    stderr = new SystemErrCapturer();
 
-    cmd = new CommandLine(new RDBParser())
-        .setOut(pstdout)
-        .setErr(pstderr);
+    cmd = new CommandLine(new RDBParser());
 
     dbMap = new TreeMap<>();
   }
 
   @AfterEach
-  public void shutdown() throws IOException {
-    if (dbStore != null) {
-      dbStore.close();
-    }
-    pstderr.close();
-    stderr.close();
-    pstdout.close();
-    stdout.close();
+  public void shutdown() {
+    IOUtils.closeQuietly(stdout, stderr, dbStore);
   }
 
   /**

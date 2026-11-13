@@ -45,6 +45,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -55,6 +56,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -87,6 +89,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -593,6 +596,73 @@ public class TestPipelineManagerImpl {
     pipeline = pipelineManager.getPipeline(pipeline.getId());
     assertEquals(Pipeline.PipelineState.CLOSED,
         pipeline.getPipelineState());
+  }
+
+  @Test
+  public void testScrubContinuesAfterPipelineFailure() throws Exception {
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    BackgroundPipelineCreator creator = mockBackgroundPipelineCreator(pipelineManager);
+    for (int i = 0; i < 2; i++) {
+      Pipeline pipeline = pipelineManager.createPipeline(new ECReplicationConfig(3, 2));
+      pipelineManager.openPipeline(pipeline.getId());
+    }
+    // scrubPipelines iterates in this order, so the failing pipeline comes before the one that should be scrubbed.
+    List<Pipeline> pipelines = pipelineManager.getPipelines();
+    assertEquals(2, pipelines.size());
+    Pipeline failingPipeline = pipelines.get(0);
+    Pipeline otherPipeline = pipelines.get(1);
+
+    // "Unregister" a node from each pipeline.
+    for (Pipeline p : Arrays.asList(failingPipeline, otherPipeline)) {
+      DatanodeDetails dn = nodeManager.getNode(p.getNodes().get(0).getID());
+      if (dn != null) {
+        nodeManager.getClusterNetworkTopologyMap().remove(dn);
+      }
+    }
+    // Closing the pipeline fails because SCM does not know about its container.
+    pipelineManager.addContainerToPipeline(failingPipeline.getId(), ContainerID.valueOf(1));
+    long numPipelineCloseFailed = getLongCounter("NumPipelineCloseFailed",
+        getMetrics(SCMPipelineMetrics.class.getSimpleName()));
+
+    pipelineManager.scrubPipelines();
+
+    // The failure on one pipeline does not stop the other from being scrubbed.
+    assertEquals(OPEN, pipelineManager.getPipeline(failingPipeline.getId()).getPipelineState());
+    assertEquals(Pipeline.PipelineState.CLOSED, pipelineManager.getPipeline(otherPipeline.getId()).getPipelineState());
+    assertEquals(numPipelineCloseFailed + 1, getLongCounter("NumPipelineCloseFailed",
+        getMetrics(SCMPipelineMetrics.class.getSimpleName())));
+    // Replacement pipelines are requested after the scrubber closes pipelines.
+    verify(creator).notifyEventTriggered(Event.SCRUBBER_CLOSED_PIPELINES);
+    pipelineManager.close();
+  }
+
+  @Test
+  public void testScrubOnlyDeletingClosedPipelinesDoesNotTriggerCreator() throws Exception {
+    conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 50, TimeUnit.SECONDS);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    BackgroundPipelineCreator creator = mockBackgroundPipelineCreator(pipelineManager);
+    Pipeline pipeline = pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    pipelineManager.openPipeline(pipeline.getId());
+    pipelineManager.closePipeline(pipeline.getId());
+    testClock.set(Instant.now());
+    testClock.fastForward(60000);
+
+    pipelineManager.scrubPipelines();
+
+    // Deleting an already closed pipeline does not free up any pipeline limit.
+    assertFalse(pipelineManager.containsPipeline(pipeline.getId()));
+    verify(creator, never()).notifyEventTriggered(Event.SCRUBBER_CLOSED_PIPELINES);
+    pipelineManager.close();
+  }
+
+  /**
+   * Replaces the pipeline manager's background pipeline creator with a mock, after stopping the real one.
+   */
+  private BackgroundPipelineCreator mockBackgroundPipelineCreator(PipelineManagerImpl pipelineManager) {
+    pipelineManager.getBackgroundPipelineCreator().stop();
+    BackgroundPipelineCreator creator = mock(BackgroundPipelineCreator.class);
+    pipelineManager.setBackgroundPipelineCreator(creator);
+    return creator;
   }
 
   @Test

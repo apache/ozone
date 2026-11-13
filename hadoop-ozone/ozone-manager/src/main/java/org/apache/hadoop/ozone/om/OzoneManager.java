@@ -61,8 +61,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
@@ -319,6 +317,7 @@ import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleServiceConfig;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
@@ -434,6 +433,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private OmConfig config;
+  private KeyLifecycleServiceConfig keyLifecycleServiceConfig;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
@@ -595,9 +595,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_BLACKLIST_GROUPS, this::reconfOzoneBlacklistGroups)
             .register(OZONE_READ_BLACKLIST_USERS, this::reconfOzoneReadBlacklistUsers)
             .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
-    KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES.forEach(property ->
-        reconfigurationHandler.register(property, newVal -> validateKeyLifecycleProperty(property, newVal)));
-    reconfigurationHandler.registerCompleteCallback(this::reconfKeyLifecycleService);
+    reconfigurationHandler.register(keyLifecycleServiceConfig)
+        .registerCompleteCallback(this::reconfKeyLifecycleService);
 
     // Allow dynamic SCM node/address reconfiguration without restarting OM.
     // Address keys use prefix matching to discover new nodes added after startup.
@@ -2035,6 +2034,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
+
     metadataManager.start(configuration);
 
     startSecretManagerIfNecessary();
@@ -2174,6 +2177,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.startSnapshotDirectoryMetrics(configuration, getMetadataManager());
 
     initializeRatisServer(false);
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    // Ratis must be initialized first so that upgrade actions (e.g. quota repair) can check leader status.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
     if (omRatisServer != null) {
       omRatisServer.start();
     }
@@ -3708,8 +3715,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     KeyLifecycleService keyLifecycleService = keyManager.getKeyLifecycleService();
     if (keyLifecycleService == null) {
       return GetLifecycleServiceStatusResponse.newBuilder()
-          .setIsEnabled(getConfiguration().getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
-              OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT))
+          .setIsEnabled(keyLifecycleServiceConfig.isEnabled())
           .build();
     }
     return keyLifecycleService.status();
@@ -5157,10 +5163,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return config;
   }
 
+  public KeyLifecycleServiceConfig getKeyLifecycleServiceConfig() {
+    return keyLifecycleServiceConfig;
+  }
+
   @VisibleForTesting
   public void setConfiguration(OzoneConfiguration conf) {
     this.configuration = conf;
     config = conf.getObject(OmConfig.class);
+    keyLifecycleServiceConfig = conf.getObject(KeyLifecycleServiceConfig.class);
   }
 
   public OzoneConfiguration reloadConfiguration() {
@@ -6293,43 +6304,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return newVal;
   }
 
-  private String validateKeyLifecycleProperty(String property, String newVal) {
-    OzoneConfiguration newConf = new OzoneConfiguration(getConfiguration());
-    if (newVal == null) {
-      newConf.unset(property);
-    } else {
-      newConf.set(property, newVal);
-    }
-    KeyLifecycleService.validate(newConf);
-    return newVal;
-  }
-
   /**
    * Apply all changed KeyLifecycleService properties at once, after each of them is validated and stored
-   * in the OM configuration.
+   * in {@link KeyLifecycleServiceConfig}.
    */
   private void reconfKeyLifecycleService(Map<String, Boolean> changedKeys, Configuration newConf) {
     KeyLifecycleService keyLifecycleService = getKeyManager().getKeyLifecycleService();
     // If the service is not running, the new values are picked up from the configuration when it is started.
     if (keyLifecycleService != null
-        && changedKeys.keySet().stream().anyMatch(KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES::contains)) {
-      keyLifecycleService.reconfigure(getConfiguration());
+        && changedKeys.keySet().stream().anyMatch(keyLifecycleServiceConfig.reconfigurableProperties()::contains)) {
+      keyLifecycleService.reconfigure(keyLifecycleServiceConfig);
     }
   }
 
   private String reconfOzoneSnapshotSSTFilteringServiceInterval(String newVal) {
-    boolean wasSstFilteringSvcEnabled = ((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled();
     getConfiguration().set(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
 
     if (this.isFilesystemSnapshotEnabled()) {
-      if (wasSstFilteringSvcEnabled) {
-        // Sanity check
-        Objects.requireNonNull(keyManager.getSnapshotSstFilteringService(),
-            "sstFilteringService should not be null when SST filtering service is enabled.");
-        ((KeyManagerImpl) keyManager).stopSnapshotSstFilteringService();
-      }
-      // Note startSnapshotSstFilteringService checks whether the config is set to a value that enables the service
-      ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
+      keyManager.restartSnapshotSstFilteringService(getConfiguration());
     } else {
       LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);
@@ -6370,6 +6362,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
   }
 
+  /**
+   * Test hook that lets a test make this OM reject a feature it supports, by listing the feature in
+   * {@link OMConfigKeys#OZONE_OM_FEATURES_DISABLED}.
+   * <p>
+   * This is not a version gate: it reads only the config, not the OM version.
+   * New features do not need to call it; add a call only for a feature that a test disables.
+   */
   public void checkFeatureEnabled(OzoneManagerVersion feature) throws OMException {
     String disabledFeatures = configuration.get(OMConfigKeys.OZONE_OM_FEATURES_DISABLED, "");
     if (disabledFeatures.contains(feature.name())) {

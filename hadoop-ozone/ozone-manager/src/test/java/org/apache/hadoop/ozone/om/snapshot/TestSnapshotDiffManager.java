@@ -81,7 +81,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.cache.CacheLoader;
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import jakarta.annotation.Nonnull;

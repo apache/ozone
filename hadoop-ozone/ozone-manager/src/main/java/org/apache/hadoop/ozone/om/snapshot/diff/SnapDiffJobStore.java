@@ -255,6 +255,11 @@ public final class SnapDiffJobStore implements AutoCloseable {
     batchPut(oldListCf, objectIdKeyBuffer(objectId), entryValue);
   }
 
+  /** Whether any entry has been written to {@code newList} or {@code oldList}. */
+  public boolean hasListEntries() {
+    return newListCount + oldListCount > 0;
+  }
+
   long getClassifiedCount(DiffType diffType) {
     return classifiedCounts.getOrDefault(diffType, 0L);
   }
