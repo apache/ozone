@@ -22,18 +22,23 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTest
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DISK_BALANCER_DIR;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -86,6 +91,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -105,6 +111,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -283,6 +290,94 @@ public class TestDiskBalancerTask {
     kvFaultInjector.reset();
     KeyValueContainer.setInjector(null);
     DiskBalancerService.setInjector(null);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"SSD, DISK", "DISK, SSD", "SSD, ARCHIVE", "ARCHIVE, SSD", "DISK, ARCHIVE", "ARCHIVE, DISK"})
+  public void testCustomPolicyCannotMoveAcrossStorageTypes(StorageType sourceType, StorageType destinationType)
+      throws IOException {
+    // Keep the real volumes and container files, overriding only their configured type labels.
+    sourceVolume = spy(sourceVolume);
+    destVolume = spy(destVolume);
+    doReturn(sourceType).when(sourceVolume).getStorageType();
+    doReturn(destinationType).when(destVolume).getStorageType();
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    ContainerController controller = spy(ozoneContainer.getController());
+    when(ozoneContainer.getController()).thenReturn(controller);
+    byte[] originalYaml = Files.readAllBytes(container.getContainerFile().toPath());
+    long sourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
+    long destUsed = destVolume.getCurrentUsage().getUsedSpace();
+    // Existing reservations and deltas must survive rejection of this particular move.
+    destVolume.incCommittedBytes(42L);
+    long destCommitted = destVolume.getCommittedBytes();
+    diskBalancerService.getDeltaSizes().put(sourceVolume, 17L);
+    setCustomPolicyCandidate(container);
+
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    assertNotNull(task);
+    assertEquals(destCommitted + CONTAINER_SIZE, destVolume.getCommittedBytes());
+    assertEquals(17L - CONTAINER_SIZE, diskBalancerService.getDeltaSizes().get(sourceVolume));
+    assertTrue(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
+    task.call();
+
+    verify(controller, never()).copyContainer(any(), any());
+    assertSame(container, containerSet.getContainer(CONTAINER_ID));
+    assertSame(sourceVolume, container.getContainerData().getVolume());
+    assertEquals(State.CLOSED, container.getContainerState());
+    assertArrayEquals(originalYaml, Files.readAllBytes(container.getContainerFile().toPath()));
+    assertFalse(Files.exists(destVolume.getTmpDir().toPath().resolve(DISK_BALANCER_DIR)
+        .resolve(String.valueOf(CONTAINER_ID))));
+    assertFalse(destVolume.getContainerIterator().hasNext());
+    assertEquals(sourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(destUsed, destVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(destCommitted, destVolume.getCommittedBytes());
+    assertEquals(17L, diskBalancerService.getDeltaSizes().get(sourceVolume));
+    assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
+    assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(0, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(0, diskBalancerService.getMetrics().getSuccessBytes());
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"DISK", "SSD", "ARCHIVE"})
+  public void testCustomPolicySameTypeMovePreservesDifferentRecordedType(StorageType volumeType) throws IOException {
+    sourceVolume = spy(sourceVolume);
+    destVolume = spy(destVolume);
+    doReturn(volumeType).when(sourceVolume).getStorageType();
+    doReturn(volumeType).when(destVolume).getStorageType();
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    // Model a relabelled volume: a same-type move must preserve the replica's different recorded storage type.
+    StorageType recordedType = volumeType == StorageType.SSD ? StorageType.DISK : StorageType.SSD;
+    container.getContainerData().setStorageType(recordedType);
+    ContainerDataYaml.createContainerFile(container.getContainerData(), container.getContainerFile());
+    long destCommitted = destVolume.getCommittedBytes();
+    setCustomPolicyCandidate(container);
+
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    assertNotNull(task);
+    task.call();
+
+    Container moved = containerSet.getContainer(CONTAINER_ID);
+    assertNotEquals(container, moved);
+    assertSame(destVolume, moved.getContainerData().getVolume());
+    assertEquals(volumeType, moved.getContainerData().getVolume().getStorageType());
+    assertEquals(recordedType, moved.getContainerData().getStorageType());
+    assertEquals(recordedType, ContainerDataYaml.readContainerFile(moved.getContainerFile()).getStorageType());
+    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(destCommitted, destVolume.getCommittedBytes());
+    assertTrue(diskBalancerService.getInProgressContainers().isEmpty());
+    assertEquals(0L, diskBalancerService.getDeltaSizes().get(sourceVolume));
+  }
+
+  private void setCustomPolicyCandidate(Container container) {
+    diskBalancerService.setVolumeContainerChoosingPolicy((ozone, volumes, deltas, inProgress, threshold, states) -> {
+      if (inProgress.contains(ContainerID.valueOf(CONTAINER_ID))) {
+        return null;
+      }
+      destVolume.incCommittedBytes(container.getContainerData().getBytesUsed());
+      return new ContainerCandidate(container.getContainerData(), sourceVolume, destVolume);
+    });
   }
 
   @ParameterizedTest

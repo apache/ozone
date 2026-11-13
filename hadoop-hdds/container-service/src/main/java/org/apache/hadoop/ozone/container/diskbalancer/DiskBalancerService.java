@@ -544,6 +544,12 @@ public class DiskBalancerService extends BackgroundService {
           LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
+        if (sourceVolume.getStorageType() != destVolume.getStorageType()) {
+          LOG.warn("Container {}: Source volume storage type ({}) differs from destination volume storage type ({}). "
+                  + "Skipping the disk balancing move.",
+              containerId, sourceVolume.getStorageType(), destVolume.getStorageType());
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        }
 
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
