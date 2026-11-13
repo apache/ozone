@@ -25,8 +25,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATU
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_IPC_MAXIMUM_DATA_LENGTH;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_IPC_MAXIMUM_DATA_LENGTH_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
@@ -88,6 +86,10 @@ import org.slf4j.LoggerFactory;
 public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
   private static final Logger LOG = LoggerFactory.getLogger(HeartbeatEndpointTask.class);
+  static final String HDDS_IPC_MAXIMUM_DATA_LENGTH =
+      "ipc.maximum.data.length";
+  static final int HDDS_IPC_MAXIMUM_DATA_LENGTH_DEFAULT =
+      128 * 1024 * 1024;
   private static final double IPC_SIZE_SAFETY_FACTOR = 0.9;
   private final EndpointStateMachine rpcEndpoint;
   private final DatanodeDetails datanodeDetails;
