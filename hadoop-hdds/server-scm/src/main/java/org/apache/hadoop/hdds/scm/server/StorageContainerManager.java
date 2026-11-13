@@ -32,7 +32,6 @@ import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
-import io.opentelemetry.api.trace.SpanKind;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -825,8 +824,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
-      scmBlockManager = TracingUtil.createProxy(new BlockManagerImpl(conf, scmConfig, this), BlockManager.class,
-          SpanKind.INTERNAL);
+      scmBlockManager = TracingUtil.createInternalProxy(new BlockManagerImpl(conf, scmConfig, this),
+          BlockManager.class, conf);
     }
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();

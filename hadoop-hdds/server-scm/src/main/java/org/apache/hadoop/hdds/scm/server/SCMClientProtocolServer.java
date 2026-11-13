@@ -37,7 +37,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
-import io.opentelemetry.api.trace.SpanKind;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -173,7 +172,7 @@ public class SCMClientProtocolServer implements
     BlockingService storageProtoPbService =
         newReflectiveBlockingService(
             new StorageContainerLocationProtocolServerSideTranslatorPB(
-                TracingUtil.createProxy(this, StorageContainerLocationInternalInterface.class, SpanKind.INTERNAL),
+                TracingUtil.createInternalProxy(this, StorageContainerLocationInternalInterface.class, conf),
                 scm,
                 protocolMetrics));
 

@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 
-import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -45,20 +44,20 @@ public class WritableContainerFactory {
   public WritableContainerFactory(StorageContainerManager scm) {
     ConfigurationSource conf = scm.getConfiguration();
 
-    this.ratisProvider = TracingUtil.createProxy(new WritableRatisContainerProvider(
+    this.ratisProvider = TracingUtil.createInternalProxy(new WritableRatisContainerProvider(
         scm.getPipelineManager(),
-        scm.getContainerManager(), scm.getPipelineChoosePolicy()), WritableContainerProvider.class, SpanKind.INTERNAL);
+        scm.getContainerManager(), scm.getPipelineChoosePolicy()), WritableContainerProvider.class, conf);
     this.standaloneProvider = ratisProvider;
 
     WritableECContainerProviderConfig ecProviderConfig =
         conf.getObject(WritableECContainerProviderConfig.class);
-    this.ecProvider = TracingUtil.createProxy(new WritableECContainerProvider(
+    this.ecProvider = TracingUtil.createInternalProxy(new WritableECContainerProvider(
         ecProviderConfig,
         getConfiguredContainerSize(conf),
         scm.getScmNodeManager(),
         scm.getPipelineManager(),
         scm.getContainerManager(),
-        scm.getEcPipelineChoosePolicy()), WritableContainerProvider.class, SpanKind.INTERNAL);
+        scm.getEcPipelineChoosePolicy()), WritableContainerProvider.class, conf);
 
     scm.getReconfigurationHandler().register(ecProviderConfig);
   }

@@ -117,6 +117,7 @@ public class TestBlockManager {
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 5,
         TimeUnit.SECONDS);
+    conf.setBoolean("ozone.tracing.enabled", true);
 
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.

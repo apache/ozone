@@ -33,7 +33,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.isServiceUser;
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
-import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -145,7 +144,7 @@ public class SCMBlockProtocolServer implements
         ScmBlockLocationProtocolProtos.ScmBlockLocationProtocolService
             .newReflectiveBlockingService(
                 new ScmBlockLocationProtocolServerSideTranslatorPB(
-                    TracingUtil.createProxy(this, ScmBlockLocationProtocol.class, SpanKind.INTERNAL), scm,
+                    TracingUtil.createInternalProxy(this, ScmBlockLocationProtocol.class, conf), scm,
                     protocolMessageMetrics));
 
     final InetSocketAddress scmBlockAddress =

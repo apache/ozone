@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
@@ -171,7 +170,7 @@ public class TestTracingInitModes {
     provider.shutdown();
   }
 
-  /** app-aware: a SpanKind proxy made with no current span still traces calls made under an app span. */
+  /** app-aware: a proxy made under an app span traces calls made under it; with no current span there is no proxy. */
   @Test
   public void testApplicationAwareSpanKindProxyCreatedAtStartup() {
     installNoExportGlobalOpenTelemetry();
@@ -179,14 +178,11 @@ public class TestTracingInitModes {
     TracingUtil.initTracing("app-aware-proxy", conf);
     ServiceImpl delegate = new ServiceImpl();
     assertSame(delegate, TracingUtil.createInternalProxy(delegate, Service.class, conf));
-    Service proxy = TracingUtil.createProxy(delegate, Service.class, SpanKind.INTERNAL);
-    assertNotSame(delegate, proxy);
-
-    proxy.normalMethod();
-    assertFalse(delegate.wasSpanActive(), "Application-aware mode must NOT manufacture a root span");
 
     Span appSpan = GlobalOpenTelemetry.getTracer("app").spanBuilder("app-root").startSpan();
     try (Scope ignored = appSpan.makeCurrent()) {
+      Service proxy = TracingUtil.createInternalProxy(delegate, Service.class, conf);
+      assertNotSame(delegate, proxy);
       proxy.normalMethod();
       assertTrue(delegate.wasSpanActive(), "Proxy call under an app span should create a child span");
     } finally {
@@ -203,7 +199,7 @@ public class TestTracingInitModes {
     assertFalse(TracingUtil.isTracingActive(conf), "Failed init must not report tracing as active");
 
     ServiceImpl delegate = new ServiceImpl();
-    assertSame(delegate, TracingUtil.createProxy(delegate, Service.class, SpanKind.INTERNAL));
+    assertSame(delegate, TracingUtil.createInternalProxy(delegate, Service.class, conf));
   }
 
   /** Both flags false: tracing is off. */
