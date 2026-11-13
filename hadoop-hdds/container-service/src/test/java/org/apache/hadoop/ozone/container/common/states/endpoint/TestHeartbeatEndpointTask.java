@@ -585,8 +585,7 @@ public class TestHeartbeatEndpointTask {
             .addReport(ContainerReplicaProto.newBuilder()
                 .setContainerID(1)
                 .setState(ContainerReplicaProto.State.CLOSED)
-                .setOriginNodeId(String.join("", Collections.nCopies(
-                    1024, "x")))
+                .setOriginNodeId(String.join("", Collections.nCopies(1024, "x")))
                 .build())
             .build();
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
