@@ -1419,7 +1419,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     long estimatedFromTableKeys = Math.max(1L, fromTable.getEstimatedKeyCount());
 
     if (fullDiff) {
-      FullDiffSequentialReader reader = new FullDiffSequentialReader(store, resolveFullDiffUpdateIdGate(fsInfo));
+      FullDiffSequentialReader reader =
+          new FullDiffSequentialReader(store, resolveFullDiffUpdateIdGate(fsInfo, tsInfo));
       if (fromTable.getName().equals(DIRECTORY_TABLE)) {
         reader.scanDirectoryTables(fromTable, toTable, tablePrefix, stageProgress,
             estimatedToTableKeys, estimatedFromTableKeys);
@@ -1439,11 +1440,19 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
   }
 
-  private Long resolveFullDiffUpdateIdGate(SnapshotInfo fromSnapshot) throws IOException {
-    if (fromSnapshot.getLastTransactionInfo() == null || fromSnapshot.getLastTransactionInfo().isEmpty()) {
+  private Long resolveFullDiffUpdateIdGate(SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot) throws IOException {
+    // Not lastTransactionInfo: purges and moves into the snapshot advance it past later changes.
+    Long fromIndex = getCreateTransactionIndex(fromSnapshot);
+    Long toIndex = getCreateTransactionIndex(toSnapshot);
+    // A from snapshot newer than the to snapshot (reverse diff) has every to row at or below its index.
+    return fromIndex != null && toIndex != null && fromIndex < toIndex ? fromIndex : null;
+  }
+
+  private static Long getCreateTransactionIndex(SnapshotInfo snapshot) throws IOException {
+    if (snapshot.getCreateTransactionInfo() == null || snapshot.getCreateTransactionInfo().isEmpty()) {
       return null;
     }
-    return TransactionInfo.fromByteString(fromSnapshot.getLastTransactionInfo()).getTransactionIndex();
+    return TransactionInfo.fromByteString(snapshot.getCreateTransactionInfo()).getTransactionIndex();
   }
 
   private long resolveFromSnapshotDbTxSequenceNumber(SnapshotInfo fromSnapshot) throws IOException {

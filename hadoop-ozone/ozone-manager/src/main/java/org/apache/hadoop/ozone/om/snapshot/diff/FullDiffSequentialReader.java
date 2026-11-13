@@ -47,13 +47,13 @@ import org.apache.hadoop.hdds.utils.db.Table;
  * signature.
  *
  * <p>When an update-id gate is supplied (HA OM), to-side gating normally admits
- * rows with {@code updateID > fromSnapshotDbTxSequenceNumber}. HA OM write paths
+ * rows with {@code updateID} above the from snapshot's creation transaction index. HA OM write paths
  * are expected to bump {@code updateID} on every meaningful metadata change.
  * Rows with a missing {@code updateID}, {@code updateID == 0}, or
  * {@code updateID == DEFAULT_OM_UPDATE_ID} ({@code -1}) are always treated as
  * candidates as a conservative fallback for legacy or ambiguous rows.
  *
- * <p>When no gate is supplied (non-HA), every to-side row is a candidate and a
+ * <p>When no gate is supplied (non-HA or reverse diff), every to-side row is a candidate and a
  * compare signature is computed for each.
  */
 public class FullDiffSequentialReader {
@@ -73,8 +73,8 @@ public class FullDiffSequentialReader {
 
   /**
    * @param store        per-job temp column families for this full diff job
-   * @param updateIdGate when non-null, enables HA gating using this from-snapshot
-   *                     transaction index; when null, gating is disabled (non-HA)
+   * @param updateIdGate when non-null, enables HA gating using the from snapshot's creation
+   *                     transaction index; when null, gating is disabled
    */
   public FullDiffSequentialReader(SnapDiffJobStore store, Long updateIdGate) {
     this.store = store;
