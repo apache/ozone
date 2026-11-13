@@ -342,7 +342,6 @@ public class TestContainerReconciliationWithMockDatanodes {
     assertEquals(healthyChecksum, laggingNode.checkAndGetDataChecksum(containerID));
     assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
         laggingNode.getContainer(containerID).getContainerData().getState());
-
   }
 
   @Test
