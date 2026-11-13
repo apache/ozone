@@ -771,7 +771,7 @@ public class KeyValueHandler extends Handler {
       LOG.info("Finalized Block request received {} ", blockID);
 
       responseData = blockManager.getBlock(kvContainer, blockID)
-          .getProtoBufMessage();
+          .getProtoBufMessage(kvContainer.getContainerData().getStorageType());
 
       chunkManager.finalizeWriteChunk(kvContainer, blockID);
       blockManager.finalizeBlock(kvContainer, blockID);
@@ -875,7 +875,8 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.GetBlockRequestProto getBlock = request.getGetBlock();
       BlockID blockID = BlockID.getFromProtobuf(getBlock.getBlockID());
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
-      responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
+      responseData = blockManager.getBlock(kvContainer, blockID)
+          .getProtoBufMessage(kvContainer.getContainerData().getStorageType());
       // only the domain socket path can pass the opened file on, other transports get the block data only
       if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()
           && DispatcherContext.op(dispatcherContext) == DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ) {
@@ -966,7 +967,7 @@ public class KeyValueHandler extends Handler {
       List<BlockData> responseData =
           blockManager.listBlock(kvContainer, startLocalId, count);
       for (BlockData responseDatum : responseData) {
-        returnData.add(responseDatum.getProtoBufMessage());
+        returnData.add(responseDatum.getProtoBufMessage(kvContainer.getContainerData().getStorageType()));
       }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);

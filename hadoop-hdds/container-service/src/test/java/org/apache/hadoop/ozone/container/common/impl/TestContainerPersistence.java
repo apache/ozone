@@ -944,7 +944,10 @@ public class TestContainerPersistence {
       BlockData readBlockData = blockManager.getBlock(container, blockData.getBlockID());
       ChunkInfo readChunk = ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(0));
       assertEquals(info.getChecksumData(), readChunk.getChecksumData());
-      assertEquals(storageType, readBlockData.getBlockID().getStorageType());
+      assertNull(readBlockData.getBlockID().getStorageType());
+      assertEquals(storageType, blockData.getBlockID().getStorageType());
+      assertEquals(storageType, container.getContainerData().getStorageType());
+      assertEquals(storageType, container.getContainerData().getVolume().getStorageType());
     }
   }
 

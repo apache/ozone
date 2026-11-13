@@ -426,7 +426,8 @@ public class TestHddsDispatcher {
       assertEquals(1, response.getListBlock().getBlockDataList().size());
       for (ContainerProtos.BlockData blockData :
           response.getListBlock().getBlockDataList()) {
-        assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
+        assertEquals(writeChunkRequest.getWriteChunk().getBlockID().toBuilder()
+                .setStorageTypeID(HddsProtos.StorageTypeProto.DISK.getNumber()).build(),
             blockData.getBlockID());
         assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
             .getLen(), blockData.getSize());
@@ -925,7 +926,8 @@ public class TestHddsDispatcher {
       assertEquals(1, response.getListBlock().getBlockDataList().size());
       for (ContainerProtos.BlockData blockData :
           response.getListBlock().getBlockDataList()) {
-        assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
+        assertEquals(writeChunkRequest.getWriteChunk().getBlockID().toBuilder()
+                .setStorageTypeID(HddsProtos.StorageTypeProto.DISK.getNumber()).build(),
             blockData.getBlockID());
         assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
             .getLen(), blockData.getSize());

@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Function;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecException;
@@ -41,7 +43,7 @@ public class BlockData {
       // allow InvalidProtocolBufferException for backward compatibility with Schema One
       Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance(), true),
       BlockData::getFromProtoBuf,
-      BlockData::getProtoBufMessage,
+      BlockData::getProtoBufMessageForDB,
       BlockData.class);
 
   private final BlockID blockID;
@@ -120,6 +122,19 @@ public class BlockData {
    * @return Proto Buf Message.
    */
   public ContainerProtos.BlockData getProtoBufMessage() throws CodecException {
+    return getProtoBufMessage(blockID.getStorageType());
+  }
+
+  private ContainerProtos.BlockData getProtoBufMessageForDB() throws CodecException {
+    // Storage type belongs to the container; retain it on requests without duplicating it in either block table.
+    return getProtoBufMessage(null);
+  }
+
+  /**
+   * Serializes block metadata with the supplied storage type. Datanode responses use the owning container's
+   * recorded type instead of a possibly stale per-block value. A null type omits the optional field.
+   */
+  public ContainerProtos.BlockData getProtoBufMessage(StorageType storageType) throws CodecException {
     final long sum = computeSize(getChunks());
     if (sum != getSize()) {
       throw new CodecException("Size mismatch: size (=" + getSize()
@@ -129,7 +144,8 @@ public class BlockData {
 
     ContainerProtos.BlockData.Builder builder =
         ContainerProtos.BlockData.newBuilder();
-    builder.setBlockID(this.blockID.getDatanodeBlockIDProtobuf());
+    builder.setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(blockID.getReplicaIndex(),
+        storageType == null ? null : StorageTypeUtils.getID(storageType)));
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
       ContainerProtos.KeyValue.Builder keyValBuilder =
           ContainerProtos.KeyValue.newBuilder();

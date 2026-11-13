@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -42,6 +43,10 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -56,6 +61,8 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.SchemaOneKeyCodec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
@@ -144,6 +151,108 @@ public class TestBlockManagerImpl {
   @AfterEach
   public void cleanup() {
     BlockUtils.shutdownCache(config);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testBlockStorageTypeIsNotPersisted(ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
+    BlockData request = BlockData.getFromProtoBuf(blockData1.getProtoBufMessage(StorageType.DISK));
+    ContainerProtos.BlockData expected = request.getProtoBufMessage(null);
+    blockManager.putBlock(keyValueContainer, request);
+    KeyValueContainerData containerData = keyValueContainer.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      assertEquals(expected, readRawBlock(db, db.getStore().getBlockDataTable(), request.getLocalID()));
+    }
+    BlockUtils.shutdownCache(config);
+    assertEquals(expected, blockManager.getBlock(keyValueContainer, request.getBlockID()).getProtoBufMessage());
+    assertEquals(StorageType.DISK, request.getBlockID().getStorageType());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testExistingBlockStorageTypesRemainReadableAfterReopen(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
+    ContainerProtos.BlockData oldRecord = blockData1.getProtoBufMessage(StorageType.DISK);
+    ContainerProtos.BlockData untypedRecord = blockData.getProtoBufMessage();
+    KeyValueContainerData containerData = keyValueContainer.getContainerData();
+    // Bypass the new writer to reproduce records written by old datanodes, with and without the optional field.
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      Table<byte[], byte[]> raw = db.getStore().getStore().getTable(db.getStore().getBlockDataTable().getName());
+      raw.put(blockKey(oldRecord.getBlockID().getLocalID()), oldRecord.toByteArray());
+      raw.put(blockKey(untypedRecord.getBlockID().getLocalID()), untypedRecord.toByteArray());
+    }
+    BlockUtils.shutdownCache(config);
+    DatanodeStore reopened = BlockUtils.getUncachedDatanodeStore(containerData, config, false);
+    try {
+      for (ContainerProtos.BlockData expected : List.of(oldRecord, untypedRecord)) {
+        BlockID id = BlockID.getFromProtobuf(expected.getBlockID());
+        assertEquals(expected, reopened.getBlockByID(id, containerData.getBlockKey(id.getLocalID()))
+            .getProtoBufMessage());
+      }
+    } finally {
+      // Profile options are shared with subsequent stores in this test JVM.
+      reopened.stop();
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrementalBlockStorageTypeIsNotPersisted(ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
+    Assumptions.assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
+    long blockNo = 2;
+    long fullChunkSize = 4 * 1024 * 1024;
+    BlockData first = BlockData.getFromProtoBuf(createBlockData(1, blockNo, 1, 0, 1024, 1)
+        .getProtoBufMessage(StorageType.DISK));
+    blockManager.putBlock(keyValueContainer, first, false);
+    assertIncrementalTablesHaveNoStorageType(blockNo);
+    BlockData next = BlockData.getFromProtoBuf(
+        createBlockDataWithOneFullChunk(1, blockNo, 2, fullChunkSize, 1024, 2)
+            .getProtoBufMessage(StorageType.DISK));
+    blockManager.putBlock(keyValueContainer, next, false);
+    assertIncrementalTablesHaveNoStorageType(blockNo);
+    BlockData last = BlockData.getFromProtoBuf(createBlockData(1, blockNo, 2, fullChunkSize, 2048, 3)
+        .getProtoBufMessage(StorageType.DISK));
+    blockManager.putBlock(keyValueContainer, last, false);
+    assertIncrementalTablesHaveNoStorageType(blockNo);
+
+    BlockUtils.shutdownCache(config);
+    BlockID id = new BlockID(1, blockNo);
+    BlockData complete = blockManager.getBlock(keyValueContainer, id);
+    assertEquals(fullChunkSize + 2048, complete.getSize());
+    assertEquals(3, complete.getBlockCommitSequenceId());
+    assertEquals(2, complete.getChunks().size());
+    assertEquals(0, complete.getChunks().get(0).getOffset());
+    assertEquals(fullChunkSize, complete.getChunks().get(1).getOffset());
+    assertNull(complete.getBlockID().getStorageType());
+
+    blockManager.finalizeBlock(keyValueContainer, id);
+    KeyValueContainerData containerData = keyValueContainer.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      assertNull(db.getStore().getLastChunkInfoTable().get(containerData.getBlockKey(blockNo)));
+      assertEquals(complete.getProtoBufMessage(), readRawBlock(db, db.getStore().getBlockDataTable(), blockNo));
+    }
+    assertEquals(StorageType.DISK, last.getBlockID().getStorageType());
+  }
+
+  private void assertIncrementalTablesHaveNoStorageType(long blockNo) throws IOException {
+    try (DBHandle db = BlockUtils.getDB(keyValueContainer.getContainerData(), config)) {
+      assertFalse(readRawBlock(db, db.getStore().getBlockDataTable(), blockNo).getBlockID().hasStorageTypeID());
+      assertFalse(readRawBlock(db, db.getStore().getLastChunkInfoTable(), blockNo).getBlockID().hasStorageTypeID());
+    }
+  }
+
+  private ContainerProtos.BlockData readRawBlock(DBHandle db, Table<String, BlockData> table, long blockNo)
+      throws IOException {
+    byte[] bytes = db.getStore().getStore().getTable(table.getName()).get(blockKey(blockNo));
+    assertNotNull(bytes);
+    return ContainerProtos.BlockData.parseFrom(bytes);
+  }
+
+  private byte[] blockKey(long blockNo) throws IOException {
+    KeyValueContainerData containerData = keyValueContainer.getContainerData();
+    Codec<String> codec = containerData.hasSchema(OzoneConsts.SCHEMA_V3) ? FixedLengthStringCodec.get()
+        : containerData.hasSchema(OzoneConsts.SCHEMA_V1) ? SchemaOneKeyCodec.get() : StringCodec.get();
+    return codec.toPersistedFormat(containerData.getBlockKey(blockNo));
   }
 
   @ContainerTestVersionInfo.ContainerTest
