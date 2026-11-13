@@ -57,8 +57,11 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
   // Use a single thread
   private static final int REVOKED_STS_TOKEN_CLEANER_CORE_POOL_SIZE = 1;
   private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
-  // Keep revocation entries until max STS token lifetime after the cutoff was captured.
-  private static final long CLEANUP_THRESHOLD = TimeUnit.SECONDS.toMillis(S3STSUtils.MAX_DURATION_SECONDS); // 12 hours
+  // Allow for the purging OM's clock being ahead of a validating OM's clock.
+  private static final long CLOCK_SKEW_MARGIN = TimeUnit.MINUTES.toMillis(30);
+  // Keep revocation entries until max STS token lifetime plus clock skew margin after the cutoff was captured.
+  private static final long CLEANUP_THRESHOLD =
+      TimeUnit.SECONDS.toMillis(S3STSUtils.MAX_DURATION_SECONDS) + CLOCK_SKEW_MARGIN; // 12 hours+0.5 hour = 12.5 hours
 
   private final OzoneManager ozoneManager;
   private final AtomicBoolean suspended;

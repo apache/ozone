@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
@@ -76,7 +76,7 @@ public class ContainerStateVerifier implements ReplicaVerifier {
               ". Falling back to default: " + DEFAULT_CONTAINER_CACHE_SIZE);
       containerCacheSize = DEFAULT_CONTAINER_CACHE_SIZE;
     }
-    containerCache = CacheBuilder.newBuilder()
+    containerCache = Caffeine.newBuilder()
         .maximumSize(containerCacheSize)
         .build();
   }
