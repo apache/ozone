@@ -32,16 +32,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.MAXIMUM_NUMBER_OF_PARTS_PER_UP
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
@@ -57,7 +56,6 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -141,6 +139,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -244,7 +243,6 @@ public class RpcClient implements ClientProtocol {
   private static final long OM_VERSION_REFRESHING = -1L;
   private volatile OzoneManagerVersion omVersion;
   private final AtomicLong omVersionLastUpdate = new AtomicLong();
-  private final boolean s3AuthCheck;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
@@ -296,14 +294,13 @@ public class RpcClient implements ClientProtocol {
         ozoneManagerProtocolClientSideTranslatorPB =
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
         clientId.toString());
-    this.ozoneManagerClient = TracingUtil.createProxy(
+    this.ozoneManagerClient = TracingUtil.createClientProxy(
         ozoneManagerProtocolClientSideTranslatorPB,
         OzoneManagerClientProtocol.class, conf);
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
     omVersionLastUpdate.set(clock.millis());
-    s3AuthCheck = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false);
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -348,19 +345,16 @@ public class RpcClient implements ClientProtocol {
     long keyProviderCacheExpiryMs = conf.getTimeDuration(
         OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY,
         OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT, TimeUnit.MILLISECONDS);
-    keyProviderCache = CacheBuilder.newBuilder()
+    keyProviderCache = Caffeine.newBuilder()
         .expireAfterAccess(keyProviderCacheExpiryMs, TimeUnit.MILLISECONDS)
-        .removalListener(new RemovalListener<URI, KeyProvider>() {
-          @Override
-          public void onRemoval(
-              @Nonnull RemovalNotification<URI, KeyProvider> notification) {
-            try {
-              assert notification.getValue() != null;
-              notification.getValue().close();
-            } catch (Throwable t) {
-              LOG.error("Error closing KeyProvider with uri [" +
-                  notification.getKey() + "]", t);
-            }
+        // close the removed providers on the calling thread, so that close() closes them before it returns
+        .executor(Runnable::run)
+        .<URI, KeyProvider>removalListener((uri, provider, cause) -> {
+          try {
+            assert provider != null;
+            provider.close();
+          } catch (Throwable t) {
+            LOG.error("Error closing KeyProvider with uri [" + uri + "]", t);
           }
         }).build();
     long maxPoolSize = (long) conf.getStorageSize(
@@ -1366,10 +1360,23 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(
       String volumeName, String bucketName) throws IOException {
+    if (volumeName == null && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion())) {
+      verifyBucketName(bucketName);
+      // Volume name is not important, as we call InfoBucket with
+      // assumeS3Context = true, OM will infer the correct s3 volume.
+      BucketInfoWithS3Context bucketInfo =
+          ozoneManagerClient.getBucketInfo(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT, bucketName, true);
+      bucketInfo.getUserPrincipal().ifPresent(this::updateS3Principal);
+      return buildOzoneBucket(bucketInfo.getBucketInfo());
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
+    return buildOzoneBucket(bucketInfo);
+  }
+
+  private OzoneBucket buildOzoneBucket(OmBucketInfo bucketInfo) {
     return OzoneBucket.newBuilder(conf, this)
         .setVolumeName(bucketInfo.getVolumeName())
         .setName(bucketInfo.getBucketName())
@@ -1566,7 +1573,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private void checkIfNoneMatchETagSupport() throws IOException {
-    if (getOmVersion().compareTo(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) < 0) {
+    if (!OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support If-None-Match entity ETags for writes.");
     }
   }
@@ -1860,6 +1867,14 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive,
       String expectedETag) throws IOException {
+    if (expectedETag != null && !OzoneManagerVersion.CONDITIONAL_DELETE.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support conditional key deletion.");
+    }
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
@@ -1867,7 +1882,8 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRecursive(recursive);
+        .setRecursive(recursive)
+        .setAssumeS3Context(assumeS3Context);
     if (expectedETag != null) {
       keyArgs.setExpectedETag(expectedETag);
     }
@@ -1901,6 +1917,12 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void renameKey(String volumeName, String bucketName,
       String fromKeyName, String toKeyName) throws IOException {
+    renameKey(volumeName, bucketName, fromKeyName, toKeyName, false);
+  }
+
+  @Override
+  public void renameKey(String volumeName, String bucketName,
+      String fromKeyName, String toKeyName, boolean requireFileSystemOptimized) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     if (checkKeyNameEnabled) {
@@ -1911,6 +1933,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(fromKeyName)
+        .setRequireFileSystemOptimized(requireFileSystemOptimized)
         .build();
     ozoneManagerClient.renameKey(keyArgs, toKeyName);
   }
@@ -2399,6 +2422,11 @@ public class RpcClient implements ClientProtocol {
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
       String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
       String excludedETag) throws IOException {
+    // Conditional MPU completion and atomic create-if-absent first shipped in 2.2.0.
+    if ((expectedDataGeneration != null || expectedETag != null)
+        && !OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support conditional multipart upload completion.");
+    }
     if (excludedETag != null) {
       checkIfNoneMatchETagSupport();
     }
@@ -3002,10 +3030,11 @@ public class RpcClient implements ClientProtocol {
     }
 
     try {
-      return keyProviderCache.get(kmsUri, new Callable<KeyProvider>() {
-        @Override
-        public KeyProvider call() throws Exception {
-          return OzoneKMSUtil.getKeyProvider(conf, kmsUri);
+      return keyProviderCache.get(kmsUri, uri -> {
+        try {
+          return OzoneKMSUtil.getKeyProvider(conf, uri);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
         }
       });
     } catch (Exception e) {
@@ -3205,7 +3234,7 @@ public class RpcClient implements ClientProtocol {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
-    boolean assumeS3Context = volumeName == null && s3AuthCheck
+    boolean assumeS3Context = volumeName == null
         && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
     if (assumeS3Context) {
       volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
@@ -3248,6 +3277,11 @@ public class RpcClient implements ClientProtocol {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
@@ -3255,6 +3289,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setAssumeS3Context(assumeS3Context)
         .build();
     ozoneManagerClient.deleteObjectTagging(keyArgs);
   }

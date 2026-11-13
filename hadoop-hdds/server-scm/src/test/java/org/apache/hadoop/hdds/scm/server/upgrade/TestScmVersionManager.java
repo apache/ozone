@@ -56,7 +56,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.ScmUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.AbstractComponentVersionManagerTest;
+import org.apache.hadoop.ozone.upgrade.AbstractRatisBasedVersionManagerTest;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +68,7 @@ import org.junit.jupiter.params.provider.Arguments;
  * Tests for {@link ScmVersionManager} using on-disk {@link SCMStorageConfig}
  * under a JUnit temp directory.
  */
-class TestScmVersionManager extends AbstractComponentVersionManagerTest {
+class TestScmVersionManager extends AbstractRatisBasedVersionManagerTest {
 
   private OzoneConfiguration conf;
 
@@ -128,6 +128,12 @@ class TestScmVersionManager extends AbstractComponentVersionManagerTest {
   @Override
   protected ComponentVersion expectedSoftwareVersion() {
     return HDDSVersion.SOFTWARE_VERSION;
+  }
+
+  @Override
+  protected ComponentVersion lastLayoutFeature() {
+    HDDSLayoutFeature[] features = HDDSLayoutFeature.values();
+    return features[features.length - 1];
   }
 
   @Override

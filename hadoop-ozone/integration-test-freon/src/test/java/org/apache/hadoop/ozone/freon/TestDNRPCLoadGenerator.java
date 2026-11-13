@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,7 +45,7 @@ import picocli.CommandLine;
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestDNRPCLoadGenerator implements NonHATests.TestCase {
+public abstract class TestDNRPCLoadGenerator implements ClusterForTests.TestCase {
 
   private ContainerWithPipeline container;
 

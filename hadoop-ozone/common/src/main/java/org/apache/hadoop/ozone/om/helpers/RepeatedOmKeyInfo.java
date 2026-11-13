@@ -111,8 +111,8 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   }
 
   /**
-   * Returns a pair of long values representing the replicated size and
-   * unreplicated size of all the keys in the list.
+   * Returns a pair of long values representing the unreplicated size and
+   * replicated size of all the keys in the list.
    */
   public ImmutablePair<Long, Long> getTotalSize() {
     long replicatedSize = 0;

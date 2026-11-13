@@ -25,6 +25,9 @@
   <name>Apache Ozone FileSystem Shaded</name>
 
   <properties>
+    <ban-httpcomponents.skip>false</ban-httpcomponents.skip>
+    <ban-rocksdb.skip>false</ban-rocksdb.skip>
+    <ban-unshaded-grpc.skip>false</ban-unshaded-grpc.skip>
     <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
@@ -37,30 +40,6 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-resolver-dns-native-macos</artifactId>
-      <classifier>osx-x86_64</classifier>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-tcnative-boringssl-static</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-epoll</artifactId>
-      <classifier>linux-aarch_64</classifier>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-epoll</artifactId>
-      <classifier>linux-x86_64</classifier>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-kqueue</artifactId>
-      <classifier>osx-x86_64</classifier>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -156,6 +135,7 @@
                          To prevent conflicts, remove them from Ozone release package.-->
                     <exclude>javax/annotation/**</exclude>
                     <!-- Filter ratis thirdparty shaded netty_tcnative libs -->
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_resolver_dns_native_macos_aarch_64.jnilib</exclude>
                     <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_resolver_dns_native_macos_x86_64.jnilib</exclude>
                     <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_tcnative_linux_aarch_64.so</exclude>
                     <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_tcnative_linux_x86_64.so</exclude>
@@ -163,18 +143,9 @@
                     <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_tcnative_osx_x86_64.jnilib</exclude>
                     <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_transport_native_epoll_aarch_64.so</exclude>
                     <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_transport_native_epoll_x86_64.so</exclude>
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_transport_native_kqueue_aarch_64.jnilib</exclude>
                     <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_transport_native_kqueue_x86_64.jnilib</exclude>
                     <exclude>META-INF/native/org_apache_ratis_thirdparty_netty_tcnative_windows_x86_64.dll</exclude>
-                    <!-- Filter unshaded netty_tcnative libs -->
-                    <exclude>META-INF/native/libnetty_resolver_dns_native_macos_x86_64.jnilib</exclude>
-                    <exclude>META-INF/native/libnetty_tcnative_linux_aarch_64.so</exclude>
-                    <exclude>META-INF/native/libnetty_tcnative_linux_x86_64.so</exclude>
-                    <exclude>META-INF/native/libnetty_tcnative_osx_aarch_64.jnilib</exclude>
-                    <exclude>META-INF/native/libnetty_tcnative_osx_x86_64.jnilib</exclude>
-                    <exclude>META-INF/native/libnetty_transport_native_epoll_aarch_64.so</exclude>
-                    <exclude>META-INF/native/libnetty_transport_native_epoll_x86_64.so</exclude>
-                    <exclude>META-INF/native/libnetty_transport_native_kqueue_x86_64.jnilib</exclude>
-                    <exclude>META-INF/native/netty_tcnative_windows_x86_64.dll</exclude>
                   </excludes>
                 </filter>
               </filters>
@@ -307,12 +278,9 @@
             </goals>
             <phase>validate</phase>
             <configuration>
-              <includeGroupIds>io.netty,org.apache.ratis</includeGroupIds>
+              <includeGroupIds>org.apache.ratis</includeGroupIds>
               <includes>**/META-INF/native/*</includes>
-              <includeArtifactIds>netty-resolver-dns-native-macos,
-                netty-tcnative-boringssl-static,
-                netty-transport-native-epoll,
-                netty-transport-native-kqueue,ratis-thirdparty-misc</includeArtifactIds>
+              <includeArtifactIds>ratis-thirdparty-misc</includeArtifactIds>
               <outputDirectory>${project.build.directory}/classes/</outputDirectory>
               <overWriteReleases>true</overWriteReleases>
               <overWriteSnapshots>true</overWriteSnapshots>
@@ -335,6 +303,10 @@
             <configuration>
               <fileSets>
                 <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_resolver_dns_native_macos_aarch_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_resolver_dns_native_macos_aarch_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
                   <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_resolver_dns_native_macos_x86_64.jnilib</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_resolver_dns_native_macos_x86_64.jnilib</destinationFile>
                 </fileSet>
@@ -345,6 +317,10 @@
                 <fileSet>
                   <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_transport_native_epoll_x86_64.so</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_transport_native_epoll_x86_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_transport_native_kqueue_aarch_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_transport_native_kqueue_aarch_64.jnilib</destinationFile>
                 </fileSet>
                 <fileSet>
                   <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_transport_native_kqueue_x86_64.jnilib</sourceFile>
@@ -369,42 +345,6 @@
                 <fileSet>
                   <sourceFile>${project.build.directory}/classes/META-INF/native/${ratis.thirdparty.shaded.native.prefix}netty_tcnative_windows_x86_64.dll</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_windows_x86_64.dll</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_resolver_dns_native_macos_x86_64.jnilib</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_resolver_dns_native_macos_x86_64.jnilib</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_epoll_aarch_64.so</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_transport_native_epoll_aarch_64.so</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_epoll_x86_64.so</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_transport_native_epoll_x86_64.so</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_kqueue_x86_64.jnilib</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_transport_native_kqueue_x86_64.jnilib</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_linux_aarch_64.so</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_tcnative_linux_aarch_64.so</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_linux_x86_64.so</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_tcnative_linux_x86_64.so</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_osx_aarch_64.jnilib</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_tcnative_osx_aarch_64.jnilib</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_osx_x86_64.jnilib</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_tcnative_osx_x86_64.jnilib</destinationFile>
-                </fileSet>
-                <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/netty_tcnative_windows_x86_64.dll</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/${ozone.shaded.native.prefix}_netty_tcnative_windows_x86_64.dll</destinationFile>
                 </fileSet>
               </fileSets>
             </configuration>

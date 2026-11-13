@@ -31,7 +31,7 @@ import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * Class which tests the SCMNodeManagerInfo Bean.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestSCMNodeManagerMXBean implements NonHATests.TestCase {
+public abstract class TestSCMNodeManagerMXBean implements ClusterForTests.TestCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
   private StorageContainerManager scm;

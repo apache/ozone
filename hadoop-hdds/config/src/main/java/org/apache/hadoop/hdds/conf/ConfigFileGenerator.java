@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
 import java.util.Set;
@@ -49,6 +51,8 @@ public class ConfigFileGenerator extends AbstractProcessor {
 
   private static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";
   private static final String OUTPUT_FILE_POSTFIX = "-default.xml";
+  private static final String TEST_OUTPUT_FILE_POSTFIX = "-test-default.xml";
+  private static final String TEST_OUTPUT_DIR = "test-classes";
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
@@ -69,7 +73,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
       if (currentArtifactId == null || currentArtifactId.isEmpty()) {
         outputFileName = OUTPUT_FILE_NAME;
       } else {
-        outputFileName = currentArtifactId + OUTPUT_FILE_POSTFIX;
+        outputFileName = currentArtifactId + (isTestOutput(filer) ? TEST_OUTPUT_FILE_POSTFIX : OUTPUT_FILE_POSTFIX);
       }
       try (InputStream input = filer
           .getResource(StandardLocation.CLASS_OUTPUT, "",
@@ -107,6 +111,20 @@ public class ConfigFileGenerator extends AbstractProcessor {
           "Can't generate the config file from annotation: " + e);
     }
     return false;
+  }
+
+  /**
+   * Test sources are compiled into {@value #TEST_OUTPUT_DIR}, which tests of dependent modules put on the
+   * classpath together with the main output. A test fragment must not share the name of the main one,
+   * or whichever comes first on the classpath hides the other.
+   */
+  private static boolean isTestOutput(Filer filer) throws IOException {
+    URI uri = filer.getResource(StandardLocation.CLASS_OUTPUT, "", OUTPUT_FILE_NAME).toUri();
+    if (!"file".equals(uri.getScheme())) {
+      return false;
+    }
+    File dir = new File(uri).getParentFile();
+    return dir != null && TEST_OUTPUT_DIR.equals(dir.getName());
   }
 
   private void writeConfigAnnotations(ConfigGroup configGroup,
