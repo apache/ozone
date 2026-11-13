@@ -73,8 +73,15 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     Preconditions.checkArgument(!chunkInfoList.isEmpty());
 
     final MessageDigest digester = MD5Hash.getDigester();
+    final int numData = ((ECReplicationConfig) keyInfo.getReplicationConfig()).getData();
+    // A replica can list a stripe beyond the block length: a stripe whose write failed on another replica is written
+    // again into the next block group, but the replicas that stored it keep it.
+    long remaining = blockLength;
 
     for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
+      if (remaining <= 0) {
+        break;
+      }
       long chunkSize = chunkInfo.getLen();
       long bytesPerCrc = chunkInfo.getChecksumData().getBytesPerChecksum();
       // Total parity checksum bytes per stripe to remove
@@ -89,6 +96,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
       final ByteBuffer byteWrap = stripeChecksum.asReadOnlyByteBuffer();
       byteWrap.limit(checksumSize - parityBytes);
       digester.update(byteWrap);
+      remaining -= chunkSize * numData;
     }
 
     final byte[] fileMD5 = digester.digest();
@@ -140,7 +148,8 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
       final ByteBuffer byteWrap = stripeChecksum.asReadOnlyByteBuffer();
       byteWrap.limit(checksumSize - parityBytes);
 
-      while (byteWrap.hasRemaining()) {
+      // Stop at the block length, the replica can list a stripe beyond it (see computeMd5Crc).
+      while (byteWrap.hasRemaining() && blockSize > 0) {
         // Here Math.min in mainly required for last stripe's last chunk. The last chunk of the last stripe can be
         // less than the chunkSize, chunkSize is only calculated from each stripe's first chunk. This would be fine
         // for rest of the stripe because all the chunks are of the same size. But for the last stripe we don't know
