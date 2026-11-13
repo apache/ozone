@@ -313,7 +313,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // This happens when network topology is absent or
     // all nodes are on the same rack.
     if (checkAllNodesAreEqual(nodeManager.getClusterNetworkTopologyMap())) {
-      return super.getResultSet(nodesRequired, healthyNodes);
+      return super.getResultSet(nodesRequired, healthyNodes, storageType);
     } else {
       // Since topology and rack awareness are available, picks nodes
       // based on them.

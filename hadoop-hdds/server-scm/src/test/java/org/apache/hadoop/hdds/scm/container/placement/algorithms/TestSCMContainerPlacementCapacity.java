@@ -23,14 +23,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -47,11 +53,84 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test for the scm container placement.
  */
 public class TestSCMContainerPlacementCapacity {
+
+  @ParameterizedTest
+  @CsvSource({"SSD,0,1,1", "SSD,1,0,1", "DISK,0,1,0", "DISK,1,0,0", ",0,1,0", ",1,0,0"})
+  void chooseNodeRanksOnRequestedStorageType(StorageType storageType, int firstIndex, int secondIndex,
+      int expectedIndex) {
+    List<DatanodeDetails> nodes = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails());
+    NodeManager nodeManager = mock(NodeManager.class);
+    // Node 0: 10% used overall, 95% used on SSD. Node 1: 50% overall, 5% on SSD.
+    when(nodeManager.getNodeStat(nodes.get(0))).thenReturn(nodeMetric(95, 5));
+    when(nodeManager.getNodeStat(nodes.get(1))).thenReturn(nodeMetric(5, 495));
+    SCMContainerPlacementMetrics metrics = mock(SCMContainerPlacementMetrics.class);
+    SCMContainerPlacementCapacity policy = spy(new SCMContainerPlacementCapacity(
+        nodeManager, new OzoneConfiguration(), null, true, metrics));
+    Random random = mock(Random.class);
+    when(random.nextInt(2)).thenReturn(firstIndex, secondIndex);
+    doReturn(random).when(policy).getRand();
+    List<DatanodeDetails> candidates = new ArrayList<>(nodes);
+
+    DatanodeDetails selected = storageType == null
+        ? policy.chooseNode(candidates) : policy.chooseNode(candidates, storageType);
+
+    assertEquals(nodes.get(expectedIndex), selected);
+    assertThat(candidates).containsExactly(nodes.get(1 - expectedIndex));
+    verify(metrics).incrDatanodeChooseAttemptCount();
+    verify(metrics).incrDatanodeChooseSuccessCount();
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1})
+  void chooseNodeKeepsSameIndexSelection(int index) {
+    NodeManager nodeManager = mock(NodeManager.class);
+    SCMContainerPlacementCapacity policy = spy(new SCMContainerPlacementCapacity(
+        nodeManager, new OzoneConfiguration(), null, true, mock(SCMContainerPlacementMetrics.class)));
+    Random random = mock(Random.class);
+    when(random.nextInt(2)).thenReturn(index);
+    doReturn(random).when(policy).getRand();
+    List<DatanodeDetails> nodes = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails());
+    List<DatanodeDetails> candidates = new ArrayList<>(nodes);
+
+    assertEquals(nodes.get(index), policy.chooseNode(candidates, StorageType.SSD));
+    assertThat(candidates).containsExactly(nodes.get(1 - index));
+    verify(nodeManager, never()).getNodeStat(any());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"SSD,1", "DISK,0", ",0"})
+  void chooseDatanodesUsesRequestedStorageType(StorageType storageType, int expectedIndex) throws SCMException {
+    List<DatanodeInfo> nodes = new ArrayList<>();
+    for (int i = 0; i < 2; i++) {
+      nodes.add(new DatanodeInfo(MockDatanodeDetails.randomDatanodeDetails(), NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
+    }
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenAnswer(ignored -> new ArrayList<>(nodes));
+    when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class), any())).thenReturn(true);
+    when(nodeManager.getNodeStat(nodes.get(0))).thenReturn(nodeMetric(95, 5));
+    when(nodeManager.getNodeStat(nodes.get(1))).thenReturn(nodeMetric(5, 495));
+    SCMContainerPlacementCapacity policy = spy(new SCMContainerPlacementCapacity(
+        nodeManager, new OzoneConfiguration(), null, true, mock(SCMContainerPlacementMetrics.class)));
+    Random random = mock(Random.class);
+    when(random.nextInt(2)).thenReturn(0, 1);
+    doReturn(random).when(policy).getRand();
+
+    List<DatanodeDetails> selected = policy.chooseDatanodes(
+        Collections.emptyList(), Collections.emptyList(), null, 1, 0, 1, storageType);
+
+    assertThat(selected).containsExactly(nodes.get(expectedIndex));
+  }
 
   @Test
   public void chooseDatanodes() throws SCMException {
@@ -182,5 +261,21 @@ public class TestSCMContainerPlacementCapacity {
         singletonMap(StorageType.DEFAULT, committed),
         singletonMap(StorageType.DEFAULT, freeSpaceToSpare),
         singletonMap(StorageType.DEFAULT, reserved));
+  }
+
+  private static SCMNodeMetric nodeMetric(long ssdUsed, long diskUsed) {
+    Map<StorageType, Long> capacity = new HashMap<>();
+    capacity.put(StorageType.SSD, 100L);
+    capacity.put(StorageType.DISK, 900L);
+    Map<StorageType, Long> used = new HashMap<>();
+    used.put(StorageType.SSD, ssdUsed);
+    used.put(StorageType.DISK, diskUsed);
+    Map<StorageType, Long> remaining = new HashMap<>();
+    remaining.put(StorageType.SSD, 100L - ssdUsed);
+    remaining.put(StorageType.DISK, 900L - diskUsed);
+    Map<StorageType, Long> zeros = new HashMap<>();
+    zeros.put(StorageType.SSD, 0L);
+    zeros.put(StorageType.DISK, 0L);
+    return new SCMNodeMetric(capacity, used, remaining, zeros, zeros, zeros);
   }
 }
