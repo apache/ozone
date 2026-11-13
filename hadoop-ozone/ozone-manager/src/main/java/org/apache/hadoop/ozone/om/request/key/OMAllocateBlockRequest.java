@@ -121,6 +121,13 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
             ACLType.WRITE, allocateBlockRequest.getClientID());
 
+    // An older client does not send the storage policy in allocateBlock requests. Using the bucket policy for them
+    // is wrong when the bucket policy changes while the key is being written.
+    // Example: the bucket policy is HOT when an older client opens the key, so the first blocks go to the SSD tier.
+    // The bucket policy then changes to COLD. The next allocateBlock request has no policy, so OM would use COLD
+    // and put the next blocks of the same key on the ARCHIVE tier.
+    // To prevent this, use the policy stored on the open key.
+    // A newer client will always send the storage policy resolved by the OM.
     final StoragePolicy storagePolicy = resolveStoragePolicy(ozoneManager, bucketInfo, resolvedKeyArgs,
         allocateBlockRequest.getClientID());
 
