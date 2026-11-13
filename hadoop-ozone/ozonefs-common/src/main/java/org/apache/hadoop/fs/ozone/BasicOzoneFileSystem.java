@@ -902,12 +902,20 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public BlockLocation[] getFileBlockLocations(Path p, long start, long len) throws IOException {
+    checkBlockLocationsRange(start, len);
     // One GetFileStatus with block locations, instead of getFileStatus followed by another for the locations.
     FileStatus fileStatus = getFileStatus(p, false);
     if (fileStatus instanceof LocatedFileStatus) {
       return getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
     }
     return super.getFileBlockLocations(fileStatus, start, len);
+  }
+
+  /** Rejects the range like {@link org.apache.hadoop.fs.FileSystem#getFileBlockLocations(FileStatus, long, long)}. */
+  static void checkBlockLocationsRange(long start, long len) {
+    if (start < 0 || len < 0) {
+      throw new IllegalArgumentException("Invalid start or len parameter");
+    }
   }
 
   /**
@@ -922,9 +930,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    * Like HDFS, return only the blocks that overlap [start, start + len), or the block containing start if len is 0.
    */
   static BlockLocation[] getBlockLocationsInRange(LocatedFileStatus fileStatus, long start, long len) {
-    if (start < 0 || len < 0) {
-      throw new IllegalArgumentException("Invalid start or len parameter");
-    }
+    checkBlockLocationsRange(start, len);
     BlockLocation[] blocks = fileStatus.getBlockLocations();
     if (blocks == null) {
       return null;

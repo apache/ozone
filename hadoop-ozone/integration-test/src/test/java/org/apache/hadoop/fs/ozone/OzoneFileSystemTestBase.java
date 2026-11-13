@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -184,7 +183,8 @@ public abstract class OzoneFileSystemTestBase {
       assertEquals(expected.length, blockLocations.length);
       for (int i = 0; i < expected.length; i++) {
         assertThat(blockLocations[i].getNames().length).isGreaterThanOrEqualTo(1);
-        assertArrayEquals(expected[i].getHosts(), blockLocations[i].getHosts());
+        // OM shuffles datanodes at the same distance, so the two lookups can order the hosts differently
+        assertThat(blockLocations[i].getHosts()).containsExactlyInAnyOrder(expected[i].getHosts());
         assertEquals(expected[i].getOffset(), blockLocations[i].getOffset());
         assertEquals(expected[i].getLength(), blockLocations[i].getLength());
       }

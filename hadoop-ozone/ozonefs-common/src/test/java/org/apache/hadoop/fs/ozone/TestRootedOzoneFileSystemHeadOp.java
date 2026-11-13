@@ -170,7 +170,19 @@ public class TestRootedOzoneFileSystemHeadOp {
 
     assertThat(fs.getFileBlockLocations(status, 0, 250)).containsExactly(BLOCKS);
     assertThat(fs.getFileBlockLocations(status, 150, 10)).containsExactly(BLOCKS[1]);
-    verifyStatusCalls(1, 2);
+    // like HDFS, an empty range returns the block containing start
+    assertThat(fs.getFileBlockLocations(status, 150, 0)).containsExactly(BLOCKS[1]);
+    verifyStatusCalls(1, 3);
+  }
+
+  @Test
+  public void getFileBlockLocationsOfPathRejectsInvalidRangeWithoutRpc() throws IOException {
+    stubFileWithBlocks();
+    Path file = new Path("/vol/bucket/file");
+
+    assertThrows(IllegalArgumentException.class, () -> fs.getFileBlockLocations(file, -1, 10));
+    assertThrows(IllegalArgumentException.class, () -> fs.getFileBlockLocations(file, 0, -1));
+    verifyStatusCalls(0, 0);
   }
 
   @Test

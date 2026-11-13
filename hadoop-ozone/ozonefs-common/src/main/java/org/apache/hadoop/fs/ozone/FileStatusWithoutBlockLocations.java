@@ -35,7 +35,9 @@ final class FileStatusWithoutBlockLocations extends FileStatus {
   private final boolean erasureCoded;
 
   /**
-   * @param erasureCoded {@code status.isErasureCoded()}, which is not in Hadoop 2
+   * @param erasureCoded the erasure coded flag of the {@link FileStatusAdapter}: passed separately because the
+   *     ozonefs-hadoop2 {@code constructFileStatus} builds {@code status} with the Hadoop 2 constructor, which has no
+   *     erasure coded flag, and {@code FileStatus#isErasureCoded} does not exist in Hadoop 2
    */
   FileStatusWithoutBlockLocations(FileStatus status, boolean erasureCoded) throws IOException {
     // the copy constructor does not copy the encrypted and erasure coded flags

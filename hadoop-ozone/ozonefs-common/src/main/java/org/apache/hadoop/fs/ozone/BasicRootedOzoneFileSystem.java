@@ -1184,6 +1184,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public BlockLocation[] getFileBlockLocations(Path p, long start, long len) throws IOException {
+    BasicOzoneFileSystem.checkBlockLocationsRange(start, len);
     // One GetFileStatus with block locations, instead of getFileStatus followed by another for the locations.
     FileStatus fileStatus = TracingUtil.executeInNewSpan("ofs getFileBlockLocations",
         () -> convertFileStatus(getFileStatusAdapter(p, false)));
