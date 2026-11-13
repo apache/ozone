@@ -37,7 +37,7 @@ public final class OnDemandScannerMetrics
 
   public static OnDemandScannerMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = MetricUtil.qualifySourceName("On-demand container scanner metrics", component);
+    String name = MetricUtil.getMetricsSourceName("On-demand container scanner metrics", component);
     return ms.register(name, null, new OnDemandScannerMetrics(name, ms));
   }
 }

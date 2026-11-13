@@ -132,7 +132,7 @@ public final class ContainerMetrics implements Closeable {
 
   public static ContainerMetrics create(ConfigurationSource conf, String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String sourceName = MetricUtil.qualifySourceName(STORAGE_CONTAINER_METRICS, component);
+    String sourceName = MetricUtil.getMetricsSourceName(STORAGE_CONTAINER_METRICS, component);
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
         conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);

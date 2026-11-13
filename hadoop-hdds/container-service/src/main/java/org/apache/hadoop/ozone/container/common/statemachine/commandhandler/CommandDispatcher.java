@@ -54,7 +54,7 @@ public final class CommandDispatcher {
    * @param handlers - Set of handlers.
    */
   private CommandDispatcher(OzoneContainer container, SCMConnectionManager
-      connectionManager, StateContext context, String metricsSourceComponent,
+      connectionManager, StateContext context, String metricsSourceId,
       CommandHandler... handlers) {
     this.context = context;
     this.container = container;
@@ -69,7 +69,7 @@ public final class CommandDispatcher {
       }
       handlerMap.put(h.getCommandType(), h);
     }
-    commandHandlerMetrics = CommandHandlerMetrics.create(handlerMap, metricsSourceComponent);
+    commandHandlerMetrics = CommandHandlerMetrics.create(handlerMap, metricsSourceId);
   }
 
   @VisibleForTesting
@@ -142,7 +142,7 @@ public final class CommandDispatcher {
     private OzoneContainer container;
     private StateContext context;
     private SCMConnectionManager connectionManager;
-    private String metricsSourceComponent;
+    private String metricsSourceId;
 
     public Builder() {
       handlerList = new LinkedList<>();
@@ -197,8 +197,8 @@ public final class CommandDispatcher {
       return this;
     }
 
-    public Builder setMetricsSourceComponent(String component) {
-      this.metricsSourceComponent = component;
+    public Builder setMetricsSourceId(String metricsSourceId) {
+      this.metricsSourceId = metricsSourceId;
       return this;
     }
 
@@ -213,7 +213,7 @@ public final class CommandDispatcher {
       Preconditions.checkArgument(!this.handlerList.isEmpty(),
           "The number of command handlers must be greater than 0.");
       return new CommandDispatcher(this.container, this.connectionManager,
-          this.context, this.metricsSourceComponent, handlerList.toArray(
+          this.context, this.metricsSourceId, handlerList.toArray(
               new CommandHandler[handlerList.size()]));
     }
   }

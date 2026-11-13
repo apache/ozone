@@ -111,26 +111,6 @@ public final class MetricUtil {
     }).collect(Collectors.toList());
   }
 
-  /**
-   * Qualifies a metrics-source name with a per-instance component from {@link #metricsSourceComponent(String)}.
-   * A null {@code component} keeps the original name. Non-alphanumeric characters are dropped from
-   * {@code component}, so the datanode UUID {@code abc-123} yields {@code <base>.abc123}. Recon resolves datanode
-   * metrics by these bean names, so the spelling is a contract rather than cosmetic.
-   */
-  public static String qualifySourceName(String base, String component) {
-    return component == null ? base : base + "." + component.replaceAll("[^A-Za-z0-9]+", "");
-  }
-
-  /**
-   * Returns {@code component} when services share this JVM, as in MiniOzoneCluster and ozone local, which both set
-   * {@link DefaultMetricsSystem#setMiniClusterMode}; returns null for a standalone service, which keeps its names.
-   * In mini-cluster mode Hadoop registers a duplicate source as {@code <name>-1} while its owner still unregisters
-   * {@code <name>}, removing another instance's source and leaking its own.
-   */
-  public static String metricsSourceComponent(String component) {
-    return DefaultMetricsSystem.inMiniClusterMode() ? component : null;
-  }
-
   public static void stop(MutableQuantiles... quantiles) {
     if (quantiles != null) {
       stop(Arrays.asList(quantiles));

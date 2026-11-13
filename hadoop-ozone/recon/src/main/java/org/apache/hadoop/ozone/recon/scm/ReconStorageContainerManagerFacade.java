@@ -123,7 +123,6 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
@@ -379,8 +378,7 @@ public class ReconStorageContainerManagerFacade
 
     // Use a version manager with no upgrade actions. The version will only be used to track Datanode versions,
     // not run SCM specific reformatting on upgrade.
-    this.scmVersionManager = new ScmVersionManager(scmStorageConfig, this, HashMap::new,
-        MetricUtil.metricsSourceComponent("ReconSCM"));
+    this.scmVersionManager = new ScmVersionManager(scmStorageConfig, this, HashMap::new, "ReconSCM");
     this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(

@@ -26,10 +26,22 @@ import static org.mockito.Mockito.when;
 
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Tests component version metrics when services share a JVM. */
 class TestComponentVersionManagerMetrics {
+
+  @BeforeEach
+  void enableMiniClusterMode() {
+    DefaultMetricsSystem.setMiniClusterMode(true);
+  }
+
+  @AfterEach
+  void resetMiniClusterMode() {
+    DefaultMetricsSystem.setMiniClusterMode(false);
+  }
 
   @Test
   void qualifiedSourcesKeepTheirOwnVersionsAndCleanup() {
@@ -43,14 +55,14 @@ class TestComponentVersionManagerMetrics {
     ComponentVersionManagerMetrics scm = ComponentVersionManagerMetrics.create(first, "SCM");
     ComponentVersionManagerMetrics dn = ComponentVersionManagerMetrics.create(second, "dn-123");
     try {
-      assertSame(scm, DefaultMetricsSystem.instance().getSource(base + ".SCM"));
-      assertSame(dn, DefaultMetricsSystem.instance().getSource(base + ".dn123"));
-      assertGauge("ApparentVersion", HDDSVersion.values()[0].serialize(), getMetrics(base + ".SCM"));
-      assertGauge("ApparentVersion", HDDSVersion.SOFTWARE_VERSION.serialize(), getMetrics(base + ".dn123"));
+      assertSame(scm, DefaultMetricsSystem.instance().getSource(base + "-SCM"));
+      assertSame(dn, DefaultMetricsSystem.instance().getSource(base + "-dn-123"));
+      assertGauge("ApparentVersion", HDDSVersion.values()[0].serialize(), getMetrics(base + "-SCM"));
+      assertGauge("ApparentVersion", HDDSVersion.SOFTWARE_VERSION.serialize(), getMetrics(base + "-dn-123"));
       scm.unRegister();
-      assertNull(DefaultMetricsSystem.instance().getSource(base + ".SCM"));
-      assertSame(dn, DefaultMetricsSystem.instance().getSource(base + ".dn123"));
-      assertGauge("SoftwareVersion", HDDSVersion.SOFTWARE_VERSION.serialize(), getMetrics(base + ".dn123"));
+      assertNull(DefaultMetricsSystem.instance().getSource(base + "-SCM"));
+      assertSame(dn, DefaultMetricsSystem.instance().getSource(base + "-dn-123"));
+      assertGauge("SoftwareVersion", HDDSVersion.SOFTWARE_VERSION.serialize(), getMetrics(base + "-dn-123"));
     } finally {
       scm.unRegister();
       dn.unRegister();

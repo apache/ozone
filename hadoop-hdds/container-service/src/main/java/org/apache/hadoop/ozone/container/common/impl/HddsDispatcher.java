@@ -139,7 +139,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   public HddsDispatcher(ConfigurationSource config, ContainerSet contSet,
       VolumeSet volumes, Map<ContainerType, Handler> handlers,
       StateContext context, ContainerMetrics metrics,
-      TokenVerifier tokenVerifier, String metricsSourceComponent) {
+      TokenVerifier tokenVerifier, String metricsSourceId) {
     this.conf = config;
     this.containerSet = contSet;
     this.context = context;
@@ -154,7 +154,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     protocolMetrics =
         new ProtocolMessageMetrics<>(
-            getMetricsName(metricsSourceComponent),
+            getMetricsName(metricsSourceId),
             "HDDS dispatcher metrics",
             Type.class);
 
@@ -166,8 +166,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             HddsUtils::processForDebug);
   }
 
-  private static String getMetricsName(String metricsSourceComponent) {
-    return MetricUtil.qualifySourceName("HddsDispatcher", metricsSourceComponent);
+  private static String getMetricsName(String metricsSourceId) {
+    return MetricUtil.getMetricsSourceName("HddsDispatcher", metricsSourceId);
   }
 
   @Override

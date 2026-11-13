@@ -190,7 +190,6 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
-import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -486,7 +485,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     registerMXBean();
     registerMetricsSource(this);
-    this.nettyMetrics = NettyMetrics.create(MetricUtil.metricsSourceComponent("SCM"));
+    this.nettyMetrics = NettyMetrics.create(getScmId());
   }
 
   private void initializeEventHandlers() {
@@ -712,8 +711,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       leaseManager = new LeaseManager<>(threadNamePrefix, timeDuration);
     }
 
-    versionManager = new ScmVersionManager(scmStorageConfig, this, new ScmUpgradeActionProvider(),
-        MetricUtil.metricsSourceComponent("SCM"));
+    versionManager = new ScmVersionManager(scmStorageConfig, this, new ScmUpgradeActionProvider(), getScmId());
     finalizationManager = new FinalizationManagerImpl.Builder()
         .setHAManager(scmHAManager)
         .setFinalizationStore(scmMetadataStore.getMetaTable())

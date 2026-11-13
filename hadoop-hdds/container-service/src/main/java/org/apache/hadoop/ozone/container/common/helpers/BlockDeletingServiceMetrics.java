@@ -89,18 +89,18 @@ public final class BlockDeletingServiceMetrics {
     this.sourceName = sourceName;
   }
 
-  public static BlockDeletingServiceMetrics create(String component) {
+  public static BlockDeletingServiceMetrics create(String datanodeId) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String sourceName = getSourceName(component);
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, datanodeId);
     return ms.register(sourceName, "BlockDeletingService", new BlockDeletingServiceMetrics(sourceName));
   }
 
   /**
-   * Returns the metrics source name registered by {@link #create(String)} for the given component,
-   * e.g. for looking up the JMX bean of a specific datanode.
+   * Returns the source name {@link #create(String)} registers for {@code datanodeId} when datanodes share a JVM,
+   * so Recon can find the JMX bean of that datanode regardless of its own metrics mode.
    */
-  public static String getSourceName(String component) {
-    return MetricUtil.qualifySourceName(SOURCE_NAME, component);
+  public static String getSourceName(String datanodeId) {
+    return SOURCE_NAME + '-' + datanodeId;
   }
 
   public void unregister() {

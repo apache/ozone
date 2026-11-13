@@ -109,8 +109,8 @@ class TestDatanodeStorageMetrics {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String uuidA = "dn-" + UUID.randomUUID();
     String uuidB = "dn-" + UUID.randomUUID();
-    String nameA = MetricUtil.qualifySourceName(DatanodeStorageMetrics.SOURCE_NAME, uuidA);
-    String nameB = MetricUtil.qualifySourceName(DatanodeStorageMetrics.SOURCE_NAME, uuidB);
+    String nameA = MetricUtil.getMetricsSourceName(DatanodeStorageMetrics.SOURCE_NAME, uuidA);
+    String nameB = MetricUtil.getMetricsSourceName(DatanodeStorageMetrics.SOURCE_NAME, uuidB);
     DatanodeStorageMetrics a = null;
     DatanodeStorageMetrics b = null;
     try {

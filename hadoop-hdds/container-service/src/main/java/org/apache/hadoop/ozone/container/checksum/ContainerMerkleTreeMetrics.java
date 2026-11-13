@@ -76,10 +76,10 @@ public final class ContainerMerkleTreeMetrics {
 
   public static ContainerMerkleTreeMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String sourceName = MetricUtil.qualifySourceName(METRICS_SOURCE_NAME, component);
+    String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME, component);
     // The unqualified name is a singleton, so a repeat create() replaces it rather than throwing.
     // A qualified name belongs to one datanode; replacing it would unregister that datanode's live source.
-    if (component == null && ms.getSource(sourceName) != null) {
+    if (sourceName.equals(METRICS_SOURCE_NAME) && ms.getSource(sourceName) != null) {
       ms.unregisterSource(sourceName);
     }
     return ms.register(sourceName, "Container Merkle Tree Metrics", new ContainerMerkleTreeMetrics(sourceName));

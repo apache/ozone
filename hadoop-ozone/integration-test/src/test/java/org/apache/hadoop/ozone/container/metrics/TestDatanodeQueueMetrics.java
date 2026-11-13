@@ -54,7 +54,7 @@ public abstract class TestDatanodeQueueMetrics implements ClusterForTests.TestCa
   @Test
   public void testQueueMetricsSourcePerDatanode() {
     for (HddsDatanodeService datanode : cluster().getHddsDatanodes()) {
-      String sourceName = MetricUtil.qualifySourceName(DatanodeQueueMetrics.METRICS_SOURCE_NAME,
+      String sourceName = MetricUtil.getMetricsSourceName(DatanodeQueueMetrics.METRICS_SOURCE_NAME,
           datanode.getDatanodeDetails().getUuidString());
       assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName), sourceName);
     }

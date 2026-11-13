@@ -63,13 +63,13 @@ public abstract class ComponentVersionManager implements Closeable {
   }
 
   protected ComponentVersionManager(ComponentVersion apparentVersion,
-      ComponentVersion softwareVersion, String metricsSourceComponent) {
+      ComponentVersion softwareVersion, String metricsSourceId) {
     this.apparentVersion = apparentVersion;
     this.softwareVersion = softwareVersion;
 
     LOG.info("Initializing version manager with apparent version {} and software version {}",
         apparentVersion, softwareVersion);
-    this.metrics = ComponentVersionManagerMetrics.create(this, metricsSourceComponent);
+    this.metrics = ComponentVersionManagerMetrics.create(this, metricsSourceId);
   }
 
   public ComponentVersion getApparentVersion() {

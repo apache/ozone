@@ -74,7 +74,7 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   }
 
   private static String buildMetricsName(String name, String component) {
-    return MetricUtil.qualifySourceName(NAME, component) + "/" + name;
+    return MetricUtil.getMetricsSourceName(NAME, component) + "/" + name;
   }
 
   @Override

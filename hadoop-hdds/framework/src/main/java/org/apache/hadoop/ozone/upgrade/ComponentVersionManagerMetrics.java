@@ -56,7 +56,7 @@ public final class ComponentVersionManagerMetrics implements MetricsSource {
   }
 
   public static ComponentVersionManagerMetrics create(ComponentVersionManager versionManager, String component) {
-    String sourceName = MetricUtil.qualifySourceName(METRICS_SOURCE_NAME, component);
+    String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME, component);
     ComponentVersionManagerMetrics metrics = (ComponentVersionManagerMetrics) DefaultMetricsSystem.instance()
             .getSource(sourceName);
     if (metrics == null) {

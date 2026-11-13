@@ -54,7 +54,7 @@ public final class NettyMetrics implements MetricsSource {
 
   public static NettyMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, component);
     NettyMetrics metrics = new NettyMetrics(sourceName);
     return ms.register(sourceName, "Netty metrics", metrics);
   }

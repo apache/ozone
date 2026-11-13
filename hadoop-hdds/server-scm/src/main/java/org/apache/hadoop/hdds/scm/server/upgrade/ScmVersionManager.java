@@ -53,9 +53,9 @@ public class ScmVersionManager extends RatisBasedVersionManager {
 
   public ScmVersionManager(SCMStorageConfig storage, OzoneStorageContainerManager upgradeActionArg,
       ComponentUpgradeActionProvider<ScmUpgradeAction> upgradeActionProvider,
-      String metricsSourceComponent) throws IOException {
+      String metricsSourceId) throws IOException {
     super(HDDSVersionUtils.deserializedPersistedApparentVersion(storage.getApparentVersion()),
-        HDDSVersion.SOFTWARE_VERSION, metricsSourceComponent);
+        HDDSVersion.SOFTWARE_VERSION, metricsSourceId);
     this.storage = storage;
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();

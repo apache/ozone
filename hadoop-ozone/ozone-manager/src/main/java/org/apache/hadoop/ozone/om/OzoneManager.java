@@ -365,7 +365,6 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
-import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -640,8 +639,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
 
-    versionManager = new OMVersionManager(omStorage, this, new OMUpgradeActionProvider(),
-        MetricUtil.metricsSourceComponent("OM"));
+    versionManager = new OMVersionManager(omStorage, this, new OMUpgradeActionProvider(), getOMNodeId());
 
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
@@ -772,7 +770,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY,
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
 
-    metrics = OMMetrics.create(conf);
+    metrics = OMMetrics.create(conf, getOMNodeId());
     omSnapshotIntMetrics = OmSnapshotInternalMetrics.create(getOMServiceId(),
         getOMNodeId());
     perfMetrics = OMPerformanceMetrics.register();

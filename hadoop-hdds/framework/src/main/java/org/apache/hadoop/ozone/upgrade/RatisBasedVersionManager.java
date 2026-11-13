@@ -33,8 +33,8 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
   private static final Logger LOG = LoggerFactory.getLogger(RatisBasedVersionManager.class);
 
   protected RatisBasedVersionManager(ComponentVersion apparentVersion, ComponentVersion softwareVersion,
-      String metricsSourceComponent) {
-    super(apparentVersion, softwareVersion, metricsSourceComponent);
+      String metricsSourceId) {
+    super(apparentVersion, softwareVersion, metricsSourceId);
   }
 
   public void validateDBVersion(Table<String, String> finalizationStore) throws IOException {

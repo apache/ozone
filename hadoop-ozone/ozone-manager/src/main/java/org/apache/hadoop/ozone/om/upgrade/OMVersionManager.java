@@ -48,9 +48,9 @@ public class OMVersionManager extends RatisBasedVersionManager {
 
   public OMVersionManager(OMStorage storage, OzoneManager upgradeActionArg,
       ComponentUpgradeActionProvider<OmUpgradeAction> upgradeActionProvider,
-      String metricsSourceComponent) throws IOException {
+      String metricsSourceId) throws IOException {
     super(computeApparentVersionInternal(storage.getApparentVersion()), OzoneManagerVersion.SOFTWARE_VERSION,
-        metricsSourceComponent);
+        metricsSourceId);
     this.storage = storage;
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();

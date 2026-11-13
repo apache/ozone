@@ -77,7 +77,7 @@ public final class VolumeHealthMetrics implements MetricsSource {
   }
 
   private static String buildSourceName(String component, StorageVolume.VolumeType volumeType) {
-    return MetricUtil.qualifySourceName(SOURCE_BASENAME, component) + '-' + volumeType.name();
+    return MetricUtil.getMetricsSourceName(SOURCE_BASENAME, component) + '-' + volumeType.name();
   }
 
   public void unregister() {

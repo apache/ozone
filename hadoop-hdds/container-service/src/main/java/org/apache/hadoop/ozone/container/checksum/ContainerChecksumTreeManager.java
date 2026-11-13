@@ -70,12 +70,12 @@ public class ContainerChecksumTreeManager {
 
   /**
    * Same as {@link #ContainerChecksumTreeManager(ConfigurationSource)}, but registers the metrics source under a
-   * name qualified by {@code metricsSourceComponent} so multiple datanodes can share one JVM.
+   * name qualified by {@code metricsSourceId} so multiple datanodes can share one JVM.
    */
-  public ContainerChecksumTreeManager(ConfigurationSource conf, String metricsSourceComponent) {
+  public ContainerChecksumTreeManager(ConfigurationSource conf, String metricsSourceId) {
     fileLocks = Striped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
         () -> new ReentrantLock(true));
-    metrics = ContainerMerkleTreeMetrics.create(metricsSourceComponent);
+    metrics = ContainerMerkleTreeMetrics.create(metricsSourceId);
   }
 
   public void stop() {

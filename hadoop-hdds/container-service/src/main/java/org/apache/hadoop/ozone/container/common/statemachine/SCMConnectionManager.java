@@ -46,6 +46,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
@@ -82,7 +83,8 @@ public class SCMConnectionManager
     this.scmMachines = new HashMap<>();
     this.conf = conf;
     Map<String, String> jmxProperties =
-        component == null ? Collections.emptyMap() : Collections.singletonMap("datanode", component);
+        DefaultMetricsSystem.inMiniClusterMode() && component != null
+        ? Collections.singletonMap("datanode", component) : Collections.emptyMap();
     jmxBean = HddsUtils.registerWithJmxProperties("HddsDatanode", "SCMConnectionManager", jmxProperties, this);
   }
 

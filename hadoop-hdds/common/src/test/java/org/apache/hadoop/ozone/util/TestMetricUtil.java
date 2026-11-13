@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.junit.jupiter.api.AfterEach;
@@ -44,18 +43,5 @@ class TestMetricUtil {
         MetricUtil.getMetricsSourceName("source", "service", "id"));
     assertEquals("source-id",
         MetricUtil.getMetricsSourceName("source", null, "id"));
-  }
-
-  @Test
-  void qualifySourceNameDropsNonAlphanumericsFromComponent() {
-    assertEquals("Source", MetricUtil.qualifySourceName("Source", null));
-    assertEquals("Source.abc123", MetricUtil.qualifySourceName("Source", "abc-123"));
-  }
-
-  @Test
-  void metricsSourceComponentFollowsMiniClusterMode() {
-    assertNull(MetricUtil.metricsSourceComponent("dn"));
-    DefaultMetricsSystem.setMiniClusterMode(true);
-    assertEquals("dn", MetricUtil.metricsSourceComponent("dn"));
   }
 }

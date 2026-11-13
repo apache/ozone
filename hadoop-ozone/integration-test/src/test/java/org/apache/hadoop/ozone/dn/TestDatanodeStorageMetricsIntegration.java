@@ -130,6 +130,6 @@ public class TestDatanodeStorageMetricsIntegration {
     // shared-JVM source leak), so look it up by the per-datanode name.
     MutableVolumeSet volumeSet = cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().getContainer().getVolumeSet();
-    return getMetrics(MetricUtil.qualifySourceName(DatanodeStorageMetrics.SOURCE_NAME, volumeSet.getDatanodeUuid()));
+    return getMetrics(MetricUtil.getMetricsSourceName(DatanodeStorageMetrics.SOURCE_NAME, volumeSet.getDatanodeUuid()));
   }
 }

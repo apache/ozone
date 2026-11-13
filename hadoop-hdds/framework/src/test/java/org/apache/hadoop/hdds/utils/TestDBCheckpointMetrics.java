@@ -21,10 +21,22 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Tests {@link DBCheckpointMetrics} source registration. */
 class TestDBCheckpointMetrics {
+
+  @BeforeEach
+  void enableMiniClusterMode() {
+    DefaultMetricsSystem.setMiniClusterMode(true);
+  }
+
+  @AfterEach
+  void resetMiniClusterMode() {
+    DefaultMetricsSystem.setMiniClusterMode(false);
+  }
 
   @Test
   void defaultCreateKeepsStandaloneSourceName() {
@@ -43,11 +55,11 @@ class TestDBCheckpointMetrics {
     DBCheckpointMetrics scmMetrics = DBCheckpointMetrics.create("SCM Metrics", "SCM");
     DBCheckpointMetrics omMetrics = DBCheckpointMetrics.create("OM Metrics", "OM");
     try {
-      assertNotNull(DefaultMetricsSystem.instance().getSource(base + ".SCM"));
-      assertNotNull(DefaultMetricsSystem.instance().getSource(base + ".OM"));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(base + "-SCM"));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(base + "-OM"));
       scmMetrics.unRegister();
-      assertNull(DefaultMetricsSystem.instance().getSource(base + ".SCM"));
-      assertNotNull(DefaultMetricsSystem.instance().getSource(base + ".OM"));
+      assertNull(DefaultMetricsSystem.instance().getSource(base + "-SCM"));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(base + "-OM"));
     } finally {
       scmMetrics.unRegister();
       omMetrics.unRegister();

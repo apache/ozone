@@ -56,7 +56,7 @@ public final class DBCheckpointMetrics {
 
   public static DBCheckpointMetrics create(String parent, String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, component);
     return ms.register(sourceName,
         parent,
         new DBCheckpointMetrics(sourceName));

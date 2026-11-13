@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.management.ManagementFactory;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -34,6 +35,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.management.ObjectName;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -71,13 +73,12 @@ class TestLocalOzoneRecon {
 
       assertEquals(reconEnabled, syncThreadRunning());
       if (reconEnabled) {
+        // SCM, OM, Recon SCM, Recon and every datanode keep their own version metrics source.
         String metricsName = ComponentVersionManagerMetrics.METRICS_SOURCE_NAME;
-        MetricsSource scm = DefaultMetricsSystem.instance().getSource(metricsName + ".SCM");
-        MetricsSource om = DefaultMetricsSystem.instance().getSource(metricsName + ".OM");
-        MetricsSource recon = DefaultMetricsSystem.instance().getSource(metricsName + ".ReconSCM");
-        assertNotNull(scm);
-        assertNotNull(om);
-        assertNotNull(recon);
+        assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName + "-ReconSCM"));
+        assertThat(ManagementFactory.getPlatformMBeanServer()
+            .queryNames(new ObjectName("Hadoop:*,name=" + metricsName + "*"), null))
+            .hasSize(4 + cluster.getDatanodeCount());
 
         assertEquals(200, responseCode(cluster.getReconEndpoint() + "/api/v1/clusterState"));
         endpoints.add(cluster.getReconEndpoint());
@@ -124,7 +125,7 @@ class TestLocalOzoneRecon {
         .setReconEnabled(true)
         .setStartupTimeout(Duration.ofMinutes(2))
         .build();
-    String reconSource = ComponentVersionManagerMetrics.METRICS_SOURCE_NAME + ".ReconSCM";
+    String reconSource = ComponentVersionManagerMetrics.METRICS_SOURCE_NAME + "-ReconSCM";
     MetricsSource firstRecon;
     try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
       cluster.start();

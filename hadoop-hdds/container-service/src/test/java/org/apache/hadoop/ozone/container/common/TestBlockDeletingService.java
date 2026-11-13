@@ -979,6 +979,18 @@ public class TestBlockDeletingService {
     }
   }
 
+  @Test
+  public void testSourceNameMatchesSharedJvmRegistration() {
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    BlockDeletingServiceMetrics metrics = BlockDeletingServiceMetrics.create("dn-1");
+    try {
+      assertNotNull(DefaultMetricsSystem.instance().getSource(BlockDeletingServiceMetrics.getSourceName("dn-1")));
+    } finally {
+      metrics.unregister();
+      DefaultMetricsSystem.setMiniClusterMode(false);
+    }
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testBlockDeletionTimeout(ContainerTestVersionInfo versionInfo)
       throws Exception {

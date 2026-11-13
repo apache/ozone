@@ -71,8 +71,7 @@ public final class DatanodeStorageMetrics implements MetricsSource {
    */
   public static DatanodeStorageMetrics create(MutableVolumeSet volumeSet) {
     // A leaked source pins a shut-down datanode's MutableVolumeSet.
-    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME,
-        MetricUtil.metricsSourceComponent(volumeSet.getDatanodeUuid()));
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, volumeSet.getDatanodeUuid());
     DatanodeStorageMetrics datanodeStorageMetrics = new DatanodeStorageMetrics(volumeSet, sourceName);
     DefaultMetricsSystem.instance().register(sourceName,
         "DataNode node-level storage totals", datanodeStorageMetrics);

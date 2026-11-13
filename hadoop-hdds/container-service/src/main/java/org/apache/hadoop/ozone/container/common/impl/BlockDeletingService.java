@@ -86,7 +86,7 @@ public class BlockDeletingService extends BackgroundService {
   public BlockDeletingService(
       OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
       TimeUnit timeUnit, int workerSize, ConfigurationSource conf,
-      String threadNamePrefix, String metricsSourceComponent,
+      String threadNamePrefix, String metricsSourceId,
       ContainerChecksumTreeManager checksumTreeManager,
       ReconfigurationHandler reconfigurationHandler
   ) {
@@ -110,7 +110,7 @@ public class BlockDeletingService extends BackgroundService {
     }
     this.blockDeletingMaxLockHoldingTime =
         dnConf.getBlockDeletingMaxLockHoldingTime();
-    metrics = BlockDeletingServiceMetrics.create(metricsSourceComponent);
+    metrics = BlockDeletingServiceMetrics.create(metricsSourceId);
   }
 
   public void registerReconfigCallbacks(ReconfigurationHandler handler) {

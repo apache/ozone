@@ -146,10 +146,10 @@ public class DiskBalancerService extends BackgroundService {
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
-      int workerSize, ConfigurationSource conf, String metricsSourceComponent)
+      int workerSize, ConfigurationSource conf, String metricsSourceId)
       throws IOException {
     this(ozoneContainer, serviceCheckInterval, serviceCheckTimeout, timeUnit,
-        workerSize, conf, metricsSourceComponent, new SlidingWindow.MonotonicClock());
+        workerSize, conf, metricsSourceId, new SlidingWindow.MonotonicClock());
   }
 
   DiskBalancerService(OzoneContainer ozoneContainer,
@@ -162,7 +162,7 @@ public class DiskBalancerService extends BackgroundService {
   @SuppressWarnings("checkstyle:parameternumber")
   private DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
-      int workerSize, ConfigurationSource conf, String metricsSourceComponent, Clock clock)
+      int workerSize, ConfigurationSource conf, String metricsSourceId, Clock clock)
       throws IOException {
     super("DiskBalancerService", serviceCheckInterval, timeUnit, workerSize,
         serviceCheckTimeout);
@@ -188,7 +188,7 @@ public class DiskBalancerService extends BackgroundService {
     DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
     replicaDeletionDelay = diskBalancerConfiguration.getReplicaDeletionDelay();
     setContainerStates(diskBalancerConfiguration.getMovableContainerStates());
-    metrics = DiskBalancerServiceMetrics.create(metricsSourceComponent);
+    metrics = DiskBalancerServiceMetrics.create(metricsSourceId);
 
     loadDiskBalancerInfo();
   }

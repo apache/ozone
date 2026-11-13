@@ -57,7 +57,7 @@ public final class BackgroundVolumeScannerMetrics {
 
   public static BackgroundVolumeScannerMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, component);
     return ms.register(sourceName, "Background Volume Scanner Metrics", new BackgroundVolumeScannerMetrics(sourceName));
   }
 

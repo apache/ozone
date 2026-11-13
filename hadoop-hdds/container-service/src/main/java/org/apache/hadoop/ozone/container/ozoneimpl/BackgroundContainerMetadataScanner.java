@@ -43,10 +43,10 @@ public class BackgroundContainerMetadataScanner extends
   }
 
   public BackgroundContainerMetadataScanner(ContainerScannerConfiguration conf,
-      ContainerController controller, String metricsSourceComponent) {
+      ContainerController controller, String metricsSourceId) {
     super("ContainerMetadataScanner", conf.getMetadataScanInterval());
     this.controller = controller;
-    this.metrics = ContainerMetadataScannerMetrics.create(metricsSourceComponent);
+    this.metrics = ContainerMetadataScannerMetrics.create(metricsSourceId);
     this.scanHelper = ContainerScanHelper.withScanGap(LOG, controller, metrics, conf);
   }
 
