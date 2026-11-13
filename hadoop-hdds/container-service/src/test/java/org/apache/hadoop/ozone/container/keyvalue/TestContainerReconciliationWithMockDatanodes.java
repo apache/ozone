@@ -328,6 +328,7 @@ public class TestContainerReconciliationWithMockDatanodes {
     // Corrupt the peer after its last scan so its Merkle tree still advertises healthy data.
     corruptPeer.introduceCorruption(containerID, 0, 1, false);
 
+    // The datanode should override this configuration value to true and always verify checksums during reconciliation.
     String verifyChecksumKey = "ozone.client.verify.checksum";
     laggingNode.conf.setBoolean(verifyChecksumKey, false);
     try {
