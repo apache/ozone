@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assumptions.assumeThat;
 
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractContractDeleteTest;
 import org.apache.hadoop.fs.contract.AbstractContractGetFileStatusTest;
@@ -72,7 +73,9 @@ abstract class AbstractOzoneContractTest extends ClusterForTests<MiniOzoneCluste
   }
 
   @AfterAll
-  void afterAll() {
+  void afterAll() throws IOException {
+    // Contracts cache filesystems for different buckets; release their clients before the cluster's leak check.
+    FileSystem.closeAll();
     shutdownCluster();
   }
 

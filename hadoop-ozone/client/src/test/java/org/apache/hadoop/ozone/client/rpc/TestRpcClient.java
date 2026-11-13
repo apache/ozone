@@ -21,7 +21,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_RE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.getOmVersion;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.validateOmVersion;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -62,10 +66,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.TestClientThreadShutdown;
 import org.apache.hadoop.hdds.utils.SlidingWindow.MonotonicClock;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.om.OmClientMetrics;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -617,6 +623,51 @@ public class TestRpcClient {
     } finally {
       logs.stopCapturing();
     }
+  }
+
+  @Test
+  void omMetricsSurviveOtherClientCloseAndTransportCloseFailure() throws Exception {
+    OmTransport transport = spy(new MockOmTransport());
+    doThrow(new IOException("close failed")).when(transport).close();
+    OmClientMetrics metrics;
+    RpcClient first = createRpcClient(transport);
+    RpcClient second = null;
+    try {
+      second = createRpcClient(new MockOmTransport());
+      try (OmClientMetrics.Handle observer = OmClientMetrics.acquireHandle(new OzoneConfiguration())) {
+        metrics = observer.metrics();
+      }
+      // Constructor ServiceList calls precede metrics acquisition.
+      first.getOzoneManagerClient().getServiceInfo();
+      assertThat(getLongCounter("ServiceListLatencyNsNumOps", getMetrics(metrics))).isEqualTo(1);
+      first.close();
+      first.close();
+      assertThat(DefaultMetricsSystem.instance().getSource(OmClientMetrics.SOURCE_NAME)).isSameAs(metrics);
+      second.getOzoneManagerClient().getServiceInfo();
+      assertThat(getLongCounter("ServiceListLatencyNsNumOps", getMetrics(metrics))).isEqualTo(2);
+    } finally {
+      first.close();
+      if (second != null) {
+        second.close();
+      }
+    }
+    assertThat(DefaultMetricsSystem.instance().getSource(OmClientMetrics.SOURCE_NAME)).isNull();
+  }
+
+  @Test
+  void failedClientInitializationDoesNotRetainOmMetrics() throws Exception {
+    OmTransport unavailable = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        throw new IOException("OM unavailable during initialization");
+      }
+    };
+    try (OmClientMetrics.Handle observer = OmClientMetrics.acquireHandle(new OzoneConfiguration())) {
+      assertThatThrownBy(() -> createRpcClient(unavailable))
+          .isInstanceOf(IOException.class).hasMessage("OM unavailable during initialization");
+      assertThat(DefaultMetricsSystem.instance().getSource(OmClientMetrics.SOURCE_NAME)).isSameAs(observer.metrics());
+    }
+    assertThat(DefaultMetricsSystem.instance().getSource(OmClientMetrics.SOURCE_NAME)).isNull();
   }
 
   @ParameterizedTest

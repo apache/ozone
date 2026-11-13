@@ -49,8 +49,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -129,7 +131,9 @@ class TestOzoneFsSnapshot {
 
   @AfterAll
   static void shutdown() throws IOException {
-    shell.close();
+    // Shell commands cache filesystems outside FsShell; release their clients before the cluster's leak check.
+    // Defer shell access so cleanup still proceeds if shell initialization failed.
+    IOUtils.closeQuietly(() -> shell.close(), FileSystem::closeAll);
     if (cluster != null) {
       cluster.shutdown();
     }
