@@ -120,7 +120,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -133,7 +132,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -1648,7 +1646,6 @@ public class TestKeyValueHandler {
       assertResponses(fixture.read(0, BYTES_PER_CHECKSUM), 0, BYTES_PER_CHECKSUM);
       assertResponses(fixture.read(BYTES_PER_CHECKSUM, BYTES_PER_CHECKSUM), BYTES_PER_CHECKSUM, BYTES_PER_CHECKSUM);
       verify(fixture.blockManager, times(1)).getBlock(any(), any());
-      verify(fixture.blockManager, times(1)).blockExists(any(), any());
     }
   }
 
@@ -1678,21 +1675,6 @@ public class TestKeyValueHandler {
       // rounds up to the cached size and needs two responses: the second must stop at the cached size, not fill
       // the response buffer from the grown file
       assertResponses(fixture.read(0, 2 * BYTES_PER_CHECKSUM + 1, 2 * (int) BYTES_PER_CHECKSUM), 0, chunkSize);
-    }
-  }
-
-  /** A cache hit must still fail with NO_SUCH_BLOCK once the block has been deleted from the block table. */
-  @Test
-  public void testReadBlockCachedBlockDataDoesNotOutliveTheBlock() throws Exception {
-    try (StreamFixture fixture = new StreamFixture()) {
-      fixture.appendChunk("chunk1", 0, 3 * (int) BYTES_PER_CHECKSUM);
-      assertResponses(fixture.read(0, BYTES_PER_CHECKSUM), 0, BYTES_PER_CHECKSUM);
-
-      fixture.deleteBlockFromTable();
-      ReadBlockResult second = fixture.read(BYTES_PER_CHECKSUM, BYTES_PER_CHECKSUM);
-      assertNotNull(second.getResponse());
-      assertEquals(ContainerProtos.Result.NO_SUCH_BLOCK, second.getResponse().getResult());
-      assertThat(second.getDataResponses()).isEmpty();
     }
   }
 
@@ -1872,13 +1854,6 @@ public class TestKeyValueHandler {
       kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, data,
           DispatcherContext.getHandleWriteChunk());
       kvHandler.getBlockManager().putBlock(container, blockData);
-    }
-
-    void deleteBlockFromTable() throws Exception {
-      KeyValueContainerData containerData = container.getContainerData();
-      try (DBHandle db = BlockUtils.getDB(containerData, conf)) {
-        db.getStore().getBlockDataTable().delete(containerData.getBlockKey(blockID.getLocalID()));
-      }
     }
 
     /** Read with one checksum unit per response. */

@@ -154,16 +154,18 @@ class TestRandomAccessFileChannel {
     final RandomAccessFileChannel c = new RandomAccessFileChannel();
     c.open(Files.createFile(tempDir.resolve("cached-block")).toFile());
 
+    // the stored BlockData has the block's committed BCSID, which may be higher than the client's
     final BlockID blockID = new BlockID(1, 2);
-    final BlockData blockData = new BlockData(blockID);
+    final BlockData blockData = new BlockData(new BlockID(1, 2));
+    blockData.setBlockCommitSequenceId(7);
     assertNull(c.getCachedBlockData(blockID));
 
-    c.cacheBlockData(blockID, blockData);
+    c.cacheBlockData(blockData);
     assertSame(blockData, c.getCachedBlockData(blockID));
     assertNull(c.getCachedBlockData(new BlockID(1, 3)));
-    final BlockID grown = new BlockID(1, 2);
-    grown.setBlockCommitSequenceId(7);
-    assertNull(c.getCachedBlockData(grown));
+    final BlockID newer = new BlockID(1, 2);
+    newer.setBlockCommitSequenceId(8);
+    assertNull(c.getCachedBlockData(newer));
 
     c.close();
     assertNull(c.getCachedBlockData(blockID));
