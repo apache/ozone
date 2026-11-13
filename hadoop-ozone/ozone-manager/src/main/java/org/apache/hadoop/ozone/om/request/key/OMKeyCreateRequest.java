@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -94,20 +95,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
-    if (keyArgs.hasExcludedETag()) {
-      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
-    }
-
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
-    if (keyArgs.hasExpectedDataGeneration()) {
-      if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
-        ozoneManager.checkFeatureEnabled(
-            OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
-      } else {
-        ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
-      }
+    if (keyArgs.hasExpectedDataGeneration()
+        && keyArgs.getExpectedDataGeneration() != OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     }
 
     OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
@@ -177,6 +169,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     newKeyArgs.setKeyName(keyPath);
 
     if (keyArgs.getIsMultipartKey()) {
+      OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
       getFileEncryptionInfoForMpuKey(keyArgs, newKeyArgs, ozoneManager);
     } else {
       generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);

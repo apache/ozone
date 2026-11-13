@@ -39,7 +39,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -48,7 +48,7 @@ import org.junit.jupiter.api.TestInstance;
  * This class is to test the REST interface exposed by OzoneManager.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneManagerRestInterface implements NonHATests.TestCase {
+public abstract class TestOzoneManagerRestInterface implements ClusterForTests.TestCase {
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;

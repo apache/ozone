@@ -27,7 +27,7 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
-    <!-- hdds-server-framework is used by ozone-tools -->
+    <!-- hdds-server-framework is used by ozone-cli-other -->
     <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
 
@@ -51,6 +51,10 @@
     <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.jnr</groupId>

@@ -61,7 +61,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -92,7 +91,6 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -175,6 +173,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
@@ -187,6 +186,14 @@ public class KeyValueHandler extends Handler {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
+  /** ReadBlock response size used when the client does not choose one. */
+  private static final int DEFAULT_READ_BLOCK_RESPONSE_DATA_SIZE = 1 << 20;
+  /**
+   * Upper bound of the ReadBlock response size: the response must fit in the client's gRPC inbound message limit,
+   * {@link OzoneConsts#OZONE_SCM_CHUNK_MAX_SIZE}, together with its checksum list and envelope. The checksum list is
+   * at most 32 bytes per 8 KiB of data, so 1 MiB of headroom is enough.
+   */
+  static final int MAX_READ_BLOCK_RESPONSE_DATA_SIZE = OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE - (1 << 20);
 
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
@@ -200,8 +207,6 @@ public class KeyValueHandler extends Handler {
   private final Striped<Lock> containerCreationLocks;
   private final ContainerChecksumTreeManager checksumManager;
   private static FaultInjector injector;
-  // map temporarily carries the RandomAccessFile for short-circuit read requests
-  private final Map<String, RandomAccessFile> blockFileMap = new ConcurrentHashMap<>();
   private OzoneContainer ozoneContainer;
   private final Clock clock;
   // Not final so tests can substitute a stubbed factory to drive reconcileChunksPerBlock without a live peer.
@@ -351,7 +356,7 @@ public class KeyValueHandler extends Handler {
     case PutBlock:
       return handler.handlePutBlock(request, kvContainer, dispatcherContext);
     case GetBlock:
-      return handler.handleGetBlock(request, kvContainer);
+      return handler.handleGetBlock(request, kvContainer, dispatcherContext);
     case DeleteBlock:
       return handler.handleDeleteBlock(request, kvContainer);
     case ListBlock:
@@ -511,10 +516,13 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
-      newContainerData.releaseCommitSpace();
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
       containerIdLock.unlock();
+      if (!created) {
+        // Release the space reserved when the volume was chosen, also on unchecked exceptions.
+        newContainerData.releaseCommitSpace();
+      }
     }
 
     if (created) {
@@ -697,6 +705,9 @@ public class KeyValueHandler extends Handler {
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
+      if (request.getPutBlock().getSync()) {
+        kvContainer.flushAndSyncDB();
+      }
 
       blockDataProto = blockData.getProtoBufMessage();
 
@@ -836,7 +847,7 @@ public class KeyValueHandler extends Handler {
    * Handle Get Block operation. Calls BlockManager to process the request.
    */
   ContainerCommandResponseProto handleGetBlock(
-      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer, DispatcherContext dispatcherContext) {
 
     if (!request.hasGetBlock()) {
       if (LOG.isDebugEnabled()) {
@@ -853,15 +864,16 @@ public class KeyValueHandler extends Handler {
       BlockID blockID = BlockID.getFromProtobuf(getBlock.getBlockID());
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
-      if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()) {
+      // only the domain socket path can pass the opened file on, other transports get the block data only
+      if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()
+          && DispatcherContext.op(dispatcherContext) == DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ) {
         boolean domainSocketServerEnabled = ozoneContainer != null
             && ozoneContainer.getReadDomainSocketChannel() != null
             && ozoneContainer.getReadDomainSocketChannel().isStarted();
         if (domainSocketServerEnabled) {
           RandomAccessFile file = chunkManager.getShortCircuitFd(kvContainer, blockID);
           Preconditions.checkState(file != null);
-          String mapKey = getBlockMapKey(request);
-          blockFileMap.put(mapKey, file);
+          dispatcherContext.setShortCircuitBlockFile(file);
           shortCircuitGranted = true;
         }
       }
@@ -879,20 +891,6 @@ public class KeyValueHandler extends Handler {
     }
 
     return getBlockDataResponse(request, responseData, shortCircuitGranted);
-  }
-
-  @Override
-  public RandomAccessFile getBlockFile(ContainerCommandRequestProto request) throws IOException {
-    if (request.getCmdType() != Type.GetBlock) {
-      throw new StorageContainerException("Request type mismatch, expected " +  Type.GetBlock +
-          ", received " + request.getCmdType(), ContainerProtos.Result.MALFORMED_REQUEST);
-    }
-    String mapKey = getBlockMapKey(request);
-    RandomAccessFile file = blockFileMap.remove(mapKey);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("File removed from blockFileMap for {}", mapKey);
-    }
-    return file;
   }
 
   /**
@@ -1442,6 +1440,10 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer container = createNewContainer(targetTempContainerData);
     HddsVolume targetVolume = targetTempContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
+    // createNewContainer() builds the new data as OPEN state. Set it as RECOVERING, as a
+    // replication import does, so the data checksum and empty flag are checked and loaded.
+    // In the meanwhile, the container file on disk is of RECOVERING state too at this point.
+    container.getContainerData().setState(RECOVERING);
     container.importContainerData((KeyValueContainerData) targetTempContainerData);
     return container;
   }
@@ -2316,6 +2318,8 @@ public class KeyValueHandler extends Handler {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), ioe, IO_EXCEPTION);
       responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    } catch (StatusRuntimeException sre) {
+      throw sre;
     } catch (Exception e) {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), e, CONTAINER_INTERNAL_ERROR);
@@ -2329,10 +2333,7 @@ public class KeyValueHandler extends Handler {
       Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
-    int responseDataSize = readBlock.getResponseDataSize();
-    if (responseDataSize == 0) {
-      responseDataSize = 1 << 20;
-    }
+    final int responseDataSize = boundResponseDataSize(readBlock.getResponseDataSize());
 
     final BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
     if (!blockFile.isOpen()) {
@@ -2382,6 +2383,15 @@ public class KeyValueHandler extends Handler {
     blockFile.close();
     streamObserver.onError(status.asRuntimeException());
     return 0;
+  }
+
+  /** The client chooses the response size, which is a uint32 and sizes the read buffer: bound it. */
+  @VisibleForTesting
+  static int boundResponseDataSize(int responseDataSize) {
+    if (responseDataSize <= 0) {
+      return DEFAULT_READ_BLOCK_RESPONSE_DATA_SIZE;
+    }
+    return Math.min(responseDataSize, MAX_READ_BLOCK_RESPONSE_DATA_SIZE);
   }
 
   @Override

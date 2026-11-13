@@ -82,7 +82,8 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
         && securityConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslClientContextBuilder = SslContextBuilder.forClient();
       sslClientContextBuilder.keyManager(scmCertificateClient.getKeyManager());
-      sslClientContextBuilder.trustManager(scmCertificateClient.getTrustManager());
+      sslClientContextBuilder.trustManager(
+          new HASecurityUtils.ScmPeerTrustManager(scmCertificateClient.getTrustManager()));
       SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
           sslClientContextBuilder, securityConfig.getGrpcSslProvider());
       channelBuilder.sslContext(sslContextBuilder.build())

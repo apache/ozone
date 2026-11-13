@@ -18,17 +18,27 @@
 package org.apache.hadoop.hdds.scm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.withSettings;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.XceiverClientManagerConfigBuilder;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
@@ -48,9 +58,9 @@ import org.slf4j.LoggerFactory;
  * observe channel termination. Every {@code close()} therefore costs &ge;100ms
  * instead of ~1ms.
  *
- * <p>The damage is amplified by <em>where</em> {@code close()} runs. Clients
+ * <p>The damage was amplified by <em>where</em> {@code close()} ran. Clients
  * are torn down through {@link XceiverClientManager}'s cache eviction, and the
- * whole acquire / evict / close sequence executes under the {@code clientCache}
+ * whole acquire / evict / close sequence executed under the {@code clientCache}
  * monitor:
  * <pre>
  *   acquireClient()                    // synchronized (clientCache)
@@ -60,9 +70,12 @@ import org.slf4j.LoggerFactory;
  *             -&gt; RemovalListener.onRemoval()   // synchronized (clientCache)
  *                -&gt; XceiverClientSpi.setEvicted() -&gt; cleanup() -&gt; close()
  * </pre>
- * So the blocking graceful-shutdown wait runs while the {@code clientCache}
- * monitor is held, and every other thread in {@code acquireClient()} /
- * {@code releaseClient()} serializes behind it.
+ * So the blocking graceful-shutdown wait ran while the {@code clientCache}
+ * monitor was held, and every other thread in {@code acquireClient()} /
+ * {@code releaseClient()} serialized behind it.
+ *
+ * <p>The manager now closes evicted clients one at a time on a background
+ * thread, so a slow {@code close()} delays the closes queued behind it.
  *
  * <p>This test exercises the <b>real</b> {@code XceiverClientManager} and
  * {@code XceiverClientGrpc.close()} — nothing is emulated. Real (lazily
@@ -73,11 +86,12 @@ import org.slf4j.LoggerFactory;
  * evicted and closed on essentially every acquisition — mirroring the per-file
  * client churn of EC checksum collection.
  *
- * <p>Run it against the pre-fix {@code close()} and the wall-clock is dominated
- * by serialized 100ms sleeps ({@code ~ evictions * 100ms}); run it against the
- * fix (immediate {@code shutdownNow()}) and per-close cost collapses. The
- * assertion below encodes the fixed expectation, so this test FAILS on the
- * regression and PASSES once HDDS-15849 restores immediate termination.
+ * <p>Each eviction-driven {@code close()} is timed on its own. Against the
+ * pre-fix {@code close()} every one of them takes at least 100ms; with the fix
+ * (immediate {@code shutdownNow()}) they take a few milliseconds. Timing the
+ * closes themselves keeps client creation and the queueing of closes on the
+ * manager's single close thread out of the measurement, so a slow machine does
+ * not push the result towards the regression (HDDS-17634).
  */
 class TestXceiverClientManagerCloseContention {
 
@@ -88,13 +102,12 @@ class TestXceiverClientManagerCloseContention {
   private static final int CYCLES_PER_THREAD = 8;
 
   /**
-   * Upper bound on acceptable average wall-clock cost per eviction-driven
-   * close(). The pre-fix code has a hard &ge;100ms floor per close (the
-   * mandatory Thread.sleep in the termination polling loop); immediate
-   * shutdownNow() is well under a millisecond. 40ms sits safely between the
-   * two so the assertion is not timing-flaky.
+   * Upper bound on the median duration of one eviction-driven close(). The
+   * pre-fix code has a hard &ge;100ms floor on every close (the mandatory
+   * Thread.sleep in the termination polling loop), so its median is above it;
+   * immediate shutdownNow() takes a few milliseconds.
    */
-  private static final long MAX_MILLIS_PER_CLOSE = 40;
+  private static final long MAX_MEDIAN_MILLIS_PER_CLOSE = 50;
 
   @Test
   void evictionDrivenCloseDoesNotSerializeAcquisition() throws Exception {
@@ -105,9 +118,10 @@ class TestXceiverClientManagerCloseContention {
         .setMaxCacheSize(1)
         .setStaleThresholdMs(TimeUnit.SECONDS.toMillis(30))
         .build();
+    // duration of each close() that actually closed a client
+    List<Long> closeNanos = Collections.synchronizedList(new ArrayList<>());
 
-    try (XceiverClientManager manager =
-             new XceiverClientManager(conf, clientConf, (ClientTrustManager) null)) {
+    try (XceiverClientManager manager = newManagerTimingCloses(conf, clientConf, closeNanos)) {
 
       ExecutorService pool = Executors.newFixedThreadPool(THREADS);
       CountDownLatch start = new CountDownLatch(1);
@@ -135,27 +149,152 @@ class TestXceiverClientManagerCloseContention {
       } finally {
         pool.shutdownNow();
       }
+      // closing the manager waits for the closes still queued, so that all of them are timed
+      manager.close();
       long wallMillis =
           TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - wallStartNanos);
 
       // recordStats() is enabled on the cache; each eviction drives one close().
       long evictions = manager.getClientCache().stats().evictionCount();
-      long millisPerClose = evictions == 0 ? 0 : wallMillis / evictions;
+      List<Long> sortedMillis;
+      synchronized (closeNanos) {
+        sortedMillis = closeNanos.stream().map(TimeUnit.NANOSECONDS::toMillis).sorted().collect(Collectors.toList());
+      }
+      long medianMillisPerClose = sortedMillis.isEmpty() ? 0 : sortedMillis.get(sortedMillis.size() / 2);
 
-      LOG.info("threads={} cyclesPerThread={} acquisitions={} evictions(closes)={}",
-          THREADS, CYCLES_PER_THREAD, THREADS * CYCLES_PER_THREAD, evictions);
-      LOG.info("wall={}ms  ms-per-close={}ms  (regression floor is ~100ms/close)",
-          wallMillis, millisPerClose);
+      LOG.info("threads={} cyclesPerThread={} acquisitions={} evictions={} closes={}",
+          THREADS, CYCLES_PER_THREAD, THREADS * CYCLES_PER_THREAD, evictions, sortedMillis.size());
+      LOG.info("wall={}ms  close median={}ms max={}ms  (regression floor is ~100ms/close)",
+          wallMillis, medianMillisPerClose, sortedMillis.isEmpty() ? 0 : sortedMillis.get(sortedMillis.size() - 1));
 
       assertThat(evictions)
           .as("cache eviction should have driven close() calls")
           .isPositive();
+      assertThat((long) sortedMillis.size())
+          .as("every evicted client should have been closed")
+          .isGreaterThanOrEqualTo(evictions);
 
-      assertThat(millisPerClose)
-          .as("HDDS-15849: eviction-driven close() must not serialize "
-              + "acquisition under the clientCache monitor; the pre-fix "
-              + "graceful-shutdown wait forces a ~100ms floor per close")
-          .isLessThan(MAX_MILLIS_PER_CLOSE);
+      assertThat(medianMillisPerClose)
+          .as("HDDS-15849: eviction-driven close() must terminate the channel "
+              + "immediately; the pre-fix graceful-shutdown wait forces a ~100ms "
+              + "floor per close")
+          .isLessThan(MAX_MEDIAN_MILLIS_PER_CLOSE);
     }
+  }
+
+  /**
+   * A manager that creates the same real {@link XceiverClientGrpc} it would otherwise, but adds the duration of each
+   * close() that actually closes a client to {@code closeNanos}.
+   */
+  private static XceiverClientManager newManagerTimingCloses(ConfigurationSource conf, ScmClientConfig clientConf,
+      List<Long> closeNanos) throws IOException {
+    return new XceiverClientManager(conf, clientConf, (ClientTrustManager) null) {
+      @Override
+      protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) throws IOException {
+        XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+          @Override
+          public void close() {
+            final boolean open = !isClosed();
+            final long startNanos = System.nanoTime();
+            super.close();
+            if (open) {
+              closeNanos.add(System.nanoTime() - startNanos);
+            }
+          }
+        };
+        try {
+          client.connect();
+        } catch (Exception e) {
+          throw new IOException(e);
+        }
+        return client;
+      }
+    };
+  }
+
+  /**
+   * A client whose close() is slow, like XceiverClientRatis waiting for channel termination, must be closed
+   * off the caller thread and outside the clientCache lock.
+   */
+  @Test
+  void slowCloseOfEvictedClientDoesNotBlockCaller() throws Exception {
+    ScmClientConfig clientConf = new XceiverClientManagerConfigBuilder()
+        .setMaxCacheSize(1)
+        .setStaleThresholdMs(TimeUnit.SECONDS.toMillis(30))
+        .build();
+    CountDownLatch closeStarted = new CountDownLatch(1);
+    CountDownLatch finishClose = new CountDownLatch(1);
+    AtomicReference<Thread> closeThread = new AtomicReference<>();
+    AtomicBoolean closedUnderCacheLock = new AtomicBoolean();
+    AtomicBoolean closed = new AtomicBoolean();
+
+    try (XceiverClientManager manager = new XceiverClientManager(new OzoneConfiguration(), clientConf, null) {
+      @Override
+      protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) {
+        XceiverClientSpi client = mock(XceiverClientSpi.class,
+            withSettings().useConstructor().defaultAnswer(CALLS_REAL_METHODS));
+        doAnswer(invocation -> {
+          closeThread.set(Thread.currentThread());
+          closedUnderCacheLock.set(Thread.holdsLock(getClientCache()));
+          closeStarted.countDown();
+          finishClose.await(10, TimeUnit.SECONDS);
+          closed.set(true);
+          return null;
+        }).when(client).close();
+        return client;
+      }
+    }) {
+      XceiverClientSpi client1 = manager.acquireClient(MockPipeline.createPipeline(1));
+      manager.releaseClient(client1, false);
+      // evicts client1, which has no reference left and so gets closed
+      XceiverClientSpi client2 = manager.acquireClient(MockPipeline.createPipeline(1));
+
+      assertThat(closeStarted.await(10, TimeUnit.SECONDS)).isTrue();
+      assertThat(closeThread.get()).isNotSameAs(Thread.currentThread());
+      assertThat(closedUnderCacheLock).isFalse();
+      // the close of client1 is still in progress, yet the cache is usable
+      assertThat(closed).isFalse();
+      manager.releaseClient(client2, false);
+      finishClose.countDown();
+    }
+    // closing the manager waits for pending closes
+    assertThat(closed).isTrue();
+  }
+
+  @Test
+  void managerClosesCachedClientsInParallel() throws Exception {
+    CountDownLatch closeStarted = new CountDownLatch(3);
+    AtomicBoolean allClosesOverlapped = new AtomicBoolean(true);
+    AtomicBoolean closedUnderCacheLock = new AtomicBoolean();
+    ScmClientConfig clientConf = new XceiverClientManagerConfigBuilder()
+        .setMaxCacheSize(3)
+        .setStaleThresholdMs(TimeUnit.SECONDS.toMillis(30))
+        .build();
+    try (XceiverClientManager manager = new XceiverClientManager(new OzoneConfiguration(), clientConf, null) {
+      @Override
+      protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) {
+        XceiverClientSpi client = mock(XceiverClientSpi.class,
+            withSettings().useConstructor().defaultAnswer(CALLS_REAL_METHODS));
+        doAnswer(invocation -> {
+          if (Thread.holdsLock(getClientCache())) {
+            closedUnderCacheLock.set(true);
+          }
+          closeStarted.countDown();
+          if (!closeStarted.await(10, TimeUnit.SECONDS)) {
+            allClosesOverlapped.set(false);
+          }
+          return null;
+        }).when(client).close();
+        return client;
+      }
+    }) {
+      for (int i = 0; i < 3; i++) {
+        XceiverClientSpi client = manager.acquireClient(MockPipeline.createPipeline(1));
+        manager.releaseClient(client, false);
+      }
+    }
+    assertThat(closeStarted.getCount()).isZero();
+    assertThat(allClosesOverlapped).isTrue();
+    assertThat(closedUnderCacheLock).isFalse();
   }
 }

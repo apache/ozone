@@ -25,6 +25,9 @@
   <packaging>jar</packaging>
   <name>Apache Ozone Common</name>
   <description>Apache Ozone Common</description>
+  <properties>
+    <ban-rocksdb.skip>false</ban-rocksdb.skip>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -66,6 +69,16 @@
       <artifactId>grpc-netty</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-protobuf</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-handler</artifactId>
     </dependency>
@@ -84,18 +97,6 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpcore</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.kerby</groupId>
-      <artifactId>kerby-util</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -128,10 +129,6 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -206,11 +203,7 @@
             <phase>generate-resources</phase>
             <configuration>
               <source>
-                <directory>${basedir}/../</directory>
-                <includes>
-                  <include>*/src/main/java/**/*.java</include>
-                  <include>*/src/main/proto/*.proto</include>
-                </includes>
+                <directory>${project.basedir}/src/main/resources</directory>
               </source>
             </configuration>
           </execution>

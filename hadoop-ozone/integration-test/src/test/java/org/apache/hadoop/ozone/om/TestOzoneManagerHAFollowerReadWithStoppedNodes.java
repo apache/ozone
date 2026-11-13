@@ -255,6 +255,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends OzoneManager
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to another OM proxy.
     getCluster().stopOzoneManager(firstProxyNodeId);
+    waitForLeaderToBeReady();
 
     // Next request to the proxy provider should result in a failover
     objectStore.getClientProxy().listVolumes(null, null, 1000);

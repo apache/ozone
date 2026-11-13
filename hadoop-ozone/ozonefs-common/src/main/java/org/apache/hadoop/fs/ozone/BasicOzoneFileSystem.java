@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
@@ -83,7 +84,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -189,9 +189,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     try {
-      uri = new URIBuilder().setScheme(OZONE_URI_SCHEME)
-          .setHost(authority)
-          .build();
+      uri = new URI(OZONE_URI_SCHEME + "://" + authority);
       LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
       ConfigurationSource source = getConfSource();
@@ -888,10 +886,26 @@ public class BasicOzoneFileSystem extends FileSystem {
                                                long start, long len)
       throws IOException {
     if (fileStatus instanceof LocatedFileStatus) {
-      return ((LocatedFileStatus) fileStatus).getBlockLocations();
+      return getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
     } else {
       return super.getFileBlockLocations(fileStatus, start, len);
     }
+  }
+
+  /**
+   * Like HDFS, return only the blocks that overlap [start, start + len), or the block containing start if len is 0.
+   */
+  static BlockLocation[] getBlockLocationsInRange(LocatedFileStatus fileStatus, long start, long len) {
+    if (start < 0 || len < 0) {
+      throw new IllegalArgumentException("Invalid start or len parameter");
+    }
+    BlockLocation[] blocks = fileStatus.getBlockLocations();
+    if (blocks == null) {
+      return null;
+    }
+    return Arrays.stream(blocks)
+        .filter(b -> b.getOffset() + b.getLength() > start && b.getOffset() - start < Math.max(len, 1))
+        .toArray(BlockLocation[]::new);
   }
 
   @Override
