@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -65,6 +67,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -314,6 +318,63 @@ public class TestOzoneStoragePolicy {
     // The recorded policy and the tier the data actually sits on must agree.
     assertEquals(OzoneStoragePolicy.COLD, overwritten.getStoragePolicy());
     assertAllBlocksOnTier(overwritten, OzoneStoragePolicy.COLD.getCreationTier());
+  }
+
+  /**
+   * An older client does not send the storage policy in allocateBlock. If the bucket policy changes
+   * while such a client writes a key, the next blocks must stay on the tier of the key's policy.
+   *
+   * <p>The current client always sends the policy, so this test calls the OM protocol directly and
+   * leaves the policy out of {@link OmKeyArgs}, as an older client does. The key opens while the
+   * bucket policy is HOT. The bucket policy then changes to COLD. If OM resolved the policy from
+   * the bucket, the next block would go to the ARCHIVE tier instead of the SSD tier.
+   */
+  @Test
+  public void testOldClientAllocateBlockKeepsKeyPolicyWhenBucketPolicyChanges()
+      throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    OzoneBucket bucket =
+        createBucket(OzoneStoragePolicy.HOT, BucketLayout.OBJECT_STORE);
+    OzoneManagerProtocol omClient = store.getClientProxy().getOzoneManagerClient();
+    OmKeyArgs oldClientKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(UUID.randomUUID().toString())
+        .setReplicationConfig(RATIS_THREE)
+        .setDataSize(1)
+        .setAcls(new ArrayList<>())
+        .setOwnerName("ownerName")
+        .build();
+
+    // The older client opens the key. The size is not 0, so OM pre-allocates the first block.
+    OpenKeySession session = omClient.openKey(oldClientKeyArgs);
+    assertThat(session.getKeyInfo().getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+    List<OmKeyLocationInfo> initialBlocks =
+        session.getKeyInfo().getLatestVersionLocations().getBlocksLatestVersionOnly();
+    assertThat(initialBlocks).hasSize(1);
+    assertBlockOnTier(initialBlocks.get(0), OzoneStoragePolicy.HOT.getCreationTier());
+
+    // The bucket policy changes while the key is still open.
+    bucket.setStoragePolicy(OzoneStoragePolicy.COLD);
+    assertThat(store.getVolume(bucket.getVolumeName()).getBucket(bucket.getName()).getStoragePolicy())
+        .isEqualTo(OzoneStoragePolicy.COLD);
+
+    // The older client asks for the next block, again without a policy.
+    OmKeyLocationInfo nextBlock =
+        omClient.allocateBlock(oldClientKeyArgs, session.getId(), new ExcludeList());
+
+    // The block must follow the key's policy (HOT), not the new bucket policy (COLD).
+    assertBlockOnTier(nextBlock, OzoneStoragePolicy.HOT.getCreationTier());
+  }
+
+  private void assertBlockOnTier(OmKeyLocationInfo block, StorageTier expectedTier)
+      throws IOException {
+    ContainerInfo containerInfo = containerManager.getContainer(
+        ContainerID.valueOf(block.getContainerID()));
+    assertThat(containerInfo.getStorageTier().getUniformStorageType())
+        .as("Mismatch in storage tier of container %s, which holds the block", block.getContainerID())
+        .isEqualTo(expectedTier.getUniformStorageType());
   }
 
   /**

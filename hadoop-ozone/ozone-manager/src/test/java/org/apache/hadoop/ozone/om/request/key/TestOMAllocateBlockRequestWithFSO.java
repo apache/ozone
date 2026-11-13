@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -49,7 +50,7 @@ public class TestOMAllocateBlockRequestWithFSO
   }
 
   @Override
-  protected String addKeyToOpenKeyTable(String volumeName, String bucketName)
+  protected String addKeyToOpenKeyTable(String volumeName, String bucketName, StoragePolicy storagePolicy)
           throws Exception {
     // need to initialize parentID
     String parentDir = keyName;
@@ -67,6 +68,7 @@ public class TestOMAllocateBlockRequestWithFSO
             .setObjectID(objectId)
             .setParentObjectID(parentID)
             .setUpdateID(txnId)
+            .setStoragePolicy(storagePolicy)
             .build();
 
     // add key to openFileTable
