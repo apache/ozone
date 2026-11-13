@@ -93,7 +93,7 @@ import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -136,7 +136,7 @@ public class TestOmContainerLocationCache {
   @TempDir
   private static File dir;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
-  private static StorageContainerLocationProtocol mockScmContainerClient;
+  private static StorageContainerLocationInternalInterface mockScmContainerClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
   private static final String BUCKET_NAME = "bucket1";
@@ -171,7 +171,7 @@ public class TestOmContainerLocationCache {
 
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     mockScmContainerClient =
-        mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationInternalInterface.class);
     InnerNode.Factory factory = InnerNodeImpl.FACTORY;
     when(mockScmBlockLocationProtocol.getNetworkTopology()).thenReturn(
         factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));

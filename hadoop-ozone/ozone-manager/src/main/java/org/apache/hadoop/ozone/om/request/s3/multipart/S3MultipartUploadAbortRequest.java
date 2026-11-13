@@ -84,6 +84,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final KeyArgs keyArgs = super.preExecute(ozoneManager)
         .getAbortMultiPartUploadRequest().getKeyArgs();
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());

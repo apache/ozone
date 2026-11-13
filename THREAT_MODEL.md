@@ -9,6 +9,7 @@
 - **Author:** ASF Security team, via the threat-model-producer rubric (Scovetta
   rubric) at the Ozone PMC's request (path 3, confirmed siyao@ 2026-06-02).
 - **Status:** v1 — ratified by the Ozone PMC. Maintainer review complete (Siyao Meng / smengcl and Wei-Chiu Chuang / jojochuang, 2026-06/07); wave-1–3 answers folded.
+- **Revisions:** 2026-10, availability added (§4, §7, §8 item 7, §9, §10, §11a, §13).
 - **Version binding:** versioned with the project; a report against version *N*
   is triaged against the model as it stood at *N*.
 - **Reporting cross-reference:** §8-violating findings go to
@@ -115,7 +116,8 @@ owns that boundary — an S3-Gateway finding from an untrusted REST client; an
 OM/SCM finding from an authenticated-but-unauthorized user; a block-access
 finding from a client without a valid token in a token-enabled deployment; a
 consensus finding from a Byzantine Datanode peer below the honest-majority
-threshold (§7).
+threshold (§7); an availability finding from an untrusted client or an
+authenticated non-admin user, with a small, fixed number of requests (§8 item 7).
 
 ## §5 Assumptions about the environment
 
@@ -176,11 +178,29 @@ stock install and must be explicitly enabled:
   `hdds.secret.key.rotate.check.duration=10m`, and `HmacSHA256`.
 - **gRPC TLS** is off by default (`hdds.grpc.tls.enabled=false`) and protects
   gRPC traffic when enabled.
+- **Hadoop RPC service-level authorization** is off by default
+  (`hadoop.security.authorization=false`). When enabled, protocols registered by
+  a service's `PolicyProvider` are gated by service ACLs, such as
+  `hdds.security.client.scm.block.protocol.acl`,
+  `hdds.security.client.scm.container.protocol.acl`, and
+  `ozone.om.security.client.protocol.acl`, each defaulting to `*`.
+  ACLs match Hadoop short user names and groups after
+  `hadoop.security.auth_to_local` mapping, not full `service/host@REALM`
+  principals or `_HOST` patterns.
+  For the SCM block protocol, OM calls `allocateBlock`/`deleteKeyBlocks`, SCM
+  peers call `addSCM` during bootstrap, and both call `getScmInfo`. If these
+  services map to `om` and `scm`, its ACL can be `om,scm`.
+  `ozone.om.security.client.protocol.acl` must admit ordinary OM clients;
+  `ozone.om.security.admin.protocol.acl` gates OM inter-service/admin RPCs.
+  *(documented — `SCMPolicyProvider`, `OMPolicyProvider`,
+  `SCMBlockProtocolServer`, `HAUtils`, `ozone-default.xml`,
+  Hadoop `AccessControlList`.)*
 - **TDE/KMS** is optional and protects data at rest only for encrypted buckets;
   it requires a configured KMS, for example via `hadoop.security.key.provider.path`.
+- **HTTP authentication (SPNEGO)** is off by default (`ozone.security.http.kerberos.enabled=false`, and each web server's own type, for example `ozone.om.http.auth.type=simple`). With these defaults the web endpoints are not authenticated, and the OM and SCM DB checkpoint endpoints, which serve the metadata DB, are served without an admin check. *(documented — `ozone-default.xml`.)*
 
 So a finding that assumes ACLs / block/container tokens / transport encryption /
-TDE are active in a default build is `OUT-OF-MODEL: non-default-build` unless the
+TDE / HTTP authentication are active in a default build is `OUT-OF-MODEL: non-default-build` unless the
 operator enabled them (§10); the §10 checklist lists these as required
 production hardening. (Answers the Q-authz / Q-token / Q-tde default-state and
 lifetime/rotation mechanism questions.)
@@ -205,6 +225,7 @@ Per-boundary input trust (grouped by family):
 - **Authenticated-but-unauthorized user** — a valid Kerberos principal who
   tries to exceed their ACLs (read another bucket, escalate). In scope —
   authorization is the defence.
+- **Client attacking availability.** An untrusted client, or an authenticated non-admin user acting *within* their ACLs, who uses a small, fixed number of requests to stop a service for everyone else. In scope (§8 item 7). Attacks that depend on request volume are not (§9). *(maintainer, smengcl, 2026-10.)*
 - **On-path network attacker** — passive/active on the wire. In scope where the
   deployment has enabled transport encryption for the relevant protocol.
 - **Authenticated-but-Byzantine Datanode peer** — a compromised Datanode holding
@@ -219,7 +240,9 @@ Per-boundary input trust (grouped by family):
   on the path it serves**. *(maintainer — smengcl, 2026-06-23; checksum behaviour documented in [ozone-site#397](https://github.com/apache/ozone-site/pull/397).)*
 - **Out of scope:** compromised KDC / Ranger / SCM-CA-key / operator host;
   side-channel/co-tenant adversaries against the host; a client that an operator
-  has authorized to do the thing it did.
+  has authorized to do the thing it did. That exclusion covers the intended
+  effect of an authorized operation. It does not cover a service failure caused
+  by an operation a non-admin user was permitted to make (§8 item 7).
 
 ## §8 Security properties the project provides (secure mode)
 
@@ -255,6 +278,7 @@ Per-boundary input trust (grouped by family):
    rest when enabled (keys in KMS). *Violation:* plaintext on a transport
    configured for encryption / unencrypted blocks when TDE is configured.
    *Severity:* high. *(documented — protect-in-transit-traffic, SecuringTDE.)*
+7. **Availability under a small, fixed number of requests.** A small, fixed number of requests from an untrusted client or an authenticated non-admin user does not terminate or hang an Ozone service process, and does not leave the service unable to serve other users. "Small, fixed" means the effect comes from what a request makes the server do, not from how many requests are sent. "Hang" means the process stays up but stops making progress for other users, for example a deadlock, a livelock, or handler threads that are all blocked, until those requests end or the process is restarted. Responses that slow down in proportion to load are not a hang (§9). This covers, for example, caller-chosen allocation or processing time that the server does not cap, and work the server does before authentication completes. *Violation:* such requests stop an OM, SCM, Datanode, S3 Gateway or Recon process, or leave it unusable for others. *Severity:* high when one round of requests takes down every member of an HA group, or when the service fails again on restart without further requests; moderate when a single process recovers on restart, or when the effect needs several concurrent requests rather than one. *(maintainer, smengcl, 2026-10.)*
 
 ## §9 Security properties the project does *not* provide
 
@@ -265,6 +289,14 @@ Per-boundary input trust (grouped by family):
 - **It does not author your authorization policy.** Ozone enforces ACLs/Ranger
   *as configured*; an over-broad Ranger policy or world-readable ACL is an
   operator decision, not an Ozone flaw (§10).
+- **Internal RPC service ACLs require operator configuration.** Enable
+  `hadoop.security.authorization` and configure each internal protocol's ACL,
+  such as `hdds.security.client.scm.block.protocol.acl`.
+  These ACLs default to `*`; selecting allowed service accounts is an operator
+  responsibility (§10). The SCM block protocol's `deleteKeyBlocks` relies on
+  protocol-level authorization without a per-method admin check.
+  SCM upgrade finalization uses the client/container-location protocol, where
+  `SCMClientProtocolServer.finalizeScmUpgrade` calls `checkAdminAccess`.
 - **It does not protect its dependencies.** KDC/Ranger/KMS/SCM-CA-key/network
   security are the operator's (§3/§10).
 - **No defence against a Byzantine majority** of a Ratis ring, and **no full
@@ -272,6 +304,9 @@ Per-boundary input trust (grouped by family):
   on the path it serves** — Ratis is not BFT, and while checksum + replica/container
   checks catch ordinary corruption, a peer that can forge consistently on its
   served path is out of model (§7). *(maintainer — smengcl, 2026-06-23.)*
+- **No promise to withstand load by volume.** Request floods, connection exhaustion, and many concurrent requests whose cost the server already limits are outside §8 item 7. Limiting them is the operator's (§10). Concurrent requests whose cost the caller chooses are not load by volume and stay under §8 item 7. *(maintainer, smengcl, 2026-10.)*
+- **Resource use within granted limits is not an availability finding.** A user who fills their own quota, creates as many keys or buckets as they are allowed to, or runs listings within the server's page limits is using the service as authorized, provided the service keeps serving others (§8 item 7). Quotas are off by default and are the operator's control (§10). *(maintainer, smengcl, 2026-10.)*
+- **No availability guarantee against admins or service peers.** Admin commands and a compromised service peer can stop a service (§7). *(maintainer, smengcl, 2026-10.)*
 - **Block tokens are bearer capabilities** — a leaked block token grants access
   until expiry; the caller/operator must protect tokens in transit (TLS). The
   default block/container-token lifetime is `1d` when those tokens are enabled.
@@ -287,6 +322,13 @@ Per-boundary input trust (grouped by family):
 - **Secure the dependencies:** harden/operate the KDC, author least-privilege
   Ranger/ACL policies, protect the **SCM CA private key**, manage KMS keys,
   network-isolate datanode/Ratis/admin ports.
+- **Configure Hadoop RPC service ACLs:** enable `hadoop.security.authorization`
+  and allow the intended users/groups for each protocol. Restrict internal
+  protocols to their service accounts (SCM block → OM **and** SCM), and preserve
+  legitimate client/admin access to user-facing protocols.
+  `ozone.om.security.client.protocol.acl` must allow ordinary OM clients.
+  Leaving the SCM block ACL at `*` allows any authenticated caller to invoke
+  operations such as `deleteKeyBlocks`.
 - **Protect tokens and secrets:** enable the relevant transport encryption
   (Hadoop RPC privacy, gRPC TLS, and/or HTTPS) so block/delegation tokens and S3
   secrets aren't sniffable; rotate S3 secrets; review token lifetimes for the
@@ -294,8 +336,10 @@ Per-boundary input trust (grouped by family):
 - **Protect service metadata at rest.** The OM, SCM, and Recon RocksDB stores
   hold critical credential/identity data — set restrictive file permissions and,
   ideally, encrypt them on disk. *(maintainer — jojochuang, 2026-06-25.)*
+- **Enable HTTP authentication (SPNEGO)** for the OM and SCM web servers, or network-isolate their HTTP ports. The DB checkpoint endpoints serve the metadata DB.
 - **Isolate the KMS** in a separate, firewalled network segment. *(maintainer —
   jojochuang, 2026-06-25.)*
+- **Bound client load:** set namespace and space quotas, enable the RPC `FairCallQueue` on the OM (for S3 traffic it needs the Ozone identity provider, and it applies only when S3 Gateway reaches the OM over Hadoop RPC, the default `ozone.om.transport.class`, not over gRPC), and put rate limiting in front of an internet-facing S3 Gateway. Ozone does not promise to withstand load by volume (§9).
 - **Client side:** treat data read from Ozone per your own trust needs; protect
   delegation tokens your app caches.
 
@@ -322,6 +366,17 @@ list. *(requested by jojochuang, 2026-06-25.)*
   scoped (§6/§8).
 - **Ranger policy too permissive** — operator policy decision, not Ozone code
   (§9/§10). `OUT-OF-MODEL: trusted-input`.
+- **Internal service RPC relies on a configurable service ACL** — the absence
+  of a per-method admin check is not by itself a finding when every caller
+  admitted by the ACL is intended to perform that operation
+  (e.g. SCM block `deleteKeyBlocks`). A permissive operator-configured ACL is
+  `OUT-OF-MODEL: trusted-input` (§9/§10). This does not exempt bypassing the
+  configured ACL or removing method-level checks from protocols shared by
+  callers with different privileges. User-facing entry points must enforce
+  the applicable authorization checks (§8). *(inferred, Q-svcacl.)*
+- **Denial of service by request volume** (floods, many connections, many concurrent requests whose cost the server already limits): `BY-DESIGN: property-disclaimed` (§9). A small, fixed number of requests that stops a service is different and is `VALID` under §8 item 7.
+- **A user exhausts resources the operator granted them** (fills their quota, creates all the keys or buckets they are allowed, runs listings within the server's page limits): `BY-DESIGN: property-disclaimed` (§9/§10).
+- **An admin (a principal in a configured administrator list) can stop or degrade a service**: `OUT-OF-MODEL: adversary-not-in-scope` (§7/§9). A caller admitted to an internal protocol only by its service ACL is covered by the service ACL entry above.
 - **Findings in `ozone-thirdparty`, `integration-test-*`, `*TestImpl`** —
   `OUT-OF-MODEL: unsupported-component` (§3).
 - **KDC/KMS/Ranger/SCM-CA-key compromise scenarios** — out of layer (§3/§7).
@@ -343,11 +398,11 @@ list. *(requested by jojochuang, 2026-06-25.)*
 | --- | --- | --- |
 | `VALID` | A §8 property breaks in secure mode, via an in-scope actor. | §8, §6, §7 |
 | `VALID-HARDENING` | No §8 break, but a §11 misuse is too easy to fall into. | §11 |
-| `OUT-OF-MODEL: trusted-input` | Requires control of operator config (Ranger/ACL/keys). | §6/§10 |
-| `OUT-OF-MODEL: adversary-not-in-scope` | Needs KDC/CA-key/Byzantine-majority. | §7 |
+| `OUT-OF-MODEL: trusted-input` | Requires control of operator config (Ranger/object ACL, service-protocol ACLs, keys). | §6/§10 |
+| `OUT-OF-MODEL: adversary-not-in-scope` | Needs KDC/CA-key/Byzantine-majority, or an admin or service peer acting against availability. | §7 |
 | `OUT-OF-MODEL: non-default-build` | Only in non-secure mode (or a discouraged knob). | §5a |
 | `OUT-OF-MODEL: unsupported-component` | thirdparty / test / infra Ozone doesn't own. | §3 |
-| `BY-DESIGN: property-disclaimed` | Non-secure mode, policy correctness, dependency security. | §9 |
+| `BY-DESIGN: property-disclaimed` | Non-secure mode, policy correctness, dependency security, load by volume, use within granted limits. | §9 |
 | `KNOWN-NON-FINDING` | Matches §11a. | §11a |
 | `MODEL-GAP` | Unroutable. | triggers §12 |
 
@@ -384,6 +439,10 @@ list. *(requested by jojochuang, 2026-06-25.)*
   Folded into §5a.)* (§8.)
 - **Q-token.** Block/delegation token lifetimes, signing-key rotation, and the
   bearer-token caveat in §9 — confirm. (§8/§9.)
+- **Q-svcacl.** Confirm the intended security contract for internal RPCs such as
+  SCM block `deleteKeyBlocks`: is a correctly configured service ACL sufficient
+  authorization for these operations, without a per-method admin check?
+  Document the confirmed scope in §9/§11a. (§5a/§9/§10/§11a.)
 - **Q-tde / Q-net / Q-infra.** TDE/KMS production expectations, the
   network-isolation assumptions, and which dependencies (KDC/Ranger/KMS) you want
   explicitly named as operator-owned in §3/§10. (§5/§3/§10.)

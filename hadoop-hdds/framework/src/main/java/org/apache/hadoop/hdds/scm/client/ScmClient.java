@@ -30,7 +30,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeStorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListStorageTypeUsageInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -400,9 +402,11 @@ public interface ScmClient extends Closeable {
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException;
 
+  @Deprecated
   StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException;
 
+  @Deprecated
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
@@ -430,4 +434,15 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException;
+
+  /**
+   * List disk usage information grouped by StorageType for each datanode.
+   *
+   * @param requestProto request specifying optional node-state and
+   *                     operational-state filters.
+   * @return per-datanode, per-StorageType usage info.
+   * @throws IOException on error.
+   */
+  List<DatanodeStorageTypeUsageInfoProto> listStorageTypeUsageInfo(
+      ListStorageTypeUsageInfoRequestProto requestProto) throws IOException;
 }

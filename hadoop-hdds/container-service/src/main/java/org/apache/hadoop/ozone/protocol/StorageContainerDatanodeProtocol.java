@@ -22,7 +22,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -30,23 +30,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
-import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * The protocol spoken between datanodes and SCM. For specifics please the
  * Protoc file that defines this protocol.
  */
-@KerberosInfo(
-    serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public interface StorageContainerDatanodeProtocol {
-
-  @SuppressWarnings("checkstyle:ConstantName")
-  /**
-   * Version 1: Initial version.
-   */
-  long versionID = 1L;
 
   /**
    * Returns SCM version.
@@ -69,7 +59,7 @@ public interface StorageContainerDatanodeProtocol {
    * @param extendedDatanodeDetailsProto - extended Datanode Details.
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
-   * @param layoutInfo - Layout Version Information.
+   * @param versionInfo - Datanode Version Information.
    * @return SCM Command.
    */
   SCMRegisteredResponseProto register(
@@ -77,6 +67,6 @@ public interface StorageContainerDatanodeProtocol {
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReports,
-      LayoutVersionProto layoutInfo) throws IOException;
+      DatanodeVersionProto versionInfo) throws IOException;
 
 }

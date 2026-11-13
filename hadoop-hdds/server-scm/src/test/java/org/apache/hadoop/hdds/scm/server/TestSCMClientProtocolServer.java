@@ -19,12 +19,15 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -35,34 +38,52 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeStorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListStorageTypeUsageInfoRequestProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -72,28 +93,37 @@ import org.junit.jupiter.api.io.TempDir;
  * servicing commands from the scm client.
  */
 public class TestSCMClientProtocolServer {
-  private SCMClientProtocolServer server;
-  private StorageContainerManager scm;
-  private StorageContainerLocationProtocolServerSideTranslatorPB service;
+  private static SCMClientProtocolServer server;
+  private static StorageContainerManager scm;
+  private static StorageContainerLocationProtocolServerSideTranslatorPB service;
+  private static SCMSafeModeManager mockSafeModeManager;
 
-  @BeforeEach
-  void setUp(@TempDir File testDir) throws Exception {
+  @BeforeAll
+  static void setUp(@TempDir File testDir) throws Exception {
     OzoneConfiguration config = SCMTestUtils.getConf(testDir);
+
+    mockSafeModeManager = mock(SCMSafeModeManager.class);
+
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
+    configurator.setScmSafeModeManager(mockSafeModeManager);
     config.set(OZONE_READONLY_ADMINISTRATORS, "testUser");
     scm = HddsTestUtils.getScm(config, configurator);
     scm.start();
-    scm.exitSafeMode();
 
     server = scm.getClientProtocolServer();
     service = new StorageContainerLocationProtocolServerSideTranslatorPB(server,
         scm, mock(ProtocolMessageMetrics.class));
   }
 
-  @AfterEach
-  public void tearDown() throws Exception {
+  @BeforeEach
+  void setUp() {
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(false);
+  }
+
+  @AfterAll
+  public static void tearDown() throws Exception {
     if (scm != null) {
       scm.stop();
       scm.join();
@@ -215,7 +245,7 @@ public class TestSCMClientProtocolServer {
         mock(ReconfigurationHandler.class));
     try {
       List<HddsProtos.SCMContainerReplicaProto> replicas =
-          scmServer.getContainerReplicas(containerId, ClientVersion.CURRENT_VERSION);
+          scmServer.getContainerReplicas(containerId, ClientVersion.CURRENT);
 
       assertThat(replicas).hasSize(1);
       HddsProtos.SCMContainerReplicaProto proto = replicas.get(0);
@@ -237,12 +267,109 @@ public class TestSCMClientProtocolServer {
         mock(ReconfigurationHandler.class));
     try {
       List<HddsProtos.SCMContainerReplicaProto> replicas =
-          scmServer.getContainerReplicas(containerId, ClientVersion.CURRENT_VERSION);
+          scmServer.getContainerReplicas(containerId, ClientVersion.CURRENT);
 
       assertThat(replicas).hasSize(1);
       HddsProtos.SCMContainerReplicaProto proto = replicas.get(0);
       assertThat(proto.hasStorageType()).isFalse();
       assertThat(proto.hasVolumeStorageType()).isFalse();
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testListStorageTypeUsageInfoAggregatesPerDatanodeAndGatesZeroCapacity() throws Exception {
+    DatanodeDetails dnDetails1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dnDetails2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeInfo dn1 = new DatanodeInfo(dnDetails1, NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultVersionProto(), 0);
+    DatanodeInfo dn2 = new DatanodeInfo(dnDetails2, NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultVersionProto(), 0);
+
+    // dn1 only reports DISK; every other StorageType stays at the default zero capacity
+    // and must be gated out of the response.
+    SCMNodeStat dn1Stat = new SCMNodeStat();
+    dn1Stat.add(2000L, 500L, 1500L, 0L, 0L, 300L, StorageType.DISK);
+
+    SCMNodeStat dn2Stat = new SCMNodeStat();
+    dn2Stat.add(1000L, 200L, 800L, 0L, 0L, 0L, StorageType.SSD);
+
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getNodes(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY))
+        .thenReturn(Arrays.asList(dn1, dn2));
+    when(nodeManager.getNodeStat(dnDetails1)).thenReturn(new SCMNodeMetric(dn1Stat));
+    when(nodeManager.getNodeStat(dnDetails2)).thenReturn(new SCMNodeMetric(dn2Stat));
+
+    StorageContainerManager scmMock = mockStorageContainerManager();
+    when(scmMock.getScmNodeManager()).thenReturn(nodeManager);
+
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(
+        new OzoneConfiguration(), scmMock, mock(ReconfigurationHandler.class));
+    try {
+      ListStorageTypeUsageInfoRequestProto request = ListStorageTypeUsageInfoRequestProto.newBuilder()
+          .setOpState(NodeOperationalState.IN_SERVICE)
+          .setState(NodeState.HEALTHY)
+          .build();
+
+      List<DatanodeStorageTypeUsageInfoProto> result =
+          scmServer.listStorageTypeUsageInfo(request, ClientVersion.CURRENT);
+
+      assertThat(result).hasSize(2);
+      DatanodeStorageTypeUsageInfoProto dn1Result = result.get(0);
+      assertThat(dn1Result.getStorageTypeUsageInfoCount()).isEqualTo(1);
+      assertThat(dn1Result.getStorageTypeUsageInfo(0).getStorageType()).isEqualTo(HddsProtos.StorageTypeProto.DISK);
+      assertThat(dn1Result.getStorageTypeUsageInfo(0).getCapacity()).isEqualTo(2000L);
+      assertThat(dn1Result.getStorageTypeUsageInfo(0).getUsed()).isEqualTo(500L);
+      assertThat(dn1Result.getStorageTypeUsageInfo(0).getReserved()).isEqualTo(300L);
+
+      DatanodeStorageTypeUsageInfoProto dn2Result = result.get(1);
+      assertThat(dn2Result.getStorageTypeUsageInfoCount()).isEqualTo(1);
+      assertThat(dn2Result.getStorageTypeUsageInfo(0).getStorageType()).isEqualTo(HddsProtos.StorageTypeProto.SSD);
+      assertThat(dn2Result.getStorageTypeUsageInfo(0).getCapacity()).isEqualTo(1000L);
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testListStorageTypeUsageInfoReturnsEmptyWhenNoNodesMatchFilter() throws Exception {
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getNodes(NodeOperationalState.DECOMMISSIONING, NodeState.HEALTHY))
+        .thenReturn(Collections.emptyList());
+
+    StorageContainerManager scmMock = mockStorageContainerManager();
+    when(scmMock.getScmNodeManager()).thenReturn(nodeManager);
+
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(
+        new OzoneConfiguration(), scmMock, mock(ReconfigurationHandler.class));
+    try {
+      ListStorageTypeUsageInfoRequestProto request = ListStorageTypeUsageInfoRequestProto.newBuilder()
+          .setOpState(NodeOperationalState.DECOMMISSIONING)
+          .setState(NodeState.HEALTHY)
+          .build();
+
+      assertThat(scmServer.listStorageTypeUsageInfo(request, ClientVersion.CURRENT)).isEmpty();
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testListStorageTypeUsageInfoWithNoFilterPassesNullsToNodeManager() throws Exception {
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getNodes(null, null)).thenReturn(Collections.emptyList());
+
+    StorageContainerManager scmMock = mockStorageContainerManager();
+    when(scmMock.getScmNodeManager()).thenReturn(nodeManager);
+
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(
+        new OzoneConfiguration(), scmMock, mock(ReconfigurationHandler.class));
+    try {
+      ListStorageTypeUsageInfoRequestProto request = ListStorageTypeUsageInfoRequestProto.newBuilder().build();
+
+      assertThat(scmServer.listStorageTypeUsageInfo(request, ClientVersion.CURRENT)).isEmpty();
+      verify(nodeManager).getNodes(null, null);
     } finally {
       scmServer.stop();
     }
@@ -284,6 +411,52 @@ public class TestSCMClientProtocolServer {
     when(scmNodeDetails.getClientProtocolServerAddressKey()).thenReturn("test");
     when(storageContainerManager.getScmNodeDetails()).thenReturn(scmNodeDetails);
     return storageContainerManager;
+  }
+
+  @Test
+  public void testLegacyFinalizeScmUpgradeAlreadyFinalized() throws Exception {
+    FinalizationManager mockFinalizationManager = mock(FinalizationManager.class);
+    SCMClientProtocolServer testServer = serverWithMockFinalization(false, mockFinalizationManager);
+    try {
+      StatusAndMessages result = testServer.finalizeScmUpgrade("testClientID");
+      assertEquals(ALREADY_FINALIZED, result.status());
+      assertTrue(result.msgs().isEmpty());
+      verify(mockFinalizationManager, never()).finalizeUpgrade();
+    } finally {
+      testServer.stop();
+    }
+  }
+
+  @Test
+  public void testLegacyFinalizeScmUpgradeFinalizationRequired() throws Exception {
+    FinalizationManager mockFinalizationManager = mock(FinalizationManager.class);
+    SCMClientProtocolServer testServer = serverWithMockFinalization(true, mockFinalizationManager);
+    try {
+      StatusAndMessages result = testServer.finalizeScmUpgrade("testClientID");
+      assertEquals(ALREADY_FINALIZED, result.status());
+      assertTrue(result.msgs().isEmpty());
+      verify(mockFinalizationManager, never()).finalizeUpgrade();
+    } finally {
+      testServer.stop();
+    }
+  }
+
+  private SCMClientProtocolServer serverWithMockFinalization(
+      boolean needsFinalization, FinalizationManager finalizationManager) throws IOException {
+    ScmVersionManager mockVersionManager = mock(ScmVersionManager.class);
+    when(mockVersionManager.needsFinalization()).thenReturn(needsFinalization);
+
+    StorageContainerManager mockScm = mockStorageContainerManager();
+    when(mockScm.getVersionManager()).thenReturn(mockVersionManager);
+    when(mockScm.getFinalizationManager()).thenReturn(finalizationManager);
+
+    return new SCMClientProtocolServer(
+        new OzoneConfiguration(), mockScm, mock(ReconfigurationHandler.class));
+  }
+
+  @Test
+  public void testGetPeerUpgradeStatusReturnsLocalVersion() throws IOException {
+    assertEquals(HDDSVersion.SOFTWARE_VERSION, server.getPeerUpgradeStatus());
   }
 
   private ContainerInfo newContainerWithLastUsedTime(long containerId,

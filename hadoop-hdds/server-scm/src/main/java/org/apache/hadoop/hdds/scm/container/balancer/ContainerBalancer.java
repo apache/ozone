@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
@@ -32,7 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -308,6 +309,10 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
       saveConfiguration(configuration, true, 0);
       this.config = configuration;
 
+      LOG.info("Container Balancer starting with balancing iteration interval {} seconds " +
+              "(hdds.container.balancer.balancing.iteration.interval).",
+          configuration.getBalancingInterval().getSeconds());
+
       // Set startedAt only after validation has passed, so a rejected start
       // does not overwrite the recorded start time of the previous run.
       startedAt = OffsetDateTime.now();
@@ -505,13 +510,20 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
               + ".iteration");
     }
 
-    // balancing interval should be greater than DUFactory refresh period
-    DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
-    long refreshPeriod = duConf.getRefreshPeriod().toMillis();
-    if (conf.getBalancingInterval().toMillis() <= refreshPeriod) {
-      LOG.warn("hdds.container.balancer.balancing.iteration.interval {} " +
-              "should be greater than hdds.datanode.du.refresh.period {}",
-          conf.getBalancingInterval().toMillis(), refreshPeriod);
+    // Balancing interval should be greater than the node report interval so
+    // that SCM receives refreshed datanode usage info between iterations.
+    // Datanode usage is tracked incrementally in memory and reported every
+    // hdds.node.report.interval, so the node report interval (not the hourly
+    // du refresh period) is the relevant freshness bound between iterations.
+    long nodeReportInterval = ozoneConfiguration.getTimeDuration(
+        HDDS_NODE_REPORT_INTERVAL, HDDS_NODE_REPORT_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    if (isBalancingIntervalBelowNodeReportInterval(
+        conf.getBalancingInterval().toMillis(), nodeReportInterval)) {
+      LOG.warn("hdds.container.balancer.balancing.iteration.interval {}ms " +
+              "should be greater than hdds.node.report.interval {}ms so that " +
+              "datanode usage info is refreshed between iterations.",
+          conf.getBalancingInterval().toMillis(), nodeReportInterval);
     }
 
     // "move.replication.timeout" should be lesser than "move.timeout"
@@ -548,6 +560,19 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
     validateIncludeExcludeLists(conf);
     validateIncludeContainersExist(conf);
     validateEligibleDatanodePool(conf);
+  }
+
+  /**
+   * A balancing interval that is not greater than the node report interval means
+   * SCM may not receive refreshed datanode usage info before the next iteration
+   * starts. Datanode usage is tracked incrementally in memory and reported every
+   * node report interval, so that interval (not the hourly du refresh period) is
+   * the relevant freshness bound between iterations.
+   */
+  @VisibleForTesting
+  static boolean isBalancingIntervalBelowNodeReportInterval(
+      long balancingIntervalMs, long nodeReportIntervalMs) {
+    return balancingIntervalMs < nodeReportIntervalMs;
   }
 
   /**

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.DEFAULT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.util.StringUtils.byteDesc;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1062,7 +1062,7 @@ class TestContainerBalancerSubCommand {
         .setUuid(UUID.randomUUID())
         .build();
     return HddsProtos.DatanodeUsageInfoProto.newBuilder()
-        .setNode(datanode.toProto(DEFAULT_VERSION.toProtoValue()))
+        .setNode(datanode.toProto(DEFAULT_VERSION))
         .setCapacity(capacity)
         .setRemaining(remaining)
         .setUsed(capacity - remaining)

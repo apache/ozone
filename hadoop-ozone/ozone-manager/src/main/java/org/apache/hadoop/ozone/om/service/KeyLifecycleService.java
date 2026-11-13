@@ -58,6 +58,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -760,30 +761,25 @@ public class KeyLifecycleService extends BackgroundService {
 
         if (item.isFirstEvaluate()) {
           // filter sub directory list
-          if (!subDirSummary.getSubDirList().isEmpty()) {
-            Iterator<OmDirectoryInfo> iterator = subDirSummary.getSubDirList().iterator();
-            while (iterator.hasNext()) {
-              OmDirectoryInfo subDir = iterator.next();
-              String subDirPath = currentDirPath.isEmpty() ? subDir.getName() :
-                  currentDirPath + OM_KEY_PREFIX + subDir.getName();
+          if (!subDirSummary.isEmpty()) {
+            subDirSummary.removeIf(i -> {
+              OmDirectoryInfo subDir = subDirSummary.getSubDirList().get(i);
+              String subDirPath = currentDirPath.isEmpty() ? subDir.getName()
+                  : currentDirPath + OM_KEY_PREFIX + subDir.getName();
               if (subDirPath.startsWith(TRASH_PREFIX)) {
-                iterator.remove();
-                continue;
+                return true;
               }
-              boolean matched = false;
               for (OmLCRule rule : ruleList) {
-                if (rule.getEffectivePrefix() != null && subDirPath.startsWith(rule.getEffectivePrefix())) {
-                  matched = true;
-                  break;
+                if (rule.getEffectivePrefix() != null
+                    && subDirPath.startsWith(rule.getEffectivePrefix())) {
+                  return false;
                 }
               }
-              if (!matched) {
-                iterator.remove();
-              }
-            }
+              return true;
+            });
           }
 
-          if (!subDirSummary.getSubDirList().isEmpty()) {
+          if (!subDirSummary.isEmpty()) {
             item.setDirectoryList(subDirSummary);
             item.setFirstEvaluate(false);
             try {
@@ -825,6 +821,8 @@ public class KeyLifecycleService extends BackgroundService {
         long numKeysExpired = 0;
         HashSet<String> deletedKeySetInCache = new HashSet();
         HashSet<String> keySetInCache = new HashSet();
+        // The cache is scanned separately before the table, so a cache key cannot represent table scan progress.
+        // Only advance lastScannedKey during table iteration to avoid skipping unprocessed table keys on resume.
         Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
         while (cacheIter.hasNext()) {
           Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry = cacheIter.next();
@@ -850,7 +848,6 @@ public class KeyLifecycleService extends BackgroundService {
                 break;
               }
             }
-            lastScannedKey = entry.getKey().getCacheKey();
           }
         }
 
@@ -953,6 +950,7 @@ public class KeyLifecycleService extends BackgroundService {
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
           cacheIter = dirTable.cacheIterator();
       HashSet<String> deletedDirSet = new HashSet();
+      HashSet<String> dirSet = new HashSet();
       while (cacheIter.hasNext()) {
         Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
             cacheIter.next();
@@ -963,6 +961,7 @@ public class KeyLifecycleService extends BackgroundService {
           continue;
         }
         if (cacheOmDirInfo.getParentObjectID() == dirObjID) {
+          dirSet.add(entry.getKey().getCacheKey());
           subDirList.addSubDir(entry.getKey().getCacheKey(), cacheOmDirInfo, cacheOmDirInfo.getName());
         }
       }
@@ -974,13 +973,19 @@ public class KeyLifecycleService extends BackgroundService {
           numDirIterated++;
           Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
           OmDirectoryInfo dir = entry.getValue();
-          if (deletedDirSet.contains(entry.getKey())) {
+          if (deletedDirSet.contains(entry.getKey()) || dirSet.contains(entry.getKey())) {
             continue;
           }
           if (dir.getParentObjectID() == dirObjID) {
             subDirList.addSubDir(entry.getKey(), dir, dir.getName());
           }
         }
+      }
+      // Cache children (hash order) and table children (ascending) are appended in that order; sort
+      // by name so the DFS stack pops siblings in strictly descending name order, which canSkipDir
+      // relies on to decide a resumed directory was already scanned.
+      if (!dirSet.isEmpty()) {
+        subDirList.sortByName();
       }
       return subDirList;
     }
@@ -1246,7 +1251,7 @@ public class KeyLifecycleService extends BackgroundService {
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(OzoneManagerProtocolProtos.Type.AbortExpiredMultiPartUploads)
           .setMultipartUploadsExpiredAbortRequest(abortRequest)
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .setClientId(clientId.toString())
           .build();
 
@@ -1393,7 +1398,7 @@ public class KeyLifecycleService extends BackgroundService {
 
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.SaveLifecycleScanState)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setSaveLifecycleScanStateRequest(saveRequest)
             .build();
@@ -1460,7 +1465,7 @@ public class KeyLifecycleService extends BackgroundService {
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {
             OMRequest omRequestRaw = OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
-                .setVersion(ClientVersion.CURRENT_VERSION)
+                .setVersion(ClientVersion.CURRENT.serialize())
                 .setClientId(clientId.toString())
                 .setDeleteKeysRequest(deleteKeysRequest)
                 .build();
@@ -1588,7 +1593,7 @@ public class KeyLifecycleService extends BackgroundService {
         // send request out
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setRenameKeyRequest(renameKeyRequest)
             .build();
@@ -1652,7 +1657,7 @@ public class KeyLifecycleService extends BackgroundService {
           OMRequest omRequest = OMRequest.newBuilder().setCreateDirectoryRequest(
                   CreateDirectoryRequest.newBuilder().setKeyArgs(keyArgs))
               .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-              .setVersion(ClientVersion.CURRENT_VERSION)
+              .setVersion(ClientVersion.CURRENT.serialize())
               .setClientId(clientId.toString())
               .build();
           try {
@@ -1998,6 +2003,48 @@ public class KeyLifecycleService extends BackgroundService {
       subDirList.add(dir);
       subDirKeyPathList.add(dirPath);
       subDirCount++;
+    }
+
+    /** Removes the entry at {@code index} from all parallel lists. */
+    void removeAt(int index) {
+      subDirList.remove(index);
+      subDirKeyList.remove(index);
+      subDirKeyPathList.remove(index);
+      subDirCount--;
+    }
+
+    /** Removes the entry if shouldRemoveIndex returns true. */
+    void removeIf(IntPredicate shouldRemoveIndex) {
+      for (int i = subDirCount - 1; i >= 0; i--) {
+        if (shouldRemoveIndex.test(i)) {
+          removeAt(i);
+        }
+      }
+    }
+
+    public void sortByName() {
+      if (subDirCount <= 1) {
+        return;
+      }
+      List<Integer> order = new ArrayList<>(subDirCount);
+      for (int i = 0; i < subDirCount; i++) {
+        order.add(i);
+      }
+      order.sort(Comparator.comparing((Integer idx) -> subDirList.get(idx).getName()));
+      List<OmDirectoryInfo> sortedDirs = new ArrayList<>(subDirCount);
+      List<String> sortedKeys = new ArrayList<>(subDirCount);
+      List<String> sortedPaths = new ArrayList<>(subDirCount);
+      for (int idx : order) {
+        sortedDirs.add(subDirList.get(idx));
+        sortedKeys.add(subDirKeyList.get(idx));
+        sortedPaths.add(subDirKeyPathList.get(idx));
+      }
+      subDirList.clear();
+      subDirList.addAll(sortedDirs);
+      subDirKeyList.clear();
+      subDirKeyList.addAll(sortedKeys);
+      subDirKeyPathList.clear();
+      subDirKeyPathList.addAll(sortedPaths);
     }
 
     public OmDirectoryInfo getLastSubDir() {

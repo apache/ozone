@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -387,11 +388,12 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     when(reconDbProvider.getDbStore()).thenReturn(mock(DBStore.class));
     when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
 
+    MockClock testClock = MockClock.newInstance();
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
         mock(ReconNamespaceSummaryManager.class),
-        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class));
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), testClock);
         
     // Set up a mock OM metadata manager
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
@@ -409,7 +411,7 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     // Attempts 1-6: should return RETRY_LATER
     for (int i = 1; i <= 6; i++) {
       if (i > 1) {
-        Thread.sleep(2100); // Wait for retry delay
+        testClock.fastForward(2100); // Wait for retry delay
       }
       result = controllerSpy.queueReInitializationEvent(
           ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
@@ -418,7 +420,7 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     }
     
     // Attempt 7: should return MAX_RETRIES_EXCEEDED
-    Thread.sleep(2100);
+    testClock.fastForward(2100);
     result = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result,
@@ -449,11 +451,12 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     when(reconDbProvider.getDbStore()).thenReturn(mock(DBStore.class));
     when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
 
+    MockClock testClock = MockClock.newInstance();
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
         mock(ReconNamespaceSummaryManager.class),
-        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class));
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), testClock);
         
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
     reconTaskController.updateOMMetadataManager(mockOMMetadataManager);
@@ -473,7 +476,7 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     for (int attempt = 1; attempt <= maxReinitQueueFailures; attempt++) {
       if (attempt > 1) {
         // Wait for delay between iterations
-        Thread.sleep(2100);
+        testClock.fastForward(2100);
       }
       
       ReconTaskController.ReInitializationResult result = controllerSpy.queueReInitializationEvent(
@@ -519,11 +522,12 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     when(reconDbProvider.getDbStore()).thenReturn(mock(DBStore.class));
     when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
 
+    MockClock testClock = MockClock.newInstance();
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
         mock(ReconNamespaceSummaryManager.class),
-        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class));
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), testClock);
         
     // Set up properly mocked ReconOMMetadataManager with required dependencies
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
@@ -558,7 +562,7 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     }
     
     // Second attempt - should return RETRY_LATER (after delay)
-    Thread.sleep(2100);
+    testClock.fastForward(2100);
     ReconTaskController.ReInitializationResult result2 = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     if (result2 != ReconTaskController.ReInitializationResult.SUCCESS) {

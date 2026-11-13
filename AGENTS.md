@@ -22,7 +22,8 @@ Apache Ozone is a multi-module Maven project. The root coordinates and version l
 
 Tech stack:
 
-- Java 8 bytecode with JDK 21 runtime compatibility (see the `[21,]` profile in `pom.xml`)
+- Java 17 by default (`ozone.java.version.server` in `pom.xml`). Modules that set `maven.compiler.release` to
+  `${ozone.java.version.client}` in their own `pom.xml` still target Java 8.
 - Maven build
 - Hadoop RPC and gRPC over Protobuf
 - RocksDB for persistent metadata
@@ -52,7 +53,8 @@ server-side handling, client translation code, and integration tests.
 
 ## Local Environment
 
-- Use a JDK 21 runtime locally. Source and target compatibility remain Java 8.
+- Use a JDK 21 runtime locally. Before using Java 9+ syntax or standard-library APIs, check the module's
+  `maven.compiler.release` in its `pom.xml`; Maven `--release` governs both language level and API surface.
 - Ozone formatting conventions are shared through `.editorconfig`.
 - If Maven behaves unexpectedly, check `java -version` and `mvn -version` first.
 
@@ -118,58 +120,17 @@ Key paths:
 - `hadoop-ozone/dev-support/checks`: scripts that mirror CI checks
 - `.run/`: IDE launch configurations for local services and HA topologies
 
-## Change Boundaries
+## Contribution Guidelines
 
-- Keep service responsibilities separated.
-  Do not move OM logic into SCM paths, bypass existing request/response layers,
-  or introduce cross-service shortcuts just because they are convenient.
-- When changing a wire type, expect to update the Protobuf definition,
-  translators, server-side logic, and relevant compatibility or integration tests.
-- Prefer existing bucket-layout, snapshot, and upgrade abstractions over one-off conditionals.
-- Do not hand-edit generated sources or generated web artifacts when a source file or generation step exists.
-- For integration coverage, extend an existing suite, base class, or cluster provider
-  before creating a new `MiniOzoneCluster` lifecycle.
-  Reuse existing cluster utilities where practical.
+Follow the guidelines in [`CONTRIBUTING.md`](./CONTRIBUTING.md): the pull request workflow and guidelines,
+code conventions, design guidelines, and tests. Committers should also follow its committer guidelines.
 
-## Coding Standards
+Before wrapping up a change:
 
-- Use 2-space indentation and stay within 120 characters.
-- Add the Apache license header to new files unless the surrounding area is explicitly exempted by RAT configuration.
-- Do not add `@author` tags.
-- Keep comments concrete and local to the code. Avoid vague architecture prose or newly invented terminology.
-- Prefer existing helpers and utility methods over new abstractions for single-call-site use.
-- When touching code that already follows a specific local pattern,
-  stay consistent with that pattern instead of normalizing the whole file.
-
-## Testing Standards
-
-- New behavior and bug fixes should come with tests.
-- Start with the narrowest useful test:
-  - unit tests for local logic
-  - integration tests when the behavior depends on service boundaries, cluster lifecycle, storage, RPC, or upgrade flows
-- When adding integration coverage, prefer merging it into an existing suite
-  over creating a brand-new test class that spins up another cluster for similar coverage.
-- Before wrapping up a non-trivial change, run `./hadoop-ozone/dev-support/checks/checkstyle.sh`.
+- For a non-trivial change, run `./hadoop-ozone/dev-support/checks/checkstyle.sh`.
 - If you added files or changed license headers, run `./hadoop-ozone/dev-support/checks/rat.sh`.
 - If you touched shell tooling, run `./hadoop-ozone/dev-support/checks/bats.sh`.
 - Use `acceptance.sh` and `kubernetes.sh` only when the changed area actually depends on those environments.
-
-## Commits and PRs
-
-- Every change should map to an Apache Jira in the HDDS project.
-- Branch names usually start with the Jira ID, for example `HDDS-1234`.
-- PR titles must be `HDDS-1234. Short summary of the change`.
-- Prefer commit subjects that also start with the Jira ID when it is known,
-  for example `HDDS-1234. Fix snapshot purge regression`.
-- For larger changes, use incremental commits so reviewers can inspect the delta.
-  Do not rewrite branch history unless explicitly asked.
-- To bring a branch up to date with `master`, merge instead of rebasing: `git merge --no-edit origin/master`
-- Avoid force-push when updating a PR unless a maintainer explicitly asks for rewritten history.
-- PR descriptions should include the Jira link, the problem statement,
-  the chosen approach, and how the patch was tested.
-- When non-trivial content is generated with AI tooling,
-  disclose it in the PR description as `Generated-by: TOOL (MODEL)`.
-  See the ASF generative tooling policy.
 
 ## Ask First
 

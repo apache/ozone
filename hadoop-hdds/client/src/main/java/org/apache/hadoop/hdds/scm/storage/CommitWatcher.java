@@ -54,7 +54,7 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   }
 
   @Override
-  public void cleanup() {
+  public synchronized void cleanup() {
     super.cleanup();
   }
 }

@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -115,7 +116,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
     Stream<BasicDatanodeInfo> allNodes = getAllNodes(scmClient).stream();
     if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getIp())) {
       allNodes = allNodes.filter(p -> p.getIpAddress()
-          .compareToIgnoreCase(exclusiveNodeOptions.getIp()) == 0);
+          .compareToIgnoreCase(exclusiveNodeOptions.getIp()) == 0
+          || HddsUtils.isSameIpAddress(p.getIpAddress(), exclusiveNodeOptions.getIp()));
     }
     if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getHostname())) {
       allNodes = allNodes.filter(p -> p.getHostName()

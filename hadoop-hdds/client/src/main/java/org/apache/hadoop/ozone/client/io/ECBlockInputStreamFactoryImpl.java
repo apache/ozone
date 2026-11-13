@@ -40,20 +40,34 @@ public final class ECBlockInputStreamFactoryImpl implements
   private final BlockInputStreamFactory inputStreamFactory;
   private final ByteBufferPool byteBufferPool;
   private final Supplier<ExecutorService> ecReconstructExecutorSupplier;
+  private final Supplier<ExecutorService> ecParallelReadExecutorSupplier;
 
   public static ECBlockInputStreamFactory getInstance(
       BlockInputStreamFactory streamFactory, ByteBufferPool byteBufferPool,
       Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+    return getInstance(streamFactory, byteBufferPool, ecReconstructExecutorSupplier, null);
+  }
+
+  /**
+   * @param ecParallelReadExecutorSupplier executor for reading the cells of a healthy EC block in parallel, or
+   *     null to always read them one at a time
+   */
+  public static ECBlockInputStreamFactory getInstance(
+      BlockInputStreamFactory streamFactory, ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier,
+      Supplier<ExecutorService> ecParallelReadExecutorSupplier) {
     return new ECBlockInputStreamFactoryImpl(streamFactory, byteBufferPool,
-        ecReconstructExecutorSupplier);
+        ecReconstructExecutorSupplier, ecParallelReadExecutorSupplier);
   }
 
   private ECBlockInputStreamFactoryImpl(BlockInputStreamFactory streamFactory,
       ByteBufferPool byteBufferPool,
-      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+      Supplier<ExecutorService> ecReconstructExecutorSupplier,
+      Supplier<ExecutorService> ecParallelReadExecutorSupplier) {
     this.byteBufferPool = byteBufferPool;
     this.inputStreamFactory = streamFactory;
     this.ecReconstructExecutorSupplier = ecReconstructExecutorSupplier;
+    this.ecParallelReadExecutorSupplier = ecParallelReadExecutorSupplier;
   }
 
   /**
@@ -94,7 +108,7 @@ public final class ECBlockInputStreamFactoryImpl implements
       // Otherwise create the more efficient non-reconstruction reader
       return new ECBlockInputStream((ECReplicationConfig)repConfig, blockInfo,
           xceiverFactory, refreshFunction, inputStreamFactory,
-          config);
+          config, ecParallelReadExecutorSupplier);
     }
   }
 

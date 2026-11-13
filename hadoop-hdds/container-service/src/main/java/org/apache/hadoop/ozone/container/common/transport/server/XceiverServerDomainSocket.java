@@ -206,9 +206,12 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   public void run() {
     while (isRunning.get()) {
       DomainPeer peer = null;
+      // true while this loop holds the count of an accepted connection that no Receiver owns yet
+      boolean releaseCount = false;
       try {
         DomainSocket connSock = domainSocket.accept();
         xceriverCount.incrementAndGet();
+        releaseCount = true;
         peer = new DomainPeer(connSock);
         peer.setReadTimeout(readTimeoutMs);
         peer.setWriteTimeout(writeTimeoutMs);
@@ -221,6 +224,8 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         Daemon daemon = new Daemon(Receiver.create(peer, config, this, dispatcher, readExecutors, metrics));
         daemon.setName(threadPrefix + "@" + peer.getDomainSocket().toString());
         daemon.start();
+        // the Receiver releases the count in closePeer
+        releaseCount = false;
       } catch (SocketTimeoutException ignored) {
         // wake up to see if should continue to run
       } catch (AsynchronousCloseException ace) {
@@ -243,6 +248,10 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         }
       } catch (Throwable te) {
         LOG.error("XceiverServerDomainSocket: Exiting.", te);
+      } finally {
+        if (releaseCount) {
+          xceriverCount.decrementAndGet();
+        }
       }
     }
 
@@ -310,6 +319,11 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   @VisibleForTesting
   public void setContainerDispatcher(ContainerDispatcher containerDispatcher) {
     this.dispatcher = containerDispatcher;
+  }
+
+  @VisibleForTesting
+  public int getXceiverCount() {
+    return xceriverCount.get();
   }
 
   @VisibleForTesting

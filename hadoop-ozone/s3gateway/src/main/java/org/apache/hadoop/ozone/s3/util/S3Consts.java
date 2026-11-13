@@ -114,6 +114,9 @@ public final class S3Consts {
   /** AWS S3 maximum number of keys per DeleteObjects request. */
   public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
 
+  /** Version ID of an object in a bucket that never had versioning enabled. */
+  public static final String NULL_VERSION_ID = "null";
+
   // Bucket owner condition headers
   // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-owner-condition.html
   public static final String EXPECTED_BUCKET_OWNER_HEADER = "x-amz-expected-bucket-owner";
@@ -147,6 +150,13 @@ public final class S3Consts {
 
   // Maximum number of parts returned in one GetObjectAttributes response.
   public static final int GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT = 1000;
+
+  // S3 storage class values passed via the `x-amz-storage-class` request header.
+  public static final String S3_STORAGE_CLASS_REDUCED_REDUNDANCY = "REDUCED_REDUNDANCY";
+  public static final String S3_STORAGE_CLASS_STANDARD = "STANDARD";
+  public static final String S3_STORAGE_CLASS_STANDARD_IA = "STANDARD_IA";
+  public static final String S3_STORAGE_CLASS_GLACIER = "GLACIER";
+  public static final String S3_STORAGE_CLASS_DEEP_ARCHIVE = "DEEP_ARCHIVE";
 
   //Never Constructed
   private S3Consts() {
@@ -192,6 +202,8 @@ public final class S3Consts {
     public static final String LIFECYCLE = "lifecycle";
     public static final String ATTRIBUTES = "attributes";
     public static final String VERSION_ID = "versionId";
+    public static final String VERSION_ID_MARKER = "version-id-marker";
+    public static final String VERSIONS = "versions";
 
     // Subresources of S3 APIs that are not implemented. They are only recognized so that the
     // request can be rejected with NotImplemented instead of falling through to another operation.
@@ -224,7 +236,6 @@ public final class S3Consts {
     public static final String RETENTION = "retention";
     public static final String SESSION = "session";
     public static final String VERSIONING = "versioning";
-    public static final String VERSIONS = "versions";
     public static final String WEBSITE = "website";
 
     private QueryParams() {

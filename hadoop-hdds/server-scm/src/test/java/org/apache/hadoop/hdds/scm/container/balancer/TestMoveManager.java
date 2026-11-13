@@ -446,7 +446,7 @@ public class TestMoveManager {
     assertEquals(COMPLETED, finalResult);
 
     verify(replicationManager, times(0))
-        .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
+        .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
   }
 
   @Test
@@ -462,7 +462,7 @@ public class TestMoveManager {
     assertEquals(DELETION_FAIL_NODE_UNHEALTHY, finalResult);
 
     verify(replicationManager, times(0))
-        .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
+        .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
   }
 
   @Test
@@ -480,7 +480,7 @@ public class TestMoveManager {
     assertEquals(DELETION_FAIL_NODE_NOT_IN_SERVICE, finalResult);
 
     verify(replicationManager, times(0))
-        .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
+        .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
   }
 
   @Test
@@ -499,7 +499,7 @@ public class TestMoveManager {
     assertEquals(DELETE_FAIL_POLICY, finalResult);
 
     verify(replicationManager, times(0))
-        .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
+        .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
   }
 
   @Test

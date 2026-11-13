@@ -21,12 +21,16 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/errorprone"}
+CHECK=errorprone
+
+BASE_DIR="$(pwd -P)"
+REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
 DIAGNOSTIC_FILE="$REPORT_DIR/diagnostics.txt"
 OUTPUT_LOG=$(mktemp)
 
 MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon -DskipShade -DskipTests'
+MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 MAVEN_DIAGNOSTIC_PATTERN='^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
 JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'
 MAVEN_ERROR_PATTERN='^\[ERROR\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'

@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.client.checksum;
 import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
@@ -35,16 +33,16 @@ public final class ChecksumHelperFactory {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static BaseFileChecksumHelper getChecksumHelper(
-      HddsProtos.ReplicationType replicationType, OzoneVolume volume,
-      OzoneBucket bucket, String keyName, long length,
+      HddsProtos.ReplicationType replicationType, String volumeName,
+      String bucketName, String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode combineMode,
       ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
 
     if (replicationType == HddsProtos.ReplicationType.EC) {
-      return new ECFileChecksumHelper(volume, bucket, keyName, length,
+      return new ECFileChecksumHelper(volumeName, bucketName, keyName, length,
           combineMode, rpcClient, keyInfo);
     } else {
-      return new ReplicatedFileChecksumHelper(volume, bucket, keyName, length,
+      return new ReplicatedFileChecksumHelper(volumeName, bucketName, keyName, length,
           combineMode, rpcClient, keyInfo);
     }
   }
