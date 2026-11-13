@@ -48,7 +48,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -58,6 +63,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
@@ -83,11 +90,12 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
   private Map<DatanodeID, DatanodeInfo> registry;
   private List<DatanodeDetails> nodes;
   private NodeManager nodeManager;
+  private StorageContainerManager scm;
 
   @BeforeEach
   void setUp() throws Exception {
     impl = mock(ScmBlockLocationProtocol.class);
-    StorageContainerManager scm = mock(StorageContainerManager.class);
+    scm = mock(StorageContainerManager.class);
 
     registry = new HashMap<>();
     nodeManager = mock(NodeManager.class);
@@ -141,6 +149,26 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
         .setOwner("owner")
         .build();
     return service.allocateScmBlock(request, ClientVersion.CURRENT);
+  }
+
+  /** Same as {@link #allocate(int)}, but through {@code send}, as the leader SCM with EC finalized. */
+  private SCMBlockLocationResponse sendAllocate(int numBlocks) throws Exception {
+    when(scm.checkLeader()).thenReturn(true);
+    ScmVersionManager versionManager = mock(ScmVersionManager.class);
+    when(versionManager.isAllowed(any())).thenReturn(true);
+    when(scm.getVersionManager()).thenReturn(versionManager);
+    AllocateScmBlockRequestProto request = AllocateScmBlockRequestProto.newBuilder()
+        .setSize(1024)
+        .setNumBlocks(numBlocks)
+        .setType(ReplicationType.RATIS)
+        .setFactor(ReplicationFactor.THREE)
+        .setOwner("owner")
+        .build();
+    return service.send(null, SCMBlockLocationRequest.newBuilder()
+        .setCmdType(Type.AllocateScmBlock)
+        .setVersion(ClientVersion.CURRENT.serialize())
+        .setAllocateScmBlockRequest(request)
+        .build());
   }
 
   private Pipeline buildPipeline(List<DatanodeDetails> pipelineNodes) {
@@ -289,5 +317,29 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     registry.remove(unknownNode.getID());
     SCMException ex = assertThrows(SCMException.class, () -> allocate(1));
     assertThat(ex.getMessage()).contains(unknownNode.toString());
+  }
+
+  @Test
+  public void testSendRecordsAttributesOnServerSpan() throws Exception {
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      assertEquals(Status.OK, sendAllocate(1).getStatus());
+      collector.assertNotError("AllocateScmBlock");
+      collector.assertAttribute("AllocateScmBlock", ScmTracingAttributes.SCM_CMD_TYPE, "AllocateScmBlock");
+      collector.assertNoAttribute("AllocateScmBlock", ScmTracingAttributes.STATUS);
+    }
+  }
+
+  @Test
+  public void testSendMarksServerSpanErrorOnFailedResponse() throws Exception {
+    when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class), anyString(), any(), anyString()))
+        .thenThrow(new SCMException("safe mode", SCMException.ResultCodes.SAFE_MODE_EXCEPTION));
+
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      SCMBlockLocationResponse response = sendAllocate(1);
+      assertEquals(Status.SAFE_MODE_EXCEPTION, response.getStatus());
+      collector.assertError("AllocateScmBlock", "safe mode");
+      collector.assertAttribute("AllocateScmBlock", ScmTracingAttributes.STATUS, "SAFE_MODE_EXCEPTION");
+      collector.assertExceptionRecorded("AllocateScmBlock", SCMException.class);
+    }
   }
 }

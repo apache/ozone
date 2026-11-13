@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -88,7 +89,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
     this.scm = scm;
     this.exitManager = new ExitManager();
     this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
-    this.ratisServer = new SCMRatisServerImpl(conf, scm, transactionBuffer);
+    this.ratisServer = TracingUtil.createInternalProxy(new SCMRatisServerImpl(conf, scm, transactionBuffer),
+        SCMRatisServer.class, conf);
     this.scmSnapshotProvider = newScmSnapshotProvider(scm);
     this.grpcServer = new InterSCMGrpcProtocolService(conf, scm);
 

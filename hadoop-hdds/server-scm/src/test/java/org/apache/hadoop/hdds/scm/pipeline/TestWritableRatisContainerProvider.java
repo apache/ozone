@@ -38,11 +38,14 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -106,6 +109,18 @@ class TestWritableRatisContainerProvider {
 
     assertSame(newContainer, container);
     verifyPipelineCreated();
+  }
+
+  @Test
+  void newPipelineIsRecordedOnSpan() throws Exception {
+    createNewContainerOnDemand();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      TracingUtil.executeInNewSpan("getContainer",
+          () -> createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
+
+      collector.assertAttribute("getContainer", ScmTracingAttributes.SCM_PIPELINE_CREATED, true);
+    }
   }
 
   @Test

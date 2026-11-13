@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
  * Factory class to obtain a container to which a block can be allocated for
@@ -43,20 +44,20 @@ public class WritableContainerFactory {
   public WritableContainerFactory(StorageContainerManager scm) {
     ConfigurationSource conf = scm.getConfiguration();
 
-    this.ratisProvider = new WritableRatisContainerProvider(
+    this.ratisProvider = TracingUtil.createInternalProxy(new WritableRatisContainerProvider(
         scm.getPipelineManager(),
-        scm.getContainerManager(), scm.getPipelineChoosePolicy());
+        scm.getContainerManager(), scm.getPipelineChoosePolicy()), WritableContainerProvider.class, conf);
     this.standaloneProvider = ratisProvider;
 
     WritableECContainerProviderConfig ecProviderConfig =
         conf.getObject(WritableECContainerProviderConfig.class);
-    this.ecProvider = new WritableECContainerProvider(
+    this.ecProvider = TracingUtil.createInternalProxy(new WritableECContainerProvider(
         ecProviderConfig,
         getConfiguredContainerSize(conf),
         scm.getScmNodeManager(),
         scm.getPipelineManager(),
         scm.getContainerManager(),
-        scm.getEcPipelineChoosePolicy());
+        scm.getEcPipelineChoosePolicy()), WritableContainerProvider.class, conf);
 
     scm.getReconfigurationHandler().register(ecProviderConfig);
   }

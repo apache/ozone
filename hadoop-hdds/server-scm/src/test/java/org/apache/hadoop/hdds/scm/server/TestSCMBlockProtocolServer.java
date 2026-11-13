@@ -84,6 +84,8 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInter
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.net.StaticMapping;
@@ -358,6 +360,19 @@ public class TestSCMBlockProtocolServer {
         UserGroupInformation.createRemoteUser("alice"));
     assertThatThrownBy(() -> proxy.doAs((PrivilegedExceptionAction<?>) this::allocateBlock))
         .isInstanceOf(AccessControlException.class);
+  }
+
+  @Test
+  void allocateBlockAuditFieldsAreRecordedOnSpan() throws IOException {
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      TracingUtil.executeInNewSpan("allocateBlock", this::allocateBlock);
+
+      collector.assertAttribute("allocateBlock", "ozone.audit.size", String.valueOf(128 * MB));
+      collector.assertAttribute("allocateBlock", "ozone.audit.num", "1");
+      collector.assertAttribute("allocateBlock", "ozone.audit.replication",
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE).toString());
+      collector.assertAttribute("allocateBlock", "ozone.audit.allocated", "1");
+    }
   }
 
   private List<AllocatedBlock> allocateBlock() throws IOException {

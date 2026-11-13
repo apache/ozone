@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.audit;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import java.util.function.Supplier;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.logging.log4j.message.Message;
 import org.apache.ratis.util.MemoizedSupplier;
@@ -121,6 +122,7 @@ public final class AuditMessage implements Message {
     }
 
     public AuditMessage build() {
+      TracingUtil.addAuditParamsToCurrentSpan(params);
       return new AuditMessage(user, ip, op, params, ret, throwable,
           performance);
     }
