@@ -55,8 +55,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -745,13 +743,20 @@ public class ContainerStateMachine extends BaseStateMachine {
       throw new StorageContainerException("Unexpected stream PutBlock request type " + request.getCmdType()
           + ", expected " + Type.PutBlock, ContainerProtos.Result.MALFORMED_REQUEST);
     }
-    final ContainerBlockID streamBlock = BlockID.getFromProtobuf(streamInit.getWriteChunk().getBlockID())
-        .getContainerBlockID();
-    final ContainerBlockID block = BlockID.getFromProtobuf(request.getPutBlock().getBlockData().getBlockID())
-        .getContainerBlockID();
-    if (!(request.getContainerID() == streamInit.getContainerID() && block.equals(streamBlock))) {
-      throw new StorageContainerException("PutBlock for " + block + " in container " + request.getContainerID()
-          + " does not match the stream block " + streamBlock, ContainerProtos.Result.MALFORMED_REQUEST);
+    final ContainerProtos.DatanodeBlockID putBlock = request.getPutBlock().getBlockData().getBlockID();
+    if (request.getContainerID() != putBlock.getContainerID()) {
+      throw new StorageContainerException("Container ID mismatched: request " + request.getContainerID()
+          + " != PutBlock " + putBlock.getContainerID(), ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    if (request.getContainerID() != streamInit.getContainerID()) {
+      throw new StorageContainerException("Container ID mismatched: request " + request.getContainerID()
+          + " != stream " + streamInit.getContainerID(), ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    final ContainerProtos.DatanodeBlockID streamBlock = streamInit.getWriteChunk().getBlockID();
+    if (!putBlock.equals(streamBlock)) {
+      throw new StorageContainerException("DatanodeBlockID mismatched: PutBlock "
+          + TextFormat.shortDebugString(putBlock) + " != stream " + TextFormat.shortDebugString(streamBlock),
+          ContainerProtos.Result.MALFORMED_REQUEST);
     }
   }
 
