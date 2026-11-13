@@ -94,7 +94,9 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
           "Checksum Bytes size does not match");
 
       final ByteBuffer byteWrap = stripeChecksum.asReadOnlyByteBuffer();
-      byteWrap.limit(checksumSize - parityBytes);
+      // Like computeCompositeCrc, digest only the data checksums of the bytes within the block length.
+      long committedChecksumBytes = getDataChecksumBytes(remaining, chunkSize, bytesPerCrc);
+      byteWrap.limit((int) Math.min(checksumSize - parityBytes, committedChecksumBytes));
       digester.update(byteWrap);
       remaining -= chunkSize * numData;
     }
@@ -172,6 +174,16 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     LOG.debug("Number of chunks = {}, chunk checksum type is {}, " +
             "composite checksum = {}", chunkInfoList.size(), dataChecksumType,
         compositeCrcChunkChecksum);
+  }
+
+  /**
+   * Get the number of data checksum bytes covering the first {@code length} bytes of a stripe whose data chunks are
+   * {@code chunkSize} long, the same CRCs computeCompositeCrc reads for them.
+   */
+  private static long getDataChecksumBytes(long length, long chunkSize, long bytesPerCrc) {
+    long crcsPerChunk = (chunkSize + bytesPerCrc - 1) / bytesPerCrc;
+    long crcsInLastChunk = (length % chunkSize + bytesPerCrc - 1) / bytesPerCrc;
+    return ((length / chunkSize) * crcsPerChunk + crcsInLastChunk) * 4L;
   }
 
   /**

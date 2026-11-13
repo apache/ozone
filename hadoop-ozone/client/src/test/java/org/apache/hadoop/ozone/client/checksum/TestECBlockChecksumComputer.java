@@ -96,19 +96,45 @@ public class TestECBlockChecksumComputer {
 
     ECBlockChecksumComputer computer = buildBlockChecksumComputer(chunkInfoList, 2 * stripeLen);
     computer.compute(combineMode);
+    assertArrayEquals(expectedChecksum(combineMode, committedChecksumBytes), computer.getOutByteBuffer().array());
+  }
 
-    byte[] expected;
+  /**
+   * The block length ends inside the last listed stripe while the replica lists checksums for the whole stripe, and
+   * a stripe beyond it. Both modes must stop at the same byte.
+   */
+  @ParameterizedTest
+  @EnumSource(ChecksumCombineMode.class)
+  @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+  public void testPartialLastStripeIsBoundedByBlockLength(ChecksumCombineMode combineMode) throws IOException {
+    int stripeLen = EC_CONFIG.getData() * CHUNK_LEN;
+    int partialLen = CHUNK_LEN + CHUNK_LEN / 2;
+    byte[] listedChecksumBytes = RandomUtils.secure().randomBytes(2 * stripeLen);
+    List<ContainerProtos.ChunkInfo> chunkInfoList = Arrays.asList(
+        buildChunkInfo(Arrays.copyOfRange(listedChecksumBytes, 0, stripeLen), CHUNK_LEN,
+            ContainerProtos.ChecksumType.CRC32C),
+        buildChunkInfo(Arrays.copyOfRange(listedChecksumBytes, stripeLen, 2 * stripeLen), CHUNK_LEN,
+            ContainerProtos.ChecksumType.CRC32C),
+        buildChunkInfo(RandomUtils.secure().randomBytes(stripeLen), CHUNK_LEN, ContainerProtos.ChecksumType.CRC32C));
+
+    ECBlockChecksumComputer computer = buildBlockChecksumComputer(chunkInfoList, stripeLen + partialLen);
+    computer.compute(combineMode);
+    // With BYTES_PER_CRC == 4, the committed data checksum bytes equal the committed length.
+    byte[] committedChecksumBytes = Arrays.copyOf(listedChecksumBytes, stripeLen + partialLen);
+    assertArrayEquals(expectedChecksum(combineMode, committedChecksumBytes), computer.getOutByteBuffer().array());
+  }
+
+  /** The checksum of a block whose data checksums are {@code checksumBytes}, each CRC covering BYTES_PER_CRC. */
+  private static byte[] expectedChecksum(ChecksumCombineMode combineMode, byte[] checksumBytes) throws IOException {
     if (combineMode == MD5MD5CRC) {
-      expected = MD5Hash.digest(committedChecksumBytes).getDigest();
-    } else {
-      CrcComposer composer = CrcComposer.newCrcComposer(DataChecksum.Type.CRC32C, BYTES_PER_CRC);
-      ByteBuffer crcs = ByteBuffer.wrap(committedChecksumBytes);
-      while (crcs.hasRemaining()) {
-        composer.update(crcs.getInt(), BYTES_PER_CRC);
-      }
-      expected = composer.digest();
+      return MD5Hash.digest(checksumBytes).getDigest();
     }
-    assertArrayEquals(expected, computer.getOutByteBuffer().array());
+    CrcComposer composer = CrcComposer.newCrcComposer(DataChecksum.Type.CRC32C, BYTES_PER_CRC);
+    ByteBuffer crcs = ByteBuffer.wrap(checksumBytes);
+    while (crcs.hasRemaining()) {
+      composer.update(crcs.getInt(), BYTES_PER_CRC);
+    }
+    return composer.digest();
   }
 
   private static byte[] computeExpectedCompositeCrc(byte[] dataChecksumBytes, long blockLength)
