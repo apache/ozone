@@ -17,12 +17,21 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
+import static org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils.mockFinalizedOmVersionManager;
+import static org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,11 +39,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -222,6 +235,194 @@ public class TestS3InitiateMultipartUploadRequest
   }
 
   @Test
+  public void testStoragePolicyInRequestOverridesBucketPolicy() throws Exception {
+    assertMpuInitiatedWithStoragePolicy(OzoneStoragePolicy.HOT, OzoneStoragePolicy.COLD, OzoneStoragePolicy.COLD);
+  }
+
+  @Test
+  public void testStoragePolicyDefaultsToBucketPolicy() throws Exception {
+    assertMpuInitiatedWithStoragePolicy(OzoneStoragePolicy.COLD, null, OzoneStoragePolicy.COLD);
+  }
+
+  @Test
+  public void testStoragePolicyDefaultsToClusterDefaultWithoutBucketPolicy() throws Exception {
+    assertMpuInitiatedWithStoragePolicy(null, null, OzoneStoragePolicy.getDefaultPolicy());
+  }
+
+  /**
+   * A request logged by an OM that did not set the policy must be applied without one,
+   * not resolved again from the bucket.
+   */
+  @Test
+  public void testRequestWithoutStoragePolicyStoresNone() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    OMRequest preExecuted = doPreExecuteInitiateMPU(volumeName, bucketName, keyName);
+    OzoneManagerProtocolProtos.MultipartInfoInitiateRequest initiateRequest =
+        preExecuted.getInitiateMultiPartUploadRequest();
+    OMRequest withoutPolicy = preExecuted.toBuilder()
+        .setInitiateMultiPartUploadRequest(initiateRequest.toBuilder()
+            .setKeyArgs(initiateRequest.getKeyArgs().toBuilder().clearStoragePolicy()))
+        .build();
+
+    OMClientResponse response = getS3InitiateMultipartUploadReq(withoutPolicy)
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        initiateRequest.getKeyArgs().getMultipartUploadID());
+    assertThat(omMetadataManager.getMultipartInfoTable().get(multipartKey).getStoragePolicy()).isNull();
+    assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getMultipartOpenKey(volumeName, bucketName, keyName, initiateRequest.getKeyArgs().getMultipartUploadID()))
+        .getStoragePolicy()).isNull();
+  }
+
+  /**
+   * Before STORAGE_POLICY_SUPPORT is finalized, an old OM will not persist the storage policy field,
+   * so a request without a policy must be applied without one and not resolved from the bucket.
+   */
+  @Test
+  public void testStoragePolicyNotStampedBeforeFinalization() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    addVolumeAndBucketWithPolicy(volumeName, bucketName, OzoneStoragePolicy.COLD);
+
+    OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName, keyName,
+        Collections.emptyMap(), Collections.emptyMap(), null);
+
+    OMRequest preExecuted = getS3InitiateMultipartUploadReq(clientRequest).preExecute(ozoneManager);
+    OzoneManagerProtocolProtos.KeyArgs keyArgs = preExecuted.getInitiateMultiPartUploadRequest().getKeyArgs();
+    assertThat(keyArgs.hasStoragePolicy()).isFalse();
+
+    OMClientResponse response = getS3InitiateMultipartUploadReq(preExecuted)
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName, keyArgs.getMultipartUploadID());
+    assertThat(omMetadataManager.getMultipartInfoTable().get(multipartKey).getStoragePolicy()).isNull();
+    assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getMultipartOpenKey(volumeName, bucketName, keyName, keyArgs.getMultipartUploadID()))
+        .getStoragePolicy()).isNull();
+  }
+
+  @Test
+  public void testRejectStoragePolicyBeforeFinalization() {
+    OMRequest request = initiateRequestWithStoragePolicy(OzoneStoragePolicy.COLD);
+
+    assertThatThrownBy(() -> S3InitiateMultipartUploadRequest.disallowInitiateMultiPartUploadWithStoragePolicy(
+        request, preFinalizedContext()))
+        .isInstanceOfSatisfying(OMException.class, ex -> {
+          assertThat(ex.getResult()).isEqualTo(OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+          assertThat(ex.getMessage()).contains("Cluster does not have the storage policy feature finalized yet");
+        });
+  }
+
+  /**
+   * A request that carries no storage policy must pass the validator untouched, since the validator's return value
+   * is chained into the next validator by the request validation framework.
+   */
+  @Test
+  public void testAllowInitiateWithoutStoragePolicyBeforeFinalization() throws Exception {
+    OMRequest request = initiateRequestWithStoragePolicy(null);
+
+    assertThat(S3InitiateMultipartUploadRequest.disallowInitiateMultiPartUploadWithStoragePolicy(
+        request, preFinalizedContext())).isEqualTo(request);
+  }
+
+  @Test
+  public void testAllowInitiateWithStoragePolicyAfterFinalization() throws Exception {
+    OMRequest request = initiateRequestWithStoragePolicy(OzoneStoragePolicy.COLD);
+
+    assertThat(S3InitiateMultipartUploadRequest.disallowInitiateMultiPartUploadWithStoragePolicy(
+        request, postFinalizedContext())).isEqualTo(request);
+  }
+
+  private OMRequest initiateRequestWithStoragePolicy(StoragePolicy storagePolicy) {
+    return OMRequestTestUtils.createInitiateMPURequest(UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), Collections.emptyMap(), Collections.emptyMap(), storagePolicy);
+  }
+
+  private ValidationContext preFinalizedContext() {
+    return of(mockPreFinalizedOmVersionManager(), omMetadataManager);
+  }
+
+  private ValidationContext postFinalizedContext() {
+    return of(mockFinalizedOmVersionManager(), omMetadataManager);
+  }
+
+  /**
+   * Creating an upload needs CREATE on the key, not READ on the bucket. ozoneManager.getBucketInfo checks READ, so
+   * the bucket policy must be read without it.
+   */
+  @Test
+  public void testPreExecuteDoesNotRequireReadAccessOnBucket() throws Exception {
+    finalizeStoragePolicySupport();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    addVolumeAndBucketWithPolicy(volumeName, bucketName, OzoneStoragePolicy.COLD);
+    when(ozoneManager.getBucketInfo(anyString(), anyString()))
+        .thenThrow(new OMException("No READ access on the bucket", OMException.ResultCodes.PERMISSION_DENIED));
+
+    OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
+        UUID.randomUUID().toString(), Collections.emptyMap(), Collections.emptyMap(), null);
+    OMRequest preExecuted = getS3InitiateMultipartUploadReq(clientRequest).preExecute(ozoneManager);
+
+    assertThat(preExecuted.getInitiateMultiPartUploadRequest().getKeyArgs().getStoragePolicy())
+        .isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+    verify(ozoneManager, never()).getBucketInfo(anyString(), anyString());
+  }
+
+  /** Adds the bucket with {@code storagePolicy}, or without a policy if null. */
+  private void addVolumeAndBucketWithPolicy(String volumeName, String bucketName, StoragePolicy storagePolicy)
+      throws Exception {
+    OmBucketInfo.Builder bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketLayout(getBucketLayout());
+    if (storagePolicy != null) {
+      bucketInfo.setStoragePolicy(storagePolicy);
+    }
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager, bucketInfo);
+  }
+
+  /**
+   * Initiates an upload on a bucket with {@code bucketPolicy} (none if null), asking for
+   * {@code requestedPolicy} (none if null), and checks that {@code expectedPolicy} is stamped on the
+   * request and stored on both the multipart info and the open key.
+   */
+  private void assertMpuInitiatedWithStoragePolicy(StoragePolicy bucketPolicy, StoragePolicy requestedPolicy,
+      StoragePolicy expectedPolicy) throws Exception {
+    finalizeStoragePolicySupport();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    addVolumeAndBucketWithPolicy(volumeName, bucketName, bucketPolicy);
+
+    OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName, keyName,
+        Collections.emptyMap(), Collections.emptyMap(), requestedPolicy);
+
+    OMRequest preExecuted = getS3InitiateMultipartUploadReq(clientRequest).preExecute(ozoneManager);
+    OzoneManagerProtocolProtos.KeyArgs keyArgs = preExecuted.getInitiateMultiPartUploadRequest().getKeyArgs();
+    assertThat(keyArgs.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.toProto(expectedPolicy));
+
+    OMClientResponse response = getS3InitiateMultipartUploadReq(preExecuted)
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName, keyArgs.getMultipartUploadID());
+    assertThat(omMetadataManager.getMultipartInfoTable().get(multipartKey).getStoragePolicy())
+        .isEqualTo(expectedPolicy);
+    assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getMultipartOpenKey(volumeName, bucketName, keyName, keyArgs.getMultipartUploadID()))
+        .getStoragePolicy()).isEqualTo(expectedPolicy);
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -284,6 +485,12 @@ public class TestS3InitiateMultipartUploadRequest
                                    String keyName, String multipartUploadID) {
     return omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
+  }
+
+  /** Key of the open key table row of a top-level key's multipart upload. */
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
+                                       String keyName, String multipartUploadID) throws IOException {
+    return getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
   }
 
   @Test

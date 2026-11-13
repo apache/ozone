@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
@@ -135,6 +136,15 @@ public class S3MultipartRequestTests {
   protected void finalizeMpuPartsTableSplit() {
     when(ozoneManager.getVersionManager()
         .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)).thenReturn(true);
+  }
+
+  /**
+   * Simulate a cluster that has finalized STORAGE_POLICY_SUPPORT, so initiate stamps the storage policy
+   * on the request. Without this the version manager mock reports the feature as not finalized.
+   */
+  protected void finalizeStoragePolicySupport() {
+    when(ozoneManager.getVersionManager()
+        .isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)).thenReturn(true);
   }
 
   @AfterEach
