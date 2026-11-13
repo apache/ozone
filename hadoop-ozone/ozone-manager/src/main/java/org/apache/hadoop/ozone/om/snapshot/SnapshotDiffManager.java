@@ -1390,7 +1390,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       throws Exception {
     List<Path> deltaFiles = getDeltaFiles(tableName, deltaDiffComputer, fsInfo, tsInfo, jobId)
         .stream().map(Pair::getLeft).collect(Collectors.toList());
-    if (deltaFiles.isEmpty()) {
+    // The directory stage also builds the path edges of the file entries, so it runs whenever there are any.
+    if (deltaFiles.isEmpty() && !(DIRECTORY_TABLE.equals(tableName) && store.hasListEntries())) {
       updateProgress(jobKey, 1.0);
       LOG.info("Skipped scan tables stage for table '{}' because there are no delta files, jobId: {}",
           tableName, jobId);

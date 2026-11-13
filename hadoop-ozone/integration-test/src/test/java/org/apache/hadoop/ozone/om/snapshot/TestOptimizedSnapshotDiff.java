@@ -97,6 +97,30 @@ public class TestOptimizedSnapshotDiff extends OmSnapshotTests {
   }
 
   @Test
+  public void testOptimizedDiffWithUnchangedDirectoryTable() throws Exception {
+    String snap1 = "snap-unchanged-dirs-1";
+    String snap2 = "snap-unchanged-dirs-2";
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, getBucketName(), getVolumeName());
+    try (FileSystem fs = FileSystem.get(new URI(rootPath), getCluster().getConf())) {
+      createFileKey(fs, "/unchanged-dirs/dir/old");
+      createSnapshot(getVolumeName(), getBucketName(), snap1);
+      // Neither change writes to the directory table, so its delta between the snapshots is empty.
+      createFileKey(fs, "/unchanged-dirs/dir/new");
+      assertThat(fs.delete(new Path("/unchanged-dirs/dir/old"), false)).isTrue();
+      createSnapshot(getVolumeName(), getBucketName(), snap2);
+    }
+
+    for (boolean ordered : new boolean[] {false, true}) {
+      SnapshotDiffResponse response = waitForDoneReportAfterOrderedSubmit(
+          getVolumeName(), getBucketName(), snap1, snap2, ordered);
+      assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
+          SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, "unchanged-dirs/dir/old"),
+          SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, "unchanged-dirs/dir/new"));
+    }
+  }
+
+  @Test
   public void testOptimizedObsDiff() throws Exception {
     String volume = uniqueObjectName("vol-opt-obs-");
     String bucket = uniqueObjectName("buc-opt-obs-");
