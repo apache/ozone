@@ -76,6 +76,10 @@ public final class HddsConfigKeys {
   public static final String HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE =
       "hdds.heartbeat.command.status.report.max.size";
   public static final String HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE_DEFAULT = "64MB";
+  public static final String HDDS_IPC_MAXIMUM_DATA_LENGTH =
+      "ipc.maximum.data.length";
+  public static final int HDDS_IPC_MAXIMUM_DATA_LENGTH_DEFAULT =
+      128 * 1024 * 1024;
   // Configuration to allow volume choosing policy.
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
