@@ -23,6 +23,8 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME;
 import static org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter.writeReport;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,6 +48,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -311,6 +314,51 @@ class TestMergeJoinSnapDiffWriter {
       List<DiffReportEntry> entries = store.readReportEntriesForTest();
       assertEquals(2, entries.size());
       verify(store, times(1)).putDependencyNode(anyInt(), any());
+      verify(store, never()).putOrderedReportEntries(anyList());
+    }
+  }
+
+  @Test
+  void testDependencyOrderingFallsBackOnCycle() throws Exception {
+    byte[] sig = signature("s");
+    SnapDiffJobStore store = spy(newStore(true));
+    try (SnapDiffJobStore ignored = store) {
+      // Files a and b swap names: each RENAME frees the path the other one takes.
+      store.putNewList(301L, entry(BUCKET_OBJECT_ID, "b", false, sig));
+      store.putOldList(301L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+      store.putNewList(302L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+      store.putOldList(302L, entry(BUCKET_OBJECT_ID, "b", false, sig));
+      store.flushWrites();
+
+      Pair<Long, String> reportMeta = writeReport(mockManagerPassthroughDeletes(), store,
+          BUCKET_OBJECT_ID, true, true, null);
+      // Successful write with unordered outcome is what SnapshotDiffManager marks DONE with.
+      assertEquals(2L, reportMeta.getKey().longValue());
+      assertFalse(store.isReportDependencyOrdered());
+      assertEquals("Report is dependency unordered.",
+          "Report is dependency " + (store.isReportDependencyOrdered() ? "ordered" : "unordered") + ".");
+
+      List<DiffReportEntry> entries = store.readReportEntriesForTest();
+      assertThat(entries).extracting(DiffReportEntry::getType).containsExactly(RENAME, RENAME);
+      assertEquals("a", new String(entries.get(0).getSourcePath(), StandardCharsets.UTF_8));
+      assertEquals("b", new String(entries.get(0).getTargetPath(), StandardCharsets.UTF_8));
+      assertEquals("b", new String(entries.get(1).getSourcePath(), StandardCharsets.UTF_8));
+      assertEquals("a", new String(entries.get(1).getTargetPath(), StandardCharsets.UTF_8));
+
+      try (SnapDiffJobStore unorderedStore = newStore(true)) {
+        unorderedStore.putNewList(301L, entry(BUCKET_OBJECT_ID, "b", false, sig));
+        unorderedStore.putOldList(301L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+        unorderedStore.putNewList(302L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+        unorderedStore.putOldList(302L, entry(BUCKET_OBJECT_ID, "b", false, sig));
+        unorderedStore.flushWrites();
+        List<DiffReportEntry> explicitUnordered =
+            runWriteReport(unorderedStore, BUCKET_OBJECT_ID, true, false);
+        for (int i = 0; i < entries.size(); i++) {
+          assertArrayEquals(explicitUnordered.get(i).getSourcePath(), entries.get(i).getSourcePath());
+          assertArrayEquals(explicitUnordered.get(i).getTargetPath(), entries.get(i).getTargetPath());
+        }
+      }
+
       verify(store, never()).putOrderedReportEntries(anyList());
     }
   }
