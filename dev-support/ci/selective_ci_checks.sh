@@ -346,6 +346,7 @@ function get_count_robot_files() {
 function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
+        "^.github/actions/setup-java-with-cache"
         "^.github/workflows/generate-config-doc.yml"
         "^dev-support/ci/xml_to_md.py"
         "^hadoop-ozone/dev-support/checks/_build.sh"

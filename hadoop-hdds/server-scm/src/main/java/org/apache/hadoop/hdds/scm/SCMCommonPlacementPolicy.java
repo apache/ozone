@@ -32,7 +32,6 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -460,33 +459,36 @@ public abstract class SCMCommonPlacementPolicy implements
         return invalidPlacement;
       }
     }
-    List<Integer> currentRackCount = new ArrayList<>(dns.stream()
-        .map(dn -> {
-          Node rack = getPlacementGroup(dn);
-          if (rack == null) {
-            try {
-              NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
-              if (nodeStatus.isDead() && nodeStatus.isMaintenance()) {
-                LOG.debug("Using rack [{}] for dead and in-maintenance dn {}.", dn.getNetworkLocation(), dn);
-                return dn.getNetworkLocation();
-              }
-              return null;
-            } catch (NodeNotFoundException e) {
-              LOG.debug("Could not get NodeStatus for dn {}.", dn, e);
-              return null;
-            }
+    Map<String, Integer> rackCounts = new HashMap<>();
+    for (DatanodeDetails dn : dns) {
+      Node rack = getPlacementGroup(dn);
+      String rackPath;
+      if (rack == null) {
+        try {
+          NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
+          if (!nodeStatus.isDead() || !nodeStatus.isMaintenance()) {
+            continue;
           }
-          /*
-          data-centre/rack1/dn1. Here, data-centre/rack1 is the network location of dn1 and data-centre/rack1 is also
-          the network full path of rack1.
-          */
-          return rack.getNetworkFullPath();
-        })
-        .filter(Objects::nonNull)
-        .collect(Collectors.groupingBy(
-            Function.identity(),
-            Collectors.reducing(0, e -> 1, Integer::sum)))
-        .values());
+          rackPath = dn.getNetworkLocation();
+          LOG.debug("Using rack [{}] for dead and in-maintenance dn {}.",
+              rackPath, dn);
+        } catch (NodeNotFoundException e) {
+          LOG.debug("Could not get NodeStatus for dn {}.", dn, e);
+          continue;
+        }
+      } else {
+        /*
+        data-centre/rack1/dn1. Here, data-centre/rack1 is the network location of dn1 and data-centre/rack1 is also
+        the network full path of rack1.
+        */
+        rackPath = rack.getNetworkFullPath();
+      }
+      if (rackPath != null) {
+        Integer count = rackCounts.get(rackPath);
+        rackCounts.put(rackPath, count == null ? 1 : count + 1);
+      }
+    }
+    List<Integer> currentRackCount = new ArrayList<>(rackCounts.values());
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }

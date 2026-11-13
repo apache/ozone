@@ -23,8 +23,16 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
  * The replication factor to be used while writing key into ozone.
  */
 public enum ReplicationFactor {
-  ONE,
-  THREE;
+  ONE(1, HddsProtos.ReplicationFactor.ONE),
+  THREE(3, HddsProtos.ReplicationFactor.THREE);
+
+  private final int value;
+  private final HddsProtos.ReplicationFactor proto;
+
+  ReplicationFactor(int value, HddsProtos.ReplicationFactor proto) {
+    this.value = value;
+    this.proto = proto;
+  }
 
   /**
    * Returns enum value corresponding to the int value.
@@ -66,25 +74,11 @@ public enum ReplicationFactor {
   }
 
   public HddsProtos.ReplicationFactor toProto() {
-    switch (this) {
-    case ONE:
-      return HddsProtos.ReplicationFactor.ONE;
-    case THREE:
-      return HddsProtos.ReplicationFactor.THREE;
-    default:
-      throw new IllegalStateException("Unexpected enum value: " + this);
-    }
+    return proto;
   }
 
   /** @return the number of replication(s). */
   public int getValue() {
-    switch (this) {
-    case ONE:
-      return 1;
-    case THREE:
-      return 3;
-    default:
-      throw new IllegalStateException("Unexpected enum value: " + this);
-    }
+    return value;
   }
 }

@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.http.ParseException;
 
 /**
  * Utility class for Rooted Ozone Filesystem (OFS) path processing.
@@ -101,7 +100,7 @@ public class OFSPath {
     // Scheme is case-insensitive
     String scheme = uri.getScheme();
     if (scheme != null && !scheme.equalsIgnoreCase(OZONE_OFS_URI_SCHEME)) {
-      throw new ParseException("Can't parse schemes other than ofs.");
+      throw new IllegalArgumentException("Can't parse schemes other than ofs.");
     }
     // authority could be empty
     authority = uri.getAuthority() == null ? "" : uri.getAuthority();
@@ -124,7 +123,7 @@ public class OFSPath {
             bucketName = getTempMountBucketNameOfCurrentUser();
           }
         } catch (IOException ex) {
-          throw new ParseException(
+          throw new IllegalArgumentException(
               "Failed to get temp bucket name for current user.");
         }
       } else if (numToken >= 2) {
