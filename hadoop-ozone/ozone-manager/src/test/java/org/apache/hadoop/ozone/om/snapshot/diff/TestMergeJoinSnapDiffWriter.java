@@ -277,21 +277,34 @@ class TestMergeJoinSnapDiffWriter {
   void testRenameIntoDeletedDirectoryReportsDeleteOfSource(boolean ordering) throws Exception {
     byte[] sig = signature("s");
     try (SnapDiffJobStore store = newStore(true)) {
-      // From: file "a" and directory "b" under the bucket, and file 302 whose parent 400 has no edge.
-      // To: both files moved under "b", which is deleted before its children are purged, so "b" has no to edge.
+      // From: file "a" and directories "b" and "c" under the bucket, file "a" under "c",
+      // and file 302 whose parent 400 has no edge.
+      // To: those files are moved under "b". "b" and "c" are deleted before their children
+      // are purged, so neither has a to edge. File 302's source path cannot be resolved.
       store.putFromEdge(BUCKET_OBJECT_ID, 300L, nameBytes("b"));
       store.putOldList(300L, entry(BUCKET_OBJECT_ID, "b", true, sig));
       store.putOldList(301L, entry(BUCKET_OBJECT_ID, "a", false, sig));
       store.putNewList(301L, entry(300L, "a", false, sig));
       store.putOldList(302L, entry(400L, "c", false, sig));
       store.putNewList(302L, entry(300L, "c", false, sig));
+      store.putFromEdge(BUCKET_OBJECT_ID, 310L, nameBytes("c"));
+      store.putOldList(310L, entry(BUCKET_OBJECT_ID, "c", true, sig));
+      store.putOldList(311L, entry(310L, "a", false, sig));
+      store.putNewList(311L, entry(300L, "a", false, sig));
       store.flushWrites();
 
       List<DiffReportEntry> entries = runWriteReportWithManager(store, BUCKET_OBJECT_ID, true,
           mockManagerWithRealDeleteRetention(), ordering);
       assertThat(entries).containsExactlyInAnyOrder(
           SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "b"),
-          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "a"));
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "a"),
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c"),
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c/a"));
+      if (ordering) {
+        assertThat(entries).containsSubsequence(
+            SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c/a"),
+            SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c"));
+      }
     }
   }
 
