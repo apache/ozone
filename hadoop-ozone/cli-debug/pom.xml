@@ -47,6 +47,10 @@
       <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.github.vlsi.mxgraph</groupId>
       <artifactId>jgraphx</artifactId>
     </dependency>
