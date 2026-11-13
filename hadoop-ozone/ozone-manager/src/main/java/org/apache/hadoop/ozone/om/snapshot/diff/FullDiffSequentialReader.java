@@ -53,7 +53,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
  * {@code updateID == DEFAULT_OM_UPDATE_ID} ({@code -1}) are always treated as
  * candidates as a conservative fallback for legacy or ambiguous rows.
  *
- * <p>When no gate is supplied (non-HA or reverse diff), every to-side row is a candidate and a
+ * <p>When no gate is supplied (non-HA or reverse diff or missing creation transaction index),
+ * every to-side row is a candidate and a
  * compare signature is computed for each.
  */
 public class FullDiffSequentialReader {
