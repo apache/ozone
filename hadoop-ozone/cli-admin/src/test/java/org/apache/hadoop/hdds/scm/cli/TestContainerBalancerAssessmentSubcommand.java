@@ -24,12 +24,16 @@ import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -53,6 +57,159 @@ class TestContainerBalancerAssessmentSubcommand {
   @AfterEach
   void tearDown() {
     IOUtils.closeQuietly(out);
+  }
+
+  @Test
+  void testAssessmentReportsImbalanceSeparatelyForEachStorageType() {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("first", 5, 95), typedProto("second", 95, 5)));
+
+    runAssessment(scmClient);
+
+    assertThat(out.get()).contains("Storage type: SSD", "Storage type: DISK", "35 B", "70 B",
+        "All storage types (shared iteration limits):", "of SSD capacity", "of DISK capacity", "of cluster capacity")
+        .doesNotContain("WARNING");
+  }
+
+  @Test
+  void testJsonAssessmentIncludesStorageTypesAndUniqueDatanodeCounts() {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("first", 5, 95), typedProto("second", 95, 5)));
+
+    runAssessment(scmClient, "--json");
+
+    assertThat(out.get()).contains("\"storageTypes\"", "\"SSD\"", "\"DISK\"",
+        "\"totalBytesToMove\" : 70", "\"count\" : 2", "\"incompleteStorageTypeUsage\" : false");
+  }
+
+  @Test
+  void testAssessmentIdentifiesMostImbalancedTypeSeparatelyFromOverallUtilization() {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("first", 5, 50), typedProto("second", 35, 90)));
+
+    runAssessment(scmClient);
+
+    assertThat(out.get()).contains("Overall datanode drift", "35.0% (max utilization 72.5% - min utilization 37.5%)",
+        "Maximum storage-type drift: 40.0% (DISK, max utilization 50.0% - min utilization 10.0%)",
+        "30.0% (max utilization 95.0% - min utilization 65.0%)");
+  }
+
+  @Test
+  void testJsonSeparatesOverallUtilizationFromStorageTypeMovement() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("first", 5, 50), typedProto("second", 35, 90)));
+
+    runAssessment(scmClient, "--json");
+
+    JsonNode report = new ObjectMapper().readTree(out.get());
+    assertThat(report.path("clusterAvgUtilizationPercentage").asDouble()).isEqualTo(55.0);
+    assertThat(report.path("maxUtilizationPercentage").asDouble()).isEqualTo(72.5);
+    assertThat(report.path("minUtilizationPercentage").asDouble()).isEqualTo(37.5);
+    assertThat(report.path("driftPercentage").asDouble()).isEqualTo(35.0);
+    assertThat(report.path("maxStorageTypeImbalancePercentage").asDouble()).isEqualTo(40.0);
+    assertThat(report.path("mostImbalancedStorageType").asText()).isEqualTo("DISK");
+    JsonNode source = report.path("sourceNodesAcrossStorageTypes");
+    assertThat(source.path("count").asInt()).isEqualTo(1);
+    assertThat(source.path("nodes").get(0).path("storageType").asText()).isEqualTo("SSD");
+    assertThat(source.path("nodes").get(0).path("utilizationPercentage").asDouble()).isEqualTo(95.0);
+    JsonNode target = report.path("targetNodesAcrossStorageTypes");
+    assertThat(target.path("count").asInt()).isEqualTo(1);
+    assertThat(target.path("nodes").get(0).path("storageType").asText()).isEqualTo("DISK");
+    assertThat(target.path("nodes").get(0).path("utilizationPercentage").asDouble()).isEqualTo(10.0);
+    JsonNode disk = report.path("storageTypes").path("DISK");
+    assertThat(disk.path("maxUtilizationPercentage").asDouble()).isEqualTo(50.0);
+    assertThat(disk.path("minUtilizationPercentage").asDouble()).isEqualTo(10.0);
+    JsonNode ssd = report.path("storageTypes").path("SSD");
+    assertThat(ssd.path("maxUtilizationPercentage").asDouble()).isEqualTo(95.0);
+    assertThat(ssd.path("minUtilizationPercentage").asDouble()).isEqualTo(65.0);
+    assertThat(report.path("totalBytesToMove").asLong()).isEqualTo(
+        disk.path("bytesToMove").asLong() + ssd.path("bytesToMove").asLong());
+    assertThat(report.has("sourceNodes")).isFalse();
+    assertThat(report.has("targetNodes")).isFalse();
+    assertThat(report.has("bytesToMove")).isFalse();
+  }
+
+  @Test
+  void testJsonCombinedNodesAreEmptyWhenNoStorageTypeHasMovement() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(
+        typedProto("first", 0, 100), typedProto("second", 40, 60), typedProto("third", 40, 60)));
+
+    runAssessment(scmClient, "--json", "-t", "20");
+
+    JsonNode report = new ObjectMapper().readTree(out.get());
+    assertThat(report.path("totalBytesToMove").asLong()).isZero();
+    assertThat(report.path("sourceNodesAcrossStorageTypes").path("count").asInt()).isZero();
+    assertThat(report.path("sourceNodesAcrossStorageTypes").path("nodes").size()).isZero();
+    assertThat(report.path("targetNodesAcrossStorageTypes").path("count").asInt()).isZero();
+    assertThat(report.path("targetNodesAcrossStorageTypes").path("nodes").size()).isZero();
+    assertThat(report.path("maxStorageTypeImbalancePercentage").asDouble()).isEqualTo(40.0);
+    JsonNode ssd = report.path("storageTypes").path("SSD");
+    assertThat(ssd.path("sourceNodes").path("count").asInt()).isEqualTo(1);
+    assertThat(ssd.path("sourceNodes").path("nodes").get(0).path("hostname").asText()).isEqualTo("first");
+    assertThat(ssd.path("targetNodes").path("count").asInt()).isZero();
+    assertThat(ssd.path("bytesToMove").asLong()).isZero();
+    JsonNode disk = report.path("storageTypes").path("DISK");
+    assertThat(disk.path("sourceNodes").path("count").asInt()).isZero();
+    assertThat(disk.path("targetNodes").path("count").asInt()).isEqualTo(1);
+    assertThat(disk.path("targetNodes").path("nodes").get(0).path("hostname").asText()).isEqualTo("first");
+    assertThat(disk.path("bytesToMove").asLong()).isZero();
+  }
+
+  @Test
+  void testJsonCombinedNodesExcludeUnpairedStorageType() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(
+        typedProto("first", 0, 20), typedProto("second", 40, 60), typedProto("third", 40, 100)));
+
+    runAssessment(scmClient, "--json", "-t", "20");
+
+    JsonNode report = new ObjectMapper().readTree(out.get());
+    JsonNode source = report.path("sourceNodesAcrossStorageTypes");
+    assertThat(source.path("count").asInt()).isEqualTo(1);
+    assertThat(source.path("nodes").size()).isEqualTo(1);
+    assertThat(source.path("nodes").get(0).path("storageType").asText()).isEqualTo("DISK");
+    assertThat(source.path("nodes").get(0).path("utilizationPercentage").asDouble()).isEqualTo(80.0);
+    JsonNode target = report.path("targetNodesAcrossStorageTypes");
+    assertThat(target.path("count").asInt()).isEqualTo(1);
+    assertThat(target.path("nodes").size()).isEqualTo(1);
+    assertThat(target.path("nodes").get(0).path("storageType").asText()).isEqualTo("DISK");
+    assertThat(target.path("nodes").get(0).path("hostname").asText()).isEqualTo("third");
+    JsonNode ssd = report.path("storageTypes").path("SSD");
+    assertThat(ssd.path("sourceNodes").path("nodes").get(0).path("utilizationPercentage").asDouble()).isEqualTo(100.0);
+    assertThat(ssd.path("bytesToMove").asLong()).isZero();
+    assertThat(report.path("totalBytesToMove").asLong()).isPositive().isEqualTo(
+        report.path("storageTypes").path("DISK").path("bytesToMove").asLong());
+  }
+
+  @Test
+  void testLegacyJsonKeepsAggregateFields() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, sampleNodes());
+
+    runAssessment(scmClient, "--json");
+
+    JsonNode report = new ObjectMapper().readTree(out.get());
+    assertThat(report.path("maxUtilizationPercentage").asDouble()).isEqualTo(90.0);
+    assertThat(report.path("minUtilizationPercentage").asDouble()).isEqualTo(50.0);
+    assertThat(report.path("driftPercentage").asDouble()).isEqualTo(40.0);
+    assertThat(report.path("sourceNodes").path("count").asInt()).isEqualTo(1);
+    assertThat(report.path("targetNodes").path("count").asInt()).isEqualTo(1);
+    assertThat(report.path("bytesToMove").asLong()).isEqualTo(10);
+    assertThat(report.has("storageTypes")).isFalse();
+    assertThat(report.has("mostImbalancedStorageType")).isFalse();
+    assertThat(report.has("totalBytesToMove")).isFalse();
+  }
+
+  @Test
+  void testAssessmentWarnsWhenStorageTypeReportsAreIncomplete() {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockUsageInfo(scmClient, Arrays.asList(typedProto("new", 5, 95), proto("legacy", 200, 100)));
+
+    runAssessment(scmClient);
+
+    assertThat(out.get()).contains("WARNING: Missing or incomplete storage-type usage",
+        "storage-type assessment is partial");
   }
 
   @Test
@@ -157,6 +314,14 @@ class TestContainerBalancerAssessmentSubcommand {
     return Arrays.asList(
         proto("source-1", 100, 10),
         proto("target-1", 100, 50));
+  }
+
+  private static DatanodeUsageInfoProto typedProto(String hostname, long ssdRemaining, long diskRemaining) {
+    return proto(hostname, 200, ssdRemaining + diskRemaining).toBuilder()
+        .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.SSD)
+            .setCapacity(100).setRemaining(ssdRemaining))
+        .addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+            .setCapacity(100).setRemaining(diskRemaining)).build();
   }
 
   private static DatanodeUsageInfoProto proto(String hostname, long capacity, long remaining) {

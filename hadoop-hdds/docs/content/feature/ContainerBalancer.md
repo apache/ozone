@@ -64,6 +64,30 @@ ozone admin containerbalancer start [options]
 | `--include-datanodes`                                 | A comma-separated list of datanode hostnames or IP addresses to be included in balancing.                                              |
 | `--exclude-datanodes`                                 | A comma-separated list of datanode hostnames or IP addresses to be excluded from balancing.                                            |
 
+### Assessment and estimate
+
+Inspect storage usage without starting the balancer:
+
+```bash
+ozone admin containerbalancer assessment -t 10
+ozone admin containerbalancer assessment -t 10 --json
+ozone admin containerbalancer estimate -t 10 -d 100 --profile MEDIUM
+```
+
+When SCM reports usage by storage type, assessment shows separate SSD, DISK, and other
+storage-type sections. For example, two datanodes can both be 50% full overall while
+one has 90% SSD usage and the other has 10% SSD usage. Assessment shows this SSD imbalance.
+The JSON report includes a `storageTypes` breakdown and an `incompleteStorageTypeUsage` flag.
+
+Estimates use separate source and target groups for each storage type. Spare DISK space
+does not count as spare SSD space. Byte and datanode limits remain shared across types.
+Assessment warns when storage-type reports are incomplete, and estimation rejects those
+reports. When no storage-type breakdown is available, both commands use overall usage.
+
+These commands report and estimate balancing work. The running balancer still chooses
+moves using overall datanode usage; selecting moves separately for each storage type is
+separate work.
+
 ### Status
 
 To check the status of the Container Balancer:

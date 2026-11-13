@@ -224,6 +224,18 @@ message DatanodeUsageInfoProto {
     // Raw filesystem stats
     optional int64 fsCapacity = 10;
     optional int64 fsAvailable = 11;
+    repeated StorageTypeUsageInfoProto storageTypeUsage = 12;
+}
+
+// Per-storage-type statistics supplement, rather than replace, the datanode totals.
+message StorageTypeUsageInfoProto {
+    optional StorageTypeProto storageType = 1;
+    optional int64 capacity = 2;
+    optional int64 used = 3;
+    optional int64 remaining = 4;
+    optional int64 committed = 5;
+    optional int64 freeSpaceToSpare = 6;
+    optional int64 reserved = 7;
 }
 
 /**

@@ -184,6 +184,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     for (HddsProtos.DatanodeUsageInfoProto info : usageInfoList) {
       assertTrue(info.getNode().getPortsList().stream()
           .anyMatch(port -> REPLICATION.name().equals(port.getName())));
+      assertStorageTypeUsageMatchesTotals(info);
     }
 
     usageInfoList =
@@ -192,7 +193,18 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     for (HddsProtos.DatanodeUsageInfoProto info : usageInfoList) {
       assertTrue(info.getNode().getPortsList().stream()
           .anyMatch(port -> REPLICATION.name().equals(port.getName())));
+      assertStorageTypeUsageMatchesTotals(info);
     }
+  }
+
+  private static void assertStorageTypeUsageMatchesTotals(HddsProtos.DatanodeUsageInfoProto info) {
+    assertThat(info.getStorageTypeUsageList()).isNotEmpty();
+    assertEquals(info.getCapacity(), info.getStorageTypeUsageList().stream()
+        .mapToLong(HddsProtos.StorageTypeUsageInfoProto::getCapacity).sum());
+    assertEquals(info.getUsed(), info.getStorageTypeUsageList().stream()
+        .mapToLong(HddsProtos.StorageTypeUsageInfoProto::getUsed).sum());
+    assertEquals(info.getRemaining(), info.getStorageTypeUsageList().stream()
+        .mapToLong(HddsProtos.StorageTypeUsageInfoProto::getRemaining).sum());
   }
 
   @Test
