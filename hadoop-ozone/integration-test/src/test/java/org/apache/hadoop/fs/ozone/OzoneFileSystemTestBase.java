@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -165,6 +166,32 @@ public abstract class OzoneFileSystemTestBase {
     FileStatus[] fileStatuses = fs.listStatus(path.getParent());
     assertEquals(1, fileStatuses.length);
     assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
+  }
+
+  /**
+   * Like HDFS, getFileStatus returns no block locations and getFileBlockLocations fetches them; for a file deleted
+   * after its getFileStatus, getFileBlockLocations fails with FileNotFoundException. Deletes the file.
+   */
+  static void fileBlockLocations(FileSystem fs, Path path, long length) throws IOException {
+    FileStatus status = fs.getFileStatus(path);
+    assertThat(status).isNotInstanceOf(LocatedFileStatus.class);
+    assertEquals(length, status.getLen());
+
+    BlockLocation[] expected = fs.listLocatedStatus(path).next().getBlockLocations();
+    assertThat(expected.length).isGreaterThanOrEqualTo(1);
+    for (BlockLocation[] blockLocations : new BlockLocation[][] {
+        fs.getFileBlockLocations(status, 0, status.getLen()), fs.getFileBlockLocations(path, 0, status.getLen())}) {
+      assertEquals(expected.length, blockLocations.length);
+      for (int i = 0; i < expected.length; i++) {
+        assertThat(blockLocations[i].getNames().length).isGreaterThanOrEqualTo(1);
+        assertArrayEquals(expected[i].getHosts(), blockLocations[i].getHosts());
+        assertEquals(expected[i].getOffset(), blockLocations[i].getOffset());
+        assertEquals(expected[i].getLength(), blockLocations[i].getLength());
+      }
+    }
+
+    fs.delete(path, false);
+    assertThrows(FileNotFoundException.class, () -> fs.getFileBlockLocations(status, 0, status.getLen()));
   }
 
   void createKeyWithECReplicationConfig(Path root, OzoneConfiguration conf) throws IOException {
