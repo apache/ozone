@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.cli;
 import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
@@ -59,7 +59,7 @@ public final class ContainerBalancerCliHelper {
         .collect(Collectors.toSet());
   }
 
-  public static void printEstimation(PrintWriter out, ContainerBalancerEstimation estimation) {
+  public static void printEstimation(PrintStream out, ContainerBalancerEstimation estimation) {
     long estimatedIterations = estimation.getEstimatedIterations();
     long planningIterations = (long) Math.ceil(estimatedIterations * PLANNING_ITERATION_BUFFER);
     long cycleTimeMillis = estimation.getMoveTimeoutMillis() + estimation.getBalancingIntervalMillis();

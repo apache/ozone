@@ -25,6 +25,7 @@
   <packaging>jar</packaging>
   <name>Apache Ozone FileSystem</name>
   <properties>
+    <ban-rocksdb.skip>false</ban-rocksdb.skip>
     <file.encoding>UTF-8</file.encoding>
   </properties>
 

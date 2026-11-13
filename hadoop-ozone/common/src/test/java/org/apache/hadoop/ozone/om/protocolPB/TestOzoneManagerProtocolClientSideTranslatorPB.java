@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
@@ -51,6 +52,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQu
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 class TestOzoneManagerProtocolClientSideTranslatorPB {
@@ -193,6 +196,27 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   }
 
   @Test
+  void getObjectTaggingSendsS3ContextFlag() throws IOException {
+    when(omTransport.submitRequest(any(OMRequest.class))).thenReturn(
+        OMResponse.newBuilder()
+            .setCmdType(Type.GetObjectTagging)
+            .setStatus(Status.OK)
+            .setGetObjectTaggingResponse(GetObjectTaggingResponse.newBuilder())
+            .build());
+
+    ArgumentCaptor<OMRequest> captor = ArgumentCaptor.forClass(OMRequest.class);
+    pb.getObjectTagging(new OmKeyArgs.Builder()
+        .setVolumeName(null)
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setAssumeS3Context(true)
+        .build());
+
+    verify(omTransport).submitRequest(captor.capture());
+    assertThat(captor.getValue().getAssumeS3Context()).isTrue();
+  }
+
+  @Test
   void abortMultipartUploadSetsS3Context() throws IOException {
     CapturingTransport transport = new CapturingTransport();
     OzoneManagerProtocolClientSideTranslatorPB client =
@@ -208,6 +232,51 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
 
     assertThat(transport.getLastRequest().getCmdType()).isEqualTo(Type.AbortMultiPartUpload);
     assertThat(transport.getLastRequest().getAssumeS3Context()).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void deleteKeySetsS3Context(boolean assumeS3Context) throws IOException {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("s3v")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setAssumeS3Context(assumeS3Context)
+        .setExpectedETag("etag")
+        .build();
+
+    client.deleteKey(keyArgs);
+
+    OMRequest request = transport.getLastRequest();
+    assertThat(request.getCmdType()).isEqualTo(Type.DeleteKey);
+    assertThat(request.getAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.hasAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.getDeleteKeyRequest().getKeyArgs().getExpectedETag()).isEqualTo("etag");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void deleteObjectTaggingSetsS3Context(boolean assumeS3Context) throws IOException {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("s3v")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setAssumeS3Context(assumeS3Context)
+        .build();
+
+    client.deleteObjectTagging(keyArgs);
+
+    OMRequest request = transport.getLastRequest();
+    assertThat(request.getCmdType()).isEqualTo(Type.DeleteObjectTagging);
+    assertThat(request.getAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.hasAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.getDeleteObjectTaggingRequest().getKeyArgs().getKeyName()).isEqualTo("key");
   }
 
   @Test

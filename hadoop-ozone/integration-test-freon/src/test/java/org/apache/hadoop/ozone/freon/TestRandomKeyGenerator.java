@@ -23,14 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
  */
-public abstract class TestRandomKeyGenerator implements NonHATests.TestCase {
+public abstract class TestRandomKeyGenerator implements ClusterForTests.TestCase {
 
   @Test
   void singleFailedAttempt() {

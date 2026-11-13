@@ -22,8 +22,8 @@ import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_A
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.CacheLoader;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;
@@ -405,9 +405,13 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       if (v == null) {
         LOG.info("SnapshotId '{}' does not exist in cache during cleanup; "
             + "it may have already been invalidated, closed, and removed.", k);
+        pendingEvictionQueue.remove(k);
       } else if (v.getTotalRefCount() > 0) {
         LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
         result = v;
+        // Deliberately leave the key queued. A concurrent release can drop the last reference and re-enqueue
+        // the key after the count above was read, and dequeuing it here would strand an unreferenced entry in
+        // dbMap that is no longer queued, so nothing would ever evict it.
       } else {
         LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
         // Close the instance, which also closes its DB handle.
@@ -417,8 +421,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
           throw new IllegalStateException("Error while closing snapshot DB for snapshotId " + k, ex);
         }
         omMetrics.decNumSnapshotCacheSize();
+        pendingEvictionQueue.remove(k);
       }
-      pendingEvictionQueue.remove(k);
       return result;
     });
     return null;

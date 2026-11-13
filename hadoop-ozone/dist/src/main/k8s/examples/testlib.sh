@@ -83,7 +83,7 @@ all_pods_are_running() {
 }
 
 pre_run_setup() {
-  rm -fr logs result
+  create_robot_dir
   regenerate_resources
   reset_k8s_env
   start_k8s_env
@@ -116,11 +116,13 @@ post_run() {
   get_logs
   stop_k8s_env
   revert_resources
+  delete_robot_dir
   set -e
 }
 
 get_logs() {
   print_phase "Collecting container logs"
+  rm -fr logs
   mkdir -p logs
   for pod in $(kubectl get pods -o custom-columns=NAME:.metadata.name | tail -n +2); do
     for initContainer in $(kubectl get pod -o jsonpath='{.spec.initContainers[*].name}' "${pod}"); do
@@ -161,7 +163,11 @@ regenerate_resources() {
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
   local runner_image="${OZONE_RUNNER_IMAGE:-apache/ozone-runner}" # may be specified by user running the test
 
-  flekszible generate -t mount:hostPath="$OZONE_ROOT",path=/opt/hadoop -t image:image="${runner_image}:${runner_version}" -t ozone/onenode
+  flekszible generate \
+    -t mount:name=ozone,path=/opt/hadoop,hostPath="$OZONE_ROOT" \
+    -t mount:name=robot,path=/robot,hostPath="$ROBOT_OUTPUT_DIR" \
+    -t image:image="${runner_image}:${runner_version}" \
+    -t ozone/onenode
 }
 
 revert_resources() {
@@ -171,7 +177,6 @@ revert_resources() {
 
 execute_robot_test() {
    print_phase "Executing robot tests $@"
-   mkdir -p result
 
    CONTAINER="$1"
    shift 1 #Remove first argument which was the container name
@@ -179,16 +184,17 @@ execute_robot_test() {
    # shellcheck disable=SC2206
    ARGUMENTS=($@)
 
-   kubectl exec -it "${CONTAINER}" -- bash -c 'rm -rf /tmp/report'
-   kubectl exec -it "${CONTAINER}" -- bash -c 'mkdir -p  /tmp/report'
-   kubectl exec -it "${CONTAINER}" -- robot --nostatusrc -d /tmp/report ${ARGUMENTS[@]-} || true
-   kubectl cp "${CONTAINER}":/tmp/report/output.xml "result/$CONTAINER-$RANDOM.xml" || true
+   kubectl exec -it "${CONTAINER}" -- robot --log NONE --nostatusrc --outputdir /robot --report NONE --timestampoutputs ${ARGUMENTS[@]-}
 }
 
 combine_reports() {
-  if [[ -d result ]]; then
-    rm -f result/output.xml
-    run_rebot result result "-o output.xml -N '$(basename $(pwd))' *.xml"
+  if [[ -d "${ROBOT_OUTPUT_DIR}" ]] && [[ -n "${CONTAINER:-}" ]]; then
+    local title="$(basename $(pwd))"
+    kubectl exec -it "${CONTAINER}" -- rebot --logtitle "${title}" --name "${title}" --nostatusrc \
+      --outputdir /robot --output output.xml --report NONE /robot/*.xml || true
+    rm -fr result
+    mkdir -p result
+    mv -iv "${ROBOT_OUTPUT_DIR}"/{log.html,output.xml} result/
   fi
 }
 
@@ -196,4 +202,18 @@ print_phase() {
    echo ""
    echo "**** $1 ****"
    echo ""
+}
+
+create_robot_dir() {
+  if [[ -z "${ROBOT_OUTPUT_DIR:-}" ]]; then
+    export ROBOT_OUTPUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"
+    export ROBOT_OUTPUT_DIR_CREATED="true"
+    chmod go+rwx "${ROBOT_OUTPUT_DIR}"
+  fi
+}
+
+delete_robot_dir() {
+  if [[ "${ROBOT_OUTPUT_DIR_CREATED:-}" == "true" ]] && [[ -n "${ROBOT_OUTPUT_DIR:-}" ]] && [[ -d "${ROBOT_OUTPUT_DIR}" ]]; then
+    rm -frv "${ROBOT_OUTPUT_DIR}"
+  fi
 }

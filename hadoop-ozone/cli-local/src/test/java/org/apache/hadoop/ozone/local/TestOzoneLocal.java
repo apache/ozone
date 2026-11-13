@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.local;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -38,6 +39,9 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemErrCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
@@ -100,19 +104,14 @@ class TestOzoneLocal {
 
   @Test
   void runCommandStartsRuntimeAndPrintsStartupSummary() throws Exception {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
     StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "http://localhost:9878");
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
-    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
-        true));
-
-    int exitCode = commandLine.execute();
-
-    assertEquals(0, exitCode);
+    CommandResult result = execute(commandLine);
+    String text = result.out;
+    assertEquals(0, result.exitCode);
     assertTrue(runtime.started);
     assertTrue(runtime.closed);
-    String text = out.toString(UTF_8.name());
     assertTrue(text.contains("Local Ozone is running from"), text);
     assertTrue(text.contains("SCM RPC: localhost:9860"), text);
     assertTrue(text.contains("OM RPC: localhost:9862"), text);
@@ -129,63 +128,54 @@ class TestOzoneLocal {
 
   @Test
   void runCommandBracketsIpv6HostInStartupSummary() throws Exception {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
     StubRuntime runtime = new StubRuntime("::1", 9860, 9862, "http://[::1]:9878");
     CommandLine commandLine = new CommandLine(new TestableRunCommand(runtime));
-    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8), true));
+    CommandResult result = execute(commandLine);
 
-    assertEquals(0, commandLine.execute());
-    String text = out.toString(UTF_8.name());
+    assertEquals(0, result.exitCode);
+    String text = result.out;
     assertTrue(text.contains("SCM RPC: [::1]:9860"), text);
     assertTrue(text.contains("OM RPC: [::1]:9862"), text);
   }
 
   @Test
   void runCommandPrintsReconEndpointWhenEnabled() throws Exception {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
     StubRuntime runtime = new StubRuntime("localhost", 9860, 9862,
         "http://localhost:9878");
     runtime.reconEndpoint = "http://localhost:9888";
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
-    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
-        true));
 
-    int exitCode = commandLine.execute("--recon");
+    CommandResult result = execute(commandLine, "--recon");
 
-    assertEquals(0, exitCode);
-    String text = out.toString(UTF_8.name());
+    assertEquals(0, result.exitCode);
+    String text = result.out;
     assertTrue(text.contains("Recon endpoint: http://localhost:9888"), text);
   }
 
   @Test
   void runCommandOmitsReconEndpointWhenDisabled() throws Exception {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
     StubRuntime runtime = new StubRuntime("localhost", 9860, 9862,
         "http://localhost:9878");
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
-    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
-        true));
 
-    int exitCode = commandLine.execute();
+    CommandResult result = execute(commandLine);
 
-    assertEquals(0, exitCode);
-    assertFalse(out.toString(UTF_8.name()).contains("Recon endpoint:"));
+    assertEquals(0, result.exitCode);
+    assertFalse(result.out.contains("Recon endpoint:"));
   }
 
   @Test
   void runCommandOmitsS3SummaryWhenS3gDisabled() throws Exception {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
     StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
-    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8), true));
 
-    int exitCode = commandLine.execute("--no-s3g");
+    CommandResult result = execute(commandLine, "--no-s3g");
 
-    assertEquals(0, exitCode);
-    String text = out.toString(UTF_8.name());
+    assertEquals(0, result.exitCode);
+    String text = result.out;
     assertFalse(text.contains("S3 endpoint:"), text);
     assertFalse(text.contains("AWS_ACCESS_KEY_ID="), text);
     assertTrue(text.contains("Press Ctrl+C to stop."), text);
@@ -205,39 +195,39 @@ class TestOzoneLocal {
 
   @Test
   void runCommandPreservesStartupFailureAsTheCause() throws Exception {
-    ByteArrayOutputStream err = new ByteArrayOutputStream();
     StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
     runtime.failStart = true;
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
-    commandLine.setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8), true));
     commandLine.parseArgs();
 
-    Exception error = assertThrows(Exception.class, command::call);
+    try (PrintStreamCapturer err = new SystemErrCapturer()) {
+      Exception error = assertThrows(Exception.class, command::call);
 
-    assertTrue(error.getCause() instanceof IllegalStateException, error.toString());
-    assertEquals("startup failed", error.getCause().getMessage());
-    assertEquals("", err.toString(UTF_8.name()));
+      assertTrue(error.getCause() instanceof IllegalStateException, error.toString());
+      assertEquals("startup failed", error.getCause().getMessage());
+      assertEquals("", err.get());
+    }
     assertTrue(runtime.closed);
   }
 
   /** Preemptive timeout: execute() otherwise blocks in awaitShutdown() until a JVM shutdown hook fires. */
   @Test
   void conflictingConfigReachesStderrThroughGenericCli(@TempDir Path dataDir) throws Exception {
-    ByteArrayOutputStream err = new ByteArrayOutputStream();
     OzoneLocal ozoneLocal = new OzoneLocal();
-    ozoneLocal.getCmd().setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8), true));
 
-    int exitCode = assertTimeoutPreemptively(Duration.ofSeconds(30),
-        () -> ozoneLocal.execute(new String[] {"-D", OZONE_REPLICATION + "=THREE",
-            "run", "--data-dir", dataDir.toString()}));
+    try (PrintStreamCapturer err = new SystemErrCapturer()) {
+      int exitCode = assertTimeoutPreemptively(Duration.ofSeconds(30),
+          () -> ozoneLocal.execute(new String[]{"-D", OZONE_REPLICATION + "=THREE",
+              "run", "--data-dir", dataDir.toString()}));
 
-    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE, exitCode);
-    String[] lines = err.toString(UTF_8.name()).trim().split("\n");
-    assertEquals(2, lines.length, err.toString(UTF_8.name()));
-    assertTrue(lines[0].contains(OZONE_REPLICATION), lines[0]);
-    assertTrue(lines[0].contains("THREE"), lines[0]);
-    assertTrue(lines[1].contains("--verbose"), lines[1]);
+      assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE, exitCode);
+      String[] lines = err.toString().trim().split("\n");
+      assertEquals(2, lines.length, err.toString());
+      assertTrue(lines[0].contains(OZONE_REPLICATION), lines[0]);
+      assertTrue(lines[0].contains("THREE"), lines[0]);
+      assertTrue(lines[1].contains("--verbose"), lines[1]);
+    }
   }
 
   @Test
@@ -477,14 +467,11 @@ class TestOzoneLocal {
   void genericCliErrorOutputIncludesOffendingConfigSource()
       throws Exception {
     OzoneLocal local = new OzoneLocal();
-    ByteArrayOutputStream err = new ByteArrayOutputStream();
-    local.getCmd().setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8),
-        true));
 
-    int exitCode = local.execute(new String[] {"run", "--datanodes", "0"});
+    CommandResult result = execute(local.getCmd(), "run", "--datanodes", "0");
 
-    assertEquals(-1, exitCode);
-    assertTrue(err.toString(UTF_8.name()).contains("--datanodes"));
+    assertThat(result.exitCode).isNotZero();
+    assertThat(result.err).contains("--datanodes");
   }
 
   private static LocalOzoneClusterConfig resolve(String... args) {
@@ -664,4 +651,13 @@ class TestOzoneLocal {
       return null;
     }
   }
+
+  private CommandResult execute(CommandLine cmd, String... args) {
+    try (PrintStreamCapturer out = new SystemOutCapturer();
+        PrintStreamCapturer err = new SystemErrCapturer()) {
+      return new CommandResult(cmd.execute(args), out.toString(), err.toString());
+    }
+  }
+
+  private record CommandResult(int exitCode, String out, String err) { }
 }

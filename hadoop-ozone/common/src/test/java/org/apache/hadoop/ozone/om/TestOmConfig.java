@@ -17,10 +17,14 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
@@ -28,6 +32,24 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class TestOmConfig {
+
+  @Test
+  void rpcBindAddress() throws UnknownHostException {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    InetSocketAddress rpcAddress = new InetSocketAddress(InetAddress.getByName("2001:db8::10"), OZONE_OM_PORT_DEFAULT);
+
+    assertEquals(rpcAddress, conf.getObject(OmConfig.class).getRpcBindAddress(rpcAddress));
+
+    InetSocketAddress ipv6Wildcard = new InetSocketAddress(InetAddress.getByName("::"), OZONE_OM_PORT_DEFAULT);
+    conf.set(OmConfig.Keys.BIND_HOST, "::");
+    assertEquals(ipv6Wildcard, conf.getObject(OmConfig.class).getRpcBindAddress(rpcAddress));
+    conf.set(OmConfig.Keys.BIND_HOST, "[::]");
+    assertEquals(ipv6Wildcard, conf.getObject(OmConfig.class).getRpcBindAddress(rpcAddress));
+
+    conf.set(OmConfig.Keys.BIND_HOST, "0.0.0.0");
+    assertEquals(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), OZONE_OM_PORT_DEFAULT),
+        conf.getObject(OmConfig.class).getRpcBindAddress(rpcAddress));
+  }
 
   @Test
   void acceptsValidValues() {
@@ -62,6 +84,16 @@ class TestOmConfig {
   }
 
   @Test
+  void mpuPartEncryptionIvEnabledByDefault() {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    assertThat(conf.getObject(OmConfig.class).isMpuPartEncryptionIvEnabled()).isTrue();
+    assertThat(new OmConfig().isMpuPartEncryptionIvEnabled()).isTrue();
+
+    conf.setBoolean(OmConfig.Keys.MPU_PART_ENCRYPTION_IV_ENABLED, false);
+    assertThat(conf.getObject(OmConfig.class).isMpuPartEncryptionIvEnabled()).isFalse();
+  }
+
+  @Test
   void testCopy() {
     MutableConfigurationSource conf = new OzoneConfiguration();
     OmConfig original = conf.getObject(OmConfig.class);
@@ -80,6 +112,7 @@ class TestOmConfig {
     updated.setKeyNameCharacterCheckEnabled(!updated.isKeyNameCharacterCheckEnabled());
     updated.setMaxListSize(updated.getMaxListSize() + 1);
     updated.setMaxUserVolumeCount(updated.getMaxUserVolumeCount() + 1);
+    updated.setMpuPartEncryptionIvEnabled(!updated.isMpuPartEncryptionIvEnabled());
 
     subject.setFrom(updated);
 
@@ -91,6 +124,7 @@ class TestOmConfig {
     assertEquals(expected.isFileSystemPathEnabled(), actual.isFileSystemPathEnabled());
     assertEquals(expected.isKeyNameCharacterCheckEnabled(), actual.isKeyNameCharacterCheckEnabled());
     assertEquals(expected.getMaxUserVolumeCount(), actual.getMaxUserVolumeCount());
+    assertEquals(expected.isMpuPartEncryptionIvEnabled(), actual.isMpuPartEncryptionIvEnabled());
   }
 
 }

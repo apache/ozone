@@ -56,8 +56,8 @@ import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +73,7 @@ import org.slf4j.event.Level;
 /**
  * Test Ozone Debug Replicas Verify commands.
  */
-public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCase {
+public abstract class TestOzoneDebugReplicasVerify implements ClusterForTests.TestCase {
   private static final Logger LOG = LoggerFactory.getLogger(TestOzoneDebugReplicasVerify.class);
   private static final String CHUNKS_DIR_NAME = "chunks";
   private static final String BLOCK_FILE_EXTENSION = ".block";

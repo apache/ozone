@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -165,7 +166,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3Se
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -629,6 +629,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OmBucketInfo getBucketInfo(String volume, String bucket)
       throws IOException {
+    return getBucketInfo(volume, bucket, false).getBucketInfo();
+  }
+
+  @Override
+  public BucketInfoWithS3Context getBucketInfo(String volume, String bucket, boolean assumeS3Context)
+      throws IOException {
     InfoBucketRequest.Builder req =
         InfoBucketRequest.newBuilder();
     req.setVolumeName(volume);
@@ -636,12 +642,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.InfoBucket)
         .setInfoBucketRequest(req)
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
-    InfoBucketResponse resp =
-        handleError(submitRequest(omRequest)).getInfoBucketResponse();
+    OMResponse resp = handleError(submitRequest(omRequest));
 
-    return OmBucketInfo.getFromProtobuf(resp.getBucketInfo());
+    return BucketInfoWithS3Context.fromProtobuf(resp);
   }
 
   /**
@@ -998,6 +1004,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize()).build();
     req.setKeyArgs(keyArgs);
     req.setToKeyName(toKeyName);
+    if (args.isRequireFileSystemOptimized()) {
+      req.setRequireFileSystemOptimized(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.RenameKey)
         .setRenameKeyRequest(req)
@@ -1025,11 +1034,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     req.setKeyArgs(keyArgs);
 
-    OMRequest omRequest = createOMRequest(Type.DeleteKey)
-        .setDeleteKeyRequest(req)
-        .build();
+    OMRequest.Builder omRequest = createOMRequest(Type.DeleteKey)
+        .setDeleteKeyRequest(req);
+    if (args.isAssumeS3Context()) {
+      omRequest.setAssumeS3Context(true);
+    }
 
-    handleError(submitRequest(omRequest));
+    handleError(submitRequest(omRequest.build()));
 
   }
 
@@ -1567,7 +1578,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     final OzoneManagerProtocolProtos.SubmitSnapshotDiffRequest.Builder
         requestBuilder =
@@ -1577,7 +1589,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
             .setForceFullDiff(forceFullDiff)
-            .setDisableNativeDiff(disableNativeDiff);
+            .setDisableNativeDiff(disableNativeDiff)
+            .setOrdered(orderedReport);
 
     final OMRequest omRequest = createOMRequest(Type.SubmitSnapshotDiff)
         .setSubmitSnapshotDiffRequest(requestBuilder)
@@ -2935,7 +2948,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
+        .setVolumeName(Strings.nullToEmpty(args.getVolumeName()))
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .build();
@@ -2946,6 +2959,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .build();
 
     OMRequest omRequest = createOMRequest(Type.GetObjectTagging)
+        .setAssumeS3Context(args.isAssumeS3Context())
         .setGetObjectTaggingRequest(req)
         .build();
 
@@ -2990,11 +3004,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setKeyArgs(keyArgs)
             .build();
 
-    OMRequest omRequest = createOMRequest(Type.DeleteObjectTagging)
-        .setDeleteObjectTaggingRequest(req)
-        .build();
+    OMRequest.Builder omRequest = createOMRequest(Type.DeleteObjectTagging)
+        .setDeleteObjectTaggingRequest(req);
+    if (args.isAssumeS3Context()) {
+      omRequest.setAssumeS3Context(true);
+    }
 
-    OMResponse omResponse = submitRequest(omRequest);
+    OMResponse omResponse = submitRequest(omRequest.build());
     handleError(omResponse);
   }
 
