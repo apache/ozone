@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -59,7 +61,8 @@ public class GrpcContainerUploader implements ContainerUploader {
 
   @Override
   public OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback, CopyContainerCompression compression) throws IOException {
+      CompletableFuture<Void> callback, CopyContainerCompression compression,
+      @Nullable StorageType targetVolumeStorageType) throws IOException {
     
     // Get container size from local datanode instead of using passed replicateSize
     Long containerSize = null;
@@ -82,7 +85,8 @@ public class GrpcContainerUploader implements ContainerUploader {
               (CallStreamObserver<SendContainerRequest>) client.upload(
               responseObserver), responseObserver);
       return new SendContainerOutputStream(requestStream, containerId,
-          GrpcReplicationService.BUFFER_SIZE, compression, containerSize) {
+          GrpcReplicationService.BUFFER_SIZE, compression, containerSize,
+          targetVolumeStorageType) {
         @Override
         public void close() throws IOException {
           try {

@@ -19,13 +19,22 @@ package org.apache.hadoop.ozone.container.replication;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 
 import java.io.OutputStream;
+import java.util.List;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Test for {@link SendContainerOutputStream}.
@@ -62,6 +71,75 @@ class TestSendContainerOutputStream
 
     verify(getObserver()).onNext(req);
     verify(getObserver()).onCompleted();
+  }
+
+  /**
+   * The target storage type travels on the first request, next to size, so the
+   * importing datanode can place the container on a matching volume.
+   */
+  @ParameterizedTest
+  @EnumSource(StorageType.class)
+  void sendsTargetVolumeStorageType(StorageType storageType) throws Exception {
+    OutputStream subject = new SendContainerOutputStream(
+        getObserver(), getContainerId(), getBufferSize(), NO_COMPRESSION, null,
+        storageType);
+
+    byte[] bytes = getRandomBytes(16);
+    subject.write(bytes, 0, bytes.length);
+    subject.close();
+
+    SendContainerRequest req = SendContainerRequest.newBuilder()
+        .setContainerID(getContainerId())
+        .setOffset(0)
+        .setData(ByteString.copyFrom(bytes))
+        .setCompression(NO_COMPRESSION.toProto())
+        .setStorageTypeID(StorageTypeUtils.getID(storageType))
+        .build();
+
+    verify(getObserver()).onNext(req);
+    verify(getObserver()).onCompleted();
+  }
+
+  /**
+   * Without a target storage type the request must not claim one, so the target
+   * keeps its configured-default behaviour.
+   */
+  @Test
+  void omitsStorageTypeWhenNotRequested() throws Exception {
+    OutputStream subject = createSubject();
+
+    byte[] bytes = getRandomBytes(16);
+    subject.write(bytes, 0, bytes.length);
+    subject.close();
+
+    ArgumentCaptor<SendContainerRequest> captor =
+        ArgumentCaptor.forClass(SendContainerRequest.class);
+    verify(getObserver()).onNext(captor.capture());
+    assertFalse(captor.getValue().hasStorageTypeID());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void sendsStorageTypeOnlyOnFirstPart(boolean includeSize) throws Exception {
+    Long size = includeSize ? 100L : null;
+    OutputStream subject = new SendContainerOutputStream(
+        getObserver(), getContainerId(), getBufferSize(), NO_COMPRESSION, size, StorageType.SSD);
+    subject.write(getRandomBytes(getBufferSize() * 2 + 1));
+    subject.close();
+
+    ArgumentCaptor<SendContainerRequest> captor = ArgumentCaptor.forClass(SendContainerRequest.class);
+    verify(getObserver(), atLeastOnce()).onNext(captor.capture());
+    List<SendContainerRequest> parts = captor.getAllValues();
+    assertTrue(parts.size() > 1);
+    assertEquals(StorageTypeUtils.getID(StorageType.SSD), parts.get(0).getStorageTypeID());
+    assertEquals(includeSize, parts.get(0).hasSize());
+    if (includeSize) {
+      assertEquals(size.longValue(), parts.get(0).getSize());
+    }
+    for (SendContainerRequest part : parts.subList(1, parts.size())) {
+      assertFalse(part.hasStorageTypeID());
+      assertFalse(part.hasSize());
+    }
   }
 
   @Override
