@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -48,8 +49,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -57,8 +61,14 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +89,7 @@ import org.junit.jupiter.api.Test;
 class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
   private ScmBlockLocationProtocol impl;
+  private StorageContainerManager scm;
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private Map<DatanodeID, DatanodeInfo> registry;
   private List<DatanodeDetails> nodes;
@@ -87,7 +98,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
   @BeforeEach
   void setUp() throws Exception {
     impl = mock(ScmBlockLocationProtocol.class);
-    StorageContainerManager scm = mock(StorageContainerManager.class);
+    scm = mock(StorageContainerManager.class);
 
     registry = new HashMap<>();
     nodeManager = mock(NodeManager.class);
@@ -171,6 +182,44 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     for (DatanodeDetailsProto member : members) {
       assertEquals(expected, member.getCurrentVersion());
     }
+  }
+
+  @Test
+  void missingPipelineResultSurvivesScmRpcTranslators() throws Exception {
+    when(scm.checkLeader()).thenReturn(true);
+    when(scm.getVersionManager()).thenReturn(mock(ScmVersionManager.class));
+    when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
+        anyString(), any(), anyString()))
+        .thenThrow(new SCMException("waited pipeline disappeared", SCMException.ResultCodes.PIPELINE_NOT_FOUND));
+
+    AllocateScmBlockRequestProto allocation = AllocateScmBlockRequestProto.newBuilder()
+        .setSize(1024)
+        .setNumBlocks(1)
+        .setType(ReplicationType.RATIS)
+        .setFactor(ReplicationFactor.THREE)
+        .setOwner("owner")
+        .build();
+    SCMBlockLocationRequest request = SCMBlockLocationRequest.newBuilder()
+        .setCmdType(ScmBlockLocationProtocolProtos.Type.AllocateScmBlock)
+        .setAllocateScmBlockRequest(allocation)
+        .build();
+    SCMBlockLocationResponse response = service.send(null, request);
+    assertEquals(ScmBlockLocationProtocolProtos.Status.PIPELINE_NOT_FOUND, response.getStatus());
+
+    ScmBlockLocationProtocolPB proxy = mock(ScmBlockLocationProtocolPB.class);
+    when(proxy.send(any(), any())).thenReturn(response);
+    SCMBlockLocationFailoverProxyProvider provider = mock(SCMBlockLocationFailoverProxyProvider.class);
+    when(provider.getInterface()).thenReturn(ScmBlockLocationProtocolPB.class);
+    when(provider.getProxy()).thenReturn(new ProxyInfo<>(proxy, "scm"));
+    when(provider.getRetryPolicy()).thenReturn(RetryPolicies.TRY_ONCE_THEN_FAIL);
+    ScmBlockLocationProtocolClientSideTranslatorPB client =
+        new ScmBlockLocationProtocolClientSideTranslatorPB(provider, new OzoneConfiguration());
+
+    SCMException error = assertThrows(SCMException.class,
+        () -> client.allocateBlock(1024, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            "owner", new ExcludeList(), ""));
+    assertEquals(SCMException.ResultCodes.PIPELINE_NOT_FOUND, error.getResult());
+    assertEquals("waited pipeline disappeared", error.getMessage());
   }
 
   @Test
