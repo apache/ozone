@@ -57,6 +57,10 @@ public abstract class Shell extends GenericCli {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
+  @CommandLine.Option(names = {"--continue-batch-on-error"},
+      description = "Continue with batch execution (see --execute) if error happens")
+  private boolean continueOnError;
+
   @CommandLine.ArgGroup
   private ExecutionMode executionMode;
 
@@ -107,7 +111,7 @@ public abstract class Shell extends GenericCli {
 
   private void installBatchExceptionHandler() {
     // exit on first error in batch mode
-    if (!executionMode.interactive) {
+    if (!executionMode.interactive && !continueOnError) {
       CommandLine.IExecutionExceptionHandler handler = getCmd().getExecutionExceptionHandler();
       getCmd().setExecutionExceptionHandler((ex, cli, parseResult) -> {
         try {

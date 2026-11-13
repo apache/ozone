@@ -66,3 +66,12 @@ Get Random Filename
 List All Processes
     ${output} =    Execute    ps aux
     [return]    ${output}
+
+File ${file} Should
+    [arguments]    @{args}
+    File Should Exist    ${file}
+    ${content} =    Get File    ${file}
+    Log    ${content}
+    FOR    ${keyword}    ${arg}    IN    @{args}
+        Run Keyword    Should ${keyword}    ${content}    ${arg}
+    END
