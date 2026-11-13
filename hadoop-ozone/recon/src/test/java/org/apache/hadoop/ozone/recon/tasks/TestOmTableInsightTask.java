@@ -385,7 +385,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     when(deletedIter.hasNext()).thenReturn(true, true, true, true, true, false);
     
     RepeatedOmKeyInfo deletedKeyInfo = mock(RepeatedOmKeyInfo.class);
-    when(deletedKeyInfo.getTotalSize()).thenReturn(ImmutablePair.of(100L, 100L));
+    // Use different unreplicated and replicated sizes to verify that
+    // reprocessing assigns each value to the correct size metric.
+    when(deletedKeyInfo.getTotalSize()).thenReturn(ImmutablePair.of(100L, 300L));
     when(deletedKeyInfo.getOmKeyInfoList()).thenReturn(Arrays.asList(mock(OmKeyInfo.class)));
     
     Table.KeyValue deletedKv = mock(Table.KeyValue.class);
@@ -441,6 +443,11 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(5L, getCountForTable(OPEN_KEY_TABLE));
     assertEquals(5L, getCountForTable(DELETED_TABLE));
     assertEquals(5L, getCountForTable(MULTIPART_INFO_TABLE));
+    // Five deleted entries, each with 100 bytes unreplicated and 300 bytes
+    // replicated, should produce totals of 500 and 1500 bytes respectively.
+    // These assertions detect a typo ie: reversal of the two size metrics.
+    assertEquals(500L, getUnReplicatedSizeForTable(DELETED_TABLE));
+    assertEquals(1500L, getReplicatedSizeForTable(DELETED_TABLE));
   }
 
   @Test

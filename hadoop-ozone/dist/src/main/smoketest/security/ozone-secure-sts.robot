@@ -1670,6 +1670,8 @@ Expired STS temporary credentials must return ExpiredToken on S3 APIs
     Execute S3api Expect Expired Token                          get-object-attributes --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} --object-attributes ETag
 
 Revoking Permanent User Must Revoke Existing Session Token
+    [Teardown]    Run Keywords    Kinit test user    ${ICEBERG_SVC_CATALOG_USER}    ${ICEBERG_SVC_CATALOG_USER}.keytab
+    ...    AND    Execute    ozone s3 revokesecret -y -u ${PERMANENT_ACCESS_KEY_ID} ${OM_HA_PARAM}
     # Create session tokens for both buckets, verify they work, then revoke permanent user secret and verify both fail.
     Assume Role And Get Temporary Credentials                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
     Set Test Variable             ${OBS_STS_ACCESS_KEY_ID}      ${STS_ACCESS_KEY_ID}
@@ -1694,3 +1696,20 @@ Revoking Permanent User Must Revoke Existing Session Token
     Get Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
     Configure STS Profile         ${FSO_STS_ACCESS_KEY_ID}  ${FSO_STS_SECRET_KEY}  ${FSO_STS_SESSION_TOKEN}
     Get Object Should Fail        ${ICEBERG_BUCKET_FSO}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+    # Recreating the permanent secret must not restore the existing session tokens.
+    ${output} =                   Execute                       ozone s3 getsecret -u ${PERMANENT_ACCESS_KEY_ID} ${OM_HA_PARAM}
+    ${secretKey} =                Get Regexp Matches            ${output}     (?<=awsSecret=).*
+    Set Test Variable             ${PERMANENT_SECRET_KEY}       ${secretKey[0]}
+    Configure STS Profile         ${OBS_STS_ACCESS_KEY_ID}  ${OBS_STS_SECRET_KEY}  ${OBS_STS_SESSION_TOKEN}
+    Get Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+    Configure STS Profile         ${FSO_STS_ACCESS_KEY_ID}  ${FSO_STS_SECRET_KEY}  ${FSO_STS_SESSION_TOKEN}
+    Get Object Should Fail        ${ICEBERG_BUCKET_FSO}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+    # Newly issued session tokens must work with the recreated permanent secret.
+    FOR    ${bucket}    ${role_arn}    IN
+    ...    ${ICEBERG_BUCKET_OBS}    ${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ...    ${ICEBERG_BUCKET_FSO}    ${ICEBERG_ALL_ACCESS_ROLE_FSO_ARN}
+        Assume Role And Configure STS Profile                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
+        Get Object Should Succeed    ${bucket}  ${ICEBERG_BUCKET_TESTFILE}
+    END

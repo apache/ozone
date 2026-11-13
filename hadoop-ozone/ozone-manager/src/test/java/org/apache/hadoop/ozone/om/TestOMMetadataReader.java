@@ -45,7 +45,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.grpc.Context;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -79,6 +78,7 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.HddsWhiteboxTestUtils;
+import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

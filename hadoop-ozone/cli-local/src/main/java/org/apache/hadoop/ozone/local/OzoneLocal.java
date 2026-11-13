@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.local;
 
-import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -260,25 +259,24 @@ public class OzoneLocal extends GenericCli {
     }
 
     private void printSummary(LocalOzoneRuntime runtime, LocalOzoneClusterConfig config) {
-      PrintWriter writer = out();
-      writer.println("Local Ozone is running from " + config.getDataDir());
-      writer.println("SCM RPC: " + HddsUtils.getHostPortString(runtime.getDisplayHost(), runtime.getScmPort()));
-      writer.println("OM RPC: " + HddsUtils.getHostPortString(runtime.getDisplayHost(), runtime.getOmPort()));
+      out().println("Local Ozone is running from " + config.getDataDir());
+      out().println("SCM RPC: " + HddsUtils.getHostPortString(runtime.getDisplayHost(), runtime.getScmPort()));
+      out().println("OM RPC: " + HddsUtils.getHostPortString(runtime.getDisplayHost(), runtime.getOmPort()));
       if (config.isS3gEnabled()) {
-        writer.println("S3 endpoint: " + runtime.getS3Endpoint());
-        writer.println("Suggested local AWS settings:");
-        writer.println("AWS_ACCESS_KEY_ID=" + LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY);
-        writer.println("AWS_SECRET_ACCESS_KEY=" + LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY);
-        writer.println("AWS_REGION=" + LocalOzoneClusterConfig.LOCAL_S3_REGION);
-        writer.println("AWS_ENDPOINT_URL_S3=" + runtime.getS3Endpoint());
-        writer.println("Use path-style addressing (AWS CLI: aws configure set default.s3.addressing_style path).");
-        writer.println("With security off (the default), the S3 Gateway accepts any credentials.");
+        out().println("S3 endpoint: " + runtime.getS3Endpoint());
+        out().println("Suggested local AWS settings:");
+        out().println("AWS_ACCESS_KEY_ID=" + LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY);
+        out().println("AWS_SECRET_ACCESS_KEY=" + LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY);
+        out().println("AWS_REGION=" + LocalOzoneClusterConfig.LOCAL_S3_REGION);
+        out().println("AWS_ENDPOINT_URL_S3=" + runtime.getS3Endpoint());
+        out().println("Use path-style addressing (AWS CLI: aws configure set default.s3.addressing_style path).");
+        out().println("With security off (the default), the S3 Gateway accepts any credentials.");
       }
       if (config.isReconEnabled()) {
-        writer.println("Recon endpoint: " + runtime.getReconEndpoint());
+        out().println("Recon endpoint: " + runtime.getReconEndpoint());
       }
-      writer.println("Press Ctrl+C to stop.");
-      writer.flush();
+      out().println("Press Ctrl+C to stop.");
+      out().flush();
     }
 
     /**

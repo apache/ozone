@@ -17,10 +17,6 @@
 
 package org.apache.hadoop.ozone.om.protocolPB.grpc;
 
-import io.grpc.Metadata;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import io.grpc.protobuf.ProtoUtils;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -28,13 +24,16 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMGrpcErrorProto;
 import org.apache.ratis.protocol.exceptions.ReadException;
 import org.apache.ratis.protocol.exceptions.ReadIndexException;
+import org.apache.ratis.thirdparty.io.grpc.Metadata;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 
 /**
  * The Java form of {@link OMGrpcErrorProto}, the error that the OM gRPC server sends in the gRPC trailers.
  */
 public final class OMGrpcError {
   private static final Metadata.Key<OMGrpcErrorProto> ERROR_KEY = Metadata.Key.of("om-grpc-error-bin",
-      ProtoUtils.metadataMarshaller(OMGrpcErrorProto.getDefaultInstance()));
+      OzoneManagerServiceGrpcBinding.metadataMarshaller(OMGrpcErrorProto.parser()));
 
   private final Kind kind;
   private final String message;

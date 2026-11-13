@@ -99,9 +99,11 @@ public final class SafeModeRuleFactory {
     }
 
     if (pipelineManager != null) {
-      if (shouldEnableRatisThreePipelineRules()) {
-        safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue,
-            pipelineManager, safeModeManager, config, nodeManager));
+      final boolean ratisThreePipelineRulesEnabled = shouldEnableRatisThreePipelineRules();
+      // Always added, as it also checks that no open pipeline of any type has unregistered datanodes.
+      safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue,
+          pipelineManager, safeModeManager, config, nodeManager, scmContext, ratisThreePipelineRulesEnabled));
+      if (ratisThreePipelineRulesEnabled) {
         safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
             safeModeManager, config));
       } else {

@@ -224,7 +224,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     if (obj.hasOwnProperty('children')) {
       obj.children.forEach((child: any) => this.minmax(child))
     };
-    if (obj.hasOwnProperty('size') && obj.hasOwnProperty('color')) {
+    if (obj.hasOwnProperty('size') && !('children' in obj && obj.children?.length)) {
       minSize = Math.min(minSize, obj.size);
       maxSize = Math.max(maxSize, obj.size);
     }
@@ -233,9 +233,8 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
   updateSize = (obj: any) => {
     //Normalize Size so other blocks also get visualized if size is large in bytes minimize and if size is too small make it big
-    // it will only apply on leaf level as checking color property
-    if (obj.hasOwnProperty('size') && obj.hasOwnProperty('color')) {
-
+    // Apply only to leaves.
+    if (obj.hasOwnProperty('size') && !('children' in obj && obj.children?.length)) {
       // hide block at key,volume,bucket level if size accessCount and maxAccessCount are zero apply normalized size only for leaf level
       if (obj && obj.size === 0 && obj.accessCount === 0) {
         obj['normalizedSize'] = 0;

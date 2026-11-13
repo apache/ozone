@@ -49,9 +49,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -81,7 +82,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private PipelineFactory pipelineFactory;
   private PipelineStateManager stateManager;
   private BackgroundPipelineCreator backgroundPipelineCreator;
-  private BackgroundSCMService backgroundPipelineScrubber;
+  private BackgroundPipelineScrubber backgroundPipelineScrubber;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -156,26 +157,12 @@ public class PipelineManagerImpl implements PipelineManager {
     serviceManager.register(backgroundPipelineCreator);
     backgroundPipelineCreator.start();
 
-    final long scrubberIntervalInMillis = conf.getTimeDuration(
-        ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL,
-        ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    final long safeModeWaitMs = conf.getTimeDuration(
-        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
-        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-
-    BackgroundSCMService backgroundPipelineScrubber =
-        new BackgroundSCMService.Builder().setClock(clock)
-            .setScmContext(scmContext)
-            .setServiceName("BackgroundPipelineScrubber")
-            .setIntervalInMillis(scrubberIntervalInMillis)
-            .setWaitTimeInMillis(safeModeWaitMs)
-            .setPeriodicalTask(pipelineManager::scrubAndClosePipelinesMissingDataStreamPort)
-            .build();
+    BackgroundPipelineScrubber backgroundPipelineScrubber = new BackgroundPipelineScrubber(
+        pipelineManager::scrubAndClosePipelinesMissingDataStreamPort, conf, scmContext, clock);
 
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
     serviceManager.register(backgroundPipelineScrubber);
+    backgroundPipelineScrubber.start();
 
     return pipelineManager;
   }
@@ -473,17 +460,28 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void closePipeline(PipelineID pipelineID) throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
-    // close containers.
-    closeContainersForPipeline(pipelineID);
-    if (!getPipeline(pipelineID).isClosed()) {
-      acquireWriteLock();
-      try {
-        stateManager.updatePipelineState(pipelineIDProtobuf,
-            HddsProtos.PipelineState.PIPELINE_CLOSED);
-      } finally {
-        releaseWriteLock();
+    try {
+      // close containers.
+      closeContainersForPipeline(pipelineID);
+      if (!getPipeline(pipelineID).isClosed()) {
+        acquireWriteLock();
+        try {
+          stateManager.updatePipelineState(pipelineIDProtobuf,
+              HddsProtos.PipelineState.PIPELINE_CLOSED);
+        } finally {
+          releaseWriteLock();
+        }
+        LOG.info("Pipeline {} moved to CLOSED state", pipelineID);
       }
-      LOG.info("Pipeline {} moved to CLOSED state", pipelineID);
+    } catch (PipelineNotFoundException e) {
+      // There is no pipeline left to close.
+      throw e;
+    } catch (IOException e) {
+      // Followers are expected to fail with not-leader errors, so they are not counted as close failures.
+      if (!(e instanceof SCMException && ((SCMException) e).getResult() == SCMException.ResultCodes.SCM_NOT_LEADER)) {
+        metrics.incNumPipelineCloseFailed();
+      }
+      throw e;
     }
 
     metrics.removePipelineMetrics(pipelineID);
@@ -557,6 +555,7 @@ public class PipelineManagerImpl implements PipelineManager {
     if (!isDataStreamEnabled()) {
       return;
     }
+    boolean closedPipelines = false;
     for (Pipeline pipeline : getPipelines()) {
       if (!pipeline.isOpen()
           || pipeline.getType() != ReplicationType.RATIS
@@ -567,11 +566,15 @@ public class PipelineManagerImpl implements PipelineManager {
         final PipelineID id = pipeline.getId();
         LOG.info("Closing RATIS pipeline {}", id);
         closePipeline(id);
+        closedPipelines = true;
         deletePipeline(id);
       } catch (IOException e) {
         LOG.error("Failed to close RATIS pipeline {} missing the datastream "
             + "port", pipeline.getId(), e);
       }
+    }
+    if (closedPipelines) {
+      notifyPipelineCreatorOfClosedPipelines();
     }
   }
 
@@ -597,6 +600,8 @@ public class PipelineManagerImpl implements PipelineManager {
     return false;
   }
 
+  // TODO: Move pipeline scrubbing, including closePipelinesMissingDataStreamPort and isOpenWithUnregisteredNodes, out
+  //  of the pipeline manager into BackgroundPipelineScrubber in a follow-up change.
   /**
    * Scrub pipelines.
    */
@@ -613,55 +618,86 @@ public class PipelineManagerImpl implements PipelineManager {
             TimeUnit.MILLISECONDS);
 
     List<Pipeline> candidates = stateManager.getPipelines();
+    boolean closedPipelines = false;
 
     for (Pipeline p : candidates) {
       final PipelineID id = p.getId();
-      // scrub pipelines who stay ALLOCATED for too long.
-      if (p.getPipelineState() == Pipeline.PipelineState.ALLOCATED &&
-          (currentTime.toEpochMilli() - p.getCreationTimestamp()
-              .toEpochMilli() >= pipelineScrubTimeoutInMills)) {
+      // Handle failures per pipeline so one bad pipeline does not stop the
+      // rest from being scrubbed until the next run.
+      try {
+        // scrub pipelines who stay ALLOCATED for too long.
+        if (p.getPipelineState() == Pipeline.PipelineState.ALLOCATED &&
+            (currentTime.toEpochMilli() - p.getCreationTimestamp()
+                .toEpochMilli() >= pipelineScrubTimeoutInMills)) {
 
-        LOG.info("Scrubbing pipeline: id: {} since it stays at ALLOCATED " +
-            "stage for {} mins.", id,
-            Duration.between(p.getCreationTimestamp(), currentTime)
-                .toMinutes());
-        closePipeline(id);
-        deletePipeline(id);
+          LOG.info("Scrubbing pipeline: id: {} since it stays at ALLOCATED " +
+              "stage for {} mins.", id,
+              Duration.between(p.getCreationTimestamp(), currentTime)
+                  .toMinutes());
+          closePipeline(id);
+          closedPipelines = true;
+          deletePipeline(id);
+        }
+        // scrub pipelines who stay CLOSED for too long.
+        if (p.getPipelineState() == Pipeline.PipelineState.CLOSED &&
+            (currentTime.toEpochMilli() - p.getStateEnterTime().toEpochMilli())
+                >= pipelineDeleteTimoutInMills) {
+          LOG.info("Scrubbing pipeline: id: {} since it stays at CLOSED stage.",
+              p.getId());
+          deletePipeline(id);
+        }
+        // If a datanode is stopped and then SCM is restarted, a pipeline can get
+        // stuck in an open state. For Ratis, provided some other DNs that were
+        // part of the open pipeline register to SCM after the restart, the Ratis
+        // pipeline close will get triggered by the DNs. For EC that will never
+        // happen, as the DNs are not aware of the pipeline. Therefore we should
+        // close any pipelines in the scrubber if they have nodes which are not
+        // registered
+        if (isOpenWithUnregisteredNodes(p, nodeManager)) {
+          LOG.info("Scrubbing pipeline: id: {} as it has unregistered nodes",
+              p.getId());
+          closePipeline(id);
+          closedPipelines = true;
+        }
+      } catch (SCMException e) {
+        // No other pipeline can be scrubbed once this SCM is no longer the leader.
+        if (e.getResult() == SCMException.ResultCodes.SCM_NOT_LEADER) {
+          throw e;
+        }
+        LOG.error("Failed to scrub pipeline {}", id, e);
+      } catch (IOException e) {
+        LOG.error("Failed to scrub pipeline {}", id, e);
       }
-      // scrub pipelines who stay CLOSED for too long.
-      if (p.getPipelineState() == Pipeline.PipelineState.CLOSED &&
-          (currentTime.toEpochMilli() - p.getStateEnterTime().toEpochMilli())
-              >= pipelineDeleteTimoutInMills) {
-        LOG.info("Scrubbing pipeline: id: {} since it stays at CLOSED stage.",
-            p.getId());
-        deletePipeline(id);
-      }
-      // If a datanode is stopped and then SCM is restarted, a pipeline can get
-      // stuck in an open state. For Ratis, provided some other DNs that were
-      // part of the open pipeline register to SCM after the restart, the Ratis
-      // pipeline close will get triggered by the DNs. For EC that will never
-      // happen, as the DNs are not aware of the pipeline. Therefore we should
-      // close any pipelines in the scrubber if they have nodes which are not
-      // registered
-      if (isOpenWithUnregisteredNodes(p)) {
-        LOG.info("Scrubbing pipeline: id: {} as it has unregistered nodes",
-            p.getId());
-        closePipeline(id);
-      }
+    }
+
+    if (closedPipelines) {
+      notifyPipelineCreatorOfClosedPipelines();
+    }
+  }
+
+  /**
+   * Closed pipelines free up the pipeline limit on their nodes, so let the
+   * creator check for replacements now instead of waiting for its next run.
+   * Pipelines which were only deleted had already been closed.
+   */
+  private void notifyPipelineCreatorOfClosedPipelines() {
+    if (backgroundPipelineCreator != null) {
+      backgroundPipelineCreator.notifyEventTriggered(Event.SCRUBBER_CLOSED_PIPELINES);
     }
   }
 
   /**
    * @param pipeline The pipeline to check
+   * @param nodeManager The node manager holding the registered nodes
    * @return True if the pipeline is open and contains unregistered nodes. False
    *         otherwise.
    */
-  private boolean isOpenWithUnregisteredNodes(Pipeline pipeline) {
+  public static boolean isOpenWithUnregisteredNodes(Pipeline pipeline, NodeManager nodeManager) {
     if (!pipeline.isOpen()) {
       return false;
     }
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (nodeManager.getNode(dn.getID()) == null) {
+      if (!nodeManager.isNodeRegistered(dn)) {
         return true;
       }
     }
@@ -893,7 +929,8 @@ public class PipelineManagerImpl implements PipelineManager {
     return scmhaManager;
   }
 
-  private void setBackgroundPipelineCreator(
+  @VisibleForTesting
+  void setBackgroundPipelineCreator(
       BackgroundPipelineCreator backgroundPipelineCreator) {
     this.backgroundPipelineCreator = backgroundPipelineCreator;
   }
@@ -904,12 +941,12 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   private void setBackgroundPipelineScrubber(
-      BackgroundSCMService backgroundPipelineScrubber) {
+      BackgroundPipelineScrubber backgroundPipelineScrubber) {
     this.backgroundPipelineScrubber = backgroundPipelineScrubber;
   }
 
   @VisibleForTesting
-  public BackgroundSCMService getBackgroundPipelineScrubber() {
+  public BackgroundPipelineScrubber getBackgroundPipelineScrubber() {
     return this.backgroundPipelineScrubber;
   }
 

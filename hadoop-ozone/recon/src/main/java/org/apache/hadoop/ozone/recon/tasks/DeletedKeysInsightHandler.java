@@ -126,8 +126,8 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
         if (kv != null && kv.getValue() != null) {
           RepeatedOmKeyInfo repeatedOmKeyInfo = kv.getValue();
           Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
-          unReplicatedSize += result.getRight();
-          replicatedSize += result.getLeft();
+          unReplicatedSize += result.getLeft();
+          replicatedSize += result.getRight();
           count += repeatedOmKeyInfo.getOmKeyInfoList().size();
         }
       }

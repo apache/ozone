@@ -242,6 +242,10 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
     this.checksum = DUMMY_CHECKSUM;
   }
 
+  boolean hasDummyChecksum() {
+    return DUMMY_CHECKSUM.equals(checksum);
+  }
+
   /**
    * Compute and set checksum for the snapshot data.
    * @param yaml Yaml instance for serialization
