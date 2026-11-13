@@ -367,11 +367,11 @@ public class TestSCMBlockProtocolServer {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       TracingUtil.executeInNewSpan("allocateBlock", this::allocateBlock);
 
-      collector.assertAttribute("allocateBlock", "size", 128 * MB);
-      collector.assertAttribute("allocateBlock", "num", 1L);
-      collector.assertAttribute("allocateBlock", "replication",
+      collector.assertAttribute("allocateBlock", "ozone.audit.size", String.valueOf(128 * MB));
+      collector.assertAttribute("allocateBlock", "ozone.audit.num", "1");
+      collector.assertAttribute("allocateBlock", "ozone.audit.replication",
           RatisReplicationConfig.getInstance(ReplicationFactor.THREE).toString());
-      collector.assertAttribute("allocateBlock", "allocated", 1L);
+      collector.assertAttribute("allocateBlock", "ozone.audit.allocated", "1");
     }
   }
 
