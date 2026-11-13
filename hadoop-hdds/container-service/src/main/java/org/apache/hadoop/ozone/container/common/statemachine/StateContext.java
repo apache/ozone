@@ -606,6 +606,9 @@ public class StateContext {
     }
   }
 
+  /**
+   * Command status reports selected for one heartbeat and their byte metrics.
+   */
   public static final class CommandStatusReportSelection {
     private final List<CommandStatusReportsProto> reports;
     private final long selectedBytes;

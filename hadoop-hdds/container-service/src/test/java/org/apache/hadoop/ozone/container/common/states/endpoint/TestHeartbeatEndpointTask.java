@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_IPC_MAXIMUM_DATA_LENGTH;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,7 +45,6 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -623,8 +623,7 @@ public class TestHeartbeatEndpointTask {
     long safeHeartbeatSize =
         (long) Math.floor(ipcMaximumDataLength * 0.9D);
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH,
-        ipcMaximumDataLength);
+    conf.setInt(HDDS_IPC_MAXIMUM_DATA_LENGTH, ipcMaximumDataLength);
     conf.set(HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE, (reportBytes * 2) + "B");
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");

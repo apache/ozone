@@ -25,6 +25,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATU
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_IPC_MAXIMUM_DATA_LENGTH;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_IPC_MAXIMUM_DATA_LENGTH_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
@@ -41,7 +43,6 @@ import java.time.ZonedDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -125,10 +126,10 @@ public class HeartbeatEndpointTask
     Preconditions.checkArgument(maxCommandStatusReportBytes > 0,
         HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE + " must be positive");
     int ipcMaximumDataLength = conf.getInt(
-        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH,
-        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
+        HDDS_IPC_MAXIMUM_DATA_LENGTH,
+        HDDS_IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
     Preconditions.checkArgument(ipcMaximumDataLength > 0,
-        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH + " must be positive");
+        HDDS_IPC_MAXIMUM_DATA_LENGTH + " must be positive");
     this.safeHeartbeatSize =
         (long) Math.floor(ipcMaximumDataLength * IPC_SIZE_SAFETY_FACTOR);
     this.datanodeDetails = context.getParent().getDatanodeDetails();
