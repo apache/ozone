@@ -740,6 +740,18 @@ public class MockNodeManager implements NodeManager {
     }
   }
 
+  /**
+   * Removes the node from this node manager, as if it had never registered.
+   */
+  public void unregister(DatanodeDetails dn) {
+    healthyNodes.remove(dn);
+    staleNodes.remove(dn);
+    deadNodes.remove(dn);
+    if (clusterMap != null && clusterMap.contains(dn)) {
+      clusterMap.remove(dn);
+    }
+  }
+
   public void setNodeState(DatanodeDetails dn, HddsProtos.NodeState state) {
     healthyNodes.remove(dn);
     staleNodes.remove(dn);

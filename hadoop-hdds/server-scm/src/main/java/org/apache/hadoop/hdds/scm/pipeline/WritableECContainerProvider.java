@@ -113,7 +113,7 @@ public class WritableECContainerProvider
             excludeList);
       }
     }
-    List<Pipeline> existingPipelines = pipelineManager.getPipelines(
+    List<Pipeline> existingPipelines = pipelineManager.getWritablePipelines(
         repConfig, Pipeline.PipelineState.OPEN);
     final int pipelineCount = existingPipelines.size();
     LOG.debug("Checking existing pipelines: {}", existingPipelines);

@@ -81,6 +81,21 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   );
 
   /**
+   * Returns pipelines matching the given ReplicationConfig and state whose
+   * nodes are all registered with SCM. Use this to choose pipelines for new
+   * writes.
+   */
+  List<Pipeline> getWritablePipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state);
+
+  /**
+   * Returns pipelines matching the given ReplicationConfig and state, minus
+   * the given exclusions, whose nodes are all registered with SCM. Use this to
+   * choose pipelines for new writes.
+   */
+  List<Pipeline> getWritablePipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state,
+      Collection<DatanodeDetails> excludeDns, Collection<PipelineID> excludePipelines);
+
+  /**
    * Returns the count of pipelines meeting the given ReplicationConfig and
    * state.
    * @param replicationConfig The ReplicationConfig of the pipelines to count
