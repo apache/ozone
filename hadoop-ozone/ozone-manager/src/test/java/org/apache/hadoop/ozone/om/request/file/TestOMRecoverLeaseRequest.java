@@ -18,12 +18,20 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import static org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB.setReplicationConfig;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.blocksWith;
+import static org.apache.hadoop.security.UserGroupInformation.createRemoteUser;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -34,6 +42,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ipc_.ExternalCall;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -66,6 +76,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Recover
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -185,6 +197,82 @@ public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
     omClientResponse = validateAndUpdateCacheForCommit(newKeyArgs);
     omResponse = omClientResponse.getOMResponse();
     assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_CLOSED, omResponse.getStatus());
+  }
+
+  /**
+   * Verify that applying a RecoverLease request does not ask SCM for pipelines. The leader adds them to the
+   * reply afterward, for the last block of the file and the last two blocks of the open file.
+   */
+  @Test
+  public void testPipelinesAreAddedAfterApply() throws Exception {
+    populateNamespace(true, true, true, true);
+
+    final OMResponse applied = validateAndUpdateCache().getOMResponse();
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, applied.getStatus());
+    verify(scmContainerLocationProtocol, never()).getContainerWithPipeline(anyLong());
+    assertThat(blocksWith(applied.getRecoverLeaseResponse().getKeyInfo(), KeyLocation::hasPipeline))
+        .containsOnly(false);
+    assertThat(blocksWith(applied.getRecoverLeaseResponse().getOpenKeyInfo(), KeyLocation::hasPipeline))
+        .containsOnly(false);
+
+    final RecoverLeaseResponse reply = OMRecoverLeaseRequest.addBlockInfo(
+        ozoneManager, createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery), applied)
+        .getRecoverLeaseResponse();
+    assertThat(blocksWith(reply.getKeyInfo(), KeyLocation::hasPipeline)).containsExactly(false, false, true);
+    assertThat(blocksWith(reply.getOpenKeyInfo(), KeyLocation::hasPipeline)).containsExactly(false, true, true);
+  }
+
+  /**
+   * Verify that block tokens are not generated while applying a RecoverLease request, and that the leader issues
+   * them to the calling user afterward, for the same blocks that get a pipeline.
+   */
+  @Test
+  public void testBlockTokensAreAddedAfterApplyForCallingUser() throws Exception {
+    populateNamespace(true, true, true, true);
+    when(ozoneManager.isGrpcBlockTokenEnabled()).thenReturn(true);
+    when(ozoneBlockTokenSecretManager.generateToken(any(), any(), any(), anyLong())).thenReturn(new Token<>());
+
+    final OMResponse applied = validateAndUpdateCache().getOMResponse();
+    verify(ozoneBlockTokenSecretManager, never()).generateToken(any(), any(), any(), anyLong());
+    assertThat(blocksWith(applied.getRecoverLeaseResponse().getKeyInfo(), KeyLocation::hasToken))
+        .containsOnly(false);
+    assertThat(blocksWith(applied.getRecoverLeaseResponse().getOpenKeyInfo(), KeyLocation::hasToken))
+        .containsOnly(false);
+
+    Server.getCurCall().set(new RpcCallerStub(createRemoteUser("alice")));
+    try {
+      final RecoverLeaseResponse reply = OMRecoverLeaseRequest.addBlockInfo(
+          ozoneManager, createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery), applied)
+          .getRecoverLeaseResponse();
+      assertThat(blocksWith(reply.getKeyInfo(), KeyLocation::hasToken)).containsExactly(false, false, true);
+      assertThat(blocksWith(reply.getOpenKeyInfo(), KeyLocation::hasToken)).containsExactly(false, true, true);
+      final ArgumentCaptor<String> tokenUser = ArgumentCaptor.forClass(String.class);
+      verify(ozoneBlockTokenSecretManager, times(3)).generateToken(tokenUser.capture(), any(), any(), anyLong());
+      assertThat(tokenUser.getAllValues()).containsOnly("alice");
+    } finally {
+      Server.getCurCall().remove();
+    }
+  }
+
+  /**
+   * Verify that a RecoverLease request is applied when SCM cannot be reached, and that only the reply fails.
+   */
+  @Test
+  public void testScmFailureDoesNotFailApply() throws Exception {
+    populateNamespace(true, true, true, true);
+    when(scmContainerLocationProtocol.getContainerWithPipeline(anyLong()))
+        .thenThrow(new IOException("SCM is not reachable"));
+
+    final OMResponse applied = validateAndUpdateCache().getOMResponse();
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, applied.getStatus());
+    assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout()).get(getOpenFileName()).getMetadata())
+        .containsKey(OzoneConsts.LEASE_RECOVERY);
+
+    final OMException e = assertThrows(
+        OMException.class, () -> OMRecoverLeaseRequest.addBlockInfo(
+            ozoneManager, createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery), applied));
+    assertEquals(OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION, e.getResult());
+    assertEquals("SCM is not reachable", e.getMessage());
   }
 
   /**
@@ -640,6 +728,20 @@ public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
 
     return omMetadataManager.getOzonePathKey(volumeId, bucketId, parentId,
         omKeyInfo.getFileName());
+  }
+
+  private static final class RpcCallerStub extends ExternalCall<String> {
+    private final UserGroupInformation remoteUser;
+
+    RpcCallerStub(UserGroupInformation remoteUser) {
+      super(null);
+      this.remoteUser = remoteUser;
+    }
+
+    @Override
+    public UserGroupInformation getRemoteUser() {
+      return remoteUser;
+    }
   }
 
 }
