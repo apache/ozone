@@ -32,6 +32,7 @@ import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.DataTestUtil;
@@ -39,6 +40,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
@@ -85,13 +88,13 @@ public class TestOptimizedSnapshotDiff extends OmSnapshotTests {
             SnapshotDiffReport.DiffType.RENAME, "dir1/dir2/key1", "dir1/dir3/renamed_key"),
         SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, "dir1/dir2"));
 
-    SnapshotDiffResponse unordered = waitForDoneReportAfterOrderedSubmit(
-        getVolumeName(), getBucketName(), snap1, snap2, false);
+    SnapshotDiffResponse unordered = waitForDoneReportAfterSubmit(
+        getVolumeName(), getBucketName(), snap1, snap2, false, false);
     assertEquals("Report is dependency unordered.", unordered.getReason());
     assertEquals(expectedUnordered, unordered.getSnapshotDiffReport().getDiffList());
 
-    SnapshotDiffResponse ordered = waitForDoneReportAfterOrderedSubmit(
-        getVolumeName(), getBucketName(), snap1, snap2, true);
+    SnapshotDiffResponse ordered = waitForDoneReportAfterSubmit(
+        getVolumeName(), getBucketName(), snap1, snap2, false, true);
     assertEquals("Report is dependency ordered.", ordered.getReason());
     assertEquals(expectedOrdered, ordered.getSnapshotDiffReport().getDiffList());
   }
@@ -112,8 +115,8 @@ public class TestOptimizedSnapshotDiff extends OmSnapshotTests {
     }
 
     for (boolean ordered : new boolean[] {false, true}) {
-      SnapshotDiffResponse response = waitForDoneReportAfterOrderedSubmit(
-          getVolumeName(), getBucketName(), snap1, snap2, ordered);
+      SnapshotDiffResponse response = waitForDoneReportAfterSubmit(
+          getVolumeName(), getBucketName(), snap1, snap2, false, ordered);
       assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
           SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, "unchanged-dirs/dir/old"),
           SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, "unchanged-dirs/dir/new"));
@@ -147,13 +150,89 @@ public class TestOptimizedSnapshotDiff extends OmSnapshotTests {
       obsBucket.deleteKey(key1);
       createSnapshot(volume, bucket, snap2);
 
-      SnapshotDiffResponse response = waitForDoneReportAfterOrderedSubmit(
-          volume, bucket, snap1, snap2, false);
+      SnapshotDiffResponse response = waitForDoneReportAfterSubmit(
+          volume, bucket, snap1, snap2, false, false);
       assertEquals("Report is dependency ordered.", response.getReason());
       assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
           SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, key1),
           SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.RENAME, key2, renamedKey));
     }
+  }
+
+  @Test
+  public void testForcedFullDiffAfterSnapshotPurge() throws Exception {
+    String snap0 = "snap-purge-0";
+    String snap1 = "snap-purge-1";
+    String snap2 = "snap-purge-2";
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, getBucketName(), getVolumeName());
+    try (FileSystem fs = FileSystem.get(new URI(rootPath), getCluster().getConf())) {
+      createFileKey(fs, "/purge/k1");
+      createSnapshot(getVolumeName(), getBucketName(), snap0);
+      createSnapshot(getVolumeName(), getBucketName(), snap1);
+      assertThat(fs.rename(new Path("/purge/k1"), new Path("/purge/k1r"))).isTrue();
+      createFileKey(fs, "/purge/k2");
+      createSnapshot(getVolumeName(), getBucketName(), snap2);
+    }
+
+    // Purging snap0 moves lastTransactionInfo of the next snapshot (snap1) past the changes above.
+    try (OzoneClient client = getCluster().newClient()) {
+      client.getObjectStore().deleteSnapshot(getVolumeName(), getBucketName(), snap0);
+    }
+    SnapshotDeletingService snapshotDeletingService =
+        new SnapshotDeletingService(1000, 60000, getCluster().getOzoneManager());
+    try {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          snapshotDeletingService.runPeriodicalTaskNow();
+          return getSnapshotInfo(snap0) == null;
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 500, 60000);
+    } finally {
+      snapshotDeletingService.shutdown();
+    }
+    SnapshotInfo fromSnapshot = getSnapshotInfo(snap1);
+    assertThat(TransactionInfo.fromByteString(fromSnapshot.getLastTransactionInfo()).getTransactionIndex())
+        .isGreaterThan(TransactionInfo.fromByteString(fromSnapshot.getCreateTransactionInfo()).getTransactionIndex());
+
+    for (boolean ordered : new boolean[] {false, true}) {
+      SnapshotDiffResponse response = waitForDoneReportAfterSubmit(
+          getVolumeName(), getBucketName(), snap1, snap2, true, ordered);
+      assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
+          SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.RENAME, "purge/k1", "purge/k1r"),
+          SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, "purge/k2"));
+    }
+  }
+
+  @Test
+  public void testForcedFullDiffFromNewerToOlderSnapshot() throws Exception {
+    String snap1 = "snap-reverse-1";
+    String snap2 = "snap-reverse-2";
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, getBucketName(), getVolumeName());
+    try (FileSystem fs = FileSystem.get(new URI(rootPath), getCluster().getConf())) {
+      createFileKey(fs, "/reverse/k1");
+      createSnapshot(getVolumeName(), getBucketName(), snap1);
+      assertThat(fs.rename(new Path("/reverse/k1"), new Path("/reverse/k1r"))).isTrue();
+      createFileKey(fs, "/reverse/k2");
+      createSnapshot(getVolumeName(), getBucketName(), snap2);
+    }
+
+    // Every row of the older (to) snapshot was written before the newer (from) snapshot was created.
+    for (boolean ordered : new boolean[] {false, true}) {
+      SnapshotDiffResponse response = waitForDoneReportAfterSubmit(
+          getVolumeName(), getBucketName(), snap2, snap1, true, ordered);
+      assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
+          SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.RENAME, "reverse/k1r", "reverse/k1"),
+          SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, "reverse/k2"));
+    }
+  }
+
+  private SnapshotInfo getSnapshotInfo(String snapshotName) throws IOException {
+    return getCluster().getOzoneManager().getMetadataManager().getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(getVolumeName(), getBucketName(), snapshotName));
   }
 
   private static void createObsKey(OzoneBucket bucket, String key) throws Exception {
