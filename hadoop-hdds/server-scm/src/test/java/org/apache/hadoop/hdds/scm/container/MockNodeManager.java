@@ -843,7 +843,8 @@ public class MockNodeManager implements NodeManager {
   @Override
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
-    return healthyNodes.contains(datanodeDetails);
+    // Registered nodes are added to the cluster map regardless of their health.
+    return getNode(datanodeDetails.getID()) != null;
   }
 
   @Override
