@@ -91,8 +91,23 @@ public class TracingConfig extends ReconfigurableConfig {
   )
   private String spanSampling;
 
+  @Config(
+      key = "ozone.tracing.internal.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      reconfigurable = true,
+      tags = { ConfigTag.OZONE, ConfigTag.HDDS },
+      description = "When true (and ozone.tracing.enabled=true), timer-driven internal work may "
+          + "start new root spans via executeInternalSpan."
+  )
+  private boolean internalTracingEnabled;
+
   public boolean isTracingEnabled() {
     return tracingEnabled;
+  }
+
+  public boolean isInternalTracingEnabled() {
+    return internalTracingEnabled;
   }
 
   public boolean isApplicationAware() {

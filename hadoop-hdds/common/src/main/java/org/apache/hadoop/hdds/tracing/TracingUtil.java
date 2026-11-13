@@ -59,9 +59,13 @@ public final class TracingUtil {
   private static final Logger LOG = LoggerFactory.getLogger(TracingUtil.class);
   private static final String NULL_SPAN_AS_STRING = "";
 
+  /** Encoded "parent" telling the receiver not to trace this request. */
+  static final String SUPPRESSED_SPAN_AS_STRING = "suppressed";
+
   private static volatile boolean isInit = false;
   private static volatile boolean tracingEnabled;
   private static volatile boolean applicationAware;
+  private static volatile boolean internalTracingEnabled;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
   private static volatile SdkTracerProvider sdkTracerProvider;
   private static BatchSpanProcessor batchSpanProcessor;
@@ -69,6 +73,10 @@ public final class TracingUtil {
   public static final String GLOBAL_TRACER_NAME = "ozone";
 
   private TracingUtil() {
+  }
+
+  private static boolean isSuppressed() {
+    return Span.current() == SuppressedSpan.INSTANCE;
   }
 
   /**
@@ -187,6 +195,7 @@ public final class TracingUtil {
       tracer = OpenTelemetry.noop().getTracer("noop");
       tracingEnabled = false;
       applicationAware = false;
+      internalTracingEnabled = false;
       isInit = false;
     }
   }
@@ -194,6 +203,7 @@ public final class TracingUtil {
   private static void initialize(String serviceName, TracingConfig cfg, boolean isReconfig) {
     tracingEnabled = cfg.isTracingEnabled();
     applicationAware = cfg.isApplicationAware();
+    internalTracingEnabled = cfg.isInternalTracingEnabled();
 
     if (!tracingEnabled && !applicationAware) {
       tracer = OpenTelemetry.noop().getTracer(GLOBAL_TRACER_NAME);
@@ -269,6 +279,10 @@ public final class TracingUtil {
     return Span.current().getSpanContext().isValid();
   }
 
+  private static boolean canStartInternalRootSpan() {
+    return tracingEnabled && internalTracingEnabled && hasUsableTracer();
+  }
+
   /**
    * Build the SdkTracerProvider using the configured OTLP endpoint and sampler.
    * Extracted so both enabled and application-aware modes share exporter/sampler setup.
@@ -314,13 +328,17 @@ public final class TracingUtil {
 
   /**
    * Export the active tracing span as a string.
+   * When suppression is active, returns {@link #SUPPRESSED_SPAN_AS_STRING} for cross-service propagation.
    * When tracing is disabled, not initialized, or no valid span is in scope,
    * {@link Span#current()} returns an invalid span; there is nothing to encode and this
    * method returns an empty string. Callers must accept that as "no context to propagate".
    *
-   * @return encoded W3C trace context, or empty string if there is no valid active span.
+   * @return encoded W3C trace context, the suppression marker, or empty string if there is no valid active span.
    */
   public static String exportCurrentSpan() {
+    if (isSuppressed()) {
+      return SUPPRESSED_SPAN_AS_STRING;
+    }
     Span currentSpan = Span.current();
     if (!currentSpan.getSpanContext().isValid()) {
       return NULL_SPAN_AS_STRING;
@@ -349,6 +367,9 @@ public final class TracingUtil {
 
   public static Span importAndCreateSpan(String name, String encodedParent,
                                          SpanKind spanKind) {
+    if (SUPPRESSED_SPAN_AS_STRING.equals(encodedParent)) {
+      return SuppressedSpan.INSTANCE;
+    }
     if (!hasUsableTracer()) {
       return Span.getInvalid();
     }
@@ -510,6 +531,24 @@ public final class TracingUtil {
       SpanKind spanKind, CheckedSupplier<R, E> supplier) throws E {
     Span span = buildSpan(spanName, spanKind);
     return executeInSpan(span, supplier);
+  }
+
+  /**
+   * Execute timer-driven internal work in a span gated by {@code ozone.tracing.internal.enabled}.
+   * If no root may be started, runs under a suppressed context: no nested or remote spans are created for this work.
+   */
+  public static <E extends Exception> void executeInternalSpan(String spanName,
+      CheckedRunnable<E> runnable) throws E {
+    executeInSpan(buildInternalSpan(spanName), runnable);
+  }
+
+  /**
+   * Execute timer-driven internal work in a span gated by {@code ozone.tracing.internal.enabled}.
+   * If no root may be started, runs under a suppressed context: no nested or remote spans are created for this work.
+   */
+  public static <R, E extends Exception> R executeInternalSpan(String spanName,
+      CheckedSupplier<R, E> supplier) throws E {
+    return executeInSpan(buildInternalSpan(spanName), supplier);
   }
 
   /**
@@ -685,6 +724,9 @@ public final class TracingUtil {
    * if not, returns an invalid span so application-aware mode never starts a new trace.
    */
   private static Span buildSpan(String spanName, SpanKind spanKind) {
+    if (isSuppressed()) {
+      return SuppressedSpan.INSTANCE;
+    }
     Context currentContext = Context.current();
     Span parentSpan = Span.fromContext(currentContext);
 
@@ -700,6 +742,27 @@ public final class TracingUtil {
     return tracer.spanBuilder(spanName)
         .setNoParent()
         .setSpanKind(spanKind)
+        .startSpan();
+  }
+
+  private static Span buildInternalSpan(String spanName) {
+    if (isSuppressed()) {
+      return SuppressedSpan.INSTANCE;
+    }
+    Context currentContext = Context.current();
+    Span parentSpan = Span.fromContext(currentContext);
+    if (parentSpan.getSpanContext().isValid()) {
+      return tracer.spanBuilder(spanName)
+          .setParent(currentContext)
+          .setSpanKind(SpanKind.INTERNAL)
+          .startSpan();
+    }
+    if (!canStartInternalRootSpan()) {
+      return SuppressedSpan.INSTANCE;
+    }
+    return tracer.spanBuilder(spanName)
+        .setNoParent()
+        .setSpanKind(SpanKind.INTERNAL)
         .startSpan();
   }
 
