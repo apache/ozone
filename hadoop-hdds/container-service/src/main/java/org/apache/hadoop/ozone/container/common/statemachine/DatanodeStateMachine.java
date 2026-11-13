@@ -460,6 +460,7 @@ public class DatanodeStateMachine implements Closeable {
     }
     context.setState(DatanodeStates.getLastState());
     replicationSupervisorMetrics.unRegister();
+    IOUtils.close(LOG, pushReplicatorWithMetrics);
     ecReconstructionMetrics.unRegister();
     executorServiceShutdownGraceful(executorService);
     executorServiceShutdownGraceful(closePipelineCommandExecutorService);
@@ -653,7 +654,6 @@ public class DatanodeStateMachine implements Closeable {
    */
   public synchronized void stopDaemon() {
     try {
-      IOUtils.close(LOG, pushReplicatorWithMetrics);
       supervisor.stop();
       context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);
