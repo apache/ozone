@@ -109,7 +109,11 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
       final Long cutoff = S3SecretRequestHelper.updateStsRevocationCutoff(
           ozoneManager.getMetadataManager(), getOmRequest(), originalAccessKeyId, context.getIndex());
       if (cutoff == null) {
-        throw new OMException("revocationTimeMillis is required for STS token revocation", INTERNAL_ERROR);
+        // This branch should not be reachable because of the checks in validateReplicatedRevokeRequestFields, but is
+        // here as a defensive mechanism (in case someone mistakenly removes that code, etc.).  It returns
+        // INTERNAL_ERROR error code because the leader should have provided the replicated revoke STS request
+        // (which is how updateStsRevocationCutoff could return null), not the client
+        throw new OMException("internal error in STS token revocation", INTERNAL_ERROR);
       }
       final long revocationTimeMillis = cutoff;
 
