@@ -2034,6 +2034,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
+
     metadataManager.start(configuration);
 
     startSecretManagerIfNecessary();
@@ -2173,6 +2177,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.startSnapshotDirectoryMetrics(configuration, getMetadataManager());
 
     initializeRatisServer(false);
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    // Ratis must be initialized first so that upgrade actions (e.g. quota repair) can check leader status.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
     if (omRatisServer != null) {
       omRatisServer.start();
     }
@@ -6310,18 +6318,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneSnapshotSSTFilteringServiceInterval(String newVal) {
-    boolean wasSstFilteringSvcEnabled = ((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled();
     getConfiguration().set(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
 
     if (this.isFilesystemSnapshotEnabled()) {
-      if (wasSstFilteringSvcEnabled) {
-        // Sanity check
-        Objects.requireNonNull(keyManager.getSnapshotSstFilteringService(),
-            "sstFilteringService should not be null when SST filtering service is enabled.");
-        ((KeyManagerImpl) keyManager).stopSnapshotSstFilteringService();
-      }
-      // Note startSnapshotSstFilteringService checks whether the config is set to a value that enables the service
-      ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
+      keyManager.restartSnapshotSstFilteringService(getConfiguration());
     } else {
       LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);
@@ -6362,6 +6362,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
   }
 
+  /**
+   * Test hook that lets a test make this OM reject a feature it supports, by listing the feature in
+   * {@link OMConfigKeys#OZONE_OM_FEATURES_DISABLED}.
+   * <p>
+   * This is not a version gate: it reads only the config, not the OM version.
+   * New features do not need to call it; add a call only for a feature that a test disables.
+   */
   public void checkFeatureEnabled(OzoneManagerVersion feature) throws OMException {
     String disabledFeatures = configuration.get(OMConfigKeys.OZONE_OM_FEATURES_DISABLED, "");
     if (disabledFeatures.contains(feature.name())) {

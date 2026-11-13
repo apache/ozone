@@ -257,6 +257,28 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
     assertThat(request.getDeleteKeyRequest().getKeyArgs().getExpectedETag()).isEqualTo("etag");
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void deleteObjectTaggingSetsS3Context(boolean assumeS3Context) throws IOException {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("s3v")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setAssumeS3Context(assumeS3Context)
+        .build();
+
+    client.deleteObjectTagging(keyArgs);
+
+    OMRequest request = transport.getLastRequest();
+    assertThat(request.getCmdType()).isEqualTo(Type.DeleteObjectTagging);
+    assertThat(request.getAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.hasAssumeS3Context()).isEqualTo(assumeS3Context);
+    assertThat(request.getDeleteObjectTaggingRequest().getKeyArgs().getKeyName()).isEqualTo("key");
+  }
+
   @Test
   void testQuietDeleteKeysThrowsWhenWholeBatchFails() throws IOException {
     // Whole-batch failure at OM: non-OK status, DeleteKeysResponse has status=false and no per-key errors.

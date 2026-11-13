@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -145,18 +146,7 @@ public class TestBlocksEndPoint {
     if (reconStorageContainerManager != null) {
       reconStorageContainerManager.stop();
     }
-    if (reconReplicaHistoryDBProvider != null) {
-      reconReplicaHistoryDBProvider.close();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    IOUtils.closeQuietly(reconReplicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, omMetadataManager);
   }
 
   @Test

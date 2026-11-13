@@ -185,6 +185,7 @@ public class TestBasicOzoneFileSystems {
 
     // The rebuilt filesystem URI keeps the (bracketed) IPv6 authority intact.
     assertEquals(new URI(uri).getAuthority(), ofs.getUri().getAuthority());
+    assertEquals("ofs://" + new URI(uri).getAuthority(), ofs.getUri().toString());
   }
 
   @Test
@@ -242,6 +243,7 @@ public class TestBasicOzoneFileSystems {
     assertEquals(expectedHost, hostCaptor.getValue());
     assertEquals(expectedPort, portCaptor.getValue().intValue());
     assertEquals(new URI(uri).getAuthority(), o3fs.getUri().getAuthority());
+    assertEquals("o3fs://" + new URI(uri).getAuthority(), o3fs.getUri().toString());
   }
 
   @Test
@@ -285,6 +287,26 @@ public class TestBasicOzoneFileSystems {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> o3fs.initialize(new URI(uri), new OzoneConfiguration()));
     assertTrue(exception.getMessage().contains("Ozone file system URL should be one of the following formats"));
+  }
+
+  @Test
+  public void testRootedAuthorityWithEncodedIllegalCharacter() throws Exception {
+    BasicRootedOzoneFileSystem ofs = spy(new BasicRootedOzoneFileSystem());
+    doReturn(mock(BasicRootedOzoneClientAdapterImpl.class)).when(ofs).createAdapter(any(), anyString(), anyInt());
+    // getAuthority() decodes %20, and the rebuilt URI must reject the space
+    IOException e = assertThrows(IOException.class,
+        () -> ofs.initialize(new URI("ofs://om%20x/"), new OzoneConfiguration()));
+    assertTrue(e.getMessage().startsWith("Invalid Ozone endpoint"));
+  }
+
+  @Test
+  public void testO3fsAuthorityWithEncodedIllegalCharacter() throws Exception {
+    BasicOzoneFileSystem o3fs = spy(new BasicOzoneFileSystem());
+    doReturn(mock(BasicOzoneClientAdapterImpl.class))
+        .when(o3fs).createAdapter(any(), anyString(), anyString(), nullable(String.class), anyInt());
+    IOException e = assertThrows(IOException.class,
+        () -> o3fs.initialize(new URI("o3fs://bucket.volume.om%20x/"), new OzoneConfiguration()));
+    assertTrue(e.getMessage().startsWith("Invalid Ozone endpoint"));
   }
 
   @Test

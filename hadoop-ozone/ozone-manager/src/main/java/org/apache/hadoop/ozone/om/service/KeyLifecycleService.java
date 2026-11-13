@@ -845,6 +845,10 @@ public class KeyLifecycleService extends BackgroundService {
             keySetInCache.add(entry.getKey().getCacheKey());
             String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
                 currentDirPath + OM_KEY_PREFIX + key.getKeyName();
+            // skip hsync'ed keys that are still open for write
+            if (key.isHsync()) {
+              continue;
+            }
             for (OmLCRule rule : ruleList) {
               if (rule.match(key, keyPath)) {
                 // mark key as expired, check next key
@@ -887,8 +891,13 @@ public class KeyLifecycleService extends BackgroundService {
             }
             numKeyIterated++;
             numKeysUnderDir++;
+            // skip if not directory's child or a hsync object
+            if (key.getParentObjectID() != currentDirObjID || key.isHsync()) {
+              lastScannedKey = keyValue.getKey();
+              continue;
+            }
             for (OmLCRule rule : ruleList) {
-              if (key.getParentObjectID() == currentDirObjID && rule.match(key, keyPath)) {
+              if (rule.match(key, keyPath)) {
                 // mark key as expired, check next key
                 if (keyList.isFull()) {
                   // if keyList is full, send delete request for pending deletion keys
@@ -1067,6 +1076,10 @@ public class KeyLifecycleService extends BackgroundService {
         LimitedExpiredObjectList expiredKeyList, OmLifecycleScanState.Builder scanStateBuilder) {
       if (bucketInfo.getBucketLayout() == BucketLayout.LEGACY &&
           key.getKeyName().startsWith(TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX)) {
+        return;
+      }
+      // skip hsync'ed keys that are still open for write
+      if (key.isHsync()) {
         return;
       }
       for (OmLCRule rule : ruleList) {
