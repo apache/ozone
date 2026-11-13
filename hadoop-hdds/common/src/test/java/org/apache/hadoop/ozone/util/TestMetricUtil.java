@@ -21,9 +21,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class TestMetricUtil {
+
+  @AfterEach
+  void resetMiniClusterMode() {
+    DefaultMetricsSystem.setMiniClusterMode(false);
+  }
+
+  @Test
+  void testGetMetricsSourceName() {
+    assertEquals("source", MetricUtil.getMetricsSourceName("source", "id"));
+
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    assertEquals("source-id",
+        MetricUtil.getMetricsSourceName("source", "id"));
+    assertEquals("source",
+        MetricUtil.getMetricsSourceName("source", null));
+    assertEquals("source-service-id",
+        MetricUtil.getMetricsSourceName("source", "service", "id"));
+    assertEquals("source-id",
+        MetricUtil.getMetricsSourceName("source", null, "id"));
+  }
 
   @Test
   void qualifySourceNameDropsNonAlphanumericsFromComponent() {
@@ -33,14 +54,8 @@ class TestMetricUtil {
 
   @Test
   void metricsSourceComponentFollowsMiniClusterMode() {
-    boolean previous = DefaultMetricsSystem.inMiniClusterMode();
-    try {
-      DefaultMetricsSystem.setMiniClusterMode(false);
-      assertNull(MetricUtil.metricsSourceComponent("dn"));
-      DefaultMetricsSystem.setMiniClusterMode(true);
-      assertEquals("dn", MetricUtil.metricsSourceComponent("dn"));
-    } finally {
-      DefaultMetricsSystem.setMiniClusterMode(previous);
-    }
+    assertNull(MetricUtil.metricsSourceComponent("dn"));
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    assertEquals("dn", MetricUtil.metricsSourceComponent("dn"));
   }
 }

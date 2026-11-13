@@ -30,7 +30,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics;
 import org.apache.hadoop.ozone.util.MetricUtil;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -38,7 +38,7 @@ import org.junit.jupiter.api.TestInstance;
  * Test for queue metrics of datanodes.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestDatanodeQueueMetrics implements NonHATests.TestCase {
+public abstract class TestDatanodeQueueMetrics implements ClusterForTests.TestCase {
 
   @Test
   public void testQueueMetrics() {

@@ -40,7 +40,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -51,7 +51,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -80,6 +83,8 @@ public class SCMDeletedBlockTransactionStatusManager {
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
   private final ContainerManager containerManager;
+  // Supplier because BlockManager is created before ReplicationManager.
+  private final Supplier<ContainerReplicaPendingOps> containerReplicaPendingOpsSupplier;
   private final ScmBlockDeletingServiceMetrics metrics;
   private final long scmCommandTimeoutMs;
 
@@ -121,12 +126,14 @@ public class SCMDeletedBlockTransactionStatusManager {
       DeletedBlockLogStateManager deletedBlockLogStateManager,
       Table<String, ByteString> statefulServiceConfigTable,
       ContainerManager containerManager,
+      Supplier<ContainerReplicaPendingOps> containerReplicaPendingOpsSupplier,
       ScmBlockDeletingServiceMetrics metrics, long scmCommandTimeoutMs) throws IOException {
     // maps transaction to dns which have committed it.
     this.deletedBlockLogStateManager = deletedBlockLogStateManager;
     this.statefulConfigTable = statefulServiceConfigTable;
     this.metrics = metrics;
     this.containerManager = containerManager;
+    this.containerReplicaPendingOpsSupplier = containerReplicaPendingOpsSupplier;
     this.scmCommandTimeoutMs = scmCommandTimeoutMs;
     this.transactionToDNsCommitMap = new ConcurrentHashMap<>();
     this.transactionToRetryCountMap = new ConcurrentHashMap<>();
@@ -656,6 +663,20 @@ public class SCMDeletedBlockTransactionStatusManager {
         }
 
         dnsWithCommittedTxn.add(dnId);
+        // A container copy made by ReplicationManager misses this deletion only if it was exported before the source
+        // recorded the deletion: the datanode serializes export and recording under the container lock, and ACKs
+        // only after recording. Such a copy was therefore scheduled before this ACK, so its replica ADD is either
+        // still pending here or already completed. ContainerStateManager registers a replica and clears its pending
+        // ADD under the same container lock, so the pending ADD is checked before the replicas are read: an ADD that
+        // is no longer pending is already in the replica set read below. A copy scheduled after this check is
+        // exported after the deletion was recorded and deletes the blocks without a resend.
+        // Not covered: a copy exported before the deletion was recorded whose pending ADD expired before its replica
+        // registered. SCM does not track per-replica delete progress, so it cannot reconcile such a late replica.
+        if (hasPendingAddReplica(containerId)) {
+          LOG.debug("Deferring purge of txId: {} for container {}: a replica is being added to it.",
+              txID, containerId);
+          continue;
+        }
         final ContainerInfo container =
             containerManager.getContainer(containerId);
         final Set<ContainerReplica> replicas =
@@ -663,20 +684,13 @@ public class SCMDeletedBlockTransactionStatusManager {
         // The delete entry can be safely removed from the log if all the
         // corresponding nodes commit the txn. It is required to check that
         // the nodes returned in the pipeline match the replication factor.
-        if (min(replicas.size(), dnsWithCommittedTxn.size())
-            >= container.getReplicationConfig().getRequiredNodes()) {
-          final List<DatanodeID> containerDns = replicas.stream()
-              .map(ContainerReplica::getDatanodeDetails)
-              .map(DatanodeDetails::getID)
-              .collect(Collectors.toList());
-          if (dnsWithCommittedTxn.containsAll(containerDns)) {
-            transactionToDNsCommitMap.remove(txID);
-            transactionToRetryCountMap.remove(txID);
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Purging txId: {} from block deletion log", txID);
-            }
-            txIDsToBeDeleted.add(txID);
+        if (allReplicasCommitted(container, replicas, dnsWithCommittedTxn)) {
+          transactionToDNsCommitMap.remove(txID);
+          transactionToRetryCountMap.remove(txID);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Purging txId: {} from block deletion log", txID);
           }
+          txIDsToBeDeleted.add(txID);
         }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Datanode txId: {} ContainerId: {} committed by Datanode: {}",
@@ -694,6 +708,37 @@ public class SCMDeletedBlockTransactionStatusManager {
       LOG.warn("Could not commit delete block transactions: "
           + txIDsToBeDeleted, e);
     }
+  }
+
+  private boolean hasPendingAddReplica(ContainerID containerId) {
+    return containerReplicaPendingOpsSupplier.get().getPendingOps(containerId).stream()
+        .anyMatch(op -> op.getOpType() == ContainerReplicaOp.PendingOpType.ADD);
+  }
+
+  /**
+   * Whether a transaction whose purge {@link #commitTransactions} deferred can be purged without another ACK:
+   * no replica ADD is in flight and every current replica has already committed it. A deferral caused only by
+   * an in-flight copy that later fails or expires is otherwise never retried, since no replica is left to ACK
+   * a resend and the entry would stay in {@link #transactionToDNsCommitMap} indefinitely.
+   */
+  boolean isPurgeableWithoutAck(long txID, ContainerID containerId) {
+    final Set<DatanodeID> committedDns = transactionToDNsCommitMap.get(txID);
+    if (committedDns == null || committedDns.isEmpty() || hasPendingAddReplica(containerId)) {
+      return false;
+    }
+    try {
+      // Read after the pending ADD check: an earlier read can miss a replica whose ADD completed in between.
+      final Set<ContainerReplica> replicas = containerManager.getContainerReplicas(containerId);
+      return allReplicasCommitted(containerManager.getContainer(containerId), replicas, committedDns);
+    } catch (ContainerNotFoundException e) {
+      return false;
+    }
+  }
+
+  private static boolean allReplicasCommitted(ContainerInfo container, Set<ContainerReplica> replicas,
+      Set<DatanodeID> committedDns) {
+    return min(replicas.size(), committedDns.size()) >= container.getReplicationConfig().getRequiredNodes()
+        && replicas.stream().map(r -> r.getDatanodeDetails().getID()).allMatch(committedDns::contains);
   }
 
   public DeletedBlocksTransactionSummary getSummary() {

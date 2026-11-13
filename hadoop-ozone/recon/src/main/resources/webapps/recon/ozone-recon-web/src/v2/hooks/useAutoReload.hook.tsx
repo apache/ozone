@@ -71,11 +71,13 @@ export function useAutoReload(
     }
   };
 
-  // Initialize polling on mount if auto-reload is enabled
+  // Load on mount and initialize polling if auto-reload is enabled
   useEffect(() => {
     const autoReloadEnabled = sessionStorage.getItem('autoReloadEnabled') !== 'false';
     if (autoReloadEnabled) {
       startPolling();
+    } else {
+      refreshFunctionRef.current();
     }
 
     return () => {

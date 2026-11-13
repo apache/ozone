@@ -68,9 +68,11 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.server.StartupProgress;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.DatanodeStartupPhase;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.DatanodeStorage;
@@ -164,6 +166,7 @@ public class OzoneContainer {
   private final ContainerMetrics metrics;
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
   private final DatanodeStorageMetrics datanodeStorageMetrics;
+  private final StartupProgress<DatanodeStartupPhase> startupProgress;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED, FAILED
@@ -188,6 +191,8 @@ public class OzoneContainer {
     this.datanodeDetails = datanodeDetails;
     this.context = context;
     this.metricsSourceComponent = MetricUtil.metricsSourceComponent(datanodeDetails.getUuidString());
+    this.startupProgress = hddsDatanodeService != null && hddsDatanodeService.getStartupProgress() != null
+        ? hddsDatanodeService.getStartupProgress() : new StartupProgress<>(DatanodeStartupPhase.class);
     this.volumeChecker = new StorageVolumeChecker(conf, new Timer(),
         datanodeDetails.threadNamePrefix(), metricsSourceComponent);
 
@@ -357,6 +362,10 @@ public class OzoneContainer {
     this(null, datanodeDetails, conf, context, null, null, volumeChoosingPolicy);
   }
 
+  public StartupProgress<DatanodeStartupPhase> getStartupProgress() {
+    return startupProgress;
+  }
+
   public GrpcTlsConfig getTlsClientConfig() {
     return tlsClientConfig;
   }
@@ -382,8 +391,10 @@ public class OzoneContainer {
         .build();
     while (volumeSetIterator.hasNext()) {
       StorageVolume volume = volumeSetIterator.next();
-      ContainerReader containerReader = new ContainerReader(volumeSet,
-          (HddsVolume) volume, containerSet, config, true);
+      HddsVolume hddsVolume = (HddsVolume) volume;
+      StartupProgress.Step step = startupProgress.addStep(DatanodeStartupPhase.LOADING_CONTAINERS,
+          hddsVolume.getHddsRootDir().getPath());
+      ContainerReader containerReader = new ContainerReader(volumeSet, hddsVolume, containerSet, config, true, step);
       Thread thread = threadFactory.newThread(containerReader);
       thread.start();
       volumeThreads.add(thread);
@@ -520,19 +531,22 @@ public class OzoneContainer {
    * Stop the scanner thread and wait for thread to die.
    */
   private void stopContainerScrub() {
-    if (metadataScanner == null) {
-      return;
+    if (metadataScanner != null) {
+      metadataScanner.shutdown();
+      metadataScanner = null;
     }
-    metadataScanner.shutdown();
-    metadataScanner = null;
 
-    if (dataScanners == null) {
-      return;
+    if (dataScanners != null) {
+      for (BackgroundContainerDataScanner s : dataScanners) {
+        s.shutdown();
+      }
+      dataScanners = null;
     }
-    for (BackgroundContainerDataScanner s : dataScanners) {
-      s.shutdown();
+
+    if (onDemandScanner != null) {
+      onDemandScanner.shutdown();
+      onDemandScanner = null;
     }
-    onDemandScanner.shutdown();
   }
 
   @VisibleForTesting
@@ -647,12 +661,14 @@ public class OzoneContainer {
   }
 
   private void initializeContainerServices(String clusterId) throws IOException {
+    startupProgress.beginPhase(DatanodeStartupPhase.LOADING_CONTAINERS);
     DatanodeStorage layoutStorage
         = new DatanodeStorage(config);
     layoutStorage.setClusterId(clusterId);
     layoutStorage.persistCurrentState();
 
     buildContainerSet();
+    startupProgress.beginPhase(DatanodeStartupPhase.CHECKING_VOLUMES);
 
     // Start background volume checks, which will begin after the configured
     // delay.
@@ -668,6 +684,7 @@ public class OzoneContainer {
       dbVolumeSet.checkAllVolumes();
       dbVolumeSet.startAllVolume();
     }
+    startupProgress.beginPhase(DatanodeStartupPhase.STARTING_SERVICES);
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -689,6 +706,7 @@ public class OzoneContainer {
     recoveringContainerScrubbingService.start();
 
     initHddsVolumeContainer();
+    startupProgress.endPhase(DatanodeStartupPhase.STARTING_SERVICES);
   }
 
   /**

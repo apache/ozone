@@ -22,8 +22,8 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2M
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadQueueWaitingTaskCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.SERVER_NAME;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyString;
@@ -81,53 +81,41 @@ public class TestHttpServer2Metrics {
     // get metrics
     HttpServer2Metrics server2Metrics =
         HttpServer2Metrics.create(threadPool, name);
-    try {
-      server2Metrics.getMetrics(metricsCollector, true);
+    server2Metrics.getMetrics(metricsCollector, true);
 
-      verify(recorder).tag(SERVER_NAME, name);
-      verify(metricsCollector).addRecord(HttpServer2Metrics.SOURCE_NAME);
-      verify(recorder).addGauge(HttpServerThreadCount, threadCount);
-      verify(recorder).addGauge(HttpServerMaxThreadCount, maxThreadCount);
-      verify(recorder).addGauge(HttpServerIdleThreadCount, idleThreadCount);
-      verify(recorder).addGauge(HttpServerThreadQueueWaitingTaskCount, threadQueueWaitingTaskCount);
-    } finally {
-      server2Metrics.unRegister();
-    }
-  }
-
-  /**
-   * All datanodes of a same-JVM cluster name their HTTP server the same, so a second create() with that component
-   * takes a counter suffix, deterministic in start order.
-   */
-  @Test
-  public void testDuplicateComponentsGetDistinctSourceNames() {
-    QueuedThreadPool firstPool = mock(QueuedThreadPool.class);
-    QueuedThreadPool secondPool = mock(QueuedThreadPool.class);
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-
-    HttpServer2Metrics firstMetrics = HttpServer2Metrics.create(firstPool, "hddsDatanode", "hddsDatanode");
-    try {
-      HttpServer2Metrics secondMetrics = HttpServer2Metrics.create(secondPool, "hddsDatanode", "hddsDatanode");
-      try {
-        assertNotNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode"));
-        assertNotNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode1"));
-      } finally {
-        secondMetrics.unRegister();
-      }
-      assertNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode1"));
-    } finally {
-      firstMetrics.unRegister();
-    }
-    assertNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode"));
+    // verify
+    verify(recorder).tag(SERVER_NAME, name);
+    verify(metricsCollector).addRecord(HttpServer2Metrics.SOURCE_NAME);
+    verify(recorder).addGauge(HttpServerThreadCount, threadCount);
+    verify(recorder).addGauge(HttpServerMaxThreadCount, maxThreadCount);
+    verify(recorder).addGauge(HttpServerIdleThreadCount, idleThreadCount);
+    verify(recorder).addGauge(HttpServerThreadQueueWaitingTaskCount,
+        threadQueueWaitingTaskCount);
   }
 
   @Test
-  public void testNullComponentKeepsStandaloneSourceName() {
-    HttpServer2Metrics metrics = HttpServer2Metrics.create(threadPool, "s3g", null);
+  void testUnregisterWithMultipleMetricsSourceIds() {
+    MetricsSystem metricsSystem = DefaultMetricsSystem.initialize("TestHttpServer2Metrics");
+    String firstName = HttpServer2Metrics.NAME + "-service1";
+    String secondName = HttpServer2Metrics.NAME + "-service2";
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
     try {
-      assertNotNull(DefaultMetricsSystem.instance().getSource(HttpServer2Metrics.SOURCE_NAME));
+      HttpServer2Metrics first = HttpServer2Metrics.create(mock(QueuedThreadPool.class), "server", "service1");
+      HttpServer2Metrics second = HttpServer2Metrics.create(mock(QueuedThreadPool.class), "server", "service2");
+      assertSame(first, metricsSystem.getSource(firstName));
+      assertSame(second, metricsSystem.getSource(secondName));
+
+      second.unRegister();
+      assertNull(metricsSystem.getSource(secondName));
+      assertSame(first, metricsSystem.getSource(firstName));
+      first.unRegister();
+      assertNull(metricsSystem.getSource(firstName));
     } finally {
-      metrics.unRegister();
+      metricsSystem.unregisterSource(firstName);
+      metricsSystem.unregisterSource(secondName);
+      DefaultMetricsSystem.shutdown();
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
     }
   }
 }

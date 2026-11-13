@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot.diff;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
@@ -143,40 +145,21 @@ public final class SnapDiffDependencyGraph {
     // Work on a local copy of the in-degrees so the method is idempotent and
     // does not mutate the graph's shared state.
     int[] remainingInDegree = Arrays.copyOf(inDegree, nodeCount);
-    // Split the ready set into two ring buffers so that, among nodes whose
-    // dependencies are already satisfied, DELETEs are emitted before other
-    // types. This retains the baseline "deletes first" ordering wherever the
-    // dependency edges leave the order free. Each node is enqueued at most
-    // once, so buffers sized to the node count are large enough.
-    int[] deleteReady = new int[nodeCount];
-    int[] otherReady = new int[nodeCount];
-    int deleteHead = 0;
-    int deleteTail = 0;
-    int otherHead = 0;
-    int otherTail = 0;
+    Queue<Integer> ready = new ArrayDeque<>();
     for (int nodeId = 0; nodeId < nodeCount; nodeId++) {
       if (remainingInDegree[nodeId] == 0) {
-        if (nodes.get(nodeId).isDelete()) {
-          deleteReady[deleteTail++] = nodeId;
-        } else {
-          otherReady[otherTail++] = nodeId;
-        }
+        ready.add(nodeId);
       }
     }
 
     List<Integer> orderedNodeIds = new ArrayList<>(nodeCount);
-    while (deleteHead < deleteTail || otherHead < otherTail) {
-      int nodeId = deleteHead < deleteTail
-          ? deleteReady[deleteHead++] : otherReady[otherHead++];
+    Integer nodeId;
+    while ((nodeId = ready.poll()) != null) {
       orderedNodeIds.add(nodeId);
       for (int i = adjOffsets[nodeId]; i < adjOffsets[nodeId + 1]; i++) {
         int dependentNodeId = adjTargets[i];
         if (--remainingInDegree[dependentNodeId] == 0) {
-          if (nodes.get(dependentNodeId).isDelete()) {
-            deleteReady[deleteTail++] = dependentNodeId;
-          } else {
-            otherReady[otherTail++] = dependentNodeId;
-          }
+          ready.add(dependentNodeId);
         }
       }
     }

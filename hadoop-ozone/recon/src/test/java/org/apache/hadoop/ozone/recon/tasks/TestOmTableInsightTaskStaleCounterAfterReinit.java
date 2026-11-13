@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -81,7 +83,9 @@ public class TestOmTableInsightTaskStaleCounterAfterReinit extends AbstractRecon
   private Path temporaryFolder;
 
   private ReconGlobalStatsManager reconGlobalStatsManager;
+  private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconDBProvider reconContainerDbProvider;
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
 
@@ -94,9 +98,9 @@ public class TestOmTableInsightTaskStaleCounterAfterReinit extends AbstractRecon
   @BeforeEach
   public void setUp() throws IOException {
     // initializeNewOmMetadataManager already writes 1 volume ("sampleVol") to the OM DB.
-    reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(
-            Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    omMetadataManager = initializeNewOmMetadataManager(
+        Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("ReconDir")).toFile());
 
     ReconTestInjector reconTestInjector =
@@ -106,6 +110,8 @@ public class TestOmTableInsightTaskStaleCounterAfterReinit extends AbstractRecon
             .withContainerDB()
             .build();
     reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
+    // Already provisioned as a singleton dependency of ReconGlobalStatsManager.
+    reconContainerDbProvider = reconTestInjector.getInstance(ReconDBProvider.class);
 
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
@@ -128,6 +134,22 @@ public class TestOmTableInsightTaskStaleCounterAfterReinit extends AbstractRecon
         mock(ReconGlobalStatsManager.class),
         mock(ReconFileMetadataManager.class));
     reconTaskController.start();
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconTaskController != null) {
+      reconTaskController.stop();
+    }
+    if (reconContainerDbProvider != null) {
+      reconContainerDbProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   /**

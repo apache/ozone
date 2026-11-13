@@ -607,6 +607,10 @@ public final class OMMetrics implements OmMetadataReaderMetrics {
     numListMultipartUploadParts.incr();
   }
 
+  public void setNumTenants(long num) {
+    numTenants.set(num);
+  }
+
   public void incNumTenants() {
     numTenants.incr();
   }

@@ -159,8 +159,7 @@ public class ContainerImporter {
         spaceToReserve);
   }
 
-  public static Path getUntarDirectory(HddsVolume hddsVolume)
-      throws IOException {
+  public static Path getUntarDirectory(HddsVolume hddsVolume) {
     return Paths.get(hddsVolume.getVolumeRootDir())
         .resolve(CONTAINER_COPY_TMP_DIR).resolve(CONTAINER_COPY_DIR);
   }

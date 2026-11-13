@@ -146,4 +146,23 @@ public final class MetricUtil {
       }
     }
   }
+
+  /**
+   * Returns a source name that is unique for a service in a mini cluster.
+   */
+  public static String getMetricsSourceName(String sourceName, String id) {
+    return DefaultMetricsSystem.inMiniClusterMode() && id != null
+        ? sourceName + '-' + id : sourceName;
+  }
+
+  /**
+   * Returns a source name that is unique for a service instance in a mini
+   * cluster.
+   */
+  public static String getMetricsSourceName(String sourceName,
+      String serviceId, String id) {
+    String metricsId = serviceId == null || serviceId.isEmpty()
+        ? id : serviceId + '-' + id;
+    return getMetricsSourceName(sourceName, metricsId);
+  }
 }

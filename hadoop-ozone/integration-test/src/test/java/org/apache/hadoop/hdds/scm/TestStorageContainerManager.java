@@ -22,10 +22,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
-import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
+import static org.apache.ozone.test.HddsWhiteboxTestUtils.setInternalState;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -112,7 +112,6 @@ import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -266,7 +265,7 @@ public class TestStorageContainerManager {
         .getScmBlockManager().getDeletedBlockLog();
     assertEquals(0, delLog.getNumOfValidTransactions());
 
-    Map<String, OmKeyInfo> keyLocations = DataTestUtil.createKeys(cluster, KEY_COUNT);
+    Map<String, OmKeyInfo> keyLocations = OzoneTestUtils.createKeys(cluster, KEY_COUNT);
     // Wait for container report
     Thread.sleep(1000);
     for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -439,7 +438,7 @@ public class TestStorageContainerManager {
           .getScmBlockManager().getSCMBlockDeletingService();
       delService.setBlockDeleteTXNum(limitSize);
 
-      Map<String, OmKeyInfo> keyLocations = DataTestUtil.createKeys(cluster, numKeys);
+      Map<String, OmKeyInfo> keyLocations = OzoneTestUtils.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(5000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -697,7 +696,7 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-      OmKeyInfo key = DataTestUtil.createKeys(cluster, 10)
+      OmKeyInfo key = OzoneTestUtils.createKeys(cluster, 10)
           .values().iterator().next();
       long containerID = key.getLatestVersionLocations()
           .createLocationList().get(0).getContainerID();

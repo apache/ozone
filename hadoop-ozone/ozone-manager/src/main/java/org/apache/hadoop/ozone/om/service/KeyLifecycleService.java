@@ -20,24 +20,9 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -58,6 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -120,10 +106,12 @@ public class KeyLifecycleService extends BackgroundService {
       LoggerFactory.getLogger(KeyLifecycleService.class);
 
   private final OzoneManager ozoneManager;
-  private int keyDeleteBatchSize;
-  private int mpuAbortLimitPerTask;
-  private long cachedDirMaxCount;
+  private volatile int keyDeleteBatchSize;
+  private volatile int mpuAbortLimitPerTask;
+  private volatile long cachedDirMaxCount;
   private final AtomicBoolean suspended;
+  // Set while the service is being restarted to apply a new interval, so that running tasks stop early.
+  private final AtomicBoolean restarting = new AtomicBoolean(false);
   private final AtomicBoolean isServiceEnabled;
   private final AtomicBoolean moveToTrashEnabled;
   private KeyLifecycleServiceMetrics metrics;
@@ -131,8 +119,8 @@ public class KeyLifecycleService extends BackgroundService {
   private final ConcurrentHashMap<String, LifecycleActionTask> inFlight;
   private OMMetadataManager omMetadataManager;
   private int ratisByteLimit;
-  private long stateSaveIntervalMs;
-  private long maxKeysProcessedPerState;
+  private volatile long stateSaveIntervalMs;
+  private volatile long maxKeysProcessedPerState;
   private ClientId clientId = ClientId.randomId();
   private AtomicLong callId = new AtomicLong(0);
   private OzoneTrash ozoneTrash;
@@ -140,45 +128,20 @@ public class KeyLifecycleService extends BackgroundService {
   private static boolean test = false;
   private static List<RuleListWithDirectoryList> consolidatedRuleList;
 
-  public KeyLifecycleService(OzoneManager ozoneManager,
-                             KeyManager manager, long serviceInterval,
-                             long serviceTimeout, int poolSize,
-                             ConfigurationSource conf) {
-    super(KeyLifecycleService.class.getSimpleName(), serviceInterval, TimeUnit.MILLISECONDS,
-        poolSize, serviceTimeout, ozoneManager.getThreadNamePrefix());
+  public KeyLifecycleService(OzoneManager ozoneManager, KeyManager manager, KeyLifecycleServiceConfig lifecycleConfig,
+      ConfigurationSource conf) {
+    super(KeyLifecycleService.class.getSimpleName(), lifecycleConfig.getIntervalMs(), TimeUnit.MILLISECONDS,
+        lifecycleConfig.getWorkers(), lifecycleConfig.getTimeoutMs(), ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
-    this.keyDeleteBatchSize = conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
-        OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT);
-    Preconditions.checkArgument(keyDeleteBatchSize > 0,
-        OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " should be a positive value.");
-    this.mpuAbortLimitPerTask = conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK,
-        OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT);
-    Preconditions.checkArgument(mpuAbortLimitPerTask > 0,
-        OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK + " should be a positive value.");
-    this.cachedDirMaxCount = conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT,
-        OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT);
+    this.keyDeleteBatchSize = lifecycleConfig.getDeleteBatchSize();
+    this.mpuAbortLimitPerTask = lifecycleConfig.getMpuAbortLimitPerTask();
+    this.cachedDirMaxCount = lifecycleConfig.getCachedDirMaxCount();
     this.suspended = new AtomicBoolean(false);
     this.metrics = KeyLifecycleServiceMetrics.create();
-    this.isServiceEnabled = new AtomicBoolean(conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
-        OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT));
-    this.moveToTrashEnabled = new AtomicBoolean(conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED,
-        OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT));
-    this.stateSaveIntervalMs = conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS,
-        OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT);
-    if (!test && stateSaveIntervalMs <= 0) {
-      LOG.warn("Illegal value {} for Property {}. Set {} to {}", stateSaveIntervalMs,
-          OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS, OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS,
-          OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT);
-      stateSaveIntervalMs = OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT;
-    }
-    this.maxKeysProcessedPerState = conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED,
-        OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT);
-    if (!test && maxKeysProcessedPerState <= 0) {
-      LOG.warn("Illegal value {} for Property {}. Set {} to {}", maxKeysProcessedPerState,
-          OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED, OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED,
-          OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT);
-      maxKeysProcessedPerState = OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT;
-    }
+    this.isServiceEnabled = new AtomicBoolean(lifecycleConfig.isEnabled());
+    this.moveToTrashEnabled = new AtomicBoolean(lifecycleConfig.isMoveToTrashEnabled());
+    this.stateSaveIntervalMs = lifecycleConfig.getStateSaveIntervalMs();
+    this.maxKeysProcessedPerState = lifecycleConfig.getMaxKeysProcessedPerState();
     LOG.info("stateSaveIntervalMs = {}, maxKeysProcessedPerState = {}", stateSaveIntervalMs, maxKeysProcessedPerState);
     this.inFlight = new ConcurrentHashMap();
     this.omMetadataManager = ozoneManager.getMetadataManager();
@@ -237,7 +200,54 @@ public class KeyLifecycleService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
-    return isServiceEnabled.get() && !suspended.get() && getOzoneManager().isLeaderReady();
+    return isServiceEnabled.get() && !suspended.get() && !restarting.get() && getOzoneManager().isLeaderReady();
+  }
+
+  /**
+   * Apply the values of the given {@link KeyLifecycleServiceConfig} at once without restarting OM.
+   * All changes except the interval take effect immediately, running tasks pick them up on their next batch scan.
+   * A new interval, or enabling a disabled service, restarts the service, running tasks stop at their next
+   * checkpoint and resume from the saved scan state in the next run.
+   * @param lifecycleConfig validated configuration holding the new values
+   */
+  public void reconfigure(KeyLifecycleServiceConfig lifecycleConfig) {
+    keyDeleteBatchSize = lifecycleConfig.getDeleteBatchSize();
+    mpuAbortLimitPerTask = lifecycleConfig.getMpuAbortLimitPerTask();
+    cachedDirMaxCount = lifecycleConfig.getCachedDirMaxCount();
+    stateSaveIntervalMs = lifecycleConfig.getStateSaveIntervalMs();
+    maxKeysProcessedPerState = lifecycleConfig.getMaxKeysProcessedPerState();
+    moveToTrashEnabled.set(lifecycleConfig.isMoveToTrashEnabled());
+    setServiceTimeoutInNanos(TimeUnit.MILLISECONDS.toNanos(lifecycleConfig.getTimeoutMs()));
+    setPoolSize(lifecycleConfig.getWorkers());
+    boolean enabled = lifecycleConfig.isEnabled();
+    boolean wasEnabled = isServiceEnabled.getAndSet(enabled);
+    long intervalMs = lifecycleConfig.getIntervalMs();
+    LOG.info("Reconfigured KeyLifecycleService: enabled = {}, interval = {} ms, timeout = {} ms, workers = {}, " +
+            "deleteBatchSize = {}, mpuAbortLimitPerTask = {}, cachedDirMaxCount = {}, stateSaveIntervalMs = {}, " +
+            "maxKeysProcessedPerState = {}, moveToTrashEnabled = {}", enabled, intervalMs,
+        lifecycleConfig.getTimeoutMs(), lifecycleConfig.getWorkers(), keyDeleteBatchSize, mpuAbortLimitPerTask,
+        cachedDirMaxCount, stateSaveIntervalMs, maxKeysProcessedPerState, moveToTrashEnabled.get());
+    if (intervalMs != getIntervalMillis() || (enabled && !wasEnabled)) {
+      restart(intervalMs);
+    }
+  }
+
+  private void restart(long newIntervalMs) {
+    LOG.info("Restarting KeyLifecycleService with interval {} ms", newIntervalMs);
+    // Running and queued tasks check shouldRun() and stop early, which lets the executor drain
+    // instead of being force-terminated with tasks left in inFlight.
+    restarting.set(true);
+    try {
+      // shutdown() awaits the executor; do not hold this monitor (same object as
+      // BackgroundService.PeriodicalTask) or the pool thread can deadlock.
+      super.shutdown();
+    } finally {
+      restarting.set(false);
+    }
+    synchronized (this) {
+      setInterval(newIntervalMs, TimeUnit.MILLISECONDS);
+      start();
+    }
   }
 
   public KeyLifecycleServiceMetrics getMetrics() {
@@ -678,8 +688,8 @@ public class KeyLifecycleService extends BackgroundService {
       while (!stack.isEmpty()) {
         if (!shouldRun()) {
           scanAborted = true;
-          LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
-              bucketName);
+          LOG.info("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart. " +
+              "Stopping task for bucket {}.", bucketName);
           return;
         }
 
@@ -760,30 +770,25 @@ public class KeyLifecycleService extends BackgroundService {
 
         if (item.isFirstEvaluate()) {
           // filter sub directory list
-          if (!subDirSummary.getSubDirList().isEmpty()) {
-            Iterator<OmDirectoryInfo> iterator = subDirSummary.getSubDirList().iterator();
-            while (iterator.hasNext()) {
-              OmDirectoryInfo subDir = iterator.next();
-              String subDirPath = currentDirPath.isEmpty() ? subDir.getName() :
-                  currentDirPath + OM_KEY_PREFIX + subDir.getName();
+          if (!subDirSummary.isEmpty()) {
+            subDirSummary.removeIf(i -> {
+              OmDirectoryInfo subDir = subDirSummary.getSubDirList().get(i);
+              String subDirPath = currentDirPath.isEmpty() ? subDir.getName()
+                  : currentDirPath + OM_KEY_PREFIX + subDir.getName();
               if (subDirPath.startsWith(TRASH_PREFIX)) {
-                iterator.remove();
-                continue;
+                return true;
               }
-              boolean matched = false;
               for (OmLCRule rule : ruleList) {
-                if (rule.getEffectivePrefix() != null && subDirPath.startsWith(rule.getEffectivePrefix())) {
-                  matched = true;
-                  break;
+                if (rule.getEffectivePrefix() != null
+                    && subDirPath.startsWith(rule.getEffectivePrefix())) {
+                  return false;
                 }
               }
-              if (!matched) {
-                iterator.remove();
-              }
-            }
+              return true;
+            });
           }
 
-          if (!subDirSummary.getSubDirList().isEmpty()) {
+          if (!subDirSummary.isEmpty()) {
             item.setDirectoryList(subDirSummary);
             item.setFirstEvaluate(false);
             try {
@@ -840,6 +845,10 @@ public class KeyLifecycleService extends BackgroundService {
             keySetInCache.add(entry.getKey().getCacheKey());
             String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
                 currentDirPath + OM_KEY_PREFIX + key.getKeyName();
+            // skip hsync'ed keys that are still open for write
+            if (key.isHsync()) {
+              continue;
+            }
             for (OmLCRule rule : ruleList) {
               if (rule.match(key, keyPath)) {
                 // mark key as expired, check next key
@@ -882,8 +891,13 @@ public class KeyLifecycleService extends BackgroundService {
             }
             numKeyIterated++;
             numKeysUnderDir++;
+            // skip if not directory's child or a hsync object
+            if (key.getParentObjectID() != currentDirObjID || key.isHsync()) {
+              lastScannedKey = keyValue.getKey();
+              continue;
+            }
             for (OmLCRule rule : ruleList) {
-              if (key.getParentObjectID() == currentDirObjID && rule.match(key, keyPath)) {
+              if (rule.match(key, keyPath)) {
                 // mark key as expired, check next key
                 if (keyList.isFull()) {
                   // if keyList is full, send delete request for pending deletion keys
@@ -954,6 +968,7 @@ public class KeyLifecycleService extends BackgroundService {
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
           cacheIter = dirTable.cacheIterator();
       HashSet<String> deletedDirSet = new HashSet();
+      HashSet<String> dirSet = new HashSet();
       while (cacheIter.hasNext()) {
         Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
             cacheIter.next();
@@ -964,6 +979,7 @@ public class KeyLifecycleService extends BackgroundService {
           continue;
         }
         if (cacheOmDirInfo.getParentObjectID() == dirObjID) {
+          dirSet.add(entry.getKey().getCacheKey());
           subDirList.addSubDir(entry.getKey().getCacheKey(), cacheOmDirInfo, cacheOmDirInfo.getName());
         }
       }
@@ -975,13 +991,19 @@ public class KeyLifecycleService extends BackgroundService {
           numDirIterated++;
           Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
           OmDirectoryInfo dir = entry.getValue();
-          if (deletedDirSet.contains(entry.getKey())) {
+          if (deletedDirSet.contains(entry.getKey()) || dirSet.contains(entry.getKey())) {
             continue;
           }
           if (dir.getParentObjectID() == dirObjID) {
             subDirList.addSubDir(entry.getKey(), dir, dir.getName());
           }
         }
+      }
+      // Cache children (hash order) and table children (ascending) are appended in that order; sort
+      // by name so the DFS stack pops siblings in strictly descending name order, which canSkipDir
+      // relies on to decide a resumed directory was already scanned.
+      if (!dirSet.isEmpty()) {
+        subDirList.sortByName();
       }
       return subDirList;
     }
@@ -1029,8 +1051,8 @@ public class KeyLifecycleService extends BackgroundService {
         while (keyTblItr.hasNext()) {
           if (!shouldRun()) {
             scanAborted = true;
-            LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
-                bucketName);
+            LOG.info("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart. " +
+                "Stopping task for bucket {}.", bucketName);
             return;
           }
           if (shouldSaveState()) {
@@ -1054,6 +1076,10 @@ public class KeyLifecycleService extends BackgroundService {
         LimitedExpiredObjectList expiredKeyList, OmLifecycleScanState.Builder scanStateBuilder) {
       if (bucketInfo.getBucketLayout() == BucketLayout.LEGACY &&
           key.getKeyName().startsWith(TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX)) {
+        return;
+      }
+      // skip hsync'ed keys that are still open for write
+      if (key.isHsync()) {
         return;
       }
       for (OmLCRule rule : ruleList) {
@@ -1095,8 +1121,8 @@ public class KeyLifecycleService extends BackgroundService {
         while (mpuIterator.hasNext()) {
           if (!shouldRun()) {
             scanAborted = true;
-            LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
-                bucketName);
+            LOG.info("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart. " +
+                "Stopping task for bucket {}.", bucketName);
             return;
           }
           Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
@@ -1999,6 +2025,48 @@ public class KeyLifecycleService extends BackgroundService {
       subDirList.add(dir);
       subDirKeyPathList.add(dirPath);
       subDirCount++;
+    }
+
+    /** Removes the entry at {@code index} from all parallel lists. */
+    void removeAt(int index) {
+      subDirList.remove(index);
+      subDirKeyList.remove(index);
+      subDirKeyPathList.remove(index);
+      subDirCount--;
+    }
+
+    /** Removes the entry if shouldRemoveIndex returns true. */
+    void removeIf(IntPredicate shouldRemoveIndex) {
+      for (int i = subDirCount - 1; i >= 0; i--) {
+        if (shouldRemoveIndex.test(i)) {
+          removeAt(i);
+        }
+      }
+    }
+
+    public void sortByName() {
+      if (subDirCount <= 1) {
+        return;
+      }
+      List<Integer> order = new ArrayList<>(subDirCount);
+      for (int i = 0; i < subDirCount; i++) {
+        order.add(i);
+      }
+      order.sort(Comparator.comparing((Integer idx) -> subDirList.get(idx).getName()));
+      List<OmDirectoryInfo> sortedDirs = new ArrayList<>(subDirCount);
+      List<String> sortedKeys = new ArrayList<>(subDirCount);
+      List<String> sortedPaths = new ArrayList<>(subDirCount);
+      for (int idx : order) {
+        sortedDirs.add(subDirList.get(idx));
+        sortedKeys.add(subDirKeyList.get(idx));
+        sortedPaths.add(subDirKeyPathList.get(idx));
+      }
+      subDirList.clear();
+      subDirList.addAll(sortedDirs);
+      subDirKeyList.clear();
+      subDirKeyList.addAll(sortedKeys);
+      subDirKeyPathList.clear();
+      subDirKeyPathList.addAll(sortedPaths);
     }
 
     public OmDirectoryInfo getLastSubDir() {

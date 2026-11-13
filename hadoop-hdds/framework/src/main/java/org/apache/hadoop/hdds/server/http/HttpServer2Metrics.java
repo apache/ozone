@@ -35,41 +35,35 @@ public final class HttpServer2Metrics implements MetricsSource {
 
   public static final String SOURCE_NAME = HttpServer2Metrics.class.getSimpleName();
 
+  public static final String NAME = HttpServer2Metrics.class.getSimpleName();
+
   private final QueuedThreadPool threadPool;
   private final String name;
   private final String sourceName;
 
-  private HttpServer2Metrics(QueuedThreadPool threadPool, String name, String sourceName) {
+  private HttpServer2Metrics(QueuedThreadPool threadPool, String name,
+      String sourceId) {
     this.threadPool = threadPool;
     this.name = name;
-    this.sourceName = sourceName;
+    this.sourceName = MetricUtil.getMetricsSourceName(NAME, sourceId);
   }
 
   public static HttpServer2Metrics create(
       QueuedThreadPool threadPool, String name) {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "HttpServer2 Metrics", new HttpServer2Metrics(threadPool, name, SOURCE_NAME));
+    return create(threadPool, name, name);
   }
 
-  public static HttpServer2Metrics create(QueuedThreadPool threadPool, String name, String component) {
-    if (component == null) {
-      return create(threadPool, name);
-    }
+  public static HttpServer2Metrics create(QueuedThreadPool threadPool,
+      String name, String sourceId) {
+    HttpServer2Metrics metrics =
+        new HttpServer2Metrics(threadPool, name, sourceId);
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    // Several servers of one service share a component (the datanodes of ozone local all name
-    // their HTTP server the same), which DefaultMetricsSystem would reject as a duplicate source.
-    // Start order makes the suffix deterministic.
-    String base = MetricUtil.qualifySourceName(SOURCE_NAME, component);
-    String sourceName = base;
-    for (int i = 1; ms.getSource(sourceName) != null; i++) {
-      sourceName = base + i;
-    }
-    return ms.register(sourceName, "HttpServer2 Metrics", new HttpServer2Metrics(threadPool, name, sourceName));
+    return ms.register(metrics.sourceName, "HttpServer2 Metrics", metrics);
   }
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder recordBuilder = collector.addRecord(sourceName)
+    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME)
         .setContext("HttpServer2")
         .tag(HttpServer2MetricsInfo.SERVER_NAME, name);
 

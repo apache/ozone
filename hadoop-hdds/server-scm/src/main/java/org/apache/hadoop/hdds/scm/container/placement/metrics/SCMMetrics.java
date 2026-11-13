@@ -40,6 +40,7 @@ public final class SCMMetrics {
 
   private final LinkedList<String> ratisEvents = new LinkedList<>();
   private final int maxRatisEvents;
+  private final String sourceName;
 
   /**
    * Container stat metrics, the meaning of following metrics
@@ -67,23 +68,25 @@ public final class SCMMetrics {
     return dbCheckpointMetrics;
   }
 
-  private SCMMetrics(int maxRatisEvents, String metricsSourceComponent) {
-    dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics", metricsSourceComponent);
+  private SCMMetrics(String sourceName, int maxRatisEvents) {
+    this.sourceName = sourceName;
+    dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics", MetricUtil.metricsSourceComponent("SCM"));
     this.maxRatisEvents = maxRatisEvents;
   }
 
-  public static SCMMetrics create() {
-    return create(null);
+  public static SCMMetrics create(String scmId) {
+    return create(scmId, null);
   }
 
-  public static SCMMetrics create(ConfigurationSource conf) {
+  public static SCMMetrics create(String scmId, ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     int maxRatisEvents = conf == null
         ? ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
         : conf.getInt(ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
-    return ms.register(SOURCE_NAME, "Storage Container Manager Metrics",
-        new SCMMetrics(maxRatisEvents, MetricUtil.metricsSourceComponent("SCM")));
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, scmId);
+    return ms.register(sourceName, "Storage Container Manager Metrics",
+        new SCMMetrics(sourceName, maxRatisEvents));
   }
 
   public void setLastContainerReportSize(long size) {
@@ -195,6 +198,6 @@ public final class SCMMetrics {
       dbCheckpointMetrics.unRegister();
     }
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 }

@@ -34,31 +34,36 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics source to report number of containers in different states.
  */
 @InterfaceAudience.Private
 @Metrics(about = "SCM Container Manager Metrics", context = OzoneConsts.OZONE)
-public class SCMContainerMetrics implements MetricsSource {
+public final class SCMContainerMetrics implements MetricsSource {
 
   private final SCMMXBean scmmxBean;
   private static final String SOURCE =
       SCMContainerMetrics.class.getSimpleName();
 
-  public SCMContainerMetrics(SCMMXBean scmmxBean) {
+  private final String sourceName;
+
+  SCMContainerMetrics(String sourceName, SCMMXBean scmmxBean) {
+    this.sourceName = sourceName;
     this.scmmxBean = scmmxBean;
   }
 
-  public static SCMContainerMetrics create(SCMMXBean scmmxBean) {
+  public static SCMContainerMetrics create(String scmId, SCMMXBean scmmxBean) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE, "Storage " +
-        "Container Manager Metrics", new SCMContainerMetrics(scmmxBean));
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE, scmId);
+    return ms.register(sourceName, "Storage " +
+        "Container Manager Metrics", new SCMContainerMetrics(sourceName, scmmxBean));
   }
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE);
+    ms.unregisterSource(sourceName);
   }
 
   @Override

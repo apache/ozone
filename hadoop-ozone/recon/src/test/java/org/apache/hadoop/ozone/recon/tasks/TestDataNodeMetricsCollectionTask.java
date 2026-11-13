@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVers
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
@@ -28,6 +29,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -36,11 +39,11 @@ import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
- * Tests for {@link DataNodeMetricsCollectionTask} bean-name resolution:
- * the datanode-qualified bean of same-JVM clusters wins when present, and
- * the plain production bean name is the fallback.
+ * Tests for {@link DataNodeMetricsCollectionTask}.
  */
 class TestDataNodeMetricsCollectionTask {
 
@@ -50,6 +53,24 @@ class TestDataNodeMetricsCollectionTask {
   private final DatanodeInfo nodeDetails = new DatanodeInfo(
       MockDatanodeDetails.randomDatanodeDetails(),
       NodeStatus.inServiceHealthy(), defaultVersionProto(), 5 * 60 * 1000);
+
+  @ParameterizedTest
+  @CsvSource({
+      "dn1.example.com, false, http://dn1.example.com:9882/jmx",
+      "2001:db8::10, false, http://[2001:db8::10]:9882/jmx",
+      "2001:db8::10, true, https://[2001:db8::10]:9883/jmx",
+  })
+  void testJmxMetricsUrl(String hostName, boolean httpsEnabled, String expectedUrl) {
+    DatanodeInfo datanode = mock(DatanodeInfo.class);
+    when(datanode.getHostName()).thenReturn(hostName);
+    when(datanode.getPort(Name.HTTP)).thenReturn(DatanodeDetails.newPort(Name.HTTP, 9882));
+    when(datanode.getPort(Name.HTTPS)).thenReturn(DatanodeDetails.newPort(Name.HTTPS, 9883));
+    MetricsServiceProviderFactory factory = mock(MetricsServiceProviderFactory.class);
+
+    new DataNodeMetricsCollectionTask(datanode, httpsEnabled, factory);
+
+    verify(factory).getJmxMetricsServiceProvider(expectedUrl);
+  }
 
   private DatanodePendingDeletionMetrics collect(List<Map<String, Object>> beans) throws Exception {
     MetricsServiceProvider provider = mock(MetricsServiceProvider.class);

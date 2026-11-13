@@ -173,7 +173,6 @@ public final class ContainerMetrics implements Closeable {
   }
 
   public void incContainerLocalOpsMetrics(ContainerProtos.Type type) {
-    numOps.incr();
     numLocalOpsArray.get(type).incr();
   }
 

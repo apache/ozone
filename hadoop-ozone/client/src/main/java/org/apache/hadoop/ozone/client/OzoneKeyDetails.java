@@ -95,6 +95,12 @@ public class OzoneKeyDetails extends OzoneKey {
     return feInfo;
   }
 
+  @Override
+  @JsonIgnore
+  public String getEncryptionKeyName() {
+    return feInfo != null ? feInfo.getKeyName() : null;
+  }
+
   public Long getGeneration() {
     return generation;
   }
