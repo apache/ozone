@@ -46,6 +46,9 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseFileChecksumHelper {
   static final Logger LOG =
       LoggerFactory.getLogger(BaseFileChecksumHelper.class);
+  // MD5 of a 32 byte zero-padded byte array, the checksum of an empty key. Explicitly sized here in case the default
+  // DataOutputBuffer buffer length value is changed in future.
+  private static final byte[] EMPTY_KEY_MD5 = MD5Hash.digest(new byte[32]).getDigest();
   private OmKeyInfo keyInfo;
 
   private String volumeName;
@@ -328,12 +331,8 @@ public abstract class BaseFileChecksumHelper {
    * @return the checksum of an empty key, the magic entry that matches the md5 of a 32 byte zero-padded byte array.
    */
   private static FileChecksum makeEmptyFileChecksum() {
-    // Explicitly specified here in case the default DataOutputBuffer
-    // buffer length value is changed in future.
-    final int lenOfZeroBytes = 32;
-    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
-    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-    return new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+    // A new instance per call: FileChecksum and MD5Hash are mutable Writables.
+    return new MD5MD5CRC32GzipFileChecksum(0, 0, new MD5Hash(EMPTY_KEY_MD5.clone()));
   }
 
   /**
