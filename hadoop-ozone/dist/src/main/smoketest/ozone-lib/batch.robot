@@ -103,8 +103,8 @@ Execute Batch of Assertions
         FOR    ${a}    IN     ${test_case.assertions}
             TRY
                 Run Keyword    @{a}
-            EXCEPT
-                Fail    ${test_case.name} failed at @{a}
+            EXCEPT    AS    ${error}
+                Fail    ${test_case.name} failed at @{a}: ${error}
             END
         END
     END
