@@ -39,7 +39,6 @@ import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.jooq.DSLContext;
-import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,11 +64,7 @@ public class TestReconTaskStatusTableUpgradeAction
   @BeforeEach
   public void setUp() throws SQLException {
     dataSource = getDataSource();
-    // Use the Derby dialect explicitly. The shared DSLContext from the base
-    // class uses SQLDialect.DEFAULT, which renders Derby-incompatible DDL
-    // (e.g. "DROP TABLE IF EXISTS" and "bigint null"); a Derby-dialect context
-    // generates SQL that the embedded Derby database accepts.
-    dslContext = DSL.using(dataSource, SQLDialect.DERBY);
+    dslContext = getDslContext();
     upgradeAction = new ReconTaskStatusTableUpgradeAction();
     createLegacyTaskStatusTable();
   }

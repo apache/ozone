@@ -237,6 +237,12 @@ public class ReconControllerModule extends AbstractModule {
     ReconSqlDbConfig sqlDbConfig =
         ozoneConfiguration.getObject(ReconSqlDbConfig.class);
 
+    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:derby:")) {
+      LOG.warn("Derby is no longer supported for the Recon SQL DB. Ignoring the configured {} and using the SQLite "
+          + "defaults.", sqlDbConfig.getJdbcUrl());
+      sqlDbConfig.setJdbcUrl(ReconSqlDbConfig.DEFAULT_JDBC_URL);
+    }
+
     // ${ozone.recon.db.dir} is left unresolved when the key is not set, so resolve it with the same fallback
     // (ozone.metadata.dirs) as the other Recon DBs.
     String reconDbDirPlaceholder = "${" + OZONE_RECON_DB_DIR + "}";

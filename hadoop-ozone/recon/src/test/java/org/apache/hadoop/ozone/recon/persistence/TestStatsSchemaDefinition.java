@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.Types;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -52,12 +53,13 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSet = metaData.getColumns(null, null,
         GLOBAL_STATS_TABLE_NAME, null);
 
+    // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
     List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
 
     expectedPairs.add(new ImmutablePair<>("key", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("value", Types.BIGINT));
+    expectedPairs.add(new ImmutablePair<>("value", Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("last_updated_timestamp",
-        Types.TIMESTAMP));
+        Types.VARCHAR));
 
     List<Pair<String, Integer>> actualPairs = new ArrayList<>();
 
@@ -85,7 +87,8 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     GlobalStatsDao dao = getDao(GlobalStatsDao.class);
 
-    LocalDateTime now = LocalDateTime.now(Clock.systemUTC().getZone());
+    // SQLite keeps timestamps at millisecond precision.
+    LocalDateTime now = LocalDateTime.now(Clock.systemUTC().getZone()).truncatedTo(ChronoUnit.MILLIS);
     GlobalStats newRecord = new GlobalStats();
     newRecord.setLastUpdatedTimestamp(now);
     newRecord.setKey("key1");
