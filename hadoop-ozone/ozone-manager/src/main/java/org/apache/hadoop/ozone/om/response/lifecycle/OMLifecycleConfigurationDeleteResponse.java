@@ -56,5 +56,6 @@ public class OMLifecycleConfigurationDeleteResponse extends OMClientResponse  {
 
     omMetadataManager.getLifecycleConfigurationTable().deleteWithBatch(
         batchOperation, dbLifecycleKey);
+    omMetadataManager.getLifecycleScanStateTable().deleteWithBatch(batchOperation, dbLifecycleKey);
   }
 }

@@ -79,6 +79,7 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
     try {
       omMetadataManager.getLifecycleConfigurationTable().deleteWithBatch(
           batchOperation, dbBucketKey);
+      omMetadataManager.getLifecycleScanStateTable().deleteWithBatch(batchOperation, dbBucketKey);
     } catch (IOException ex) {
       // Do nothing if there is no lifecycle attached.
     }

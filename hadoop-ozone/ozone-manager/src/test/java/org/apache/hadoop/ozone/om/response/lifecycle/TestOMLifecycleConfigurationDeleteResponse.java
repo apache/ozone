@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationResponse;
@@ -105,13 +106,17 @@ public class TestOMLifecycleConfigurationDeleteResponse {
                 DeleteLifecycleConfigurationResponse.getDefaultInstance()
                     .newBuilderForType()).build(), volumeName, bucketName);
 
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    omMetadataManager.getLifecycleScanStateTable().put(bucketKey,
+        new OmLifecycleScanState.Builder().setBucketKey(bucketKey).setScanStartTime(Time.now()).build());
+
     createResponse.addToDBBatch(omMetadataManager, batchOperation);
     deleteResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    assertNull(omMetadataManager.getLifecycleConfigurationTable().get(
-        omMetadataManager.getBucketKey(volumeName, bucketName)));
+    assertNull(omMetadataManager.getLifecycleConfigurationTable().get(bucketKey));
+    assertNull(omMetadataManager.getLifecycleScanStateTable().get(bucketKey));
   }
 }
