@@ -293,6 +293,25 @@ public class TestSCMContainerPlacementRackAware {
         cluster.isSameParent(datanodeDetails.get(0), excludedNodes.get(1)));
   }
 
+  @Test
+  public void chooseNodeWithOverlappingUsedAndExcludedNodes() throws SCMException {
+    setup(3);
+    List<DatanodeDetails> usedNodes = new ArrayList<>(datanodes.subList(0, 2));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(datanodes.subList(0, 1));
+
+    assertThat(policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5))
+        .containsExactly(datanodes.get(2));
+  }
+
+  @Test
+  public void rejectWhenOverlappingListsLeaveNoAvailableNodes() {
+    setup(3);
+    List<DatanodeDetails> usedNodes = new ArrayList<>(datanodes.subList(0, 2));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(2)));
+
+    assertThrows(SCMException.class, () -> policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5));
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {NODE_PER_RACK + 1, 2 * NODE_PER_RACK + 1})
   public void testSingleNodeRack(int datanodeCount) throws SCMException {

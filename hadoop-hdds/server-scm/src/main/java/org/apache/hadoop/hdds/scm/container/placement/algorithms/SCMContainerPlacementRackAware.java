@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
@@ -120,7 +122,7 @@ public final class SCMContainerPlacementRackAware
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
-    if (datanodeCount < nodesRequired + excludedNodesCount + usedNodesCount) {
+    if (datanodeCount < nodesRequired + countUnavailableNodes(usedNodes, excludedNodes)) {
       throw new SCMException("No enough datanodes to choose. " +
           "TotalNode = " + datanodeCount + " RequiredNode = " + nodesRequired +
           " ExcludedNode = " + excludedNodesCount +
@@ -253,6 +255,14 @@ public final class SCMContainerPlacementRackAware
     // choose remaining nodes on different racks
     return chooseNodes(mutableExcludedNodes, chosenNodes, mutableFavoredNodes,
         mutableUsedNodes, favorIndex, nodesRequired, mapSizeRequired);
+  }
+
+  private static int countUnavailableNodes(List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes) {
+    Set<DatanodeDetails> unavailableNodes = new HashSet<>(usedNodes);
+    if (excludedNodes != null) {
+      unavailableNodes.addAll(excludedNodes);
+    }
+    return unavailableNodes.size();
   }
 
   /**
