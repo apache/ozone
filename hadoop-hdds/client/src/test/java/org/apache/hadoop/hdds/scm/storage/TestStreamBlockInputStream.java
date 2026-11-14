@@ -39,6 +39,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -46,6 +47,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -79,6 +81,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
@@ -312,6 +315,314 @@ public class TestStreamBlockInputStream {
             }
           });
     }
+  }
+
+  @Test
+  public void testPositionedReadsDoNotReuseStreamsByDefault() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    try (StreamBlockInputStream stream = dn.newStream(newStreamReadConfig())) {
+      dn.assertPositionedRead(stream, 0, 10);
+      dn.assertPositionedRead(stream, 10, 10);
+    }
+    verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+    verify(dn.client, never()).resumeStreamRead();
+    assertEquals(2, dn.halfClosed.get());
+  }
+
+  @Test
+  public void testSequentialPositionedReadsReuseOneStream() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      for (int i = 0; i < 5; i++) {
+        dn.assertPositionedRead(stream, i * 20, 20);
+      }
+      verify(dn.client, times(1)).initStreamRead(any(), any(), any());
+      // each read after the first takes back the permit the idle reader gave up
+      verify(dn.client, times(4)).resumeStreamRead();
+      verify(dn.client, times(5)).completeStreamRead();
+      assertEquals(0, dn.halfClosed.get());
+    }
+    assertEquals(1, dn.halfClosed.get());
+    // closing the idle reader must not release its permit again
+    verify(dn.client, times(5)).completeStreamRead();
+    verify(dn.factory, times(1)).acquireClientForReadData(any());
+    verify(dn.factory, times(1)).releaseClientForReadData(dn.client, false);
+  }
+
+  @Test
+  public void testConcurrentPositionedReadsUseDistinctStreams() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      dn.readConcurrently(stream, 2);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+      assertEquals(0, dn.halfClosed.get());
+
+      // both streams are idle now and serve the next reads
+      dn.readConcurrently(stream, 2);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+    }
+    assertEquals(2, dn.halfClosed.get());
+  }
+
+  @Test
+  public void testIdleReadersAreBounded() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(1, Duration.ofMinutes(1)))) {
+      dn.readConcurrently(stream, 2);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+      // only one of the two streams is kept
+      assertEquals(1, dn.halfClosed.get());
+
+      dn.assertPositionedRead(stream, 30, 10);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+    }
+    assertEquals(2, dn.halfClosed.get());
+  }
+
+  @Test
+  public void testFailedIdleReaderIsReplacedWithoutBlamingTheDatanode() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    ArgumentCaptor<Set<DatanodeID>> excluded = ArgumentCaptor.forClass(Set.class);
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      dn.assertPositionedRead(stream, 0, 10);
+      // the idle stream broke: the next read retries on a new stream
+      dn.failNextRequests.set(1);
+      dn.assertPositionedRead(stream, 10, 10);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), excluded.capture());
+      assertEquals(1, dn.halfClosed.get());
+      assertThat(excluded.getValue()).isEmpty();
+
+      dn.assertPositionedRead(stream, 20, 10);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+    }
+  }
+
+  @Test
+  public void testRetryAfterFailedIdleReaderUsesNewStream() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    ArgumentCaptor<Set<DatanodeID>> excluded = ArgumentCaptor.forClass(Set.class);
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      dn.readConcurrently(stream, 2);
+      // both idle streams broke, e.g. the datanode restarted, before the client noticed
+      dn.failNextRequests.set(1);
+      dn.assertPositionedRead(stream, 10, 10);
+      // the retry opened a new stream instead of leasing the other idle reader, which was dropped
+      verify(dn.client, times(3)).initStreamRead(any(), any(), excluded.capture());
+      assertEquals(2, dn.halfClosed.get());
+      assertThat(excluded.getValue()).isEmpty();
+    }
+  }
+
+  @Test
+  public void testTrimmerClosesRemainingReadersAfterAFailure() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMillis(100)))) {
+      dn.readConcurrently(stream, 2);
+      // the first reader the trimmer closes fails to release its client
+      doThrow(new IllegalStateException("injected")).doNothing()
+          .when(dn.factory).releaseClientForReadData(any(), anyBoolean());
+      GenericTestUtils.waitFor(() -> dn.halfClosed.get() == 2, 10, 10_000);
+      verify(dn.factory, times(2)).releaseClientForReadData(dn.client, false);
+    }
+  }
+
+  @Test
+  public void testPositionedReadEndingAfterUnbufferClosesItsReader() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      Future<?> read = dn.startGatedPositionedRead(executor, stream, 0, 10);
+      stream.unbuffer();
+      dn.openGate();
+      read.get(10, TimeUnit.SECONDS);
+      // not kept after unbuffer()
+      assertEquals(1, dn.halfClosed.get());
+      verify(dn.factory, times(1)).releaseClientForReadData(dn.client, false);
+
+      dn.assertPositionedRead(stream, 10, 10);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testFailoverOfSequentialReadClosesIdleReaders() throws Exception {
+    byte[] data = TestChunkInputStream.generateRandomData(100);
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(data);
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      dn.assertPositionedRead(stream, 50, 10);
+      // the sequential read fails over: a new stream, and the block info is refreshed
+      dn.failNextRequests.set(1);
+      byte[] buffer = new byte[10];
+      assertEquals(10, stream.read(buffer, 0, 10));
+      assertArrayEquals(Arrays.copyOfRange(data, 0, 10), buffer);
+      // the idle reader and the failed sequential stream are closed
+      assertEquals(2, dn.halfClosed.get());
+
+      dn.assertPositionedRead(stream, 60, 10);
+      // pread, failed sequential, sequential retry, and a new stream for this pread
+      verify(dn.client, times(4)).initStreamRead(any(), any(), any());
+    }
+  }
+
+  @Test
+  public void testPositionedReadEndingAfterFailoverClosesItsReader() throws Exception {
+    byte[] data = TestChunkInputStream.generateRandomData(100);
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(data);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      Future<?> read = dn.startGatedPositionedRead(executor, stream, 50, 10);
+      // while the positioned read waits, a sequential read fails over and refreshes the block info
+      CountDownLatch gate = dn.requestGate;
+      dn.requestGate = null;
+      dn.failNextRequests.set(1);
+      byte[] buffer = new byte[10];
+      assertEquals(10, stream.read(buffer, 0, 10));
+      gate.countDown();
+      read.get(10, TimeUnit.SECONDS);
+
+      dn.assertPositionedRead(stream, 60, 10);
+      // the reader of the positioned read that started before the refresh was not kept
+      verify(dn.client, times(4)).initStreamRead(any(), any(), any());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testTimeoutOnIdleReaderIsNotRetriedOnANewStream() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    OzoneClientConfig config = newPreadReuseConfig(2, Duration.ofMinutes(1));
+    config.setStreamReadTimeout(Duration.ofMillis(300));
+    ArgumentCaptor<Set<DatanodeID>> excluded = ArgumentCaptor.forClass(Set.class);
+    try (StreamBlockInputStream stream = dn.newStream(config)) {
+      dn.assertPositionedRead(stream, 0, 10);
+      // the datanode does not answer on the live idle stream: that is the datanode's failure, not a stale stream
+      dn.hangNextRequests.set(1);
+      dn.assertPositionedRead(stream, 10, 10);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), excluded.capture());
+      assertThat(excluded.getValue()).as("the timed-out datanode is excluded at once").hasSize(1);
+    }
+  }
+
+  @Test
+  public void testInterruptedReadOnIdleReaderIsNotRetried() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      dn.readConcurrently(stream, 2);
+      dn.hangNextRequests.set(1);
+      dn.requestsArrived = new CountDownLatch(1);
+      Future<?> read = executor.submit(() -> stream.readPositioned(30, ByteBuffer.allocate(10)));
+      assertTrue(dn.requestsArrived.await(10, TimeUnit.SECONDS));
+      read.cancel(true);
+      // the interrupted read neither opened a new stream nor dropped the other idle reader
+      executor.shutdown();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+      dn.assertPositionedRead(stream, 40, 10);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testCloseCompletesWhenClosingAnIdleReaderFails() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)));
+    dn.assertPositionedRead(stream, 0, 10);
+    doThrow(new IllegalStateException("injected")).doNothing()
+        .when(dn.factory).releaseClientForReadData(any(), anyBoolean());
+    assertDoesNotThrow(stream::close);
+    // close() went all the way: the stream is closed
+    assertThrows(IOException.class, () -> stream.readPositioned(10, ByteBuffer.allocate(10)));
+  }
+
+  @Test
+  public void testInterruptedResumeClosesTheIdleReader() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      dn.assertPositionedRead(stream, 0, 10);
+      doThrow(new InterruptedIOException("injected")).when(dn.client).resumeStreamRead();
+      assertThrows(InterruptedIOException.class, () -> stream.readPositioned(10, ByteBuffer.allocate(10)));
+      assertEquals(1, dn.halfClosed.get());
+      verify(dn.factory, times(1)).releaseClientForReadData(dn.client, false);
+    }
+    assertEquals(dn.permitsTaken.get(), dn.permitsReleased.get());
+  }
+
+  @Test
+  public void testIdleReaderIsClosedAfterIdleTimeout() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMillis(100)))) {
+      dn.assertPositionedRead(stream, 0, 10);
+      GenericTestUtils.waitFor(() -> dn.halfClosed.get() == 1, 10, 10_000);
+      verify(dn.factory, times(1)).releaseClientForReadData(dn.client, false);
+      verify(dn.client, times(1)).completeStreamRead();
+
+      dn.assertPositionedRead(stream, 10, 10);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+    }
+  }
+
+  @Test
+  public void testUnbufferAndCloseCloseIdleReaders() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      dn.assertPositionedRead(stream, 0, 10);
+      stream.unbuffer();
+      assertEquals(1, dn.halfClosed.get());
+      verify(dn.factory, times(1)).releaseClientForReadData(dn.client, false);
+
+      dn.assertPositionedRead(stream, 10, 10);
+      verify(dn.client, times(2)).initStreamRead(any(), any(), any());
+      assertEquals(1, dn.halfClosed.get());
+    }
+    assertEquals(2, dn.halfClosed.get());
+    verify(dn.factory, times(2)).releaseClientForReadData(dn.client, false);
+  }
+
+  @Test
+  public void testPositionedReadEndingAfterCloseClosesItsReader() throws Exception {
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(TestChunkInputStream.generateRandomData(100));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)));
+      dn.requestGate = new CountDownLatch(1);
+      dn.requestsArrived = new CountDownLatch(1);
+      Future<?> read = executor.submit(() -> {
+        dn.assertPositionedRead(stream, 0, 10);
+        return null;
+      });
+      assertTrue(dn.requestsArrived.await(10, TimeUnit.SECONDS));
+      stream.close();
+      dn.requestGate.countDown();
+      read.get(10, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+    assertEquals(1, dn.halfClosed.get());
+    verify(dn.factory, times(1)).releaseClientForReadData(dn.client, false);
+    verify(dn.client, times(1)).completeStreamRead();
+  }
+
+  @Test
+  public void testConcurrentPositionedReadsWithReuseReleaseAllPermits() throws Exception {
+    byte[] data = TestChunkInputStream.generateRandomData(SOURCE_SIZE);
+    ReusableStreamDatanode dn = new ReusableStreamDatanode(data);
+    try (StreamBlockInputStream stream = dn.newStream(newPreadReuseConfig(2, Duration.ofMinutes(1)))) {
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, (offset, buf) -> {
+        int read = stream.readPositioned(offset, buf);
+        if (read != BUFFER_SIZE) {
+          throw new AssertionError("expected " + BUFFER_SIZE + " bytes at " + offset + " but read " + read);
+        }
+      });
+    }
+    // every permit taken, by opening a stream or by resuming an idle one, was given back
+    assertEquals(dn.permitsTaken.get(), dn.permitsReleased.get());
+    assertEquals(dn.streamsOpened.get(), dn.halfClosed.get());
   }
 
   @Test
@@ -770,6 +1081,133 @@ public class TestStreamBlockInputStream {
       ByteBuffer second = ByteBuffer.allocate(2);
       assertEquals(2, sbis.read(second), "read after unbuffer must resume from the current position");
       assertArrayEquals(new byte[] {3, 4}, second.array());
+    }
+  }
+
+  private OzoneClientConfig newPreadReuseConfig(int maxIdleReaders, Duration idleTimeout) {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setStreamReadPreadReuseEnabled(true);
+    clientConfig.setStreamReadPreadMaxIdleReaders(maxIdleReaders);
+    clientConfig.setStreamReadPreadIdleTimeout(idleTimeout);
+    return clientConfig;
+  }
+
+  /**
+   * A datanode that serves every ReadBlock request on a stream and keeps the stream open until the client ends it,
+   * as GrpcXceiverService does.
+   */
+  private final class ReusableStreamDatanode {
+    private final byte[] data;
+    private final XceiverClientGrpc client = mock(XceiverClientGrpc.class);
+    private final XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    private final Map<StreamingReadResponse, StreamingReaderSpi> readers = new ConcurrentHashMap<>();
+    private final AtomicInteger streamsOpened = new AtomicInteger();
+    private final AtomicInteger halfClosed = new AtomicInteger();
+    private final AtomicInteger permitsTaken = new AtomicInteger();
+    private final AtomicInteger permitsReleased = new AtomicInteger();
+    // the number of next requests that fail with UNAVAILABLE
+    private final AtomicInteger failNextRequests = new AtomicInteger();
+    // the number of next requests the datanode never answers
+    private final AtomicInteger hangNextRequests = new AtomicInteger();
+    // when set, each request waits for the gate after counting down requestsArrived
+    private volatile CountDownLatch requestGate;
+    private volatile CountDownLatch requestsArrived;
+
+    ReusableStreamDatanode(byte[] data) throws Exception {
+      this.data = data;
+      when(factory.acquireClientForReadData(any())).thenReturn(client);
+      doAnswer(inv -> {
+        StreamingReaderSpi reader = inv.getArgument(1);
+        ClientCallStreamObserver<ContainerCommandRequestProto> observer = mock(ClientCallStreamObserver.class);
+        doAnswer(i -> halfClosed.incrementAndGet()).when(observer).onCompleted();
+        DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+        StreamingReadResponse response = new StreamingReadResponse(datanode, observer);
+        reader.setStreamingReadResponse(response);
+        readers.put(response, reader);
+        streamsOpened.incrementAndGet();
+        permitsTaken.incrementAndGet();
+        return null;
+      }).when(client).initStreamRead(any(), any(), any());
+      doAnswer(inv -> permitsTaken.incrementAndGet()).when(client).resumeStreamRead();
+      doAnswer(inv -> permitsReleased.incrementAndGet()).when(client).completeStreamRead();
+      doAnswer(inv -> {
+        ContainerCommandRequestProto request = inv.getArgument(0);
+        StreamingReaderSpi reader = readers.get(inv.getArgument(1));
+        CountDownLatch gate = requestGate;
+        if (gate != null) {
+          requestsArrived.countDown();
+          assertTrue(gate.await(10, TimeUnit.SECONDS), "request gate was not opened");
+        }
+        if (hangNextRequests.getAndUpdate(n -> Math.max(n - 1, 0)) > 0) {
+          CountDownLatch arrived = requestsArrived;
+          if (arrived != null) {
+            arrived.countDown();
+          }
+          return null;
+        }
+        if (failNextRequests.getAndUpdate(n -> Math.max(n - 1, 0)) > 0) {
+          reader.onError(Status.UNAVAILABLE.withDescription("injected").asRuntimeException());
+          return null;
+        }
+        int start = (int) request.getReadBlock().getOffset();
+        int end = (int) Math.min(data.length, start + request.getReadBlock().getLength());
+        reader.onNext(buildResponseProto(Arrays.copyOfRange(data, start, end), start));
+        return null;
+      }).when(client).streamRead(any(), any());
+    }
+
+    StreamBlockInputStream newStream(OzoneClientConfig config) throws Exception {
+      return new StreamBlockInputStream(newBlockInfo(new BlockID(1L, 30L), data.length), mockStandalonePipeline(),
+          null, factory, NO_REFRESH, config);
+    }
+
+    void assertPositionedRead(StreamBlockInputStream stream, int offset, int length) throws IOException {
+      ByteBuffer buffer = ByteBuffer.allocate(length);
+      assertEquals(length, stream.readPositioned(offset, buffer));
+      assertArrayEquals(Arrays.copyOfRange(data, offset, offset + length), buffer.array());
+    }
+
+    /** Starts a positioned read that waits in the datanode until {@link #openGate()}; returns once it is waiting. */
+    Future<?> startGatedPositionedRead(ExecutorService executor, StreamBlockInputStream stream, int offset,
+        int length) throws InterruptedException {
+      requestGate = new CountDownLatch(1);
+      requestsArrived = new CountDownLatch(1);
+      Future<?> read = executor.submit(() -> {
+        assertPositionedRead(stream, offset, length);
+        return null;
+      });
+      assertTrue(requestsArrived.await(10, TimeUnit.SECONDS), "positioned read did not reach the datanode");
+      return read;
+    }
+
+    void openGate() {
+      requestGate.countDown();
+      requestGate = null;
+    }
+
+    /** Runs {@code count} positioned reads that are all in flight at the same time. */
+    void readConcurrently(StreamBlockInputStream stream, int count) throws Exception {
+      requestGate = new CountDownLatch(1);
+      requestsArrived = new CountDownLatch(count);
+      ExecutorService executor = Executors.newFixedThreadPool(count);
+      try {
+        List<Future<?>> reads = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+          final int offset = i * 10;
+          reads.add(executor.submit(() -> {
+            assertPositionedRead(stream, offset, 10);
+            return null;
+          }));
+        }
+        assertTrue(requestsArrived.await(10, TimeUnit.SECONDS), "positioned reads must overlap");
+        requestGate.countDown();
+        for (Future<?> read : reads) {
+          read.get(10, TimeUnit.SECONDS);
+        }
+      } finally {
+        requestGate = null;
+        executor.shutdownNow();
+      }
     }
   }
 
