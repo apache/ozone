@@ -135,7 +135,7 @@ public final class S3Utils {
       S3StorageType storageType = S3StorageType.valueOf(s3StorageType);
       if (S3StorageType.STANDARD_IA.equals(storageType) &&
           !StringUtils.isEmpty(s3StorageConfig)) {
-        return new ECReplicationConfig(s3StorageConfig);
+        return ECReplicationConfig.getInstance(s3StorageConfig);
       }
       return storageType.getReplicationConfig();
     } catch (IllegalArgumentException ex) {

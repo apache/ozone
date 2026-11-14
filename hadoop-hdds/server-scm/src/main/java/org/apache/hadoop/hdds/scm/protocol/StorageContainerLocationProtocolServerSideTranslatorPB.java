@@ -938,7 +938,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       // passed Type. Therefore, we must check for replicationConfig.
       if (replicationType == HddsProtos.ReplicationType.EC) {
         if (request.hasEcReplicationConfig()) {
-          repConfig = new ECReplicationConfig(request.getEcReplicationConfig());
+          repConfig = ECReplicationConfig.getInstance(request.getEcReplicationConfig());
         }
       } else {
         if (request.hasFactor()) {
