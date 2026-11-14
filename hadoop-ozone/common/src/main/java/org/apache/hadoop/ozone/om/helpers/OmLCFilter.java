@@ -42,6 +42,7 @@ public final class OmLCFilter {
   private final boolean directoryStylePrefix;
   private final String tagKey;
   private final String tagValue;
+  private final boolean tagSet;
   private final OmLifecycleRuleAndOperator andOperator;
 
   private OmLCFilter() {
@@ -58,6 +59,7 @@ public final class OmLCFilter {
     this.andOperator = builder.andOperator;
     this.tagKey = builder.tagKey;
     this.tagValue = builder.tagValue;
+    this.tagSet = builder.tagSet;
   }
 
   /**
@@ -76,6 +78,10 @@ public final class OmLCFilter {
    * @throws OMException if the filter is invalid.
    */
   public void valid(BucketLayout layout) throws OMException {
+    if (tagSet && (tagKey == null || tagValue == null)) {
+      throw new OMException("A Tag must have a Key and a Value.", OMException.ResultCodes.INVALID_REQUEST);
+    }
+
     boolean hasPrefix = prefix != null;
     boolean hasTag = hasTag();
     boolean hasAndOperator = andOperator != null;
@@ -210,6 +216,7 @@ public final class OmLCFilter {
     private String prefix = null;
     private String tagKey = null;
     private String tagValue = null;
+    private boolean tagSet = false;
     private OmLifecycleRuleAndOperator andOperator = null;
 
     public Builder setPrefix(String lcPrefix) {
@@ -220,6 +227,7 @@ public final class OmLCFilter {
     public Builder setTag(String key, String value) {
       this.tagKey = key;
       this.tagValue = value;
+      this.tagSet = true;
       return this;
     }
 
