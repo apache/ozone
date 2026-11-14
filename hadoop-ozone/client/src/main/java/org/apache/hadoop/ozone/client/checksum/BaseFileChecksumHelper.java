@@ -201,7 +201,8 @@ public abstract class BaseFileChecksumHelper {
          blockIdx++) {
       OmKeyLocationInfo keyLocationInfo =
           getKeyLocationInfoList().get(blockIdx);
-      if (currentLength > getLength()) {
+      if (currentLength >= getLength()) {
+        // The blocks so far cover the requested length.
         return;
       }
       if (keyLocationInfo.getLength() == 0) {

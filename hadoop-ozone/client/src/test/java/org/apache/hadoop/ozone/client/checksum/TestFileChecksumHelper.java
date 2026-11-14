@@ -297,12 +297,15 @@ public class TestFileChecksumHelper {
         checksumOfBlocks(COMPOSITE_CRC, Long.MAX_VALUE, first, new byte[0], second));
   }
 
-  @Test
-  public void testCompositeCrcIgnoresBlocksBeyondRequestedLength() throws IOException {
+  @ParameterizedTest
+  @EnumSource(ChecksumCombineMode.class)
+  public void testBlocksBeyondRequestedLengthAreIgnored(ChecksumCombineMode combineMode) throws IOException {
     byte[] first = RandomUtils.secure().randomBytes(1000);
     byte[] second = RandomUtils.secure().randomBytes(700);
-    assertEquals(checksumOfBlocks(COMPOSITE_CRC, Long.MAX_VALUE, first),
-        checksumOfBlocks(COMPOSITE_CRC, 500, first, second));
+    FileChecksum firstBlockOnly = checksumOfBlocks(combineMode, Long.MAX_VALUE, first);
+    assertEquals(firstBlockOnly, checksumOfBlocks(combineMode, 500, first, second));
+    // the requested length ends exactly at the block boundary
+    assertEquals(firstBlockOnly, checksumOfBlocks(combineMode, first.length, first, second));
   }
 
   /**
