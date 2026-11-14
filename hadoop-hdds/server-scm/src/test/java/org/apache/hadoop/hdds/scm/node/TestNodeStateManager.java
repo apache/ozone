@@ -24,8 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -56,6 +58,7 @@ import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 /**
  * Class to test the NodeStateManager, which is an internal class used by
@@ -171,6 +174,26 @@ public class TestNodeStateManager {
     nsm.checkNodesHealth();
     assertEquals(staleDn, nsm.getStaleNodes().get(0));
     assertEquals(deadDn, nsm.getDeadNodes().get(0));
+  }
+
+  @Test
+  public void testPauseDuringHealthCheckRunDoesNotMarkNodesStale()
+      throws NodeAlreadyExistsException, NodeNotFoundException {
+    DatanodeDetails dn = generateDatanode();
+    nsm.addNode(dn, defaultVersionProto());
+    long now = Time.monotonicNow();
+    nsm.getNode(dn).updateLastHeartbeatTime(now);
+    eventPublisher.clearEvents();
+
+    // The clock moves past the stale interval after the first reading in the run, as if SCM paused there.
+    // The later reading for the processing time log then reports the pause as a slow run, which is expected.
+    long afterPause = now + HddsServerUtil.getStaleNodeInterval(conf) + 1000;
+    try (MockedStatic<Time> time = mockStatic(Time.class, CALLS_REAL_METHODS)) {
+      time.when(Time::monotonicNow).thenReturn(now, afterPause);
+      nsm.run();
+    }
+    assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
+    assertNull(eventPublisher.getLastEvent());
   }
 
   @Test
