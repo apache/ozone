@@ -169,14 +169,18 @@ public class SCMBlockDeletingService extends BackgroundService
           final Set<DatanodeDetails> included =
               getDatanodesWithinCommandLimit(datanodes);
           int blockDeletionLimit = getBlockDeleteTXNum();
+          // Over the limit, new transactions are held back but those already
+          // sent keep being retried (and timed out commands cleaned up), so
+          // the map can still drain instead of waiting for ACKs forever.
           int txnToDNsCommitMapSize = deletedBlockLog.getTransactionToDNsCommitMapSize();
-          if (txnToDNsCommitMapSize >= transactionToDNsCommitMapLimit) {
-            LOG.warn("Skipping block deletion as transactionToDNsCommitMap size = {}, exceeds threshold {}",
+          boolean retryOnly = txnToDNsCommitMapSize >= transactionToDNsCommitMapLimit;
+          if (retryOnly) {
+            LOG.warn("Skipping new block deletion transactions as transactionToDNsCommitMap size = {}, " +
+                "exceeds threshold {}, only retrying the ones already sent",
                 txnToDNsCommitMapSize, transactionToDNsCommitMapLimit);
-            return EmptyTaskResult.newResult();
           }
           DatanodeDeletedBlockTransactions transactions =
-              deletedBlockLog.getTransactions(blockDeletionLimit, included);
+              deletedBlockLog.getTransactions(blockDeletionLimit, included, retryOnly);
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();

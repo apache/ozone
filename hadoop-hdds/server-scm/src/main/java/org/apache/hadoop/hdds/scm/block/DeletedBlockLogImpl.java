@@ -346,7 +346,7 @@ public class DeletedBlockLogImpl
 
   @Override
   public DatanodeDeletedBlockTransactions getTransactions(
-      int blockDeletionLimit, Set<DatanodeDetails> dnList)
+      int blockDeletionLimit, Set<DatanodeDetails> dnList, boolean retryOnly)
       throws IOException {
     lock.lock();
     try {
@@ -412,9 +412,11 @@ public class DeletedBlockLogImpl
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
             final ContainerInfo container = containerManager.getContainer(id);
-            // HDDS-7126. When container is under replicated, it is possible
-            // that container is deleted, but transactions are not deleted.
-            if (container.isDeleted()) {
+            if (retryOnly && !transactionStatusManager.isInCommitMap(txn.getTxID())) {
+              LOG.trace("Transaction {} waits until transactionToDNsCommitMap is below its limit.", txn.getTxID());
+            } else if (container.isDeleted()) {
+              // HDDS-7126. When container is under replicated, it is possible
+              // that container is deleted, but transactions are not deleted.
               LOG.warn("Container: {} was deleted for the transaction: {}.", id, txn);
               txIDs.add(txn.getTxID());
               addTxToTxSizeMap(txn);

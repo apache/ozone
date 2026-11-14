@@ -50,8 +50,20 @@ public interface DeletedBlockLog extends Closeable {
    * @return Mapping from containerId to latest transactionId for the container.
    * @throws IOException
    */
-  DatanodeDeletedBlockTransactions getTransactions(
+  default DatanodeDeletedBlockTransactions getTransactions(
       int blockDeletionLimit, Set<DatanodeDetails> dnList)
+      throws IOException {
+    return getTransactions(blockDeletionLimit, dnList, false);
+  }
+
+  /**
+   * Same as {@link #getTransactions(int, Set)}, but with retryOnly only
+   * transactions that were already sent and are still waiting for ACKs
+   * (i.e. in transactionToDNsCommitMap) are returned, so the map does not
+   * grow. Used while the map is over its limit.
+   */
+  DatanodeDeletedBlockTransactions getTransactions(
+      int blockDeletionLimit, Set<DatanodeDetails> dnList, boolean retryOnly)
       throws IOException;
 
   /**
