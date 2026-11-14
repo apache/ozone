@@ -31,9 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Collections;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter.Tag;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilter;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +59,7 @@ class TestOmLCFilter {
     OmLCFilter lcFilter1 = getOmLCFilterBuilder("prefix", null, null).build();
     assertDoesNotThrow(() -> lcFilter1.valid(BucketLayout.DEFAULT));
 
-    OmLCFilter lcFilter2 = getOmLCFilterBuilder(null, Pair.of("key", "value"), null).build();
+    OmLCFilter lcFilter2 = getOmLCFilterBuilder(null, new Tag("key", "value"), null).build();
     assertDoesNotThrow(() -> lcFilter2.valid(BucketLayout.DEFAULT));
 
     OmLCFilter lcFilter3 = getOmLCFilterBuilder(null, null, VALID_OM_LC_AND_OPERATOR).build();
@@ -74,11 +74,11 @@ class TestOmLCFilter {
 
   @Test
   public void testInValidFilter() {
-    OmLCFilter.Builder lcFilter1 = getOmLCFilterBuilder("prefix", Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
+    OmLCFilter.Builder lcFilter1 = getOmLCFilterBuilder("prefix", new Tag("key", "value"), VALID_OM_LC_AND_OPERATOR);
     assertOMException(() -> lcFilter1.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
-    OmLCFilter.Builder lcFilter2 = getOmLCFilterBuilder("prefix", Pair.of("key", "value"), null);
+    OmLCFilter.Builder lcFilter2 = getOmLCFilterBuilder("prefix", new Tag("key", "value"), null);
     assertOMException(() -> lcFilter2.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
@@ -86,7 +86,7 @@ class TestOmLCFilter {
     assertOMException(() -> lcFilter3.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
-    OmLCFilter.Builder lcFilter4 = getOmLCFilterBuilder(null, Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
+    OmLCFilter.Builder lcFilter4 = getOmLCFilterBuilder(null, new Tag("key", "value"), VALID_OM_LC_AND_OPERATOR);
     assertOMException(() -> lcFilter4.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
@@ -107,13 +107,13 @@ class TestOmLCFilter {
 
     // 3. Tag key too long
     String longKey = RandomStringUtils.randomAlphanumeric(129);
-    OmLCFilter.Builder longKeyFilter = getOmLCFilterBuilder(null, Pair.of(longKey, "value"), null);
+    OmLCFilter.Builder longKeyFilter = getOmLCFilterBuilder(null, new Tag(longKey, "value"), null);
     assertOMException(() -> longKeyFilter.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "A Tag's Key must be a length between 1 and 128");
 
     // 4. Tag value too long
     String longValue = RandomStringUtils.randomAlphanumeric(257);
-    OmLCFilter.Builder longValueFilter = getOmLCFilterBuilder(null, Pair.of("key", longValue), null);
+    OmLCFilter.Builder longValueFilter = getOmLCFilterBuilder(null, new Tag("key", longValue), null);
     assertOMException(() -> longValueFilter.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "A Tag's Value must be a length between 0 and 256");
   }
@@ -129,7 +129,7 @@ class TestOmLCFilter {
     assertNull(filterFromProto1.getAndOperator());
 
     // Only tag
-    OmLCFilter filter2 = getOmLCFilterBuilder(null, Pair.of("key", "value"), null).build();
+    OmLCFilter filter2 = getOmLCFilterBuilder(null, new Tag("key", "value"), null).build();
     LifecycleFilter proto2 = filter2.getProtobuf();
     OmLCFilter filterFromProto2 = OmLCFilter.getFromProtobuf(proto2, BucketLayout.DEFAULT);
     assertNull(filterFromProto2.getPrefix());

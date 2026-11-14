@@ -27,8 +27,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter.Tag;
 import org.junit.jupiter.api.function.Executable;
 
 /**
@@ -107,7 +107,7 @@ public final class OMLCUtils {
     return rBuilder;
   }
 
-  public static OmLCFilter.Builder getOmLCFilterBuilder(String filterPrefix, Pair<String, String> filterTag,
+  public static OmLCFilter.Builder getOmLCFilterBuilder(String filterPrefix, Tag filterTag,
                                                 OmLifecycleRuleAndOperator andOperator) {
     OmLCFilter.Builder lcfBuilder = new OmLCFilter.Builder()
         .setPrefix(filterPrefix)

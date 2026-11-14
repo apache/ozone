@@ -35,9 +35,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter.Tag;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 import org.junit.jupiter.api.Test;
 
@@ -183,7 +183,7 @@ class TestOmLCRule {
   @Test
   public void testRuleWithTagFilter() throws OMException {
     long currentTime = System.currentTimeMillis();
-    OmLCFilter filter = getOmLCFilterBuilder(null, Pair.of("app", "hadoop"), null).build();
+    OmLCFilter filter = getOmLCFilterBuilder(null, new Tag("app", "hadoop"), null).build();
 
     OmLCRule.Builder builder = new OmLCRule.Builder()
         .setId("tag-filter-rule")
@@ -256,7 +256,7 @@ class TestOmLCRule {
 
     // Case 1: Tag key too long
     String longKey = RandomStringUtils.randomAlphanumeric(OmLifecycleUtils.MAX_TAG_KEY_LENGTH + 1);
-    OmLCFilter filterKeyTooLong = getOmLCFilterBuilder(null, Pair.of(longKey, "value"), null).build();
+    OmLCFilter filterKeyTooLong = getOmLCFilterBuilder(null, new Tag(longKey, "value"), null).build();
     OmLCRule.Builder r1 = new OmLCRule.Builder()
         .setId("long-tag-key")
         .setEnabled(true)
@@ -267,7 +267,7 @@ class TestOmLCRule {
 
     // Case 2: Tag value too long
     String longValue = RandomStringUtils.randomAlphanumeric(OmLifecycleUtils.MAX_TAG_VALUE_LENGTH + 1);
-    OmLCFilter filterValueTooLong = getOmLCFilterBuilder(null, Pair.of("key", longValue), null).build();
+    OmLCFilter filterValueTooLong = getOmLCFilterBuilder(null, new Tag("key", longValue), null).build();
     OmLCRule.Builder r2 = new OmLCRule.Builder()
         .setId("long-tag-value")
         .setEnabled(true)

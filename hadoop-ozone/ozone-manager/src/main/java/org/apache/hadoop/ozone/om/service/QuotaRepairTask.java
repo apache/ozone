@@ -567,7 +567,7 @@ public class QuotaRepairTask {
     if (usage == null) {
       return;
     }
-    usage.incrSpace(val.getTotalSize().getRight());
+    usage.incrSpace(val.getTotalSize().getReplicatedSize());
     usage.incrNamespace(val.getOmKeyInfoList().size());
   }
 
