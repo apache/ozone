@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,12 +31,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.net.URI;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,6 +55,12 @@ import org.mockito.ArgumentCaptor;
  * so no cluster is required.
  */
 public class TestRootedOzoneFileSystemHeadOp {
+
+  private static final BlockLocation[] BLOCKS = {
+      new BlockLocation(new String[] {"dn1:9859"}, new String[] {"dn1"}, 0, 100),
+      new BlockLocation(new String[] {"dn2:9859"}, new String[] {"dn2"}, 100, 100),
+      new BlockLocation(new String[] {"dn3:9859"}, new String[] {"dn3"}, 200, 50),
+  };
 
   private BasicRootedOzoneClientAdapterImpl adapter;
   private BasicRootedOzoneFileSystem fs;
@@ -112,11 +124,94 @@ public class TestRootedOzoneFileSystemHeadOp {
   }
 
   @Test
-  public void fullGetFileStatusDoesNotUseHeadOp() throws IOException {
+  public void getFileStatusUsesHeadOp() throws IOException {
     stubStatus(false);
-    fs.getFileStatus(new Path("/vol/bucket/file"));
+    FileStatus status = fs.getFileStatus(new Path("/vol/bucket/file"));
+    assertFalse(status instanceof LocatedFileStatus);
     verify(adapter).getFileStatus(anyString(), any(URI.class), any(Path.class),
-        anyString(), eq(false));
+        anyString(), eq(true));
+  }
+
+  /** A 250 byte file: OM returns its block locations only for a full status. */
+  private void stubFileWithBlocks() throws IOException {
+    when(adapter.getFileStatus(anyString(), any(URI.class), any(Path.class), anyString(), anyBoolean()))
+        .thenAnswer(inv -> new FileStatusAdapter(250L, 750L, inv.getArgument(2), false, (short) 3, 100L, 0L, 0L,
+            (short) 0, "user", "group", null, inv.<Boolean>getArgument(4) ? new BlockLocation[0] : BLOCKS,
+            false, false));
+  }
+
+  private void verifyStatusCalls(int headOps, int fullStatuses) throws IOException {
+    verify(adapter, times(headOps)).getFileStatus(anyString(), any(URI.class), any(Path.class), anyString(),
+        eq(true));
+    verify(adapter, times(fullStatuses)).getFileStatus(anyString(), any(URI.class), any(Path.class), anyString(),
+        eq(false));
+  }
+
+  @Test
+  public void getFileStatusKeepsAttributes() throws IOException {
+    when(adapter.getFileStatus(anyString(), any(URI.class), any(Path.class), anyString(), anyBoolean()))
+        .thenAnswer(inv -> new FileStatusAdapter(250L, 750L, inv.getArgument(2), false, (short) 3, 100L, 7L, 7L,
+            (short) 0, "owner", "group", null, new BlockLocation[0], true, true));
+
+    FileStatus status = fs.getFileStatus(new Path("/vol/bucket/file"));
+    assertFalse(status instanceof LocatedFileStatus);
+    assertEquals(250, status.getLen());
+    assertEquals(7, status.getModificationTime());
+    assertEquals("owner", status.getOwner());
+    assertTrue(status.isFile());
+    assertTrue(status.isEncrypted());
+    assertTrue(status.isErasureCoded());
+  }
+
+  @Test
+  public void getFileBlockLocationsOfStatusFetchesLocations() throws IOException {
+    stubFileWithBlocks();
+    FileStatus status = fs.getFileStatus(new Path("/vol/bucket/file"));
+
+    assertThat(fs.getFileBlockLocations(status, 0, 250)).containsExactly(BLOCKS);
+    assertThat(fs.getFileBlockLocations(status, 150, 10)).containsExactly(BLOCKS[1]);
+    // like HDFS, an empty range returns the block containing start
+    assertThat(fs.getFileBlockLocations(status, 150, 0)).containsExactly(BLOCKS[1]);
+    verifyStatusCalls(1, 3);
+  }
+
+  @Test
+  public void getFileBlockLocationsOfPathRejectsInvalidRangeWithoutRpc() throws IOException {
+    stubFileWithBlocks();
+    Path file = new Path("/vol/bucket/file");
+
+    assertThrows(IllegalArgumentException.class, () -> fs.getFileBlockLocations(file, -1, 10));
+    assertThrows(IllegalArgumentException.class, () -> fs.getFileBlockLocations(file, 0, -1));
+    verifyStatusCalls(0, 0);
+  }
+
+  @Test
+  public void getFileBlockLocationsOfPathUsesOneRpc() throws IOException {
+    stubFileWithBlocks();
+
+    assertThat(fs.getFileBlockLocations(new Path("/vol/bucket/file"), 100, 150)).containsExactly(BLOCKS[1], BLOCKS[2]);
+    verifyStatusCalls(0, 1);
+  }
+
+  @Test
+  public void getFileBlockLocationsWithoutBlocksInRangeDoesNotFetch() throws IOException {
+    stubFileWithBlocks();
+    FileStatus status = fs.getFileStatus(new Path("/vol/bucket/file"));
+    FileStatus empty = new FileStatus(0, false, 3, 100, 0, status.getPath());
+    FileStatus dir = new FileStatus(0, true, 0, 0, 0, status.getPath());
+
+    assertThat(fs.getFileBlockLocations(status, 250, 10)).isEmpty();
+    assertThat(fs.getFileBlockLocations(empty, 0, 10)).isEmpty();
+    assertThat(fs.getFileBlockLocations(dir, 0, 10)).isEmpty();
+    assertNull(fs.getFileBlockLocations((FileStatus) null, 0, 10));
+    assertThrows(IllegalArgumentException.class, () -> fs.getFileBlockLocations(status, -1, 10));
+    // a status from listStatus keeps the placeholder location, so a listing that asks for the locations of every file
+    // (like Spark) does not pay an RPC per file
+    FileStatus listed = new FileStatus(250, false, 3, 100, 0, status.getPath());
+    BlockLocation[] placeholder = fs.getFileBlockLocations(listed, 0, 250);
+    assertThat(placeholder).hasSize(1);
+    assertThat(placeholder[0].getHosts()).containsExactly("localhost");
+    verifyStatusCalls(1, 0);
   }
 
   @Test

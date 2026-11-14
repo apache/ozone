@@ -848,16 +848,20 @@ public class BasicOzoneFileSystem extends FileSystem {
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
+  /**
+   * Like HDFS, the status has no block locations: OM skips the pipeline refresh (headOp).
+   * {@link #getFileBlockLocations} fetches the locations when they are asked for.
+   */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    return getFileStatus(f, false);
+    return getFileStatus(f, true);
   }
 
   /**
-   * @param headOp when true, requests a metadata-only (type) check so the OM
-   *               skips the pipeline refresh (SCM round-trip) and datanode
-   *               sorting. Used by {@link #isDirectory(Path)}/{@link #isFile(Path)},
-   *               which only need the entry type.
+   * @param headOp when true, requests a metadata-only check so the OM skips the
+   *               pipeline refresh (SCM round-trip) and datanode sorting, and the
+   *               status has no block locations. Used by {@link #getFileStatus(Path)},
+   *               {@link #isDirectory(Path)} and {@link #isFile(Path)}.
    */
   private FileStatus getFileStatus(Path f, boolean headOp) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
@@ -867,8 +871,9 @@ public class BasicOzoneFileSystem extends FileSystem {
     String key = pathToKey(qualifiedPath);
     FileStatus fileStatus = null;
     try {
-      fileStatus = convertFileStatus(
-          adapter.getFileStatus(key, uri, qualifiedPath, getUsername(), headOp));
+      FileStatusAdapter status = adapter.getFileStatus(key, uri, qualifiedPath, getUsername(), headOp);
+      fileStatus = headOp ? new FileStatusWithoutBlockLocations(convertFileStatus(status), status.isErasureCoded())
+          : convertFileStatus(status);
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         if (((OMException) ex).getResult()
@@ -887,18 +892,45 @@ public class BasicOzoneFileSystem extends FileSystem {
       throws IOException {
     if (fileStatus instanceof LocatedFileStatus) {
       return getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
-    } else {
-      return super.getFileBlockLocations(fileStatus, start, len);
     }
+    if (needsBlockLocations(fileStatus, start, len)) {
+      // getFileStatus returns no block locations: fetch them by path, as HDFS does.
+      return getFileBlockLocations(fileStatus.getPath(), start, len);
+    }
+    return super.getFileBlockLocations(fileStatus, start, len);
+  }
+
+  @Override
+  public BlockLocation[] getFileBlockLocations(Path p, long start, long len) throws IOException {
+    checkBlockLocationsRange(start, len);
+    // One GetFileStatus with block locations, instead of getFileStatus followed by another for the locations.
+    FileStatus fileStatus = getFileStatus(p, false);
+    if (fileStatus instanceof LocatedFileStatus) {
+      return getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
+    }
+    return super.getFileBlockLocations(fileStatus, start, len);
+  }
+
+  /** Rejects the range like {@link org.apache.hadoop.fs.FileSystem#getFileBlockLocations(FileStatus, long, long)}. */
+  static void checkBlockLocationsRange(long start, long len) {
+    if (start < 0 || len < 0) {
+      throw new IllegalArgumentException("Invalid start or len parameter");
+    }
+  }
+
+  /**
+   * Whether the block locations of the range must be fetched for a status from {@link #getFileStatus(Path)}.
+   */
+  static boolean needsBlockLocations(FileStatus fileStatus, long start, long len) {
+    return fileStatus instanceof FileStatusWithoutBlockLocations && fileStatus.isFile()
+        && start >= 0 && len >= 0 && start < fileStatus.getLen();
   }
 
   /**
    * Like HDFS, return only the blocks that overlap [start, start + len), or the block containing start if len is 0.
    */
   static BlockLocation[] getBlockLocationsInRange(LocatedFileStatus fileStatus, long start, long len) {
-    if (start < 0 || len < 0) {
-      throw new IllegalArgumentException("Invalid start or len parameter");
-    }
+    checkBlockLocationsRange(start, len);
     BlockLocation[] blocks = fileStatus.getBlockLocations();
     if (blocks == null) {
       return null;

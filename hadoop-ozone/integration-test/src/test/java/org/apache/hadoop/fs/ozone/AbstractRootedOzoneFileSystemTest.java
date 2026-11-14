@@ -280,6 +280,19 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
         userOfs.getHomeDirectory());
   }
 
+  /**
+   * Like HDFS, getFileStatus has no block locations (HDDS-17714): getFileBlockLocations fetches them, for a status
+   * and for a path.
+   */
+  @Test
+  void testGetFileBlockLocations() throws Exception {
+    Path path = new Path(bucketPath, "testGetFileBlockLocations");
+    byte[] data = ContractTestUtils.dataset(1024, 'a', 26);
+    ContractTestUtils.createFile(fs, path, true, data);
+
+    fileBlockLocations(fs, path, data.length);
+  }
+
   @Test
   void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path grandparent = new Path(bucketPath,
