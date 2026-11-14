@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Comparator;
@@ -138,8 +140,11 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         .get(ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
-    final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(new
-        SecurityConfig(ozoneConf), trustManager);
+    final SecurityConfig securityConfig;
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("SecurityConfig.init")) {
+      securityConfig = new SecurityConfig(ozoneConf);
+    }
+    final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(securityConfig, trustManager);
     return new XceiverClientRatis(pipeline,
         SupportedRpcType.valueOfIgnoreCase(rpcType),
         retryPolicy, tlsConfig, ozoneConf, errorInjector);
@@ -254,27 +259,50 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         return CompletableFuture.completedFuture(response);
       }
     }
-    return TracingUtil.executeInNewSpan(
-        "XceiverClientRatis." + request.getCmdType().name(), SpanKind.CLIENT,
-        () -> {
-          final ContainerCommandRequestMessage message
-              = ContainerCommandRequestMessage.toMessage(
-              request, TracingUtil.exportCurrentSpan());
-          if (HddsUtils.isReadOnly(request)) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync ReadOnly {}", message);
-            }
-            return getClient().async().sendReadOnly(message);
-          } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync {}", message);
-            }
-            return getClient().async().send(message);
-          }
-
+    Span span = TracingUtil.createSpan("XceiverClientRatis." + request.getCmdType().name(), SpanKind.CLIENT);
+    CompletableFuture<RaftClientReply> reply;
+    try (Scope ignored = span.makeCurrent()) {
+      addRequestAttributesToCurrentSpan(request);
+      final ContainerCommandRequestMessage message
+          = ContainerCommandRequestMessage.toMessage(
+          request, TracingUtil.exportCurrentSpan());
+      if (HddsUtils.isReadOnly(request)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("sendCommandAsync ReadOnly {}", message);
         }
+        reply = getClient().async().sendReadOnly(message);
+      } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("sendCommandAsync {}", message);
+        }
+        reply = getClient().async().send(message);
+      }
+    } catch (RuntimeException e) {
+      TracingUtil.recordException(span, e);
+      span.end();
+      throw e;
+    }
+    return reply.whenComplete((r, e) -> {
+      TracingUtil.recordException(span, e);
+      span.end();
+    });
+  }
 
-    );
+  private void addRequestAttributesToCurrentSpan(ContainerCommandRequestProto request) {
+    TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_CONTAINER_ID, request.getContainerID());
+    TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.PIPELINE_ID, getPipeline().getId().toString());
+    if (request.hasWriteChunk()) {
+      ContainerProtos.WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          writeChunk.getBlockID().getLocalID());
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_CHUNK_OFFSET,
+          writeChunk.getChunkData().getOffset());
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_CHUNK_LENGTH,
+          writeChunk.getChunkData().getLen());
+    } else if (request.hasPutBlock()) {
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          request.getPutBlock().getBlockData().getBlockID().getLocalID());
+    }
   }
 
   // gets the minimum log index replicated to all servers
