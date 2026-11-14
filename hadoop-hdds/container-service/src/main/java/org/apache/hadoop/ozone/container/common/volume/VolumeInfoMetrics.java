@@ -87,6 +87,9 @@ public class VolumeInfoMetrics implements MetricsSource {
   @Metric("Number of scans skipped for the volume")
   private MutableCounterLong numScansSkipped;
 
+  @Metric("Number of disk I/O errors hit while reading or writing container data and metadata on the volume")
+  private MutableCounterLong numDataPathIOErrors;
+
   @Metric("Write requests allowed while usable space is between the reported (soft) and hard min-free-space thresholds")
   private MutableCounterLong numWriteRequestsInSoftBandMinFreeSpace;
 
@@ -198,6 +201,14 @@ public class VolumeInfoMetrics implements MetricsSource {
 
   public void incNumScans() {
     numScans.incr();
+  }
+
+  public long getNumDataPathIOErrors() {
+    return numDataPathIOErrors.value();
+  }
+
+  public void incNumDataPathIOErrors() {
+    numDataPathIOErrors.incr();
   }
 
   public long getNumScansSkipped() {

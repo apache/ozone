@@ -59,6 +59,17 @@ public final class StorageVolumeUtil {
     }
   }
 
+  /**
+   * Same as {@link #onFailure(StorageVolume)}, but first records the error on the volume if it is a disk I/O error,
+   * so that disks failing on the data path can be identified even if the volume check itself passes.
+   */
+  public static void onFailure(StorageVolume volume, Throwable cause) {
+    if (volume instanceof HddsVolume && DiskCheckUtil.isDiskIOError(cause)) {
+      ((HddsVolume) volume).recordDataPathIOError(cause);
+    }
+    onFailure(volume);
+  }
+
   public static List<HddsVolume> getHddsVolumesList(
       List<StorageVolume> volumes) {
     return volumes.stream().

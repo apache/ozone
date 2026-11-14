@@ -136,7 +136,7 @@ public final class BlockUtils {
             containerData.getSchemaVersion(), conf);
       }
     } catch (IOException ex) {
-      onFailure(containerData.getVolume());
+      onFailure(containerData.getVolume(), ex);
       String message = String.format("Error opening DB. Container:%s " +
           "ContainerPath:%s", containerData.getContainerID(), containerData
           .getDbFile().getPath());
