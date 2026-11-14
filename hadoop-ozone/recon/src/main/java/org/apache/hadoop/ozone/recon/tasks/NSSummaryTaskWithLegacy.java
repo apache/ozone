@@ -137,17 +137,17 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           processWithObjectStoreLayout(updatedKeyInfo, oldKeyInfo, action,
               nsSummaryMap);
         }
-      } catch (IOException ioEx) {
+        if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+          if (!flushAndCommitNSToDB(nsSummaryMap)) {
+            return new ImmutablePair<>(seekPos, false);
+          }
+          seekPos = itrPos + eventCounter;
+        }
+      } catch (IOException | RuntimeException ex) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
+            ex);
         nsSummaryMap.clear();
         return new ImmutablePair<>(seekPos, false);
-      }
-      if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-        if (!flushAndCommitNSToDB(nsSummaryMap)) {
-          return new ImmutablePair<>(seekPos, false);
-        }
-        seekPos = eventCounter + 1;
       }
     }
 
@@ -157,7 +157,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithLegacy");
-    return new ImmutablePair<>(seekPos, true);
+    return new ImmutablePair<>(itrPos + eventCounter, true);
   }
 
   private void processWithFileSystemLayout(OmKeyInfo updatedKeyInfo,
