@@ -320,6 +320,42 @@ public class KeyLifecycleService extends BackgroundService {
     private long lastStateSaveTime = Time.monotonicNow();
     private long lastStateSaveKeyCount = 0;
     private boolean scanAborted;
+    private boolean policyChanged;
+
+    /**
+     * Checks whether the bucket's lifecycle configuration was deleted or updated after this task was scheduled.
+     * Stop the task if the bucket's lifecycle configuration is deleted or updated.
+     */
+    private boolean checkPolicyChange() {
+      if (!policyChanged) {
+        String bucketKey = omMetadataManager.getBucketKey(policy.getVolume(), policy.getBucket());
+        try {
+          OmLifecycleConfiguration current = omMetadataManager.getLifecycleConfigurationTable().get(bucketKey);
+          policyChanged = current == null || current.getUpdateID() != policy.getUpdateID();
+        } catch (IOException e) {
+          LOG.warn("Failed to get lifecycle configuration of bucket {}", bucketKey, e);
+          policyChanged = true;
+        }
+        if (policyChanged) {
+          LOG.info("Lifecycle configuration of bucket {} is deleted or updated, stopping task", bucketKey);
+        }
+      }
+      return policyChanged;
+    }
+
+    /**
+     * Returns false if the task should stop, either the service is suspended, disabled, not leader or about to
+     * restart, or the bucket's lifecycle configuration is deleted or updated.
+     */
+    private boolean shouldContinue(String bucketName) {
+      if (!shouldRun()) {
+        scanAborted = true;
+        LOG.info("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart. " +
+            "Stopping task for bucket {}.", bucketName);
+        return false;
+      }
+      return !policyChanged;
+    }
 
     private boolean shouldSaveState() {
       if ((Time.monotonicNow() - lastStateSaveTime) > stateSaveIntervalMs ||
@@ -339,6 +375,7 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     @Override
+    @SuppressWarnings("checkstyle:MethodLength")
     public BackgroundTaskResult call() {
       EmptyTaskResult result = EmptyTaskResult.newResult();
       String bucketKey = omMetadataManager.getBucketKey(policy.getVolume(), policy.getBucket());
@@ -367,6 +404,11 @@ public class KeyLifecycleService extends BackgroundService {
         } catch (IOException e) {
           LOG.warn("Failed to get Bucket {}", bucketKey, e);
           onFailure(bucketKey);
+          return result;
+        }
+
+        if (checkPolicyChange()) {
+          onSuccess(bucketKey);
           return result;
         }
 
@@ -686,10 +728,7 @@ public class KeyLifecycleService extends BackgroundService {
 
       HashSet<Long> deletedDirSet = new HashSet<>();
       while (!stack.isEmpty()) {
-        if (!shouldRun()) {
-          scanAborted = true;
-          LOG.info("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart. " +
-              "Stopping task for bucket {}.", bucketName);
+        if (!shouldContinue(bucketName)) {
           return;
         }
 
@@ -1049,10 +1088,7 @@ public class KeyLifecycleService extends BackgroundService {
         }
 
         while (keyTblItr.hasNext()) {
-          if (!shouldRun()) {
-            scanAborted = true;
-            LOG.info("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart. " +
-                "Stopping task for bucket {}.", bucketName);
+          if (!shouldContinue(bucketName)) {
             return;
           }
           if (shouldSaveState()) {
@@ -1119,10 +1155,7 @@ public class KeyLifecycleService extends BackgroundService {
       try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
                omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
         while (mpuIterator.hasNext()) {
-          if (!shouldRun()) {
-            scanAborted = true;
-            LOG.info("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart. " +
-                "Stopping task for bucket {}.", bucketName);
+          if (!shouldContinue(bucketName)) {
             return;
           }
           Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
@@ -1308,6 +1341,10 @@ public class KeyLifecycleService extends BackgroundService {
       if (expiredUploads.isEmpty()) {
         return;
       }
+      if (checkPolicyChange()) {
+        expiredUploads.clear();
+        return;
+      }
 
       abortExpiredMultipartUploads(bucketInfo, expiredUploads.getUploads());
       expiredUploads.clear();
@@ -1399,7 +1436,7 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     private void sendSaveScanStateRequest(OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
-      if (scanStateBuilder != null) {
+      if (scanStateBuilder != null && !checkPolicyChange()) {
         if (lastScannedDir != null) {
           scanStateBuilder.setLastScannedDir(lastScannedDir);
         }
@@ -1444,6 +1481,10 @@ public class KeyLifecycleService extends BackgroundService {
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
+        }
+
+        if (checkPolicyChange()) {
+          return;
         }
 
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bucketOwner);
@@ -1571,6 +1612,10 @@ public class KeyLifecycleService extends BackgroundService {
 
     private void moveToTrash(OmBucketInfo bucket, LimitedExpiredObjectList keysList, boolean isDir) {
       if (keysList.isEmpty()) {
+        return;
+      }
+      if (checkPolicyChange()) {
+        keysList.clear();
         return;
       }
       String volumeName = bucket.getVolumeName();
