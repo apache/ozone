@@ -29,11 +29,13 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OpenKeyDBKey;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -195,6 +197,12 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
             continue;
           }
 
+          final String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+          if (hsyncClientId != null && isReferencedByCommittedKey(omMetadataManager, fullKeyName, hsyncClientId)) {
+            LOG.debug("Key {} was not deleted, as the committed key still refers to it.", fullKeyName);
+            continue;
+          }
+
           // Set the UpdateID to current transactionLogIndex
           omKeyInfo = omKeyInfo.toBuilder()
               .setUpdateID(trxnLogIndex)
@@ -225,4 +233,15 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     }
   }
 
+  private boolean isReferencedByCommittedKey(OMMetadataManager omMetadataManager, String openKeyName,
+      String hsyncClientId) throws IOException {
+    final OpenKeyDBKey openKey = new OpenKeyDBKey(openKeyName);
+    if (openKey.isUpload() || !hsyncClientId.equals(String.valueOf(openKey.getClientId()))) {
+      return false;
+    }
+    final OmKeyInfo committedKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(openKey.getKeyTableDBKey());
+    return committedKeyInfo != null
+        && hsyncClientId.equals(committedKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID));
+  }
 }

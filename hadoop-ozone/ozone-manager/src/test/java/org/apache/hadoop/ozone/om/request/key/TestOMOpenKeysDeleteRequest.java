@@ -46,11 +46,16 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -66,6 +71,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  * This class tests the OM Open Keys Delete Request.
  */
 public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
+
+  /** Transaction index of the hsync that lands before the open key cleanup is applied at 100. */
+  private static final long HSYNC_TRXN_INDEX = 50L;
 
   private BucketLayout bucketLayout;
 
@@ -266,6 +274,107 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
 
     assertInOpenKeyTable(keysWithHigherUpdateID);
     assertNotInOpenKeyTable(keysWithSameUpdateID);
+  }
+
+  /**
+   * Tests that an open key hsync'ed after it was selected for cleanup is kept
+   * as long as the committed key still refers to it.
+   */
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteHsyncedKeys(BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
+    final String volume = UUID.randomUUID().toString();
+    final String bucket = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket,
+        omMetadataManager, getBucketLayout());
+
+    final List<Pair<Long, OmKeyInfo>> openKeys = new ArrayList<>();
+    for (Pair<Long, OmKeyInfo> openKey : makeOpenKeys(volume, bucket, 3)) {
+      final OmKeyInfo keyInfo = openKey.getRight().toBuilder()
+          .setOmKeyLocationInfos(Collections.singletonList(
+              new OmKeyLocationInfoGroup(0L, new ArrayList<>(), false)))
+          .build();
+      openKeys.add(Pair.of(openKey.getLeft(), keyInfo));
+    }
+    // a non-zero key size so that the keys have blocks that can be queued for deletion.
+    // The DB copy carries no HSYNC_CLIENT_ID, which is why the cleanup scan selected these keys.
+    addToOpenKeyTableDB(100L, openKeys);
+
+    // the first hsync of each key is only in the open key table cache when the delete is applied
+    final List<String> dbKeyNames = getDBKeyNames(openKeys);
+    final List<Pair<Long, OmKeyInfo>> hsyncedKeys = new ArrayList<>(openKeys.size());
+    for (int i = 0; i < openKeys.size(); i++) {
+      final long clientId = openKeys.get(i).getLeft();
+      final OmKeyInfo hsyncedKeyInfo = hsync(openKeys.get(i).getRight(), clientId).toBuilder()
+          .setUpdateID(HSYNC_TRXN_INDEX)
+          .build();
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+          new CacheKey<>(dbKeyNames.get(i)), CacheValue.get(HSYNC_TRXN_INDEX, hsyncedKeyInfo));
+      hsyncedKeys.add(Pair.of(clientId, hsyncedKeyInfo));
+    }
+    final List<Pair<Long, OmKeyInfo>> keysToKeep = hsyncedKeys.subList(0, 1);
+    final List<Pair<Long, OmKeyInfo>> keysToDelete = hsyncedKeys.subList(1, 3);
+
+    // the committed key of the first open key still refers to it
+    addToKeyTableDB(hsyncedKeys.get(0).getRight());
+    // the second was overwritten, so its committed key carries another client's ID
+    addToKeyTableDB(hsync(hsyncedKeys.get(1).getRight(), hsyncedKeys.get(1).getLeft() + 1));
+    // the third has no committed key at all
+
+    final OMRequest omRequest = doPreExecute(createDeleteOpenKeyRequest(hsyncedKeys));
+    final OMClientResponse omClientResponse = new OMOpenKeysDeleteRequest(omRequest, getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
+
+    assertInOpenKeyTable(keysToKeep);
+    assertNotInOpenKeyTable(keysToDelete);
+
+    // the kept key's blocks must not be queued for deletion
+    try (BatchOperation batchOperation =
+        omMetadataManager.getStore().initBatchOperation()) {
+      omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    assertNotInDeletedTable(keysToKeep);
+    assertInDeletedTable(keysToDelete);
+  }
+
+  private void assertInDeletedTable(List<Pair<Long, OmKeyInfo>> openKeys) throws Exception {
+    for (String deletePathKey : getDeletePathKeys(openKeys)) {
+      assertTrue(omMetadataManager.getDeletedTable().isExist(deletePathKey));
+    }
+  }
+
+  private void assertNotInDeletedTable(List<Pair<Long, OmKeyInfo>> openKeys) throws Exception {
+    for (String deletePathKey : getDeletePathKeys(openKeys)) {
+      assertFalse(omMetadataManager.getDeletedTable().isExist(deletePathKey));
+    }
+  }
+
+  private List<String> getDeletePathKeys(List<Pair<Long, OmKeyInfo>> openKeys) throws IOException {
+    final List<String> dbKeyNames = getDBKeyNames(openKeys);
+    final List<String> result = new ArrayList<>(openKeys.size());
+    for (int i = 0; i < openKeys.size(); i++) {
+      result.add(omMetadataManager.getOzoneDeletePathKey(
+          openKeys.get(i).getRight().getObjectID(), dbKeyNames.get(i)));
+    }
+    return result;
+  }
+
+  private OmKeyInfo hsync(OmKeyInfo keyInfo, long clientId) {
+    return keyInfo.withMetadataMutations(
+        metadata -> metadata.put(OzoneConsts.HSYNC_CLIENT_ID, String.valueOf(clientId)));
+  }
+
+  private void addToKeyTableDB(OmKeyInfo keyInfo) throws Exception {
+    if (getBucketLayout().isFileSystemOptimized()) {
+      OMRequestTestUtils.addFileToKeyTable(false, false, keyInfo.getFileName(),
+          keyInfo, 0L, 0L, omMetadataManager);
+    } else {
+      OMRequestTestUtils.addKeyToTable(false, false, keyInfo, 0L, 0L, omMetadataManager);
+    }
   }
 
   /**
