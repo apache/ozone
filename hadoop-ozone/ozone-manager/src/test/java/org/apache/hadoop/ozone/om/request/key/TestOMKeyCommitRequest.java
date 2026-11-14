@@ -571,6 +571,85 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertEquals(1, bucketInfo.getUsedNamespace());
   }
 
+  @Test
+  public void testRejectedOverwriteCommitKeepsHsyncedKeyWritable() throws Exception {
+    // Create a bucket with quotaInNamespace = 1.
+    OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketLayout(getBucketLayout())
+        .setQuotaInNamespace(1L));
+
+    // The writer A hsyncs the key, which uses up the namespace quota.
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(3);
+    doKeyCommit(true, allocatedKeyLocationList);
+    long hsyncClientID = clientID;
+
+    // Previous key should be there in key table.
+    String ozoneKey = getOzonePathKey();
+    OmKeyInfo originalKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    assertNotNull(originalKeyInfo);
+
+    // The commit of writer B overwriting the key is rejected.
+    clientID = hsyncClientID + 1;
+    OMKeyCommitRequest overwriteRequest =
+        getOmKeyCommitRequest(doPreExecute(createCommitKeyRequest(allocatedKeyLocationList, false)));
+    List<OmKeyLocationInfo> allocatedBlockList = allocatedKeyLocationList
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .toList();
+    addKeyToOpenKeyTable(allocatedBlockList);
+
+    OMClientResponse omClientResponse =
+        overwriteRequest.validateAndUpdateCache(ozoneManager, 101L);
+    assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
+        omClientResponse.getOMResponse().getStatus());
+
+    // The key has not been overwritten, so the writer A can still hsync it.
+    clientID = hsyncClientID;
+    OMKeyCommitRequest hsyncRequest =
+        getOmKeyCommitRequest(doPreExecute(createCommitKeyRequest(allocatedKeyLocationList, true)));
+    assertEquals(OK, hsyncRequest.validateAndUpdateCache(ozoneManager, 102L).getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testRejectedAtomicRewriteCommitKeepsHsyncedKeyWritable() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    // The writer A hsyncs the key.
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(3);
+    doKeyCommit(true, allocatedKeyLocationList);
+    long hsyncClientID = clientID;
+
+    // Previous key should be there in key table.
+    String ozoneKey = getOzonePathKey();
+    OmKeyInfo originalKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    assertNotNull(originalKeyInfo);
+
+    // The commit of writer B overwriting the key is rejected, as it expects a data generation
+    // that is no longer the current one.
+    clientID = hsyncClientID + 1;
+    OMKeyCommitRequest overwriteRequest =
+        getOmKeyCommitRequest(doPreExecute(createCommitKeyRequest(allocatedKeyLocationList, false)));
+    List<OmKeyLocationInfo> allocatedBlockList = allocatedKeyLocationList
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .toList();
+    OmKeyInfo.Builder rewriteKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()))
+        .setExpectedDataGeneration(originalKeyInfo.getUpdateID() + 1);
+    addKeyToOpenKeyTable(allocatedBlockList, rewriteKeyInfoBuilder);
+
+    OMClientResponse omClientResponse =
+        overwriteRequest.validateAndUpdateCache(ozoneManager, 101L);
+    assertEquals(OzoneManagerProtocolProtos.Status.ATOMIC_WRITE_CONFLICT, omClientResponse.getOMResponse().getStatus());
+
+    // The key has not been overwritten, so the writer A can still hsync it.
+    clientID = hsyncClientID;
+    OMKeyCommitRequest hsyncRequest =
+        getOmKeyCommitRequest(doPreExecute(createCommitKeyRequest(allocatedKeyLocationList, true)));
+    assertEquals(OK, hsyncRequest.validateAndUpdateCache(ozoneManager, 102L).getOMResponse().getStatus());
+  }
+
   private Map<String, RepeatedOmKeyInfo> doKeyCommit(boolean isHSync,
       List<KeyLocation> keyLocations) throws Exception {
     // allocated block list
