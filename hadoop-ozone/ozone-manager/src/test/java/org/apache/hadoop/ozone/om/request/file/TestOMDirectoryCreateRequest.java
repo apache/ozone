@@ -122,7 +122,7 @@ public class TestOMDirectoryCreateRequest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"a/b/c", "a/.snapshot/c", "a.snapshot/b/c"})
+  @ValueSource(strings = {"a/b/c", "a/.snapshot/c", "a.snapshot/b/c", "a/./b/"})
   public void testPreExecute(String keyName) throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
@@ -140,6 +140,7 @@ public class TestOMDirectoryCreateRequest {
 
     // As in preExecute, we modify the original request.
     assertNotEquals(omRequest, modifiedOmRequest);
+    assertEquals(keyName, modifiedOmRequest.getCreateDirectoryRequest().getKeyArgs().getKeyName());
   }
 
   // Test verifies that .snapshot is not allowed as root dir name.
