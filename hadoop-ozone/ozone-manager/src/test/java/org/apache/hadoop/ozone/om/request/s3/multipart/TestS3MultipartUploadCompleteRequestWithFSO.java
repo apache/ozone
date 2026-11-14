@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -158,6 +160,10 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     String uploadId = getS3InitiateMultipartUploadReq(initiateRequest).validateAndUpdateCache(ozoneManager, 1L)
         .getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
     String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "a");
+    long dirId = omMetadataManager.getDirectoryTable().get(dirKey).getObjectID();
+    String openKey = omMetadataManager.getMultipartKey(volumeId, bucketId, dirId, "b", uploadId);
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    assertNotNull(openKeyInfo);
     omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(dirKey), CacheValue.get(2L));
     OmKeyInfo fileInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "a",
         RatisReplicationConfig.getInstance(ONE)).setParentObjectID(bucketId).build();
@@ -167,8 +173,46 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     OMClientResponse response = getS3MultipartUploadCompleteReq(request).validateAndUpdateCache(ozoneManager, 3L);
 
     assertEquals(OzoneManagerProtocolProtos.Status.NOT_A_FILE, response.getOMResponse().getStatus());
+    assertEquals(openKeyInfo, omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
     assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(omMetadataManager.getMultipartKey(volumeId, bucketId, bucketId, "b", uploadId)));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheDirectoryExistsAtKey() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    addVolumeAndBucket(volumeName, bucketName);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    OMClientResponse initiateResponse = getS3InitiateMultipartUploadReq(
+        doPreExecuteInitiateMPU(volumeName, bucketName, "x/a")).validateAndUpdateCache(ozoneManager, 1L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, initiateResponse.getOMResponse().getStatus());
+    String uploadId = initiateResponse.getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+    long oldParentId = omMetadataManager.getDirectoryTable()
+        .get(omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "x")).getObjectID();
+    String openKey = omMetadataManager.getMultipartKey(volumeId, bucketId, oldParentId, "a", uploadId);
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName, "x/a", uploadId);
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager.getMultipartInfoTable().get(multipartKey);
+    assertNotNull(openKeyInfo);
+    assertNotNull(multipartKeyInfo);
+    // Replace "x" with a new directory that has a directory "a" in it.
+    OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, "x/a", omMetadataManager);
+    long newParentId = omMetadataManager.getDirectoryTable()
+        .get(omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "x")).getObjectID();
+    assertNotEquals(oldParentId, newParentId);
+
+    OMRequest request = doPreExecuteCompleteMPU(volumeName, bucketName, "x/a", uploadId, new ArrayList<>());
+    OMClientResponse response = getS3MultipartUploadCompleteReq(request).validateAndUpdateCache(ozoneManager, 3L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.NOT_A_FILE, response.getOMResponse().getStatus());
+    assertEquals(openKeyInfo, omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
+    assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(omMetadataManager.getMultipartKey(volumeId, bucketId, newParentId, "a", uploadId)));
+    OmMultipartKeyInfo multipartKeyInfoAfter = omMetadataManager.getMultipartInfoTable().get(multipartKey);
+    assertNotNull(multipartKeyInfoAfter);
+    assertEquals(multipartKeyInfo.getUpdateID(), multipartKeyInfoAfter.getUpdateID());
   }
 
   @Test

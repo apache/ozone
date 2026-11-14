@@ -42,6 +42,8 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -190,6 +192,26 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
         omBucketInfo == null ? 1000 : omBucketInfo.getObjectID(),
         keyName, id);
 
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testAtomicRewriteOnDirectoryReturnsKeyNotFound(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, keyName, omMetadataManager);
+
+    OMRequest omRequest = createKeyRequest(false, 0);
+    KeyArgs keyArgs = omRequest.getCreateKeyRequest().getKeyArgs().toBuilder().setExpectedDataGeneration(1L).build();
+    omRequest = omRequest.toBuilder()
+        .setCreateKeyRequest(omRequest.getCreateKeyRequest().toBuilder().setKeyArgs(keyArgs)).build();
+    omRequest = getOMKeyCreateRequest(omRequest).preExecute(ozoneManager);
+    OMClientResponse response = getOMKeyCreateRequest(omRequest).validateAndUpdateCache(ozoneManager, 100L);
+
+    // The rewrite precondition is checked before the path, so a directory at the key gives KEY_NOT_FOUND.
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND, response.getOMResponse().getStatus());
   }
 
   @Override

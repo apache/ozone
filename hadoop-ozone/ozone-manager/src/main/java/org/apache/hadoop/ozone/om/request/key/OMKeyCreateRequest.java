@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
@@ -259,15 +256,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
             pathInfo.getDirectoryResult();
 
         // Check if a file or directory exists with same key name.
-        if (omDirectoryResult == DIRECTORY_EXISTS) {
-          throw new OMException("Cannot write to " +
-              "directory. createIntermediateDirs behavior is enabled and " +
-              "hence / has special interpretation: " + keyName, NOT_A_FILE);
-        } else
-          if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-            throw new OMException("Can not create file: " + keyName +
-                " as there is already file in the given path", NOT_A_FILE);
-          }
+        OMFileRequest.checkDirectoryResult(keyName, true, omDirectoryResult);
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
             pathInfo.getMissingParents(), bucketInfo,

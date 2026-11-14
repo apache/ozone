@@ -179,6 +179,22 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     }
   }
 
+  @Test
+  public void testInitiateMultipartUploadOnDirectory() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, "dir", omMetadataManager);
+
+    OMRequest request = doPreExecuteInitiateMPUWithFSO(volumeName, bucketName, "dir");
+    OMClientResponse response = getS3InitiateMultipartUploadReq(request).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.NOT_A_FILE, response.getOMResponse().getStatus());
+    String uploadId = request.getInitiateMultiPartUploadRequest().getKeyArgs().getMultipartUploadID();
+    assertNull(omMetadataManager.getMultipartInfoTable()
+        .get(omMetadataManager.getMultipartKey(volumeName, bucketName, "dir", uploadId)));
+  }
+
   private long verifyDirectoriesInDB(List<String> dirs, final long volumeId,
                                      final long bucketId)
       throws IOException {
