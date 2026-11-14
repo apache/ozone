@@ -212,8 +212,11 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
     ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 1 /tmp/${PREFIX}-multipartKey3-part1.result
     Compare files       /tmp/part1         /tmp/${PREFIX}-multipartKey3-part1.result
 
-    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 3 /tmp/${PREFIX}-multipartKey3-part2.result
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 2 /tmp/${PREFIX}-multipartKey3-part2.result
     Compare files       /tmp/part2         /tmp/${PREFIX}-multipartKey3-part2.result
+
+    ${result} =         Execute AWSS3APICli and checkrc    get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 3 /tmp/${PREFIX}-multipartKey3-part3.result    255
+                        Should contain          ${result}    InvalidPart
 
 Test abort Multipart upload
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey4    0     --storage-class REDUCED_REDUNDANCY
