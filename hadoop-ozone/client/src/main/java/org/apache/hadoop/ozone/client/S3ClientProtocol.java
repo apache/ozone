@@ -495,13 +495,14 @@ final class S3ClientProtocol implements ClientProtocol {
   @Override
   public OzoneMultipartUploadPartListParts listParts(String volumeName, String bucketName, String keyName,
       String uploadID, int partNumberMarker, int maxParts) throws IOException {
-    return delegate.listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts);
+    return delegate.listParts(resolveVolumeName(volumeName), bucketName, keyName, uploadID, partNumberMarker, maxParts);
   }
 
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumename, String bucketName, String prefix,
       String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
-    return delegate.listMultipartUploads(volumename, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
+    return delegate.listMultipartUploads(
+        resolveVolumeName(volumename), bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
   }
 
   @Override

@@ -1986,6 +1986,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public OmMultipartUploadListParts listParts(String volumeName,
       String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts) throws IOException {
+    return listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts, false);
+  }
+
+  @Override
+  public OmMultipartUploadListParts listParts(String volumeName, String bucketName, String keyName, String uploadID,
+      int partNumberMarker, int maxParts, boolean assumeS3Context) throws IOException {
     MultipartUploadListPartsRequest.Builder multipartUploadListPartsRequest =
         MultipartUploadListPartsRequest.newBuilder();
     multipartUploadListPartsRequest.setVolume(volumeName)
@@ -1993,6 +1999,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setPartNumbermarker(partNumberMarker).setMaxParts(maxParts);
 
     OMRequest omRequest = createOMRequest(Type.ListMultiPartUploadParts)
+        .setAssumeS3Context(assumeS3Context)
         .setListMultipartUploadPartsRequest(
             multipartUploadListPartsRequest.build()).build();
 
@@ -2018,6 +2025,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       String bucketName,
       String prefix,
       String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws IOException {
+    return listMultipartUploads(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+        withPagination, false);
+  }
+
+  @Override
+  public OmMultipartUploadList listMultipartUploads(String volumeName, String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination, boolean assumeS3Context)
+      throws IOException {
     ListMultipartUploadsRequest request = ListMultipartUploadsRequest
         .newBuilder()
         .setVolume(volumeName)
@@ -2030,6 +2045,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     OMRequest omRequest = createOMRequest(Type.ListMultipartUploads)
+        .setAssumeS3Context(assumeS3Context)
         .setListMultipartUploadsRequest(request)
         .build();
 

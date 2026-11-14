@@ -2495,6 +2495,11 @@ public class RpcClient implements ClientProtocol {
   public OzoneMultipartUploadPartListParts listParts(String volumeName,
       String bucketName, String keyName, String uploadID, int partNumberMarker,
       int maxParts)  throws IOException {
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(uploadID);
@@ -2505,7 +2510,7 @@ public class RpcClient implements ClientProtocol {
         " 1 and ranges till 10000");
     OmMultipartUploadListParts omMultipartUploadListParts =
         ozoneManagerClient.listParts(volumeName, bucketName, keyName,
-            uploadID, partNumberMarker, maxParts);
+            uploadID, partNumberMarker, maxParts, assumeS3Context);
 
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         new OzoneMultipartUploadPartListParts(
@@ -2527,17 +2532,17 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
 
-    OmMultipartUploadList omMultipartUploadList;
-    if (OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION.isSupportedBy(getOmVersion())) {
-      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
-          uploadIdMarker, maxUploads, true);
-    } else {
-      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
-          uploadIdMarker, maxUploads, false);
-    }
+    boolean withPagination = OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION.isSupportedBy(getOmVersion());
+    OmMultipartUploadList omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName,
+        prefix, keyMarker, uploadIdMarker, maxUploads, withPagination, assumeS3Context);
     List<OzoneMultipartUpload> uploads = omMultipartUploadList.getUploads()
         .stream()
         .map(upload -> new OzoneMultipartUpload(upload.getVolumeName(),

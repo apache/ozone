@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
+import java.io.IOException;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -27,6 +30,21 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadCon
  * when communicating with Ozone Manager.
  */
 public interface OzoneManagerClientProtocol extends OzoneManagerProtocol {
+  /**
+   * Lists the parts of a multipart upload.
+   * @param assumeS3Context if true, OM resolves the S3 volume and ignores the given volume name.
+   */
+  OmMultipartUploadListParts listParts(String volumeName, String bucketName, String keyName, String uploadID,
+      int partNumberMarker, int maxParts, boolean assumeS3Context) throws IOException;
+
+  /**
+   * Lists in-flight multipart uploads.
+   * @param assumeS3Context if true, OM resolves the S3 volume and ignores the given volume name.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  OmMultipartUploadList listMultipartUploads(String volumeName, String bucketName, String prefix, String keyMarker,
+      String uploadIdMarker, int maxUploads, boolean withPagination, boolean assumeS3Context) throws IOException;
+
   /**
    * Sets the S3 Authentication information when OM request is generated as
    * part of the S3 API implementation from Ozone. S3 Gateway needs to add
