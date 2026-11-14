@@ -46,6 +46,9 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseFileChecksumHelper {
   static final Logger LOG =
       LoggerFactory.getLogger(BaseFileChecksumHelper.class);
+  // MD5 of a 32 byte zero-padded byte array, the checksum of an empty key. Explicitly sized here in case the default
+  // DataOutputBuffer buffer length value is changed in future.
+  private static final byte[] EMPTY_KEY_MD5 = MD5Hash.digest(new byte[32]).getDigest();
   private OmKeyInfo keyInfo;
 
   private String volumeName;
@@ -198,8 +201,14 @@ public abstract class BaseFileChecksumHelper {
          blockIdx++) {
       OmKeyLocationInfo keyLocationInfo =
           getKeyLocationInfoList().get(blockIdx);
-      if (currentLength > getLength()) {
+      if (currentLength >= getLength()) {
+        // The blocks so far cover the requested length.
         return;
+      }
+      if (keyLocationInfo.getLength() == 0) {
+        // An empty block adds no bytes to the key, so it adds nothing to the checksum.
+        LOG.debug("Skipped empty block index {}", blockIdx);
+        continue;
       }
 
       if (!checksumBlock(keyLocationInfo)) {
@@ -312,12 +321,7 @@ public abstract class BaseFileChecksumHelper {
      * magic entry that matches the md5 of a 32 byte zero-padded byte array.
      */
     if (keyLocationInfos == null || keyLocationInfos.isEmpty()) {
-      // Explicitly specified here in case the default DataOutputBuffer
-      // buffer length value is changed in future.
-      final int lenOfZeroBytes = 32;
-      byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
-      MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-      fileChecksum = new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+      fileChecksum = makeEmptyFileChecksum();
     } else {
       checksumBlocks();
       fileChecksum = makeFinalResult();
@@ -325,10 +329,22 @@ public abstract class BaseFileChecksumHelper {
   }
 
   /**
+   * @return the checksum of an empty key, the magic entry that matches the md5 of a 32 byte zero-padded byte array.
+   */
+  private static FileChecksum makeEmptyFileChecksum() {
+    // A new instance per call: FileChecksum and MD5Hash are mutable Writables.
+    return new MD5MD5CRC32GzipFileChecksum(0, 0, new MD5Hash(EMPTY_KEY_MD5.clone()));
+  }
+
+  /**
    * Make final file checksum result given the per-block or per-block-group
    * checksums collected into getBlockChecksumBuf().
    */
   private FileChecksum makeFinalResult() throws IOException {
+    if (getBlockChecksumBuf().getLength() == 0) {
+      // Every block is empty, e.g. a zero-length key whose writer died after allocating a block.
+      return makeEmptyFileChecksum();
+    }
     switch (getCombineMode()) {
     case MD5MD5CRC:
       return makeMd5CrcResult();
@@ -377,14 +393,25 @@ public abstract class BaseFileChecksumHelper {
     }
     CrcComposer crcComposer =
         CrcComposer.newCrcComposer(toHadoopChecksumType(), blockSizeHint);
+    // NB: blockChecksumBytes.length may be much longer than actual bytes written into the DataOutput.
     byte[] blockChecksumBytes = blockChecksumBuf.getData();
+    int checksumOffset = 0;
 
     for (int i = 0; i < keyLocationInfos.size(); ++i) {
       OmKeyLocationInfo block = keyLocationInfos.get(i);
+      if (block.getLength() == 0) {
+        // checksumBlocks() skipped the empty block, there is no CRC to read.
+        continue;
+      }
+      if (checksumOffset >= blockChecksumBuf.getLength()) {
+        // checksumBlocks() stopped before this block because of the requested length.
+        break;
+      }
       // For every LocatedBlock, we expect getBlockSize()
       // to accurately reflect the number of file bytes digested in the block
       // checksum.
-      int blockCrc = CrcUtil.readInt(blockChecksumBytes, i * 4);
+      int blockCrc = CrcUtil.readInt(blockChecksumBytes, checksumOffset);
+      checksumOffset += Integer.BYTES;
 
       crcComposer.update(blockCrc, block.getLength());
       LOG.debug(
