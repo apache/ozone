@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -32,13 +34,16 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -54,6 +59,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -108,6 +114,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
   private KeyValueHandler keyValueHandler;
   private ContainerChecksumTreeManager checksumTreeManager;
   private DiskBalancerServiceTestImpl diskBalancerService;
+  private final List<Container> icrContainers = new CopyOnWriteArrayList<>();
 
   private HddsVolume hotVolume;
   private HddsVolume coldVolume;
@@ -188,7 +195,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
     ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
     checksumTreeManager = new ContainerChecksumTreeManager(conf);
     keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
-        containerSet, volumeSet, containerMetrics, c -> { },
+        containerSet, volumeSet, containerMetrics, icrContainers::add,
         checksumTreeManager);
     keyValueHandler.setClusterID(scmId);
 
@@ -519,6 +526,152 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
         () -> diskBalancerLogs.getOutput().contains("Deleted expired container 42 after delay")
             && diskBalancerLogs.getOutput().contains(String.valueOf(CONTAINER_ID)),
         100, 10_000);
+  }
+
+  /**
+   * Reconciliation writes to the replica it started on for as long as it runs, so DiskBalancer must not move the
+   * container meanwhile: repairs written after the copy would stay behind in the source replica. The move is
+   * skipped while the reconciliation is in progress and goes ahead once it has finished.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  void moveSkipsContainerBeingReconciled(ContainerTestVersionInfo versionInfo) throws Exception {
+    ContainerTestVersionInfo.setTestSchemaVersion(versionInfo.getSchemaVersion(), conf);
+    KeyValueContainer replica = createClosedContainer(CONTAINER_ID, hotVolume, versionInfo);
+
+    // Hold the reconciliation in its first call to the peer.
+    CountDownLatch reconcileAtPeer = new CountDownLatch(1);
+    CountDownLatch continueReconcile = new CountDownLatch(1);
+    DNContainerOperationClient dnClient = mock(DNContainerOperationClient.class);
+    when(dnClient.getContainerChecksumInfo(anyLong(), any())).thenAnswer(invocation -> {
+      reconcileAtPeer.countDown();
+      continueReconcile.await();
+      return null;
+    });
+    CompletableFuture<Void> reconcileDone = runReconcile(dnClient, replica);
+    try {
+      assertThat(reconcileAtPeer.await(10, TimeUnit.SECONDS)).isTrue();
+
+      DiskBalancerService.DiskBalancerTask task =
+          (DiskBalancerService.DiskBalancerTask) diskBalancerService.getTasks().poll();
+      assertNotNull(task);
+      task.call();
+
+      assertSame(replica, containerSet.getContainer(CONTAINER_ID),
+          "A container that is being reconciled must not be moved");
+      assertEquals(State.CLOSED, replica.getContainerState());
+    } finally {
+      continueReconcile.countDown();
+    }
+    reconcileDone.get(60, TimeUnit.SECONDS);
+
+    GenericTestUtils.waitFor(() -> {
+      DiskBalancerService.DiskBalancerTask task =
+          (DiskBalancerService.DiskBalancerTask) diskBalancerService.getTasks().poll();
+      if (task != null) {
+        task.call();
+      }
+      return containerSet.getContainer(CONTAINER_ID) != replica;
+    }, 100, 10_000);
+    assertNotEquals(hotVolume, containerSet.getContainer(CONTAINER_ID).getContainerData().getVolume());
+    assertEquals(State.DELETED, replica.getContainerState());
+  }
+
+  /**
+   * Reconciliation started with a stale source container while the map already references the destination after
+   * {@link ContainerSet#updateContainer}. Without resolving the live instance, it would repair the source replica
+   * that is about to be deleted and report that replica to SCM. With
+   * {@link ContainerSet#getContainerWithWriteLock}, the destination is reconciled and reported.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  void reconcileAppliesOnDestVolumeContainer(ContainerTestVersionInfo versionInfo) throws Exception {
+    ContainerTestVersionInfo.setTestSchemaVersion(versionInfo.getSchemaVersion(), conf);
+    KeyValueContainer oldReplica = createClosedContainer(CONTAINER_ID, hotVolume, versionInfo);
+    Container staleContainerRef = oldReplica;
+
+    AfterInMemoryUpdateInjector raceInjector = new AfterInMemoryUpdateInjector();
+    DiskBalancerService.setInjector(raceInjector);
+
+    DiskBalancerService.DiskBalancerTask balancerTask =
+        (DiskBalancerService.DiskBalancerTask) diskBalancerService.getTasks().poll();
+    assertNotNull(balancerTask);
+    CompletableFuture<Void> balancerDone = CompletableFuture.runAsync(balancerTask::call);
+
+    raceInjector.awaitSwapPoint();
+
+    Container<?> liveReplica = containerSet.getContainer(CONTAINER_ID);
+    assertNotNull(liveReplica);
+    assertNotEquals(staleContainerRef, liveReplica);
+
+    // The peer has no checksum yet, so nothing is repaired and the reconciliation ends with its report to SCM.
+    runReconcile(mock(DNContainerOperationClient.class), staleContainerRef).get(60, TimeUnit.SECONDS);
+
+    raceInjector.continueBalancer();
+    balancerDone.get(60, TimeUnit.SECONDS);
+
+    assertThat(icrContainers).contains(liveReplica).doesNotContain(staleContainerRef);
+    assertSame(liveReplica, containerSet.getContainer(CONTAINER_ID));
+    assertEquals(State.CLOSED, liveReplica.getContainerState());
+    assertEquals(State.DELETED, staleContainerRef.getContainerState());
+  }
+
+  /**
+   * Reconciliation is started while the move has copied the source replica and has not yet put the copy in place.
+   * It must wait for the move, which holds the read lock of the source, and then work on the destination replica.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  void reconcileWaitsForMoveInProgress(ContainerTestVersionInfo versionInfo) throws Exception {
+    ContainerTestVersionInfo.setTestSchemaVersion(versionInfo.getSchemaVersion(), conf);
+    KeyValueContainer oldReplica = createClosedContainer(CONTAINER_ID, hotVolume, versionInfo);
+
+    // Hold the move after its copy, before the import and the container set update.
+    CountDownLatch copied = new CountDownLatch(1);
+    CountDownLatch continueMove = new CountDownLatch(1);
+    FaultInjector previousInjector = KeyValueContainer.getInjector();
+    KeyValueContainer.setInjector(new FaultInjector() {
+      @Override
+      public Throwable getException() {
+        copied.countDown();
+        try {
+          continueMove.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+        return null;
+      }
+    });
+    try {
+      DiskBalancerService.DiskBalancerTask balancerTask =
+          (DiskBalancerService.DiskBalancerTask) diskBalancerService.getTasks().poll();
+      assertNotNull(balancerTask);
+      CompletableFuture<Void> balancerDone = CompletableFuture.runAsync(balancerTask::call);
+      assertThat(copied.await(60, TimeUnit.SECONDS)).isTrue();
+
+      CompletableFuture<Void> reconcileDone = runReconcile(mock(DNContainerOperationClient.class), oldReplica);
+      assertThatThrownBy(() -> reconcileDone.get(500, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+      assertThat(icrContainers).isEmpty();
+
+      continueMove.countDown();
+      balancerDone.get(60, TimeUnit.SECONDS);
+      reconcileDone.get(60, TimeUnit.SECONDS);
+    } finally {
+      continueMove.countDown();
+      KeyValueContainer.setInjector(previousInjector);
+    }
+
+    Container<?> liveReplica = containerSet.getContainer(CONTAINER_ID);
+    assertNotEquals(hotVolume, liveReplica.getContainerData().getVolume());
+    assertThat(icrContainers).contains(liveReplica).doesNotContain(oldReplica);
+    assertEquals(State.DELETED, oldReplica.getContainerState());
+  }
+
+  private CompletableFuture<Void> runReconcile(DNContainerOperationClient dnClient, Container<?> container) {
+    return CompletableFuture.runAsync(() -> {
+      try {
+        keyValueHandler.reconcileContainer(dnClient, container, Collections.singleton(randomDatanodeDetails()));
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
   }
 
   /**
