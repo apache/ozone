@@ -136,7 +136,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OMUpgradeTestUtils;
@@ -323,13 +323,13 @@ public abstract class OmSnapshotTests {
   }
 
   private void stopKeyManager() throws IOException {
-    KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+    KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     keyManager.stop();
   }
 
   private void startKeyManager() throws IOException {
-    KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+    KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     keyManager.start(conf);
   }
@@ -3988,10 +3988,10 @@ public abstract class OmSnapshotTests {
     assertEquals(expectedDiffs, diff.getDiffList());
   }
 
-  protected SnapshotDiffResponse waitForDoneReportAfterOrderedSubmit(String volume, String bucket,
-      String fromSnap, String toSnap, boolean orderedReport)
+  protected SnapshotDiffResponse waitForDoneReportAfterSubmit(String volume, String bucket,
+      String fromSnap, String toSnap, boolean forceFullDiff, boolean orderedReport)
       throws IOException, InterruptedException, TimeoutException {
-    store.submitSnapshotDiff(volume, bucket, fromSnap, toSnap, false, false, orderedReport);
+    store.submitSnapshotDiff(volume, bucket, fromSnap, toSnap, forceFullDiff, false, orderedReport);
     AtomicReference<SnapshotDiffResponse> responseRef = new AtomicReference<>();
     GenericTestUtils.waitFor(() -> {
       try {

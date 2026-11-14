@@ -74,6 +74,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "client-side InfoBucket layout check for getFileChecksum"),
   // Derived keys predate ZDU and are available before finalization.
   S3_DERIVED_KEY(16, "OzoneManager version that returns derived S3 signing keys for chunk verification"),
+  // Conditional delete predates ZDU; pre-ZDU versions must not be added after 2.3.0 is released.
+  CONDITIONAL_DELETE(17, "OzoneManager version that supports conditional key deletion"),
   ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
   LIST_STATUS_REJECTS_OBS(101,
       "OzoneManager version that rejects listStatus on OBJECT_STORE buckets "
@@ -96,6 +98,12 @@ public enum OzoneManagerVersion implements ComponentVersion {
   MULTIPART_PART_IV(105,
       "OzoneManager version that gives each multipart upload part in an "
           + "encrypted bucket its own IV"),
+
+  RENAME_KEY_REJECTS_NON_FSO(106,
+      "OzoneManager version that rejects renameKey on buckets that are not "
+          + "FILE_SYSTEM_OPTIMIZED when the request sets requireFileSystemOptimized, "
+          + "so file system clients no longer need the client-side InfoBucket "
+          + "layout check for rename"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");

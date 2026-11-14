@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
@@ -753,18 +754,30 @@ public class TestHeatMapInfo {
     if (reconScm != null) {
       reconScm.stop();
     }
-    if (replicaHistoryDBProvider != null) {
-      replicaHistoryDBProvider.close();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    IOUtils.closeQuietly(replicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, omMetadataManager);
+  }
+
+  @Test
+  public void testHeatMapSerializesZeroColorOnLeaves() throws IOException {
+    EntityMetaData hot = new EntityMetaData();
+    hot.setVal("vol1/bucket1/hot-key");
+    hot.setReadAccessCount(5000);
+    EntityMetaData cold = new EntityMetaData();
+    cold.setVal("vol1/bucket1/cold-key");
+    cold.setReadAccessCount(1);
+
+    JsonNode root = JsonUtils.readTree(JsonUtils.toJsonString(heatMapUtil.generateHeatMap(Arrays.asList(hot, cold))));
+    JsonNode volume = root.path("children").get(0);
+    JsonNode bucket = volume.path("children").get(0);
+    JsonNode hotKey = bucket.path("children").get(0);
+    JsonNode coldKey = bucket.path("children").get(1);
+
+    assertThat(coldKey.has("color")).isTrue();
+    assertEquals(0.0, coldKey.path("color").doubleValue());
+    assertEquals(1.0, hotKey.path("color").doubleValue());
+    assertThat(root.has("color")).isFalse();
+    assertThat(volume.has("color")).isFalse();
+    assertThat(bucket.has("color")).isFalse();
   }
 
   @Test
@@ -795,8 +808,7 @@ public class TestHeatMapInfo {
       assertEquals(2924, entityReadAccessHeatMapResponse.getMinAccessCount());
       assertEquals(155074, entityReadAccessHeatMapResponse.getMaxAccessCount());
       assertEquals("root", entityReadAccessHeatMapResponse.getLabel());
-      assertEquals(0.0,
-          entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+      assertNull(entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
       assertEquals(0.442,
           entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
               .get(0).getChildren().get(1).getColor());
@@ -1127,8 +1139,7 @@ public class TestHeatMapInfo {
             0);
         assertEquals(2,
             entityReadAccessHeatMapResponse.getChildren().size());
-        assertEquals(0.0,
-            entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+        assertNull(entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
         String path =
             entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
                 .get(0).getPath();

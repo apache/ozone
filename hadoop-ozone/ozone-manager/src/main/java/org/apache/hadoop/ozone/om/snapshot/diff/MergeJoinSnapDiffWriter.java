@@ -429,6 +429,9 @@ public final class MergeJoinSnapDiffWriter {
         String targetPath = buildChildPath(targetParentPaths.get(i), targetNames.get(i));
         if (sourcePath != null && targetPath != null) {
           reportEntries.add(getDiffReportEntry(RENAME, sourcePath, targetPath));
+        } else if (sourcePath != null) {
+          // Moved under a directory deleted before its children were purged: gone from the to-snapshot.
+          reportEntries.add(getDiffReportEntry(DELETE, sourcePath));
         } else {
           reportEntries.add(null);
         }

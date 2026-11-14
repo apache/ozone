@@ -45,6 +45,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -65,6 +66,11 @@ public class TestOzoneConfiguration {
       TestOzoneConfiguration.class);
 
   private OzoneConfiguration conf;
+
+  @BeforeAll
+  public static void addResource() {
+    OzoneConfiguration.addDefaultResource("hdds-common-test-default.xml");
+  }
 
   @BeforeEach
   public void setUp() throws Exception {

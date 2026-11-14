@@ -31,15 +31,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.TraceFlags;
 import io.opentelemetry.api.trace.TraceState;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.ContextStorage;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.ReadableSpan;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.data.SpanData;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,6 +56,7 @@ import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
@@ -71,6 +80,22 @@ public class TestTracingUtil {
 
   private static TracingUtil.MdcContextStorage mdcContextStorage() {
     return new TracingUtil.MdcContextStorage(ContextStorage.defaultStorage());
+  }
+
+  /** Puts a real GlobalOpenTelemetry in place with no exporter, so tests stay offline and shut down fast. */
+  @BeforeEach
+  public void setUp() {
+    TracingUtil.shutdownTracing();
+    GlobalOpenTelemetry.resetForTest();
+    SdkTracerProvider provider =
+        SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.noop())).build();
+    GlobalOpenTelemetry.set(OpenTelemetrySdk.builder().setTracerProvider(provider).build());
+  }
+
+  @AfterEach
+  public void cleanup() {
+    TracingUtil.shutdownTracing();
+    GlobalOpenTelemetry.resetForTest();
   }
 
   private static MutableConfigurationSource tracingEnabled() {
@@ -104,10 +129,49 @@ public class TestTracingUtil {
 
   @Test
   public void testDefaultMethod() {
-    Service subject = createProxy(new ServiceImpl(), Service.class,
+    Service subject = TracingUtil.createInternalProxy(new ServiceImpl(), Service.class,
         tracingEnabled());
 
     assertEquals("Hello default", subject.defaultMethod());
+  }
+
+  @Test
+  public void testSpanKindProxyReturnsDelegateWhenTracingOff() {
+    ServiceImpl delegate = new ServiceImpl();
+    assertSame(delegate, createProxy(delegate, Service.class, SpanKind.INTERNAL));
+  }
+
+  @Test
+  public void testSpanKindProxyCreatesRootSpanWithoutParent() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test-service")) {
+      Service proxy = createProxy(new ServiceImpl(), Service.class, SpanKind.INTERNAL);
+      assertEquals("normal", proxy.normalMethod());
+      collector.assertKind("ServiceImpl.normalMethod", SpanKind.INTERNAL);
+      assertFalse(collector.onlySpan("ServiceImpl.normalMethod").getParentSpanContext().isValid());
+    }
+  }
+
+  @Test
+  public void testSpanKindProxyCreatesChildSpans() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test-service")) {
+      Service proxy = createProxy(new ServiceImpl(), Service.class, SpanKind.CLIENT);
+      Span parent = TracingUtil.createInternalSpan("parent");
+      try (Scope ignored = parent.makeCurrent()) {
+        assertEquals("normal", proxy.normalMethod());
+        assertEquals("skipped", proxy.skippedMethod());
+        assertThrows(IOException.class, proxy::tracedThrowingMethod);
+      } finally {
+        parent.end();
+      }
+
+      collector.assertParent("ServiceImpl.normalMethod", "parent");
+      collector.assertKind("ServiceImpl.normalMethod", SpanKind.CLIENT);
+      assertTrue(collector.named("ServiceImpl.skippedMethod").isEmpty());
+      collector.assertParent("ServiceImpl.tracedThrowingMethod", "parent");
+      collector.assertError("ServiceImpl.tracedThrowingMethod", "Failed");
+      collector.assertExceptionRecorded("ServiceImpl.tracedThrowingMethod", IOException.class);
+      collector.assertNotError("parent");
+    }
   }
 
   @Test
@@ -192,6 +256,31 @@ public class TestTracingUtil {
               throw new IOException("expected");
             }));
     assertEquals("expected", thrown.getMessage());
+  }
+
+  @Test
+  public void testExecuteInSpanRecordsException() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      assertThrows(IOException.class, () -> TracingUtil.executeInNewSpan("supplier", () -> {
+        throw new IOException("supplier failed");
+      }));
+      Span parent = TracingUtil.createInternalSpan("parent");
+      try (Scope ignored = parent.makeCurrent()) {
+        String parentContext = TracingUtil.exportCurrentSpan();
+        assertThrows(IllegalStateException.class, () -> TracingUtil.executeAsChildSpan("runnable", parentContext,
+            () -> {
+              throw new IllegalStateException("runnable failed");
+            }));
+      } finally {
+        parent.end();
+      }
+
+      collector.assertError("supplier", "supplier failed");
+      collector.assertExceptionRecorded("supplier", IOException.class);
+      collector.assertError("runnable", "runnable failed");
+      collector.assertExceptionRecorded("runnable", IllegalStateException.class);
+      collector.assertNotError("parent");
+    }
   }
 
   @Test
@@ -332,6 +421,141 @@ public class TestTracingUtil {
       assertNull(executor.submit(() -> MDC.get(MDC_SPAN_ID)).get());
     } finally {
       executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testCreateSpanIsChildOfCurrentSpan() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Span parent = TracingUtil.createInternalSpan("parent");
+      try (Scope ignored = parent.makeCurrent()) {
+        Span child = TracingUtil.createSpan("child", SpanKind.CLIENT);
+        child.end();
+      } finally {
+        parent.end();
+      }
+
+      collector.assertParent("child", "parent");
+      collector.assertKind("parent", SpanKind.INTERNAL);
+      collector.assertKind("child", SpanKind.CLIENT);
+    }
+  }
+
+  @Test
+  public void testCreateSpanWithoutParentStartsRootWhenEnabled() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Span span = TracingUtil.createInternalSpan("root");
+      assertTrue(span.getSpanContext().isValid());
+      span.end();
+      assertFalse(collector.onlySpan("root").getParentSpanContext().isValid());
+    }
+  }
+
+  @Test
+  public void testRecordExceptionSetsErrorAndAddsEvent() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Span span = TracingUtil.createInternalSpan("failing");
+      try (Scope ignored = span.makeCurrent()) {
+        TracingUtil.recordExceptionInCurrentSpan(new IOException("disk failed"));
+      } finally {
+        span.end();
+      }
+
+      collector.assertError("failing", "disk failed");
+      collector.assertExceptionRecorded("failing", IOException.class);
+    }
+  }
+
+  @Test
+  public void testRecordExceptionInCatchMarksSpanNotParent() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Span parent = TracingUtil.createInternalSpan("parent");
+      try (Scope ignored = parent.makeCurrent()) {
+        Span span = TracingUtil.createInternalSpan("failing");
+        try (Scope ignored2 = span.makeCurrent()) {
+          throw new IOException("disk failed");
+        } catch (IOException e) {
+          TracingUtil.recordException(span, e);
+        } finally {
+          span.end();
+        }
+      } finally {
+        parent.end();
+      }
+
+      collector.assertError("failing", "disk failed");
+      collector.assertExceptionRecorded("failing", IOException.class);
+      assertEquals(StatusCode.UNSET, collector.onlySpan("parent").getStatus().getStatusCode());
+      assertTrue(collector.onlySpan("parent").getEvents().isEmpty());
+    }
+  }
+
+  @Test
+  public void testRecordExceptionWithoutMessageSetsError() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Span span = TracingUtil.createInternalSpan("failing");
+      try (Scope ignored = span.makeCurrent()) {
+        TracingUtil.recordExceptionInCurrentSpan(new IllegalStateException());
+      } finally {
+        span.end();
+      }
+      collector.assertError("failing", "");
+    }
+  }
+
+  @Test
+  public void testRecordExceptionIgnoresNull() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Span span = TracingUtil.createInternalSpan("ok");
+      try (Scope ignored = span.makeCurrent()) {
+        TracingUtil.recordExceptionInCurrentSpan(null);
+      } finally {
+        span.end();
+      }
+      collector.assertNotError("ok");
+    }
+  }
+
+  @Test
+  public void testCurrentSpanHelpersSetAttributesAndEvents() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Span span = TracingUtil.createInternalSpan("request");
+      try (Scope ignored = span.makeCurrent()) {
+        TracingUtil.addAttributesToCurrentSpan("volume", "vol1");
+        TracingUtil.addAttributesToCurrentSpan("bucket", (String) null);
+        TracingUtil.addAttributesToCurrentSpan("dataSize", 1024L);
+        TracingUtil.addAttributesToCurrentSpan("om.success", false);
+        TracingUtil.addEventToCurrentSpan("client.datanode.failover", "datanode", "dn1");
+        TracingUtil.addEventToCurrentSpan("scm.allocate.failed", "reason", null);
+      } finally {
+        span.end();
+      }
+
+      collector.assertAttribute("request", "volume", "vol1");
+      collector.assertNoAttribute("request", "bucket");
+      collector.assertAttribute("request", "dataSize", 1024L);
+      collector.assertAttribute("request", "om.success", false);
+      collector.assertNotError("request");
+
+      SpanData data = collector.onlySpan("request");
+      assertEquals(2, data.getEvents().size());
+      assertEquals("client.datanode.failover", data.getEvents().get(0).getName());
+      assertEquals("dn1", data.getEvents().get(0).getAttributes().get(AttributeKey.stringKey("datanode")));
+      assertEquals("scm.allocate.failed", data.getEvents().get(1).getName());
+      assertTrue(data.getEvents().get(1).getAttributes().isEmpty());
+    }
+  }
+
+  @Test
+  public void testCurrentSpanHelpersWithoutCurrentSpanAreNoOp() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      assertFalse(Span.current().getSpanContext().isValid());
+      TracingUtil.addAttributesToCurrentSpan("volume", "vol1");
+      TracingUtil.addAttributesToCurrentSpan("dataSize", 1L);
+      TracingUtil.addAttributesToCurrentSpan("om.success", true);
+      TracingUtil.addEventToCurrentSpan("event", "k", "v");
+      TracingUtil.recordExceptionInCurrentSpan(new IOException("ignored"));
+      assertTrue(collector.getSpans().isEmpty());
     }
   }
 }

@@ -29,6 +29,10 @@ OZONE_ROOT=$(pwd -P)
 if [[ "${OZONE_TEST_SELECTOR}" == "xcompat/test-old.sh" ]]; then
   : ${OZONE_OLD_VERSIONS:="${2:-}"}
   export OZONE_OLD_VERSIONS
+
+  # use JDK8 image for Rebot in compat-old, to avoid pulling JDK25 image just for generating reports
+  # TODO after HDDS-17509 this can be moved to env: of compat-old job
+  export OZONE_RUNNER_VERSION=$(mvn help:evaluate -pl :ozone-dist -Dexpression="docker.ozone-runner.client.version" -q -DforceStdout -Dscan=false)
 fi
 
 source "${DIR}/_lib.sh"
