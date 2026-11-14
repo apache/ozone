@@ -39,4 +39,17 @@ public class TestOzoneNetUtils {
     assertEquals("pod0", addr1.getHostName());
     assertEquals(port, addr1.getPort());
   }
+
+  @Test
+  public void testFlexibleFqdnChecksKeepIpLiteral() {
+    InetSocketAddress addr = NetUtils.createSocketAddr("127.0.0.1", 1234);
+    String reverseName = NetUtils.createSocketAddr("127.0.0.1", 1234).getHostName();
+
+    OzoneNetUtils.isUnresolved(true, addr);
+    OzoneNetUtils.isAddressLocal(true, addr);
+    assertEquals(reverseName.split("\\.")[0], OzoneNetUtils.getAddressWithHostNameLocal(addr).getHostString());
+
+    // NodeDetails builds the Ratis peer address from getHostString().
+    assertEquals("127.0.0.1", addr.getHostString());
+  }
 }
