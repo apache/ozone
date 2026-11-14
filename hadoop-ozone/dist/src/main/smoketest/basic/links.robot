@@ -18,225 +18,261 @@ Documentation       Test bucket links via Ozone CLI
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
-Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Resource            ../ozone-lib/batch.robot
 Test Timeout        4 minute
-Suite Setup         Create volumes
+Suite Setup         Setup Suite
+Suite Teardown      Teardown Suite
 
 *** Variables ***
 ${prefix}    generated
 ${SCM}       scm
 
 *** Keywords ***
-Create volumes
+Setup Suite
     Get Security Enabled From Config
+    Setup Batch
+    Kinit test user
+    Setup Tests
+    Setup Secure Tests
+
+Teardown Suite
+    Teardown Batch
+
+Setup Tests
     ${random} =         Generate Random String  5  [NUMBERS]
     Set Suite Variable  ${source}  ${random}-source
     Set Suite Variable  ${target}  ${random}-target
-    Ozone Shell Batch   volume create ${source}
-    ...                 volume create ${target}
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Setup ACL tests
+    Execute Later ozone sh    volume create ${source}
+    Execute Later ozone sh    volume create ${target}
+    Execute Later ozone sh    bucket link ${source}/no-such-bucket ${target}/dangling-link
+    Execute Later ozone sh    bucket link no-such-volume/no-such-bucket ${target}/dangling-missing-vol
+    Execute Later ozone sh    bucket link ${target}/dangling-missing-vol ${target}/link-to-dangling-link
+    Execute Later ozone sh    bucket link ${source}/bucket-in-source ${target}/link-to-existing-bucket
+    Execute Later ozone sh    bucket create ${source}/bucket-in-source
+    Execute Later ozone sh    bucket create ${target}/bucket-in-target
 
-Setup ACL tests
-    Ozone Shell Batch   bucket create ${source}/readable-bucket
-    ...                 key put ${source}/readable-bucket/key-in-readable-bucket /etc/passwd
-    ...                 bucket create ${source}/unreadable-bucket
-    ...                 bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
-    ...                 volume addacl --acl user:testuser2:r[DEFAULT] ${target}
-    ...                 bucket link ${source}/readable-bucket ${target}/readable-link
-    ...                 bucket link ${source}/readable-bucket ${target}/readable-link2
-    ...                 volume addacl --acl user:testuser2:rl ${source}
-    ...                 bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
+Setup Secure Tests
+    Return From Keyword If   '${SECURITY_ENABLED}' != 'true'    only if security is enabled
 
-Verify Bucket ACL
-    [arguments]         ${source_option}   ${object}    ${type}   ${name}    ${acls}
-    ${actual_acls} =    Execute          ozone sh bucket getacl ${source_option} ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
-                        Should Be Equal    ${acls}    ${actual_acls}
+    Execute Later ozone sh    bucket create ${source}/readable-bucket
+    Execute Later ozone sh    key put ${source}/readable-bucket/key-in-readable-bucket /etc/passwd
+    Execute Later ozone sh    bucket create ${source}/unreadable-bucket
+    Execute Later ozone sh    bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
+    Execute Later ozone sh    volume addacl --acl user:testuser2:r[DEFAULT] ${target}
+    Execute Later ozone sh    bucket link ${source}/readable-bucket ${target}/readable-link
+    Execute Later ozone sh    volume addacl --acl user:testuser2:rl ${source}
+    Execute Later ozone sh    bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
+
+Verify ACL in ${file}
+    [arguments]    ${type}    ${name}    ${expected}
+    ${actual} =    Execute    jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' ${file} | xargs
+    Should Be Equal    ${actual}    ${expected}
+
+Verify ACL of ${object_type} ${object}
+    [arguments]   @{params}    ${source_option}=${EMPTY}
+    ${output_file} =    Execute Later ozone sh    ${object_type} getacl ${source_option} ${object}
+    Assert Later    Verify ACL in ${output_file}    @{params}
 
 Can follow link with read access
-    Execute             kdestroy
-    Run Keyword         Kinit test user             testuser2         testuser2.keytab
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/readable-link
-                        Should Contain              ${result}         key-in-readable-bucket
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/readable-link2
-                        Should Contain              ${result}         key-in-readable-bucket
+    ${result} =    Execute Later ozone sh    key list ${target}/readable-link
+    Assert Later    File ${result} Should    Contain    key-in-readable-bucket
 
 Cannot follow link without read access
-    Execute             kdestroy
-    Run Keyword         Kinit test user             testuser2         testuser2.keytab
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-to-unreadable-bucket
-                        Should Contain              ${result}         PERMISSION_DENIED
-    ${result} =         Execute And Ignore Error    ozone sh key list ${source}/unreadable-bucket
-                        Should Contain              ${result}         PERMISSION_DENIED
+    ${result} =    Execute Later ozone sh    key list ${target}/link-to-unreadable-bucket
+    Assert Later    File ${result} Should    Contain    PERMISSION_DENIED
+
+    ${result} =    Execute Later ozone sh    key list ${source}/unreadable-bucket
+    Assert Later    File ${result} Should    Contain    PERMISSION_DENIED
 
 ACL verified on source and target bucket
-    Execute             kdestroy
-    Run Keyword         Kinit test user             testuser2         testuser2.keytab
-    ${result} =         Execute                     ozone sh bucket info ${target}/link-to-unreadable-bucket
-                        Should Contain              ${result}         link-to-unreadable-bucket
-                        Should Not Contain          ${result}         PERMISSION_DENIED
-    ${result} =         Execute And Ignore Error    ozone sh bucket info ${source}/unreadable-bucket
-                        Should Contain              ${result}         PERMISSION_DENIED
+    ${result} =    Execute Later ozone sh    bucket info ${target}/link-to-unreadable-bucket
+    Assert Later    File ${result} Should
+    ...    Contain    link-to-unreadable-bucket
+    ...    Not Contain    PERMISSION_DENIED
+
+    ${result} =    Execute Later ozone sh    bucket info ${source}/unreadable-bucket
+    Assert Later    File ${result} Should    Contain    PERMISSION_DENIED
 
 Create link loop
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
-                        Ozone Shell Batch   bucket link ${target}/loop1 ${target}/loop2
-                        ...                 bucket link ${target}/loop2 ${target}/loop3
-                        ...                 bucket link ${target}/loop3 ${target}/loop1
+    Execute Later ozone sh    bucket link ${target}/loop1 ${target}/loop2
+    Execute Later ozone sh    bucket link ${target}/loop2 ${target}/loop3
+    Execute Later ozone sh    bucket link ${target}/loop3 ${target}/loop1
 
 Delete link loop
-                        Ozone Shell Batch   bucket delete ${target}/loop1
-                        ...                 bucket delete ${target}/loop2
-                        ...                 bucket delete ${target}/loop3
+    Execute Later ozone sh    bucket delete ${target}/loop1
+    Execute Later ozone sh    bucket delete ${target}/loop2
+    Execute Later ozone sh    bucket delete ${target}/loop3
+
+Put and get key
+    [arguments]    ${put_to}    ${get_from}    ${put_from}=/etc/passwd
+    ${get_to} =    Get Next Filename    ${TEMP_DIR}/key-get
+    Execute Later ozone sh    key put ${put_to} ${put_from}
+    Execute Later ozone sh    key get -f ${get_from} ${get_to}
+    Assert Later    Compare Files    ${put_from}    ${get_to}
+
 
 *** Test Cases ***
 Link to non-existent bucket
-                        Execute                     ozone sh bucket link ${source}/no-such-bucket ${target}/dangling-link
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/dangling-link
-                        Should Contain              ${result}         BUCKET_NOT_FOUND
-                        Should Contain              ${result}         Cannot follow bucket link
+    ${result} =    Execute Later ozone sh    key list ${target}/dangling-link
+    Assert Later    File ${result} Should
+    ...    Contain    BUCKET_NOT_FOUND
+    ...    Contain    Cannot follow bucket link
 
 Link to non-existent source volume
-                        Execute                     ozone sh bucket link no-such-volume/no-such-bucket ${target}/dangling-missing-vol
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/dangling-missing-vol
-                        Should Contain              ${result}         VOLUME_NOT_FOUND
-                        Should Contain              ${result}         Cannot follow bucket link
+    ${result} =    Execute Later ozone sh    key list ${target}/dangling-missing-vol
+    Assert Later    File ${result} Should
+    ...    Contain    VOLUME_NOT_FOUND
+    ...    Contain    Cannot follow bucket link
 
 Link chain to broken source
-                        Execute                     ozone sh bucket link no-such-volume/no-such-bucket ${target}/link-bucket2
-                        Execute                     ozone sh bucket link ${target}/link-bucket2 ${target}/link-bucket1
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-bucket1
-                        Should Contain              ${result}         VOLUME_NOT_FOUND
-                        Should Contain              ${result}         Cannot follow bucket link
+    ${result} =    Execute Later ozone sh    key list ${target}/link-to-dangling-link
+    Assert Later    File ${result} Should
+    ...    Contain    VOLUME_NOT_FOUND
+    ...    Contain    Cannot follow bucket link
 
 Key create passthrough
-                        Ozone Shell Batch           bucket link ${source}/bucket1 ${target}/link1
-                        ...                         bucket create ${source}/bucket1
-                        ...                         key put ${target}/link1/key1 /etc/passwd
-                        Key Should Match Local File     ${target}/link1/key1    /etc/passwd
+    # put to link, get from bucket
+    Put and get key    put_to=${target}/link-to-existing-bucket/key1    get_from=${source}/bucket-in-source/key1
 
 Key read passthrough
-                        Execute                     ozone sh key put ${source}/bucket1/key2 /opt/hadoop/NOTICE.txt
-                        Key Should Match Local File     ${source}/bucket1/key2    /opt/hadoop/NOTICE.txt
+    # put to bucket, get from link
+    Put and get key    put_to=${source}/bucket-in-source/key2    get_from=${target}/link-to-existing-bucket/key2
 
 Key list passthrough
-    ${target_list} =    Execute                     ozone sh key list ${target}/link1 | jq -r '.[].name'
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
-                        Should Be Equal             ${target_list}    ${source_list}
-                        Should Contain              ${source_list}    key1
-                        Should Contain              ${source_list}    key2
+    ${target_list} =    Execute Later ozone sh    key list ${target}/link-to-existing-bucket
+    ${source_list} =    Execute Later ozone sh    key list ${source}/bucket-in-source
+    Assert Later    Compare files    ${source_list}    ${target_list}
+    Assert Later    File ${source_list} Should
+    ...    Contain    key1
+    ...    Contain    key2
 
 Key delete passthrough
-                        Execute                     ozone sh key delete ${target}/link1/key2
-    ${bucket1keys} =    Execute                     ozone sh key list ${source}/bucket1
-    ${source_list} =    Execute                     echo '${bucket1keys}' | jq -r '.[] | select(.name | startswith(".Trash")) | .name'
-                        Should Contain Any          ${source_list}    .Trash/hadoop    .Trash/testuser    .Trash/root
-                        Should contain              ${source_list}    key2
-    ${result} =         Execute                     echo '${bucket1keys}' | jq -r '.[] | select(.name | startswith(".Trash") | not) | .name'
-                        Should Not contain          ${result}    key2
+    Execute Later ozone sh    key delete ${target}/link-to-existing-bucket/key2
+    ${delete} =    Execute Later ozone sh    key list --all --prefix .Trash ${source}/bucket-in-source
+    ${retain} =    Execute Later ozone sh    key list --all --prefix key ${source}/bucket-in-source
+    Assert Later   File ${delete} Should    Contain    key2
+    Assert Later   File ${retain} Should    Not Contain    key2
 
 Bucket list contains links
-    ${result} =         Execute                     ozone sh bucket list ${target}
-                        Should Contain              ${result}         link1
-                        Should Contain              ${result}         dangling-link
+    ${result} =    Execute Later ozone sh    bucket list ${target}
+    Assert Later    File ${result} Should
+    ...    Contain    link-to-existing-bucket
+    ...    Contain    dangling-link
 
 Bucket info shows source
-    ${result} =         Execute                     ozone sh bucket info ${target}/link1
-                        Should Contain              ${result}            ${source}
-                        Should Contain              ${result}            bucket1
-                        Should Contain              ${result}            ${target}
-                        Should Contain              ${result}            link1
-                        Should Contain              ${result}            modificationTime
-                        Should Contain              ${result}            creationTime
-                        Should Not contain          ${result}            metadata
+    ${result} =    Execute Later ozone sh    bucket info ${target}/link-to-existing-bucket
+    Assert Later    File ${result} Should
+    ...    Contain    ${source}
+    ...    Contain    bucket-in-source
+    ...    Contain    ${target}
+    ...    Contain    link-to-existing-bucket
+    ...    Contain    modificationTime
+    ...    Contain    creationTime
+    ...    Not Contain    metadata
 
 Source and target bucket have different ACLs
-    Execute             ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
-    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
-    Verify Bucket ACL   --source=false  ${target}/link1      USER    user1    ${EMPTY}
-    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Verify ACL          bucket          ${source}/bucket1    USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Execute Later ozone sh    bucket addacl --acl user:user1:rwxy ${target}/link-to-existing-bucket
+    Verify ACL of bucket ${target}/link-to-existing-bucket    USER    user1    ${EMPTY}
+    Verify ACL of bucket ${target}/link-to-existing-bucket    USER    user1    ${EMPTY}    source_option=--source=false
+    Verify ACL of bucket ${target}/link-to-existing-bucket    USER    user1    READ WRITE READ_ACL WRITE_ACL    source_option=--source
+    Verify ACL of bucket ${source}/bucket-in-source    USER    user1    READ WRITE READ_ACL WRITE_ACL
 
-    Execute             ozone sh bucket removeacl --acl user:user1:y ${target}/link1
-    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
-    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE READ_ACL
+    Execute Later ozone sh    bucket removeacl --acl user:user1:y ${target}/link-to-existing-bucket
+    Verify ACL of bucket ${target}/link-to-existing-bucket    USER    user1    ${EMPTY}
+    Verify ACL of bucket ${target}/link-to-existing-bucket    USER    user1    READ WRITE READ_ACL    source_option=--source
 
-    Execute             ozone sh bucket setacl --acl user:user1:rw ${source}/bucket1
-    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
-    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE
+    Execute Later ozone sh    bucket setacl --acl user:user1:rw ${source}/bucket-in-source
+    Verify ACL of bucket ${target}/link-to-existing-bucket    USER    user1    ${EMPTY}
+    Verify ACL of bucket ${target}/link-to-existing-bucket    USER    user1    READ WRITE    source_option=--source
 
-    Execute             ozone sh bucket addacl --acl group:group2:r ${source}/bucket1
-    Verify ACL          bucket          ${target}/link1      GROUP   group2    ${EMPTY}
-    Verify Bucket ACL   --source        ${target}/link1      GROUP   group2    READ
+    Execute Later ozone sh    bucket addacl --acl group:group2:r ${source}/bucket-in-source
+    Verify ACL of bucket ${target}/link-to-existing-bucket    GROUP   group2    ${EMPTY}
+    Verify ACL of bucket ${target}/link-to-existing-bucket    GROUP   group2    READ    source_option=--source
 
 Source and target key have same ACLs
-    Execute             ozone sh key addacl --acl user:user1:rwxy ${source}/bucket1/key1
-    Verify ACL          key       ${target}/link1/key1     USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Verify ACL          key       ${source}/bucket1/key1   USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Execute             ozone sh key removeacl --acl user:user1:y ${target}/link1/key1
-    Verify ACL          key       ${target}/link1/key1     USER    user1    READ WRITE READ_ACL
-    Verify ACL          key       ${source}/bucket1/key1   USER    user1    READ WRITE READ_ACL
-    Execute             ozone sh key setacl --acl user:user1:rw ${source}/bucket1/key1
-    Verify ACL          key       ${target}/link1/key1     USER    user1    READ WRITE
-    Verify ACL          key       ${source}/bucket1/key1   USER    user1    READ WRITE
+    Execute Later ozone sh    key addacl --acl user:user1:rwxy ${source}/bucket-in-source/key1
+    Verify ACL of key ${target}/link-to-existing-bucket/key1    USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Verify ACL of key ${source}/bucket-in-source/key1   USER    user1    READ WRITE READ_ACL WRITE_ACL
 
-    Execute             ozone sh key addacl --acl group:group2:r ${source}/bucket1/key1
-    Verify ACL          key    ${target}/link1/key1     GROUP   group2    READ
-    Verify ACL          key    ${source}/bucket1/key1   GROUP   group2    READ
+    Execute Later ozone sh    key removeacl --acl user:user1:y ${target}/link-to-existing-bucket/key1
+    Verify ACL of key ${target}/link-to-existing-bucket/key1    USER    user1    READ WRITE READ_ACL
+    Verify ACL of key ${source}/bucket-in-source/key1   USER    user1    READ WRITE READ_ACL
+
+    Execute Later ozone sh    key setacl --acl user:user1:rw ${source}/bucket-in-source/key1
+    Verify ACL of key ${target}/link-to-existing-bucket/key1    USER    user1    READ WRITE
+    Verify ACL of key ${source}/bucket-in-source/key1   USER    user1    READ WRITE
+
+    Execute Later ozone sh    key addacl --acl group:group2:r ${source}/bucket-in-source/key1
+    Verify ACL of key ${target}/link-to-existing-bucket/key1    GROUP   group2    READ
+    Verify ACL of key ${source}/bucket-in-source/key1   GROUP   group2    READ
 
 Source and target prefix have same ACLs
-    Execute             ozone sh prefix addacl --acl user:user1:rwxy ${source}/bucket1/prefix1/
-    Verify ACL          prefix       ${target}/link1/prefix1/     USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Verify ACL          prefix       ${source}/bucket1/prefix1/   USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Execute             ozone sh prefix removeacl --acl user:user1:y ${target}/link1/prefix1/
-    Verify ACL          prefix       ${target}/link1/prefix1/     USER    user1    READ WRITE READ_ACL
-    Verify ACL          prefix       ${source}/bucket1/prefix1/   USER    user1    READ WRITE READ_ACL
-    Execute             ozone sh prefix setacl --acl user:user1:rw ${source}/bucket1/prefix1/
-    Verify ACL          prefix       ${target}/link1/prefix1/     USER    user1    READ WRITE
-    Verify ACL          prefix       ${source}/bucket1/prefix1/   USER    user1    READ WRITE
+    Execute Later ozone sh    prefix addacl --acl user:user1:rwxy ${source}/bucket-in-source/prefix1/
+    Verify ACL of prefix ${target}/link-to-existing-bucket/prefix1/    USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Verify ACL of prefix ${source}/bucket-in-source/prefix1/   USER    user1    READ WRITE READ_ACL WRITE_ACL
 
-    Execute             ozone sh prefix addacl --acl group:group2:r ${source}/bucket1/prefix1/
-    Verify ACL          prefix       ${target}/link1/prefix1/     GROUP   group2    READ
-    Verify ACL          prefix       ${source}/bucket1/prefix1/   GROUP   group2    READ
+    Execute Later ozone sh    prefix removeacl --acl user:user1:y ${target}/link-to-existing-bucket/prefix1/
+    Verify ACL of prefix ${target}/link-to-existing-bucket/prefix1/    USER    user1    READ WRITE READ_ACL
+    Verify ACL of prefix ${source}/bucket-in-source/prefix1/   USER    user1    READ WRITE READ_ACL
+
+    Execute Later ozone sh    prefix setacl --acl user:user1:rw ${source}/bucket-in-source/prefix1/
+    Verify ACL of prefix ${target}/link-to-existing-bucket/prefix1/    USER    user1    READ WRITE
+    Verify ACL of prefix ${source}/bucket-in-source/prefix1/   USER    user1    READ WRITE
+
+    Execute Later ozone sh    prefix addacl --acl group:group2:r ${source}/bucket-in-source/prefix1/
+    Verify ACL of prefix ${target}/link-to-existing-bucket/prefix1/    GROUP   group2    READ
+    Verify ACL of prefix ${source}/bucket-in-source/prefix1/   GROUP   group2    READ
 
 Buckets and links share namespace
-                        Execute                     ozone sh bucket link ${source}/bucket2 ${target}/link2
-    ${result} =         Execute And Ignore Error    ozone sh bucket create ${target}/link2
-                        Should Contain              ${result}    BUCKET_ALREADY_EXISTS
+    ${result} =    Execute Later ozone sh    bucket create ${target}/link-to-existing-bucket
+    Assert Later    File ${result} Should    Contain    BUCKET_ALREADY_EXISTS
 
-                        Execute                     ozone sh bucket create ${target}/bucket3
-    ${result} =         Execute And Ignore Error    ozone sh bucket link ${source}/bucket1 ${target}/bucket3
-                        Should Contain              ${result}    BUCKET_ALREADY_EXISTS
+    ${result} =    Execute Later ozone sh    bucket create ${target}/dangling-link
+    Assert Later    File ${result} Should    Contain    BUCKET_ALREADY_EXISTS
 
-Can follow link with read access
-    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Can follow link with read access
-
-Cannot follow link without read access
-    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Cannot follow link without read access
-
-ACL verified on source and target bucket
-    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    ACL verified on source and target bucket
+    ${result} =    Execute Later ozone sh    bucket link ${source}/bucket-in-source ${target}/bucket-in-target
+    Assert Later    File ${result} Should    Contain    BUCKET_ALREADY_EXISTS
 
 Loop in link chain is detected
-    [setup]             Create link loop
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/loop2
-                        Should Contain              ${result}    DETECTED_LOOP
-    [teardown]          Delete link loop
+    [setup]    Create link loop
+    ${result} =    Execute Later ozone sh    key list ${target}/loop2
+    Assert Later    File ${result} Should    Contain    DETECTED_LOOP
+    [teardown]    Delete link loop
 
 Multiple links to same bucket are allowed
-    Ozone Shell Batch               bucket link ${source}/bucket1 ${target}/link3
-    ...                             key put ${target}/link3/key3 /etc/group
-    Key Should Match Local File     ${target}/link1/key3    /etc/group
+    Execute Later ozone sh    bucket link ${source}/bucket-in-source ${target}/another-link
+    Put and get key    put_to=${target}/another-link/key3    get_from=${target}/link-to-existing-bucket/key3    put_from=/etc/group
+    Put and get key    put_to=${target}/link-to-existing-bucket/key4    get_from=${target}/another-link/key4    put_from=/etc/hostname
 
 Source bucket not affected by deleting link
-                        Execute                     ozone sh bucket delete ${target}/link1
-    ${bucket_list} =    Execute                     ozone sh bucket list ${target}
-                        Should Not Contain          ${bucket_list}    link1
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
-                        Should Contain              ${source_list}    key1
+    Execute Later ozone sh    bucket link ${source}/bucket-in-source ${target}/link-to-be-deleted
+    Execute Later ozone sh    bucket delete ${target}/link-to-be-deleted
+
+    ${buckets_in_target} =    Execute Later ozone sh    bucket list ${target}
+    Assert Later    File ${buckets_in_target} Should    Not Contain    link-to-be-deleted
+
+    ${keys_in_source} =    Execute Later ozone sh    key list ${source}/bucket-in-source
+    Assert Later    File ${keys_in_source} Should    Contain    key3
 
 Setting bucket property on link not allowed
-                        Execute                     ozone sh bucket link ${source}/bucket1 ${target}/link4
-    ${result} =         Execute And Ignore Error    ozone sh bucket setquota ${target}/link4 --quota 1GB
-                        Should Contain              ${result}    NOT_SUPPORTED_OPERATION
-    ${result} =         Execute                     ozone sh bucket info ${target}/link4
-                        Should Contain              ${result}            sourceBucket
+    ${result} =    Execute Later ozone sh    bucket setquota ${target}/link-to-existing-bucket --quota 1GB
+    Assert Later    File ${result} Should    Contain    NOT_SUPPORTED_OPERATION
+
+Bucket info for link contains source
+    ${result} =    Execute Later ozone sh    bucket info ${target}/link-to-existing-bucket
+    Assert Later    File ${result} Should    Contain    sourceBucket
+
+Execute Batch for testuser
+    Execute Batch
+
+Test with other user
+    Skip If   '${SECURITY_ENABLED}' != 'true'    only if security is enabled
+
+    Execute    kdestroy
+    Run Keyword    Kinit test user    testuser2    testuser2.keytab
+
+    Can follow link with read access
+    Cannot follow link without read access
+    ACL verified on source and target bucket
+
+    Execute Batch

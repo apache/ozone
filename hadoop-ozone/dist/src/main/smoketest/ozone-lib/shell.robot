@@ -24,6 +24,13 @@ Ozone Shell Batch
     ${cmd} =    Catenate    SEPARATOR=' --execute '    @{commands}
     Run Keyword And Return    Execute and checkrc    ozone sh --execute '${cmd}'    0
 
+Ozone Batch ${subcmd}
+    [arguments]    @{commands}
+    ${cmd} =    Catenate    SEPARATOR=' --execute '    @{commands}
+    Run    ozone ${subcmd} --continue-batch-on-error --execute '${cmd}' &> ${TEMP_DIR}/batch.out
+    ${output} =    Get File    ${TEMP_DIR}/batch.out
+    Log    ${output}
+
 Bucket Exists
     [arguments]    ${bucket}
     ${rc}    ${output} =      Run And Return Rc And Output             timeout 15 ozone sh bucket info ${bucket}
@@ -51,11 +58,6 @@ File Should Match Local File
     [arguments]    ${key}    ${file}
     ${matches} =   Compare Key With Local File    ${key}    ${file}    fs -get
     Should Be True    ${matches}
-
-Verify ACL
-    [arguments]         ${object_type}   ${object}    ${type}   ${name}    ${acls}
-    ${actual_acls} =    Execute          ozone sh ${object_type} getacl ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
-                        Should Be Equal    ${acls}    ${actual_acls}
 
 Create Random Volume
     ${random} =    Generate Random String  5  [LOWER]

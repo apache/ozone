@@ -45,9 +45,9 @@ Kinit HTTP user
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k -t /etc/security/keytabs/HTTP.keytab ${principal}
 
 Kinit test user
+    [arguments]    ${user}=testuser    ${keytab}=testuser.keytab
     Get Security Enabled From Config
-    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
-    [arguments]                      ${user}       ${keytab}
+    Return From Keyword If   '${SECURITY_ENABLED}' != 'true'    only if security is enabled
     ${TEST_USER} =      Get test user principal    ${user}
     Set Suite Variable  ${TEST_USER}
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k -t /etc/security/keytabs/${keytab} ${TEST_USER}
