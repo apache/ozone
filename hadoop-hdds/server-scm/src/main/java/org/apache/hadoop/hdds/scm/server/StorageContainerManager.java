@@ -172,6 +172,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.upgrade.ScmUpgradeActionProvider;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -484,7 +485,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     registerMXBean();
     registerMetricsSource(this);
-    this.nettyMetrics = NettyMetrics.create();
+    this.nettyMetrics = NettyMetrics.create(getScmId());
   }
 
   private void initializeEventHandlers() {
@@ -710,7 +711,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       leaseManager = new LeaseManager<>(threadNamePrefix, timeDuration);
     }
 
-    versionManager = new ScmVersionManager(scmStorageConfig, this);
+    versionManager = new ScmVersionManager(scmStorageConfig, this, new ScmUpgradeActionProvider(), getScmId());
     finalizationManager = new FinalizationManagerImpl.Builder()
         .setHAManager(scmHAManager)
         .setFinalizationStore(scmMetadataStore.getMetaTable())

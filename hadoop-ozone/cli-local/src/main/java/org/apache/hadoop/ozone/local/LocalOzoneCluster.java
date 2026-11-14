@@ -1047,6 +1047,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   }
 
   private void enableSameJvmMetricsMode() {
+    // Mini-cluster mode makes MetricUtil#getMetricsSourceName qualify source names per service, and makes a
+    // remaining duplicate name non-fatal by appending a numeric suffix instead of throwing.
     if (!metricsMiniClusterModeEnabled) {
       previousMetricsMiniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
       DefaultMetricsSystem.setMiniClusterMode(true);

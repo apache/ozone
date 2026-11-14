@@ -98,7 +98,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
     stsServer = new S3STSHttpServer(OzoneConfigurationHolder.configuration(), "s3g-sts");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
     versionMetrics = S3GatewayVersionMetrics.create();
-    nettyMetrics = NettyMetrics.create();
+    nettyMetrics = NettyMetrics.create("S3Gateway");
     start();
 
     ShutdownHookManager.get().addShutdownHook(() -> {

@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics related to Block Deleting Service running on Datanode.
@@ -32,9 +33,9 @@ import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
     + "background block deleting service on Datanode", context = "dfs")
 public final class BlockDeletingServiceMetrics {
 
-  private static BlockDeletingServiceMetrics instance;
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
+  private final String sourceName;
 
   @Metric(about = "The number of successful delete blocks")
   private MutableCounterLong successCount;
@@ -84,26 +85,27 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The number of delete block transactions failed.")
   private MutableGaugeLong processedTransactionFailCount;
 
-  private BlockDeletingServiceMetrics() {
+  private BlockDeletingServiceMetrics(String sourceName) {
+    this.sourceName = sourceName;
   }
 
-  public static synchronized BlockDeletingServiceMetrics create() {
-    if (instance == null) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      instance = ms.register(SOURCE_NAME, "BlockDeletingService",
-          new BlockDeletingServiceMetrics());
-    }
-
-    return instance;
+  public static BlockDeletingServiceMetrics create(String datanodeId) {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, datanodeId);
+    return ms.register(sourceName, "BlockDeletingService", new BlockDeletingServiceMetrics(sourceName));
   }
 
   /**
-   * Unregister the metrics instance.
+   * Returns the source name {@link #create(String)} registers for {@code datanodeId} when datanodes share a JVM,
+   * so Recon can find the JMX bean of that datanode regardless of its own metrics mode.
    */
-  public static synchronized void unRegister() {
-    instance = null;
+  public static String getSourceName(String datanodeId) {
+    return SOURCE_NAME + '-' + datanodeId;
+  }
+
+  public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   public void incrSuccessCount(long count) {

@@ -50,10 +50,16 @@ public final class OnDemandContainerScanner {
 
   public OnDemandContainerScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
+    this(conf, controller, null);
+  }
+
+  public OnDemandContainerScanner(
+      ContainerScannerConfiguration conf, ContainerController controller,
+      String metricsSourceId) {
     throttler = new DataTransferThrottler(
         conf.getOnDemandBandwidthPerVolume());
     canceler = new Canceler();
-    metrics = OnDemandScannerMetrics.create();
+    metrics = OnDemandScannerMetrics.create(metricsSourceId);
     scanExecutor = Executors.newSingleThreadExecutor();
     containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
     this.scannerHelper = ContainerScanHelper.withScanGap(LOG, controller, metrics, conf);

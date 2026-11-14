@@ -68,9 +68,9 @@ public final class SCMMetrics {
     return dbCheckpointMetrics;
   }
 
-  private SCMMetrics(String sourceName, int maxRatisEvents) {
+  private SCMMetrics(String sourceName, int maxRatisEvents, String scmId) {
     this.sourceName = sourceName;
-    dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics");
+    dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics", scmId);
     this.maxRatisEvents = maxRatisEvents;
   }
 
@@ -86,7 +86,7 @@ public final class SCMMetrics {
         ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
     String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, scmId);
     return ms.register(sourceName, "Storage Container Manager Metrics",
-        new SCMMetrics(sourceName, maxRatisEvents));
+        new SCMMetrics(sourceName, maxRatisEvents, scmId));
   }
 
   public void setLastContainerReportSize(long size) {
@@ -194,6 +194,9 @@ public final class SCMMetrics {
   }
 
   public void unRegister() {
+    if (dbCheckpointMetrics != null) {
+      dbCheckpointMetrics.unRegister();
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }
