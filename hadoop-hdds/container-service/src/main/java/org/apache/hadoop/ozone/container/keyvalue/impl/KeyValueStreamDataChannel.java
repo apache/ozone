@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
@@ -50,12 +51,16 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
       = new AtomicReference<>();
   private final AtomicBoolean closed = new AtomicBoolean();
   private final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock;
+  /** Called when this channel is closed or cleaned up. */
+  private final Consumer<KeyValueStreamDataChannel> onClose;
 
   KeyValueStreamDataChannel(File file, ContainerData containerData,
                             CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock,
-                            ContainerMetrics metrics) throws StorageContainerException {
+                            ContainerMetrics metrics, Consumer<KeyValueStreamDataChannel> onClose)
+      throws StorageContainerException {
     super(file, containerData, metrics);
     this.putBlock = putBlock;
+    this.onClose = onClose;
   }
 
   @Override
@@ -69,7 +74,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   }
 
   @Override
-  public int write(ReferenceCountedObject<ByteBuffer> referenceCounted)
+  public synchronized int write(ReferenceCountedObject<ByteBuffer> referenceCounted)
       throws IOException {
     getMetrics().incContainerOpsMetrics(getType());
     assertOpen();
@@ -123,13 +128,15 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
           writeBuffers();
         }
       } finally {
+        onClose.accept(this);
         super.close();
       }
     }
   }
 
   @Override
-  protected void cleanupInternal() throws IOException {
+  protected synchronized void cleanupInternal() throws IOException {
+    onClose.accept(this);
     buffers.cleanUpAll();
     if (closed.compareAndSet(false, true)) {
       super.close();
@@ -140,7 +147,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
    * Write the data in {@link #buffers} to the channel.
    * Note that the PutBlock proto at the end is ignored; see HDDS-12007.
    */
-  private void writeBuffers() throws IOException {
+  private synchronized void writeBuffers() throws IOException {
     final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(false);
     final ByteBuf buf = ref.retain();
     try {
@@ -157,7 +164,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
    * It must be called before committing a PutBlock in the middle of the stream;
    * otherwise, the buffered data is not yet in the block file.
    */
-  public void drainBuffers() throws IOException {
+  public synchronized void drainBuffers() throws IOException {
     assertOpen();
     final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(true);
     if (ref == null) {
@@ -168,6 +175,34 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
       writeFully(buf.nioBuffer(), super::writeFileChannel);
     } finally {
       ref.release();
+    }
+  }
+
+  /**
+   * Write the data in {@link #buffers} to the channel until the block file has at least the given length.
+   * It must be called before committing a PutBlock with this block length.
+   * Unlike {@link #drainBuffers()}, it does not write all the data:
+   * the end of the stream may be the PutBlock request, which must not be written to the block file.
+   * Since the client sends the PutBlock request in separate packets after the data,
+   * whole buffers can be written as long as the block file is shorter than the given length.
+   */
+  synchronized void drainBuffers(long length) throws IOException {
+    if (closed.get()) {
+      // close() has written the data, or cleanUp() has dropped it.
+      return;
+    }
+    long position = getPosition();
+    while (position < length) {
+      final ReferenceCountedObject<ByteBuffer> b = buffers.pollFirst();
+      if (b == null) {
+        return;
+      }
+      try {
+        position += b.get().remaining();
+        writeFully(b.get(), super::writeFileChannel);
+      } finally {
+        b.release();
+      }
     }
   }
 
@@ -264,10 +299,13 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   }
 
   private void closeWithStreamPutBlock() throws IOException {
-    final ContainerCommandRequestProto proto =
-        closeBuffers(buffers, super::writeFileChannel);
+    final ContainerCommandRequestProto proto;
+    synchronized (this) {
+      proto = closeBuffers(buffers, super::writeFileChannel);
+    }
     putBlockRequest.set(proto);
     Preconditions.checkState(putBlock != null);
+    // The lock only protects the buffers; do not hold it while committing the PutBlock.
     putBlock.accept(proto);
     setLinked();
   }
