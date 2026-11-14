@@ -573,7 +573,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
   @Test
   public void testRejectedOverwriteCommitKeepsHsyncedKeyWritable() throws Exception {
-    // Create a bucket with quotaInNamespace = 1
+    // Create a bucket with quotaInNamespace = 1.
     OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE, omMetadataManager);
     OMRequestTestUtils.addBucketToDB(omMetadataManager, OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
