@@ -31,6 +31,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.dynatrace.hash4j</groupId>
+      <artifactId>hash4j</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
     </dependency>

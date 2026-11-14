@@ -37,7 +37,12 @@ class TestTrailerChecksum {
       "CRC32C,4waSgw==,AAAAAA==",
       "CRC64NVME,rosUhgp5mIg=,AAAAAAAAAAA=",
       "SHA1,98O8HYCOBHMq32eZZczDTKeuNEE=,2jmj7l5rSw0yVb/vlWAYkK/YBwk=",
-      "SHA256,FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU=,47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="})
+      "SHA256,FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU=,47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+      "SHA512,2eZ2LdHI6vbWGzxhkvxAjU1tXxF20MKRabwk5xw/J0rSf81YEbMT1oH35V7ALXPUmclUVba1u1A6z1dPuo/+hQ==,"
+          + "z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+      "XXHASH64,jLhB20DmroM=,70bbN1HY6Zk=",
+      "XXHASH3,ctyxi2ehff8=,LQaABTjTlMI=",
+      "XXHASH128,MxGUd+3l3NXpcWQnaB1YYA==,maoG0wFHmNhgAcMkRo1Jfw=="})
   void verifiesKnownVectorsAcrossReadBoundaries(TrailerHeader header, String expected, String empty) {
     header.newChecksum().verify(Base64.getDecoder().decode(empty), "key");
     byte[] payload = "!123456789!".getBytes(UTF_8);
@@ -55,6 +60,26 @@ class TestTrailerChecksum {
     OS3Exception error = assertThrows(OS3Exception.class,
         () -> wrong.verify(Base64.getDecoder().decode(expected), "key"));
     assertThat(error.getCode()).isEqualTo(S3ErrorTable.BAD_DIGEST.getCode());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"XXHASH64,niilpeyUrvg=", "XXHASH3,2bjpPvP75BY=", "XXHASH128,8VoTlV1TZ+jZuOk+8/vkFg=="})
+  void xxHashMatchesLongPayloadAcrossUpdates(TrailerHeader header, String expected) {
+    byte[] payload = new byte[1027];
+    for (int i = 0; i < 1025; i++) {
+      payload[i + 1] = (byte) (i * 131 + 17);
+    }
+    TrailerChecksum checksum = header.newChecksum();
+    int offset = 1;
+    for (int length : new int[]{7, 1, 241, 3, 773}) {
+      if (length == 1) {
+        checksum.update(payload[offset]);
+      } else {
+        checksum.update(payload, offset, length);
+      }
+      offset += length;
+    }
+    checksum.verify(Base64.getDecoder().decode(expected), "key");
   }
 
   @Test

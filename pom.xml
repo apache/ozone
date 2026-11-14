@@ -94,6 +94,7 @@
     <guice.version>6.0.0</guice.version>
     <hadoop.version>3.4.3</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
+    <hash4j.version>0.31.0</hash4j.version>
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <hdds.version>${ozone.version}</hdds.version>
     <hk2.version>2.6.1</hk2.version>
@@ -371,6 +372,11 @@
         <groupId>com.bettercloud</groupId>
         <artifactId>vault-java-driver</artifactId>
         <version>${vault.driver.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.dynatrace.hash4j</groupId>
+        <artifactId>hash4j</artifactId>
+        <version>${hash4j.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
