@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -41,10 +42,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -56,6 +59,8 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests to ensure the DatanodeAdminMonitor is working correctly. This class
@@ -440,6 +445,36 @@ public class TestDatanodeAdminMonitor {
     assertEquals(0, monitor.getTrackedNodeCount());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
         nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ContainerHealthState.class, names = {"UNDER_REPLICATED", "UNHEALTHY_UNDER_REPLICATED",
+      "MISSING_UNDER_REPLICATED", "QUASI_CLOSED_STUCK_UNDER_REPLICATED"})
+  public void testDecommissionWaitsForUnderReplicatedHealthStates(ContainerHealthState healthState)
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn, NodeStatus.valueOf(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY));
+    nodeManager.setContainers(dn, generateContainers(1));
+    DatanodeAdminMonitorTestUtil.mockGetContainerReplicaCount(repManager, false, HddsProtos.LifeCycleState.CLOSED,
+        DECOMMISSIONING, IN_SERVICE, IN_SERVICE);
+    when(repManager.checkContainerStatus(any(ContainerInfo.class), any(ReplicationManagerReport.class)))
+        .thenAnswer(invocation -> {
+          ReplicationManagerReport report = invocation.getArgument(1);
+          report.increment(healthState);
+          return true;
+        });
+
+    monitor.startMonitoring(dn);
+    monitor.run();
+    monitor.run();
+    assertEquals(DECOMMISSIONING, nodeManager.getNodeStatus(dn).getOperationalState());
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertThat(monitor.getContainersPendingReplication(dn).get("UnderReplicated")).hasSize(1);
+
+    DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, false);
+    monitor.run();
+    assertEquals(DECOMMISSIONED, nodeManager.getNodeStatus(dn).getOperationalState());
+    assertEquals(0, monitor.getTrackedNodeCount());
   }
 
   @Test
