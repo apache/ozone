@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -708,11 +709,17 @@ public class TestRpcClient {
     config.setBoolean(S3Auth.S3_AUTH_CHECK, s3Client);
     RpcClient client = spy(createRpcClient(transport, config));
     try {
-      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
-          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
       boolean assumeContext = volumeName == null
           && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version);
-      String expectedVolume = assumeContext ? "s3v" : volumeName == null ? "tenant-volume" : volumeName;
+      if (volumeName == null && !assumeContext) {
+        assertThrows(NullPointerException.class,
+            () -> client.listMultipartUploads(null, "bucket", "prefix/", "previous", "previous-upload", 2));
+        assertThrows(NullPointerException.class, () -> client.listParts(null, "bucket", "key", "upload-id", 3, 2));
+        assertThat(requests).isEmpty();
+        verify(client, never()).getS3VolumeContext();
+        return;
+      }
+      String expectedVolume = assumeContext ? "s3v" : volumeName;
 
       assertThat(client.listMultipartUploads(volumeName, "bucket", "prefix/", "previous", "previous-upload", 2)
           .getUploads()).isEmpty();
@@ -739,7 +746,7 @@ public class TestRpcClient {
       assertEquals("upload-id", parts.getUploadID());
       assertEquals(3, parts.getPartNumbermarker());
       assertEquals(2, parts.getMaxParts());
-      verify(client, times(volumeName == null && !assumeContext ? 2 : 0)).getS3VolumeContext();
+      verify(client, never()).getS3VolumeContext();
     } finally {
       client.close();
     }

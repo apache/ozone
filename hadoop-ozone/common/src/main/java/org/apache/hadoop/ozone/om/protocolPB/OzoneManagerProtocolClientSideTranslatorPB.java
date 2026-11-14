@@ -59,7 +59,6 @@ import org.apache.hadoop.ipc_.CallerContext;
 import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -1987,15 +1986,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public OmMultipartUploadListParts listParts(String volumeName,
       String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts) throws IOException {
+    return listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts, false);
+  }
+
+  @Override
+  public OmMultipartUploadListParts listParts(String volumeName, String bucketName, String keyName, String uploadID,
+      int partNumberMarker, int maxParts, boolean assumeS3Context) throws IOException {
     MultipartUploadListPartsRequest.Builder multipartUploadListPartsRequest =
         MultipartUploadListPartsRequest.newBuilder();
-    multipartUploadListPartsRequest.setVolume(
-        volumeName == null ? OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT : volumeName)
+    multipartUploadListPartsRequest.setVolume(volumeName)
         .setBucket(bucketName).setKey(keyName).setUploadID(uploadID)
         .setPartNumbermarker(partNumberMarker).setMaxParts(maxParts);
 
     OMRequest omRequest = createOMRequest(Type.ListMultiPartUploadParts)
-        .setAssumeS3Context(volumeName == null)
+        .setAssumeS3Context(assumeS3Context)
         .setListMultipartUploadPartsRequest(
             multipartUploadListPartsRequest.build()).build();
 
@@ -2021,9 +2025,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       String bucketName,
       String prefix,
       String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws IOException {
+    return listMultipartUploads(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+        withPagination, false);
+  }
+
+  @Override
+  public OmMultipartUploadList listMultipartUploads(String volumeName, String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination, boolean assumeS3Context)
+      throws IOException {
     ListMultipartUploadsRequest request = ListMultipartUploadsRequest
         .newBuilder()
-        .setVolume(volumeName == null ? OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT : volumeName)
+        .setVolume(volumeName)
         .setBucket(bucketName)
         .setPrefix(prefix == null ? "" : prefix)
         .setKeyMarker(keyMarker == null ? "" : keyMarker)
@@ -2033,7 +2045,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     OMRequest omRequest = createOMRequest(Type.ListMultipartUploads)
-        .setAssumeS3Context(volumeName == null)
+        .setAssumeS3Context(assumeS3Context)
         .setListMultipartUploadsRequest(request)
         .build();
 
