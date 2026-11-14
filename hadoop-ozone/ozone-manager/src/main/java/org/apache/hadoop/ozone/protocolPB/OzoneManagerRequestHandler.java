@@ -1048,15 +1048,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     MultipartUploadListPartsResponse.Builder response =
         MultipartUploadListPartsResponse.newBuilder();
 
-    String volumeName = assumeS3Context
-        ? impl.getS3VolumeContext(true).getOmVolumeArgs().getVolume() : multipartUploadListPartsRequest.getVolume();
     OmMultipartUploadListParts omMultipartUploadListParts =
-        impl.listParts(volumeName,
+        impl.listParts(multipartUploadListPartsRequest.getVolume(),
             multipartUploadListPartsRequest.getBucket(),
             multipartUploadListPartsRequest.getKey(),
             multipartUploadListPartsRequest.getUploadID(),
             multipartUploadListPartsRequest.getPartNumbermarker(),
-            multipartUploadListPartsRequest.getMaxParts());
+            multipartUploadListPartsRequest.getMaxParts(), assumeS3Context);
 
     List<OmPartInfo> omPartInfoList =
         omMultipartUploadListParts.getPartInfoList();
@@ -1091,11 +1089,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       ListMultipartUploadsRequest request, boolean assumeS3Context)
       throws IOException {
 
-    String volumeName = assumeS3Context
-        ? impl.getS3VolumeContext(true).getOmVolumeArgs().getVolume() : request.getVolume();
-    OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(volumeName, request.getBucket(),
-        request.getPrefix(),
-        request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads(), request.getWithPagination());
+    OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(request.getVolume(),
+        request.getBucket(), request.getPrefix(), request.getKeyMarker(), request.getUploadIdMarker(),
+        request.getMaxUploads(), request.getWithPagination(), assumeS3Context);
 
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()

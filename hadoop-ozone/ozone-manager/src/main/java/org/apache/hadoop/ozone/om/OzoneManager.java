@@ -4426,7 +4426,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return getS3VolumeContext(false);
   }
 
-  public S3VolumeContext getS3VolumeContext(boolean skipChecks) throws IOException {
+  S3VolumeContext getS3VolumeContext(boolean skipChecks) throws IOException {
     long start = Time.monotonicNowNanos();
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
@@ -4533,8 +4533,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmMultipartUploadListParts listParts(final String volumeName,
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
+    return listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts, false);
+  }
 
-    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+  public OmMultipartUploadListParts listParts(String volumeName, String bucketName, String keyName, String uploadID,
+      int partNumberMarker, int maxParts, boolean assumeS3Context) throws IOException {
+    String resolvedVolumeName = assumeS3Context ? getS3VolumeContext(true).getOmVolumeArgs().getVolume() : volumeName;
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(resolvedVolumeName, bucketName));
     final String realVolumeName = bucket.realVolume();
     final String realBucketName = bucket.realBucket();
 
@@ -4573,8 +4578,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String bucketName,
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws IOException {
+    return listMultipartUploads(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+        withPagination, false);
+  }
 
-    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OmMultipartUploadList listMultipartUploads(String volumeName, String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination, boolean assumeS3Context)
+      throws IOException {
+    String resolvedVolumeName = assumeS3Context ? getS3VolumeContext(true).getOmVolumeArgs().getVolume() : volumeName;
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(resolvedVolumeName, bucketName));
     final String realVolumeName = bucket.realVolume();
     final String realBucketName = bucket.realBucket();
 

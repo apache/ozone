@@ -52,10 +52,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -93,15 +91,10 @@ public class TestOzoneManagerRequestHandler {
   void testMultipartListingS3Context(boolean assumeContext) throws IOException {
     OzoneManagerRequestHandler handler = getRequestHandler(10);
     OzoneManager om = handler.getOzoneManager();
-    String expectedVolume = assumeContext ? "tenant-volume" : "request-volume";
-    if (assumeContext) {
-      Mockito.when(om.getS3VolumeContext(true)).thenReturn(new S3VolumeContext(
-          OmVolumeArgs.newBuilder().setVolume("tenant-volume").setOwnerName("owner").setAdminName("admin").build(),
-          "owner"));
-    }
-    Mockito.when(om.listMultipartUploads(expectedVolume, "bucket", "prefix/", "previous", "previous-upload", 2, true))
+    Mockito.when(om.listMultipartUploads(
+        "request-volume", "bucket", "prefix/", "previous", "previous-upload", 2, true, assumeContext))
         .thenReturn(OmMultipartUploadList.newBuilder().setUploads(Collections.emptyList()).build());
-    Mockito.when(om.listParts(expectedVolume, "bucket", "key", "upload-id", 3, 2))
+    Mockito.when(om.listParts("request-volume", "bucket", "key", "upload-id", 3, 2, assumeContext))
         .thenReturn(new OmMultipartUploadListParts(
             RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), 0, false));
     OzoneManagerProtocolProtos.OMRequest.Builder request = OzoneManagerProtocolProtos.OMRequest.newBuilder()
@@ -124,9 +117,9 @@ public class TestOzoneManagerRequestHandler {
     assertThat(uploads.getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
     assertThat(parts.getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
     Mockito.verify(om)
-        .listMultipartUploads(expectedVolume, "bucket", "prefix/", "previous", "previous-upload", 2, true);
-    Mockito.verify(om).listParts(expectedVolume, "bucket", "key", "upload-id", 3, 2);
-    Mockito.verify(om, Mockito.times(assumeContext ? 2 : 0)).getS3VolumeContext(true);
+        .listMultipartUploads("request-volume", "bucket", "prefix/", "previous", "previous-upload", 2, true,
+            assumeContext);
+    Mockito.verify(om).listParts("request-volume", "bucket", "key", "upload-id", 3, 2, assumeContext);
   }
 
   private OmKeyInfo getMockedOmKeyInfo() {
