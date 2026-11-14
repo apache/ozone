@@ -118,6 +118,9 @@ const Heatmap: React.FC<{}> = () => {
   }
 
   function handleSubmit() {
+    if (inputPathState.isInputPathValid === 'error') {
+      return;
+    }
     if (isHeatmapEnabled && state.date && inputPathState.inputPath && state.entityType) {
       setSearchPath(inputPathState.inputPath);
     }
