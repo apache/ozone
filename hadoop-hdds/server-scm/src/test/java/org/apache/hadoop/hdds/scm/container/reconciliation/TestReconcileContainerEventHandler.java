@@ -17,9 +17,19 @@
 
 package org.apache.hadoop.hdds.scm.container.reconciliation;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +41,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +69,8 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -98,6 +111,8 @@ public class TestReconcileContainerEventHandler {
     when(scmContext.getTermOfLeader()).thenReturn(LEADER_TERM);
     eventPublisher = mock(EventPublisher.class);
     nodeManager = mock(NodeManager.class);
+    // Unless a test overrides it, every datanode is healthy and in service so all replicas participate.
+    when(nodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
     // By default every datanode is known and reports the current version, so
     // the reconcile path can resolve an apparent version. Individual tests
     // override this for specific nodes.
@@ -116,7 +131,7 @@ public class TestReconcileContainerEventHandler {
     addReplicasToContainer(5);
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertFalse(result.isOk());
     assertEquals(Result.INELIGIBLE_REPLICATION_TYPE, result.getResult());
 
@@ -133,7 +148,7 @@ public class TestReconcileContainerEventHandler {
     addReplicasToContainer(1);
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertFalse(result.isOk());
     assertEquals(Result.NOT_ENOUGH_REQUIRED_NODES, result.getResult());
 
@@ -149,7 +164,7 @@ public class TestReconcileContainerEventHandler {
 
     // Container is eligible for reconciliation, but the request will not go through because this SCM is not the leader.
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertTrue(result.isOk());
     assertEquals(Result.OK, result.getResult());
 
@@ -166,7 +181,7 @@ public class TestReconcileContainerEventHandler {
     when(containerManager.getContainer(any())).thenThrow(new ContainerNotFoundException());
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertFalse(result.isOk());
     assertEquals(Result.CONTAINER_NOT_FOUND, result.getResult());
 
@@ -181,7 +196,7 @@ public class TestReconcileContainerEventHandler {
         "Expected no replicas for this container");
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertFalse(result.isOk());
     assertEquals(Result.NO_REPLICAS_FOUND, result.getResult());
 
@@ -195,7 +210,7 @@ public class TestReconcileContainerEventHandler {
     addContainer(RATIS_THREE_REP, state);
     addReplicasToContainer(3);
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     switch (state) {
     case OPEN:
@@ -215,7 +230,7 @@ public class TestReconcileContainerEventHandler {
     }
   }
 
-  // TODO HDDS-10714 will change which datanodes are eligible to participate in reconciliation.
+  // When every node is healthy and in service, all replicas are both peers and targets.
   @Test
   public void testReconcileSentToAllPeers() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
@@ -225,7 +240,7 @@ public class TestReconcileContainerEventHandler {
         .collect(Collectors.toSet());
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
     assertTrue(result.isOk());
     assertEquals(Result.OK, result.getResult());
 
@@ -264,6 +279,134 @@ public class TestReconcileContainerEventHandler {
   }
 
   @Test
+  public void testReconcileRestrictedByNodeStatus() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    List<DatanodeDetails> nodes = addReplicasToContainer(9).stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toCollection(ArrayList::new));
+
+    // Assign a distinct node status to each replica's datanode.
+    NodeStatus[] statuses = {
+        NodeStatus.valueOf(IN_SERVICE, HEALTHY),
+        NodeStatus.valueOf(IN_SERVICE, HEALTHY),
+        NodeStatus.valueOf(IN_SERVICE, STALE),
+        NodeStatus.valueOf(IN_SERVICE, DEAD),
+        NodeStatus.valueOf(DECOMMISSIONING, HEALTHY),
+        NodeStatus.valueOf(ENTERING_MAINTENANCE, HEALTHY),
+        NodeStatus.valueOf(DECOMMISSIONED, HEALTHY),
+        NodeStatus.valueOf(IN_MAINTENANCE, HEALTHY),
+        NodeStatus.valueOf(IN_SERVICE, HEALTHY_READONLY),
+    };
+    for (int i = 0; i < nodes.size(); i++) {
+      when(nodeManager.getNodeStatus(nodes.get(i))).thenReturn(statuses[i]);
+    }
+    DatanodeInfo excludedOlderInfo = mock(DatanodeInfo.class);
+    when(excludedOlderInfo.getLastKnownApparentVersion()).thenReturn(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION);
+    when(nodeManager.getNode(nodes.get(2).getID())).thenReturn(excludedOlderInfo);
+
+    // Only healthy in-service nodes are targets; the deprecated read-only state is excluded.
+    Set<DatanodeID> expectedTargets = new HashSet<>(Arrays.asList(
+        nodes.get(0).getID(), nodes.get(1).getID()));
+    // Healthy nodes that have not decommissioned or entered maintenance are peers.
+    Set<DatanodeID> expectedPeers = new HashSet<>(Arrays.asList(
+        nodes.get(0).getID(), nodes.get(1).getID(), nodes.get(4).getID(), nodes.get(5).getID()));
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, times(expectedTargets.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+
+    Set<DatanodeID> actualTargets = new HashSet<>();
+    for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand : commandCaptor.getAllValues()) {
+      DatanodeID targetID = dnCommand.getDatanodeId();
+      assertThat(actualTargets.add(targetID)).as("Duplicate reconcile command sent to datanode").isTrue();
+
+      // A target reconciles against every eligible peer except itself.
+      Set<DatanodeID> expectedPeerIDs = expectedPeers.stream()
+          .filter(id -> !id.equals(targetID))
+          .collect(Collectors.toSet());
+      Set<DatanodeID> actualPeerIDs = dnCommand.getCommand().getProto().getPeersList().stream()
+          .map(dn -> DatanodeID.fromProto(dn.getId()))
+          .collect(Collectors.toSet());
+      assertThat(actualPeerIDs).isEqualTo(expectedPeerIDs);
+      assertThat(((ReconcileContainerCommand) dnCommand.getCommand()).getApparentVersion())
+          .isEqualTo(HDDSVersion.SOFTWARE_VERSION);
+    }
+    assertThat(actualTargets).isEqualTo(expectedTargets);
+    for (int i : new int[] {2, 3, 6, 7, 8}) {
+      verify(nodeManager, never()).getNode(nodes.get(i).getID());
+    }
+  }
+
+  @Test
+  public void testReconcileTargetWithNoEligiblePeers() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    List<DatanodeDetails> nodes = addReplicasToContainer(3).stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toCollection(ArrayList::new));
+    when(nodeManager.getNodeStatus(nodes.get(0))).thenReturn(NodeStatus.valueOf(IN_SERVICE, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(1))).thenReturn(NodeStatus.valueOf(IN_SERVICE, STALE));
+    when(nodeManager.getNodeStatus(nodes.get(2))).thenReturn(NodeStatus.valueOf(IN_SERVICE, DEAD));
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    CommandForDatanode<ReconcileContainerCommandProto> command = commandCaptor.getValue();
+    assertThat(command.getDatanodeId()).isEqualTo(nodes.get(0).getID());
+    assertThat(command.getCommand().getProto().getPeersList()).isEmpty();
+    assertThat(((ReconcileContainerCommand) command.getCommand()).getApparentVersion())
+        .isEqualTo(HDDSVersion.SOFTWARE_VERSION);
+  }
+
+  @Test
+  public void testReconcileSkipsWhenNoEligibleTargets() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    List<DatanodeDetails> nodes = addReplicasToContainer(3).stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toCollection(ArrayList::new));
+    when(nodeManager.getNodeStatus(nodes.get(0))).thenReturn(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(1))).thenReturn(NodeStatus.valueOf(IN_MAINTENANCE, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(2))).thenReturn(NodeStatus.valueOf(IN_SERVICE, STALE));
+
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
+    assertEquals(Result.NO_ELIGIBLE_TARGETS, result.getResult());
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
+    verify(nodeManager, never()).getNode(any(DatanodeID.class));
+  }
+
+  @Test
+  public void testReconcileSkipsNodeWithUnknownStatus() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    List<DatanodeDetails> nodes = addReplicasToContainer(3).stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toCollection(ArrayList::new));
+    when(nodeManager.getNodeStatus(nodes.get(0))).thenReturn(NodeStatus.valueOf(IN_SERVICE, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(1))).thenReturn(NodeStatus.valueOf(IN_SERVICE, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(2))).thenThrow(new NodeNotFoundException(nodes.get(2).getID()));
+
+    Set<DatanodeID> eligible = new HashSet<>(Arrays.asList(nodes.get(0).getID(), nodes.get(1).getID()));
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, times(eligible.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+
+    Set<DatanodeID> actualTargets = new HashSet<>();
+    for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand : commandCaptor.getAllValues()) {
+      DatanodeID targetID = dnCommand.getDatanodeId();
+      actualTargets.add(targetID);
+      Set<DatanodeID> peerIDs = dnCommand.getCommand().getProto().getPeersList().stream()
+          .map(dn -> DatanodeID.fromProto(dn.getId()))
+          .collect(Collectors.toSet());
+      assertThat(peerIDs).doesNotContain(nodes.get(2).getID());
+      assertThat(peerIDs)
+          .isEqualTo(eligible.stream().filter(id -> !id.equals(targetID)).collect(Collectors.toSet()));
+      assertThat(((ReconcileContainerCommand) dnCommand.getCommand()).getApparentVersion())
+          .isEqualTo(HDDSVersion.SOFTWARE_VERSION);
+    }
+    assertThat(actualTargets).isEqualTo(eligible);
+    verify(nodeManager, never()).getNode(nodes.get(2).getID());
+  }
+
+  @Test
   public void testReconcileCommandCarriesLowestApparentVersion() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
     Set<ContainerReplica> replicas = addReplicasToContainer(3);
@@ -288,6 +431,25 @@ public class TestReconcileContainerEventHandler {
     assertEquals(3, numCmds);
   }
 
+  @Test
+  public void testReconcileCommandVersionIncludesTransitioningPeers() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    DatanodeDetails olderPeer = addReplicasToContainer(3).iterator().next().getDatanodeDetails();
+    when(nodeManager.getNodeStatus(olderPeer)).thenReturn(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
+    DatanodeInfo olderInfo = mock(DatanodeInfo.class);
+    when(olderInfo.getLastKnownApparentVersion()).thenReturn(lower);
+    when(nodeManager.getNode(olderPeer.getID())).thenReturn(olderInfo);
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+
+    verify(eventPublisher, times(2)).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    for (CommandForDatanode<ReconcileContainerCommandProto> command : commandCaptor.getAllValues()) {
+      assertThat(command.getDatanodeId()).isNotEqualTo(olderPeer.getID());
+      assertThat(((ReconcileContainerCommand) command.getCommand()).getApparentVersion()).isEqualTo(lower);
+    }
+  }
+
   @ParameterizedTest
   @EnumSource(State.class)
   public void testReconcileFailsWithIneligibleReplicas(State replicaState) throws Exception {
@@ -298,7 +460,7 @@ public class TestReconcileContainerEventHandler {
     addReplicasToContainer(replicaState, State.CLOSED, State.CLOSED);
 
     EligibilityResult result =
-        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager, nodeManager);
 
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     switch (replicaState) {
