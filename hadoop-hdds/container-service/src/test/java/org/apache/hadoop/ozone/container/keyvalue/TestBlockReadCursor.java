@@ -116,6 +116,33 @@ class TestBlockReadCursor {
   }
 
   @Test
+  void testResponseDataSizeIsAtMostTheRequestedRange() throws Exception {
+    final int responseSize = 1 << 20;
+    List<ChunkInfo> chunks = Arrays.asList(chunk(0, 3, 4), chunk(3, 9, 4), chunk(12, 7, 3));
+    assertEquals(0, new BlockReadCursor(3, 0, responseSize, chunks).responseDataSize());
+    assertRangeLengths(new BlockReadCursor(4, 1, responseSize, chunks), 4, 4);
+    assertRangeLengths(new BlockReadCursor(18, 5, responseSize, chunks), 1, 1);
+    assertRangeLengths(new BlockReadCursor(0, Long.MAX_VALUE, responseSize, chunks), 19, 19);
+    assertRangeLengths(new BlockReadCursor(0, Long.MAX_VALUE, 5, chunks), 5, 3, 4, 5, 3, 4);
+    assertRangeLengths(new BlockReadCursor(3, 9, 1, chunks), 4, 4, 4, 1);
+
+    final int interval = 64 * 1024;
+    List<ChunkInfo> noChecksums = Collections.singletonList(ChunkInfo.newBuilder().setChunkName("chunk-0")
+        .setOffset(0).setLen(3 * interval + 10).setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.NONE).setBytesPerChecksum(0)).build());
+    assertRangeLengths(new BlockReadCursor(interval + 1, 1, responseSize, noChecksums), interval, interval);
+    assertRangeLengths(new BlockReadCursor(3 * interval + 1, 1, responseSize, noChecksums), 10, 10);
+  }
+
+  private static void assertRangeLengths(BlockReadCursor cursor, int responseDataSize, int... lengths) {
+    assertEquals(responseDataSize, cursor.responseDataSize());
+    for (int length : lengths) {
+      assertEquals(length, cursor.next().length());
+    }
+    assertFalse(cursor.hasNext());
+  }
+
+  @Test
   void testRangeNearLongLimit() throws Exception {
     List<ChunkInfo> chunks = Arrays.asList(chunk(0, Long.MAX_VALUE - 9, 4), chunk(Long.MAX_VALUE - 9, 9, 4));
     BlockReadCursor cursor = new BlockReadCursor(Long.MAX_VALUE - 8, Long.MAX_VALUE, 4, chunks);

@@ -53,7 +53,6 @@ class BlockReadCursor implements Iterator<BlockReadCursor.ReadRange> {
     ChunkInfo lastChunk = chunks.get(chunks.size() - 1);
     long blockEnd = lastChunk.getOffset() + lastChunk.getLen();
     chunkOffsets[chunks.size()] = blockEnd;
-    this.responseDataSize = bufferSize;
     chunkIndex = findChunk(requestedOffset);
     offset = length == 0 ? requestedOffset : alignDown(requestedOffset, chunkIndex);
     if (length == 0) {
@@ -64,6 +63,7 @@ class BlockReadCursor implements Iterator<BlockReadCursor.ReadRange> {
       long floor = alignDown(requestedEnd - 1, last);
       end = floor + Math.min(intervals[last], chunkOffsets[last + 1] - floor);
     }
+    this.responseDataSize = (int) Math.min(bufferSize, end - offset);
   }
 
   private static int interval(ChunkInfo chunk) throws IOException {
