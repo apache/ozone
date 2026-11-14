@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.protocol.ClientId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,6 +89,9 @@ public class TestOMUpgradeFinalizeService {
     omRatisServer = mock(OzoneManagerRatisServer.class);
     // OzoneManagerRatisUtils.submitRequest() calls ozoneManager.getOmRatisServer().submitRequest(...)
     when(ozoneManager.getOmRatisServer()).thenReturn(omRatisServer);
+    // OzoneManagerRatisUtils.submitRequest() records per-type metrics via ozoneManager.getOmClientProtocolMetrics()
+    when(ozoneManager.getOmClientProtocolMetrics()).thenReturn(ProtocolMessageMetrics.create(
+        "OmClientProtocol", "Ozone Manager RPC endpoint", OzoneManagerProtocolProtos.Type.class));
 
     blockClient = mock(ScmBlockLocationProtocol.class);
     scmClient = mock(ScmClient.class);
