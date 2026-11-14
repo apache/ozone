@@ -64,11 +64,10 @@ import org.slf4j.LoggerFactory;
  * monitor:
  * <pre>
  *   acquireClient()                    // synchronized (clientCache)
- *     -&gt; getClient()
- *       -&gt; clientCache.get(key, newClient)
- *          -&gt; (Guava evicts an entry on the calling thread)
- *             -&gt; RemovalListener.onRemoval()   // synchronized (clientCache)
- *                -&gt; XceiverClientSpi.setEvicted() -&gt; cleanup() -&gt; close()
+ *     -&gt; clientCache.get(key, newClient)
+ *        -&gt; (Guava evicts an entry on the calling thread)
+ *           -&gt; RemovalListener.onRemoval()   // synchronized (clientCache)
+ *              -&gt; XceiverClientSpi.setEvicted() -&gt; cleanup() -&gt; close()
  * </pre>
  * So the blocking graceful-shutdown wait ran while the {@code clientCache}
  * monitor was held, and every other thread in {@code acquireClient()} /
