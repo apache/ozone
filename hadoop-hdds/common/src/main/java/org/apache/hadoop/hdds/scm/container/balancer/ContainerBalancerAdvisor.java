@@ -162,19 +162,34 @@ public final class ContainerBalancerAdvisor {
         .setThresholdPercent(thresholdPercent);
 
     try {
-      long moveReplicationTimeoutMillis = balancerConfig.getMoveReplicationTimeout().toMillis();
-      long moveTimeoutMillis = balancerConfig.getMoveTimeout().toMillis();
-      long balancingIntervalMillis = balancerConfig.getBalancingInterval().toMillis();
+      long moveReplicationTimeoutMillis = request.moveReplicationTimeoutMillis != null
+          ? request.moveReplicationTimeoutMillis
+          : balancerConfig.getMoveReplicationTimeout().toMillis();
+      long moveTimeoutMillis = request.moveTimeoutMillis != null
+          ? request.moveTimeoutMillis
+          : balancerConfig.getMoveTimeout().toMillis();
+      long balancingIntervalMillis = request.balancingIntervalMillis != null
+          ? request.balancingIntervalMillis
+          : balancerConfig.getBalancingInterval().toMillis();
       validateMoveTimeouts(conf, moveReplicationTimeoutMillis, moveTimeoutMillis);
       validateBalancingIntervalMillis(balancingIntervalMillis);
 
-      long configCeiling = balancerConfig.getMaxSizeToMovePerIteration();
+      boolean userProvidedMaxSizeToMove = request.maxSizeToMovePerIteration != null;
+      long configCeiling = userProvidedMaxSizeToMove
+          ? request.maxSizeToMovePerIteration
+          : balancerConfig.getMaxSizeToMovePerIteration();
       ContainerBalancerEstimation initialEstimation = estimateForProfile(
           conf, request, profile, snapshot, balancerConfig, thresholdPercent, null);
       if (!initialEstimation.succeeded()) {
         throw new IllegalArgumentException(initialEstimation.getFailureMessage());
       }
-      long recommendedMaxMove = computeRecommendedMaxSizeToMove(configCeiling, initialEstimation);
+      long recommendedMaxMove;
+      if (userProvidedMaxSizeToMove) {
+        recommendedMaxMove = request.maxSizeToMovePerIteration;
+      } else {
+        recommendedMaxMove = computeRecommendedMaxSizeToMove(configCeiling, initialEstimation);
+        recommendedMaxMove = floorToWholeGb(recommendedMaxMove);
+      }
 
       // Estimate with the recommended max-size-to-move so it matches the suggested command.
       ContainerBalancerEstimation estimation = estimateForProfile(
@@ -223,6 +238,10 @@ public final class ContainerBalancerAdvisor {
         estimation.getMaxSizeEnteringTarget(),
         estimation.getMaxSizeLeavingSource());
     return minPositive(configCeiling, floor);
+  }
+
+  private static long floorToWholeGb(long bytes) {
+    return (bytes / OzoneConsts.GB) * OzoneConsts.GB;
   }
 
   private static Map<String, String> buildRationale(
