@@ -27,6 +27,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -128,6 +129,17 @@ public class SCMDeletedBlockTransactionStatusManager {
       ContainerManager containerManager,
       Supplier<ContainerReplicaPendingOps> containerReplicaPendingOpsSupplier,
       ScmBlockDeletingServiceMetrics metrics, long scmCommandTimeoutMs) throws IOException {
+    this(deletedBlockLogStateManager, statefulServiceConfigTable, containerManager, containerReplicaPendingOpsSupplier,
+        metrics, scmCommandTimeoutMs, Clock.systemUTC());
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public SCMDeletedBlockTransactionStatusManager(
+      DeletedBlockLogStateManager deletedBlockLogStateManager,
+      Table<String, ByteString> statefulServiceConfigTable,
+      ContainerManager containerManager,
+      Supplier<ContainerReplicaPendingOps> containerReplicaPendingOpsSupplier,
+      ScmBlockDeletingServiceMetrics metrics, long scmCommandTimeoutMs, Clock clock) throws IOException {
     // maps transaction to dns which have committed it.
     this.deletedBlockLogStateManager = deletedBlockLogStateManager;
     this.statefulConfigTable = statefulServiceConfigTable;
@@ -139,7 +151,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     this.transactionToRetryCountMap = new ConcurrentHashMap<>();
     this.txSizeMap = new ConcurrentHashMap<>();
     this.scmDeleteBlocksCommandStatusManager =
-        new SCMDeleteBlocksCommandStatusManager(metrics);
+        new SCMDeleteBlocksCommandStatusManager(metrics, clock);
     this.initDataDistributionData();
   }
 
@@ -156,10 +168,16 @@ public class SCMDeletedBlockTransactionStatusManager {
     private static final Set<CmdStatus> STATUSES_REQUIRING_TIMEOUT = Collections.singleton(SENT);
 
     private ScmBlockDeletingServiceMetrics metrics;
+    private final Clock clock;
 
     public SCMDeleteBlocksCommandStatusManager(ScmBlockDeletingServiceMetrics metrics) {
+      this(metrics, Clock.systemUTC());
+    }
+
+    public SCMDeleteBlocksCommandStatusManager(ScmBlockDeletingServiceMetrics metrics, Clock clock) {
       this.scmCmdStatusRecord = new ConcurrentHashMap<>();
       this.metrics = metrics;
+      this.clock = clock;
     }
 
     /**
@@ -183,13 +201,15 @@ public class SCMDeletedBlockTransactionStatusManager {
       private final DatanodeID dnId;
       private final long scmCmdId;
       private final Set<Long> deletedBlocksTxIds;
+      private final Clock clock;
       private Instant updateTime;
       private CmdStatus status;
 
-      private CmdStatusData(DatanodeID dnId, long scmTxID, Set<Long> deletedBlocksTxIds) {
+      private CmdStatusData(DatanodeID dnId, long scmTxID, Set<Long> deletedBlocksTxIds, Clock clock) {
         this.dnId = dnId;
         this.scmCmdId = scmTxID;
         this.deletedBlocksTxIds = deletedBlocksTxIds;
+        this.clock = clock;
         setStatus(DEFAULT_STATUS);
       }
 
@@ -210,7 +230,7 @@ public class SCMDeletedBlockTransactionStatusManager {
       }
 
       public void setStatus(CmdStatus status) {
-        this.updateTime = Instant.now();
+        this.updateTime = clock.instant();
         this.status = status;
       }
 
@@ -232,7 +252,11 @@ public class SCMDeletedBlockTransactionStatusManager {
 
     protected static CmdStatusData createScmCmdStatusData(
         DatanodeID dnId, long scmCmdId, Set<Long> deletedBlocksTxIds) {
-      return new CmdStatusData(dnId, scmCmdId, deletedBlocksTxIds);
+      return new CmdStatusData(dnId, scmCmdId, deletedBlocksTxIds, Clock.systemUTC());
+    }
+
+    private CmdStatusData newScmCmdStatusData(DatanodeID dnId, long scmCmdId, Set<Long> deletedBlocksTxIds) {
+      return new CmdStatusData(dnId, scmCmdId, deletedBlocksTxIds, clock);
     }
 
     protected void recordScmCommand(CmdStatusData statusData) {
@@ -362,7 +386,7 @@ public class SCMDeletedBlockTransactionStatusManager {
 
     private void removeTimeoutScmCommand(DatanodeID dnId,
         Set<Long> scmCmdIds, long timeoutMs) {
-      Instant now = Instant.now();
+      Instant now = clock.instant();
       for (Long scmCmdId : scmCmdIds) {
         Instant updateTime = getUpdateTime(dnId, scmCmdId);
         if (updateTime != null &&
@@ -432,8 +456,7 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   void recordTransactionCreated(DatanodeID dnId, long scmCmdId, Set<Long> dnTxSet) {
     scmDeleteBlocksCommandStatusManager.recordScmCommand(
-        SCMDeleteBlocksCommandStatusManager
-            .createScmCmdStatusData(dnId, scmCmdId, dnTxSet));
+        scmDeleteBlocksCommandStatusManager.newScmCmdStatusData(dnId, scmCmdId, dnTxSet));
     dnTxSet.forEach(txId -> transactionToDNsCommitMap
         .putIfAbsent(txId, new LinkedHashSet<>()));
   }

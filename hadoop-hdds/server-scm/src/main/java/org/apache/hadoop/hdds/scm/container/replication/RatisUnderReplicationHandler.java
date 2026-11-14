@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Random;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -56,16 +57,27 @@ public class RatisUnderReplicationHandler
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
   private final ReplicationManagerMetrics metrics;
+  private final Random random;
 
   public RatisUnderReplicationHandler(final PlacementPolicy placementPolicy,
       final ConfigurationSource conf,
       final ReplicationManager replicationManager) {
+    this(placementPolicy, conf, replicationManager, new Random());
+  }
+
+  /**
+   * @param random decides the order in which vulnerable UNHEALTHY replicas are replicated
+   */
+  public RatisUnderReplicationHandler(final PlacementPolicy placementPolicy,
+      final ConfigurationSource conf,
+      final ReplicationManager replicationManager, final Random random) {
     this.placementPolicy = placementPolicy;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.replicationManager = replicationManager;
     this.metrics = replicationManager.getMetrics();
+    this.random = random;
   }
 
   /**
@@ -203,7 +215,7 @@ public class RatisUnderReplicationHandler
     Since we're replicating UNHEALTHY replicas, it's possible that replication keeps on failing. Shuffling gives
     other replicas a chance to be replicated since there's a limit on in-flight adds.
     */
-    Collections.shuffle(vulnerableUnhealthy);
+    Collections.shuffle(vulnerableUnhealthy, random);
     return replicateEachSource(replicaCount, vulnerableUnhealthy, pendingOps);
   }
 

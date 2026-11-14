@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * 4. Choose an anchor node among the viable nodes.
  * 5. Choose other nodes around the anchor node based on network topology
  */
-public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
+public class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @VisibleForTesting
   static final Logger LOG =
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);

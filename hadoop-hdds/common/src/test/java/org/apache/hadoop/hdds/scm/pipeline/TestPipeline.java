@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -175,7 +176,7 @@ public class TestPipeline {
 
   @Test
   public void testBuilderCopiesAllFieldsFromOtherPipeline() {
-    Pipeline original = MockPipeline.createEcPipeline();
+    Pipeline original = MockPipeline.createEcPipeline().toBuilder().setStateEnterTime(Instant.ofEpochSecond(1)).build();
     Pipeline copied = original.toBuilder().build();
     assertEquals(original.getId(), copied.getId());
     assertEquals(original.getReplicationConfig(),
@@ -186,6 +187,7 @@ public class TestPipeline {
     assertEquals(original.getLeaderId(), copied.getLeaderId());
     assertEquals(original.getCreationTimestamp(),
         copied.getCreationTimestamp());
+    assertEquals(original.getStateEnterTime(), copied.getStateEnterTime());
     assertEquals(original.getSuggestedLeaderId(),
         copied.getSuggestedLeaderId());
     for (DatanodeDetails dn : original.getNodes()) {

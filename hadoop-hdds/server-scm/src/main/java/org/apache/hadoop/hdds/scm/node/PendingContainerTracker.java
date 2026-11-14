@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.time.Clock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -26,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,20 +84,23 @@ public class PendingContainerTracker {
   public static class TwoWindowBucket {
     private Set<ContainerID> currentWindow = new HashSet<>();
     private Set<ContainerID> previousWindow = new HashSet<>();
-    private long lastRollTime = Time.monotonicNow();
+    private long lastRollTime;
     private final long rollIntervalMs;
     private final DatanodeID datanodeID;
+    private final Clock clock;
 
-    TwoWindowBucket(DatanodeID id, long rollIntervalMs) {
+    TwoWindowBucket(DatanodeID id, long rollIntervalMs, Clock clock) {
       this.datanodeID = id;
       this.rollIntervalMs = rollIntervalMs;
+      this.clock = clock;
+      this.lastRollTime = clock.millis();
     }
 
     /**
      * Roll one or both windows based on elapsed time.
      */
     synchronized void rollIfNeeded() {
-      long now = Time.monotonicNow();
+      long now = clock.millis();
       long elapsed = now - lastRollTime;
 
       if (elapsed >= 2 * rollIntervalMs) {

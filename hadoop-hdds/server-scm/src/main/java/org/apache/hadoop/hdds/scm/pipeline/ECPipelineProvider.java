@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -66,8 +67,9 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   public ECPipelineProvider(NodeManager nodeManager,
                             PipelineStateManager stateManager,
                             ConfigurationSource conf,
-                            PlacementPolicy placementPolicy) {
-    super(nodeManager, stateManager);
+                            PlacementPolicy placementPolicy,
+                            Supplier<PipelineID> pipelineIdGenerator) {
+    super(nodeManager, stateManager, pipelineIdGenerator);
     this.conf = conf;
     this.placementPolicy = placementPolicy;
     this.containerSizeBytes = (long) this.conf
@@ -104,7 +106,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
     }
 
     return newPipelineBuilder(replicationConfig, nodes)
-        .setId(PipelineID.randomId())
+        .setId(newPipelineID())
         .setReplicaIndexes(dnIndexes)
         .build();
   }

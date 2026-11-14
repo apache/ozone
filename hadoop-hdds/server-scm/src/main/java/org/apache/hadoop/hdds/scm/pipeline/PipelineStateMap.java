@@ -21,6 +21,7 @@ import static java.lang.String.format;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -56,8 +57,16 @@ class PipelineStateMap {
   // TODO: Use TreeMap for range operations?
   private final Map<PipelineID, PipelineInfo> pipelineMap = new HashMap<>();
   private final Map<ReplicationConfig, List<Pipeline>> query2OpenPipelines = new HashMap<>();
+  /** Records when pipelines enter a new state. */
+  private final Clock clock;
 
-  PipelineStateMap() { }
+  PipelineStateMap() {
+    this(Clock.systemUTC());
+  }
+
+  PipelineStateMap(Clock clock) {
+    this.clock = clock;
+  }
 
   /**
    * Adds provided pipeline in the data structures.
@@ -377,7 +386,7 @@ class PipelineStateMap {
           "updatePipelineState directly.");
       return pipeline;
     }
-    final Pipeline updated = pipeline.toBuilder().setState(state).build();
+    final Pipeline updated = pipeline.toBuilder().setState(state).setStateEnterTime(clock.instant()).build();
     PipelineInfo newInfo = new PipelineInfo(updated);
 
     for (ContainerID cid : info.getContainers()) {

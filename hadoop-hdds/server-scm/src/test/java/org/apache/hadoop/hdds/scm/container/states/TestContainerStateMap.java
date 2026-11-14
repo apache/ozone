@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.states;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
@@ -35,6 +36,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -107,6 +110,19 @@ class TestContainerStateMap {
 
   private static List<Long> toIds(List<ContainerID> ids) {
     return ids.stream().map(id -> id.getProtobuf().getId()).collect(Collectors.toList());
+  }
+
+  @Test
+  void testStateChangeTimeComesFromClock() throws SCMException {
+    MockClock clock = MockClock.newInstance();
+    ContainerStateMap stateMap = new ContainerStateMap(clock);
+    ContainerInfo container = buildContainerInfo(1, OPEN, HEALTHY);
+    stateMap.addContainer(container);
+    clock.fastForward(60_000);
+
+    stateMap.updateState(container.containerID(), OPEN, CLOSING);
+
+    assertEquals(clock.instant(), stateMap.getContainerInfo(container.containerID()).getStateEnterTime());
   }
 
   private static List<ContainerInfo> containerInfos() {
