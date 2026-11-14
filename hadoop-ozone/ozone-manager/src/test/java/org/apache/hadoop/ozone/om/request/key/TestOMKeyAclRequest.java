@@ -20,12 +20,15 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAclRequest;
@@ -188,6 +191,22 @@ public class TestOMKeyAclRequest extends OMKeyRequestTests {
     OmKeyInfo newKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
     assertEquals(newKeyInfo.getAcls().get(0), acl);
     assertEquals(omKeyInfo.getKeyName(), newKeyInfo.getKeyName());
+  }
+
+  @Test
+  public void testRejectUnknownAclRights() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    addKeyToTable();
+    OzoneAcl acl = OMRequestTestUtils.aclWithUnknownRights();
+
+    for (OMKeyAclRequest request : Arrays.asList(getOmKeyAddAclRequest(createAddAclkeyRequest(acl)),
+        getOmKeyRemoveAclRequest(createRemoveAclKeyRequest(acl)), getOmKeySetAclRequest(createSetAclKeyRequest(acl)))) {
+      OMException e = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+
+      OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    }
   }
 
   /**
