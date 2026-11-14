@@ -320,6 +320,7 @@ public class KeyLifecycleService extends BackgroundService {
     private long lastStateSaveTime = Time.monotonicNow();
     private long lastStateSaveKeyCount = 0;
     private boolean scanAborted;
+    private long stackCapacitySkippedDirectories = 0;
 
     private boolean shouldSaveState() {
       if ((Time.monotonicNow() - lastStateSaveTime) > stateSaveIntervalMs ||
@@ -680,7 +681,7 @@ public class KeyLifecycleService extends BackgroundService {
           stack.push(new PendingEvaluateDirectory(null, "", "", null));
         }
       } catch (CapacityFullException e) {
-        LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, directoryPath != null ? directoryPath : "", e);
+        stackCapacitySkippedDirectories++;
         return;
       }
 
@@ -794,8 +795,8 @@ public class KeyLifecycleService extends BackgroundService {
             try {
               stack.push(item);
             } catch (CapacityFullException e) {
-              LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, currentDirPath, e);
-              return;
+              stackCapacitySkippedDirectories++;
+              continue;
             }
 
             // depth first evaluation, push subDirs into stack
@@ -807,8 +808,10 @@ public class KeyLifecycleService extends BackgroundService {
                 stack.push(new PendingEvaluateDirectory(subDir, subDirSummary.getSubDirKeyList().get(i),
                     subDirPath, null));
               } catch (CapacityFullException e) {
-                LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, subDirPath, e);
-                return;
+                // The stack stays full until an entry is popped, so the remaining siblings cannot be pushed either.
+                // Skipped sub directories are not expired, which also keeps their parent from being expired.
+                stackCapacitySkippedDirectories += subDirSummary.getSubDirCount() - i;
+                break;
               }
             }
             newSubDirPushed = true;
@@ -1369,6 +1372,10 @@ public class KeyLifecycleService extends BackgroundService {
               "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
           numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
           numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
+      if (stackCapacitySkippedDirectories > 0) {
+        LOG.info("Lifecycle evaluate for {} skipped {} directories because in-memory directory stack "
+            + "exceeded limit {}", bucketName, stackCapacitySkippedDirectories, cachedDirMaxCount);
+      }
     }
 
     private void onSuccess(String bucketName) {
@@ -1385,6 +1392,10 @@ public class KeyLifecycleService extends BackgroundService {
               "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
           numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
           numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
+      if (stackCapacitySkippedDirectories > 0) {
+        LOG.info("Lifecycle evaluate for {} skipped {} directories because in-memory directory stack "
+            + "exceeded limit {}", bucketName, stackCapacitySkippedDirectories, cachedDirMaxCount);
+      }
     }
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList,
@@ -1734,6 +1745,11 @@ public class KeyLifecycleService extends BackgroundService {
   @VisibleForTesting
   public void setKeyDeleteBatchSize(int size) {
     this.keyDeleteBatchSize = size;
+  }
+
+  @VisibleForTesting
+  public void setCachedDirMaxCount(long count) {
+    this.cachedDirMaxCount = count;
   }
 
   // Returns the test-injected OzoneTrash if set, otherwise the live instance
@@ -2190,7 +2206,7 @@ public class KeyLifecycleService extends BackgroundService {
         }
       }
       if (parent == null) {
-        // e.g,  dir1 and dir2, dir2 should ahead of dir2, given the depth-first and dir's RocksDB key order
+        // e.g, dir1 and dir2, dir2 should ahead of dir1, given the depth-first and dir's RocksDB key order
         return dirList2.get(0).getName().compareTo(dirList1.get(0).getName());
       } else {
         long parentID = parent.getObjectID();
