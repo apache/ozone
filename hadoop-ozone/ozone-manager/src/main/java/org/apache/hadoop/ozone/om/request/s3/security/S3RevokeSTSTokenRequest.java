@@ -27,8 +27,6 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -107,14 +105,20 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
       final RevokeSTSTokenRequest revokeReq = validateReplicatedRevokeRequestFields(getOmRequest());
       final String originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
       auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, originalAccessKeyId);
-      final long revocationTimeMillis = revokeReq.getRevocationTimeMillis();
+      // Update the cache immediately so subsequent validation checks see the revocation
+      final Long cutoff = S3SecretRequestHelper.updateStsRevocationCutoff(
+          ozoneManager.getMetadataManager(), getOmRequest(), originalAccessKeyId, context.getIndex());
+      if (cutoff == null) {
+        // This branch should not be reachable because of the checks in validateReplicatedRevokeRequestFields, but is
+        // here as a defensive mechanism (in case someone mistakenly removes that code, etc.).  It returns
+        // INTERNAL_ERROR error code because the leader should have provided the replicated revoke STS request
+        // (which is how updateStsRevocationCutoff could return null), not the client
+        throw new OMException("internal error in STS token revocation", INTERNAL_ERROR);
+      }
+      final long revocationTimeMillis = cutoff;
 
       // All actual DB mutations are done in the response's addToDBBatch().
       omClientResponse = new S3RevokeSTSTokenResponse(originalAccessKeyId, revocationTimeMillis, omResponse.build());
-
-      // Update the cache immediately so subsequent validation checks see the revocation
-      ozoneManager.getMetadataManager().getS3RevokedStsTokenTable().addCacheEntry(
-          new CacheKey<>(originalAccessKeyId), CacheValue.get(context.getIndex(), revocationTimeMillis));
 
       LOG.info(
           "Marked STS tokens as revoked for originalAccessKeyId={} with cutoff time {}.",
