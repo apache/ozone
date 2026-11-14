@@ -396,12 +396,14 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     if (excludeList != null) {
       excludeList.clear();
     }
-    if (bufferPool != null) {
-      bufferPool.clearBufferPool();
-    }
-
-    if (streamEntries != null) {
-      streamEntries.clear();
+    try {
+      if (bufferPool != null) {
+        bufferPool.clearBufferPool();
+      }
+    } finally {
+      if (streamEntries != null) {
+        streamEntries.clear();
+      }
     }
   }
 

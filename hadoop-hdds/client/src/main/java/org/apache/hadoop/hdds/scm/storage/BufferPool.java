@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
@@ -166,8 +167,8 @@ public class BufferPool {
   public void clearBufferPool() {
     lock.lock();
     try {
-      RuntimeException failure = closeAll(allocated, null);
-      failure = closeAll(released, failure);
+      RuntimeException failure = BufferUtils.closeAll(allocated, null);
+      failure = BufferUtils.closeAll(released, failure);
       allocated.clear();
       released.clear();
       currentBuffer = null;
@@ -177,21 +178,6 @@ public class BufferPool {
     } finally {
       lock.unlock();
     }
-  }
-
-  private static RuntimeException closeAll(List<ChunkBuffer> buffers, RuntimeException failure) {
-    for (ChunkBuffer buffer : buffers) {
-      try {
-        buffer.close();
-      } catch (RuntimeException e) {
-        if (failure == null) {
-          failure = e;
-        } else {
-          failure.addSuppressed(e);
-        }
-      }
-    }
-    return failure;
   }
 
   public long computeBufferData() {

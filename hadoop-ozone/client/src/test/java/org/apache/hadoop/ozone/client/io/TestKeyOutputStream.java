@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -142,6 +143,24 @@ public class TestKeyOutputStream {
     thread1.join();
   }
   
+  @Test
+  void testCleanupClearsStreamEntriesWhenBufferCleanupFails() throws Exception {
+    BlockOutputStreamEntryPool pool = new BlockOutputStreamEntryPool(new KeyOutputStream.Builder()
+        .setConfig(new OzoneClientConfig()).setOmClient(mock(OzoneManagerProtocol.class))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setHandler(new OpenKeySession(1, new OmKeyInfo.Builder()
+            .setVolumeName("v").setBucketName("b").setKeyName("k").build(), 0))
+        .setStreamBufferArgs(StreamBufferArgs.Builder.getNewBuilder()
+            .setBufferSize(1024).setBufferFlushSize(1024).setBufferMaxSize(2048).build()));
+    // closing the buffer again in cleanup() fails as a double release
+    pool.getBufferPool().allocateBuffer(0).close();
+    pool.getStreamEntries().add(mock(BlockOutputStreamEntry.class));
+
+    assertThrows(IllegalStateException.class, pool::cleanup);
+    assertTrue(pool.getStreamEntries().isEmpty());
+    assertEquals(0, pool.getBufferPool().getSize());
+  }
+
   @Test
   void testGetCurrentStreamEntryDuringBlockAllocation() throws Exception {
     CountDownLatch allocationStarted = new CountDownLatch(1);

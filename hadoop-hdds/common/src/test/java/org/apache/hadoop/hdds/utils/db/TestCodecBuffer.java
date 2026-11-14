@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -77,5 +79,26 @@ final class TestCodecBuffer {
 
     assertThrows(IllegalStateException.class, buffer::release);
     assertTrue(buf.release());
+  }
+
+  /** The ByteBuf of a released buffer still reports refCnt 1 once the pool hands it to another owner. */
+  @Test
+  void testAccessAfterReleaseFails() {
+    final ReusedAfterReleaseByteBuf buf = new ReusedAfterReleaseByteBuf(16);
+    final CodecBuffer buffer = CodecBuffer.allocate(16, capacity -> buf);
+    buffer.release();
+
+    assertThrows(IllegalStateException.class, () -> buffer.putInt(1));
+    assertThrows(IllegalStateException.class, buffer::asReadOnlyByteBuffer);
+    assertThrows(IllegalStateException.class, buffer::asWritableByteBuffer);
+    assertThat(buffer.toString()).contains("released");
+  }
+
+  @Test
+  void testZeroCapacityBufferIsAccessibleAfterRelease() {
+    final CodecBuffer buffer = CodecBuffer.allocateDirect(0);
+    buffer.release();
+    buffer.release();
+    assertEquals(0, buffer.asReadOnlyByteBuffer().remaining());
   }
 }
