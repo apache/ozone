@@ -60,9 +60,10 @@ import org.slf4j.LoggerFactory;
  * {@link #handlePartDeleteEvent}, {@link #handlePartUpdateEvent}), each O(1).
  * {@code OmMultipartPartInfo} does not carry a replication config, so the parent
  * MPU's config is cached here, keyed by uploadId, from the {@code multipartInfoTable}
- * PUT/UPDATE events handled below; OM always writes {@code multipartInfoTable}
+ * PUT/UPDATE/DELETE events handled below; OM always writes {@code multipartInfoTable}
  * before the corresponding {@code multipartPartsTable} row in the same batch, so the
- * cache entry is available by the time a part event for that upload is processed.
+ * cache entry is available by the time a part event for that upload is processed,
+ * including the part deletes of an upload that was initiated before a Recon restart.
  * The cache is bounded (LRU) rather than explicitly evicted per upload, since a
  * part-delete event can follow an info-table delete for the same upload within the
  * same batch and still needs the cached config.
@@ -129,6 +130,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count > 0 ? count - 1L : 0L);
       applyLegacyPartSizes(multipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, false);
+      cacheSplitSchemaReplicationConfig(multipartKeyInfo);
     } else {
       LOG.warn("Delete event does not have the Multipart Key Info for {}.", event.getKey());
     }

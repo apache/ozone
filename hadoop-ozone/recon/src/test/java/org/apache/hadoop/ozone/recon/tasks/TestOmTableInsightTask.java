@@ -656,6 +656,69 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
   }
 
+  /**
+   * Multipart open keys are tracked through the multipart info table, so they must not be counted as open keys.
+   * Open keys of parts being written are still counted.
+   */
+  @Test
+  public void testProcessExcludesMultipartOpenKeys() {
+    OmKeyInfo multipartOpenKey = getMultipartOpenKeyInfo("vol", "bucket", "mpu-key");
+    OmKeyInfo partOpenKey = getOmKeyInfo("vol", "bucket", "mpu-key", 2L, true);
+
+    for (String tableName : Arrays.asList(OPEN_KEY_TABLE, OPEN_FILE_TABLE)) {
+      long count = getCountForTable(tableName);
+      long unReplicatedSize = getUnReplicatedSizeForTable(tableName);
+      long replicatedSize = getReplicatedSizeForTable(tableName);
+
+      ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+      putEvents.add(getOMUpdateEvent("mpu-key/uploadId", multipartOpenKey, tableName, PUT, null));
+      putEvents.add(getOMUpdateEvent("mpu-key/clientId", partOpenKey, tableName, PUT, null));
+      omTableInsightTask.process(new OMUpdateEventBatch(putEvents, 0L), Collections.emptyMap());
+
+      assertEquals(count + 1, getCountForTable(tableName));
+      assertEquals(unReplicatedSize + 100L, getUnReplicatedSizeForTable(tableName));
+      assertEquals(replicatedSize + 100L, getReplicatedSizeForTable(tableName));
+
+      ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+      deleteEvents.add(getOMUpdateEvent("mpu-key/uploadId", multipartOpenKey, tableName, DELETE, null));
+      deleteEvents.add(getOMUpdateEvent("mpu-key/clientId", partOpenKey, tableName, DELETE, null));
+      omTableInsightTask.process(new OMUpdateEventBatch(deleteEvents, 0L), Collections.emptyMap());
+
+      assertEquals(count, getCountForTable(tableName));
+      assertEquals(unReplicatedSize, getUnReplicatedSizeForTable(tableName));
+      assertEquals(replicatedSize, getReplicatedSizeForTable(tableName));
+    }
+  }
+
+  @Test
+  public void testReprocessExcludesMultipartOpenKeys() throws Exception {
+    assertTrue(omTableInsightTask.reprocess(reconOMMetadataManager).isTaskSuccess());
+    long openKeyCount = getCountForTable(OPEN_KEY_TABLE);
+    long openFileCount = getCountForTable(OPEN_FILE_TABLE);
+
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.LEGACY)
+        .put("/vol/bucket/mpu-key/" + UUID.randomUUID(), getMultipartOpenKeyInfo("vol", "bucket", "mpu-key"));
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/1/2/2/mpu-file/" + UUID.randomUUID(), getMultipartOpenKeyInfo("vol", "fso", "mpu-file"));
+
+    assertTrue(omTableInsightTask.reprocess(reconOMMetadataManager).isTaskSuccess());
+    assertEquals(openKeyCount, getCountForTable(OPEN_KEY_TABLE));
+    assertEquals(openFileCount, getCountForTable(OPEN_FILE_TABLE));
+  }
+
+  private OmKeyInfo getMultipartOpenKeyInfo(String volumeName, String bucketName, String keyName) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFile(true)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(0L)
+        .setObjectID(1L)
+        .setOmKeyLocationInfos(Collections.singletonList(new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+        .build();
+  }
+
   @Test
   public void testProcessForDeletedTable() {
     // Prepare mock data size
@@ -857,6 +920,53 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         DELETE, null));
     finalEvents.add(getOMUpdateEvent(multipartKey, splitMpu, MULTIPART_INFO_TABLE, DELETE, null));
     omTableInsightTask.process(new OMUpdateEventBatch(finalEvents, 0L), Collections.emptyMap());
+
+    assertEquals(0L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(0L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(0L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  /**
+   * A split-schema MPU initiated before a Recon restart must still have its part sizes subtracted when it is
+   * aborted or completed after the restart, even though the restarted task starts with no cached replication config.
+   */
+  @Test
+  public void testProcessForSplitSchemaMPUDeletedAfterRestart() throws Exception {
+    String uploadID = UUID.randomUUID().toString();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    OmMultipartKeyInfo splitMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+    OmMultipartPartInfo part1 = buildSplitSchemaPartInfo(volumeName, bucketName, keyName, uploadID, 1, 100L);
+    OmMultipartPartInfo part2 = buildSplitSchemaPartInfo(volumeName, bucketName, keyName, uploadID, 2, 100L);
+
+    ArrayList<OMDBUpdateEvent> initEvents = new ArrayList<>();
+    initEvents.add(getOMUpdateEvent(multipartKey, splitMpu, MULTIPART_INFO_TABLE, PUT, null));
+    initEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 1), part1, MULTIPART_PARTS_TABLE, PUT, null));
+    initEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 2), part2, MULTIPART_PARTS_TABLE, PUT, null));
+    omTableInsightTask.process(new OMUpdateEventBatch(initEvents, 0L), Collections.emptyMap());
+
+    assertEquals(1L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(200L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(600L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+
+    // A new task instance loads the persisted totals but has an empty replication config cache, as after a restart.
+    OmTableInsightTask restartedTask = new OmTableInsightTask(reconGlobalStatsManager, reconOMMetadataManager);
+
+    // OM deletes the multipartInfoTable row before its multipartPartsTable rows in the same batch.
+    ArrayList<OMDBUpdateEvent> abortEvents = new ArrayList<>();
+    abortEvents.add(getOMUpdateEvent(multipartKey, splitMpu, MULTIPART_INFO_TABLE, DELETE, null));
+    abortEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 1), part1, MULTIPART_PARTS_TABLE, DELETE, null));
+    abortEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 2), part2, MULTIPART_PARTS_TABLE, DELETE, null));
+    restartedTask.process(new OMUpdateEventBatch(abortEvents, 0L), Collections.emptyMap());
 
     assertEquals(0L, getCountForTable(MULTIPART_INFO_TABLE));
     assertEquals(0L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));

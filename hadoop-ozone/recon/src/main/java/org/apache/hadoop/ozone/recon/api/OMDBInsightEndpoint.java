@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
@@ -96,6 +98,9 @@ public class OMDBInsightEndpoint {
   private final ReconOMMetadataManager omMetadataManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
+  /** Excludes multipart open keys, which are reported by {@code /keys/open/mpu/summary} instead. */
+  private static final Predicate<OmKeyInfo> NOT_MULTIPART_OPEN_KEY =
+      keyInfo -> !OMMultipartUploadUtils.isMultipartKeySet(keyInfo);
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
@@ -201,7 +206,7 @@ public class OMDBInsightEndpoint {
       if (includeNonFso) {
         // Search for non-FSO keys in KeyTable
         Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
-        obsKeys = ReconUtils.extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
+        obsKeys = ReconUtils.extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey, NOT_MULTIPART_OPEN_KEY);
         for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
           keysFound = true;
           skipPrevKeyDone = true; // Don't use the prevKey for the file table
@@ -286,7 +291,8 @@ public class OMDBInsightEndpoint {
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
         matchedKeys.putAll(
-            ReconUtils.extractKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
+            ReconUtils.extractKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey,
+                NOT_MULTIPART_OPEN_KEY));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -296,7 +302,7 @@ public class OMDBInsightEndpoint {
 
     // If the search level is at the volume, bucket or key level, directly search the openFileTable
     matchedKeys.putAll(
-        ReconUtils.extractKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
+        ReconUtils.extractKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey, NOT_MULTIPART_OPEN_KEY));
     return matchedKeys;
   }
 
