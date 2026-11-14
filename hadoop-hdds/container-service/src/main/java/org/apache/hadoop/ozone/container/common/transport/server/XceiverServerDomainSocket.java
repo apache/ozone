@@ -24,6 +24,7 @@ import java.nio.channels.AsynchronousCloseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -74,6 +75,8 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   private int readTimeoutMs;
   private int writeTimeoutMs;
   private final ThreadPoolExecutor readExecutors;
+  // Requests of all connections that are dispatched and not yet answered. One connection may take half of them.
+  private final Semaphore responseSlots;
   private FaultInjector injector;
 
   /**
@@ -97,6 +100,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
     this.xceriverCount = new AtomicInteger(0);
     this.dispatcher = dispatcher;
     this.readExecutors = executor;
+    this.responseSlots = new Semaphore(2 * executor.getMaximumPoolSize());
     this.metrics = metrics;
     LOG.info("Max allowed {} xceiver", maxXceiverCount);
     this.threadPrefix = datanodeDetails.threadNamePrefix() + XceiverServerDomainSocket.class.getSimpleName();
@@ -221,7 +225,8 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         if (xceriverCount.get() > maxXceiverCount) {
           throw new IOException("Xceiver count exceeds the limit " + maxXceiverCount);
         }
-        Daemon daemon = new Daemon(Receiver.create(peer, config, this, dispatcher, readExecutors, metrics));
+        Daemon daemon = new Daemon(
+            Receiver.create(peer, config, this, dispatcher, readExecutors, responseSlots, metrics));
         daemon.setName(threadPrefix + "@" + peer.getDomainSocket().toString());
         daemon.start();
         // the Receiver releases the count in closePeer
