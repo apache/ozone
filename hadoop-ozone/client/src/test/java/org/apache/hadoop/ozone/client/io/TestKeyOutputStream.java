@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.client.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -33,12 +35,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -140,6 +144,67 @@ public class TestKeyOutputStream {
     // Let threads finish
     thread2.join();
     thread1.join();
+  }
+
+  @Test
+  void testInterruptedCallDoesNotReleasePermit() throws Exception {
+    KeyOutputStreamSemaphore sema1 = new KeyOutputStreamSemaphore(1);
+    KeyOutputStream keyOutputStream = spy(KeyOutputStream.class);
+    when(keyOutputStream.getRequestSemaphore()).thenReturn(sema1);
+    final CountDownLatch inHandleWrite = new CountDownLatch(1);
+    final CountDownLatch finishWrite = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      inHandleWrite.countDown();
+      finishWrite.await();
+      return null;
+    }).when(keyOutputStream).handleWrite(any(), anyInt(), anyLong(), anyBoolean());
+
+    final FutureTask<Void> write1 = newWriteTask(keyOutputStream);
+    final FutureTask<Void> write2 = newWriteTask(keyOutputStream);
+    final FutureTask<Void> write3 = newWriteTask(keyOutputStream);
+    final Thread thread1 = new Thread(write1);
+    final Thread thread2 = new Thread(write2);
+    final Thread thread3 = new Thread(write3);
+    try {
+      // thread1 holds the only permit
+      thread1.start();
+      assertTrue(inHandleWrite.await(5, TimeUnit.SECONDS));
+
+      // thread2 is interrupted while waiting for the permit
+      thread2.start();
+      GenericTestUtils.waitFor(() -> sema1.getQueueLength() == 1, 10, 5000);
+      thread2.interrupt();
+      ExecutionException e = assertThrows(ExecutionException.class, () -> write2.get(5, TimeUnit.SECONDS));
+      assertInstanceOf(InterruptedIOException.class, e.getCause());
+
+      // flush and hsync on an already interrupted thread
+      Thread.currentThread().interrupt();
+      assertThrows(InterruptedIOException.class, keyOutputStream::flush);
+      assertTrue(Thread.interrupted());
+      Thread.currentThread().interrupt();
+      assertThrows(InterruptedIOException.class, keyOutputStream::hsync);
+      assertTrue(Thread.interrupted());
+
+      // thread3 must still wait for the permit held by thread1
+      thread3.start();
+      GenericTestUtils.waitFor(() -> thread3.getState() == Thread.State.WAITING, 10, 5000);
+      assertEquals(1, sema1.getQueueLength(), "writes waiting for the permit");
+    } finally {
+      Thread.interrupted();
+      finishWrite.countDown();
+      thread1.join(5000);
+      thread3.join(5000);
+    }
+    write1.get(5, TimeUnit.SECONDS);
+    write3.get(5, TimeUnit.SECONDS);
+    verify(keyOutputStream, times(2)).handleWrite(any(), anyInt(), anyLong(), anyBoolean());
+  }
+
+  private static FutureTask<Void> newWriteTask(KeyOutputStream keyOutputStream) {
+    return new FutureTask<>(() -> {
+      keyOutputStream.write(new byte[4], 0, 4);
+      return null;
+    });
   }
   
   @Test
