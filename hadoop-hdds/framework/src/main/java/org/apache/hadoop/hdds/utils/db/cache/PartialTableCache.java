@@ -107,6 +107,11 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   }
 
   @Override
+  public void close() {
+    executorService.shutdown();
+  }
+
+  @Override
   public int size() {
     return cache.size();
   }
