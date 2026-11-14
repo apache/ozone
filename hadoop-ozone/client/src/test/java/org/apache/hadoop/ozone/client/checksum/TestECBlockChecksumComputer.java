@@ -24,16 +24,21 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Unit tests for ECBlockChecksumComputer class.
@@ -69,6 +74,69 @@ public class TestECBlockChecksumComputer {
     assertArrayEquals(expectedCompositeCrc, computer.getOutByteBuffer().array());
   }
 
+  /**
+   * A replica can list a stripe that the block group never committed: its write failed on another replica and the
+   * client wrote it again into the next block group. The checksum must stop at the committed block length.
+   */
+  @ParameterizedTest
+  @EnumSource(ChecksumCombineMode.class)
+  @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+  public void testStripeBeyondBlockLengthIsIgnored(ChecksumCombineMode combineMode) throws IOException {
+    // With BYTES_PER_CRC == 4 and 4-byte CRCs, a stripe's data checksum bytes equal its data length.
+    int stripeLen = EC_CONFIG.getData() * CHUNK_LEN;
+    byte[] committedChecksumBytes = RandomUtils.secure().randomBytes(2 * stripeLen);
+    List<ContainerProtos.ChunkInfo> chunkInfoList = Arrays.asList(
+        buildChunkInfo(Arrays.copyOfRange(committedChecksumBytes, 0, stripeLen), CHUNK_LEN,
+            ContainerProtos.ChecksumType.CRC32C),
+        buildChunkInfo(Arrays.copyOfRange(committedChecksumBytes, stripeLen, 2 * stripeLen), CHUNK_LEN,
+            ContainerProtos.ChecksumType.CRC32C),
+        // Uncommitted stripe beyond the block length.
+        buildChunkInfo(RandomUtils.secure().randomBytes(CHUNK_LEN / 2), CHUNK_LEN / 2,
+            ContainerProtos.ChecksumType.CRC32C));
+
+    ECBlockChecksumComputer computer = buildBlockChecksumComputer(chunkInfoList, 2 * stripeLen);
+    computer.compute(combineMode);
+    assertArrayEquals(expectedChecksum(combineMode, committedChecksumBytes), computer.getOutByteBuffer().array());
+  }
+
+  /**
+   * The block length ends inside the last listed stripe while the replica lists checksums for the whole stripe, and
+   * a stripe beyond it. Both modes must stop at the same byte.
+   */
+  @ParameterizedTest
+  @EnumSource(ChecksumCombineMode.class)
+  @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+  public void testPartialLastStripeIsBoundedByBlockLength(ChecksumCombineMode combineMode) throws IOException {
+    int stripeLen = EC_CONFIG.getData() * CHUNK_LEN;
+    int partialLen = CHUNK_LEN + CHUNK_LEN / 2;
+    byte[] listedChecksumBytes = RandomUtils.secure().randomBytes(2 * stripeLen);
+    List<ContainerProtos.ChunkInfo> chunkInfoList = Arrays.asList(
+        buildChunkInfo(Arrays.copyOfRange(listedChecksumBytes, 0, stripeLen), CHUNK_LEN,
+            ContainerProtos.ChecksumType.CRC32C),
+        buildChunkInfo(Arrays.copyOfRange(listedChecksumBytes, stripeLen, 2 * stripeLen), CHUNK_LEN,
+            ContainerProtos.ChecksumType.CRC32C),
+        buildChunkInfo(RandomUtils.secure().randomBytes(stripeLen), CHUNK_LEN, ContainerProtos.ChecksumType.CRC32C));
+
+    ECBlockChecksumComputer computer = buildBlockChecksumComputer(chunkInfoList, stripeLen + partialLen);
+    computer.compute(combineMode);
+    // With BYTES_PER_CRC == 4, the committed data checksum bytes equal the committed length.
+    byte[] committedChecksumBytes = Arrays.copyOf(listedChecksumBytes, stripeLen + partialLen);
+    assertArrayEquals(expectedChecksum(combineMode, committedChecksumBytes), computer.getOutByteBuffer().array());
+  }
+
+  /** The checksum of a block whose data checksums are {@code checksumBytes}, each CRC covering BYTES_PER_CRC. */
+  private static byte[] expectedChecksum(ChecksumCombineMode combineMode, byte[] checksumBytes) throws IOException {
+    if (combineMode == MD5MD5CRC) {
+      return MD5Hash.digest(checksumBytes).getDigest();
+    }
+    CrcComposer composer = CrcComposer.newCrcComposer(DataChecksum.Type.CRC32C, BYTES_PER_CRC);
+    ByteBuffer crcs = ByteBuffer.wrap(checksumBytes);
+    while (crcs.hasRemaining()) {
+      composer.update(crcs.getInt(), BYTES_PER_CRC);
+    }
+    return composer.digest();
+  }
+
   private static byte[] computeExpectedCompositeCrc(byte[] dataChecksumBytes, long blockLength)
       throws IOException {
     CrcComposer blockCrcComposer =
@@ -87,6 +155,12 @@ public class TestECBlockChecksumComputer {
 
   private static ECBlockChecksumComputer buildBlockChecksumComputer(
       byte[] dataChecksumBytes, int chunkLen, ContainerProtos.ChecksumType checksumType) {
+    return buildBlockChecksumComputer(
+        Collections.singletonList(buildChunkInfo(dataChecksumBytes, chunkLen, checksumType)), chunkLen);
+  }
+
+  private static ContainerProtos.ChunkInfo buildChunkInfo(
+      byte[] dataChecksumBytes, int chunkLen, ContainerProtos.ChecksumType checksumType) {
     int parityBytes = getParityBytes(chunkLen, BYTES_PER_CRC, EC_CONFIG.getParity());
     byte[] stripeChecksumBytes = new byte[dataChecksumBytes.length + parityBytes];
     System.arraycopy(dataChecksumBytes, 0, stripeChecksumBytes, 0, dataChecksumBytes.length);
@@ -96,16 +170,17 @@ public class TestECBlockChecksumComputer {
             .setBytesPerChecksum((int) BYTES_PER_CRC)
             .setType(checksumType)
             .build();
-    ContainerProtos.ChunkInfo chunkInfo =
-        ContainerProtos.ChunkInfo.newBuilder()
-            .setChecksumData(checksumData)
-            .setChunkName("dummy_chunk")
-            .setOffset(0)
-            .setLen(chunkLen)
-            .setStripeChecksum(ByteString.copyFrom(stripeChecksumBytes))
-            .build();
-    List<ContainerProtos.ChunkInfo> chunkInfoList = Collections.singletonList(chunkInfo);
+    return ContainerProtos.ChunkInfo.newBuilder()
+        .setChecksumData(checksumData)
+        .setChunkName("dummy_chunk")
+        .setOffset(0)
+        .setLen(chunkLen)
+        .setStripeChecksum(ByteString.copyFrom(stripeChecksumBytes))
+        .build();
+  }
 
+  private static ECBlockChecksumComputer buildBlockChecksumComputer(
+      List<ContainerProtos.ChunkInfo> chunkInfoList, long blockLength) {
     OmKeyInfo keyInfo = new OmKeyInfo.Builder()
         .setVolumeName("vol1")
         .setBucketName("bucket1")
@@ -113,7 +188,7 @@ public class TestECBlockChecksumComputer {
         .setReplicationConfig(EC_CONFIG)
         .build();
 
-    return new ECBlockChecksumComputer(chunkInfoList, keyInfo, chunkLen);
+    return new ECBlockChecksumComputer(chunkInfoList, keyInfo, blockLength);
   }
 
   private static int getParityBytes(long chunkSize, long bytesPerCrc, int numParity) {
