@@ -575,6 +575,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     return response;
   }
 
+  private ContainerCommandResponseProto dispatchCommandOrThrow(ContainerCommandRequestProto request,
+      DispatcherContext context) throws StorageContainerException {
+    final ContainerCommandResponseProto response = dispatchCommand(request, context);
+    if (response.getResult() != ContainerProtos.Result.SUCCESS) {
+      throw new StorageContainerException(response.getMessage(), response.getResult());
+    }
+    return response;
+  }
+
   private CompletableFuture<Message> writeStateMachineData(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
@@ -730,7 +739,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               requestProto.getContainerID(), requestProto.getPipelineID(),
               requestProto.getTraceID());
     }
-    dispatchCommand(requestProto, context);  // stream init
+    dispatchCommandOrThrow(requestProto, context);  // stream init
     final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock
         = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? this::streamPutBlock : null;
     return dispatcher.getStreamDataChannel(requestProto, putBlock);
@@ -741,7 +750,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
         .build();
-    dispatchCommand(request, context);
+    dispatchCommandOrThrow(request, context);
   }
 
   /**
@@ -767,10 +776,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
         .build();
-    final ContainerCommandResponseProto response = dispatchCommand(request, context);
-    if (response.getResult() != ContainerProtos.Result.SUCCESS) {
-      throw new StorageContainerException(response.getMessage(), response.getResult());
-    }
+    final ContainerCommandResponseProto response = dispatchCommandOrThrow(request, context);
     return response.toByteString().asReadOnlyByteBuffer();
   }
 

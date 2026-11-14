@@ -125,8 +125,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // Futures of the PutBlock(s) sent through the Ratis write API, i.e. committed by the Raft log.
   private Queue<CompletableFuture<ContainerCommandResponseProto>>
       putBlockFutures = new LinkedList<>();
-
-  // Futures of the PutBlock(s) sent as data stream commands, i.e. committed without the Raft log.
+  
+  // PutBlock(s) on the data stream without a Raft log entry: mid-stream commandAsync PutBlocks
+  // (flush boundaries, hsync/flush) and the PutBlock on stream close.
   private final Queue<CompletableFuture<DataStreamReply>>
       putBlockCommandFutures = new LinkedList<>();
 
@@ -441,6 +442,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (close && putBlockWithoutRaft) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
       waitPutBlockCommandFuturesComplete();
+      // handleFlush skips its watch if the stream close fails; release what the boundary PutBlock(s) committed.
+      watchForCommit(false);
     }
     final BlockData blockData = containerBlockData.build();
     if (close) {
@@ -464,6 +467,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       if (putBlockWithoutRaft) {
         // PutBlock is supposed to be committed after the data stream close so there
         // is no need to continue.
+        putBlockCommandFutures.add(dataStreamCloseReply.whenComplete((reply, e) -> {
+          if (e == null && reply != null && reply.isSuccess()) {
+            addBuffersCommittedWithoutRaft(byteBufferList);
+          }
+        }));
         return;
       }
     } else if (putBlockWithoutRaft) {
@@ -549,12 +557,16 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             setIoException(ioe);
             throw new CompletionException(ioe);
           }
-          // The command has no log index; use 0 as for the standalone protocol
-          // so that the buffers are released by the next watchForCommit.
-          if (byteBufferList != null) {
-            commitWatcher.updateCommitInfoMap(0, byteBufferList);
-          }
+          addBuffersCommittedWithoutRaft(byteBufferList);
         }, responseExecutor));
+  }
+
+  private void addBuffersCommittedWithoutRaft(List<StreamBuffer> byteBufferList) {
+    // The command has no log index; use 0 as for the standalone protocol
+    // so that the buffers are released by the next watchForCommit.
+    if (byteBufferList != null) {
+      commitWatcher.updateCommitInfoMap(0, byteBufferList);
+    }
   }
 
   private void validatePutBlockCommandReply(DataStreamReply reply, Throwable e)

@@ -74,6 +74,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InOrder;
 
@@ -295,20 +296,63 @@ abstract class ContainerStateMachineTests {
     verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
   }
 
+  @Test
+  public void testStreamPutBlockFailsIfDispatchFails() throws Exception {
+    when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.PutBlock).setResult(ContainerProtos.Result.CLOSED_CONTAINER_IO)
+        .setMessage("Requested operation not allowed as ContainerState is CLOSED").build());
+
+    final StorageContainerException e = assertThrows(
+        StorageContainerException.class, () -> stateMachine.streamPutBlock(newPutBlockRequest()));
+    assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO, e.getResult());
+    verify(dispatcher).dispatch(
+        argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
+        argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_LINK));
+  }
+
+  @Test
+  public void testStreamPutBlockSucceedsIfDispatchSucceeds() throws Exception {
+    when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.PutBlock).setResult(ContainerProtos.Result.SUCCESS).build());
+
+    stateMachine.streamPutBlock(newPutBlockRequest());
+    verify(dispatcher).dispatch(
+        argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
+        argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_LINK));
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ContainerProtos.Type.class, names = {"StreamInit", "StreamInitWithPutBlock"})
+  public void testStreamOpenedOnlyIfStreamInitSucceeds(ContainerProtos.Type streamInitType) throws Exception {
+    when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(streamInitType).setResult(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED).build());
+
+    final ExecutionException e = assertThrows(
+        ExecutionException.class, () -> stateMachine.stream(newStreamRequest(streamInitType)).get());
+    assertInstanceOf(StorageContainerException.class, e.getCause());
+    final StorageContainerException sce = (StorageContainerException) e.getCause();
+    assertEquals(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED, sce.getResult());
+    verify(dispatcher, never()).getStreamDataChannel(any(), any());
+  }
+
   private StateMachine.DataStream setUpStream(StateMachine.DataChannel channel) throws Exception {
     when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
         .setCmdType(ContainerProtos.Type.PutBlock).setResult(ContainerProtos.Result.SUCCESS).build());
     when(dispatcher.getStreamDataChannel(any(), any())).thenReturn(channel);
+    return stateMachine.stream(newStreamRequest(ContainerProtos.Type.StreamInit)).get();
+  }
+
+  private RaftClientRequest newStreamRequest(ContainerProtos.Type streamInitType) {
     final ContainerProtos.ContainerCommandRequestProto streamInit = ContainerProtos.ContainerCommandRequestProto
         .newBuilder()
-        .setCmdType(ContainerProtos.Type.StreamInit)
+        .setCmdType(streamInitType)
         .setWriteChunk(ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(newBlockID()).build())
         .setContainerID(1)
         .setDatanodeUuid(UUID.randomUUID().toString())
         .build();
     final RaftClientRequest request = mock(RaftClientRequest.class);
     when(request.getMessage()).thenReturn(ContainerCommandRequestMessage.toMessage(streamInit, null));
-    return stateMachine.stream(request).get();
+    return request;
   }
 
   private static ByteBuffer newPutBlockCommand() {
@@ -316,8 +360,15 @@ abstract class ContainerStateMachineTests {
   }
 
   private static ByteBuffer newPutBlockCommand(boolean sync) {
-    final ContainerProtos.ContainerCommandRequestProto putBlock = ContainerProtos.ContainerCommandRequestProto
-        .newBuilder()
+    return ContainerCommandRequestMessage.toMessage(newPutBlockRequest(sync), null).getContent().asReadOnlyByteBuffer();
+  }
+
+  private static ContainerProtos.ContainerCommandRequestProto newPutBlockRequest() {
+    return newPutBlockRequest(false);
+  }
+
+  private static ContainerProtos.ContainerCommandRequestProto newPutBlockRequest(boolean sync) {
+    return ContainerProtos.ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.PutBlock)
         .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
             .setBlockData(ContainerProtos.BlockData.newBuilder().setBlockID(newBlockID()).build())
@@ -325,7 +376,6 @@ abstract class ContainerStateMachineTests {
         .setContainerID(1)
         .setDatanodeUuid(UUID.randomUUID().toString())
         .build();
-    return ContainerCommandRequestMessage.toMessage(putBlock, null).getContent().asReadOnlyByteBuffer();
   }
 
   private static ContainerProtos.DatanodeBlockID newBlockID() {
