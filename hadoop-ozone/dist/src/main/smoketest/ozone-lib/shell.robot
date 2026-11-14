@@ -21,7 +21,8 @@ Library     String
 *** Keywords ***
 Ozone Shell Batch
     [arguments]    @{commands}
-    Ozone Batch sh    @{commands}
+    ${cmd} =    Catenate    SEPARATOR=' --execute '    @{commands}
+    Run Keyword And Return    Execute and checkrc    ozone sh --execute '${cmd}'    0
 
 Ozone Batch ${subcmd}
     [arguments]    @{commands}
