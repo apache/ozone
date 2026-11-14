@@ -30,6 +30,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Message;
 import java.io.IOException;
@@ -52,18 +53,22 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext.CommandStatusReportSelection;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -228,46 +233,148 @@ public class TestStateContext {
   }
 
   @Test
-  public void testGetAllAvailableReportsRespectsLimit() throws IOException {
-    StateContext ctx = createSubject();
-    HostAndPort scm1 = new HostAndPort("scm1", 9001);
-    ctx.addEndpoint(scm1);
+  public void testCommandStatusReportsRespectByteLimit() throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
 
-    // Queue 10 ICRs; no full report is refreshed, so only ICRs are returned.
-    batchAddIncrementalReport(ctx,
-        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 10);
+    CommandStatusReportsProto first = newCommandStatusReport(1, 128);
+    CommandStatusReportsProto second = newCommandStatusReport(2, 128);
+    context.addIncrementalReport(first);
+    context.addIncrementalReport(second);
 
-    // A limited collection returns at most the limit and leaves the rest.
-    assertEquals(4, ctx.getAllAvailableReports(scm1, 4).size());
-    assertTrue(ctx.hasPendingReports(scm1));
-    assertEquals(4, ctx.getAllAvailableReports(scm1, 4).size());
-    assertTrue(ctx.hasPendingReports(scm1));
-    // Last chunk drains the queue.
-    assertEquals(2, ctx.getAllAvailableReports(scm1, 4).size());
-    assertFalse(ctx.hasPendingReports(scm1));
-    assertEquals(0, ctx.getAllAvailableReports(scm1, 4).size());
+    long firstBytes = commandStatusReportWireSize(first);
+    CommandStatusReportSelection selection =
+        context.getCommandStatusReports(scm, 10, firstBytes, firstBytes, firstBytes);
+    assertEquals(Collections.singletonList(first), selection.getReports());
+    assertEquals(firstBytes, selection.getSelectedBytes());
+    assertEquals(commandStatusReportWireSize(second), context.getCommandStatusReportQueueBytes(scm));
   }
 
   @Test
-  public void testHasPendingReportsWithFullReports() throws IOException {
-    StateContext ctx = createSubject();
-    HostAndPort scm1 = new HostAndPort("scm1", 9001);
-    ctx.addEndpoint(scm1);
+  public void testAggregateCommandStatusReportIsSplitAtStatusBoundary() throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
 
-    // addEndpoint marks the full-report ready flags true, but no full report
-    // value has been generated yet, so nothing is actually pending.
-    assertFalse(ctx.hasPendingReports(scm1));
+    CommandStatus first = newCommandStatus(1, 128);
+    CommandStatus second = newCommandStatus(2, 128);
+    CommandStatus third = newCommandStatus(3, 128);
+    CommandStatusReportsProto aggregate =
+        CommandStatusReportsProto.newBuilder()
+            .addCmdStatus(first)
+            .addCmdStatus(second)
+            .addCmdStatus(third)
+            .build();
+    CommandStatusReportsProto firstBatch =
+        CommandStatusReportsProto.newBuilder()
+            .addCmdStatus(first)
+            .addCmdStatus(second)
+            .build();
+    CommandStatusReportsProto secondBatch =
+        CommandStatusReportsProto.newBuilder()
+            .addCmdStatus(third)
+            .build();
+    context.addIncrementalReport(aggregate);
 
-    // Generate all three full reports; now values exist and flags are ready.
-    batchRefreshfullReports(ctx, StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
-    batchRefreshfullReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 1);
-    batchRefreshfullReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
-    assertTrue(ctx.hasPendingReports(scm1));
+    CommandStatusReportSelection selection = context.getCommandStatusReports(
+        scm, 10, commandStatusReportWireSize(firstBatch),
+        commandStatusReportWireSize(firstBatch),
+        commandStatusReportWireSize(firstBatch));
+    assertEquals(Collections.singletonList(firstBatch),
+        selection.getReports());
+    assertEquals(commandStatusReportWireSize(secondBatch), context.getCommandStatusReportQueueBytes(scm));
 
-    // With a cap of one, a heartbeat takes a single full report but the others
-    // stay ready, so a follow-up is still needed.
-    assertEquals(1, ctx.getAllAvailableReports(scm1, 1).size());
-    assertTrue(ctx.hasPendingReports(scm1));
+    selection = context.getCommandStatusReports(
+        scm, 10, commandStatusReportWireSize(firstBatch),
+        commandStatusReportWireSize(firstBatch),
+        commandStatusReportWireSize(firstBatch));
+    assertEquals(Collections.singletonList(secondBatch),
+        selection.getReports());
+    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
+  }
+
+  @Test
+  public void testNonCommandReportsAreSelectedIndependently() throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
+    CommandStatusReportsProto commandStatus =
+        newCommandStatusReport(1, 128);
+    IncrementalContainerReportProto icr =
+        IncrementalContainerReportProto.getDefaultInstance();
+    context.addIncrementalReport(commandStatus);
+    context.addIncrementalReport(icr);
+
+    assertEquals(Collections.singletonList(icr),
+        context.getAvailableNonCommandStatusReports(scm, 10));
+    assertEquals(commandStatusReportWireSize(commandStatus),
+        context.getCommandStatusReportQueueBytes(scm));
+  }
+
+  @Test
+  public void testOversizedCommandStatusMakesProgressWhenSafe() throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
+    CommandStatusReportsProto report = newCommandStatusReport(1, 128);
+    context.addIncrementalReport(report);
+    long reportBytes = commandStatusReportWireSize(report);
+
+    CommandStatusReportSelection selection =
+        context.getCommandStatusReports(scm, 10, reportBytes - 1, reportBytes, reportBytes - 1);
+    assertEquals(Collections.singletonList(report), selection.getReports());
+    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(reportBytes, selection.getOversizedBytes());
+
+    context.addIncrementalReport(report);
+    selection = context.getCommandStatusReports(
+        scm, 10, reportBytes - 1, reportBytes - 1, reportBytes - 1);
+    assertTrue(selection.getReports().isEmpty());
+    assertEquals(reportBytes, context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(reportBytes, selection.getOversizedBytes());
+  }
+
+  @Test
+  public void testOversizedCommandStatusPreservesAggregateOrder() throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
+    CommandStatus firstSmall = newCommandStatus(1, 16);
+    CommandStatus oversized = newCommandStatus(2, 256);
+    CommandStatus lastSmall = newCommandStatus(3, 16);
+    CommandStatusReportsProto aggregate = CommandStatusReportsProto.newBuilder()
+        .addCmdStatus(firstSmall)
+        .addCmdStatus(oversized)
+        .addCmdStatus(lastSmall)
+        .build();
+    CommandStatusReportsProto firstSmallReport =
+        CommandStatusReportsProto.newBuilder().addCmdStatus(firstSmall).build();
+    CommandStatusReportsProto oversizedReport =
+        CommandStatusReportsProto.newBuilder().addCmdStatus(oversized).build();
+    CommandStatusReportsProto lastSmallReport =
+        CommandStatusReportsProto.newBuilder().addCmdStatus(lastSmall).build();
+    CommandStatusReportsProto firstRemainder = CommandStatusReportsProto.newBuilder()
+        .addCmdStatus(oversized)
+        .addCmdStatus(lastSmall)
+        .build();
+    long smallBytes = commandStatusReportWireSize(firstSmallReport);
+    long oversizedBytes = commandStatusReportWireSize(oversizedReport);
+    context.addIncrementalReport(aggregate);
+
+    CommandStatusReportSelection selection =
+        context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+    assertEquals(Collections.singletonList(firstSmallReport), selection.getReports());
+    assertEquals(commandStatusReportWireSize(firstRemainder), context.getCommandStatusReportQueueBytes(scm));
+
+    selection = context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+    assertEquals(Collections.singletonList(oversizedReport), selection.getReports());
+    assertEquals(oversizedBytes, selection.getOversizedBytes());
+    assertEquals(commandStatusReportWireSize(lastSmallReport), context.getCommandStatusReportQueueBytes(scm));
+
+    selection = context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+    assertEquals(Collections.singletonList(lastSmallReport), selection.getReports());
+    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
   }
 
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
@@ -292,6 +399,29 @@ public class TestStateContext {
     }
     // Verify
     assertEquals(expectedReportCount, reportCount);
+  }
+
+  private static CommandStatusReportsProto newCommandStatusReport(
+      long commandId, int messageSize) {
+    return CommandStatusReportsProto.newBuilder()
+        .addCmdStatus(newCommandStatus(commandId, messageSize))
+        .build();
+  }
+
+  private static CommandStatus newCommandStatus(
+      long commandId, int messageSize) {
+    return CommandStatus.newBuilder()
+        .setCmdId(commandId)
+        .setStatus(CommandStatus.Status.EXECUTED)
+        .setType(SCMCommandProto.Type.deleteBlocksCommand)
+        .setMsg(String.join("", Collections.nCopies(messageSize, "x")))
+        .build();
+  }
+
+  private static long commandStatusReportWireSize(
+      CommandStatusReportsProto report) {
+    return CodedOutputStream.computeMessageSize(
+        SCMHeartbeatRequestProto.COMMANDSTATUSREPORTS_FIELD_NUMBER, report);
   }
 
   /**
@@ -729,17 +859,17 @@ public class TestStateContext {
     // (100 - 3 non-incremental reports)
     expectedReportCount.put(
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 97);
-    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm1, 100),
+    checkReportCount(ctx.getAvailableNonCommandStatusReports(scm1, 100),
         expectedReportCount);
-    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
+    checkReportCount(ctx.getAvailableNonCommandStatusReports(scm2, 100),
         expectedReportCount);
     expectedReportCount.clear();
     expectedReportCount.put(
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME,
         totalIncrementalCount - 97);
-    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm1, 100),
+    checkReportCount(ctx.getAvailableNonCommandStatusReports(scm1, 100),
         expectedReportCount);
-    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
+    checkReportCount(ctx.getAvailableNonCommandStatusReports(scm2, 100),
         expectedReportCount);
   }
 
