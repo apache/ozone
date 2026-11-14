@@ -61,6 +61,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Sets;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -100,6 +102,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -1196,6 +1200,35 @@ public class TestKeyValueHandler {
     ArgumentCaptor<DispatcherContext> captor = ArgumentCaptor.forClass(DispatcherContext.class);
     verify(spyChunkManager).writeChunk(eq(container), any(), any(), any(ChunkBuffer.class), captor.capture());
     assertEquals(HDDSVersion.ZDU, captor.getValue().getWriteVersion());
+  }
+
+  @Test
+  public void testWriteChunkAndPutBlockAreTraced() throws Exception {
+    Path testDir = Files.createTempDirectory("testWriteChunkAndPutBlockAreTraced");
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainer container = createOpenContainer(containerID, handlerWithVolume.getVolumeSet(),
+          handlerWithVolume.getContainerSet());
+      ContainerCommandRequestProto writeChunk = ContainerTestHelper.getWriteChunkRequest(
+          MockPipeline.createSingleNodePipeline(), ContainerTestHelper.getTestBlockID(containerID), 1024);
+
+      Span span = TracingUtil.createInternalSpan("dispatch");
+      try (Scope ignored = span.makeCurrent()) {
+        assertEquals(ContainerProtos.Result.SUCCESS,
+            kvHandler.handleWriteChunk(writeChunk, container, null).getResult());
+        assertEquals(ContainerProtos.Result.SUCCESS,
+            kvHandler.handlePutBlock(ContainerTestHelper.getPutBlockRequest(writeChunk), container, null).getResult());
+      } finally {
+        span.end();
+      }
+
+      collector.assertParent("ChunkManagerDispatcher.writeChunk", "dispatch");
+      collector.assertParent("FilePerBlockStrategy.writeChunk", "ChunkManagerDispatcher.writeChunk");
+      collector.assertParent("BlockManagerImpl.putBlock", "dispatch");
+    }
   }
 
   private static ChunkManager spyChunkManager(KeyValueHandler kvHandler) throws Exception {

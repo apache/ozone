@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 
+import io.opentelemetry.api.trace.SpanKind;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -30,6 +31,7 @@ import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -59,9 +61,9 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
   ChunkManagerDispatcher(boolean sync, BlockManager manager) {
     handlers.put(FILE_PER_CHUNK,
-        new FilePerChunkStrategy(sync, manager));
+        TracingUtil.createProxy(new FilePerChunkStrategy(sync, manager), ChunkManager.class, SpanKind.INTERNAL));
     handlers.put(FILE_PER_BLOCK,
-        new FilePerBlockStrategy(sync, manager));
+        TracingUtil.createProxy(new FilePerBlockStrategy(sync, manager), ChunkManager.class, SpanKind.INTERNAL));
   }
 
   @Override
