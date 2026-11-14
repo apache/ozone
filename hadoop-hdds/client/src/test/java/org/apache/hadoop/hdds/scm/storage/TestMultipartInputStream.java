@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.primitives.Bytes;
 import java.io.EOFException;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -91,6 +92,19 @@ public class TestMultipartInputStream {
         assertEquals(0, multipartStream.read(offset, empty));
       }
     }
+  }
+
+  @Test
+  public void testPositionedReadAfterCloseFails() throws Exception {
+    BlockInputStream blockPart = mock(BlockInputStream.class);
+    when(blockPart.getLength()).thenReturn((long) PART_SIZE);
+    StreamBlockInputStream streamPart = stubStreamBlockPart(generateRandomData(PART_SIZE));
+    MultipartInputStream multipartStream = new MultipartInputStream("test-key", Arrays.asList(blockPart, streamPart));
+    multipartStream.close();
+    assertThrows(IOException.class, () -> multipartStream.read(0, ByteBuffer.allocate(1)));
+    assertThrows(IOException.class, () -> multipartStream.read(PART_SIZE, ByteBuffer.allocate(1)));
+    verify(blockPart, never()).read(anyLong(), any(ByteBuffer.class));
+    verify(streamPart, never()).read(anyLong(), any(ByteBuffer.class));
   }
 
   @Test
