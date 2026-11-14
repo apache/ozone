@@ -165,7 +165,7 @@ public class TestMultiTenantVolume {
 
   @Test
   public void testDefaultS3Volume() throws Exception {
-    final String bucketName = "bucket";
+    final String bucketName = "default-s3-bucket";
 
     // Default client not belonging to a tenant should end up in the S3 volume.
     ObjectStore store = client.getObjectStore();
@@ -177,7 +177,7 @@ public class TestMultiTenantVolume {
         store.getS3Bucket(bucketName).getVolumeName());
     OzoneBucket bucket = store.getS3Bucket(bucketName);
     String uploadID = bucket.initiateMultipartUpload("key").getUploadID();
-    assertMultipartListing(store, bucketName, "key", uploadID);
+    assertMultipartListing(olderS3Client.getObjectStore(), bucketName, "key", uploadID);
     assertMultipartListing(getStoreForAccessID(UUID.randomUUID().toString()), bucketName, "key", uploadID);
     try (OzoneClient s3Client = newS3Client()) {
       assertEquals(s3VolumeName, s3Client.getProxy().getBucketDetails(null, bucketName).getVolumeName());
