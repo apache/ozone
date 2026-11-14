@@ -299,6 +299,19 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
 
     if (cmdType != Type.CreateContainer) {
+      if (container == null && container2BCSIDMap != null && container2BCSIDMap.containsKey(containerID)) {
+        // The container was created over this pipeline and has been deleted since, eg. by a forced delete from SCM.
+        // Do not recreate it: a write that SCM does not expect would make this replica diverge from the others.
+        // Look it up again first: a concurrent write may have just created it, which adds it to the map afterwards.
+        container = getContainer(containerID);
+        if (container == null) {
+          StorageContainerException sce = new StorageContainerException("ContainerID " + containerID
+              + " was created over this pipeline and has been deleted, it cannot be recreated",
+              ContainerProtos.Result.CONTAINER_NOT_OPEN);
+          audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
+          return ContainerUtils.logAndReturnError(LOG, sce, msg);
+        }
+      }
       /**
        * Create Container should happen only as part of Write_Data phase of
        * writeChunk.
