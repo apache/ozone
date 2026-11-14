@@ -18,19 +18,27 @@
 package org.apache.hadoop.hdds.security.token;
 
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.EnumSet;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.security.token.Token;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests for {@link BlockTokenVerifier}.
@@ -73,5 +81,61 @@ public class TestBlockTokenVerifier
             Instant.now().plusSeconds(3600).toEpochMilli(), 100);
     tokenId.setSecretKeyId(SECRET_KEY_ID);
     return tokenId;
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ContainerProtos.Type.class, names = {"StreamInit", "StreamInitWithPutBlock"})
+  public void testVerifiesStreamInitLikeWriteChunk(ContainerProtos.Type streamInitType) throws Exception {
+    final SecretKeyVerifierClient secretKeyClient = mockSecretKeyClient(true);
+    final ShortLivedTokenSecretManager<OzoneBlockTokenIdentifier> secretManager = new MockTokenManager();
+    final OzoneBlockTokenIdentifier tokenId = valid(newTokenId());
+    final Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken(tokenId);
+    final TokenVerifier subject = newTestSubject(tokenEnabled(), secretKeyClient);
+
+    assertDoesNotThrow(() -> subject.verify(token, newStreamInit(streamInitType, new BlockID(1, 0))));
+
+    final BlockTokenException idMismatch = assertThrows(
+        BlockTokenException.class, () -> subject.verify(token, newStreamInit(streamInitType, new BlockID(1, 1))));
+    assertThat(idMismatch.getMessage()).contains("ID mismatch");
+
+    final OzoneBlockTokenIdentifier readOnly = valid(
+        new OzoneBlockTokenIdentifier(
+            "any user", new BlockID(1, 0), EnumSet.of(AccessModeProto.READ),
+            Instant.now().plusSeconds(3600).toEpochMilli(), 100));
+    readOnly.setSecretKeyId(SECRET_KEY_ID);
+    final Token<OzoneBlockTokenIdentifier> readToken = secretManager.generateToken(readOnly);
+    final BlockTokenException noWrite = assertThrows(
+        BlockTokenException.class, () -> subject.verify(readToken, newStreamInit(streamInitType, new BlockID(1, 0))));
+    assertThat(noWrite.getMessage()).contains("doesn't have WRITE permission");
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ContainerProtos.Type.class, names = {"StreamInit", "StreamInitWithPutBlock"})
+  public void testStreamInitRejectsInvalidSignature(ContainerProtos.Type streamInitType) throws Exception {
+    // secretKeyClient is mocked to return an invalid signature
+    final SecretKeyVerifierClient secretKeyClient = mockSecretKeyClient(false);
+    final ShortLivedTokenSecretManager<OzoneBlockTokenIdentifier> secretManager = new MockTokenManager();
+    final OzoneBlockTokenIdentifier tokenId = valid(newTokenId());
+    final Token<?> invalidToken = secretManager.generateToken(tokenId);
+    final TokenVerifier subject = newTestSubject(tokenEnabled(), secretKeyClient);
+
+    final BlockTokenException ex = assertThrows(
+        BlockTokenException.class,
+        () -> subject.verify(invalidToken, newStreamInit(streamInitType, new BlockID(1, 0))));
+    assertThat(ex.getMessage()).contains("Invalid token for user");
+  }
+
+  private static ContainerCommandRequestProto newStreamInit(
+      ContainerProtos.Type streamInitType, BlockID blockId) throws IOException {
+    final Pipeline pipeline = MockPipeline.createPipeline(1);
+    final WriteChunkRequestProto writeChunk = WriteChunkRequestProto.newBuilder()
+        .setBlockID(blockId.getDatanodeBlockIDProtobuf())
+        .build();
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(streamInitType)
+        .setContainerID(blockId.getContainerID())
+        .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
+        .setWriteChunk(writeChunk)
+        .build();
   }
 }
