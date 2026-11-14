@@ -63,9 +63,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
       }
       ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
       int partMarker = parsePartNumberMarker(partNumberMarker);
-      String volumeName = S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())
-          ? context.getBucket().getVolumeName() : null;
-      Response response = listParts(volumeName, context.getBucketName(), keyPath, uploadId,
+      Response response = listParts(context.getCachedVolumeName(), context.getBucketName(), keyPath, uploadId,
           partMarker, maxParts, perf);
       long opLatencyNs = getMetrics().updateListPartsSuccessStats(context.getStartNanos());
       perf.appendOpLatencyNanos(opLatencyNs);
