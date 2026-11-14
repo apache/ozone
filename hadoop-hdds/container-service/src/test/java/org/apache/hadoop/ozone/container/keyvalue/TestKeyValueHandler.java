@@ -70,7 +70,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -81,7 +80,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
@@ -1691,8 +1689,7 @@ public class TestKeyValueHandler {
 
       ArgumentCaptor<ByteBuffer> buffers = ArgumentCaptor.forClass(ByteBuffer.class);
       verify(fixture.blockFile, times(4)).read(buffers.capture());
-      assertEquals(Arrays.asList(unit, 20, 3 * unit, 3 * unit),
-          buffers.getAllValues().stream().map(ByteBuffer::capacity).collect(Collectors.toList()));
+      assertThat(buffers.getAllValues()).extracting(ByteBuffer::capacity).containsExactly(unit, 20, 3 * unit, 3 * unit);
     }
   }
 
