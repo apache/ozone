@@ -25,17 +25,25 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** {@link RandomAccessFile} and its {@link FileChannel}. */
+/**
+ * {@link RandomAccessFile} and its {@link FileChannel}. A ReadBlock stream serves one block through one instance,
+ * which therefore also caches the block's {@link BlockData} and the read buffer across the stream's requests.
+ */
 public class RandomAccessFileChannel implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(RandomAccessFileChannel.class);
 
   private File blockFile;
   private RandomAccessFile raf;
   private FileChannel channel;
+  private final AtomicReference<BlockData> cachedBlockData = new AtomicReference<>();
+  private ByteBuffer readBuffer;
 
   public RandomAccessFileChannel() {
   }
@@ -54,6 +62,35 @@ public class RandomAccessFileChannel implements Closeable {
     blockFile = f;
     raf = newRaf;
     channel = newChannel;
+  }
+
+  /**
+   * @return the {@link BlockData} cached for the given block, or null if none is cached for it or the cached one has
+   * a lower BCSID than requested.
+   */
+  public BlockData getCachedBlockData(BlockID blockID) {
+    final BlockData cached = cachedBlockData.get();
+    return cached != null && cached.getBlockID().getContainerBlockID().equals(blockID.getContainerBlockID())
+        && cached.getBlockCommitSequenceId() >= blockID.getBlockCommitSequenceId() ? cached : null;
+  }
+
+  /** Cache the {@link BlockData} of the block this channel serves until {@link #close()}. */
+  public void cacheBlockData(BlockData blockData) {
+    cachedBlockData.set(blockData);
+  }
+
+  /**
+   * @return a cleared read buffer of at least the given capacity, reallocated only when it has to grow.
+   * Not thread-safe: the buffer is shared across requests, so the caller must serialize them (gRPC serializes a
+   * stream's requests).
+   */
+  public ByteBuffer getReadBuffer(int capacity) {
+    if (readBuffer == null || readBuffer.capacity() < capacity) {
+      readBuffer = ByteBuffer.allocate(capacity);
+    } else {
+      readBuffer.clear();
+    }
+    return readBuffer;
   }
 
   /** Similar to {@link FileChannel#position(long)}. */
@@ -97,6 +134,8 @@ public class RandomAccessFileChannel implements Closeable {
       return;
     }
     blockFile = null;
+    cachedBlockData.set(null);
+    readBuffer = null;
 
     try {
       if (channel != null) {

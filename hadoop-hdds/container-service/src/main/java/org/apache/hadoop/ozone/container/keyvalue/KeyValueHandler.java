@@ -2347,7 +2347,17 @@ public class KeyValueHandler extends Handler {
     BlockUtils.verifyReplicaIdx(kvContainer, blockID);
     BlockUtils.verifyBCSId(kvContainer, blockID);
 
-    final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+    if (readBlock.getOffset() < 0 || readBlock.getLength() < 0) {
+      return rejectReadBlock(blockFile, streamObserver, Status.INVALID_ARGUMENT.withDescription(
+          "Negative offset " + readBlock.getOffset() + " or length " + readBlock.getLength() + " for " + blockID));
+    }
+
+    // Cached per stream; re-resolve when the range reaches the cached size, since the block may have grown.
+    BlockData blockData = blockFile.getCachedBlockData(blockID);
+    if (blockData == null || readBlock.getLength() >= blockData.getSize() - readBlock.getOffset()) {
+      blockData = getBlockManager().getBlock(kvContainer, blockID);
+      blockFile.cacheBlockData(blockData);
+    }
     if (readBlock.getOffset() >= blockData.getSize()) {
       return rejectReadBlock(blockFile, streamObserver, Status.OUT_OF_RANGE.withDescription(
           "Requested offset " + readBlock.getOffset() + " is beyond the end of block " + blockID + " with size "
@@ -2355,12 +2365,13 @@ public class KeyValueHandler extends Handler {
     }
     final BlockReadCursor cursor = new BlockReadCursor(readBlock.getOffset(), readBlock.getLength(),
         responseDataSize, blockData.getChunks());
-    final ByteBuffer buffer = ByteBuffer.allocate(cursor.responseDataSize());
     long bytesRead = 0;
     while (cursor.hasNext()) {
       final BlockReadCursor.ReadRange range = cursor.next();
+      // Reused across the stream's requests: gRPC serializes the response inside onNext, before the buffer is refilled.
+      final ByteBuffer buffer = blockFile.getReadBuffer(range.length());
       blockFile.position(range.offset());
-      buffer.clear().limit(range.length());
+      buffer.limit(range.length());
       blockFile.read(buffer);
       if (buffer.hasRemaining()) {
         throw new EOFException("Unexpected end of block " + blockID + " at " + range.offset());
@@ -2370,7 +2381,8 @@ public class KeyValueHandler extends Handler {
       if (validateChunkChecksumData) {
         Checksum.validateChecksums(buffer, range.offset(), 0, range.chunks());
       }
-      streamObserver.onNext(getReadBlockResponse(request, range.chunks(), buffer, range.offset()));
+      streamObserver.onNext(
+          getReadBlockResponse(request, range.chunks(), buffer, range.offset(), byteBufferToByteString));
     }
     return bytesRead;
   }
@@ -2387,7 +2399,7 @@ public class KeyValueHandler extends Handler {
     return 0;
   }
 
-  /** The client chooses the response size, which is a uint32 and sizes the read buffer: bound it. */
+  /** The client chooses the response size, which is a uint32 and sizes a buffer kept for the stream: bound it. */
   @VisibleForTesting
   static int boundResponseDataSize(int responseDataSize) {
     if (responseDataSize <= 0) {
