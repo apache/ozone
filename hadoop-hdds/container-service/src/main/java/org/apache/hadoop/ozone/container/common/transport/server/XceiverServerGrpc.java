@@ -80,6 +80,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private boolean isStarted;
   private DatanodeDetails datanodeDetails;
   private EventLoopGroup eventLoopGroup;
+  private final XceiverServerGrpcMetrics metrics;
 
   /**
    * Constructs a Grpc server class.
@@ -120,6 +121,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
                   "ChunkReader-%d")
               .build());
     }
+    metrics = XceiverServerGrpcMetrics.create(readExecutors, datanodeDetails.getUuidString());
 
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setDaemon(true)
@@ -159,7 +161,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .keepAliveTimeout(30, TimeUnit.SECONDS)
         .addService(ServerInterceptors.intercept(
             xceiverService.bindServiceWithZeroCopy(),
-            new GrpcServerInterceptor()));
+            new GrpcServerInterceptor()))
+        .addTransportFilter(metrics.newTransportFilter());
 
     SecurityConfig secConf = new SecurityConfig(conf);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
@@ -177,7 +180,12 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         LOG.error("Unable to setup TLS for secure datanode GRPC endpoint.", ex);
       }
     }
-    server = nettyServerBuilder.build();
+    try {
+      server = nettyServerBuilder.build();
+    } catch (RuntimeException e) {
+      metrics.unregister();
+      throw e;
+    }
     storageContainer = dispatcher;
   }
 
@@ -232,17 +240,19 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
   @Override
   public void stop() {
-    if (isStarted) {
-      try {
+    try {
+      if (isStarted) {
         server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
         xceiverService.shutdown();
         eventLoopGroup.shutdownGracefully().sync();
-      } catch (InterruptedException e) {
-        LOG.error("failed to shutdown XceiverServerGrpc", e);
-        Thread.currentThread().interrupt();
       }
+    } catch (InterruptedException e) {
+      LOG.error("failed to shutdown XceiverServerGrpc", e);
+      Thread.currentThread().interrupt();
+    } finally {
       isStarted = false;
+      metrics.unregister();
     }
   }
 
