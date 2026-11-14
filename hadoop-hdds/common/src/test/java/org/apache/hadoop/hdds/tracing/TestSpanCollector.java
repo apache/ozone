@@ -53,14 +53,19 @@ public final class TestSpanCollector implements SpanProcessor, AutoCloseable {
 
   /** Registers a collecting SDK as the global OpenTelemetry and initializes Ozone tracing with it. */
   public static TestSpanCollector install(String serviceName) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.tracing.enabled", true);
+    return install(serviceName, conf);
+  }
+
+  /** Same as {@link #install(String)} with an explicit configuration (e.g. internal tracing keys). */
+  public static TestSpanCollector install(String serviceName, OzoneConfiguration conf) {
     TracingUtil.shutdownTracing();
     GlobalOpenTelemetry.resetForTest();
     TestSpanCollector collector = new TestSpanCollector();
     GlobalOpenTelemetry.set(OpenTelemetrySdk.builder()
         .setTracerProvider(SdkTracerProvider.builder().addSpanProcessor(collector).build())
         .build());
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.tracing.enabled", true);
     TracingUtil.initTracing(serviceName, conf);
     return collector;
   }

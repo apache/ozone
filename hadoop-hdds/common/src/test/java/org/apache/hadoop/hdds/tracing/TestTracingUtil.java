@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.tracing;
 
 import static org.apache.hadoop.hdds.tracing.TracingUtil.MdcContextStorage.MDC_SPAN_ID;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.MdcContextStorage.MDC_TRACE_ID;
+import static org.apache.hadoop.hdds.tracing.TracingUtil.SUPPRESSED_SPAN_AS_STRING;
+import static org.apache.hadoop.hdds.tracing.TracingUtil.createClientProxy;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.exportCurrentSpan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,6 +55,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
 import org.junit.jupiter.api.AfterEach;
@@ -556,6 +559,53 @@ public class TestTracingUtil {
       TracingUtil.addEventToCurrentSpan("event", "k", "v");
       TracingUtil.recordExceptionInCurrentSpan(new IOException("ignored"));
       assertTrue(collector.getSpans().isEmpty());
+    }
+  }
+
+  @Test
+  public void testExecuteInternalSpanSuppressesNestedWhenInternalTracingOff() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.tracing.enabled", true);
+    conf.setBoolean("ozone.tracing.internal.enabled", false);
+    try (TestSpanCollector collector = TestSpanCollector.install("test", conf)) {
+      TracingUtil.executeInternalSpan("root", () -> {
+        assertEquals(SUPPRESSED_SPAN_AS_STRING, exportCurrentSpan());
+        TracingUtil.executeInNewSpan("child", () -> { });
+        Service proxy = createClientProxy(new ServiceImpl(), Service.class, conf);
+        proxy.normalMethod();
+        TracingUtil.executeAsChildSpan("db", exportCurrentSpan(), () -> { });
+      });
+      assertTrue(collector.getSpans().isEmpty());
+    }
+  }
+
+  @Test
+  public void testImportAndCreateSpanSuppressedCarrier() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.tracing.enabled", true);
+    try (TestSpanCollector collector = TestSpanCollector.install("scm", conf)) {
+      Span server = TracingUtil.importAndCreateSpan(
+          "DeleteScmKeyBlocks", SUPPRESSED_SPAN_AS_STRING, SpanKind.SERVER);
+      try (Scope ignored = server.makeCurrent()) {
+        assertFalse(server.isRecording());
+        TracingUtil.executeInNewSpan("DeletedBlockLog.addTransactions", () -> { });
+      }
+      assertTrue(collector.getSpans().isEmpty());
+    }
+  }
+
+  @Test
+  public void testExecuteInternalSpanRecordsTreeWhenInternalTracingOn() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.tracing.enabled", true);
+    conf.setBoolean("ozone.tracing.internal.enabled", true);
+    try (TestSpanCollector collector = TestSpanCollector.install("test", conf)) {
+      TracingUtil.executeInternalSpan("root", () -> {
+        TracingUtil.executeInNewSpan("child", () -> { });
+        TracingUtil.executeAsChildSpan("db", exportCurrentSpan(), () -> { });
+      });
+      collector.assertParent("child", "root");
+      collector.assertParent("db", "root");
     }
   }
 }

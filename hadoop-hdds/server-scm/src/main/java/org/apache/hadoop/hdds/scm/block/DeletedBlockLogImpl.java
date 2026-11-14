@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.DeletedBlock;
@@ -247,24 +248,31 @@ public class DeletedBlockLogImpl
     try {
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
       long currentBatchSizeBytes = 0;
+      long batchFirstTxID = -1;
+      long batchLastTxID = -1;
       for (Map.Entry<Long, List<DeletedBlock>> entry :
           containerBlocksMap.entrySet()) {
         long nextTXID = sequenceIdGen.getNextId(SequenceIdType.delTxnId);
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
             entry.getKey(), entry.getValue());
+        if (txsToBeAdded.isEmpty()) {
+          batchFirstTxID = nextTXID;
+        }
+        batchLastTxID = nextTXID;
         txsToBeAdded.add(tx);
         long txSize = tx.getSerializedSize();
         currentBatchSizeBytes += txSize;
 
         if (currentBatchSizeBytes >= logAppenderQueueByteLimit) {
-          transactionStatusManager.addTransactions(txsToBeAdded);
-          metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
+          int txCount = txsToBeAdded.size();
+          addTransactionsWithTracing(txsToBeAdded, batchFirstTxID, batchLastTxID, txCount);
+          metrics.incrBlockDeletionTransactionCreated(txCount);
           txsToBeAdded.clear();
           currentBatchSizeBytes = 0;
         }
       }
       if (!txsToBeAdded.isEmpty()) {
-        transactionStatusManager.addTransactions(txsToBeAdded);
+        addTransactionsWithTracing(txsToBeAdded, batchFirstTxID, batchLastTxID, txsToBeAdded.size());
         metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
       }
     } finally {
@@ -552,5 +560,15 @@ public class DeletedBlockLogImpl
         lock.unlock();
       }
     }
+  }
+
+  private void addTransactionsWithTracing(ArrayList<DeletedBlocksTransaction> txs,
+      long firstTxID, long lastTxID, int txCount) throws IOException {
+    TracingUtil.executeInNewSpan("DeletedBlockLog.addTransactions", () -> {
+      TracingUtil.addAttributesToCurrentSpan("firstTxID", firstTxID);
+      TracingUtil.addAttributesToCurrentSpan("lastTxID", lastTxID);
+      TracingUtil.addAttributesToCurrentSpan("txCount", txCount);
+      transactionStatusManager.addTransactions(txs);
+    });
   }
 }
