@@ -245,13 +245,14 @@ Multiple links to same bucket are allowed
     Put and get key    put_to=${target}/link-to-existing-bucket/key4    get_from=${target}/another-link/key4    put_from=/etc/hostname
 
 Source bucket not affected by deleting link
+    Execute Later ozone sh    bucket link ${source}/bucket-in-source ${target}/link-to-be-deleted
     Execute Later ozone sh    bucket delete ${target}/link-to-be-deleted
 
     ${buckets_in_target} =    Execute Later ozone sh    bucket list ${target}
     Assert Later    File ${buckets_in_target} Should    Not Contain    link-to-be-deleted
 
-    ${keys_in_source} =    Execute Later ozone sh    key list ${source}/bucket-in-source | jq -r '.[].name'
-    Assert Later    File ${keys_in_source} Should    Contain    key1
+    ${keys_in_source} =    Execute Later ozone sh    key list ${source}/bucket-in-source
+    Assert Later    File ${keys_in_source} Should    Contain    key3
 
 Setting bucket property on link not allowed
     ${result} =    Execute Later ozone sh    bucket setquota ${target}/link-to-existing-bucket --quota 1GB
