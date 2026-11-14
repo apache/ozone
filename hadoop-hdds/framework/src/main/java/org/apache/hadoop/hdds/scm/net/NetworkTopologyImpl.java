@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.net;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DEFAULT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.SCOPE_REVERSE_STR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -27,8 +29,10 @@ import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.TreeMap;
@@ -61,6 +65,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
   private final NodeSchemaManager schemaManager;
   /** The algorithm to randomize nodes with equal distances. */
   private final Consumer<List<? extends Node>> shuffleOperation;
+  /** Whether sortByDistanceCost keeps nodes in the same rack next to each other. */
+  private final boolean sortGroupByRack;
+  /** Level of the rack layer in the schema. */
+  private final int rackLevel;
   /** Lock to coordinate cluster tree access. */
   private final ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
@@ -68,18 +76,23 @@ public class NetworkTopologyImpl implements NetworkTopology {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(conf);
     shuffleOperation = Collections::shuffle;
+    sortGroupByRack = conf.getBoolean(OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_KEY,
+        OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT);
     maxLevel = schemaManager.getMaxLevel();
+    rackLevel = getRackLevel(schemaManager);
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
         NetConstants.ROOT_LEVEL,
         schemaManager.getCost(NetConstants.ROOT_LEVEL));
   }
 
-  public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree) {
+  public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree, boolean sortGroupByRack) {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(schemaFile);
     maxLevel = schemaManager.getMaxLevel();
     shuffleOperation = Collections::shuffle;
+    this.sortGroupByRack = sortGroupByRack;
+    rackLevel = getRackLevel(schemaManager);
     factory = InnerNodeImpl.FACTORY;
     this.clusterTree = clusterTree;
   }
@@ -87,9 +100,17 @@ public class NetworkTopologyImpl implements NetworkTopology {
   @VisibleForTesting
   public NetworkTopologyImpl(NodeSchemaManager manager,
                              Consumer<List<? extends Node>> shuffleOperation) {
+    this(manager, shuffleOperation, OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT);
+  }
+
+  @VisibleForTesting
+  public NetworkTopologyImpl(NodeSchemaManager manager, Consumer<List<? extends Node>> shuffleOperation,
+      boolean sortGroupByRack) {
     schemaManager = manager;
     this.shuffleOperation = shuffleOperation;
+    this.sortGroupByRack = sortGroupByRack;
     maxLevel = schemaManager.getMaxLevel();
+    rackLevel = getRackLevel(schemaManager);
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
         NetConstants.ROOT_LEVEL,
@@ -771,6 +792,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
    *
    * As an additional twist, we also randomize the nodes at each network
    * distance. This helps with load balancing when there is data skew.
+   * If {@code ozone.network.topology.sort.group.by.rack} is enabled, nodes at the same distance
+   * in the same rack are kept next to each other, so that a pipeline through the sorted nodes
+   * does not cross racks more often than needed.
    *
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
@@ -811,7 +835,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
     for (List<N> list : tree.values()) {
       if (list != null) {
         shuffleOperation.accept(list);
-        ret.addAll(list);
+        if (sortGroupByRack) {
+          Map<String, List<N>> racks = new LinkedHashMap<>();
+          for (N node : list) {
+            racks.computeIfAbsent(getRackPath(node), k -> new ArrayList<>()).add(node);
+          }
+          racks.values().forEach(ret::addAll);
+        } else {
+          ret.addAll(list);
+        }
       }
     }
 
@@ -821,6 +853,33 @@ public class NetworkTopologyImpl implements NetworkTopology {
       LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes, reader, ret);
     }
     return ret;
+  }
+
+  /**
+   * @return the level of the schema layer whose default name is {@link NetConstants#DEFAULT_RACK},
+   * or the level of the leaves' parent if there is no such layer.
+   */
+  private static int getRackLevel(NodeSchemaManager manager) {
+    final int leafLevel = manager.getMaxLevel();
+    for (int level = NetConstants.ROOT_LEVEL; level < leafLevel; level++) {
+      if (NetConstants.DEFAULT_RACK.equals(manager.getDefaultName(level))) {
+        return level;
+      }
+    }
+    return leafLevel - 1;
+  }
+
+  /**
+   * @return the path of the rack containing the given leaf node, e.g. /r1 for a node at /r1/ng1/node1
+   * when the schema has a nodegroup layer under the rack layer.
+   */
+  private String getRackPath(Node node) {
+    final String location = node.getNetworkLocation();
+    int index = 0;
+    for (int level = NetConstants.ROOT_LEVEL; level < rackLevel && index >= 0; level++) {
+      index = location.indexOf(NetConstants.PATH_SEPARATOR, index + 1);
+    }
+    return index <= 0 ? location : location.substring(0, index);
   }
 
   /**

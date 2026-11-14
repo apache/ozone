@@ -555,6 +555,10 @@ public final class OzoneConfigKeys {
       "ozone.network.topology.aware.read";
   public static final boolean OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT = true;
 
+  public static final String OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_KEY =
+      "ozone.network.topology.sort.group.by.rack";
+  public static final boolean OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT = true;
+
   public static final String OZONE_MANAGER_FAIR_LOCK = "ozone.om.lock.fair";
   public static final boolean OZONE_MANAGER_FAIR_LOCK_DEFAULT = false;
 
