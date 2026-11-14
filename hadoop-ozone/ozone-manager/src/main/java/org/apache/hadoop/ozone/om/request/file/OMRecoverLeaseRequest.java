@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_CLOSED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RecoverLease;
@@ -38,6 +39,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -50,7 +52,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -253,10 +254,28 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     keyInfo.setKeyName(keyName);
     openKeyInfo.setKeyName(keyName);
 
-    OmKeyLocationInfoGroup keyLatestVersionLocations = keyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.createLocationList();
-    OmKeyLocationInfoGroup openKeyLatestVersionLocations = openKeyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.createLocationList();
+    RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
+    ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
+    rb.setKeyInfo(keyInfo.getNetworkProtobuf(clientVersion, true));
+    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(clientVersion, true));
+    return rb.build();
+  }
+
+  /**
+   * Adds the block token and the current pipeline to the blocks that the recovering client has to contact:
+   * the last block of the file and the last two blocks of the open file.
+   * Only the reply to the client needs them, so this runs on the leader after the request has been applied:
+   * applying the request must not depend on SCM.
+   */
+  public static OMResponse addBlockInfo(OzoneManager ozoneManager, OMRequest omRequest, OMResponse omResponse)
+      throws IOException {
+    final RecoverLeaseResponse recoverLeaseResponse = omResponse.getRecoverLeaseResponse();
+    final OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo());
+    final OmKeyInfo openKeyInfo = OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo());
+
+    final List<OmKeyLocationInfo> keyLocationInfoList = keyInfo.getLatestVersionLocations().createLocationList();
+    final List<OmKeyLocationInfo> openKeyLocationInfoList =
+        openKeyInfo.getLatestVersionLocations().createLocationList();
 
     if (!keyLocationInfoList.isEmpty()) {
       updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
@@ -268,26 +287,30 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(0));
     }
 
-    RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
-    ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
-    rb.setKeyInfo(keyInfo.getNetworkProtobuf(clientVersion, true));
-    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(clientVersion, true));
-    return rb.build();
+    final ClientVersion clientVersion = ClientVersion.deserialize(omRequest.getVersion());
+    return omResponse.toBuilder().setRecoverLeaseResponse(RecoverLeaseResponse.newBuilder()
+        .setKeyInfo(keyInfo.getNetworkProtobuf(clientVersion, true))
+        .setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(clientVersion, true))).build();
   }
 
-  private void updateBlockInfo(OzoneManager ozoneManager, OmKeyLocationInfo blockInfo) throws IOException {
+  private static void updateBlockInfo(OzoneManager ozoneManager, OmKeyLocationInfo blockInfo) throws IOException {
     if (blockInfo != null) {
       // set token to last block if enabled
       if (ozoneManager.isGrpcBlockTokenEnabled()) {
-        String remoteUser = getRemoteUser().getShortUserName();
-        OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
+        final String remoteUser = HddsServerUtil.getRemoteUser().getShortUserName();
+        final OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
         blockInfo.setToken(secretManager.generateToken(remoteUser, blockInfo.getBlockID(),
             EnumSet.of(READ, WRITE), blockInfo.getLength()));
       }
       // refresh last block pipeline
-      ContainerWithPipeline containerWithPipeline =
-          ozoneManager.getScmClient().getContainerClient().getContainerWithPipeline(blockInfo.getContainerID());
-      blockInfo.setPipeline(containerWithPipeline.getPipeline());
+      try {
+        final ContainerWithPipeline containerWithPipeline =
+            ozoneManager.getScmClient().getContainerClient().getContainerWithPipeline(blockInfo.getContainerID());
+        blockInfo.setPipeline(containerWithPipeline.getPipeline());
+      } catch (IOException e) {
+        // SCM fails with IOException. Map it to a retriable client error instead of INTERNAL_ERROR
+        throw new OMException(e.getMessage(), e, SCM_GET_PIPELINE_EXCEPTION);
+      }
     }
   }
 
