@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
@@ -76,6 +77,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -1770,6 +1772,49 @@ public class SCMClientProtocolServer implements
       }
     }
     return failedContainerIDs;
+  }
+
+  @Override
+  public String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("startContainerID", String.valueOf(startContainerId));
+    auditMap.put("lifeCycleState", String.valueOf(lifeCycleState));
+    auditMap.put("healthState", String.valueOf(healthState));
+    auditMap.put("maxRows", String.valueOf(maxRows));
+    auditMap.put("batchSize", String.valueOf(batchSize));
+    auditMap.put("partSize", String.valueOf(partSize));
+    try {
+      final String jobId = scm.getContainerExportManager().submitJob(
+          startContainerId, lifeCycleState, healthState, maxRows, batchSize, partSize).getId().toString();
+      auditMap.put("jobId", jobId);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.EXPORT_CONTAINER_IDS, auditMap));
+      return jobId;
+    } catch (IllegalArgumentException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.EXPORT_CONTAINER_IDS, auditMap, ex));
+      throw new NonRetriableException(ex.getMessage());
+    } catch (IOException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.EXPORT_CONTAINER_IDS, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  public GetContainerIdExportStatusResponseProto getContainerIdExportStatus(String jobId) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("jobId", jobId);
+    final GetContainerIdExportStatusResponseProto status =
+        scm.getContainerExportManager().getContainerExportStatus(jobId);
+    if (status == null) {
+      final IOException ex = new NonRetriableException("Container ID export job not found: " + jobId
+          + ". It may have been evicted, or SCM may have restarted.");
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_CONTAINER_ID_EXPORT_STATUS, auditMap, ex));
+      throw ex;
+    }
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.GET_CONTAINER_ID_EXPORT_STATUS, auditMap));
+    return status;
   }
 
   private void persistContainerSuppression(long longContainerID, boolean suppress, SCMAction action)
