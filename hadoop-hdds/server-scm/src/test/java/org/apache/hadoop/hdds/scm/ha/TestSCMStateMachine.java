@@ -49,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -80,12 +81,15 @@ import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.DivisionInfo;
+import org.apache.ratis.server.RaftConfiguration;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,12 +104,14 @@ public class TestSCMStateMachine {
 
   private final AtomicBoolean commitIndexAvailable = new AtomicBoolean();
   private final AtomicBoolean scmStopped = new AtomicBoolean();
+  private final AtomicReference<LifeCycle.State> divisionState = new AtomicReference<>(LifeCycle.State.RUNNING);
   private final AtomicLong lastAppliedIndex = new AtomicLong(5L);
   private final AtomicLong leaderCommitIndex = new AtomicLong(5L);
   private final AtomicLong retryClock = new AtomicLong(1000L);
   private final RaftPeerId followerId = RaftPeerId.valueOf("follower");
   private final RaftPeerId leaderId = RaftPeerId.valueOf("leader");
 
+  private StorageContainerManager mockScm;
   private SCMMetrics metrics;
   private SCMDatanodeProtocolServer datanodeProtocolServer;
   private SCMSafeModeManager safeModeManager;
@@ -113,7 +119,7 @@ public class TestSCMStateMachine {
 
   @BeforeEach
   void setUp() {
-    StorageContainerManager scm = mock(StorageContainerManager.class);
+    mockScm = mock(StorageContainerManager.class);
     metrics = SCMMetrics.create("scm1");
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     datanodeProtocolServer = mock(SCMDatanodeProtocolServer.class);
@@ -125,15 +131,25 @@ public class TestSCMStateMachine {
     RaftServer.Division division = mock(RaftServer.Division.class);
     DivisionInfo divisionInfo = mock(DivisionInfo.class);
 
-    when(scm.getMetrics()).thenReturn(metrics);
-    when(scm.isStopped()).thenAnswer(invocation -> scmStopped.get());
-    when(scm.getScmContext()).thenReturn(scmContext);
-    when(scm.getScmHAManager()).thenReturn(haManager);
-    when(scm.getDatanodeProtocolServer()).thenReturn(datanodeProtocolServer);
-    when(scm.getScmSafeModeManager()).thenReturn(safeModeManager);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setTimeDuration("hdds.scm.ratis.shutdown.timeout", 1, TimeUnit.SECONDS);
+    RaftConfiguration raftConf = mock(RaftConfiguration.class);
+
+    when(mockScm.getMetrics()).thenReturn(metrics);
+    when(mockScm.getConfiguration()).thenReturn(conf);
+    when(mockScm.getScmId()).thenReturn("follower");
+    when(division.getRaftConf()).thenReturn(raftConf);
+    when(raftConf.getCurrentPeers()).thenReturn(
+        Collections.singletonList(RaftPeer.newBuilder().setId(followerId).build()));
+    when(mockScm.isStopped()).thenAnswer(invocation -> scmStopped.get());
+    when(mockScm.getScmContext()).thenReturn(scmContext);
+    when(mockScm.getScmHAManager()).thenReturn(haManager);
+    when(mockScm.getDatanodeProtocolServer()).thenReturn(datanodeProtocolServer);
+    when(mockScm.getScmSafeModeManager()).thenReturn(safeModeManager);
     when(haManager.getRatisServer()).thenReturn(ratisServer);
     when(ratisServer.getDivision()).thenReturn(division);
     when(division.getInfo()).thenReturn(divisionInfo);
+    when(divisionInfo.getLifeCycleState()).thenAnswer(invocation -> divisionState.get());
     when(divisionInfo.getLeaderId()).thenReturn(leaderId);
     when(divisionInfo.getLastAppliedIndex()).thenAnswer(invocation -> lastAppliedIndex.get());
     when(division.getCommitInfos()).thenAnswer(invocation -> commitIndexAvailable.get()
@@ -145,7 +161,7 @@ public class TestSCMStateMachine {
     when(buffer.getLatestTrxInfo()).thenReturn(
         TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
 
-    stateMachine = new SCMStateMachine(scm, buffer, RETRY_INTERVAL, retryClock::get);
+    stateMachine = new SCMStateMachine(mockScm, buffer, RETRY_INTERVAL, retryClock::get);
   }
 
   @AfterEach
@@ -158,6 +174,36 @@ public class TestSCMStateMachine {
   void testRatisEventsRecording() {
     stateMachine.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
     assertTrue(metrics.getRatisEvents().contains("Configuration changed at term index"));
+  }
+
+  @Test
+  void testRatisShutdownTerminatesScmAfterTimeout() {
+    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+
+    verify(mockScm, after(300).never()).shutDown(anyString());
+    verify(mockScm, timeout(5000)).shutDown(anyString());
+  }
+
+  @Test
+  void testForcedExitWhenScmStopHangs() throws Exception {
+    ExitUtils.disableSystemExit();
+    ExitUtils.clear();
+    CountDownLatch release = new CountDownLatch(1);
+    try {
+      mockScm.getConfiguration().setTimeDuration("ozone.service.shutdown.timeout", 1, TimeUnit.SECONDS);
+      doAnswer(invocation -> {
+        release.await();
+        return null;
+      }).when(mockScm).shutDown(anyString());
+
+      stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+
+      GenericTestUtils.waitFor(ExitUtils::isTerminated, 100, 10_000);
+      verify(mockScm).shutDown(anyString());
+    } finally {
+      release.countDown();
+      ExitUtils.clear();
+    }
   }
 
   @Test

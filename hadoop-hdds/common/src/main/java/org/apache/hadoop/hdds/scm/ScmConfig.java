@@ -138,6 +138,20 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private int transactionToDNsCommitMapLimit = 5000000;
 
+  @Config(key = "hdds.scm.ratis.shutdown.timeout",
+      defaultValue = "60s",
+      type = ConfigType.TIME,
+      tags = { ConfigTag.SCM, ConfigTag.RATIS },
+      description =
+          "Time to wait after the SCM Ratis server starts shutting down on its own, for example after a"
+              + "long JVM pause, before SCM is terminated. Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration ratisShutdownTimeout = Duration.ofSeconds(60);
+
+  public Duration getRatisShutdownTimeout() {
+    return ratisShutdownTimeout;
+  }
+
   public int getTransactionToDNsCommitMapLimit() {
     return transactionToDNsCommitMapLimit;
   }
