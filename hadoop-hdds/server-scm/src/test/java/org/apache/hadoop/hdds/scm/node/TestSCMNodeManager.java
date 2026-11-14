@@ -2329,6 +2329,33 @@ public class TestSCMNodeManager {
     }
   }
 
+  @Test
+  public void testPipelineLimitExcludesFailedMetadataVolumes() throws IOException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 0);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME, 2);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 12);
+
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      DatanodeDetails dn = registerWithCapacity(nodeManager);
+      NodeReportProto healthyReport = HddsTestUtils.getRandomNodeReport(1, 2);
+      nodeManager.processNodeReport(dn, healthyReport);
+      assertEquals(4, nodeManager.pipelineLimit(dn));
+      assertEquals(3, nodeManager.openContainerLimit(Collections.singletonList(dn)));
+
+      NodeReportProto failedReport = healthyReport.toBuilder()
+          .setMetadataStorageReport(1, healthyReport.getMetadataStorageReport(1).toBuilder().setFailed(true))
+          .build();
+      nodeManager.processNodeReport(dn, failedReport);
+      assertEquals(2, nodeManager.pipelineLimit(dn));
+      assertEquals(6, nodeManager.openContainerLimit(Collections.singletonList(dn)));
+
+      nodeManager.processNodeReport(dn, healthyReport);
+      assertEquals(4, nodeManager.pipelineLimit(dn));
+      assertEquals(3, nodeManager.openContainerLimit(Collections.singletonList(dn)));
+    }
+  }
+
   /**
    * Test that pipelineLimit() uses the default value when the config is not set.
    */
