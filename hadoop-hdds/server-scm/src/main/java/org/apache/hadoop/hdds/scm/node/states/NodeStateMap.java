@@ -100,18 +100,24 @@ public class NodeStateMap {
   }
 
   /**
-   * Updates the node health state.
+   * Updates the node health state, but only if the node has not changed since the caller read it. That is, the map
+   * still holds the same {@link DatanodeInfo} object, and its health is still {@code health}. {@link #updateNode} puts
+   * a new {@link DatanodeInfo} in the map, so a decision made on the old one is not applied to the new one.
    *
-   * @param nodeId Node Id
+   * @param node the node as the caller read it
+   * @param health the health the caller read
    * @param newHealth new health state
-   *
+   * @return the new status, or null if the node has changed
    * @throws NodeNotFoundException if the node is not present
    */
-  public NodeStatus updateNodeHealthState(DatanodeID nodeId, NodeState newHealth)
+  public NodeStatus updateNodeHealthState(DatanodeInfo node, NodeState health, NodeState newHealth)
       throws NodeNotFoundException {
     lock.writeLock().lock();
     try {
-      final DatanodeInfo dn = getExisting(nodeId).getInfo();
+      final DatanodeInfo dn = getExisting(node.getID()).getInfo();
+      if (dn != node || dn.getNodeStatus().getHealth() != health) {
+        return null;
+      }
       final NodeStatus newStatus = dn.getNodeStatus().newNodeState(newHealth);
       dn.setNodeStatus(newStatus);
       return newStatus;
