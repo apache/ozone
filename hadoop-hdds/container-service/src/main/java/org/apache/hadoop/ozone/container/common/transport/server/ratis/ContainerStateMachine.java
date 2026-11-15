@@ -730,7 +730,10 @@ public class ContainerStateMachine extends BaseStateMachine {
               requestProto.getContainerID(), requestProto.getPipelineID(),
               requestProto.getTraceID());
     }
-    dispatchCommand(requestProto, context);  // stream init
+    final ContainerCommandResponseProto response = dispatchCommand(requestProto, context);  // stream init
+    if (response.getResult() != ContainerProtos.Result.SUCCESS) {
+      throw new StorageContainerException(response.getMessage(), response.getResult());
+    }
     final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock
         = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? this::streamPutBlock : null;
     return dispatcher.getStreamDataChannel(requestProto, putBlock);
