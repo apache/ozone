@@ -2034,6 +2034,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
+
     metadataManager.start(configuration);
 
     startSecretManagerIfNecessary();
@@ -2173,6 +2177,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.startSnapshotDirectoryMetrics(configuration, getMetadataManager());
 
     initializeRatisServer(false);
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    // Ratis must be initialized first so that upgrade actions (e.g. quota repair) can check leader status.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
     if (omRatisServer != null) {
       omRatisServer.start();
     }
@@ -4525,8 +4533,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmMultipartUploadListParts listParts(final String volumeName,
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
+    return listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts, false);
+  }
 
-    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+  public OmMultipartUploadListParts listParts(String volumeName, String bucketName, String keyName, String uploadID,
+      int partNumberMarker, int maxParts, boolean assumeS3Context) throws IOException {
+    String resolvedVolumeName = assumeS3Context ? getS3VolumeContext(true).getOmVolumeArgs().getVolume() : volumeName;
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(resolvedVolumeName, bucketName));
     final String realVolumeName = bucket.realVolume();
     final String realBucketName = bucket.realBucket();
 
@@ -4565,8 +4578,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String bucketName,
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws IOException {
+    return listMultipartUploads(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+        withPagination, false);
+  }
 
-    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OmMultipartUploadList listMultipartUploads(String volumeName, String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination, boolean assumeS3Context)
+      throws IOException {
+    String resolvedVolumeName = assumeS3Context ? getS3VolumeContext(true).getOmVolumeArgs().getVolume() : volumeName;
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(resolvedVolumeName, bucketName));
     final String realVolumeName = bucket.realVolume();
     final String realBucketName = bucket.realBucket();
 

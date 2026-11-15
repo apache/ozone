@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getNotLe
 import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getReadException;
 import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getReadIndexException;
 
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
@@ -31,6 +30,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.ratis.protocol.exceptions.ReadException;
 import org.apache.ratis.protocol.exceptions.ReadIndexException;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;

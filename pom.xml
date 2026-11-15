@@ -42,6 +42,7 @@
     <aws-java-sdk2.version>2.55.6</aws-java-sdk2.version>
     <ban-httpcomponents.skip>true</ban-httpcomponents.skip>
     <ban-rocksdb.skip>true</ban-rocksdb.skip>
+    <ban-unshaded-grpc.skip>true</ban-unshaded-grpc.skip>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.2</build-helper-maven-plugin.version>
@@ -2155,6 +2156,26 @@
                       <exclude>org.rocksdb:rocksdbjni</exclude>
                     </excludes>
                     <message>Ozone client artifacts must not depend on RocksDB, which adds about 85 MB of native libraries to them</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-unshaded-grpc</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <!-- enabled in the shaded filesystem module -->
+                <skip>${ban-unshaded-grpc.skip}</skip>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>io.grpc</exclude>
+                      <exclude>io.netty</exclude>
+                    </excludes>
+                    <message>The Ozone filesystem jar must use Ratis's shaded gRPC and Netty, not unshaded io.grpc / io.netty</message>
                   </bannedDependencies>
                 </rules>
               </configuration>

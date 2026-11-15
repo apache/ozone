@@ -21,7 +21,9 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
@@ -116,6 +118,40 @@ class TestWritableRatisContainerProvider {
         () -> createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
 
     verifyPipelineCreated();
+  }
+
+  @Test
+  void reportsMissingAllocatedPipelineIfNoReplacementIsAvailable() throws Exception {
+    Pipeline allocated = MockPipeline.createPipeline(3);
+    throwWhenCreatePipeline();
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, ALLOCATED, emptySet(), emptySet()))
+        .thenReturn(singletonList(allocated));
+    when(pipelineManager.waitOnePipelineReady(singletonList(allocated.getId()), 0))
+        .thenThrow(new PipelineNotFoundException("The input pipeline IDs " + allocated.getId() + " cannot be found"));
+
+    SCMException error = assertThrows(SCMException.class,
+        () -> createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
+
+    assertEquals(SCMException.ResultCodes.PIPELINE_NOT_FOUND, error.getResult());
+    assertEquals(PipelineNotFoundException.class, error.getCause().getClass());
+    verifyPipelineCreated();
+  }
+
+  @Test
+  void usesReplacementContainerEvenIfAllocatedPipelineDisappears() throws Exception {
+    Pipeline allocated = MockPipeline.createPipeline(3);
+    Pipeline replacementPipeline = MockPipeline.createPipeline(3);
+    ContainerInfo replacement = pipelineHasContainer(replacementPipeline);
+    throwWhenCreatePipeline();
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, ALLOCATED, emptySet(), emptySet()))
+        .thenReturn(singletonList(allocated));
+    when(pipelineManager.waitOnePipelineReady(singletonList(allocated.getId()), 0))
+        .thenThrow(new PipelineNotFoundException("missing"));
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
+        .thenReturn(emptyList(), singletonList(replacementPipeline));
+
+    assertSame(replacement,
+        createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
   }
 
   private void existingPipelines(Pipeline... pipelines) {
