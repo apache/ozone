@@ -124,7 +124,7 @@ public final class SCMContainerPlacementRackAware
     int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
     int unavailableNodesCount = countUnavailableNodes(usedNodes, excludedNodes);
     if (datanodeCount < nodesRequired + unavailableNodesCount) {
-      throw new SCMException("Not enough datanodes to choose. TotalNode = " + datanodeCount +
+      throw new SCMException("No enough datanodes to choose. TotalNode = " + datanodeCount +
           " RequiredNode = " + nodesRequired + " UnavailableNode = " + unavailableNodesCount +
           " (UsedNode = " + usedNodesCount + ", ExcludedNode = " + excludedNodesCount + ")", null);
     }
