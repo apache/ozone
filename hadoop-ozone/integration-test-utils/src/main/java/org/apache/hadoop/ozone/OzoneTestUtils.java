@@ -181,7 +181,8 @@ public final class OzoneTestUtils {
 
   /**
    * Shortens the time SCM keeps closed pipelines, for tests that wait for them to be removed.
-   * The destroy timeout must stay longer than the close container wait.
+   * Keeps the destroy timeout longer than the close container wait, following the comment on
+   * {@code ScmConfigKeys#OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT}.
    */
   public static void setFastPipelineScrub(OzoneConfiguration conf) {
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "1s");
