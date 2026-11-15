@@ -302,7 +302,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (container == null && container2BCSIDMap != null && container2BCSIDMap.containsKey(containerID)) {
         // The container was created over this pipeline and has been deleted since, eg. by a forced delete from SCM.
         // Do not recreate it: a write that SCM does not expect would make this replica diverge from the others.
-        // Look it up again first: a concurrent write may have just created it, which adds it to the map afterwards.
+        // Look it up again first: a concurrent write may have just created it. No lock is needed here: every path adds
+        // a container to the map only after it is in the container set (createContainer() adds it there under the
+        // container creation lock), so a map entry without a container means that the container was deleted since.
         container = getContainer(containerID);
         if (container == null) {
           StorageContainerException sce = new StorageContainerException("ContainerID " + containerID
