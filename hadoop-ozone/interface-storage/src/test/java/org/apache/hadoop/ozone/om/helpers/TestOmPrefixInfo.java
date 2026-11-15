@@ -141,6 +141,22 @@ public class TestOmPrefixInfo {
   }
 
   @Test
+  public void testGetFromProtobufWithUnknownOrNoRights() {
+    OzoneManagerStorageProtos.OzoneAclInfo acl = buildTestOzoneAclInfo("user:myuser:r");
+    OzoneManagerStorageProtos.PersistedPrefixInfo prefixInfo =
+        OzoneManagerStorageProtos.PersistedPrefixInfo.newBuilder()
+            .setName("/mypath/path")
+            .addAcls(acl.toBuilder().setRights(ByteString.copyFrom(new byte[] {1, 4})))
+            .addAcls(acl.toBuilder().setName("otheruser").setRights(ByteString.EMPTY))
+            .build();
+
+    OmPrefixInfo omPrefixInfo = OmPrefixInfo.getFromProtobuf(prefixInfo);
+
+    assertEquals(OzoneAcl.parseAcl("user:myuser:r"), omPrefixInfo.getAcls().get(0));
+    assertEquals(Collections.emptyList(), omPrefixInfo.getAcls().get(1).getAclList());
+  }
+
+  @Test
   public void testGetProtobuf() {
     String testPath = "/my/custom/path";
     String username = "myuser";

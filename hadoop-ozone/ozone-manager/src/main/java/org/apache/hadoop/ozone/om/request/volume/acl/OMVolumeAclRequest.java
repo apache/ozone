@@ -58,6 +58,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
+    checkAclRights(getAcls());
     OzoneManagerProtocolProtos.OMRequest omRequest = super.preExecute(ozoneManager);
 
     // ACL check during preExecute

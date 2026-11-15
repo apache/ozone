@@ -60,6 +60,12 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    checkAclRights(getAcls());
+    return super.preExecute(ozoneManager);
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long transactionLogIndex = context.getIndex();
 

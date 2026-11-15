@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -61,6 +62,12 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
     ozoneObj = OzoneObjInfo.fromProtobuf(removeAclRequest.getObj());
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(removeAclRequest.getAcl()));
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    checkAclRights(ozoneAcls);
+    return super.preExecute(ozoneManager);
   }
 
   @Override

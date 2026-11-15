@@ -21,10 +21,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.BucketRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -114,5 +116,17 @@ public class TestOMBucketAddAclRequest extends BucketRequestTests {
     // The bucket is not created.
     assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omResponse.getStatus());
+  }
+
+  @Test
+  public void testRejectUnknownAclRights() throws Exception {
+    OMRequest omRequest = OMRequestTestUtils.createBucketAddAclRequest(
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), OMRequestTestUtils.aclWithUnknownRights());
+    OMBucketAddAclRequest request = new OMBucketAddAclRequest(omRequest);
+    OMException e = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+
+    OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 1);
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND, response.getOMResponse().getStatus());
   }
 }

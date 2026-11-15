@@ -22,6 +22,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.when;
 
+import com.google.protobuf.ByteString;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +30,7 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -85,6 +87,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadCompleteRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -1155,6 +1158,31 @@ public final class OMRequestTestUtils {
         .setCompleteMultiPartUploadRequest(multipartUploadCompleteRequest)
         .build();
 
+  }
+
+  /**
+   * @return malformed ACLs: a USER ACL without a name, a WORLD ACL with a user name, rights longer than 4 bytes,
+   * and unknown rights
+   */
+  public static List<OzoneAclInfo> invalidAcls() {
+    return Arrays.asList(
+        invalidAcl(OzoneAclInfo.OzoneAclType.USER, "", new byte[] {1}),
+        invalidAcl(OzoneAclInfo.OzoneAclType.WORLD, "user1", new byte[] {1}),
+        invalidAcl(OzoneAclInfo.OzoneAclType.USER, "user1", new byte[] {1, 0, 0, 0, 1}),
+        invalidAcl(OzoneAclInfo.OzoneAclType.USER, "user1", new byte[] {0, 4}),
+        invalidAcl(OzoneAclInfo.OzoneAclType.USER, "user1", new byte[] {1, 0, 1}));
+  }
+
+  /**
+   * @return a USER ACL with READ and a right that is not a known ACL type
+   */
+  public static OzoneAcl aclWithUnknownRights() {
+    return OzoneAcl.fromProtobuf(invalidAcl(OzoneAclInfo.OzoneAclType.USER, "user1", new byte[] {1, 4}));
+  }
+
+  private static OzoneAclInfo invalidAcl(OzoneAclInfo.OzoneAclType type, String name, byte[] rights) {
+    return OzoneAclInfo.newBuilder().setType(type).setName(name).setRights(ByteString.copyFrom(rights))
+        .setAclScope(OzoneAclInfo.OzoneAclScope.ACCESS).build();
   }
 
   /**

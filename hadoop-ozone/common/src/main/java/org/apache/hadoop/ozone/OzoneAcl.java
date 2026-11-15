@@ -59,6 +59,8 @@ import org.apache.ratis.util.MemoizedSupplier;
 @Immutable
 public final class OzoneAcl {
 
+  private static final int KNOWN_ACL_BITS = (int) ((1L << ACLType.values().length) - 1);
+
   private static final String ACL_SCOPE_REGEX = ".*\\[(ACCESS|DEFAULT)\\]";
   /**
    * Link bucket default acl defined [world::rw]
@@ -233,7 +235,7 @@ public final class OzoneAcl {
   public static OzoneAcl fromProtobuf(OzoneAclInfo protoAcl) {
     final byte[] bytes = protoAcl.getRights().toByteArray();
     if (bytes.length > 4) {
-      throw new AssertionError("Expected at most 4 bytes but got " + bytes.length);
+      throw new IllegalArgumentException("Expected at most 4 bytes but got " + bytes.length);
     }
     int aclRights = 0;
     for (int i = 0; i < bytes.length; i++) {
@@ -311,6 +313,13 @@ public final class OzoneAcl {
     final byte second = (byte) (aclBits >>> 8);
     final byte[] bytes = second != 0 ? new byte[]{first, second} : new byte[]{first};
     return UnsafeByteOperations.unsafeWrap(bytes);
+  }
+
+  /**
+   * @return true if the rights include bits that are not a known {@link ACLType}
+   */
+  public boolean hasUnknownRights() {
+    return (aclBits & ~KNOWN_ACL_BITS) != 0;
   }
 
   @JsonIgnore

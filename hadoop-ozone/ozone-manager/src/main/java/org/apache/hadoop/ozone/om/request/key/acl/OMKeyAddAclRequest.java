@@ -63,6 +63,7 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    checkAclRights(ozoneAcls);
     final OMRequest omRequest = super.preExecute(ozoneManager);
 
     final long modificationTime = Time.now();

@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -324,6 +325,36 @@ public class TestOMVolumeCreateRequest extends OMVolumeRequestTests {
       assertFalse(aclList.contains(OzoneAcl.parseAcl(acl)));
     } else {
       assertTrue(aclList.contains(OzoneAcl.parseAcl(acl)));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testInvalidAcl(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+    for (OzoneAclInfo acl : OMRequestTestUtils.invalidAcls()) {
+      String volumeName = UUID.randomUUID().toString();
+      OMRequest.Builder request = OMRequestTestUtils.createVolumeRequest(volumeName, "user1", "user1").toBuilder();
+      request.getCreateVolumeRequestBuilder().getVolumeInfoBuilder().addVolumeAcls(acl);
+      if (ignoreClientACLs) {
+        OMRequest modifiedRequest = new OMVolumeCreateRequest(request.build()).preExecute(ozoneManager);
+        OMClientResponse response =
+            new OMVolumeCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 1);
+        assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+        assertNotNull(omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(volumeName)));
+        continue;
+      }
+      OMException e = assertThrows(OMException.class,
+          () -> new OMVolumeCreateRequest(request.build()).preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+
+      OMRequest validRequest = OMRequestTestUtils.createVolumeRequest(volumeName, "user1", "user1");
+      OMRequest.Builder modifiedRequest = new OMVolumeCreateRequest(validRequest).preExecute(ozoneManager).toBuilder();
+      modifiedRequest.getCreateVolumeRequestBuilder().getVolumeInfoBuilder().addVolumeAcls(acl);
+      OMClientResponse response =
+          new OMVolumeCreateRequest(modifiedRequest.build()).validateAndUpdateCache(ozoneManager, 1);
+      assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST, response.getOMResponse().getStatus());
+      assertNull(omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(volumeName)));
     }
   }
 
