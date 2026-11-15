@@ -52,6 +52,7 @@ class TestXceiverServerGrpcMetrics {
     XceiverServerGrpcMetrics metrics = XceiverServerGrpcMetrics.create(readExecutor, "test-datanode");
     try {
       ServerTransportFilter transportFilter = metrics.newTransportFilter();
+      transportFilter.transportTerminated(null);
       transportFilter.transportReady(Attributes.EMPTY);
       transportFilter.transportReady(Attributes.EMPTY);
       transportFilter.transportTerminated(Attributes.EMPTY);

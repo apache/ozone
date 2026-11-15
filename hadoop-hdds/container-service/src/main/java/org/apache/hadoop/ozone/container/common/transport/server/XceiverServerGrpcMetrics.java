@@ -68,7 +68,9 @@ public final class XceiverServerGrpcMetrics implements MetricsSource {
 
       @Override
       public void transportTerminated(Attributes transportAttrs) {
-        activeClientConnections.decrementAndGet();
+        if (transportAttrs != null) {
+          activeClientConnections.decrementAndGet();
+        }
       }
     };
   }
