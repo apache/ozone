@@ -50,7 +50,7 @@ A counter is omitted when its total is 0 (e.g. a method with no branches), so a
 missing counter means n/a, not 0% coverage.
 
 Every level carries its own aggregated <counter> elements, so we read the direct
-children of <report> instead of summing.
+children of <report> and of each <package> instead of summing.
 """
 import argparse
 import dataclasses
@@ -112,10 +112,11 @@ def read_counters(elem):
 
 def parse_report(xml_path):
   root = ET.parse(xml_path).getroot()
-  return Coverage("", read_counters(root))
+  packages = [Coverage(p.get("name", "").replace("/", "."), read_counters(p)) for p in root.findall("package")]
+  return Coverage("", read_counters(root)), packages
 
 
-def render_summary(overall):
+def render_summary(overall, packages):
   lines, branches = overall.counter(JACOCO_LINE), overall.counter(JACOCO_BRANCH)
   out = ["## Coverage Summary", ""]
   out.append(f"**Overall coverage: {overall.combined}** (lines and branches combined, same formula as SonarCloud)")
@@ -131,6 +132,15 @@ def render_summary(overall):
   report_url = os.environ.get("COVERAGE_REPORT_URL")
   if report_url:
     out.extend([f"📦 Full HTML report: [download artifact]({report_url})", ""])
+  if packages:
+    out.extend([f"<details><summary><b>Coverage by package ({len(packages)})</b></summary>", ""])
+    out.append("|Package|Coverage|Lines|Missed lines|Branches|Missed branches|")
+    out.append("|---|---|---|---|---|---|")
+    for p in sorted(packages, key=lambda p: (-p.missed, p.name)):
+      p_line, p_branch = p.counter(JACOCO_LINE), p.counter(JACOCO_BRANCH)
+      out.append(f"|{p.name}|{p.combined}|{percent(p_line.covered, p_line.total)}|{p_line.missed}|"
+                 f"{percent(p_branch.covered, p_branch.total)}|{p_branch.missed}|")
+    out.extend(["", "</details>", ""])
   return "\n".join(out) + "\n"
 
 
@@ -139,8 +149,8 @@ def main(argv=None):
   parser.add_argument("--report", default=DEFAULT_REPORT, help="path to the JaCoCo XML report")
   args = parser.parse_args(argv)
 
-  overall = parse_report(args.report)
-  print(render_summary(overall), end="")
+  overall, packages = parse_report(args.report)
+  print(render_summary(overall, packages), end="")
   return 0
 
 

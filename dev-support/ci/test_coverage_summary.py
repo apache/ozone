@@ -60,6 +60,13 @@ SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <counter type="METHOD" missed="3" covered="68"/>
     <counter type="CLASS" missed="0" covered="11"/>
   </package>
+  <package name="org/apache/ozone/hdfs/web">
+    <counter type="INSTRUCTION" missed="0" covered="11"/>
+    <counter type="LINE" missed="0" covered="2"/>
+    <counter type="COMPLEXITY" missed="0" covered="1"/>
+    <counter type="METHOD" missed="0" covered="1"/>
+    <counter type="CLASS" missed="0" covered="1"/>
+  </package>
   <counter type="INSTRUCTION" missed="115391" covered="603867"/>
   <counter type="BRANCH" missed="14856" covered="40462"/>
   <counter type="LINE" missed="27270" covered="148570"/>
@@ -90,16 +97,36 @@ class TestPercent(unittest.TestCase):
 
 class TestParseReport(unittest.TestCase):
   def test_overall_counters(self):
-    overall = parse_sample()
+    overall, _ = parse_sample()
     lines = overall.counter(coverage_summary.JACOCO_LINE)
     self.assertEqual((lines.missed, lines.covered, lines.total), (27270, 148570, 175840))
     self.assertEqual(overall.counter(coverage_summary.JACOCO_CLASS).missed, 210)
     self.assertEqual(overall.counter("NO_SUCH_TYPE").total, 0)
 
+  def test_packages_counters(self):
+    _, packages = parse_sample()
+    by_name = {p.name: p for p in packages}
+    self.assertEqual(sorted(by_name),
+                     ["org.apache.hadoop.ozone.recon.persistence", "org.apache.ozone.hdfs.web"])
+    package_persistence = by_name["org.apache.hadoop.ozone.recon.persistence"]
+    self.assertEqual(package_persistence.counter(coverage_summary.JACOCO_LINE).missed, 75)
+    self.assertEqual(package_persistence.missed, 75 + 34)
+    package_web = by_name["org.apache.ozone.hdfs.web"]
+    self.assertEqual(package_web.counter(coverage_summary.JACOCO_BRANCH).total, 0)
+    self.assertEqual(package_web.missed, 0)
+
+  def test_combined_uses_sonar_formula(self):
+    _, packages = parse_sample()
+    by_name = {p.name: p for p in packages}
+    # (286 + 54) / (361 + 88)
+    self.assertEqual(by_name["org.apache.hadoop.ozone.recon.persistence"].combined, "75.7%")
+    # no branches: falls back to line coverage, 2 / 2
+    self.assertEqual(by_name["org.apache.ozone.hdfs.web"].combined, "100.0%")
+
 
 class TestRenderSummary(unittest.TestCase):
   def render(self):
-    return coverage_summary.render_summary(parse_sample())
+    return coverage_summary.render_summary(*parse_sample())
 
   def table_rows(self, text):
     return [line for line in text.splitlines() if line.startswith("|") and not line.startswith("|---")]
@@ -110,9 +137,9 @@ class TestRenderSummary(unittest.TestCase):
     # (covered_lines + covered_branches)/(total_lines + total_branches)
     self.assertIn("**Overall coverage: 81.8%**", out)
     rows = self.table_rows(out)
-    self.assertEqual(rows, ["|Counter|Coverage|Missed|Total|",
-                            "|Lines|84.5%|27270|175840|",
-                            "|Branches|73.1%|14856|55318|"])
+    self.assertEqual(rows[:3], ["|Counter|Coverage|Missed|Total|",
+                                "|Lines|84.5%|27270|175840|",
+                                "|Branches|73.1%|14856|55318|"])
     self.assertIn("\nUntested: 4369 methods, 210 classes\n", out)
 
   def test_report_url(self):
@@ -120,6 +147,22 @@ class TestRenderSummary(unittest.TestCase):
       self.assertIn("📦 Full HTML report: [download artifact](https://example.com/artifact)", self.render())
     with mock.patch.dict(os.environ, {}, clear=True):
       self.assertNotIn("📦 Full HTML report: [download artifact]", self.render())
+
+  def test_package_table_sorted_by_missed(self):
+    out = self.render()
+    self.assertIn("<details><summary><b>Coverage by package (2)</b></summary>\n\n|Package|", out)
+    rows = self.table_rows(out)[3:]
+    # most untested code first: persistence misses 75 lines + 34 branches, web misses 0 lines
+    self.assertEqual(rows, ["|Package|Coverage|Lines|Missed lines|Branches|Missed branches|",
+                            "|org.apache.hadoop.ozone.recon.persistence|75.7%|79.2%|75|61.4%|34|",
+                            "|org.apache.ozone.hdfs.web|100.0%|100.0%|0|n/a|0|"])
+    self.assertTrue(out.endswith("|\n\n</details>\n\n"))
+
+  def test_no_packages(self):
+    overall, _ = parse_sample()
+    out = coverage_summary.render_summary(overall, [])
+    self.assertNotIn("<details>", out)
+    self.assertTrue(out.endswith("\nUntested: 4369 methods, 210 classes\n\n"))
 
 
 class TestMain(unittest.TestCase):
