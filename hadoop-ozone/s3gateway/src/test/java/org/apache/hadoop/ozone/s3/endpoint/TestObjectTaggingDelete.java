@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -44,6 +45,7 @@ import java.io.IOException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -87,16 +89,40 @@ public class TestObjectTaggingDelete {
   }
 
   @Test
-  public void testDeleteTaggingWithoutBucketLookup() throws Exception {
+  public void testDeleteTaggingWithoutVolumeOrBucketLookup() throws Exception {
     OzoneVolume volume = mock(OzoneVolume.class);
     ClientProtocol protocol = mock(ClientProtocol.class);
     ObjectEndpoint endpoint = createObjectEndpoint(protocol, volume, BUCKET_NAME);
 
     deleteTagging(endpoint, BUCKET_NAME, KEY_WITH_TAG);
 
+    verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
+    verify(protocol, never()).getS3VolumeContext();
     verify(volume, never()).getBucket(anyString());
     verify(protocol, never()).getBucketDetails(any(), anyString());
-    verify(protocol).deleteObjectTagging("s3Volume", BUCKET_NAME, KEY_WITH_TAG);
+    verify(protocol).deleteObjectTagging(null, BUCKET_NAME, KEY_WITH_TAG);
+  }
+
+  @Test
+  public void testDeleteTaggingReusesVolumeForExpectedOwner() throws Exception {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    ClientProtocol protocol = mock(ClientProtocol.class);
+    ObjectEndpoint original = createObjectEndpoint(protocol, volume, BUCKET_NAME);
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(protocol.getBucketDetails(null, BUCKET_NAME)).thenReturn(bucket);
+    when(bucket.getOwner()).thenReturn("owner");
+    when(bucket.getVolumeName()).thenReturn("tenant-volume");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(original.getClient()).setHeaders(headers).build();
+
+    assertEquals(HTTP_NO_CONTENT, deleteTagging(endpoint, BUCKET_NAME, KEY_WITH_TAG).getStatus());
+
+    verify(protocol).getBucketDetails(null, BUCKET_NAME);
+    verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
+    verify(protocol, never()).getS3VolumeContext();
+    verify(protocol).deleteObjectTagging("tenant-volume", BUCKET_NAME, KEY_WITH_TAG);
   }
 
   @Test
@@ -140,20 +166,17 @@ public class TestObjectTaggingDelete {
   public void testDeleteObjectTaggingNotImplemented() throws Exception {
     OzoneClient mockClient = mock(OzoneClient.class);
     ObjectStore mockObjectStore = mock(ObjectStore.class);
-    OzoneVolume mockVolume = mock(OzoneVolume.class);
     ClientProtocol protocol = mock(ClientProtocol.class);
 
     when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
-    when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
     when(mockObjectStore.getClientProxy()).thenReturn(protocol);
     when(mockClient.getProxy()).thenReturn(protocol);
-    when(mockVolume.getName()).thenReturn("s3Volume");
 
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(mockClient)
         .build();
     doThrow(new OMException("DeleteObjectTagging is not currently supported for FSO directory",
-        ResultCodes.NOT_SUPPORTED_OPERATION)).when(protocol).deleteObjectTagging("s3Volume", "fsoBucket", "dir/");
+        ResultCodes.NOT_SUPPORTED_OPERATION)).when(protocol).deleteObjectTagging(null, "fsoBucket", "dir/");
 
     assertErrorResponse(NOT_IMPLEMENTED, () -> deleteTagging(endpoint, "fsoBucket", "dir/"));
   }

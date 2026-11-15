@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +52,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -1426,6 +1428,26 @@ public class TestKeyValueHandler {
 
   private static DispatcherContext newShortCircuitContext() {
     return DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ).build();
+  }
+
+  @Test
+  public void testReadBlockCancellationIsNotAContainerFailure() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, 1024);
+      ContainerCommandRequestProto request = ContainerCommandRequestProto.newBuilder()
+          .setCmdType(ContainerProtos.Type.ReadBlock)
+          .setContainerID(fixture.container.getContainerData().getContainerID())
+          .setDatanodeUuid(DATANODE_UUID)
+          .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+              .setBlockID(fixture.blockID.getDatanodeBlockIDProtobuf()).setOffset(0).setLength(1024))
+          .build();
+      @SuppressWarnings("unchecked")
+      StreamObserver<ContainerCommandResponseProto> observer = mock(StreamObserver.class);
+      doThrow(Status.CANCELLED.asRuntimeException()).when(observer).onNext(any());
+
+      assertThrows(StatusRuntimeException.class,
+          () -> fixture.kvHandler.readBlock(request, fixture.container, fixture.blockFile, observer));
+    }
   }
 
   @Test

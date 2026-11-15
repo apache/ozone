@@ -283,7 +283,6 @@ Apache License 2.0
    com.github.jnr:jffi
    com.github.stephenc.jcip:jcip-annotations
    com.google.android:annotations
-   com.google.api.grpc:proto-google-common-protos
    com.google.code.gson:gson
    com.google.errorprone:error_prone_annotations
    com.google.guava:failureaccess
@@ -320,26 +319,11 @@ Apache License 2.0
    info.picocli:picocli-shell-jline3
    io.airlift:aircompressor
    io.dropwizard.metrics:metrics-core
-   io.grpc:grpc-api
-   io.grpc:grpc-context
-   io.grpc:grpc-core
-   io.grpc:grpc-netty
-   io.grpc:grpc-protobuf
-   io.grpc:grpc-protobuf-lite
-   io.grpc:grpc-stub
-   io.grpc:grpc-util
    io.netty:netty-buffer
    io.netty:netty-codec
-   io.netty:netty-codec-http
-   io.netty:netty-codec-http2
-   io.netty:netty-codec-socks
    io.netty:netty-common
    io.netty:netty-handler
-   io.netty:netty-handler-proxy
    io.netty:netty-resolver
-   io.netty:netty-tcnative
-   io.netty:netty-tcnative-boringssl-static
-   io.netty:netty-tcnative-classes
    io.netty:netty-transport
    io.netty:netty-transport-classes-epoll
    io.netty:netty-transport-native-epoll
@@ -358,7 +342,6 @@ Apache License 2.0
    io.opentelemetry:opentelemetry-sdk-logs
    io.opentelemetry:opentelemetry-sdk-metrics
    io.opentelemetry:opentelemetry-sdk-trace
-   io.perfmark:perfmark-api
    io.prometheus:simpleclient
    io.prometheus:simpleclient_common
    io.prometheus:simpleclient_dropwizard
@@ -493,7 +476,6 @@ MIT
    org.bouncycastle:bcpkix-jdk18on
    org.bouncycastle:bcprov-jdk18on
    org.bouncycastle:bcutil-jdk18on
-   org.codehaus.mojo:animal-sniffer-annotations
    org.slf4j:jcl-over-slf4j
    org.slf4j:jul-to-slf4j
    org.slf4j:slf4j-api

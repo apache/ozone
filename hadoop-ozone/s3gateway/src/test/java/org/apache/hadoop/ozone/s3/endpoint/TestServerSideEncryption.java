@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getObjectAttributes;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
@@ -32,6 +33,9 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_ALGORITHM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_KEY_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_KEY_MD5_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CONTEXT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_ALGORITHM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_KEY_HEADER;
@@ -39,6 +43,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_KEY_MD5_HEAD
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_KMS_KEY_ID_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -49,15 +54,20 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -283,6 +293,129 @@ public class TestServerSideEncryption {
       assertEquals(200, response.getStatus());
       assertEquals(AWS_KMS, response.getHeaderString(SSE_HEADER));
       assertEquals(BUCKET_KEY, response.getHeaderString(SSE_KMS_KEY_ID_HEADER));
+    }
+  }
+
+  /** Asserts the SSE headers that GetObject and HeadObject return for {@code key}. */
+  private void assertReadReports(String bucket, String key, String algorithm, String kmsKeyId) throws IOException {
+    // the read requests carry no SSE headers
+    setHeader(SSE_HEADER, null);
+    setHeader(SSE_KMS_KEY_ID_HEADER, null);
+    setHeader(COPY_SOURCE_HEADER, null);
+    setHeader(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER, null);
+    try (Response getResponse = get(objectEndpoint, bucket, key);
+         Response headResponse = objectEndpoint.head(bucket, key)) {
+      for (Response response : new Response[] {getResponse, headResponse}) {
+        assertEquals(200, response.getStatus());
+        assertEquals(algorithm, response.getHeaderString(SSE_HEADER));
+        assertEquals(kmsKeyId, response.getHeaderString(SSE_KMS_KEY_ID_HEADER));
+        // the stored algorithm is not returned as user metadata
+        assertThat(response.getStringHeaders().keySet())
+            .noneMatch(name -> name.contains(RESERVED_USER_METADATA_KEY_PREFIX));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", AES256, AWS_KMS})
+  public void readOfEncryptedObjectReportsItsEncryption(String writeAlgorithm) throws IOException {
+    if (!writeAlgorithm.isEmpty()) {
+      setHeader(SSE_HEADER, writeAlgorithm);
+    }
+    put(objectEndpoint, ENCRYPTED, KEY_NAME, CONTENT).close();
+
+    // the algorithm of the write, aws:kms with the bucket key if the write did not ask for encryption
+    if (AES256.equals(writeAlgorithm)) {
+      assertReadReports(ENCRYPTED, KEY_NAME, AES256, null);
+    } else {
+      assertReadReports(ENCRYPTED, KEY_NAME, AWS_KMS, BUCKET_KEY);
+    }
+  }
+
+  @Test
+  public void readOfPlainObjectReportsNoEncryption() throws IOException {
+    put(objectEndpoint, PLAIN, KEY_NAME, CONTENT).close();
+
+    assertReadReports(PLAIN, KEY_NAME, null, null);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", AES256})
+  public void multipartObjectReportsEncryptionOfItsUpload(String writeAlgorithm) throws IOException {
+    if (!writeAlgorithm.isEmpty()) {
+      setHeader(SSE_HEADER, writeAlgorithm);
+    }
+    final String uploadId = initiateMultipartUpload(objectEndpoint, ENCRYPTED, KEY_NAME);
+    setHeader(SSE_HEADER, null);
+    completeMultipartUpload(objectEndpoint, ENCRYPTED, KEY_NAME, uploadId,
+        Collections.singletonList(uploadPart(objectEndpoint, ENCRYPTED, KEY_NAME, 1, uploadId, CONTENT)));
+    objectEndpoint.queryParamsForTest().unset(QueryParams.UPLOAD_ID);
+    objectEndpoint.queryParamsForTest().unset(QueryParams.PART_NUMBER);
+
+    final String algorithm = writeAlgorithm.isEmpty() ? AWS_KMS : writeAlgorithm;
+    final String kmsKeyId = writeAlgorithm.isEmpty() ? BUCKET_KEY : null;
+    assertReadReports(ENCRYPTED, KEY_NAME, algorithm, kmsKeyId);
+    objectEndpoint.queryParamsForTest().setInt(QueryParams.PART_NUMBER, 1);
+    assertReadReports(ENCRYPTED, KEY_NAME, algorithm, kmsKeyId);
+  }
+
+  /** A copy reports the algorithm of the copy request, not the one its source was written with. */
+  @ParameterizedTest
+  @CsvSource({"AES256,,COPY", "AES256,aws:kms,COPY", "AES256,,REPLACE", "aws:kms,AES256,COPY",
+      "aws:kms,AES256,REPLACE"})
+  public void copyReportsEncryptionOfTheCopyRequest(String sourceAlgorithm, String copyAlgorithm, String directive)
+      throws IOException {
+    setHeader(SSE_HEADER, sourceAlgorithm);
+    put(objectEndpoint, ENCRYPTED, KEY_NAME, CONTENT).close();
+    setHeader(SSE_HEADER, copyAlgorithm);
+    setHeader(COPY_SOURCE_HEADER, ENCRYPTED + "/" + KEY_NAME);
+    setHeader(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER, directive);
+    put(objectEndpoint, ENCRYPTED, "copy", CONTENT).close();
+
+    if (AES256.equals(copyAlgorithm)) {
+      assertReadReports(ENCRYPTED, "copy", AES256, null);
+    } else {
+      assertReadReports(ENCRYPTED, "copy", AWS_KMS, BUCKET_KEY);
+    }
+    // the source is unchanged
+    if (AES256.equals(sourceAlgorithm)) {
+      assertReadReports(ENCRYPTED, KEY_NAME, AES256, null);
+    } else {
+      assertReadReports(ENCRYPTED, KEY_NAME, AWS_KMS, BUCKET_KEY);
+    }
+  }
+
+  /**
+   * User metadata {@code x-amz-server-side-encryption} written before the algorithm was stored is still returned as
+   * user metadata, and not read as the algorithm.
+   */
+  @Test
+  public void userMetadataNamedLikeTheHeaderWrittenBeforeIsKept() throws IOException {
+    put(objectEndpoint, ENCRYPTED, KEY_NAME, CONTENT).close();
+    ((OzoneBucketStub) encryptedBucket).putKeyMetadataForTest(KEY_NAME, SSE_HEADER, AES256);
+
+    assertReadReports(ENCRYPTED, KEY_NAME, AWS_KMS, BUCKET_KEY);
+    try (Response response = get(objectEndpoint, ENCRYPTED, KEY_NAME)) {
+      assertEquals(AES256, response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + SSE_HEADER));
+    }
+  }
+
+  /** User metadata with the name of the SSE header is kept apart from the stored algorithm, in any bucket. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void userMetadataNamedLikeTheAlgorithmIsKept(boolean encrypted) throws IOException {
+    final MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + SSE_HEADER, "user-value");
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+    final String bucket = encrypted ? ENCRYPTED : PLAIN;
+    if (encrypted) {
+      setHeader(SSE_HEADER, AES256);
+    }
+    put(objectEndpoint, bucket, KEY_NAME, CONTENT).close();
+
+    assertReadReports(bucket, KEY_NAME, encrypted ? AES256 : null, null);
+    try (Response response = get(objectEndpoint, bucket, KEY_NAME)) {
+      assertEquals("user-value", response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + SSE_HEADER));
     }
   }
 }

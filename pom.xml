@@ -40,10 +40,15 @@
     <aspectj.java8.version>1.9.7</aspectj.java8.version>
     <assertj.version>3.27.7</assertj.version>
     <aws-java-sdk2.version>2.55.6</aws-java-sdk2.version>
+    <ban-httpcomponents.skip>true</ban-httpcomponents.skip>
+    <ban-rocksdb.skip>true</ban-rocksdb.skip>
+    <ban-unshaded-grpc.skip>true</ban-unshaded-grpc.skip>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.2</build-helper-maven-plugin.version>
     <byte-buddy.version>1.18.15</byte-buddy.version>
+    <!-- 2.x: the last line that runs on Java 8, which the client modules target -->
+    <caffeine.version>2.9.3</caffeine.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
@@ -371,6 +376,18 @@
         <groupId>com.fasterxml.woodstox</groupId>
         <artifactId>woodstox-core</artifactId>
         <version>${woodstox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- annotations only, not shipped -->
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -2073,7 +2090,6 @@
                     <allowedImports>
                       <!-- Allow non-RocksObject classes. -->
                       <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
-                      <allowedImport>org.rocksdb.CompactRangeOptions.BottommostLevelCompaction</allowedImport>
                       <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
                       <allowedImport>org.rocksdb.KeyMayExist</allowedImport>
                       <allowedImport>org.rocksdb.HistogramData</allowedImport>
@@ -2121,6 +2137,64 @@
                       <exclude>com.amazonaws</exclude>
                     </excludes>
                     <message>AWS SDK for Java v1 is end of life, use AWS SDK for Java v2 (software.amazon.awssdk)</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-rocksdb</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <!-- enabled in client modules -->
+                <skip>${ban-rocksdb.skip}</skip>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>org.rocksdb:rocksdbjni</exclude>
+                    </excludes>
+                    <message>Ozone client artifacts must not depend on RocksDB, which adds about 85 MB of native libraries to them</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-unshaded-grpc</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <!-- enabled in the shaded filesystem module -->
+                <skip>${ban-unshaded-grpc.skip}</skip>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>io.grpc</exclude>
+                      <exclude>io.netty</exclude>
+                    </excludes>
+                    <message>The Ozone filesystem jar must use Ratis's shaded gRPC and Netty, not unshaded io.grpc / io.netty</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-httpcomponents</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <!-- enabled in the shaded filesystem module; unshaded client modules get httpclient from Hadoop -->
+                <skip>${ban-httpcomponents.skip}</skip>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>org.apache.httpcomponents</exclude>
+                    </excludes>
+                    <message>The Ozone filesystem jar must not bundle Apache HttpComponents, use java.net.URI instead</message>
                   </bannedDependencies>
                 </rules>
               </configuration>
@@ -2203,6 +2277,17 @@
                     <reason>AWS SDK for Java v1 is end of life, use AWS SDK for Java v2 (software.amazon.awssdk)</reason>
                     <bannedImports>
                       <bannedImport>com.amazonaws.**</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use Caffeine (com.github.benmanes.caffeine.cache), as Guava recommends</reason>
+                    <bannedImports>
+                      <bannedImport>com.google.common.cache.**</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
