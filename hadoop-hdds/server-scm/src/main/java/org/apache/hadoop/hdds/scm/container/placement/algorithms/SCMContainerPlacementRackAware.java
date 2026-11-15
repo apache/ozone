@@ -122,11 +122,11 @@ public final class SCMContainerPlacementRackAware
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
-    if (datanodeCount < nodesRequired + countUnavailableNodes(usedNodes, excludedNodes)) {
-      throw new SCMException("No enough datanodes to choose. " +
-          "TotalNode = " + datanodeCount + " RequiredNode = " + nodesRequired +
-          " ExcludedNode = " + excludedNodesCount +
-          " UsedNode = " + usedNodesCount, null);
+    int unavailableNodesCount = countUnavailableNodes(usedNodes, excludedNodes);
+    if (datanodeCount < nodesRequired + unavailableNodesCount) {
+      throw new SCMException("Not enough datanodes to choose. TotalNode = " + datanodeCount +
+          " RequiredNode = " + nodesRequired + " UnavailableNode = " + unavailableNodesCount +
+          " (UsedNode = " + usedNodesCount + ", ExcludedNode = " + excludedNodesCount + ")", null);
     }
     List<DatanodeDetails> mutableFavoredNodes = favoredNodes;
     // sanity check of favoredNodes
@@ -258,10 +258,12 @@ public final class SCMContainerPlacementRackAware
   }
 
   private static int countUnavailableNodes(List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes) {
-    Set<DatanodeDetails> unavailableNodes = new HashSet<>(usedNodes);
-    if (excludedNodes != null) {
-      unavailableNodes.addAll(excludedNodes);
+    if (excludedNodes.isEmpty()) {
+      return usedNodes.size();
     }
+    Set<DatanodeDetails> unavailableNodes = new HashSet<>(usedNodes.size() + excludedNodes.size(), 1);
+    unavailableNodes.addAll(usedNodes);
+    unavailableNodes.addAll(excludedNodes);
     return unavailableNodes.size();
   }
 
