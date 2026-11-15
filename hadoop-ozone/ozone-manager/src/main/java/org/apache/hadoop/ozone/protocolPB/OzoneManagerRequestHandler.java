@@ -260,12 +260,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case ListMultiPartUploadParts:
         MultipartUploadListPartsResponse listPartsResponse =
-            listParts(request.getListMultipartUploadPartsRequest());
+            listParts(request.getListMultipartUploadPartsRequest(), request.getAssumeS3Context());
         responseBuilder.setListMultipartUploadPartsResponse(listPartsResponse);
         break;
       case ListMultipartUploads:
         ListMultipartUploadsResponse response =
-            listMultipartUploads(request.getListMultipartUploadsRequest());
+            listMultipartUploads(request.getListMultipartUploadsRequest(), request.getAssumeS3Context());
         responseBuilder.setListMultipartUploadsResponse(response);
         break;
       case ListOpenFiles:
@@ -1042,7 +1042,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private MultipartUploadListPartsResponse listParts(
-      MultipartUploadListPartsRequest multipartUploadListPartsRequest)
+      MultipartUploadListPartsRequest multipartUploadListPartsRequest, boolean assumeS3Context)
       throws IOException {
 
     MultipartUploadListPartsResponse.Builder response =
@@ -1054,7 +1054,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             multipartUploadListPartsRequest.getKey(),
             multipartUploadListPartsRequest.getUploadID(),
             multipartUploadListPartsRequest.getPartNumbermarker(),
-            multipartUploadListPartsRequest.getMaxParts());
+            multipartUploadListPartsRequest.getMaxParts(), assumeS3Context);
 
     List<OmPartInfo> omPartInfoList =
         omMultipartUploadListParts.getPartInfoList();
@@ -1086,12 +1086,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListMultipartUploadsResponse listMultipartUploads(
-      ListMultipartUploadsRequest request)
+      ListMultipartUploadsRequest request, boolean assumeS3Context)
       throws IOException {
 
-    OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(request.getVolume(), request.getBucket(),
-        request.getPrefix(),
-        request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads(), request.getWithPagination());
+    OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(request.getVolume(),
+        request.getBucket(), request.getPrefix(), request.getKeyMarker(), request.getUploadIdMarker(),
+        request.getMaxUploads(), request.getWithPagination(), assumeS3Context);
 
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()
