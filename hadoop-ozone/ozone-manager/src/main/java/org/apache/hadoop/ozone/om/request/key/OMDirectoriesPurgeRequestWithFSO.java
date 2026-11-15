@@ -34,7 +34,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -60,6 +59,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
+import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO.VolumeBucketName;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketNameInfo;
@@ -145,9 +145,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       // All bucket locks are still held here, and every purge path has been processed, so the accumulated
       // copies can be published as a whole. Publishing only here, after all fallible apply work has
       // succeeded, keeps a failed purge from changing the live bucket usage (HDDS-16161).
-      for (Map.Entry<Pair<String, String>, OmBucketInfo> entry : result.volBucketInfoMap.entrySet()) {
+      for (Map.Entry<VolumeBucketName, OmBucketInfo> entry : result.volBucketInfoMap.entrySet()) {
         omMetadataManager.getBucketTable().addCacheEntry(
-            omMetadataManager.getBucketKey(entry.getKey().getLeft(), entry.getKey().getRight()),
+            omMetadataManager.getBucketKey(entry.getKey().volumeName(), entry.getKey().bucketName()),
             entry.getValue(), context.getIndex());
       }
 
@@ -184,7 +184,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       }
       // Snapshot the mutated bucket infos for the response after releasing the lock. The single apply thread is the
       // only writer, so no other transaction can mutate them between release and copy.
-      for (Map.Entry<Pair<String, String>, OmBucketInfo> entry :
+      for (Map.Entry<VolumeBucketName, OmBucketInfo> entry :
           result.volBucketInfoMap.entrySet()) {
         entry.setValue(entry.getValue().copyObject());
       }
@@ -326,9 +326,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       PurgeApplyResult result) throws IOException {
     // Holds one mutable bucket-info copy per bucket for this apply so that a purge transaction touching many keys of
     // the same bucket resolves it once and accumulates every quota delta on the same copy.
-    Map<Pair<String, String>, OmBucketInfo> bucketInfoCache = new HashMap<>();
+    Map<VolumeBucketName, OmBucketInfo> bucketInfoCache = new HashMap<>();
     // Quota deltas are accumulated per bucket across all three entry loops and applied once at the end.
-    Map<Pair<String, String>, QuotaDelta> quotaDeltas = new HashMap<>();
+    Map<VolumeBucketName, QuotaDelta> quotaDeltas = new HashMap<>();
 
     applyMarkedSubDirs(preparedSubDirs, omMetadataManager, trxnLogIndex, result, bucketInfoCache, quotaDeltas);
     applyMovedSubFiles(preparedSubFiles, omMetadataManager, trxnLogIndex, result, bucketInfoCache, quotaDeltas);
@@ -341,8 +341,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * accumulates its namespace quota decrement, when its bucket still matches the prepared bucket id.
    */
   private void applyMarkedSubDirs(List<PreparedEntry> preparedSubDirs, OmMetadataManagerImpl omMetadataManager,
-      long trxnLogIndex, PurgeApplyResult result, Map<Pair<String, String>, OmBucketInfo> bucketInfoCache,
-      Map<Pair<String, String>, QuotaDelta> quotaDeltas) {
+      long trxnLogIndex, PurgeApplyResult result, Map<VolumeBucketName, OmBucketInfo> bucketInfoCache,
+      Map<VolumeBucketName, QuotaDelta> quotaDeltas) {
     for (PreparedEntry entry : preparedSubDirs) {
       ProcessedKeyInfo processed = entry.processed;
       result.subDirNames.add(processed.deleteKey);
@@ -353,8 +353,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       if (null != omBucketInfo && omBucketInfo.getObjectID() == entry.bucketId) {
         omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(processed.pathKey),
             CacheValue.get(trxnLogIndex));
-        result.volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
-        quotaDeltas.computeIfAbsent(processed.volBucketPair, k -> new QuotaDelta(omBucketInfo)).usedNamespace += 1L;
+        result.volBucketInfoMap.putIfAbsent(processed.volBucketName, omBucketInfo);
+        quotaDeltas.computeIfAbsent(processed.volBucketName, k -> new QuotaDelta(omBucketInfo)).usedNamespace += 1L;
       }
     }
   }
@@ -365,8 +365,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * prepared bucket id.
    */
   private void applyMovedSubFiles(List<PreparedEntry> preparedSubFiles, OmMetadataManagerImpl omMetadataManager,
-      long trxnLogIndex, PurgeApplyResult result, Map<Pair<String, String>, OmBucketInfo> bucketInfoCache,
-      Map<Pair<String, String>, QuotaDelta> quotaDeltas) throws IOException {
+      long trxnLogIndex, PurgeApplyResult result, Map<VolumeBucketName, OmBucketInfo> bucketInfoCache,
+      Map<VolumeBucketName, QuotaDelta> quotaDeltas) throws IOException {
     for (PreparedEntry entry : preparedSubFiles) {
       ProcessedKeyInfo processed = entry.processed;
       result.subFileNames.add(processed.deleteKey);
@@ -389,8 +389,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       if (null != omBucketInfo && omBucketInfo.getObjectID() == entry.bucketId) {
         omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(processed.pathKey),
             CacheValue.get(trxnLogIndex));
-        result.volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
-        QuotaDelta quotaDelta = quotaDeltas.computeIfAbsent(processed.volBucketPair, k -> new QuotaDelta(omBucketInfo));
+        result.volBucketInfoMap.putIfAbsent(processed.volBucketName, omBucketInfo);
+        QuotaDelta quotaDelta = quotaDeltas.computeIfAbsent(processed.volBucketName, k -> new QuotaDelta(omBucketInfo));
         quotaDelta.usedBytes += entry.replicatedSize;
         quotaDelta.usedNamespace += 1L;
       }
@@ -402,16 +402,17 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * when its bucket still matches the prepared bucket id.
    */
   private void applyDirPurges(List<PreparedDirPurge> preparedDirPurges, OmMetadataManagerImpl omMetadataManager,
-      PurgeApplyResult result, Map<Pair<String, String>, OmBucketInfo> bucketInfoCache,
-      Map<Pair<String, String>, QuotaDelta> quotaDeltas) {
+      PurgeApplyResult result, Map<VolumeBucketName, OmBucketInfo> bucketInfoCache,
+      Map<VolumeBucketName, QuotaDelta> quotaDeltas) {
     for (PreparedDirPurge dirPurge : preparedDirPurges) {
       result.deletedDirNames.add(dirPurge.deletedDir);
       OmBucketInfo omBucketInfo = getBucketInfoCached(omMetadataManager,
           bucketInfoCache, dirPurge.volumeName, dirPurge.bucketName);
       if (omBucketInfo != null && omBucketInfo.getObjectID() == dirPurge.bucketId) {
-        Pair<String, String> volBucketPair = Pair.of(omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
-        result.volBucketInfoMap.put(volBucketPair, omBucketInfo);
-        quotaDeltas.computeIfAbsent(volBucketPair, k -> new QuotaDelta(omBucketInfo)).snapshotNamespacePurge += 1L;
+        VolumeBucketName volBucketName =
+            new VolumeBucketName(omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
+        result.volBucketInfoMap.put(volBucketName, omBucketInfo);
+        quotaDeltas.computeIfAbsent(volBucketName, k -> new QuotaDelta(omBucketInfo)).snapshotNamespacePurge += 1L;
       }
       result.numDirsDeleted++;
     }
@@ -421,7 +422,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * Phase 2 (under the bucket write lock): applies the per-bucket accumulated quota changes once each, instead of once
    * per entry, to minimize the mutations done while holding the bucket write lock.
    */
-  private void applyQuotaDeltas(Map<Pair<String, String>, QuotaDelta> quotaDeltas) {
+  private void applyQuotaDeltas(Map<VolumeBucketName, QuotaDelta> quotaDeltas) {
     for (QuotaDelta quotaDelta : quotaDeltas.values()) {
       if (quotaDelta.usedBytes != 0L) {
         quotaDelta.bucketInfo.decrUsedBytes(quotaDelta.usedBytes, true);
@@ -441,7 +442,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * for the deletion metrics and the success audit.
    */
   private static final class PurgeApplyResult {
-    private final Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
+    private final Map<VolumeBucketName, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     private final Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
     private final Set<String> subDirNames = new HashSet<>();
     private final Set<String> subFileNames = new HashSet<>();
@@ -460,7 +461,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     private final String bucketName;
     private final long parentObjectID;
     private final String fileName;
-    private final Pair<String, String> volBucketPair;
+    private final VolumeBucketName volBucketName;
 
     ProcessedKeyInfo(String deleteKey, String pathKey, String volumeName,
                      String bucketName, long parentObjectID, String fileName) {
@@ -470,7 +471,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       this.bucketName = bucketName;
       this.parentObjectID = parentObjectID;
       this.fileName = fileName;
-      this.volBucketPair = Pair.of(volumeName, bucketName);
+      this.volBucketName = new VolumeBucketName(volumeName, bucketName);
     }
   }
 
@@ -554,8 +555,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * until they are published on the success path. {@code null} results (deleted bucket) are memoized too.
    */
   private static OmBucketInfo getBucketInfoCached(OmMetadataManagerImpl omMetadataManager,
-      Map<Pair<String, String>, OmBucketInfo> cache, String volumeName, String bucketName) {
-    Pair<String, String> cacheKey = Pair.of(volumeName, bucketName);
+      Map<VolumeBucketName, OmBucketInfo> cache, String volumeName, String bucketName) {
+    VolumeBucketName cacheKey = new VolumeBucketName(volumeName, bucketName);
     if (cache.containsKey(cacheKey)) {
       return cache.get(cacheKey);
     }
@@ -598,18 +599,18 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   private List<String[]> getBucketLockKeySet(PurgeDirectoriesRequest purgeDirsRequest) {
     if (!purgeDirsRequest.getBucketNameInfosList().isEmpty()) {
       return purgeDirsRequest.getBucketNameInfosList().stream()
-          .map(keyInfo -> Pair.of(keyInfo.getVolumeName(), keyInfo.getBucketName()))
+          .map(keyInfo -> new VolumeBucketName(keyInfo.getVolumeName(), keyInfo.getBucketName()))
           .distinct()
-          .map(pair -> new String[]{pair.getLeft(), pair.getRight()})
+          .map(volBucket -> new String[]{volBucket.volumeName(), volBucket.bucketName()})
           .collect(Collectors.toList());
     }
 
     return purgeDirsRequest.getDeletedPathList().stream()
         .flatMap(purgePathRequest -> Stream.concat(purgePathRequest.getDeletedSubFilesList().stream(),
             purgePathRequest.getMarkDeletedSubDirsList().stream()))
-        .map(keyInfo -> Pair.of(keyInfo.getVolumeName(), keyInfo.getBucketName()))
+        .map(keyInfo -> new VolumeBucketName(keyInfo.getVolumeName(), keyInfo.getBucketName()))
         .distinct()
-        .map(pair -> new String[]{pair.getLeft(), pair.getRight()})
+        .map(volBucket -> new String[]{volBucket.volumeName(), volBucket.bucketName()})
         .collect(Collectors.toList());
   }
 
