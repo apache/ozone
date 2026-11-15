@@ -167,16 +167,31 @@ class TestRenderSummary(unittest.TestCase):
 
 class TestMain(unittest.TestCase):
   def run_main(self, argv):
-    out = io.StringIO()
-    with contextlib.redirect_stdout(out):
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
       code = coverage_summary.main(argv)
-    return code, out.getvalue()
+    return code, out.getvalue(), err.getvalue()
 
   def test_prints_summary(self):
     with tempfile.TemporaryDirectory() as tmp:
-      code, out = self.run_main(["--report", write_report(tmp)])
+      code, out, err = self.run_main(["--report", write_report(tmp)])
     self.assertEqual(code, 0)
     self.assertIn("|Lines|84.5%|27270|175840|", out)
+    self.assertEqual(err, "")
+
+  def test_missing_report(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      code, out, err = self.run_main(["--report", os.path.join(tmp, "missing.xml")])
+    self.assertEqual(code, 0)
+    self.assertEqual(out, "")
+    self.assertIn("coverage_summary failed", err)
+
+  def test_invalid_report(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      code, out, err = self.run_main(["--report", write_report(tmp, "<report>")])
+    self.assertEqual(code, 0)
+    self.assertEqual(out, "")
+    self.assertIn("coverage_summary failed", err)
 
 
 if __name__ == "__main__":
