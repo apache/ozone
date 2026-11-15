@@ -1,0 +1,119 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Setup Java with Maven Cache
+description: Setup Java and restore Maven cache of Ozone's dependencies
+
+inputs:
+  java-version:
+    description: >
+      Java version to set up.
+    required: true
+
+  only-exact-hit:
+    description: >
+      Restore cache only with exact key (if true), or allow fallback to any cache.
+    default: 'false'
+
+outputs:
+  cache-hit:
+    description: >
+      Whether cache with exact key was restored (true) or not (false).
+    value: ${{ steps.exact-hit.outputs.value }}
+
+  cache-key:
+    description: >
+      The cache key calculated from POM and other files.  This may not be the key
+      of the cache that was restored if fallback is allowed.
+    value: ${{ steps.cache-key.outputs.value }}
+
+  restored:
+    description: >
+      Whether any cache was restored (true) or not (false).
+    value: ${{ steps.any-hit.outputs.value }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Java ${{ inputs.java-version }}
+      id: setup-java
+      uses: actions/setup-java@v6
+      with:
+        distribution: 'temurin'
+        java-version: ${{ inputs.java-version }}
+
+    - name: Calculate cache key
+      id: cache-key
+      shell: bash
+      run: |
+        echo "value=maven-repo-${{ hashFiles('**/pom.xml', '.mvn/extensions.xml') }}" >> "$GITHUB_OUTPUT"
+
+    - name: Remove any leftover Maven repo
+      id: cleanup
+      shell: bash
+      run: |
+        rm -frv ~/.m2/repository
+
+    - name: Restore cache with exact key
+      id: exact-cache
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/.m2/repository/*/*/*
+          !~/.m2/repository/org/apache/ozone
+        key: ${{ steps.cache-key.outputs.value }}
+
+    - name: Exact hit?
+      id: exact-hit
+      shell: bash
+      run: |
+        if [[ "$HIT" == "true" ]] || [[ -d ~/.m2/repository ]]; then
+          value="true"
+        else
+          value="false"
+        fi
+        echo "hit: $value"
+        echo "value=$value" >> "$GITHUB_OUTPUT"
+      env:
+        HIT: ${{ steps.exact-cache.outputs.cache-hit }}
+
+    - name: Fallback to generic cache
+      id: generic-cache
+      if: >
+        steps.exact-hit.outputs.value != 'true'
+        && inputs.only-exact-hit != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/.m2/repository/*/*/*
+          !~/.m2/repository/org/apache/ozone
+        key: maven-repo-
+
+    - name: Any hit?
+      id: any-hit
+      if: >
+        steps.exact-hit.outputs.value != 'true'
+        && inputs.only-exact-hit != 'true'
+      shell: bash
+      run: |
+        if [[ "$HIT" == "true" ]] || [[ -d ~/.m2/repository ]]; then
+          value="true"
+        else
+          value="false"
+        fi
+        echo "hit: $value"
+        echo "value=$value" >> "$GITHUB_OUTPUT"
+      env:
+        HIT: ${{ steps.exact-hit.outputs.value }}

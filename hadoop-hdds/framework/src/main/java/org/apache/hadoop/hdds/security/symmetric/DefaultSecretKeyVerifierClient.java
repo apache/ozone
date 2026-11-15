@@ -20,14 +20,14 @@ package org.apache.hadoop.hdds.security.symmetric;
 import static org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig.parseExpiryDuration;
 import static org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig.parseRotateDuration;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.CacheLoader;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -63,19 +63,15 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
     Duration cacheExpiry = expiryDuration.multipliedBy(
         secretKeyCacheMultiplier);
 
-    CacheLoader<UUID, Optional<ManagedSecretKey>> loader =
-        new CacheLoader<UUID, Optional<ManagedSecretKey>>() {
-          @Override
-          public Optional<ManagedSecretKey> load(UUID id) throws Exception {
-            ManagedSecretKey secretKey = secretKeyProtocol.getSecretKey(id);
-            LOG.info("Secret key fetched from SCM: {}", secretKey);
-            return Optional.ofNullable(secretKey);
-          }
-        };
+    CacheLoader<UUID, Optional<ManagedSecretKey>> loader = id -> {
+      ManagedSecretKey secretKey = secretKeyProtocol.getSecretKey(id);
+      LOG.info("Secret key fetched from SCM: {}", secretKey);
+      return Optional.ofNullable(secretKey);
+    };
 
     LOG.info("Initializing secret key cache with size {}, TTL {}",
         cacheSize, expiryDuration);
-    cache = CacheBuilder.newBuilder()
+    cache = Caffeine.newBuilder()
         .maximumSize(cacheSize)
         .expireAfterWrite(cacheExpiry.toMillis(), TimeUnit.MILLISECONDS)
         .recordStats()
@@ -86,8 +82,8 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
   public ManagedSecretKey getSecretKey(UUID id) throws SCMSecurityException {
     try {
       return cache.get(id).orElse(null);
-    } catch (ExecutionException e) {
-      // handle cache load exception.
+    } catch (CompletionException e) {
+      // handle cache load exception: a checked exception of the loader is wrapped, an unchecked one is not.
       if (e.getCause() instanceof IOException) {
         IOException cause = (IOException) e.getCause();
         if (cause instanceof SCMSecurityException) {

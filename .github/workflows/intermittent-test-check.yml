@@ -112,15 +112,10 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v6
+      - name: Setup java
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Download Ratis repo
         if: ${{ github.event.inputs.ratis-ref != '' }}
         uses: actions/download-artifact@v8
@@ -128,11 +123,6 @@ jobs:
           name: ratis-jars
           path: |
             ~/.m2/repository/org/apache/ratis
-      - name: Setup java
-        uses: actions/setup-java@v6
-        with:
-          distribution: 'temurin'
-          java-version: ${{ github.event.inputs.java-version }}
       - name: Build (most) of Ozone
         run: |
           args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true -Drocks_tools_native"
@@ -166,15 +156,10 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v6
+      - name: Setup java
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Download Ratis repo
         if: ${{ github.event.inputs.ratis-ref != '' }}
         uses: actions/download-artifact@v8
@@ -189,11 +174,6 @@ jobs:
           name: ozone-repo
           path: |
             ~/.m2/repository/org/apache/ozone
-      - name: Setup java
-        uses: actions/setup-java@v6
-        with:
-          distribution: 'temurin'
-          java-version: ${{ github.event.inputs.java-version }}
       - name: Execute tests
         run: |
           if [[ -e "$repo_path" ]]; then

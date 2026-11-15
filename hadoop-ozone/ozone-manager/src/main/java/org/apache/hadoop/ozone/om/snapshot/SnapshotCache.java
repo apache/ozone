@@ -22,8 +22,8 @@ import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_A
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.CacheLoader;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;

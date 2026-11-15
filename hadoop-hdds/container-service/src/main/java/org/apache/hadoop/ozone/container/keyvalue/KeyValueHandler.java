@@ -173,6 +173,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
@@ -1976,9 +1977,12 @@ public class KeyValueHandler extends Handler {
         .build();
     // Under construction is set here, during BlockInputStream#initialize() it is used to update the block length.
     blkInfo.setUnderConstruction(true);
+    // Always verify peer data before using it to repair this replica, regardless of the client setting.
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     try (BlockInputStream blockInputStream = blockInputStreamFactory.createBlockInputStream(
         blkInfo, pipeline, blockToken, dnClient.getXceiverClientManager(),
-        null, conf.getObject(OzoneClientConfig.class))) {
+        null, clientConfig)) {
       // Initialize the BlockInputStream. Gets the blockData from the peer, sets the block length and
       // initializes ChunkInputStream for each chunk.
       blockInputStream.initialize();
@@ -2316,6 +2320,8 @@ public class KeyValueHandler extends Handler {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), ioe, IO_EXCEPTION);
       responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    } catch (StatusRuntimeException sre) {
+      throw sre;
     } catch (Exception e) {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), e, CONTAINER_INTERNAL_ERROR);

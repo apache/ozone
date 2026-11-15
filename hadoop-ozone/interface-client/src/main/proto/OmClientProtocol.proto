@@ -1481,6 +1481,10 @@ message RenameKeyRequest{
     required KeyArgs keyArgs = 1;
     required string toKeyName = 2;
     optional uint64 updateID = 3;
+    // Set by file system clients that rely on atomic directory rename: OM
+    // rejects the request with NOT_SUPPORTED_OPERATION unless the resolved
+    // bucket layout is FILE_SYSTEM_OPTIMIZED.
+    optional bool requireFileSystemOptimized = 4;
 }
 
 message RenameKeyResponse{
@@ -2877,6 +2881,33 @@ service OzoneManagerService {
     // A client-to-OM RPC to send client requests to OM Ratis server
     rpc submitRequest(OMRequest)
           returns(OMResponse);
+}
+
+/**
+ The error that OzoneManagerService sends in the gRPC trailers when submitRequest fails.
+*/
+message OMGrpcErrorProto {
+  message NotLeader {
+    optional string message = 1;
+    optional string suggestedLeaderNodeId = 2;
+  }
+  message LeaderNotReady {
+    optional string message = 1;
+  }
+  message ReadIndexFailed {
+    optional string message = 1;
+  }
+  message ReadFailed {
+    optional string message = 1;
+  }
+
+  // Not set for any other error.
+  oneof error {
+    NotLeader notLeader = 1;
+    LeaderNotReady leaderNotReady = 2;
+    ReadIndexFailed readIndexFailed = 3;
+    ReadFailed readFailed = 4;
+  }
 }
 
 message GetLifecycleServiceStatusRequest {

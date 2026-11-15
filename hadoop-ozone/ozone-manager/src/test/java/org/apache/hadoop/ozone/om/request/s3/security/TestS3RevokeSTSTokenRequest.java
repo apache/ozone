@@ -552,6 +552,48 @@ public class TestS3RevokeSTSTokenRequest {
     }
   }
 
+  @Test
+  public void testRevokeWithLowerStampKeepsStoredCutoff() throws Exception {
+    // Revokes can be applied with stamps that do not increase in log order; a lower stamp must not lower the cutoff.
+    final String originalAccessKeyId = "original-access-key-id";
+    final long base = 1_700_000_000_000L;
+    final OmMetadataManagerImpl omMetadataManager = createMetadataManager();
+    try {
+      final OzoneManager ozoneManager = mockOzoneManager(omMetadataManager);
+      final Table<String, Long> table = omMetadataManager.getS3RevokedStsTokenTable();
+
+      flush(omMetadataManager, 1L, revoke(ozoneManager, 1L, originalAccessKeyId, base + 1_000L));
+      assertCutoff(table, originalAccessKeyId, base + 1_000L);
+
+      flush(omMetadataManager, 2L, revoke(ozoneManager, 2L, originalAccessKeyId, base));
+      assertCutoff(table, originalAccessKeyId, base + 1_000L);
+
+      flush(omMetadataManager, 3L, revoke(ozoneManager, 3L, originalAccessKeyId, base + 2_000L));
+      assertCutoff(table, originalAccessKeyId, base + 2_000L);
+    } finally {
+      omMetadataManager.stop();
+    }
+  }
+
+  @Test
+  public void testRevokeWithLowerStampBeforeFlushKeepsCachedCutoff() throws Exception {
+    // The higher cutoff is still only in the cache when the lower stamp is applied, and the DB must end up with it.
+    final String originalAccessKeyId = "original-access-key-id";
+    final long higherCutoff = 1_700_000_000_000L;
+    final OmMetadataManagerImpl omMetadataManager = createMetadataManager();
+    try {
+      final OzoneManager ozoneManager = mockOzoneManager(omMetadataManager);
+      final OMClientResponse higherRevoke = revoke(ozoneManager, 1L, originalAccessKeyId, higherCutoff);
+      final OMClientResponse lowerRevoke = revoke(ozoneManager, 2L, originalAccessKeyId, higherCutoff - 1_000L);
+      flush(omMetadataManager, 1L, higherRevoke);
+      flush(omMetadataManager, 2L, lowerRevoke);
+
+      assertCutoff(omMetadataManager.getS3RevokedStsTokenTable(), originalAccessKeyId, higherCutoff);
+    } finally {
+      omMetadataManager.stop();
+    }
+  }
+
   private OmMetadataManagerImpl createMetadataManager() throws IOException {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, folder.toAbsolutePath().toString());
@@ -612,6 +654,12 @@ public class TestS3RevokeSTSTokenRequest {
     final Set<String> keys = new HashSet<>();
     table.cacheIterator().forEachRemaining(entry -> keys.add(entry.getKey().getCacheKey()));
     return keys;
+  }
+
+  private static void assertCutoff(Table<String, Long> table, String originalAccessKeyId, long expectedCutoff)
+      throws IOException {
+    assertThat(table.getIfExist(originalAccessKeyId)).isEqualTo(expectedCutoff);
+    assertThat(table.getSkipCache(originalAccessKeyId)).isEqualTo(expectedCutoff);
   }
 
   private static void assertRevokedEntryFullyRemoved(Table<String, Long> table, String originalAccessKeyId)

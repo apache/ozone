@@ -1579,53 +1579,6 @@
   </property>
 
   <property>
-    <name>ozone.om.compaction.service.enabled</name>
-    <value>false</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>
-      Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.compaction.service.run.interval</name>
-    <value>6h</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>
-      A background job that periodically compacts rocksdb tables flagged for compaction.
-      Unit could be defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.compaction.service.timeout</name>
-    <value>10m</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>A timeout value of compaction service. If this is set
-      greater than 0, the service will stop waiting for compaction
-      completion after this time.
-      Unit could be defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.compaction.service.columnfamilies</name>
-    <value>keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>A comma separated, no spaces list of all the column families
-      that are compacted by the compaction service.
-      If this is empty, no column families are compacted.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.compaction.service.bottommost-level-compaction</name>
-    <value>kSkip</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>
-      Bottommost level compaction type for compaction.
-      Invalid values will default to kSkip.
-      Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.snapshot.compact.non.snapshot.diff.tables</name>
     <value>false</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -1722,7 +1675,10 @@
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
       SCM schedules a fixed interval job using the configured interval to
-      scrub pipelines.
+      scrub pipelines. While SCM is in safe mode, the job starts on the leader
+      once the container safe mode rules have passed and
+      ozone.scm.stale.node.interval has elapsed since SCM started, so that open
+      pipelines with unregistered datanodes are closed before safe mode exits.
     </description>
   </property>
   <property>
@@ -1774,8 +1730,7 @@
     <value>5m</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description> After exiting safemode, wait for configured interval of
-      time to start replication monitor and cleanup activities of unhealthy
-      pipelines.
+      time to start replication monitor and other background services.
     </description>
   </property>
 
@@ -5442,77 +5397,5 @@
     <value>1m</value>
     <tag>OM</tag>
     <description>If OM is unfinalized, how frequently it should poll SCM to trigger finalization</description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.enabled</name>
-    <value>false</value>
-    <tag>OZONE</tag>
-    <description>It specifies whether to enable lifecycle management service.</description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.move.to.trash.enabled</name>
-    <value>true</value>
-    <tag>OZONE</tag>
-    <description>When enabled KeyLifecycleService will move expired keys/dirs to trash if trash is available.
-      When disabled, it will delete them directly.
-    </description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.delete.batch-size</name>
-    <value>1000</value>
-    <tag>OZONE</tag>
-    <description>Max numbers of objects allowed for deletion in a batch for a lifecycle evaluating task.</description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.interval</name>
-    <value>24h</value>
-    <tag>OZONE</tag>
-    <description>Interval at which key lifecycle management service will run.</description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.timeout</name>
-    <value>2h</value>
-    <tag>OZONE</tag>
-    <description>Timeout for task of key lifecycle management service.</description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.workers</name>
-    <value>5</value>
-    <tag>OZONE</tag>
-    <description>Number of workers executed of key lifecycle management service. This
-      configuration should be set to greater than 0.</description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.delete.cached.directory.max-count</name>
-    <value>1000000</value>
-    <tag>OZONE</tag>
-    <description>Max numbers of directory objects held in memory stack for recursive FSO bucket evaluating for
-      a lifecycle evaluating task. Once the cached directory objects exceeds this limit, the evaluation of the involved
-      directories will abort.
-    </description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.mpu.abort.limit.per.task</name>
-    <value>1000</value>
-    <tag>OZONE</tag>
-    <description>Maximum number of multipart upload parts (rounded up to complete uploads)
-      to abort in a single task when processing AbortIncompleteMultipartUpload
-      lifecycle rules.
-    </description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.state.save.interval.ms</name>
-    <value>300000</value>
-    <tag>OZONE</tag>
-    <description>The interval of bucket scan task saves its pointer to DB. Default is 5 mins.</description>
-  </property>
-  <property>
-    <name>ozone.lifecycle.service.state.save.keys.processed</name>
-    <value>100000</value>
-    <tag>OZONE</tag>
-    <description>Bucket scan task will save its pointer to DB by default every 100000 keys are scanned. Bucket scan
-      pointer save will happen when either ozone.lifecycle.service.state.save.interval.ms or
-      ozone.lifecycle.service.state.save.keys.processed is satisfied.
-    </description>
   </property>
 </configuration>
