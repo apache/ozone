@@ -1467,12 +1467,13 @@ public class KeyValueHandler extends Handler {
           container.getContainerState();
       // Move the container to CLOSING state only if it's OPEN/RECOVERING
       if (HddsUtils.isOpenToWriteState(state)) {
-        if (state == RECOVERING) {
+        boolean wasRecovering = state == RECOVERING;
+        container.markContainerForClose();
+        if (wasRecovering) {
           containerSet.removeRecoveringContainer(
               container.getContainerData().getContainerID());
           ContainerLogger.logRecovered(container.getContainerData());
         }
-        container.markContainerForClose();
         stateChanged = true;
       }
     } finally {
