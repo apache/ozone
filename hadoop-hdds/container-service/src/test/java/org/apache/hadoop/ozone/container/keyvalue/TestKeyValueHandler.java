@@ -101,7 +101,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -115,6 +114,7 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -1448,14 +1448,14 @@ public class TestKeyValueHandler {
       doThrow(Status.CANCELLED.asRuntimeException()).when(observer).onNext(any());
 
       assertThrows(StatusRuntimeException.class,
-          () -> fixture.kvHandler.readBlock(request, fixture.container, fixture.blockFile, observer));
+          () -> fixture.kvHandler.readBlock(request, fixture.container, fixture.readBlockContext, observer));
     }
   }
 
   @Test
   public void testReadBlockMetrics() throws Exception {
     Path testDir = Files.createTempDirectory("testReadBlockMetrics");
-    RandomAccessFileChannel blockFile = null;
+    ReadBlockContext readBlockContext = null;
     try {
       conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
       HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
@@ -1514,9 +1514,9 @@ public class TestKeyValueHandler {
             }
           };
 
-      blockFile = new RandomAccessFileChannel();
+      readBlockContext = new ReadBlockContext();
       ContainerCommandResponseProto response = kvHandler.readBlock(
-          readBlockRequest, container, blockFile, streamObserver);
+          readBlockRequest, container, readBlockContext, streamObserver);
 
       assertNull(response, "ReadBlock should return null on success");
       assertTrue(responseCount.get() > 0, "Should receive at least one response");
@@ -1525,8 +1525,8 @@ public class TestKeyValueHandler {
           ContainerMetrics.STORAGE_CONTAINER_METRICS);
       assertCounter("bytesReadBlock", 1024L, containerMetrics);
     } finally {
-      if (blockFile != null) {
-        blockFile.close();
+      if (readBlockContext != null) {
+        readBlockContext.close();
       }
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
@@ -1595,15 +1595,16 @@ public class TestKeyValueHandler {
     try (StreamFixture fixture = new StreamFixture()) {
       fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
       assertResponses(fixture.read(0, BLOCK_SIZE), 0, BLOCK_SIZE);
-      assertTrue(fixture.blockFile.isOpen(), "block file stays open on the stream after a successful read");
+      assertTrue(fixture.readBlockContext.getBlockFile().isOpen(),
+          "block file stays open on the stream after a successful read");
       assertOutOfRange(fixture.read(BLOCK_SIZE, 1024), BLOCK_SIZE);
-      assertFalse(fixture.blockFile.isOpen(), "block file closed after OUT_OF_RANGE");
+      assertFalse(fixture.readBlockContext.getBlockFile().isOpen(), "block file closed after OUT_OF_RANGE");
 
       assertInvalidArgument(fixture.read(-1, 1024));
-      assertFalse(fixture.blockFile.isOpen(), "block file closed after INVALID_ARGUMENT");
+      assertFalse(fixture.readBlockContext.getBlockFile().isOpen(), "block file closed after INVALID_ARGUMENT");
 
       assertInvalidArgument(fixture.read(0, -1));
-      assertFalse(fixture.blockFile.isOpen(), "block file closed after negative length");
+      assertFalse(fixture.readBlockContext.getBlockFile().isOpen(), "block file closed after negative length");
     }
   }
 
@@ -1621,9 +1622,9 @@ public class TestKeyValueHandler {
     try (StreamFixture fixture = new StreamFixture()) {
       fixture.appendChunk("chunk1", 0, chunkSize);
       assertResponses(fixture.read(0, 1, Integer.MAX_VALUE), 0, BYTES_PER_CHECKSUM);
-      verify(fixture.blockFile).getReadBuffer((int) BYTES_PER_CHECKSUM);
+      verify(fixture.readBlockContext).getReadBuffer((int) BYTES_PER_CHECKSUM);
       assertResponses(fixture.read(0, chunkSize, Integer.MAX_VALUE), 0, chunkSize);
-      verify(fixture.blockFile).getReadBuffer(chunkSize);
+      verify(fixture.readBlockContext).getReadBuffer(chunkSize);
     }
   }
 
@@ -1802,8 +1803,8 @@ public class TestKeyValueHandler {
   }
 
   /**
-   * A real FILE_PER_BLOCK container with one block and one {@link RandomAccessFileChannel} standing in for the
-   * per-stream channel of GrpcXceiverService. The block manager is spied to count block table lookups.
+   * A real FILE_PER_BLOCK container with one block and one {@link ReadBlockContext} standing in for the
+   * per-stream state of GrpcXceiverService. The block manager is spied to count block table lookups.
    */
   private final class StreamFixture implements AutoCloseable {
     private final Path testDir = Files.createTempDirectory("testReadBlock");
@@ -1812,7 +1813,7 @@ public class TestKeyValueHandler {
     private final KeyValueContainer container;
     private final BlockID blockID;
     private final BlockData blockData;
-    private final RandomAccessFileChannel blockFile = spy(new RandomAccessFileChannel());
+    private final ReadBlockContext readBlockContext = spy(new ReadBlockContext());
 
     StreamFixture() throws Exception {
       try {
@@ -1874,13 +1875,13 @@ public class TestKeyValueHandler {
           .setReadBlock(readBlock.setBlockID(blockID.getDatanodeBlockIDProtobuf()))
           .build();
       ReadBlockResult result = new ReadBlockResult(blockID);
-      result.setResponse(kvHandler.readBlock(request, container, blockFile, result));
+      result.setResponse(kvHandler.readBlock(request, container, readBlockContext, result));
       return result;
     }
 
     @Override
     public void close() throws IOException {
-      blockFile.close();
+      readBlockContext.close();
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
     }
@@ -2148,9 +2149,9 @@ public class TestKeyValueHandler {
       return null;
     }).when(streamObserver).onNext(any(ContainerCommandResponseProto.class));
 
-    try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
+    try (ReadBlockContext readBlockContext = new ReadBlockContext()) {
       ContainerCommandResponseProto response = handlerWithVolume.getHandler().readBlock(
-          readBlockRequest, container, blockFile, streamObserver);
+          readBlockRequest, container, readBlockContext, streamObserver);
 
       assertNull(response, "ReadBlock should return null on success");
     }
