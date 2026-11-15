@@ -471,9 +471,9 @@ class TestReconAndAdminContainerCLI {
         0, SECONDS);
     // Configure multiple task threads for concurrent task execution
     CONF.setInt("ozone.recon.task.thread.count", 6);
-    CONF.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
-    CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
-    CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    CONF.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "1s");
+    CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "1s");
+    CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "2s");
 
     CONF.setTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
         1, TimeUnit.SECONDS);

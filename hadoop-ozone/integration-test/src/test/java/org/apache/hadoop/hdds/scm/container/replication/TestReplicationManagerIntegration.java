@@ -133,9 +133,9 @@ class TestReplicationManagerIntegration {
         1, SECONDS);
     conf.setTimeDuration(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, SECONDS);
-    conf.set(OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
-    conf.set(OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
-    conf.set(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    conf.set(OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "1s");
+    conf.set(OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "1s");
+    conf.set(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "2s");
 
     replicationConf = conf.getObject(ReplicationManagerConfiguration.class);
     replicationConf.setInterval(Duration.ofSeconds(1));
