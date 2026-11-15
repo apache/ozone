@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -207,6 +208,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       long requestedSize, boolean shouldSortDatanodes,
       UserInfo userInfo, OzoneManager ozoneManager)
       throws IOException {
+    Preconditions.checkArgument(requestedSize > 0, "requestedSize = %s <= 0", requestedSize);
     final long scmBlockSize = ozoneManager.getScmBlockSize();
     final KeyManager keyManager = ozoneManager.getKeyManager();
 
@@ -215,6 +217,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
+    final String scmClientMachine;
+    // Sorted order cached by datanode set so blocks whose pipelines share the
+    // same datanodes are sorted once (mirrors the read path's caching). Keyed by
+    // the UUID set so it is order-insensitive and dedups across pipelines.
+    final Map<Set<String>, List<? extends DatanodeDetails>> sortedByNodes;
     final String remoteAddress = userInfo.getRemoteAddress();
     final NetworkTopology clusterMap = shouldSortDatanodes
         && keyManager.isSortDatanodesForWriteEnabled()
@@ -223,14 +230,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // DNS-to-switch mapping is consulted at most once.
     final Node omClient = clusterMap != null && !remoteAddress.isEmpty()
         ? keyManager.resolveClientForWrite(remoteAddress, clusterMap) : null;
-    // Let SCM sort when OM sorting is disabled or its topology/client lookup is unavailable.
-    // An empty client address tells SCM to skip sorting.
-    final String scmClientMachine = shouldSortDatanodes && omClient == null ? remoteAddress : "";
-    // Sorted order cached by datanode set so blocks whose pipelines share the
-    // same datanodes are sorted once (mirrors the read path's caching). Keyed by
-    // the UUID set so it is order-insensitive and dedups across pipelines.
-    final Map<Set<String>, List<? extends DatanodeDetails>> sortedByNodes =
-        omClient != null ? new HashMap<>() : null;
+    if (!shouldSortDatanodes) {
+      scmClientMachine = "";
+      sortedByNodes = null;
+    } else if (omClient != null) {
+      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
+      scmClientMachine = "";
+      sortedByNodes = new HashMap<>();
+    } else {
+      // Sort in SCM when OM has no topology or cannot resolve the client (or keep order
+      // when remoteAddress is empty, since SCM skips sorting for an empty client machine).
+      scmClientMachine = remoteAddress;
+      sortedByNodes = null;
+    }
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
