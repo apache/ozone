@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo.TotalSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,11 +53,11 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
           (RepeatedOmKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count + repeatedOmKeyInfo.getOmKeyInfoList().size());
-      Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
+      TotalSize result = repeatedOmKeyInfo.getTotalSize();
       unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
-          (k, size) -> size + result.getLeft());
+          (k, size) -> size + result.getUnreplicatedSize());
       replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
-          (k, size) -> size + result.getRight());
+          (k, size) -> size + result.getReplicatedSize());
     } else {
       LOG.warn("Put event does not have the Key Info for {}.",
           event.getKey());
@@ -81,11 +81,11 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
           (RepeatedOmKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName), (k, count) ->
           count > 0 ? count - repeatedOmKeyInfo.getOmKeyInfoList().size() : 0L);
-      Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
+      TotalSize result = repeatedOmKeyInfo.getTotalSize();
       unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
-          (k, size) -> size > result.getLeft() ? size - result.getLeft() : 0L);
+          (k, size) -> size > result.getUnreplicatedSize() ? size - result.getUnreplicatedSize() : 0L);
       replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
-          (k, size) -> size > result.getRight() ? size - result.getRight() :
+          (k, size) -> size > result.getReplicatedSize() ? size - result.getReplicatedSize() :
               0L);
     } else {
       LOG.warn("Delete event does not have the Key Info for {}.",
@@ -125,9 +125,9 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
           RepeatedOmKeyInfo repeatedOmKeyInfo = kv.getValue();
-          Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
-          unReplicatedSize += result.getLeft();
-          replicatedSize += result.getRight();
+          TotalSize result = repeatedOmKeyInfo.getTotalSize();
+          unReplicatedSize += result.getUnreplicatedSize();
+          replicatedSize += result.getReplicatedSize();
           count += repeatedOmKeyInfo.getOmKeyInfoList().size();
         }
       }

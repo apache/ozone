@@ -1675,7 +1675,10 @@
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
       SCM schedules a fixed interval job using the configured interval to
-      scrub pipelines.
+      scrub pipelines. While SCM is in safe mode, the job starts on the leader
+      once the container safe mode rules have passed and
+      ozone.scm.stale.node.interval has elapsed since SCM started, so that open
+      pipelines with unregistered datanodes are closed before safe mode exits.
     </description>
   </property>
   <property>
@@ -1727,8 +1730,7 @@
     <value>5m</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description> After exiting safemode, wait for configured interval of
-      time to start replication monitor and cleanup activities of unhealthy
-      pipelines.
+      time to start replication monitor and other background services.
     </description>
   </property>
 
