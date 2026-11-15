@@ -231,6 +231,7 @@ public class ReconControllerModule extends AbstractModule {
   }
 
   @Provides
+  @Singleton
   DataSourceConfiguration getDataSourceConfiguration(
       final OzoneConfiguration ozoneConfiguration) {
 
