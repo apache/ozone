@@ -318,40 +318,67 @@ Test native authorizer
 
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
 
-    Execute Later ozone sh    volume removeacl ${protocol}${server}/${volume} -a group:root:a
+    # setup with testuser
+
+    ${expected} =    Get test user principal    testuser
+    Should Be Equal    ${TEST_USER}    ${expected}
+
+    # no access
+    ${vol1} =    Set Variable    ${protocol}${server}/${volume}1
+    Execute Later ozone sh    volume create ${vol1}
+    Execute Later ozone sh    volume removeacl ${vol1} -a group:root:a
+
+    # no list
+    ${vol2} =    Set Variable    ${protocol}${server}/${volume}2
+    Execute Later ozone sh    volume create ${vol2}
+    Execute Later ozone sh    volume removeacl ${vol2} -a group:root:a
+    Execute Later ozone sh    volume addacl ${vol2} -a user:testuser2:xyrw
+    Execute Later ozone sh    bucket create ${vol2}/bb1
+
+    # all access to bucket
+    ${vol3} =    Set Variable    ${protocol}${server}/${volume}3
+    Execute Later ozone sh    volume create ${vol3}
+    Execute Later ozone sh    volume removeacl ${vol3} -a group:root:a
+    Execute Later ozone sh    volume addacl ${vol3} -a user:testuser2:xyrw
+    Execute Later ozone sh    bucket create ${vol3}/bb1
+    Execute Later ozone sh    bucket addacl ${vol3}/bb1 -a user:testuser2:a
+
     Execute Batch
 
-    Execute         kdestroy
-    Run Keyword     Kinit test user     testuser2    testuser2.keytab
-    ${result} =     Execute And Ignore Error         ozone sh bucket list ${protocol}${server}/${volume}
-                    Should contain      ${result}    PERMISSION_DENIED
-    ${result} =     Execute And Ignore Error         ozone sh key list ${protocol}${server}/${volume}/bb1
-                    Should contain      ${result}    PERMISSION_DENIED
-    ${result} =     Execute And Ignore Error         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:xy
-                    Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have WRITE_ACL permission to access volume
-    Execute         kdestroy
-    Run Keyword     Kinit test user     testuser     testuser.keytab
-    Execute         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:xyrw
-    Execute         kdestroy
-    Run Keyword     Kinit test user     testuser2    testuser2.keytab
-    ${result} =     Execute And Ignore Error         ozone sh bucket list ${protocol}${server}/${volume}
-                    Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have LIST permission to access volume
-    Execute         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:l
-    Execute         ozone sh bucket list ${protocol}${server}/${volume}
-    Execute         ozone sh volume getacl ${protocol}${server}/${volume}
+    # tests with testuser2
 
-    ${result} =     Execute And Ignore Error         ozone sh key list ${protocol}${server}/${volume}/bb1
-    Should contain      ${result}    PERMISSION_DENIED
     Execute         kdestroy
-    Run Keyword     Kinit test user     testuser     testuser.keytab
-    Execute         ozone sh bucket addacl ${protocol}${server}/${volume}/bb1 -a user:testuser2:a
-    Execute         ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    Kinit test user     testuser2    testuser2.keytab
+
+    # no access
+    ${result} =     Execute Later ozone sh    bucket list ${vol1}
+    Assert Later    File ${result} Should    Contain    PERMISSION_DENIED
+    ${result} =     Execute Later ozone sh    key list ${vol1}/bb1
+    Assert Later    File ${result} Should    Contain    PERMISSION_DENIED
+    ${result} =     Execute Later ozone sh    volume addacl ${vol1} -a user:testuser2:xy
+    Assert Later    File ${result} Should    Contain    PERMISSION_DENIED User testuser2 doesn't have WRITE_ACL permission to access volume
+
+    # no list
+    ${result} =     Execute Later ozone sh    bucket list ${vol2}
+    Assert Later    File ${result} Should    Contain    PERMISSION_DENIED User testuser2 doesn't have LIST permission to access volume
+    ${result} =     Execute Later ozone sh    volume addacl ${vol2} -a user:testuser2:l
+    Assert Later    File ${result} Should    Not Contain    PERMISSION_DENIED
+    ${result} =     Execute Later ozone sh    bucket list ${vol2}
+    Assert Later    File ${result} Should    Not Contain    PERMISSION_DENIED
+    ${result} =     Execute Later ozone sh    volume getacl ${vol2}
+    Assert Later    File ${result} Should    Not Contain    PERMISSION_DENIED
+    ${result} =     Execute Later ozone sh    key list ${vol2}/bb1
+    Assert Later    File ${result} Should    Contain    PERMISSION_DENIED
+
+    # all access to bucket
+    ${result} =     Execute Later ozone sh    bucket getacl ${vol3}/bb1
+    Assert Later    File ${result} Should    Not Contain    PERMISSION_DENIED
+    ${result} =     Execute Later ozone sh    key list ${vol3}/bb1
+    Assert Later    File ${result} Should    Not Contain    PERMISSION_DENIED
+
+    Execute Batch
     Execute         kdestroy
-    Run Keyword     Kinit test user     testuser2    testuser2.keytab
-    Execute         ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Execute         ozone sh key list ${protocol}${server}/${volume}/bb1
-    Execute         kdestroy
-    Run Keyword     Kinit test user     testuser    testuser.keytab
+
 
 Test Delete key with Trash
     [arguments]    ${protocol}         ${server}       ${volume}

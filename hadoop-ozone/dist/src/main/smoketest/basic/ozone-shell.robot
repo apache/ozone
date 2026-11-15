@@ -49,11 +49,6 @@ RpcClient bucket acls
 RpcClient key acls
     Test Key Acls         o3://            om:9862     ${prefix}-acls
 
-# depends on being run between key and prefix tests
-Test native authorizer
-    Skip If   '${SECURITY_ENABLED}' != 'true'    only if security is enabled
-    Test native authorizer    o3://    om:9862    ${prefix}-acls
-
 RpcClient prefix acls
     Test Prefix Acls      o3://            om:9862     ${prefix}-acls
 
@@ -62,3 +57,7 @@ RpcClient without host
 
 RpcClient Delete key
    Test Delete key with Trash       o3://            om:9862      ${prefix}-with-del
+
+Test native authorizer with other user
+    Skip If   '${SECURITY_ENABLED}' != 'true'    only if security is enabled
+    Test native authorizer    o3://    om:9862    ${prefix}-testuser2
