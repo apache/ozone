@@ -70,7 +70,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
@@ -471,9 +471,7 @@ class TestReconAndAdminContainerCLI {
         0, SECONDS);
     // Configure multiple task threads for concurrent task execution
     CONF.setInt("ozone.recon.task.thread.count", 6);
-    CONF.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "1s");
-    CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "1s");
-    CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "2s");
+    OzoneTestUtils.setFastPipelineScrub(CONF);
 
     CONF.setTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
         1, TimeUnit.SECONDS);
