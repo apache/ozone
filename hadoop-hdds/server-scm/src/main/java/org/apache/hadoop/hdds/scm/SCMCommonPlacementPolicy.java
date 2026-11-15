@@ -437,12 +437,10 @@ public abstract class SCMCommonPlacementPolicy implements
       List<DatanodeDetails> healthyNodes);
 
   /**
-   * Choose a datanode according to the policy, ranking candidates by their usage
-   * of the given storage type.
+   * Choose a datanode according to the policy. The default implementation ignores the storage type and delegates to
+   * {@link #chooseNode(List)}.
    *
-   * Policies that rank nodes by usage should override this to compare on
-   * {@code storageType}; the default ignores it, which is correct for policies
-   * that choose on topology or at random.
+   * Policies that rank nodes by usage should override this to compare on {@code storageType}.
    *
    * @param healthyNodes - Set of healthy nodes we can choose from.
    * @param storageType  - storage type to compare node usage on, or null to
