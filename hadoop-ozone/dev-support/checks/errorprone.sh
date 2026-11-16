@@ -51,7 +51,7 @@ declare -i rc
 trap 'rm -f "$OUTPUT_LOG"' EXIT
 
 #shellcheck disable=SC2086
-mvn $MAVEN_OPTIONS clean package "$@" 2>&1 | tee "$OUTPUT_LOG"
+./mvnw $MAVEN_OPTIONS clean package "$@" 2>&1 | tee "$OUTPUT_LOG"
 rc=$?
 
 mkdir -p "$REPORT_DIR"
