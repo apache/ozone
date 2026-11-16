@@ -386,6 +386,12 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
+  /**
+   * Flush and commit NSSummary to DB.
+   *
+   * @param nsSummaryMap Map of objectId to NSSummary
+   * @return true if successful, false otherwise
+   */
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
       updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
