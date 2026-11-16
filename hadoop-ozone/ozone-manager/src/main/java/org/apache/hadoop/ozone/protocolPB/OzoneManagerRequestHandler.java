@@ -36,7 +36,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
@@ -59,7 +58,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
-import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -203,7 +201,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
-  private FaultInjector injector;
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
@@ -263,12 +260,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case ListMultiPartUploadParts:
         MultipartUploadListPartsResponse listPartsResponse =
-            listParts(request.getListMultipartUploadPartsRequest());
+            listParts(request.getListMultipartUploadPartsRequest(), request.getAssumeS3Context());
         responseBuilder.setListMultipartUploadPartsResponse(listPartsResponse);
         break;
       case ListMultipartUploads:
         ListMultipartUploadsResponse response =
-            listMultipartUploads(request.getListMultipartUploadsRequest());
+            listMultipartUploads(request.getListMultipartUploadsRequest(), request.getAssumeS3Context());
         responseBuilder.setListMultipartUploadsResponse(response);
         break;
       case ListOpenFiles:
@@ -487,7 +484,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @Override
   public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context) throws IOException {
-    injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
@@ -502,27 +498,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, getOzoneManager(), context.getTermIndex(),
           th);
       throw th;
-    }
-  }
-
-  @VisibleForTesting
-  public void setInjector(FaultInjector injector) {
-    this.injector = injector;
-  }
-
-  @VisibleForTesting
-  public FaultInjector getInjector() {
-    return injector;
-  }
-
-  /**
-   * Inject pause for test only.
-   *
-   * @throws IOException
-   */
-  private void injectPause() throws IOException {
-    if (injector != null) {
-      injector.pause();
     }
   }
 
@@ -1067,7 +1042,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private MultipartUploadListPartsResponse listParts(
-      MultipartUploadListPartsRequest multipartUploadListPartsRequest)
+      MultipartUploadListPartsRequest multipartUploadListPartsRequest, boolean assumeS3Context)
       throws IOException {
 
     MultipartUploadListPartsResponse.Builder response =
@@ -1079,7 +1054,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             multipartUploadListPartsRequest.getKey(),
             multipartUploadListPartsRequest.getUploadID(),
             multipartUploadListPartsRequest.getPartNumbermarker(),
-            multipartUploadListPartsRequest.getMaxParts());
+            multipartUploadListPartsRequest.getMaxParts(), assumeS3Context);
 
     List<OmPartInfo> omPartInfoList =
         omMultipartUploadListParts.getPartInfoList();
@@ -1111,12 +1086,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListMultipartUploadsResponse listMultipartUploads(
-      ListMultipartUploadsRequest request)
+      ListMultipartUploadsRequest request, boolean assumeS3Context)
       throws IOException {
 
-    OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(request.getVolume(), request.getBucket(),
-        request.getPrefix(),
-        request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads(), request.getWithPagination());
+    OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(request.getVolume(),
+        request.getBucket(), request.getPrefix(), request.getKeyMarker(), request.getUploadIdMarker(),
+        request.getMaxUploads(), request.getWithPagination(), assumeS3Context);
 
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()

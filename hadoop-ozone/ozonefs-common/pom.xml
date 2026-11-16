@@ -25,6 +25,7 @@
   <packaging>jar</packaging>
   <name>Apache Ozone FileSystem Common</name>
   <properties>
+    <ban-rocksdb.skip>false</ban-rocksdb.skip>
     <file.encoding>UTF-8</file.encoding>
     <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
@@ -57,10 +58,6 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

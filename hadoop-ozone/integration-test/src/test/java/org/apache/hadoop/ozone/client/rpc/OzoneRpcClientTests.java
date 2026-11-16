@@ -200,6 +200,8 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocolPB.FaultInjectedOzoneManagerRequestHandler;
+import org.apache.hadoop.ozone.protocolPB.RequestHandler;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -1506,7 +1508,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void testCreateKeyIfNotExistsSuccess(BucketLayout layout) throws IOException {
-    checkFeatureEnable(OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
     OzoneBucket bucket = createBucket(layout);
     String keyName = "create-if-not-exists-" + layout.name();
     byte[] content = "test-content".getBytes(UTF_8);
@@ -1524,7 +1525,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void testCreateKeyIfNotExistsFailsWhenKeyExists(BucketLayout layout) throws IOException {
-    checkFeatureEnable(OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     byte[] newContent = "new-content".getBytes(UTF_8);
@@ -5469,7 +5469,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     OMRequestHandlerPauseInjector injector =
         new OMRequestHandlerPauseInjector();
-    omSM.getHandler().setInjector(injector);
+    RequestHandler handler = omSM.getHandler();
+    omSM.setHandler(new FaultInjectedOzoneManagerRequestHandler(handler, injector));
     thread1.start();
     thread2.start();
     // Wait long enough for createKey's preExecute to finish executing
@@ -5486,7 +5487,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       throw new RuntimeException(ex);
     }
 
-    omSM.getHandler().setInjector(null);
+    omSM.setHandler(handler);
     // Generate more write requests to OM
     String newBucketName = UUID.randomUUID().toString();
     volume.createBucket(newBucketName);

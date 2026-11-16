@@ -59,6 +59,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,7 +93,6 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -237,7 +237,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       if (copyHeader != null) {
         //Copy object, as copy source available.
         context.setAction(S3GAction.COPY_OBJECT);
-        CopyObjectResponse copyObjectResponse = copyObject(bucket, keyPath, replicationConfig, perf);
+        CopyObjectResponse copyObjectResponse = copyObject(bucket, keyPath, replicationConfig, sseHeaders, perf);
         return ServerSideEncryption.withHeaders(Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build(), sseHeaders);
       }
@@ -288,6 +288,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       putContentType(customMetadata);
       putStandardObjectHeaders(customMetadata);
+      ServerSideEncryption.putAlgorithm(customMetadata, sseHeaders);
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
       long putLength;
@@ -494,6 +495,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       addLastModifiedDate(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
       addCustomMetadataHeaders(responseBuilder, keyDetails);
+      ServerSideEncryption.readHeaders(keyDetails).forEach(responseBuilder::header);
 
       long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -729,6 +731,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     addLastModifiedDate(response, key);
     addTagCountIfAny(response, key);
     addCustomMetadataHeaders(response, key);
+    ServerSideEncryption.readHeaders(key).forEach(response::header);
     getMetrics().updateHeadKeySuccessStats(startNanos);
     auditReadSuccess(context.getAction());
     return response.build();
@@ -763,15 +766,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     S3ConditionalRequest.DeleteCondition deleteCondition = null;
 
     try {
-      OzoneVolume volume = context.getVolume();
       deleteCondition = S3ConditionalRequest.parseDeleteCondition(getHeaders(), keyPath);
 
-      if (!deleteCondition.hasIfMatch()) {
-        getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false);
-      } else {
-        getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false,
-            deleteCondition.getExpectedETag());
-      }
+      getClientProtocol().deleteKey(context.getCachedVolumeName(), context.getBucketName(), keyPath, false,
+          deleteCondition.getExpectedETag());
 
       getMetrics().updateDeleteKeySuccessStats(startNanos);
       return Response.status(Status.NO_CONTENT).build();
@@ -824,6 +822,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       putContentType(customMetadata);
       putStandardObjectHeaders(customMetadata);
+      ServerSideEncryption.putAlgorithm(customMetadata, sseHeaders);
 
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
@@ -938,8 +937,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: " +
             OmConfig.Keys.ENABLE_FILESYSTEM_PATHS + " is enabled Keys are " +
-            "considered as Unix Paths. A directory already exists with a " +
-            "given KeyName caused failure for MPU");
+            "considered as Unix Paths. Path has Violated FS Semantics " +
+            "which caused failure for MPU");
         throw os3Exception;
       } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
           || ex.getResult() == ResultCodes.ETAG_MISMATCH
@@ -1228,7 +1227,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   }
 
   private CopyObjectResponse copyObject(OzoneBucket destinationBucket, String destkey,
-      ReplicationConfig replicationConfig,
+      ReplicationConfig replicationConfig, Map<String, String> sseHeaders,
       PerformanceStringBuilder perf)
       throws OS3Exception, IOException {
     String destBucket = destinationBucket.getName();
@@ -1315,7 +1314,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> customMetadata;
       if (StringUtils.isEmpty(metadataCopyDirective) || metadataCopyDirective.equals(CopyDirective.COPY.name())) {
         // The custom metadata will be copied from the source key
-        customMetadata = sourceKeyDetails.getMetadata();
+        customMetadata = new HashMap<>(sourceKeyDetails.getMetadata());
       } else if (metadataCopyDirective.equals(CopyDirective.REPLACE.name())) {
         // Replace the metadata with the metadata form the request headers
         customMetadata = getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
@@ -1329,6 +1328,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             "The metadata copy directive specified is invalid. Valid values are COPY or REPLACE.");
         throw ex;
       }
+      ServerSideEncryption.putAlgorithm(customMetadata, sseHeaders);
 
       // A whole-object copy writes byte-identical content, so a plain (non-multipart) MD5 ETag
       // stored on the source is also the correct content MD5 for the destination and the data does

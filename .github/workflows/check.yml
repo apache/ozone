@@ -51,12 +51,6 @@ on:
         default: ''
         required: false
 
-      needs-maven-cache:
-        type: boolean
-        description: "Whether to restore Maven cache before run (default: yes)"
-        default: true
-        required: false
-
       needs-npm-cache:
         type: boolean
         description: "Whether to restore NPM cache before run (default: no)"
@@ -195,16 +189,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      - name: Cache for Maven dependencies
-        if: ${{ inputs.needs-maven-cache }}
-        uses: actions/cache/restore@v6
+      - name: Setup Java ${{ inputs.java-version }} with cache
+        if: ${{ inputs.java-version }}
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
+          java-version: ${{ inputs.java-version }}
 
       - name: Download Ozone repo
         id: download-ozone-repo
@@ -235,13 +224,6 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
           rm ozone*.tar.gz
-
-      - name: Setup java ${{ inputs.java-version }}
-        if: ${{ inputs.java-version }}
-        uses: actions/setup-java@v6
-        with:
-          distribution: 'temurin'
-          java-version: ${{ inputs.java-version }}
 
       - name: Get versions
         id: versions

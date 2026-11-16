@@ -145,7 +145,6 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
-import org.apache.hadoop.ozone.recon.ReconSqlDbConfig;
 import org.apache.hadoop.ozone.s3.Gateway;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -746,10 +745,6 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     conf.setIfUnset(OZONE_RECON_DB_DIR, reconDir.toString());
     conf.setIfUnset(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconDir.toString());
     conf.setIfUnset(OZONE_RECON_SCM_DB_DIR, reconDir.toString());
-
-    ReconSqlDbConfig dbConfig = conf.getObject(ReconSqlDbConfig.class);
-    dbConfig.setJdbcUrl("jdbc:derby:" + reconDir.resolve("ozone_recon_derby.db"));
-    conf.setFromObject(dbConfig);
 
     int reconHttpPort = reservePort(portAllocator, persistedPorts, RECON_HTTP_PORT_KEY, config.getReconPort());
     int reconHttpsPort = reservePort(portAllocator, persistedPorts, RECON_HTTPS_PORT_KEY, 0);
