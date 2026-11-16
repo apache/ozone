@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -174,7 +175,7 @@ public class TestRatisUnderReplicationHandler {
   }
 
   @Test
-  public void testUnderReplicationDoesNotFallbackToIncompatibleStorageTier() {
+  public void testUnderReplicationDoesNotFallbackToIncompatibleStorageTier() throws IOException {
     container = TestContainerInfo.newBuilderForTest()
         .setContainerID(1)
         .setReplicationConfig(RATIS_REPLICATION_CONFIG)
@@ -513,7 +514,8 @@ public class TestRatisUnderReplicationHandler {
 
     // Ensure that the replica with SEQ=2 is the only source sent
     verify(replicationManager).sendThrottledReplicationCommand(any(ContainerInfo.class),
-        eq(Collections.singletonList(valid.getDatanodeDetails())), any(DatanodeDetails.class), anyInt());
+        eq(Collections.singletonList(valid.getDatanodeDetails())), any(DatanodeDetails.class), anyInt(),
+        eq(StorageType.DEFAULT));
   }
 
   @Test

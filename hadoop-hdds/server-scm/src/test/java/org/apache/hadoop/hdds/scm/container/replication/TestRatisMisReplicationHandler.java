@@ -102,12 +102,12 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
 
   @Test
   public void testMisReplicationPreservesStorageTier() throws IOException {
-    container = TestContainerInfo.newBuilderForTest()
+    setContainerForTest(TestContainerInfo.newBuilderForTest()
         .setContainerID(1)
         .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(LifeCycleState.CLOSED)
         .setStorageTier(StorageTier.SSD)
-        .build();
+        .build());
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicas(
         Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
     PlacementPolicy placementPolicy = mockPlacementPolicy();
@@ -116,9 +116,8 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
 
     verify(placementPolicy).chooseDatanodes(
         any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD));
-    ReplicateContainerCommand command =
-        (ReplicateContainerCommand) commandsSent.iterator().next().getValue();
-    assertEquals(StorageType.SSD, command.getTargetVolumeStorageType());
+    verify(getReplicationManager()).sendThrottledReplicationCommand(
+        any(), anyList(), any(), eq(0), eq(StorageType.SSD));
   }
 
   @ParameterizedTest
@@ -273,7 +272,8 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
     nodeInfos.get(4).setNodeStatus(NodeStatus.inServiceHealthy());
     assertEquals(1, handler.processAndSendCommands(replicas, Collections.emptyList(), result, 0));
     ArgumentCaptor<DatanodeDetails> target = ArgumentCaptor.forClass(DatanodeDetails.class);
-    verify(getReplicationManager()).sendThrottledReplicationCommand(eq(container), anyList(), target.capture(), eq(0));
+    verify(getReplicationManager()).sendThrottledReplicationCommand(
+        eq(container), anyList(), target.capture(), eq(0), eq(StorageType.DEFAULT));
     assertEquals(nodes.get(4), target.getValue());
   }
 
@@ -282,7 +282,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
-            anyList(), any(), anyInt());
+            anyList(), any(), anyInt(), any());
 
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
