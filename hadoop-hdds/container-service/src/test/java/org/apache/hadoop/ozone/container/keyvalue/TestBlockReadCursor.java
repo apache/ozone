@@ -59,6 +59,36 @@ class TestBlockReadCursor {
   }
 
   @Test
+  void testUnalignedRangesCoverExactlyTheRequestedBytes() throws Exception {
+    List<ChunkInfo> chunks = Arrays.asList(chunk(0, 3, 4), chunk(3, 9, 4), chunk(12, 7, 3));
+    BlockReadCursor cursor = new BlockReadCursor(4, 14, 6, chunks, false);
+    assertEquals(6, cursor.responseDataSize());
+    assertNextRange(cursor, 4, 6, Collections.emptyList());
+    assertNextRange(cursor, 10, 6, Collections.emptyList());
+    assertNextRange(cursor, 16, 2, Collections.emptyList());
+    assertFalse(cursor.hasNext());
+
+    // Clamped to the end of the block.
+    cursor = new BlockReadCursor(5, Long.MAX_VALUE, 100, chunks, false);
+    assertNextRange(cursor, 5, 14, Collections.emptyList());
+    assertFalse(cursor.hasNext());
+
+    // A request inside one interval is not widened to it.
+    cursor = new BlockReadCursor(13, 1, 6, chunks, false);
+    assertNextRange(cursor, 13, 1, Collections.emptyList());
+    assertFalse(cursor.hasNext());
+
+    assertFalse(new BlockReadCursor(4, 0, 6, chunks, false).hasNext());
+
+    // The same request with checksums keeps the aligned ranges.
+    cursor = new BlockReadCursor(4, 14, 6, chunks, true);
+    assertNextRange(cursor, 3, 4, chunks.subList(1, 2));
+    assertNextRange(cursor, 7, 5, chunks.subList(1, 2));
+    assertNextRange(cursor, 12, 6, chunks.subList(2, 3));
+    assertFalse(cursor.hasNext());
+  }
+
+  @Test
   void testSpanningChunksAndShortFinalChecksum() throws Exception {
     List<ChunkInfo> chunks = Arrays.asList(chunk(0, 3, 4), chunk(3, 9, 4));
     BlockReadCursor cursor = new BlockReadCursor(0, Long.MAX_VALUE, 8, chunks);
