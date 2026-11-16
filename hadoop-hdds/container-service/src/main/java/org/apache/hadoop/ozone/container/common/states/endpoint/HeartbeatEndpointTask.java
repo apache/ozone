@@ -295,7 +295,7 @@ public class HeartbeatEndpointTask
           rpcEndpoint.getAddress(), currentHeartbeatSize, safeHeartbeatSize);
     }
     if (selection.getOversizedBytes() > 0) {
-      LOG.warn("A command status for {} is {} bytes, exceeding the effective "
+      LOG.warn("A command status report for {} is {} bytes, exceeding the effective "
               + "limit of {} bytes (configured limit: {}, safe heartbeat size: {})",
           rpcEndpoint.getAddress(), selection.getOversizedBytes(),
           oversizedThreshold, maxCommandStatusReportBytes, safeHeartbeatSize);

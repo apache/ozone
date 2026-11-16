@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -74,7 +76,8 @@ public class ContainerReportPublisher extends
   }
 
   @Override
-  protected ContainerReportsProto getReport() throws IOException {
-    return getContext().getFullContainerReportDiscardPendingICR();
+  protected List<ContainerReportsProto> getReports() throws IOException {
+    return Collections.singletonList(
+        getContext().getFullContainerReportDiscardPendingICR());
   }
 }

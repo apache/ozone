@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.report;
 
 import com.google.protobuf.Message;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -77,11 +78,12 @@ public abstract class ReportPublisher<T extends Message>
    */
   private void publishReport() {
     try {
-      Message report = getReport();
-      if (report instanceof CommandStatusReportsProto) {
-        context.addIncrementalReport(report);
-      } else {
-        context.refreshFullReport(report);
+      for (Message report : getReports()) {
+        if (report instanceof CommandStatusReportsProto) {
+          context.addIncrementalReport(report);
+        } else {
+          context.refreshFullReport(report);
+        }
       }
     } catch (IOException e) {
       LOG.error("Exception while publishing report.", e);
@@ -96,11 +98,12 @@ public abstract class ReportPublisher<T extends Message>
   protected abstract long getReportFrequency();
 
   /**
-   * Generate and returns the report which has to be sent as part of heartbeat.
+   * Generates and returns the reports which have to be sent as part of
+   * heartbeat.
    *
-   * @return datanode report
+   * @return datanode reports
    */
-  protected abstract T getReport() throws IOException;
+  protected abstract List<T> getReports() throws IOException;
 
   /**
    * Returns {@link StateContext}.

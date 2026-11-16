@@ -37,7 +37,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -61,7 +60,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -399,14 +397,12 @@ public class StateContext {
 
   /**
    * Selects command status reports within both the report count and serialized
-   * byte limits. An aggregate report may be split between complete command
-   * statuses, but an individual command status is never split. To guarantee
-   * progress, one status may exceed {@code maxBytes} when it still fits within
-   * {@code maxSingleStatusBytes}.
+   * byte limits. To guarantee progress, one report may exceed {@code maxBytes}
+   * when it still fits within {@code maxSingleReportBytes}.
    */
   public CommandStatusReportSelection getCommandStatusReports(
       HostAndPort endpoint, int maxLimit, long maxBytes,
-      long maxSingleStatusBytes, long oversizedThreshold) {
+      long maxSingleReportBytes, long oversizedThreshold) {
     List<CommandStatusReportsProto> selected = new LinkedList<>();
     long selectedBytes = 0;
     long oversizedBytes = 0;
@@ -414,7 +410,7 @@ public class StateContext {
       List<Message> reportsForEndpoint =
           incrementalReportsQueue.get(endpoint);
       if (reportsForEndpoint != null) {
-        ListIterator<Message> iterator = reportsForEndpoint.listIterator();
+        Iterator<Message> iterator = reportsForEndpoint.iterator();
         while (iterator.hasNext() && selected.size() < maxLimit) {
           Message message = iterator.next();
           if (!(message instanceof CommandStatusReportsProto)) {
@@ -425,42 +421,18 @@ public class StateContext {
               (CommandStatusReportsProto) message;
           long remainingBytes = maxBytes - selectedBytes;
           long reportBytes = getCommandStatusReportWireSize(report);
-          if (reportBytes <= remainingBytes) {
+          if (reportBytes <= remainingBytes ||
+              (selected.isEmpty() && reportBytes <= maxSingleReportBytes)) {
             selected.add(report);
             selectedBytes += reportBytes;
             iterator.remove();
+            if (reportBytes > oversizedThreshold) {
+              oversizedBytes = reportBytes;
+            }
             continue;
           }
-
-          CommandStatusReportSplit split =
-              splitCommandStatusReport(report, remainingBytes);
-          if (split.getSelected() != null) {
-            selected.add(split.getSelected());
-            selectedBytes +=
-                getCommandStatusReportWireSize(split.getSelected());
-            iterator.set(split.getRemainder());
-          } else {
-            long firstStatusBytes = getFirstCommandStatusWireSize(report);
-            if (selected.isEmpty() && firstStatusBytes <= maxSingleStatusBytes) {
-              if (report.getCmdStatusCount() == 0) {
-                selected.add(report);
-                selectedBytes += firstStatusBytes;
-                iterator.remove();
-              } else {
-                CommandStatusReportSplit singleStatus =
-                    splitCommandStatusReport(report, firstStatusBytes);
-                selected.add(singleStatus.getSelected());
-                selectedBytes += firstStatusBytes;
-                if (singleStatus.getRemainder().getCmdStatusCount() == 0) {
-                  iterator.remove();
-                } else {
-                  iterator.set(singleStatus.getRemainder());
-                }
-              }
-            }
-            if (firstStatusBytes > oversizedThreshold) {
-              oversizedBytes = firstStatusBytes;
-            }
+          if (reportBytes > oversizedThreshold) {
+            oversizedBytes = reportBytes;
           }
           break;
         }
@@ -535,44 +507,6 @@ public class StateContext {
     return reportsToReturn;
   }
 
-  private CommandStatusReportSplit splitCommandStatusReport(
-      CommandStatusReportsProto report, long maxBytes) {
-    CommandStatusReportsProto.Builder selected =
-        CommandStatusReportsProto.newBuilder();
-    CommandStatusReportsProto.Builder remainder =
-        CommandStatusReportsProto.newBuilder();
-    long selectedReportBytes = 0;
-    boolean limitReached = false;
-    for (StorageContainerDatanodeProtocolProtos.CommandStatus status :
-        report.getCmdStatusList()) {
-      int statusBytes = CodedOutputStream.computeMessageSize(
-          CommandStatusReportsProto.CMDSTATUS_FIELD_NUMBER, status);
-      long candidateReportBytes = selectedReportBytes + statusBytes;
-      if (!limitReached &&
-          getCommandStatusReportWireSize(candidateReportBytes) <= maxBytes) {
-        selected.addCmdStatus(status);
-        selectedReportBytes = candidateReportBytes;
-      } else {
-        limitReached = true;
-        remainder.addCmdStatus(status);
-      }
-    }
-    return new CommandStatusReportSplit(
-        selected.getCmdStatusCount() == 0 ? null : selected.build(),
-        remainder.build());
-  }
-
-  private long getFirstCommandStatusWireSize(
-      CommandStatusReportsProto report) {
-    if (report.getCmdStatusCount() == 0) {
-      return getCommandStatusReportWireSize(report);
-    }
-    int statusBytes = CodedOutputStream.computeMessageSize(
-        CommandStatusReportsProto.CMDSTATUS_FIELD_NUMBER,
-        report.getCmdStatus(0));
-    return getCommandStatusReportWireSize(statusBytes);
-  }
-
   private static long getCommandStatusReportWireSize(
       CommandStatusReportsProto report) {
     return getCommandStatusReportWireSize(report.getSerializedSize());
@@ -631,25 +565,6 @@ public class StateContext {
 
     public long getOversizedBytes() {
       return oversizedBytes;
-    }
-  }
-
-  private static final class CommandStatusReportSplit {
-    private final CommandStatusReportsProto selected;
-    private final CommandStatusReportsProto remainder;
-
-    private CommandStatusReportSplit(CommandStatusReportsProto selected,
-        CommandStatusReportsProto remainder) {
-      this.selected = selected;
-      this.remainder = remainder;
-    }
-
-    private CommandStatusReportsProto getSelected() {
-      return selected;
-    }
-
-    private CommandStatusReportsProto getRemainder() {
-      return remainder;
     }
   }
 
