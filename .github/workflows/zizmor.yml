@@ -22,10 +22,12 @@ on:
     tags:
       - '**'
     paths:
+      - ".github/actions/**"
       - '.github/workflows/**'
       - '.github/zizmor.yml'
   pull_request:
     paths:
+      - ".github/actions/**"
       - '.github/workflows/**'
       - '.github/zizmor.yml'
 

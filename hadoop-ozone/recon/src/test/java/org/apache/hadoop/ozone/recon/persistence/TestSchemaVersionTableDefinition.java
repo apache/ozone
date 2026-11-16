@@ -62,10 +62,11 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSet = metaData.getColumns(null, null,
         SCHEMA_VERSION_TABLE_NAME, null);
 
+    // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
     List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
 
     expectedPairs.add(new ImmutablePair<>("version_number", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("applied_on", Types.TIMESTAMP));
+    expectedPairs.add(new ImmutablePair<>("applied_on", Types.VARCHAR));
 
     List<Pair<String, Integer>> actualPairs = new ArrayList<>();
 
@@ -152,7 +153,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize the schema
     SchemaVersionTableDefinition schemaVersionTable = new SchemaVersionTableDefinition(getDataSource());
-    schemaVersionTable.setSoftwareVersion(3);
+    schemaVersionTable.setFreshInstallVersion(3);
     schemaVersionTable.initializeSchema();
 
     // Verify that the SchemaVersionTable is created
@@ -235,7 +236,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize the schema
     SchemaVersionTableDefinition schemaVersionTable = new SchemaVersionTableDefinition(getDataSource());
-    schemaVersionTable.setSoftwareVersion(3);
+    schemaVersionTable.setFreshInstallVersion(3);
     schemaVersionTable.initializeSchema();
 
     try (ReconVersionManager versionManager = new ReconVersionManager(getDataSource())) {

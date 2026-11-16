@@ -24,13 +24,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SSL_
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
 import com.google.protobuf.ServiceException;
-import io.grpc.Context;
-import io.grpc.ManagedChannel;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyChannelBuilder;
-import io.netty.handler.ssl.SslContextBuilder;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
@@ -59,10 +52,18 @@ import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressClientInterceptor;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OzoneManagerServiceGrpcBinding;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.thirdparty.io.grpc.Channel;
+import org.apache.ratis.thirdparty.io.grpc.Context;
+import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
+import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,8 +82,7 @@ public class GrpcOmTransport implements OmTransport {
   // gRPC specific
   private static List<X509Certificate> caCerts = null;
 
-  private final Map<String,
-      OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub> clients;
+  private final Map<String, Channel> clients;
   private final Map<String, ManagedChannel> channels;
   private final ConfigurationSource conf;
 
@@ -180,9 +180,7 @@ public class GrpcOmTransport implements OmTransport {
       channels.put(hostaddr,
           channelBuilder.intercept(new ClientAddressClientInterceptor())
               .build());
-      clients.put(hostaddr,
-          OzoneManagerServiceGrpc
-              .newBlockingStub(channels.get(hostaddr)));
+      clients.put(hostaddr, channels.get(hostaddr));
     }
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
@@ -237,8 +235,7 @@ public class GrpcOmTransport implements OmTransport {
             inetAddress.getHostAddress())
         .withValue(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY,
             inetAddress.getHostName())
-        .run(() -> resp.set(clients.get(targetHost)
-            .submitRequest(payload)));
+        .run(() -> resp.set(OzoneManagerServiceGrpcBinding.submitRequest(clients.get(targetHost), payload)));
     return resp.get();
   }
 
@@ -371,9 +368,7 @@ public class GrpcOmTransport implements OmTransport {
     for (String nodeId : omFailoverProxyProvider.getOMProxyMap().getNodeIds()) {
       String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
 
-      clients.put(hostaddr,
-          OzoneManagerServiceGrpc
-              .newBlockingStub(testChannel));
+      clients.put(hostaddr, testChannel);
     }
     LOG.info("{}: started", CLIENT_NAME);
   }
@@ -381,9 +376,7 @@ public class GrpcOmTransport implements OmTransport {
   @VisibleForTesting
   public void startClient(String nodeId, ManagedChannel testChannel) throws IOException {
     String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
-    clients.put(hostaddr,
-        OzoneManagerServiceGrpc
-            .newBlockingStub(testChannel));
+    clients.put(hostaddr, testChannel);
     LOG.info("{}: started test client for {}", CLIENT_NAME, nodeId);
   }
 
