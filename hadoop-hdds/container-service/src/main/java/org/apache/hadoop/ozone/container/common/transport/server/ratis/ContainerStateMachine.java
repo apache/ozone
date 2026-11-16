@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
@@ -141,9 +142,11 @@ import org.slf4j.LoggerFactory;
  * 2) WriteChunk commit is executed after WriteChunk write.
  *    Then, WriteChunk commit and CreateContainer will be executed in the same order.
  */
-public class ContainerStateMachine extends BaseStateMachine {
+public final class ContainerStateMachine extends BaseStateMachine {
   static final Logger LOG = LoggerFactory.getLogger(ContainerStateMachine.class);
 
+  /** Either {@link ReplicationType#RATIS} or {@link ReplicationType#CHAINED}. */
+  private final ReplicationType replicationType;
   private final SimpleStateMachineStorage storage = new SimpleStateMachineStorage();
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
@@ -249,18 +252,85 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
   }
 
-  @SuppressWarnings("parameternumber")
-  public ContainerStateMachine(HddsDatanodeService hddsDatanodeService, RaftGroupId gid,
-      ContainerDispatcher dispatcher,
-      ContainerController containerController,
-      List<ThreadPoolExecutor> chunkExecutors,
-      XceiverServerRatis ratisServer,
-      ConfigurationSource conf,
-      String threadNamePrefix) {
-    this.datanodeService = hddsDatanodeService;
-    this.dispatcher = dispatcher;
-    this.containerController = containerController;
-    this.ratisServer = ratisServer;
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  /** Builder for {@link ContainerStateMachine}. */
+  public static final class Builder {
+    private ReplicationType replicationType;
+    private HddsDatanodeService datanodeService;
+    private RaftGroupId groupId;
+    private ContainerDispatcher dispatcher;
+    private ContainerController containerController;
+    private List<ThreadPoolExecutor> chunkExecutors;
+    private XceiverServerRatis ratisServer;
+    private ConfigurationSource conf;
+    private String threadNamePrefix;
+
+    private Builder() {
+    }
+
+    public Builder setReplicationType(ReplicationType type) {
+      this.replicationType = type;
+      return this;
+    }
+
+    public Builder setDatanodeService(HddsDatanodeService service) {
+      this.datanodeService = service;
+      return this;
+    }
+
+    public Builder setGroupId(RaftGroupId id) {
+      this.groupId = id;
+      return this;
+    }
+
+    public Builder setDispatcher(ContainerDispatcher containerDispatcher) {
+      this.dispatcher = containerDispatcher;
+      return this;
+    }
+
+    public Builder setContainerController(ContainerController controller) {
+      this.containerController = controller;
+      return this;
+    }
+
+    public Builder setChunkExecutors(List<ThreadPoolExecutor> executors) {
+      this.chunkExecutors = executors;
+      return this;
+    }
+
+    public Builder setRatisServer(XceiverServerRatis server) {
+      this.ratisServer = server;
+      return this;
+    }
+
+    public Builder setConf(ConfigurationSource configuration) {
+      this.conf = configuration;
+      return this;
+    }
+
+    public Builder setThreadNamePrefix(String prefix) {
+      this.threadNamePrefix = prefix;
+      return this;
+    }
+
+    public ContainerStateMachine build() {
+      return new ContainerStateMachine(this);
+    }
+  }
+
+  private ContainerStateMachine(Builder b) {
+    this.replicationType = b.replicationType;
+    Preconditions.checkArgument(replicationType == ReplicationType.RATIS || replicationType == ReplicationType.CHAINED,
+        "Unexpected replicationType: %s", replicationType);
+    this.datanodeService = b.datanodeService;
+    this.dispatcher = b.dispatcher;
+    this.containerController = b.containerController;
+    this.ratisServer = b.ratisServer;
+    final RaftGroupId gid = b.groupId;
+    final ConfigurationSource conf = b.conf;
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentSkipListMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
@@ -280,7 +350,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           }
         });
 
-    this.chunkExecutors = chunkExecutors;
+    this.chunkExecutors = b.chunkExecutors;
 
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
@@ -298,7 +368,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(
-            threadNamePrefix + "ContainerOp-" + gid.getUuid() + "-%d")
+            b.threadNamePrefix + "ContainerOp-" + gid.getUuid() + "-%d")
         .build();
     this.executor = Executors.newFixedThreadPool(numContainerOpExecutors,
         threadFactory);
@@ -321,6 +391,10 @@ public class ContainerStateMachine extends BaseStateMachine {
           ContainerProtos.Result.INVALID_CONFIG);
     }
     peersValidated.set(true);
+  }
+
+  public ReplicationType getReplicationType() {
+    return replicationType;
   }
 
   @Override

@@ -238,8 +238,17 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
-    return new ContainerStateMachine(datanodeService, gid, dispatcher, containerController,
-        chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
+    return ContainerStateMachine.newBuilder()
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setDatanodeService(datanodeService)
+        .setGroupId(gid)
+        .setDispatcher(dispatcher)
+        .setContainerController(containerController)
+        .setChunkExecutors(chunkExecutors)
+        .setRatisServer(this)
+        .setConf(conf)
+        .setThreadNamePrefix(datanodeDetails.threadNamePrefix())
+        .build();
   }
 
   private void setUpRatisStream(RaftProperties properties) {
