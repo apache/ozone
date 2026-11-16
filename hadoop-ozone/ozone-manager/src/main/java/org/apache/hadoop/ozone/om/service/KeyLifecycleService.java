@@ -316,6 +316,7 @@ public class KeyLifecycleService extends BackgroundService {
     private String lastScannedKey;
     private String lastScannedDir;
     private String lastScannedDirKey;
+    private String lastScannedMpuKey;
 
     private long lastStateSaveTime = Time.monotonicNow();
     private long lastStateSaveKeyCount = 0;
@@ -360,7 +361,7 @@ public class KeyLifecycleService extends BackgroundService {
 
     private boolean shouldSaveState() {
       if ((Time.monotonicNow() - lastStateSaveTime) > stateSaveIntervalMs ||
-          (numKeyIterated - lastStateSaveKeyCount) >= maxKeysProcessedPerState) {
+          (numKeyIterated + numMultipartUploadIterated - lastStateSaveKeyCount) >= maxKeysProcessedPerState) {
         return true;
       }
       return false;
@@ -488,7 +489,8 @@ public class KeyLifecycleService extends BackgroundService {
               evaluateBucket(bucket, keyTable, expirationRules, expiredKeyList, scanStateBuilder);
             }
 
-            boolean scanFinished = !scanAborted;
+            // With multipart upload rules, the scan finishes after the multipart uploads are processed
+            boolean scanFinished = !scanAborted && mpuRules.isEmpty();
             if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
               LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
               sendSaveScanStateRequest(scanStateBuilder, scanFinished);
@@ -510,7 +512,8 @@ public class KeyLifecycleService extends BackgroundService {
           }
 
           if (!mpuRules.isEmpty()) {
-            processMultipartUploads(bucket, mpuRules);
+            processMultipartUploads(bucket, mpuRules, scanStateBuilder);
+            sendSaveScanStateRequest(scanStateBuilder, !scanAborted);
           }
         } catch (Throwable e) {
           LOG.error("Failed to evaluate lifecycle configuration for bucket {}", bucketKey, e);
@@ -1072,7 +1075,7 @@ public class KeyLifecycleService extends BackgroundService {
         sendSaveScanStateRequest(scanStateBuilder, false);
       }
       lastStateSaveTime = Time.monotonicNow();
-      lastStateSaveKeyCount = numKeyIterated;
+      lastStateSaveKeyCount = numKeyIterated + numMultipartUploadIterated;
     }
 
     private void evaluateBucket(OmBucketInfo bucketInfo,
@@ -1146,8 +1149,10 @@ public class KeyLifecycleService extends BackgroundService {
      *
      * @param bucketInfo the bucket information
      * @param ruleList list of lifecycle rules with AbortIncompleteMultipartUpload action
+     * @param scanStateBuilder scan state to resume from and to save the scanned multipart upload pointer to
      */
-    private void processMultipartUploads(OmBucketInfo bucketInfo, List<OmLCRule> ruleList) {
+    private void processMultipartUploads(OmBucketInfo bucketInfo, List<OmLCRule> ruleList,
+        OmLifecycleScanState.Builder scanStateBuilder) {
       String volumeName = bucketInfo.getVolumeName();
       String bucketName = bucketInfo.getBucketName();
       String bucketPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
@@ -1155,15 +1160,30 @@ public class KeyLifecycleService extends BackgroundService {
       LOG.debug("Processing AbortIncompleteMultipartUpload actions for bucket {}/{}", volumeName, bucketName);
 
       PartCountLimitedList expiredUploads = new PartCountLimitedList(mpuAbortLimitPerTask);
+      boolean seekPerformed = false;
       try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
                omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
+        String resumeMpuKey = scanStateBuilder == null ? null : scanStateBuilder.getLastScannedMpuKey();
+        if (resumeMpuKey != null) {
+          mpuIterator.seek(resumeMpuKey);
+          seekPerformed = true;
+        }
         while (mpuIterator.hasNext()) {
           if (!shouldContinue(bucketName)) {
-            return;
+            break;
+          }
+          if (shouldSaveState()) {
+            // abort the pending uploads first, so the saved pointer never skips an upload that is not aborted
+            abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+            flushAndSaveState(bucketInfo, null, null, scanStateBuilder);
           }
           Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
+          if (seekPerformed && entry.getKey().equals(resumeMpuKey)) {
+            continue;
+          }
           OmMultipartKeyInfo mpuKeyInfo = entry.getValue();
           numMultipartUploadIterated++;
+          lastScannedMpuKey = entry.getKey();
 
           OmMultipartUpload upload;
           try {
@@ -1254,8 +1274,8 @@ public class KeyLifecycleService extends BackgroundService {
               volumeName, bucketName, keyName, upload.getUploadId(), uploadedParts);
         }
       } catch (IOException e) {
+        // log failure and continue the process to abort uploads already identified in this run
         LOG.warn("Failed to iterate multipartInfoTable for bucket {}/{}", volumeName, bucketName, e);
-        return;
       }
 
       if (!expiredUploads.isEmpty()) {
@@ -1456,6 +1476,9 @@ public class KeyLifecycleService extends BackgroundService {
         }
         if (lastScannedKey != null) {
           scanStateBuilder.setLastScannedKey(lastScannedKey);
+        }
+        if (lastScannedMpuKey != null) {
+          scanStateBuilder.setLastScannedMpuKey(lastScannedMpuKey);
         }
         if (scanFinished) {
           scanStateBuilder.setScanEndTime(System.currentTimeMillis());
