@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -64,6 +65,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,8 +98,7 @@ public class ContainerBalancerTask implements Runnable {
   private ContainerBalancerConfiguration config;
   private ContainerBalancerMetrics metrics;
   private final ContainerMoveFailureTracker moveFailureTracker;
-  private double upperLimit;
-  private double lowerLimit;
+  private final List<StorageTypeBalancingState> storageTypeStates = new ArrayList<>();
   private ContainerBalancerSelectionCriteria selectionCriteria;
   private volatile Status taskStatus = Status.RUNNING;
   /*
@@ -116,6 +117,7 @@ public class ContainerBalancerTask implements Runnable {
       moveSelectionToFutureMap;
   private IterationResult iterationResult;
   private int nextIterationIndex;
+  private int currentIterationIndex;
   private boolean delayStart;
   private Queue<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
   private OffsetDateTime currentIterationStarted;
@@ -233,6 +235,7 @@ public class ContainerBalancerTask implements Runnable {
     // leader change or restart
     int i = nextIterationIndex;
     for (; i < iterations && isBalancerRunning(); i++) {
+      currentIterationIndex = i;
       currentIterationStarted = now();
 
       isCurrentIterationInProgress.compareAndSet(false, true);
@@ -557,56 +560,45 @@ public class ContainerBalancerTask implements Runnable {
 
     this.totalNodesInCluster = datanodeUsageInfos.size();
 
-    double clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Average utilization of the cluster is {}", clusterAvgUtilisation);
+    // Node include/exclude filters have already been applied above.
+    ContainerBalancerClusterSnapshot analysis = ContainerBalancerClusterAnalyzer.analyze(datanodeUsageInfos.stream()
+        .map(node -> node.toProto(ClientVersion.DEFAULT_VERSION)).collect(Collectors.toList()),
+        config.getThresholdAsRatio(), Collections.emptySet(), Collections.emptySet());
+    if (analysis.hasIncompleteStorageTypeUsage()) {
+      lastInitializationFailureDetail = "Incomplete storage-type usage reports; cannot safely select typed moves";
+      LOG.warn(lastInitializationFailureDetail);
+      return false;
     }
-
-    double threshold = config.getThresholdAsRatio();
-    // over utilized nodes have utilization(that is, used / capacity) greater than upper limit
-    this.upperLimit = ContainerBalancerClusterAnalyzer.computeUpperLimit(
-        clusterAvgUtilisation, threshold);
-    // under utilized nodes have utilization(that is, used / capacity) less than lower limit
-    this.lowerLimit = ContainerBalancerClusterAnalyzer.computeLowerLimit(
-        clusterAvgUtilisation, threshold);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Lower limit for utilization is {} and Upper limit for utilization is {}", lowerLimit, upperLimit);
+    if (analysis.getStorageTypeSnapshots().isEmpty()) {
+      storageTypeStates.add(new StorageTypeBalancingState(null, analysis.getLowerLimit(), analysis.getUpperLimit(),
+          datanodeUsageInfos, analysis.getSourceDatanodes(), analysis.getTargetDatanodes()));
+    } else {
+      analysis.getStorageTypeSnapshots().forEach((type, snapshot) ->
+          storageTypeStates.add(new StorageTypeBalancingState(type, snapshot.getLowerLimit(), snapshot.getUpperLimit(),
+              datanodeUsageInfos, snapshot.getSourceDatanodes(), snapshot.getTargetDatanodes())));
     }
-
-    long totalOverUtilizedBytes = 0L, totalUnderUtilizedBytes = 0L;
-    // find over and under utilized nodes
-    for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
+    Set<DatanodeDetails> sources = new HashSet<>();
+    Set<DatanodeDetails> targets = new HashSet<>();
+    storageTypeStates.forEach(state -> {
+      sources.addAll(state.sources);
+      targets.addAll(state.targets);
+    });
+    for (DatanodeUsageInfo node : datanodeUsageInfos) {
       if (!isBalancerRunning()) {
         return false;
       }
-      double utilization = datanodeUsageInfo.calculateUtilization();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Utilization for node {} with capacity {}B, used {}B, and " +
-                "remaining {}B is {}",
-            datanodeUsageInfo.getDatanodeDetails(),
-            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            datanodeUsageInfo.getScmNodeStat().getScmUsed().get(),
-            datanodeUsageInfo.getScmNodeStat().getRemaining().get(),
-            utilization);
+      if (sources.contains(node.getDatanodeDetails())) {
+        overUtilizedNodes.add(node);
       }
-      if (ContainerBalancerClusterAnalyzer.isOverUtilized(utilization, upperLimit)) {
-        overUtilizedNodes.add(datanodeUsageInfo);
-        metrics.incrementNumDatanodesUnbalanced(1);
-        totalOverUtilizedBytes +=
-            ContainerBalancerClusterAnalyzer.overUtilizedBytes(datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-                utilization, upperLimit);
-      } else if (ContainerBalancerClusterAnalyzer.isUnderUtilized(utilization, lowerLimit)) {
-        underUtilizedNodes.add(datanodeUsageInfo);
-        metrics.incrementNumDatanodesUnbalanced(1);
-        totalUnderUtilizedBytes +=
-            ContainerBalancerClusterAnalyzer.underUtilizedBytes(datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-                utilization, lowerLimit);
+      if (targets.contains(node.getDatanodeDetails())) {
+        underUtilizedNodes.add(node);
       }
     }
+    Set<DatanodeDetails> unbalancedNodes = new HashSet<>(sources);
+    unbalancedNodes.addAll(targets);
+    metrics.incrementNumDatanodesUnbalanced(unbalancedNodes.size());
     metrics.incrementDataSizeUnbalancedGB(
-        Math.max(totalOverUtilizedBytes, totalUnderUtilizedBytes) /
-            OzoneConsts.GB);
+        Math.max(analysis.getTotalOverUtilizedBytes(), analysis.getTotalUnderUtilizedBytes()) / OzoneConsts.GB);
     Collections.reverse(underUtilizedNodes);
 
     if (overUtilizedNodes.isEmpty() && underUtilizedNodes.isEmpty()) {
@@ -652,17 +644,56 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   private IterationResult doIteration() {
-    // note that potential and selected targets are updated in the following
-    // loop
-    List<DatanodeUsageInfo> potentialTargets = getPotentialTargets();
-    findTargetStrategy.reInitialize(potentialTargets, config, upperLimit);
-    findSourceStrategy.reInitialize(getPotentialSources(), config, lowerLimit);
-
+    findTargetStrategy.reInitialize(getPotentialTargets(), config, 1D);
+    findSourceStrategy.reInitialize(getPotentialSources(), config, 0D);
     moveSelectionToFutureMap = new ConcurrentHashMap<>();
-    boolean isMoveGeneratedInThisIteration = false;
     iterationResult = IterationResult.ITERATION_COMPLETED;
-    boolean canAdaptWhenNearingLimits = true;
-    boolean canAdaptOnReachingLimits = true;
+    boolean isMoveGeneratedInThisIteration = false;
+
+    List<StorageTypeBalancingState> active = storageTypeStates.stream()
+        .filter(state -> !state.sources.isEmpty() && !state.targets.isEmpty()).collect(Collectors.toList());
+    // Rotate the first turn too: a small shared limit may allow only one move.
+    if (!active.isEmpty()) {
+      Collections.rotate(active, -Math.floorMod(currentIterationIndex, active.size()));
+    }
+    while (!active.isEmpty() && isBalancerRunning() && !reachedMaxSizeToMovePerIteration()) {
+      Iterator<StorageTypeBalancingState> iterator = active.iterator();
+      while (iterator.hasNext() && isBalancerRunning() && !reachedMaxSizeToMovePerIteration()) {
+        if (balanceStorageType(iterator.next())) {
+          isMoveGeneratedInThisIteration = true;
+        } else {
+          iterator.remove();
+        }
+      }
+    }
+    if (!isBalancerRunning()) {
+      iterationResult = IterationResult.ITERATION_INTERRUPTED;
+    } else if (reachedMaxSizeToMovePerIteration()) {
+      metrics.incrementNumIterationLimitsSkipped();
+    }
+
+    checkIterationResults(isMoveGeneratedInThisIteration);
+    return iterationResult;
+  }
+
+  /**
+   * Selects at most one move before giving the next storage type a turn.
+   *
+   * @param state candidates and utilization bounds for the storage type
+   * @return true if at least one move was generated
+   */
+  private boolean balanceStorageType(StorageTypeBalancingState state) {
+    if (state.sources.isEmpty() || state.targets.isEmpty()) {
+      return false;
+    }
+    findTargetStrategy.setStorageType(state.storageType, state.upperLimit);
+    findSourceStrategy.setStorageType(state.storageType, state.lowerLimit);
+    if (!state.initialized) {
+      findTargetStrategy.resetPotentialTargets(state.targets);
+      findSourceStrategy.resetPotentialSources(state.sources);
+      state.initialized = true;
+    }
+    adaptOnReachingIterationLimits(state);
 
     // match each source node with a target
     while (true) {
@@ -676,22 +707,6 @@ public class ContainerBalancerTask implements Runnable {
         break;
       }
 
-      /* if balancer is approaching the iteration limits for max datanodes to
-       involve, take some action in adaptWhenNearingIterationLimits()
-      */
-      if (canAdaptWhenNearingLimits) {
-        if (adaptWhenNearingIterationLimits()) {
-          canAdaptWhenNearingLimits = false;
-        }
-      }
-      if (canAdaptOnReachingLimits) {
-        // check if balancer has hit the iteration limits and take some action
-        if (adaptOnReachingIterationLimits()) {
-          canAdaptOnReachingLimits = false;
-          canAdaptWhenNearingLimits = false;
-        }
-      }
-
       DatanodeDetails source =
           findSourceStrategy.getNextCandidateSourceDataNode();
       if (source == null) {
@@ -699,23 +714,26 @@ public class ContainerBalancerTask implements Runnable {
         break;
       }
 
-      ContainerMoveSelection moveSelection = matchSourceWithTarget(source);
+      adaptWhenNearingIterationLimits(state, source);
+
+      ContainerMoveSelection moveSelection =
+          matchSourceWithTarget(source, state.storageType);
       if (moveSelection != null) {
-        if (processMoveSelection(source, moveSelection)) {
-          isMoveGeneratedInThisIteration = true;
+        if (processMoveSelection(source, moveSelection, state.storageType)) {
+          return true;
         }
       } else {
         // can not find any target for this source
         findSourceStrategy.removeCandidateSourceDataNode(source);
+        state.sources.remove(source);
       }
     }
 
-    checkIterationResults(isMoveGeneratedInThisIteration);
-    return iterationResult;
+    return false;
   }
 
   private boolean processMoveSelection(DatanodeDetails source,
-                                       ContainerMoveSelection moveSelection) {
+                                       ContainerMoveSelection moveSelection, StorageType storageType) {
     ContainerID containerID = moveSelection.getContainerID();
     if (containerToSourceMap.containsKey(containerID) ||
         containerToTargetMap.containsKey(containerID)) {
@@ -751,7 +769,7 @@ public class ContainerBalancerTask implements Runnable {
         source,
         moveSelection.getTargetNode());
 
-    if (moveContainer(source, moveSelection)) {
+    if (moveContainer(source, moveSelection, storageType)) {
       // consider move successful for now, and update selection criteria
       updateTargetsAndSelectionCriteria(moveSelection, source);
     }
@@ -773,7 +791,9 @@ public class ContainerBalancerTask implements Runnable {
        If no move was generated during this iteration then we don't need to
        check the move results
        */
-      iterationResult = IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+      if (iterationResult != IterationResult.ITERATION_INTERRUPTED) {
+        iterationResult = IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+      }
     } else {
       checkIterationMoveResults();
     }
@@ -805,7 +825,9 @@ public class ContainerBalancerTask implements Runnable {
       }
     }
 
-    countDatanodesInvolvedPerIteration = selectedSources.size() + selectedTargets.size();
+    Set<DatanodeDetails> involvedNodes = new HashSet<>(selectedSources);
+    involvedNodes.addAll(selectedTargets);
+    countDatanodesInvolvedPerIteration = involvedNodes.size();
 
     metrics.incrementNumDatanodesInvolvedInLatestIteration(countDatanodesInvolvedPerIteration);
 
@@ -875,9 +897,9 @@ public class ContainerBalancerTask implements Runnable {
    *
    * @return ContainerMoveSelection containing the selected target and container
    */
-  private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source) {
+  private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source, StorageType storageType) {
     Set<ContainerID> sourceContainerIDSet =
-        selectionCriteria.getContainerIDSet(source);
+        selectionCriteria.getContainerIDSet(source, storageType);
 
     if (sourceContainerIDSet.isEmpty()) {
       if (LOG.isDebugEnabled()) {
@@ -896,7 +918,7 @@ public class ContainerBalancerTask implements Runnable {
     Set<ContainerID> toRemoveContainerIds = new HashSet<>();
     for (ContainerID containerId: sourceContainerIDSet) {
       if (selectionCriteria.shouldBeExcluded(containerId, source,
-          sizeScheduledForMoveInLatestIteration)) {
+          sizeScheduledForMoveInLatestIteration, storageType)) {
         toRemoveContainerIds.add(containerId);
         continue;
       }
@@ -933,56 +955,44 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Restricts potential target datanodes to nodes that have
-   * already been selected if balancer is one datanode away from
-   * "datanodes.involved.max.percentage.per.iteration" limit.
-   * @return true if potential targets were restricted, else false
+   * When only one new datanode can be involved, a new source must reuse an eligible selected target.
    */
-  private boolean adaptWhenNearingIterationLimits() {
+  private void adaptWhenNearingIterationLimits(StorageTypeBalancingState state, DatanodeDetails source) {
     // check if we're nearing max datanodes to involve
     int maxDatanodesToInvolve =
         config.computeMaxDatanodesToInvolvePerIteration(totalNodesInCluster);
     if (countDatanodesInvolvedPerIteration + 1 == maxDatanodesToInvolve) {
-      /* We're one datanode away from reaching the limit. Restrict potential
-      targets to targets that have already been selected.
-       */
-      findTargetStrategy.resetPotentialTargets(selectedTargets);
-      LOG.debug("Approaching max datanodes to involve limit. {} datanodes " +
-              "have already been selected for balancing and the limit is " +
-              "{}. Only already selected targets can be selected as targets" +
-              " now.",
-          countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
-      return true;
+      findTargetStrategy.resetPotentialTargets(state.targets.stream()
+          .filter(target -> isSelectedDatanode(source) || isSelectedDatanode(target)).collect(Collectors.toList()));
+      LOG.debug("Approaching max datanodes to involve limit: {} of {} datanodes selected; source already selected: {}",
+          countDatanodesInvolvedPerIteration, maxDatanodesToInvolve, isSelectedDatanode(source));
     }
 
-    // return false if we didn't adapt
-    return false;
   }
 
   /**
    * Restricts potential source and target datanodes to nodes that have
    * already been selected if balancer has reached
    * "datanodes.involved.max.percentage.per.iteration" limit.
-   * @return true if potential sources and targets were restricted, else false
    */
-  private boolean adaptOnReachingIterationLimits() {
+  private void adaptOnReachingIterationLimits(StorageTypeBalancingState state) {
     // check if we've reached max datanodes to involve limit
     int maxDatanodesToInvolve =
         config.computeMaxDatanodesToInvolvePerIteration(totalNodesInCluster);
-    if (countDatanodesInvolvedPerIteration == maxDatanodesToInvolve) {
+    if (countDatanodesInvolvedPerIteration == maxDatanodesToInvolve && !state.nodeLimitApplied) {
       // restrict both to already selected sources and targets
-      findTargetStrategy.resetPotentialTargets(selectedTargets);
-      findSourceStrategy.resetPotentialSources(selectedSources);
+      findTargetStrategy.resetPotentialTargets(state.targets.stream()
+          .filter(this::isSelectedDatanode).collect(Collectors.toList()));
+      findSourceStrategy.resetPotentialSources(state.sources.stream()
+          .filter(this::isSelectedDatanode).collect(Collectors.toList()));
+      state.nodeLimitApplied = true;
       LOG.debug("Reached max datanodes to involve limit. {} datanodes " +
               "have already been selected for balancing and the limit " +
               "is {}. Only already selected sources and targets can be " +
               "involved in balancing now.",
           countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
-      return true;
     }
 
-    // return false if we didn't adapt
-    return false;
   }
 
   /**
@@ -996,12 +1006,13 @@ public class ContainerBalancerTask implements Runnable {
    * if the move completed with MoveResult.COMPLETED or move is not yet done
    */
   private boolean moveContainer(DatanodeDetails source,
-                                ContainerMoveSelection moveSelection) {
+                                ContainerMoveSelection moveSelection, StorageType storageType) {
     ContainerID containerID = moveSelection.getContainerID();
     CompletableFuture<MoveManager.MoveResult> future;
     try {
       ContainerInfo containerInfo = containerManager.getContainer(containerID);
-      future = moveManager.move(containerID, source, moveSelection.getTargetNode());
+      future = storageType == null ? moveManager.move(containerID, source, moveSelection.getTargetNode())
+          : moveManager.move(containerID, source, moveSelection.getTargetNode(), storageType);
 
       metrics.incrementNumContainerMovesScheduledInLatestIteration(1);
 
@@ -1082,7 +1093,8 @@ public class ContainerBalancerTask implements Runnable {
           // the container which caused failure of move is not excluded
           // as it is an intermittent failure or a replica related failure
           findSourceStrategy.addBackSourceDataNode(source);
-        } else if (result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE) {
+        } else if (result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE ||
+            result == MoveManager.MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH) {
           findSourceStrategy.addBackSourceDataNode(source);
           selectionCriteria.addToExcludeDueToFailContainers(containerID);
         }
@@ -1106,11 +1118,11 @@ public class ContainerBalancerTask implements Runnable {
     DatanodeDetails target = moveSelection.getTargetNode();
 
     // count source if it has not been involved in move earlier
-    if (!selectedSources.contains(source)) {
+    if (!isSelectedDatanode(source)) {
       countDatanodesInvolvedPerIteration += 1;
     }
     // count target if it has not been involved in move earlier
-    if (!selectedTargets.contains(target)) {
+    if (!isSelectedDatanode(target)) {
       countDatanodesInvolvedPerIteration += 1;
     }
 
@@ -1215,6 +1227,7 @@ public class ContainerBalancerTask implements Runnable {
     moveManager.resetState();
     this.overUtilizedNodes.clear();
     this.underUtilizedNodes.clear();
+    this.storageTypeStates.clear();
     this.containerToSourceMap.clear();
     this.containerToTargetMap.clear();
     this.selectedSources.clear();
@@ -1231,6 +1244,35 @@ public class ContainerBalancerTask implements Runnable {
     metrics.resetNumDatanodesUnbalanced();
     metrics.resetNumContainerMovesFailedInLatestIteration();
     moveFailureTracker.reset();
+  }
+
+  private boolean isSelectedDatanode(DatanodeDetails node) {
+    return selectedSources.contains(node) || selectedTargets.contains(node);
+  }
+
+  private static final class StorageTypeBalancingState {
+    private final StorageType storageType;
+    private final double lowerLimit;
+    private final double upperLimit;
+    private final List<DatanodeDetails> sources = new ArrayList<>();
+    private final List<DatanodeDetails> targets = new ArrayList<>();
+    private boolean initialized;
+    private boolean nodeLimitApplied;
+
+    private StorageTypeBalancingState(StorageType storageType, double lowerLimit, double upperLimit,
+        List<DatanodeUsageInfo> nodes, Set<String> sourceIds, Set<String> targetIds) {
+      this.storageType = storageType;
+      this.lowerLimit = lowerLimit;
+      this.upperLimit = upperLimit;
+      for (DatanodeUsageInfo node : nodes) {
+        String id = node.getDatanodeID().toString();
+        if (sourceIds.contains(id)) {
+          sources.add(node.getDatanodeDetails());
+        } else if (targetIds.contains(id)) {
+          targets.add(node.getDatanodeDetails());
+        }
+      }
+    }
   }
 
   private static boolean isCancellationCause(Throwable ex) {

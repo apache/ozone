@@ -44,6 +44,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -316,7 +317,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
     mockedSCM.startBalancerTask(config);
 
     verify(mockedSCM.getMoveManager(), atLeastOnce()).
-        move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
+        move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class));
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
@@ -342,7 +343,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
     // deliberately set max size per iteration to a low value, 6 GB
     config.setMaxSizeToMovePerIteration(6 * STORAGE_UNIT);
 
-    when(mockedSCM.getMoveManager().move(any(), any(), any()))
+    when(mockedSCM.getMoveManager().move(any(), any(), any(), any()))
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
@@ -531,7 +532,8 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
     int numContainers = nextTask.getContainerToTargetMap().size();
     verify(mockedSCM.getMoveManager(), times(numContainers))
-            .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
+            .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class),
+                any(StorageType.class));
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
@@ -614,7 +616,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
     The first move being 10ms falls within the timeout duration of 500ms. It should be successful. The rest should fail.
      */
     when(mockedSCM.getMoveManager()
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
         .thenReturn(completedFuture)
         .thenAnswer(invocation -> genCompletableFuture(150));
 
@@ -648,7 +650,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
         CompletableFuture.supplyAsync(() -> MoveManager.MoveResult.DELETION_FAIL_TIME_OUT);
 
     when(mockedSCM.getMoveManager()
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
         .thenReturn(future).thenAnswer(invocation -> future2);
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
@@ -670,7 +672,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
     // Try the same test but with MoveManager instead of ReplicationManager.
     when(mockedSCM.getMoveManager()
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
         .thenReturn(genCompletableFutureWithException(1))
         .thenThrow(ContainerNotFoundException.newInstanceForTesting())
         .thenReturn(future);

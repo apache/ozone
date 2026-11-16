@@ -34,6 +34,9 @@ public final class ContainerBalancerMetrics {
 
   private final MetricsSystem ms;
 
+  @Metric("Number of times scheduling reached the shared iteration byte limit")
+  private MutableCounterLong numIterationLimitsSkipped;
+
   @Metric(about = "Amount of Gigabytes that Container Balancer moved" +
       " in the latest iteration.")
   private MutableCounterLong dataSizeMovedGBInLatestIteration;
@@ -206,6 +209,7 @@ public final class ContainerBalancerMetrics {
     case FAIL_LEADER_NOT_READY:
     case REPLICATION_FAIL_INFLIGHT_REPLICATION:
     case REPLICATION_FAIL_NOT_EXIST_IN_SOURCE:
+    case REPLICATION_FAIL_STORAGE_TYPE_MISMATCH:
     case REPLICATION_FAIL_EXIST_IN_TARGET:
     case REPLICATION_FAIL_CONTAINER_NOT_CLOSED:
     case REPLICATION_FAIL_INFLIGHT_DELETION:
@@ -254,6 +258,15 @@ public final class ContainerBalancerMetrics {
    */
   public void resetNumContainerMovesTimeoutInLatestIteration() {
     numContainerMovesTimeoutInLatestIteration.incr(-getNumContainerMovesTimeoutInLatestIteration());
+  }
+
+  /** Returns the number of times scheduling reached the shared iteration byte limit. */
+  public long getNumIterationLimitsSkipped() {
+    return numIterationLimitsSkipped.value();
+  }
+
+  public void incrementNumIterationLimitsSkipped() {
+    numIterationLimitsSkipped.incr();
   }
 
   /**
