@@ -122,7 +122,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
@@ -1219,18 +1221,37 @@ public class TestReplicationManager {
    * target has the correct deadline and that ContainerReplicaOp for
    * replica ADD is created correctly.
    */
-  @Test
-  public void testReplicateContainerCommandToTarget()
-      throws NotLeaderException {
-    // create a closed EC container
-    ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+  @ParameterizedTest
+  @CsvSource({
+      "0, SSD, ARCHIVE, ARCHIVE",
+      "1, SSD, ARCHIVE, ARCHIVE",
+      "0, ARCHIVE, SSD, SSD",
+      "1, ARCHIVE, SSD, SSD",
+      "0, SSD, DISK, DISK",
+      "1, SSD, DISK, DISK",
+      "0, SSD, , SSD",
+      "1, SSD, , SSD",
+      "0, , ARCHIVE, ARCHIVE",
+      "1, , ARCHIVE, ARCHIVE",
+      "0, EMPTY, SSD, SSD",
+      "1, EMPTY, SSD, SSD",
+      "0, , , ",
+      "1, , , ",
+      "0, EMPTY, , ",
+      "1, EMPTY, , "
+  })
+  public void testReplicateContainerCommandToTarget(int replicaIndex, StorageTier storageTier,
+      StorageType commandStorageType, StorageType expectedStorageType) throws NotLeaderException {
+    // Create a closed RATIS or EC container.
+    ReplicationConfig replicationConfig = replicaIndex == 0
+        ? RatisReplicationConfig.getInstance(THREE) : new ECReplicationConfig(3, 2);
     ContainerInfo containerInfo = TestContainerInfo.newBuilderForTest()
         .setContainerID(1)
-        .setReplicationConfig(ecRepConfig)
+        .setReplicationConfig(replicationConfig)
         .setState(HddsProtos.LifeCycleState.CLOSED)
         .setNumberOfKeys(10)
         .setUsedBytes(20)
-        .setStorageTier(StorageTier.SSD)
+        .setStorageTier(storageTier)
         .build();
 
     // command will be pushed from source to target
@@ -1238,7 +1259,8 @@ public class TestReplicationManager {
     DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
     ReplicateContainerCommand command = ContainerTestUtils.getReplicateContainerCommand(
         containerInfo.getContainerID(), target);
-    command.setReplicaIndex(1);
+    command.setReplicaIndex(replicaIndex);
+    command.setTargetVolumeStorageType(commandStorageType);
     replicationManager.sendDatanodeCommand(command, containerInfo, source);
 
     // check the command's deadline
@@ -1253,16 +1275,19 @@ public class TestReplicationManager {
     assertEquals(ContainerReplicaOp.PendingOpType.ADD,
         ops.get(0).getOpType());
     assertEquals(target, ops.get(0).getTarget());
-    assertEquals(1, ops.get(0).getReplicaIndex());
-    assertEquals(StorageType.SSD, ops.get(0).getStorageType());
-    assertEquals(1, replicationManager.getMetrics()
+    assertEquals(replicaIndex, ops.get(0).getReplicaIndex());
+    assertEquals(expectedStorageType, ops.get(0).getStorageType());
+    assertEquals(commandStorageType, command.getTargetVolumeStorageType());
+    assertEquals(replicaIndex > 0 ? 1 : 0, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
-    assertEquals(0, replicationManager.getMetrics()
+    assertEquals(replicaIndex == 0 ? 1 : 0, replicationManager.getMetrics()
         .getReplicationCmdsSentTotal());
   }
 
-  @Test
-  public void testSendLowPriorityReplicateContainerCommand()
+  @ParameterizedTest
+  @EnumSource(value = StorageType.class, names = {"SSD", "ARCHIVE"})
+  @NullSource
+  public void testSendLowPriorityReplicateContainerCommand(StorageType storageType)
       throws NotLeaderException {
     ContainerInfo containerInfo =
         ReplicationTestUtil.createContainerInfo(repConfig, 1,
@@ -1273,8 +1298,12 @@ public class TestReplicationManager {
     long scmDeadline = clock.millis() + rmConf.getEventTimeout();
     long datanodeDeadline = scmDeadline - rmConf.getDatanodeTimeoutOffset();
 
-    replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        0, src, target, scmDeadline);
+    if (storageType == null) {
+      replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo, 0, src, target, scmDeadline);
+    } else {
+      replicationManager.sendLowPriorityReplicateContainerCommand(
+          containerInfo, 0, src, target, scmDeadline, storageType);
+    }
 
     ArgumentCaptor<SCMCommand<?>> command =
         ArgumentCaptor.forClass(SCMCommand.class);
@@ -1287,10 +1316,13 @@ public class TestReplicationManager {
     assertEquals(LOW, sentCommand.getPriority());
     assertEquals(src.getID(), targetUUID.getValue());
     assertEquals(target, sentCommand.getTargetDatanode());
+    assertEquals(storageType, sentCommand.getTargetVolumeStorageType());
   }
 
-  @Test
-  public void testSendThrottledReplicateContainerCommand()
+  @ParameterizedTest
+  @EnumSource(value = StorageType.class, names = {"SSD", "ARCHIVE"})
+  @NullSource
+  public void testSendThrottledReplicateContainerCommand(StorageType storageType)
       throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
@@ -1302,7 +1334,7 @@ public class TestReplicationManager {
     mockReplicationCommandCounts(sourceNodes::get, any -> 0);
 
     testReplicationCommand(cmdTarget, sourceNodes.keySet(), 0,
-        MockDatanodeDetails.randomDatanodeDetails());
+        MockDatanodeDetails.randomDatanodeDetails(), storageType);
     assertEquals(0, replicationManager.getMetrics()
         .getReplicateContainerCmdsDeferredTotal());
   }
@@ -1333,11 +1365,22 @@ public class TestReplicationManager {
       DatanodeDetails expectedTarget, Set<DatanodeDetails> sourceNodes,
       int replicaIndex, DatanodeDetails destination)
       throws CommandTargetOverloadedException, NotLeaderException {
+    testReplicationCommand(expectedTarget, sourceNodes, replicaIndex, destination, null);
+  }
+
+  private void testReplicationCommand(DatanodeDetails expectedTarget, Set<DatanodeDetails> sourceNodes,
+      int replicaIndex, DatanodeDetails destination, StorageType storageType)
+      throws CommandTargetOverloadedException, NotLeaderException {
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
 
-    replicationManager.sendThrottledReplicationCommand(
-        container, new ArrayList<>(sourceNodes), destination, replicaIndex);
+    if (storageType == null) {
+      replicationManager.sendThrottledReplicationCommand(
+          container, new ArrayList<>(sourceNodes), destination, replicaIndex);
+    } else {
+      replicationManager.sendThrottledReplicationCommand(
+          container, new ArrayList<>(sourceNodes), destination, replicaIndex, storageType);
+    }
 
     assertEquals(1, commandsSent.size());
     Pair<DatanodeID, SCMCommand<?>> cmdWithTarget = commandsSent.iterator().next();
@@ -1348,6 +1391,7 @@ public class TestReplicationManager {
         (ReplicateContainerCommand) cmdWithTarget.getRight();
     assertEquals(destination, cmd.getTargetDatanode());
     assertEquals(replicaIndex, cmd.getReplicaIndex());
+    assertEquals(storageType, cmd.getTargetVolumeStorageType());
   }
 
   @Test
