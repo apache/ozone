@@ -266,6 +266,11 @@ public class TestOzoneStoragePolicy {
             + "but the file in a %s bucket has %d", bucketLayout, blocks.size())
         .isGreaterThan(1);
     assertAllBlocksOnTier(original, OzoneStoragePolicy.COLD.getCreationTier());
+    // Block 0 is pre-allocated by OM and the rest come from client allocateBlock calls, so each block needs its own
+    // datanode check. Looping is only needed here because this file spans several blocks.
+    for (int i = 0; i < blocks.size(); i++) {
+      assertDatanodeContainerAndBlock(original, i, OzoneStoragePolicy.COLD.getCreationTier());
+    }
 
     writeFile(bucket, keyName, multiBlockData(), 0, true, OzoneStoragePolicy.HOT);
     OmKeyInfo overwritten = lookupKey(bucket, keyName);
@@ -402,9 +407,8 @@ public class TestOzoneStoragePolicy {
   }
 
   /**
-   * Checks every block of a key landed on a container of the expected tier. The
-   * {@code assertDatanodeContainerAndBlock} helper only inspects the first block, which cannot
-   * catch a tier that changes partway through a key.
+   * Checks every block of a key landed on a container of the expected tier. This reads SCM's container record
+   * only; to check the datanode volume of a block, use {@code assertDatanodeContainerAndBlock} with a block index.
    */
   private void assertAllBlocksOnTier(OmKeyInfo keyInfo, StorageTier expectedTier)
       throws IOException {
@@ -514,14 +518,21 @@ public class TestOzoneStoragePolicy {
   }
 
   /**
-   * Checks the block actually landed on a volume of the expected tier, and that
-   * the storage type travelled to the datanode on the block id.
+   * Checks the first block of a key on the datanodes. Meant for single-block keys; for a key that spans
+   * several blocks, check each block with {@link #assertDatanodeContainerAndBlock(OmKeyInfo, int, StorageTier)}.
    */
   private void assertDatanodeContainerAndBlock(OmKeyInfo keyInfo,
       StorageTier expectedTier) throws IOException {
+    assertDatanodeContainerAndBlock(keyInfo, 0, expectedTier);
+  }
+
+  /**
+   * Checks the block at {@code blockIndex} actually landed on a volume of the expected tier.
+   */
+  private void assertDatanodeContainerAndBlock(OmKeyInfo keyInfo, int blockIndex,
+      StorageTier expectedTier) throws IOException {
     StorageType expectedStorageType = expectedTier.getUniformStorageType();
-    OmKeyLocationInfo block =
-        keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
+    OmKeyLocationInfo block = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(blockIndex);
     ContainerInfo containerInfo = containerManager.getContainer(
         ContainerID.valueOf(block.getContainerID()));
     Pipeline pipeline =
