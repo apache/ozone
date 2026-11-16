@@ -19,89 +19,23 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_ENABLE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.mock;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests for APIs in FeaturesEndPoint.
  */
 public class TestFeaturesEndPoint {
 
-  @TempDir
-  private Path temporaryFolder;
-  private FeaturesEndpoint featuresEndPoint;
-  private boolean isSetupDone = false;
-  private OzoneConfiguration ozoneConfiguration;
-  private OMMetadataManager omMetadataManager;
-  private ReconOMMetadataManager reconOMMetadataManager;
-
-  private void initializeInjector() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
-    omMetadataManager = initializeNewOmMetadataManager(Files.createDirectory(
-        temporaryFolder.resolve("JunitOmDBDir")).toFile());
-    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
-
-    ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder.toFile())
-            .withReconSqlDb()
-            .withReconOm(reconOMMetadataManager)
-            .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
-            // No longer using mock reconSCM as we need nodeDB in Facade
-            //  to establish datanode UUID to hostname mapping
-            .addBinding(OzoneStorageContainerManager.class,
-                ReconStorageContainerManagerFacade.class)
-            .withContainerDB()
-            .addBinding(StorageContainerServiceProvider.class,
-                mock(StorageContainerServiceProviderImpl.class))
-            .addBinding(FeaturesEndpoint.class)
-            .build();
-
-    featuresEndPoint = reconTestInjector.getInstance(
-        FeaturesEndpoint.class);
-  }
-
-  @BeforeEach
-  public void setUp() throws Exception {
-    // The following setup runs only once
-    if (!isSetupDone) {
-      initializeInjector();
-      isSetupDone = true;
-    }
-  }
-
-  @AfterEach
-  public void tearDown() throws Exception {
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
-  }
+  private final OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+  private final FeaturesEndpoint featuresEndPoint = new FeaturesEndpoint(ozoneConfiguration);
 
   @Test
   public void testGetDisabledFeaturesGreaterThanZero() {

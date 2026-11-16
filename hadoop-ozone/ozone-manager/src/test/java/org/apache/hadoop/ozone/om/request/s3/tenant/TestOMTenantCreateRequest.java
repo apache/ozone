@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.TenantOp;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -296,6 +297,40 @@ public class TestOMTenantCreateRequest {
   }
 
   @Test
+  public void testValidateAndUpdateCacheWhenTenantExists() throws Exception {
+    final String tenantId = "tenant1";
+    OMTenantCreateRequest request = doPreExecute(tenantId, tenantId, false);
+    addTenantToDB(tenantId);
+
+    OMResponse omResponse = request.validateAndUpdateCache(ozoneManager, 2L).getOMResponse();
+    assertEquals(Status.TENANT_ALREADY_EXISTS, omResponse.getStatus());
+    // The rejected request must not leave its volume or the owner's volume list in the table cache
+    assertThat(omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(tenantId))).isNull();
+    assertThat(omMetadataManager.getUserTable().get(omMetadataManager.getUserKey("username"))).isNull();
+  }
+
+  @Test
+  public void testForceCreateWhenTenantExistsKeepsVolumeRefCount() throws Exception {
+    OMRequestTestUtils.addVolumeToDB("vol", "username", omMetadataManager);
+    OMTenantCreateRequest request = doPreExecute("tenant1", "vol", true);
+    addTenantToDB("tenant1");
+
+    OMResponse omResponse = request.validateAndUpdateCache(ozoneManager, 2L).getOMResponse();
+    assertEquals(Status.TENANT_ALREADY_EXISTS, omResponse.getStatus());
+    assertEquals(0L, omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey("vol")).getRefCount());
+  }
+
+  @Test
+  public void testVolumeExistsTakesPrecedenceOverTenantExists() throws Exception {
+    OMTenantCreateRequest request = doPreExecute("tenant1", "tenant1", false);
+    OMRequestTestUtils.addVolumeToDB("tenant1", "username", omMetadataManager);
+    addTenantToDB("tenant1");
+
+    OMResponse omResponse = request.validateAndUpdateCache(ozoneManager, 2L).getOMResponse();
+    assertEquals(Status.VOLUME_ALREADY_EXISTS, omResponse.getStatus());
+  }
+
+  @Test
   public void
       testAcceptS3CompliantTenantIdCreationRegardlessOfStrictS3Setting()
       throws Exception {
@@ -378,6 +413,14 @@ public class TestOMTenantCreateRequest {
     doReturn("username").when(omTenantCreateRequest).getUserName();
 
     return new OMTenantCreateRequest(omTenantCreateRequest.preExecute(ozoneManager));
+  }
+
+  // Puts a tenant directly into tenantStateTable, as if another request created it after preExecute
+  private void addTenantToDB(String tenantId) throws Exception {
+    omMetadataManager.getTenantStateTable().put(tenantId, new OmDBTenantState(tenantId, "othervolume",
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId), OMMultiTenantManager.getDefaultAdminRoleName(tenantId),
+        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId),
+        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId)));
   }
 
   @Test

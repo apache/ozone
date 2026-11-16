@@ -38,7 +38,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.cache.CacheLoader;
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;

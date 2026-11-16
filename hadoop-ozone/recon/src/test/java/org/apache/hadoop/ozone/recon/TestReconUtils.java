@@ -95,6 +95,21 @@ public class TestReconUtils {
   }
 
   @Test
+  public void testSqlDbDerbyConfigFallsBackToSqlite() {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OZONE_METADATA_DIRS, temporaryFolder.toString());
+    configuration.set("ozone.recon.sql.db.driver", "org.apache.derby.jdbc.EmbeddedDriver");
+    configuration.set("ozone.recon.sql.db.jdbc.url", "jdbc:derby:/old/ozone_recon_derby.db");
+    configuration.set("ozone.recon.sql.db.jooq.dialect", "DERBY");
+
+    DataSourceConfiguration dataSourceConfiguration =
+        new ReconControllerModule(null).getDataSourceConfiguration(configuration);
+
+    assertEquals("jdbc:sqlite:" + temporaryFolder + "/ozone_recon_sqlite.db", dataSourceConfiguration.getJdbcUrl());
+    assertEquals(ReconSqlDbConfig.DEFAULT_SQL_DB_DIALECT, dataSourceConfiguration.getSqlDialect());
+  }
+
+  @Test
   public void testCreateTarFile(@TempDir File tempSnapshotDir)
       throws Exception {
 

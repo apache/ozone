@@ -52,7 +52,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -71,6 +70,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo.TotalSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
@@ -385,7 +385,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     when(deletedIter.hasNext()).thenReturn(true, true, true, true, true, false);
     
     RepeatedOmKeyInfo deletedKeyInfo = mock(RepeatedOmKeyInfo.class);
-    when(deletedKeyInfo.getTotalSize()).thenReturn(ImmutablePair.of(100L, 100L));
+    // Use different unreplicated and replicated sizes to verify that
+    // reprocessing assigns each value to the correct size metric.
+    when(deletedKeyInfo.getTotalSize()).thenReturn(new TotalSize(100L, 300L));
     when(deletedKeyInfo.getOmKeyInfoList()).thenReturn(Arrays.asList(mock(OmKeyInfo.class)));
     
     Table.KeyValue deletedKv = mock(Table.KeyValue.class);
@@ -410,7 +412,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
       if (tableName.equals(DELETED_TABLE)) {
         RepeatedOmKeyInfo keyInfo = mock(RepeatedOmKeyInfo.class);
-        when(keyInfo.getTotalSize()).thenReturn(ImmutablePair.of(100L, 100L));
+        when(keyInfo.getTotalSize()).thenReturn(new TotalSize(100L, 100L));
         when(keyInfo.getOmKeyInfoList()).thenReturn(
             Arrays.asList(mock(OmKeyInfo.class)));
         when(mockKeyValue.getValue()).thenReturn(keyInfo);
@@ -441,6 +443,11 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(5L, getCountForTable(OPEN_KEY_TABLE));
     assertEquals(5L, getCountForTable(DELETED_TABLE));
     assertEquals(5L, getCountForTable(MULTIPART_INFO_TABLE));
+    // Five deleted entries, each with 100 bytes unreplicated and 300 bytes
+    // replicated, should produce totals of 500 and 1500 bytes respectively.
+    // These assertions detect a typo ie: reversal of the two size metrics.
+    assertEquals(500L, getUnReplicatedSizeForTable(DELETED_TABLE));
+    assertEquals(1500L, getReplicatedSizeForTable(DELETED_TABLE));
   }
 
   @Test
@@ -652,8 +659,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Test
   public void testProcessForDeletedTable() {
     // Prepare mock data size
-    ImmutablePair<Long, Long> sizeToBeReturned =
-        new ImmutablePair<>(1000L, 3000L);
+    TotalSize sizeToBeReturned = new TotalSize(1000L, 3000L);
     ArrayList<OmKeyInfo> omKeyInfoList = new ArrayList<>();
     // Add 5 OmKeyInfo objects to the list
     for (long i = 0; i < 5; i++) {

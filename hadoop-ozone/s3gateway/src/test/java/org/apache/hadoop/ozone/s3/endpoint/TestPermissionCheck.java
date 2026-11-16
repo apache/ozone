@@ -315,7 +315,7 @@ public class TestPermissionCheck {
     when(objectStore.getS3Volume()).thenReturn(volume);
     when(clientProtocol.getObjectTagging(isNull(), anyString(), anyString())).thenThrow(exception);
     doThrow(exception).when(clientProtocol).putObjectTagging(anyString(), anyString(), anyString(), anyMap());
-    doThrow(exception).when(clientProtocol).deleteObjectTagging(anyString(), anyString(), anyString());
+    doThrow(exception).when(clientProtocol).deleteObjectTagging(isNull(), anyString(), anyString());
 
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)

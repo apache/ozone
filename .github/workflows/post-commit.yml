@@ -42,6 +42,7 @@ on:
       - '!hadoop-ozone/dist/src/main/license/jar-report.txt'
       # ignore .github except this workflow and the ones used transitively
       - '.github/**'
+      - '!.github/actions/setup-java-with-cache/**'
       - '!.github/workflows/check.yml'
       - '!.github/workflows/ci.yml'
       - '!.github/workflows/post-commit.yml'
