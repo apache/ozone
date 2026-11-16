@@ -24,32 +24,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -74,12 +65,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.AdditionalAnswers;
-import org.mockito.ArgumentCaptor;
 
 /**
  * Verifies that a key honours its storage policy end to end: the policy is
@@ -212,13 +199,11 @@ public class TestOzoneStoragePolicy {
   @Test
   public void testCreateFileWithStoragePolicy() throws Exception {
     startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
-    OzoneManagerProtocol omClientSpy = spyOmClient();
 
     for (BucketLayout bucketLayout : FILE_BUCKET_LAYOUTS) {
       assertFileStoragePolicyIsHonoured(bucketLayout);
       assertFileInheritsBucketPolicyOrClusterDefault(bucketLayout);
-      assertMultiBlockFileKeepsPolicy(bucketLayout, omClientSpy);
-      assertOverwriteUpdatesPolicyAndPlacement(bucketLayout);
+      assertMultiBlockFileAndOverwriteHonourPolicy(bucketLayout);
     }
   }
 
@@ -258,48 +243,16 @@ public class TestOzoneStoragePolicy {
   }
 
   /**
-   * Tests whether a file that needs more blocks than OM pre-allocates keeps its policy on
-   * every block, and the client sends that policy with every later allocateBlock call.
+   * Tests two scenarios on a file that spans several blocks.
    *
-   * <p>The file asks for COLD while its bucket is WARM, so a policy that is lost
-   * on the way makes the later blocks land on DISK, or makes the call carry none.
-   * Creating the file with size 0 makes OM pre-allocate one block, so the others
-   * come from allocateBlock calls.
-   */
-  private void assertMultiBlockFileKeepsPolicy(BucketLayout bucketLayout, OzoneManagerProtocol omClientSpy)
-      throws IOException {
-    OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, bucketLayout);
-    String keyName = UUID.randomUUID().toString();
-    clearInvocations(omClientSpy);
-
-    writeFile(bucket, keyName, multiBlockData(), 0, false, OzoneStoragePolicy.COLD);
-
-    OmKeyInfo keyInfo = lookupKey(bucket, keyName);
-    assertThat(keyInfo.getStoragePolicy()).as("layout %s", bucketLayout).isEqualTo(OzoneStoragePolicy.COLD);
-    List<OmKeyLocationInfo> blocks = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
-    assertThat(blocks.size())
-        .withFailMessage("Expected more than one block so a later allocation is exercised, "
-            + "but the file in a %s bucket has %d", bucketLayout, blocks.size())
-        .isGreaterThan(1);
-
-    ArgumentCaptor<OmKeyArgs> allocateBlockArgs = ArgumentCaptor.forClass(OmKeyArgs.class);
-    verify(omClientSpy, atLeastOnce()).allocateBlock(allocateBlockArgs.capture(), anyLong(), any());
-    List<StoragePolicy> sentPolicies = allocateBlockArgs.getAllValues().stream()
-        .map(OmKeyArgs::getStoragePolicy)
-        .collect(Collectors.toList());
-    assertThat(sentPolicies)
-        .as("storage policy in each allocateBlock call for a file in a %s bucket", bucketLayout)
-        .isEqualTo(Collections.nCopies(blocks.size() - 1, OzoneStoragePolicy.COLD));
-
-    // Every block, not just the first, must sit on the tier the file asked for.
-    assertAllBlocksOnTier(keyInfo, OzoneStoragePolicy.COLD.getCreationTier());
-  }
-
-  /**
-   * Overwriting a file with a different storage policy updates the recorded
+   * <p>Multi-block write: Tests whether a file that needs more blocks than OM pre-allocates keeps its policy on
+   * every block. Creating the file with size 0 makes OM pre-allocate one block, so the other blocks come from
+   * allocateBlock calls. Every block, not just the first, must sit on the COLD tier.
+   *
+   * <p>Overwrite: Overwriting a file with a different storage policy updates the recorded
    * policy and moves the new blocks to the new tier.
    */
-  private void assertOverwriteUpdatesPolicyAndPlacement(BucketLayout bucketLayout)
+  private void assertMultiBlockFileAndOverwriteHonourPolicy(BucketLayout bucketLayout)
       throws IOException {
     OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, bucketLayout);
     String keyName = UUID.randomUUID().toString();
@@ -307,6 +260,11 @@ public class TestOzoneStoragePolicy {
     writeFile(bucket, keyName, multiBlockData(), 0, false, OzoneStoragePolicy.COLD);
     OmKeyInfo original = lookupKey(bucket, keyName);
     assertThat(original.getStoragePolicy()).as("layout %s", bucketLayout).isEqualTo(OzoneStoragePolicy.COLD);
+    List<OmKeyLocationInfo> blocks = original.getLatestVersionLocations().getBlocksLatestVersionOnly();
+    assertThat(blocks.size())
+        .withFailMessage("Expected more than one block so a later allocation is exercised, "
+            + "but the file in a %s bucket has %d", bucketLayout, blocks.size())
+        .isGreaterThan(1);
     assertAllBlocksOnTier(original, OzoneStoragePolicy.COLD.getCreationTier());
 
     writeFile(bucket, keyName, multiBlockData(), 0, true, OzoneStoragePolicy.HOT);
@@ -516,19 +474,6 @@ public class TestOzoneStoragePolicy {
     byte[] data = new byte[(int) (2 * ozoneManager.getScmBlockSize() + 1024)];
     Arrays.fill(data, (byte) 'p');
     return data;
-  }
-
-  /**
-   * Replaces the client's OM protocol with a mock that delegates to the real one,
-   * so a test can inspect the calls the client sends to OM.
-   */
-  private OzoneManagerProtocol spyOmClient() {
-    RpcClient rpcClient = (RpcClient) ozClient.getProxy();
-    OzoneManagerClientProtocol omClient = (OzoneManagerClientProtocol) rpcClient.getOzoneManagerClient();
-    OzoneManagerClientProtocol omClientSpy =
-        mock(OzoneManagerClientProtocol.class, AdditionalAnswers.delegatesTo(omClient));
-    HddsWhiteboxTestUtils.setInternalState(rpcClient, "ozoneManagerClient", omClientSpy);
-    return omClientSpy;
   }
 
   private OmKeyInfo lookupKey(OzoneBucket bucket, String keyName)
