@@ -53,6 +53,8 @@ public class PipelineFactory {
         new RatisPipelineProvider(nodeManager,
             stateManager, conf,
             eventPublisher, scmContext));
+    providers.put(ReplicationType.CHAINED,
+        new ChainedPipelineProvider(nodeManager, stateManager, conf, eventPublisher, scmContext));
     PlacementPolicy ecPlacementPolicy;
     try {
       ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(conf,
