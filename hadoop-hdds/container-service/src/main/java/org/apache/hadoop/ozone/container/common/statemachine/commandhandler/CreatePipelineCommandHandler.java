@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -115,13 +116,15 @@ public class CreatePipelineCommandHandler implements CommandHandler {
         final DatanodeDetails dn = context.getParent().getDatanodeDetails();
         final List<DatanodeDetails> peers = createCommand.getNodeList();
         final List<Integer> priorityList = createCommand.getPriorityList();
+        final ReplicationType type = createCommand.getReplicationType();
 
         try {
           XceiverServerSpi server = ozoneContainer.getWriteChannel();
           if (!server.isExist(pipelineID)) {
             final RaftGroup group = RatisHelper.newRaftGroup(pipelineID.getGroupId(), peers, priorityList);
-            server.addGroup(pipelineID, peers, priorityList);
-            peers.stream().filter(d -> !d.getID().equals(dn.getID()))
+            server.addGroup(pipelineID, type, peers, priorityList);
+            // For CHAINED, each datanode adds the group from its own command; see XceiverServerRatis.addGroup.
+            peers.stream().filter(d -> type != ReplicationType.CHAINED && !d.getID().equals(dn.getID()))
                 .forEach(d -> {
                   final RaftPeer peer = RatisHelper.toRaftPeer(d);
                   try (RaftClient client = newRaftClient.apply(peer,
@@ -133,9 +136,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
                     LOG.warn("Add group failed for {}", d, ioe);
                   }
                 });
-            LOG.info("Created Pipeline {} {} {}.",
-                createCommand.getReplicationType(), createCommand.getFactor(),
-                pipelineID);
+            LOG.info("Created {}/{} {}: {}", type, createCommand.getFactor(), pipelineID, group);
           }
         } catch (IOException e) {
           // The server.addGroup may exec after a getGroupManagementApi call
