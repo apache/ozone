@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -54,6 +55,17 @@ public final class ReplicationManagerUtil {
   private static final Logger LOG = LoggerFactory.getLogger(ReplicationManagerUtil.class);
 
   private ReplicationManagerUtil() {
+  }
+
+  /**
+   * Returns the storage type to use for a new replica of the container.
+   * Legacy containers without a storage tier retain the previous DISK
+   * placement behavior.
+   */
+  public static StorageType getTargetStorageType(ContainerInfo container) {
+    StorageTier storageTier = container.getStorageTier();
+    return storageTier == null || storageTier == StorageTier.EMPTY
+        ? StorageType.DEFAULT : storageTier.getUniformStorageType();
   }
 
   private static String formatDatanodeDetails(List<DatanodeDetails> dns) {

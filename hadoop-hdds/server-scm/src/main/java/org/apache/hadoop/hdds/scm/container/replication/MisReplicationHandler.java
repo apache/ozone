@@ -156,12 +156,12 @@ public abstract class MisReplicationHandler implements
 
     int requiredNodes = replicasToBeReplicated.size();
 
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
     List<DatanodeDetails> targetDatanodes = ReplicationManagerUtil
         .getTargetDatanodes(containerPlacement, requiredNodes,
             excludedAndUsedNodes.getUsedNodes(),
             excludedAndUsedNodes.getExcludedNodes(), currentContainerSize,
-            container, StorageType.DEFAULT);
+            container, container.getReplicationType() == HddsProtos.ReplicationType.RATIS
+                ? ReplicationManagerUtil.getTargetStorageType(container) : StorageType.DEFAULT);
     if (!targetDatanodes.isEmpty()) {
       // When no other rack has a usable node, placement can fall back to a rack that already has a replica.
       // Copying there doesn't help: the container is still mis-replicated, the extra copy gets deleted, and the

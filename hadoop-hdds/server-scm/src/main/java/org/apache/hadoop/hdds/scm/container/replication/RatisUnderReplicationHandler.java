@@ -148,7 +148,8 @@ public class RatisUnderReplicationHandler
     }
 
     int commandsSent = sendReplicationCommands(
-        containerInfo, sourceDatanodes, targetDatanodes);
+        containerInfo, sourceDatanodes, targetDatanodes,
+        ReplicationManagerUtil.getTargetStorageType(containerInfo));
 
     if (targetDatanodes.size() < replicaCount.additionalReplicaNeeded()) {
       // The placement policy failed to find enough targets to satisfy fix
@@ -236,15 +237,18 @@ public class RatisUnderReplicationHandler
 
     CommandTargetOverloadedException firstException = null;
     int numCommandsSent = 0;
+    StorageType targetStorageType =
+        ReplicationManagerUtil.getTargetStorageType(container);
     for (ContainerReplica replica : sources) {
       // find a target for each source and send replicate command
-      // TODO StoragePolicy replace this StorageType with container actual StorageType
       final List<DatanodeDetails> target =
           ReplicationManagerUtil.getTargetDatanodes(placementPolicy, 1, excludedAndUsedNodes.getUsedNodes(),
-              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container, StorageType.DEFAULT);
+              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container,
+              targetStorageType);
       int count = 0;
       try {
-        count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target);
+        count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target,
+            targetStorageType);
       } catch (CommandTargetOverloadedException e) {
         LOG.info("Exception while replicating {} to target {} for container {}.", replica, target, container, e);
         if (firstException == null) {
@@ -461,20 +465,21 @@ public class RatisUnderReplicationHandler
 
     LOG.debug("UsedList: {}, size {}. ExcludeList: {}, size: {}. ",
         used, used.size(), excluded, excluded.size());
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
         replicaCount.additionalReplicaNeeded(), used, excluded,
-        currentContainerSize, replicaCount.getContainer(), StorageType.DEFAULT);
+        currentContainerSize, replicaCount.getContainer(),
+        ReplicationManagerUtil.getTargetStorageType(replicaCount.getContainer()));
   }
 
   private int sendReplicationCommands(
       ContainerInfo containerInfo, List<DatanodeDetails> sources,
-      List<DatanodeDetails> targets) throws CommandTargetOverloadedException,
+      List<DatanodeDetails> targets, StorageType targetStorageType)
+      throws CommandTargetOverloadedException,
       NotLeaderException {
     int commandsSent = 0;
     for (DatanodeDetails target : targets) {
       replicationManager.sendThrottledReplicationCommand(
-          containerInfo, sources, target, 0);
+          containerInfo, sources, target, 0, targetStorageType);
       commandsSent++;
     }
     return commandsSent;

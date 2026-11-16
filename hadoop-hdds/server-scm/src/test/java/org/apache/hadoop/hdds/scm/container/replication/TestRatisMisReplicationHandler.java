@@ -44,6 +44,7 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -55,6 +56,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -96,6 +98,27 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
             Pair.of(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(),
             0, misreplicationCount, Math.min(misreplicationCount, 3));
+  }
+
+  @Test
+  public void testMisReplicationPreservesStorageTier() throws IOException {
+    container = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicas(
+        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
+    PlacementPolicy placementPolicy = mockPlacementPolicy();
+
+    testMisReplication(replicas, placementPolicy, Collections.emptyList(), 0, 1, 1);
+
+    verify(placementPolicy).chooseDatanodes(
+        any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD));
+    ReplicateContainerCommand command =
+        (ReplicateContainerCommand) commandsSent.iterator().next().getValue();
+    assertEquals(StorageType.SSD, command.getTargetVolumeStorageType());
   }
 
   @ParameterizedTest

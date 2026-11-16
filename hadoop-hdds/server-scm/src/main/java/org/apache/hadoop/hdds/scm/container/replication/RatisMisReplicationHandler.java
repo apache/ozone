@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -62,11 +63,13 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
       List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
       throws CommandTargetOverloadedException, NotLeaderException {
     ReplicationManager replicationManager = getReplicationManager();
+    StorageType targetStorageType = ReplicationManagerUtil
+        .getTargetStorageType(containerInfo);
 
     int commandsSent = 0;
     for (DatanodeDetails target : targetDns) {
       replicationManager.sendThrottledReplicationCommand(containerInfo,
-          sources, target, 0);
+          sources, target, 0, targetStorageType);
       commandsSent++;
     }
 

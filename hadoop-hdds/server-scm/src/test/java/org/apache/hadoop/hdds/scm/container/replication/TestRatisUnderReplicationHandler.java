@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -61,13 +62,16 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
@@ -141,8 +145,56 @@ public class TestRatisUnderReplicationHandler {
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
             MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0, null));
 
-    testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
-        1);
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(
+        replicas, pendingOps, getUnderReplicatedHealthResult(), 2, 1);
+    ReplicateContainerCommand command =
+        (ReplicateContainerCommand) commands.iterator().next().getValue();
+    assertEquals(StorageType.DEFAULT, command.getTargetVolumeStorageType());
+  }
+
+  @Test
+  public void testUnderReplicationPreservesStorageTier() throws IOException {
+    container = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    policy = mock(PlacementPolicy.class);
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD)))
+        .thenReturn(Collections.singletonList(target));
+
+    testProcessing(createReplicas(container.containerID(), State.CLOSED, 0, 0), Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 1);
+
+    ReplicateContainerCommand command =
+        (ReplicateContainerCommand) commandsSent.iterator().next().getValue();
+    assertEquals(StorageType.SSD, command.getTargetVolumeStorageType());
+  }
+
+  @Test
+  public void testUnderReplicationDoesNotFallbackToIncompatibleStorageTier() {
+    container = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    DatanodeDetails diskTarget = MockDatanodeDetails.randomDatanodeDetails();
+    policy = mock(PlacementPolicy.class);
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD)))
+        .thenThrow(new SCMException("No SSD target", SCMException.ResultCodes.NO_SUCH_DATANODE));
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.DISK)))
+        .thenReturn(Collections.singletonList(diskTarget));
+
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+    assertThrows(SCMException.class, () -> handler.processAndSendCommands(
+        replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    assertTrue(commandsSent.isEmpty());
   }
 
   /**
