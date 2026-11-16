@@ -85,6 +85,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final Set<String> preCheckRules = new HashSet<>();
   private final Set<String> validatedRules = new HashSet<>();
   private final Set<String> validatedPreCheckRules = new HashSet<>();
+  private boolean containerRulesValidated = false;
 
   private final SCMServiceManager serviceManager;
   private final SCMContext scmContext;
@@ -201,6 +202,16 @@ public class SCMSafeModeManager implements SafeModeManager {
     } else {
       // This should never happen
       LOG.error("No Such Exit rule {}", ruleName);
+    }
+
+    // Once all container rules have been validated, notify the services that are
+    // allowed to start in safe mode at that point, such as the pipeline scrubber.
+    if (!containerRulesValidated && exitRules.values().stream()
+        .filter(rule -> rule instanceof AbstractContainerSafeModeRule)
+        .allMatch(rule -> validatedRules.contains(rule.getRuleName()))) {
+      containerRulesValidated = true;
+      LOG.info("All SCM safe mode container rules have passed");
+      serviceManager.notifyEventTriggered(Event.CONTAINER_SAFE_MODE_RULES_VALIDATED);
     }
 
     // If all the precheck rules have been validated, set status to PRE_CHECKS_PASSED

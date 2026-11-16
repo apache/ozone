@@ -25,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -57,6 +60,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -169,6 +174,31 @@ public class TestSCMSafeModeManager {
     assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
 
+  }
+
+  @Test
+  public void testContainerRulesValidatedEventFiredOnce() throws Exception {
+    containers = new ArrayList<>(HddsTestUtils.getContainerInfo(5));
+    for (ContainerInfo container : containers) {
+      container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
+    }
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
+    SCMService service = mock(SCMService.class);
+    serviceManager.register(service);
+    scmSafeModeManager = new SCMSafeModeManager(config, null, null, containerManager,
+        serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+    verify(service, never()).notifyEventTriggered(Event.CONTAINER_SAFE_MODE_RULES_VALIDATED);
+
+    SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
+        HddsTestUtils.createNodeRegistrationContainerReport(containers);
+    queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationContainerReport);
+    queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 100, 1000 * 5);
+
+    verify(service, times(1)).notifyEventTriggered(Event.CONTAINER_SAFE_MODE_RULES_VALIDATED);
   }
 
   @Test
@@ -850,8 +880,13 @@ public class TestSCMSafeModeManager {
         pipelineManager, containerManager, serviceManager, queue, scmContext);
     scmSafeModeManager.start();
 
-    assertThat(SafeModeRuleFactory.getInstance()
-        .getSafeModeRule(HealthyPipelineSafeModeRule.class)).isNull();
+    // The rule is still registered to check for pipelines with unregistered
+    // datanodes, but without the RATIS/THREE threshold.
+    HealthyPipelineSafeModeRule healthyPipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+    assertThat(healthyPipelineRule).isNotNull();
+    assertFalse(healthyPipelineRule.isRatisThreeRuleEnabled());
+    assertTrue(healthyPipelineRule.validate());
     assertThat(SafeModeRuleFactory.getInstance()
         .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)).isNull();
     ECMinDataNodeSafeModeRule ecMinDnRule = SafeModeRuleFactory.getInstance()

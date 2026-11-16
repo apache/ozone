@@ -32,16 +32,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.MAXIMUM_NUMBER_OF_PARTS_PER_UP
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
@@ -57,7 +56,6 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -347,19 +345,16 @@ public class RpcClient implements ClientProtocol {
     long keyProviderCacheExpiryMs = conf.getTimeDuration(
         OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY,
         OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT, TimeUnit.MILLISECONDS);
-    keyProviderCache = CacheBuilder.newBuilder()
+    keyProviderCache = Caffeine.newBuilder()
         .expireAfterAccess(keyProviderCacheExpiryMs, TimeUnit.MILLISECONDS)
-        .removalListener(new RemovalListener<URI, KeyProvider>() {
-          @Override
-          public void onRemoval(
-              @Nonnull RemovalNotification<URI, KeyProvider> notification) {
-            try {
-              assert notification.getValue() != null;
-              notification.getValue().close();
-            } catch (Throwable t) {
-              LOG.error("Error closing KeyProvider with uri [" +
-                  notification.getKey() + "]", t);
-            }
+        // close the removed providers on the calling thread, so that close() closes them before it returns
+        .executor(Runnable::run)
+        .<URI, KeyProvider>removalListener((uri, provider, cause) -> {
+          try {
+            assert provider != null;
+            provider.close();
+          } catch (Throwable t) {
+            LOG.error("Error closing KeyProvider with uri [" + uri + "]", t);
           }
         }).build();
     long maxPoolSize = (long) conf.getStorageSize(
@@ -1872,6 +1867,9 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive,
       String expectedETag) throws IOException {
+    if (expectedETag != null && !OzoneManagerVersion.CONDITIONAL_DELETE.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support conditional key deletion.");
+    }
     boolean assumeS3Context = volumeName == null
         && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
     if (assumeS3Context) {
@@ -2424,6 +2422,11 @@ public class RpcClient implements ClientProtocol {
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
       String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
       String excludedETag) throws IOException {
+    // Conditional MPU completion and atomic create-if-absent first shipped in 2.2.0.
+    if ((expectedDataGeneration != null || expectedETag != null)
+        && !OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support conditional multipart upload completion.");
+    }
     if (excludedETag != null) {
       checkIfNoneMatchETagSupport();
     }
@@ -2492,6 +2495,11 @@ public class RpcClient implements ClientProtocol {
   public OzoneMultipartUploadPartListParts listParts(String volumeName,
       String bucketName, String keyName, String uploadID, int partNumberMarker,
       int maxParts)  throws IOException {
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(uploadID);
@@ -2502,7 +2510,7 @@ public class RpcClient implements ClientProtocol {
         " 1 and ranges till 10000");
     OmMultipartUploadListParts omMultipartUploadListParts =
         ozoneManagerClient.listParts(volumeName, bucketName, keyName,
-            uploadID, partNumberMarker, maxParts);
+            uploadID, partNumberMarker, maxParts, assumeS3Context);
 
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         new OzoneMultipartUploadPartListParts(
@@ -2524,17 +2532,17 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
 
-    OmMultipartUploadList omMultipartUploadList;
-    if (OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION.isSupportedBy(getOmVersion())) {
-      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
-          uploadIdMarker, maxUploads, true);
-    } else {
-      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
-          uploadIdMarker, maxUploads, false);
-    }
+    boolean withPagination = OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION.isSupportedBy(getOmVersion());
+    OmMultipartUploadList omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName,
+        prefix, keyMarker, uploadIdMarker, maxUploads, withPagination, assumeS3Context);
     List<OzoneMultipartUpload> uploads = omMultipartUploadList.getUploads()
         .stream()
         .map(upload -> new OzoneMultipartUpload(upload.getVolumeName(),
@@ -3027,10 +3035,11 @@ public class RpcClient implements ClientProtocol {
     }
 
     try {
-      return keyProviderCache.get(kmsUri, new Callable<KeyProvider>() {
-        @Override
-        public KeyProvider call() throws Exception {
-          return OzoneKMSUtil.getKeyProvider(conf, kmsUri);
+      return keyProviderCache.get(kmsUri, uri -> {
+        try {
+          return OzoneKMSUtil.getKeyProvider(conf, uri);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
         }
       });
     } catch (Exception e) {
@@ -3273,6 +3282,11 @@ public class RpcClient implements ClientProtocol {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
@@ -3280,6 +3294,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setAssumeS3Context(assumeS3Context)
         .build();
     ozoneManagerClient.deleteObjectTagging(keyArgs);
   }

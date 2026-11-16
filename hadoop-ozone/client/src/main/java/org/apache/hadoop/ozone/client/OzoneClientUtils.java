@@ -28,7 +28,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -61,11 +60,9 @@ public final class OzoneClientUtils {
 
   public static BucketLayout resolveLinkBucketLayout(OzoneBucket bucket,
                                                      ObjectStore objectStore,
-                                                     Set<Pair<String,
-                                                         String>> visited)
-      throws IOException {
+                                                     Set<VolumeBucket> visited) throws IOException {
     if (bucket.isLink()) {
-      if (!visited.add(Pair.of(bucket.getVolumeName(),
+      if (!visited.add(new VolumeBucket(bucket.getVolumeName(),
           bucket.getName()))) {
         throw new OMException("Detected loop in bucket links. Bucket name: " +
             bucket.getName() + ", Volume name: " + bucket.getVolumeName(),
@@ -292,6 +289,36 @@ public final class OzoneClientUtils {
               + " {} and volume {} after snapDiff op. Exception : {}", snapshot,
           bucketName, volumeName,
           exception.getMessage());
+    }
+  }
+
+  /**
+   * A volume name paired with a bucket name, used to track the visited buckets when detecting loops in bucket links.
+   */
+  public static final class VolumeBucket {
+    private final String volume;
+    private final String bucket;
+
+    public VolumeBucket(String volume, String bucket) {
+      this.volume = volume;
+      this.bucket = bucket;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      VolumeBucket that = (VolumeBucket) o;
+      return Objects.equals(volume, that.volume) && Objects.equals(bucket, that.bucket);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(volume, bucket);
     }
   }
 }
