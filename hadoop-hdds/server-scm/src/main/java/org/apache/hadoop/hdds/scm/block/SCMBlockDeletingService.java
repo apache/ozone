@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -75,6 +77,8 @@ public class SCMBlockDeletingService extends BackgroundService
       LoggerFactory.getLogger(SCMBlockDeletingService.class);
 
   private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 1;
+  // How many datanodes to log in retryOnly mode.
+  private static final int TOP_RETRIED_DATANODES = 5;
   private final DeletedBlockLog deletedBlockLog;
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
@@ -185,6 +189,10 @@ public class SCMBlockDeletingService extends BackgroundService
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
           }
+          if (retryOnly) {
+            LOG.warn("Retrying transactions not acknowledged yet, top datanodes: {}",
+                topRetriedDatanodes(transactions, included, TOP_RETRIED_DATANODES));
+          }
 
           Set<Long> processedTxIDs = new HashSet<>();
           for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
@@ -244,6 +252,27 @@ public class SCMBlockDeletingService extends BackgroundService
 
       return EmptyTaskResult.newResult();
     }
+  }
+
+  /**
+   * @return the datanodes which get the most transactions in this round,
+   * as "host=count" sorted by count, which are the ones the commit map
+   * is waiting for in retryOnly mode.
+   */
+  @VisibleForTesting
+  static String topRetriedDatanodes(DatanodeDeletedBlockTransactions transactions,
+      Collection<DatanodeDetails> datanodes, int limit) {
+    final Map<DatanodeID, DatanodeDetails> byId = datanodes.stream()
+        .collect(Collectors.toMap(DatanodeDetails::getID, Function.identity(), (a, b) -> a));
+    return transactions.getDatanodeTransactionMap().entrySet().stream()
+        .sorted((a, b) -> Integer.compare(b.getValue().size(), a.getValue().size()))
+        .limit(limit)
+        .map(e -> {
+          final DatanodeDetails dn = byId.get(e.getKey());
+          return (dn != null ? dn.getHostName() : e.getKey().toString())
+              + "=" + e.getValue().size();
+        })
+        .collect(Collectors.joining(", "));
   }
 
   @VisibleForTesting

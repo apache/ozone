@@ -149,6 +149,27 @@ public class TestSCMBlockDeletingService {
     verify(mockDeletedBlockLog).getTransactions(anyInt(), anySet(), eq(true));
   }
 
+  @Test
+  public void testTopRetriedDatanodes() {
+    DatanodeDetails dn1 = datanodeDetails.get(0);
+    DatanodeDetails dn2 = datanodeDetails.get(1);
+    DatanodeDetails dn3 = datanodeDetails.get(2);
+    DatanodeDeletedBlockTransactions txns = new DatanodeDeletedBlockTransactions();
+    for (long i = 1; i <= 3; i++) {
+      txns.addTransactionToDN(dn2.getID(), createTestDeleteTxn(i, Arrays.asList(i), 1));
+    }
+    for (long i = 1; i <= 2; i++) {
+      txns.addTransactionToDN(dn1.getID(), createTestDeleteTxn(i, Arrays.asList(i), 1));
+    }
+    txns.addTransactionToDN(dn3.getID(), createTestDeleteTxn(1, Arrays.asList(1L), 1));
+
+    assertEquals(dn2.getHostName() + "=3, " + dn1.getHostName() + "=2",
+        SCMBlockDeletingService.topRetriedDatanodes(txns, datanodeDetails, 2));
+    // A datanode not in the list is shown by its ID.
+    assertEquals(dn2.getID() + "=3",
+        SCMBlockDeletingService.topRetriedDatanodes(txns, Arrays.asList(dn1, dn3), 1));
+  }
+
   private void callDeletedBlockTransactionScanner() throws Exception {
     service.getTasks().poll().call();
   }
