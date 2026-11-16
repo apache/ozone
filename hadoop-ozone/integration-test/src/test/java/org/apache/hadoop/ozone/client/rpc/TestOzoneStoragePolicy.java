@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -511,8 +512,8 @@ public class TestOzoneStoragePolicy {
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
       OzoneStoragePolicy storagePolicy) throws IOException {
-    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName, RATIS_THREE,
-        Collections.emptyMap(), Collections.emptyMap(), storagePolicy);
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
+        new MultipartUploadOptions.Builder().setReplicationConfig(RATIS_THREE).setStoragePolicy(storagePolicy).build());
     assertThat(multipartInfo.getUploadID()).isNotNull();
     return multipartInfo.getUploadID();
   }

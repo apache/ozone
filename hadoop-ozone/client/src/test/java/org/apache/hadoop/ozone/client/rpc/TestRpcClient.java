@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.rpc;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.getOmVersion;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.validateOmVersion;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -749,6 +751,18 @@ public class TestRpcClient {
     }
   }
 
+  @Test
+  public void testInitiateMultipartUploadRejectsNullOptions() throws IOException {
+    RpcClient client = createRpcClient();
+    try {
+      assertThatThrownBy(() -> client.initiateMultipartUpload("vol", "bucket", "key", (MultipartUploadOptions) null))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("options == null");
+    } finally {
+      client.close();
+    }
+  }
+
   /**
    * A storage policy is sent only to an OM that supports it, and a request without one is never rejected.
    */
@@ -776,10 +790,10 @@ public class TestRpcClient {
     try {
       ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
       IOException withoutPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
-          "vol", "bucket", "key", replication, Collections.emptyMap(), Collections.emptyMap(), null));
+          "vol", "bucket", "key", new MultipartUploadOptions.Builder().setReplicationConfig(replication).build()));
       IOException withPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
-          "vol", "bucket", "key", replication, Collections.emptyMap(), Collections.emptyMap(),
-          OzoneStoragePolicy.COLD));
+          "vol", "bucket", "key", new MultipartUploadOptions.Builder().setReplicationConfig(replication)
+              .setStoragePolicy(OzoneStoragePolicy.COLD).build()));
 
       assertThat(withoutPolicyError).hasMessage("captured");
       assertThat(requests.get(0).hasStoragePolicy()).isFalse();

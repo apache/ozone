@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -1063,24 +1064,24 @@ public class OzoneBucket extends WithMetadata {
       ReplicationConfig config, Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
-    return initiateMultipartUpload(keyName, config, metadata, tags, null);
+    return initiateMultipartUpload(keyName, new MultipartUploadOptions.Builder()
+        .setReplicationConfig(config)
+        .setMetadata(metadata)
+        .setTags(tags)
+        .build());
   }
 
   /**
    * Initiate multipart upload for a specified key.
    * @param keyName Name of the key to be created when the multipart upload is completed.
-   * @param config Replication config.
-   * @param metadata Custom key metadata.
-   * @param tags Tags used for S3 object tags.
-   * @param keyStoragePolicy StoragePolicy of the key, or null to inherit the bucket's.
+   * @param options Replication config, metadata, tags and storage policy of the key.
    * @return OmMultipartInfo
    * @throws IOException
    */
-  public OmMultipartInfo initiateMultipartUpload(String keyName,
-      ReplicationConfig config, Map<String, String> metadata,
-      Map<String, String> tags, StoragePolicy keyStoragePolicy)
+  public OmMultipartInfo initiateMultipartUpload(String keyName, MultipartUploadOptions options)
       throws IOException {
-    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata, tags, keyStoragePolicy);
+    Objects.requireNonNull(options, "options == null");
+    return proxy.initiateMultipartUpload(volumeName, name, keyName, options);
   }
 
   /**

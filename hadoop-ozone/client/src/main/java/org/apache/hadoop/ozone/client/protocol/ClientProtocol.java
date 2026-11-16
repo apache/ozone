@@ -857,17 +857,12 @@ public interface ClientProtocol {
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
-   * @param replicationConfig Replication config
-   * @param metadata Custom key value metadata
-   * @param tags Tags used for S3 object tags
-   * @param storagePolicy StoragePolicy of the key, or null to inherit the bucket's
+   * @param options Replication config, metadata, tags and storage policy of the key
    * @return {@link OmMultipartInfo}
    * @throws IOException
    */
   OmMultipartInfo initiateMultipartUpload(String volumeName, String
-      bucketName, String keyName, ReplicationConfig replicationConfig,
-      Map<String, String> metadata, Map<String, String> tags,
-      @Nullable StoragePolicy storagePolicy)
+      bucketName, String keyName, MultipartUploadOptions options)
       throws IOException;
 
   /**

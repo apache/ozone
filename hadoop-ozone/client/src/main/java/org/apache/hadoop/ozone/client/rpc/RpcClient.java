@@ -130,6 +130,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
@@ -2209,22 +2210,27 @@ public class RpcClient implements ClientProtocol {
       Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
-    return initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig,
-        metadata, tags, null);
+    return initiateMultipartUpload(volumeName, bucketName, keyName, new MultipartUploadOptions.Builder()
+        .setReplicationConfig(replicationConfig)
+        .setMetadata(metadata)
+        .setTags(tags)
+        .build());
   }
 
   @Override
   public OmMultipartInfo initiateMultipartUpload(String volumeName,
       String bucketName,
       String keyName,
-      ReplicationConfig replicationConfig,
-      Map<String, String> metadata,
-      Map<String, String> tags,
-      StoragePolicy storagePolicy)
+      MultipartUploadOptions options)
       throws IOException {
+    Objects.requireNonNull(options, "options == null");
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName);
+    final ReplicationConfig replicationConfig = options.getReplicationConfig();
+    final Map<String, String> metadata = options.getMetadata();
+    final Map<String, String> tags = options.getTags();
+    final StoragePolicy storagePolicy = options.getStoragePolicy();
     String ownerName = getRealUserInfo().getShortUserName();
     if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
       if (replicationConfig != null && replicationConfig.getReplicationType()

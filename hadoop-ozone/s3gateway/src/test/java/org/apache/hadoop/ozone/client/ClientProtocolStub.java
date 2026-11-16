@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -485,11 +486,10 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OmMultipartInfo initiateMultipartUpload(String volumeName,
-         String bucketName, String keyName, ReplicationConfig replicationConfig,
-         Map<String, String> metadata, Map<String, String> tags, StoragePolicy storagePolicy)
+         String bucketName, String keyName, MultipartUploadOptions options)
       throws IOException {
     return getBucket(volumeName, bucketName)
-        .initiateMultipartUpload(keyName, replicationConfig, metadata, tags, storagePolicy);
+        .initiateMultipartUpload(keyName, options);
   }
 
   @Override
