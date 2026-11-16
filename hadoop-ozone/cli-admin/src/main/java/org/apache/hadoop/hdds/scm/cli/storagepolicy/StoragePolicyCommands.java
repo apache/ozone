@@ -32,6 +32,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
+        CheckStoragePolicySubCommand.class,
         UsageInfoSubCommand.class,
     })
 @MetaInfServices(AdminSubcommand.class)
