@@ -770,8 +770,9 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneBucket bucket = getBucket(ofsPath, false);
           status = bucket.getFileStatus(key, headOp);
         }
+        // An OM without HDDS-15678 still returns the block locations of a head op, without pipelines: ignore them.
         return toFileStatusAdapter(status, userName, uri, qualifiedPath,
-            ofsPath.getNonKeyPath());
+            ofsPath.getNonKeyPath(), !headOp);
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -1097,7 +1098,7 @@ public class BasicRootedOzoneClientAdapterImpl
         }
       } else {
         for (OzoneFileStatus status : statuses) {
-          result.add(toFileStatusAdapter(status, username, uri, workingDir, ofsPathPrefix));
+          result.add(toFileStatusAdapter(status, username, uri, workingDir, ofsPathPrefix, true));
         }
       }
 
@@ -1184,7 +1185,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
-      String owner, URI defaultUri, Path workingDir, String ofsPathPrefix) {
+      String owner, URI defaultUri, Path workingDir, String ofsPathPrefix, boolean withBlockLocations) {
     OmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
@@ -1209,7 +1210,7 @@ public class BasicRootedOzoneClientAdapterImpl
         StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
         owner,
         null,
-        getBlockLocations(status),
+        getBlockLocations(withBlockLocations ? status : null),
         OzoneClientUtils.isKeyEncrypted(keyInfo),
         isEc,
         ecPolicy

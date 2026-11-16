@@ -165,7 +165,7 @@ public class TestMultiTenantVolume {
 
   @Test
   public void testDefaultS3Volume() throws Exception {
-    final String bucketName = "bucket";
+    final String bucketName = "default-s3-bucket";
 
     // Default client not belonging to a tenant should end up in the S3 volume.
     ObjectStore store = client.getObjectStore();
@@ -175,9 +175,15 @@ public class TestMultiTenantVolume {
     store.createS3Bucket(bucketName);
     assertEquals(s3VolumeName,
         store.getS3Bucket(bucketName).getVolumeName());
+    OzoneBucket bucket = store.getS3Bucket(bucketName);
+    String uploadID = bucket.initiateMultipartUpload("key").getUploadID();
+    assertMultipartListing(olderS3Client.getObjectStore(), bucketName, "key", uploadID);
+    assertMultipartListing(getStoreForAccessID(UUID.randomUUID().toString()), bucketName, "key", uploadID);
     try (OzoneClient s3Client = newS3Client()) {
       assertEquals(s3VolumeName, s3Client.getProxy().getBucketDetails(null, bucketName).getVolumeName());
+      assertMultipartListing(s3Client.getObjectStore(), bucketName, "key", uploadID);
     }
+    bucket.abortMultipartUpload("key", uploadID);
 
     assertS3KeyDeletion(store, store.getS3Bucket(bucketName), bucketName);
     assertS3TagDeletion(store, store.getS3Bucket(bucketName), bucketName);
@@ -235,6 +241,7 @@ public class TestMultiTenantVolume {
 
     String keyName = "key";
     String uploadID = bucket.initiateMultipartUpload(keyName).getUploadID();
+    assertMultipartListing(store, BUCKET_NAME, keyName, uploadID);
     store.getClientProxy().abortS3MultipartUpload(BUCKET_NAME, keyName, uploadID);
     OMException exception = assertThrows(OMException.class, () -> bucket.abortMultipartUpload(keyName, uploadID));
     assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
@@ -252,6 +259,7 @@ public class TestMultiTenantVolume {
         .setSourceVolume(sourceVolumeName).setSourceBucket(sourceBucketName).build());
     OzoneBucket sourceBucket = sourceVolume.getBucket(sourceBucketName);
     String linkUploadID = sourceBucket.initiateMultipartUpload(keyName).getUploadID();
+    assertMultipartListing(store, linkBucketName, keyName, linkUploadID);
     store.getClientProxy().abortS3MultipartUpload(linkBucketName, keyName, linkUploadID);
     exception = assertThrows(OMException.class, () -> sourceBucket.abortMultipartUpload(keyName, linkUploadID));
     assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
@@ -317,6 +325,14 @@ public class TestMultiTenantVolume {
 
     assertThat(bucket.getKey(keyName).getTags()).isEmpty();
     bucket.deleteKey(keyName);
+  }
+
+  private static void assertMultipartListing(ObjectStore store, String bucketName, String keyName, String uploadID)
+      throws IOException {
+    assertThat(store.getClientProxy().listMultipartUploads(null, bucketName, keyName, "", "", 10).getUploads())
+        .extracting(upload -> upload.getUploadId()).containsExactly(uploadID);
+    assertThat(store.getClientProxy().listParts(null, bucketName, keyName, uploadID, 0, 10).getPartInfoList())
+        .isEmpty();
   }
 
   /**

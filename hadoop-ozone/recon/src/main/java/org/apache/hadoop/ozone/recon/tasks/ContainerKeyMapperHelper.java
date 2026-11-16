@@ -517,7 +517,7 @@ public abstract class ContainerKeyMapperHelper {
         }
       }
     }
-    // Container count will be written once at the end of reprocess, not here (Derby optimization)
+    // Container count will be written once at the end of reprocess, not here
   }
 
   public static boolean flushAndCommitContainerKeyInfoToDB(

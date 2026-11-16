@@ -1326,8 +1326,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       Table<String, OmLifecycleScanState> spyTable = spy(originalTable);
       tableField.set(metadataManager, spyTable);
       try {
-        runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
-
+        runSingleLifecycleScan(volumeName, bucketName, false);
         GenericTestUtils.waitFor(() ->
             (getDeletedKeyCount() - initialDeletedKeyCount) == 3, WAIT_CHECK_INTERVAL, 10000);
         assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
@@ -3776,6 +3775,15 @@ class TestKeyLifecycleService extends OzoneTestBase {
   // later and deletes the objects the caller expects to remain.
   private void runSingleLifecycleScanAndDeleteConfiguration(String volume, String bucket)
       throws IOException, TimeoutException, InterruptedException {
+    runSingleLifecycleScan(volume, bucket, true);
+  }
+
+  /**
+   * @param deletePolicy delete the policy once the task starts, so the bucket is not scanned again. Scan state is
+   *     not saved after the policy is deleted, so tests checking the saved scan state keep the policy instead.
+   */
+  private void runSingleLifecycleScan(String volume, String bucket, boolean deletePolicy)
+      throws IOException, TimeoutException, InterruptedException {
     FaultInjectorImpl taskStart = new FaultInjectorImpl();
     FaultInjectorImpl firstDelete = new FaultInjectorImpl();
     // The third injector is only read for an injected exception, but the scan expects it to exist
@@ -3783,7 +3791,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
     keyLifecycleService.resume();
     // The in-flight list is filled at schedule time, so wait for the task to reach the injector
     taskStart.awaitPaused(10000);
-    deleteLifecyclePolicy(volume, bucket);
+    if (deletePolicy) {
+      deleteLifecyclePolicy(volume, bucket);
+    }
     taskStart.release();
     firstDelete.release();
     GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
