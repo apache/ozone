@@ -143,6 +143,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
   private final ConcurrentMap<RaftGroupId, ActivePipelineContext> activePipelines = new ConcurrentHashMap<>();
+  /** Recorded from CreatePipelineCommand; not persisted, so unknown for groups reloaded at startup. */
+  private final ConcurrentMap<RaftGroupId, HddsProtos.ReplicationType> replicationTypes = new ConcurrentHashMap<>();
   // Timeout used while calling submitRequest directly.
   private final long requestTimeout;
   private final boolean shouldDeleteRatisLogDirectory;
@@ -238,17 +240,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
-    return ContainerStateMachine.newBuilder()
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setDatanodeService(datanodeService)
-        .setGroupId(gid)
-        .setDispatcher(dispatcher)
-        .setContainerController(containerController)
-        .setChunkExecutors(chunkExecutors)
-        .setRatisServer(this)
-        .setConf(conf)
-        .setThreadNamePrefix(datanodeDetails.threadNamePrefix())
-        .build();
+    return new ContainerStateMachine(datanodeService, gid, dispatcher, containerController,
+        chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
   }
 
   private void setUpRatisStream(RaftProperties properties) {
@@ -944,6 +937,17 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   public void notifyGroupRemove(RaftGroupId gid) {
     // Remove Group ID entry from the active pipeline map
     activePipelines.remove(gid);
+    replicationTypes.remove(gid);
+  }
+
+  @Override
+  public void setReplicationType(HddsProtos.PipelineID pipelineId, HddsProtos.ReplicationType type) {
+    replicationTypes.put(RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()), type);
+  }
+
+  /** @return the recorded replication type of the given group, or null if unknown. */
+  public HddsProtos.ReplicationType getReplicationType(RaftGroupId gid) {
+    return replicationTypes.get(gid);
   }
 
   void notifyGroupAdd(RaftGroupId gid) {

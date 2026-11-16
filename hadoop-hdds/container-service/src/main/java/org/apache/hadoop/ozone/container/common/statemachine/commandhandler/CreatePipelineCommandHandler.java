@@ -121,6 +121,8 @@ public class CreatePipelineCommandHandler implements CommandHandler {
 
         try {
           XceiverServerSpi server = ozoneContainer.getWriteChannel();
+          // The group may already exist since it can be added by a peer, so always record the type.
+          server.setReplicationType(pipelineIdProto, createCommand.getReplicationType());
           if (!server.isExist(pipelineIdProto)) {
             final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
             final RaftGroup group =

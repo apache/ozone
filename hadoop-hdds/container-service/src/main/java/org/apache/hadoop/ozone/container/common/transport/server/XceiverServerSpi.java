@@ -80,6 +80,12 @@ public interface XceiverServerSpi {
   }
 
   /**
+   * Record the replication type of a pipeline.
+   */
+  default void setReplicationType(HddsProtos.PipelineID pipelineId, HddsProtos.ReplicationType type) {
+  }
+
+  /**
    * Get pipeline report for the XceiverServer instance.
    * @return list of report for each pipeline.
    */

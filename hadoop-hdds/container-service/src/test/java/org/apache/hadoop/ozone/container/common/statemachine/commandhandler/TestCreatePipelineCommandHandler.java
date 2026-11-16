@@ -102,6 +102,8 @@ public class TestCreatePipelineCommandHandler {
         new ArrayList<>(Collections.nCopies(datanodes.size(), 0));
 
     verify(writeChanel, times(1))
+        .setReplicationType(pipelineID.getProtobuf(), HddsProtos.ReplicationType.RATIS);
+    verify(writeChanel, times(1))
         .addGroup(pipelineID.getProtobuf(), datanodes, priorityList);
 
     verify(raftClientGroupManager, times(2))
@@ -133,6 +135,27 @@ public class TestCreatePipelineCommandHandler {
 
     verify(raftClientGroupManager, times(0))
         .add(any(RaftGroup.class));
+  }
+
+  @Test
+  public void testReplicationTypeRecordedWhenGroupExists() {
+    final List<DatanodeDetails> datanodes = getDatanodes();
+    final PipelineID pipelineID = PipelineID.randomId();
+    final SCMCommand<CreatePipelineCommandProto> command =
+        new CreatePipelineCommand(pipelineID, HddsProtos.ReplicationType.CHAINED,
+            HddsProtos.ReplicationFactor.THREE, datanodes);
+
+    final XceiverServerSpi writeChanel = mock(XceiverServerSpi.class);
+    StateContext stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
+    when(ozoneContainer.getWriteChannel()).thenReturn(writeChanel);
+    when(writeChanel.isExist(pipelineID.getProtobuf())).thenReturn(true);
+
+    final CreatePipelineCommandHandler commandHandler =
+        new CreatePipelineCommandHandler((leader, tls) -> raftClient, MoreExecutors.directExecutor());
+    commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
+
+    verify(writeChanel, times(1))
+        .setReplicationType(pipelineID.getProtobuf(), HddsProtos.ReplicationType.CHAINED);
   }
 
   private List<DatanodeDetails> getDatanodes() {
