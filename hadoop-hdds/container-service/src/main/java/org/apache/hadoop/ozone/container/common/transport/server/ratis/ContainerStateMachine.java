@@ -142,7 +142,7 @@ import org.slf4j.LoggerFactory;
  * 2) WriteChunk commit is executed after WriteChunk write.
  *    Then, WriteChunk commit and CreateContainer will be executed in the same order.
  */
-public final class ContainerStateMachine extends BaseStateMachine {
+public class ContainerStateMachine extends BaseStateMachine {
   static final Logger LOG = LoggerFactory.getLogger(ContainerStateMachine.class);
 
   /** Either {@link ReplicationType#RATIS} or {@link ReplicationType#CHAINED}. */
