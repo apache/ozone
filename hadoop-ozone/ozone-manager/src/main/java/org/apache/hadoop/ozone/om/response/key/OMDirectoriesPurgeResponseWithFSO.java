@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.VolumeBucket;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
@@ -55,14 +56,14 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       LoggerFactory.getLogger(OMDirectoriesPurgeResponseWithFSO.class);
 
   private List<OzoneManagerProtocolProtos.PurgePathRequest> paths;
-  private Map<VolumeBucketName, OmBucketInfo> volBucketInfoMap;
+  private Map<VolumeBucket, OmBucketInfo> volBucketInfoMap;
   private SnapshotInfo fromSnapshotInfo;
   private Map<String, OmKeyInfo> openKeyInfoMap;
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
       @Nonnull BucketLayout bucketLayout,
-      Map<VolumeBucketName, OmBucketInfo> volBucketInfoMap,
+      Map<VolumeBucket, OmBucketInfo> volBucketInfoMap,
       SnapshotInfo fromSnapshotInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
     super(omResponse, bucketLayout);
     this.paths = paths;
@@ -193,14 +194,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   }
 
   @VisibleForTesting
-  public Map<VolumeBucketName, OmBucketInfo> getVolBucketInfoMap() {
+  public Map<VolumeBucket, OmBucketInfo> getVolBucketInfoMap() {
     return volBucketInfoMap;
-  }
-
-  /**
-   * A volume name paired with the name of a bucket under it,
-   * used as the key of the bucket infos mutated by a directory purge.
-   */
-  public record VolumeBucketName(String volumeName, String bucketName) {
   }
 }
