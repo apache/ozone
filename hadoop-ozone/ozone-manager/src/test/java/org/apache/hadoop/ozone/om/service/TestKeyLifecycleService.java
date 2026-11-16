@@ -1176,7 +1176,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
       installInjectors(taskStart, beforeDelete, new FaultInjectorImpl());
       keyLifecycleService.resume();
       taskStart.awaitPaused(10000);
-      deleteLifecyclePolicy(volumeName, bucketName);
       taskStart.release();
       // dir1 is evaluated as expired, and the scan waits before sending the deletion requests
       beforeDelete.awaitPaused(10000);
@@ -1201,6 +1200,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           bucketName + "/" + dirName + ", status: " + expectedStatus);
       assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
       assertNotNull(getDirectory(volumeName, bucketName, dirName).getKeyInfo());
+      deleteLifecyclePolicy(volumeName, bucketName);
     }
 
     @ParameterizedTest
@@ -3262,6 +3262,104 @@ class TestKeyLifecycleService extends OzoneTestBase {
           "MPU with prefix 'temp/' should be aborted");
 
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testMultipartUploadScanResume() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+
+      keyLifecycleService.suspend();
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE, owner);
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+      int uploadCount = 3;
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      List<String> dbKeys = new ArrayList<>();
+      for (int i = 0; i < uploadCount; i++) {
+        String keyName = "uploads/file" + i;
+        OmMultipartInfo mpuInfo = createTestMultipartUpload(volumeName, bucketName, keyName, owner);
+        updateMultipartUploadCreationTime(volumeName, bucketName, keyName, mpuInfo.getUploadID(), oldCreationTime);
+        dbKeys.add(metadataManager.getMultipartKey(volumeName, bucketName, keyName, mpuInfo.getUploadID()));
+      }
+      Collections.sort(dbKeys);
+      OmLCRule rule = new OmLCRule.Builder()
+          .setId("abort-mpu-uploads")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setPrefix("uploads/").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder().setDaysAfterInitiation(1).build())
+          .build();
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(rule));
+
+      // inject the resume state, pointing to the 2nd upload
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      OmLifecycleConfiguration policy = metadataManager.getLifecycleConfiguration(volumeName, bucketName);
+      OmLifecycleScanState scanState = new OmLifecycleScanState.Builder()
+          .setBucketKey(bucketKey)
+          .setBucketObjID(metadataManager.getBucketTable().get(bucketKey).getObjectID())
+          .setLifecycleConfigurationUpdateID(policy.getUpdateID())
+          .setScanStartTime(System.currentTimeMillis())
+          .setLastScannedMpuKey(dbKeys.get(1))
+          .build();
+      metadataManager.getLifecycleScanStateTable().put(bucketKey, scanState);
+      metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
+          CacheValue.get(1L, scanState));
+
+      runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
+
+      // only the upload after the saved pointer is aborted
+      GenericTestUtils.waitFor(() -> getMultipartUploadCount(volumeName, bucketName) - initialMpuCount == 2,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertNotNull(metadataManager.getMultipartInfoTable().get(dbKeys.get(0)));
+      assertNotNull(metadataManager.getMultipartInfoTable().get(dbKeys.get(1)));
+      assertNull(metadataManager.getMultipartInfoTable().get(dbKeys.get(2)));
+      OmLifecycleScanState savedState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+      assertEquals(dbKeys.get(2), savedState.getLastScannedMpuKey());
+      assertNotNull(savedState.getScanEndTime());
+    }
+
+    @Test
+    void testMultipartUploadScanPeriodicStateSave() throws Exception {
+      assumeTrue(maxKeysProcessedPerState == 1);
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+
+      keyLifecycleService.suspend();
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE, owner);
+      int uploadCount = 3;
+      for (int i = 0; i < uploadCount; i++) {
+        String keyName = "keep/file" + i;
+        OmMultipartInfo mpuInfo = createTestMultipartUpload(volumeName, bucketName, keyName, owner);
+        awaitMultipartCacheDrained(
+            metadataManager.getMultipartKey(volumeName, bucketName, keyName, mpuInfo.getUploadID()));
+      }
+      // no upload matches the rule, so the state is saved periodically without any abort request
+      OmLCRule rule = new OmLCRule.Builder()
+          .setId("abort-mpu-uploads")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setPrefix("uploads/").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder().setDaysAfterInitiation(1).build())
+          .build();
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(rule));
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+
+      Field tableField = OmMetadataManagerImpl.class.getDeclaredField("lifecycleScanStateTable");
+      tableField.setAccessible(true);
+      Table<String, OmLifecycleScanState> originalTable =
+          (Table<String, OmLifecycleScanState>) tableField.get(metadataManager);
+      Table<String, OmLifecycleScanState> spyTable = spy(originalTable);
+      tableField.set(metadataManager, spyTable);
+      try {
+        runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
+        verify(spyTable, atLeast(uploadCount))
+            .addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)), any());
+        OmLifecycleScanState savedState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+        assertNotNull(savedState.getScanEndTime());
+        assertEquals(uploadCount, getMultipartUploadCount(volumeName, bucketName));
+      } finally {
+        tableField.set(metadataManager, originalTable);
+      }
     }
 
     @Test
