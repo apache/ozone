@@ -92,6 +92,8 @@ public class DeletedBlockLogImpl
   private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
   private long lastProcessedTransactionId = -1;
+  // Cursor of retryOnly mode over transactionToDNsCommitMap.
+  private long lastRetriedTransactionId = -1;
   private final int logAppenderQueueByteLimit;
   private int deletionFactorPerDatanode;
 
@@ -344,6 +346,91 @@ public class DeletedBlockLogImpl
     }
   }
 
+  private void processTransaction(DeletedBlocksTransaction txn,
+      DatanodeDeletedBlockTransactions transactions, Set<DatanodeDetails> dnList,
+      Map<DatanodeID, Map<Long, CmdStatus>> commandStatus,
+      List<Long> txIDs, int maxDeleteBlocksPerDatanode) throws IOException {
+    final ContainerID id = ContainerID.valueOf(txn.getContainerID());
+    try {
+      final ContainerInfo container = containerManager.getContainer(id);
+      if (container.isDeleted()) {
+        // HDDS-7126. When container is under replicated, it is possible
+        // that container is deleted, but transactions are not deleted.
+        LOG.warn("Container: {} was deleted for the transaction: {}.", id, txn);
+        txIDs.add(txn.getTxID());
+        addTxToTxSizeMap(txn);
+      } else if (!container.isOpen()) {
+        Set<ContainerReplica> replicas = containerManager
+            .getContainerReplicas(
+                ContainerID.valueOf(txn.getContainerID()));
+        if (!checkInadequateReplica(replicas, txn, dnList)) {
+          if (transactionStatusManager.isPurgeableWithoutAck(txn.getTxID(), id)) {
+            txIDs.add(txn.getTxID());
+          } else {
+            getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
+          }
+        } else {
+          metrics.incrSkippedTransaction();
+        }
+      } else {
+        metrics.incrSkippedTransaction();
+      }
+    } catch (ContainerNotFoundException ex) {
+      LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
+      txIDs.add(txn.getTxID());
+      addTxToTxSizeMap(txn);
+    }
+  }
+
+  /**
+   * Used while transactionToDNsCommitMap is over its limit: only the
+   * transactions already sent (the keys of the map) are walked, starting
+   * after the one walked last time, so the cost is bounded by the map size
+   * instead of the size of the deleted blocks table. Keys whose transaction
+   * is no longer in the table are dropped from the map.
+   */
+  private void retryTransactionsInCommitMap(
+      Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter,
+      int blockDeletionLimit, Set<DatanodeDetails> dnList,
+      DatanodeDeletedBlockTransactions transactions,
+      Map<DatanodeID, Map<Long, CmdStatus>> commandStatus, List<Long> txIDs,
+      int maxDeleteBlocksPerDatanode) throws IOException {
+    final long start = lastRetriedTransactionId;
+    final List<Long> staleTxIDs = new ArrayList<>();
+    boolean wrapped = false;
+    Long txId = transactionStatusManager.nextTxIdInCommitMap(start);
+    while (transactions.getBlocksDeleted() < blockDeletionLimit) {
+      if (txId == null) {
+        if (wrapped || start == -1) {
+          break;
+        }
+        // Reached the end of the map, continue from its beginning.
+        wrapped = true;
+        txId = transactionStatusManager.nextTxIdInCommitMap(-1);
+        continue;
+      }
+      if (wrapped && txId > start) {
+        // We have circled back to where we started.
+        break;
+      }
+      lastRetriedTransactionId = txId;
+      final Table.KeyValue<Long, DeletedBlocksTransaction> kv = iter.seek(txId);
+      if (kv == null || kv.getKey().longValue() != txId) {
+        staleTxIDs.add(txId);
+      } else {
+        processTransaction(kv.getValue(), transactions, dnList,
+            commandStatus, txIDs, maxDeleteBlocksPerDatanode);
+      }
+      txId = transactionStatusManager.nextTxIdInCommitMap(txId);
+    }
+    if (!staleTxIDs.isEmpty()) {
+      LOG.info("Removed {} transactions from transactionToDNsCommitMap which "
+          + "are no longer in the deleted blocks table.", staleTxIDs.size());
+      transactionStatusManager.removeTransactionFromDNsCommitMap(staleTxIDs);
+      transactionStatusManager.removeTransactionFromDNsRetryCountMap(staleTxIDs);
+    }
+  }
+
   @Override
   public DatanodeDeletedBlockTransactions getTransactions(
       int blockDeletionLimit, Set<DatanodeDetails> dnList, boolean retryOnly)
@@ -358,7 +445,7 @@ public class DeletedBlockLogImpl
           new DatanodeDeletedBlockTransactions();
       try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        if (lastProcessedTransactionId != -1) {
+        if (!retryOnly && lastProcessedTransactionId != -1) {
           iter.seek(lastProcessedTransactionId);
           /*
            * We should start from (lastProcessedTransactionId + 1) transaction.
@@ -394,7 +481,6 @@ public class DeletedBlockLogImpl
                 map(DatanodeDetails::getID).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
         metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
-        Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = null;
 
         int factor = dnList.size() / deletionFactorPerDatanode;
         int maxDeleteBlocksPerDatanode = (factor > 0)
@@ -405,59 +491,34 @@ public class DeletedBlockLogImpl
         // that part of replicas committed the TXN and recorded in the
         // SCMDeletedBlockTransactionStatusManager, while they are counted
         // in the threshold.
-        while (iter.hasNext() &&
-            transactions.getBlocksDeleted() < blockDeletionLimit) {
-          keyValue = iter.next();
-          DeletedBlocksTransaction txn = keyValue.getValue();
-          final ContainerID id = ContainerID.valueOf(txn.getContainerID());
-          try {
-            final ContainerInfo container = containerManager.getContainer(id);
-            if (retryOnly && !transactionStatusManager.isInCommitMap(txn.getTxID())) {
-              LOG.trace("Transaction {} waits until transactionToDNsCommitMap is below its limit.", txn.getTxID());
-            } else if (container.isDeleted()) {
-              // HDDS-7126. When container is under replicated, it is possible
-              // that container is deleted, but transactions are not deleted.
-              LOG.warn("Container: {} was deleted for the transaction: {}.", id, txn);
-              txIDs.add(txn.getTxID());
-              addTxToTxSizeMap(txn);
-            } else if (!container.isOpen()) {
-              Set<ContainerReplica> replicas = containerManager
-                  .getContainerReplicas(
-                      ContainerID.valueOf(txn.getContainerID()));
-              if (!checkInadequateReplica(replicas, txn, dnList)) {
-                if (transactionStatusManager.isPurgeableWithoutAck(txn.getTxID(), id)) {
-                  txIDs.add(txn.getTxID());
-                } else {
-                  getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
-                }
-              } else {
-                metrics.incrSkippedTransaction();
-              }
-            } else if (containerManager.getContainer(id).isOpen()) {
-              metrics.incrSkippedTransaction();
+        if (retryOnly) {
+          retryTransactionsInCommitMap(iter, blockDeletionLimit, dnList,
+              transactions, commandStatus, txIDs, maxDeleteBlocksPerDatanode);
+        } else {
+          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = null;
+          while (iter.hasNext() &&
+              transactions.getBlocksDeleted() < blockDeletionLimit) {
+            keyValue = iter.next();
+            processTransaction(keyValue.getValue(), transactions, dnList,
+                commandStatus, txIDs, maxDeleteBlocksPerDatanode);
+
+            if (lastProcessedTransactionId == keyValue.getKey()) {
+              // We have circled back to the last transaction.
+              break;
             }
-          } catch (ContainerNotFoundException ex) {
-            LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
-            txIDs.add(txn.getTxID());
-            addTxToTxSizeMap(txn);
+
+            if (!iter.hasNext() && lastProcessedTransactionId != -1) {
+              /*
+               * We started from in-between and reached end of the table,
+               * now we should go to the start of the table and process
+               * the transactions.
+               */
+              iter.seekToFirst();
+            }
           }
 
-          if (lastProcessedTransactionId == keyValue.getKey()) {
-            // We have circled back to the last transaction.
-            break;
-          }
-
-          if (!iter.hasNext() && lastProcessedTransactionId != -1) {
-            /*
-             * We started from in-between and reached end of the table,
-             * now we should go to the start of the table and process
-             * the transactions.
-             */
-            iter.seekToFirst();
-          }
+          lastProcessedTransactionId = keyValue != null ? keyValue.getKey() : -1;
         }
-
-        lastProcessedTransactionId = keyValue != null ? keyValue.getKey() : -1;
 
         if (!txIDs.isEmpty()) {
           transactionStatusManager.removeTransactions(txIDs);

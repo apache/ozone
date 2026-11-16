@@ -557,6 +557,56 @@ public class TestDeletedBlockLog {
     assertEquals(30 * THREE, getTransactions(Integer.MAX_VALUE).size());
   }
 
+  private Set<Long> txIds(List<DeletedBlocksTransaction> txns) {
+    return txns.stream().map(DeletedBlocksTransaction::getTxID)
+        .collect(Collectors.toSet());
+  }
+
+  @Test
+  public void testRetryOnlyContinuesFromLastRetriedTransaction()
+      throws Exception {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    addTransactions(generateData(20), true);
+    mockContainerHealthResult(true);
+    List<DeletedBlocksTransaction> sent = getTransactions(20 * BLOCKS_PER_TXN * THREE);
+    commitTransactions(sent, dnList.get(1), dnList.get(2));
+    assertEquals(20, commitMapSize());
+
+    // Each round retries the next 5 transactions of the map, wrapping around.
+    deletedBlockLog.setScmCommandTimeoutMs(-1L);
+    Set<Long> retried = new HashSet<>();
+    for (int i = 0; i < 4; i++) {
+      Set<Long> round = txIds(getTransactions(5 * BLOCKS_PER_TXN, true));
+      assertEquals(5, round.size());
+      assertTrue(Collections.disjoint(retried, round));
+      retried.addAll(round);
+    }
+    assertEquals(txIds(sent), retried);
+    assertEquals(5, txIds(getTransactions(5 * BLOCKS_PER_TXN, true)).size());
+  }
+
+  @Test
+  public void testRetryOnlyDropsStaleCommitMapEntries() throws Exception {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    addTransactions(generateData(20), true);
+    mockContainerHealthResult(true);
+    List<DeletedBlocksTransaction> sent = getTransactions(20 * BLOCKS_PER_TXN * THREE);
+    commitTransactions(sent, dnList.get(1), dnList.get(2));
+    assertEquals(20, commitMapSize());
+
+    // 5 transactions vanish from the table, but stay in the map.
+    List<Long> gone = new ArrayList<>(txIds(sent)).subList(0, 5);
+    for (Long txId : gone) {
+      scm.getScmMetadataStore().getDeletedBlocksTXTable().delete(txId);
+    }
+
+    deletedBlockLog.setScmCommandTimeoutMs(-1L);
+    Set<Long> retried = txIds(getTransactions(Integer.MAX_VALUE, true));
+    assertEquals(15, retried.size());
+    assertTrue(Collections.disjoint(retried, gone));
+    assertEquals(15, commitMapSize());
+  }
+
   private void recordScmCommandToStatusManager(
       DatanodeID dnId, DeleteBlocksCommand command) {
     Set<Long> dnTxSet = command.blocksTobeDeleted()

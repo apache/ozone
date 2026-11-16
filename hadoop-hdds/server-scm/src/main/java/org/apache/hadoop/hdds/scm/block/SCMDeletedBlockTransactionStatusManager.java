@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -73,7 +75,9 @@ public class SCMDeletedBlockTransactionStatusManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMDeletedBlockTransactionStatusManager.class);
   // Maps txId to set of DNs which are successful in committing the transaction
-  private final Map<Long, Set<DatanodeID>> transactionToDNsCommitMap;
+  // Sorted, so that in retryOnly mode the sent transactions can be walked
+  // directly instead of scanning the whole deleted blocks table.
+  private final ConcurrentNavigableMap<Long, Set<DatanodeID>> transactionToDNsCommitMap;
   // Maps txId to its retry counts;
   private final Map<Long, Integer> transactionToRetryCountMap;
   // an in memory map to cache the size of each transaction sending to DN.
@@ -135,7 +139,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     this.containerManager = containerManager;
     this.containerReplicaPendingOpsSupplier = containerReplicaPendingOpsSupplier;
     this.scmCommandTimeoutMs = scmCommandTimeoutMs;
-    this.transactionToDNsCommitMap = new ConcurrentHashMap<>();
+    this.transactionToDNsCommitMap = new ConcurrentSkipListMap<>();
     this.transactionToRetryCountMap = new ConcurrentHashMap<>();
     this.txSizeMap = new ConcurrentHashMap<>();
     this.scmDeleteBlocksCommandStatusManager =
@@ -472,9 +476,12 @@ public class SCMDeletedBlockTransactionStatusManager {
     scmDeleteBlocksCommandStatusManager.onDatanodeDead(dnId);
   }
 
-  /** @return true if the transaction has been sent and not purged yet */
-  boolean isInCommitMap(long txId) {
-    return transactionToDNsCommitMap.containsKey(txId);
+  /**
+   * @return the smallest txId in transactionToDNsCommitMap greater than
+   * the given one, or null if there is none.
+   */
+  Long nextTxIdInCommitMap(long txId) {
+    return transactionToDNsCommitMap.higherKey(txId);
   }
 
   boolean isDuplication(DatanodeID datanodeID, long tx, Map<DatanodeID, Map<Long, CmdStatus>> commandStatus) {
