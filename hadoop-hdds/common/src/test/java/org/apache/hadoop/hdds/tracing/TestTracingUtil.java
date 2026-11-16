@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.tracing;
 
 import static org.apache.hadoop.hdds.tracing.TracingUtil.MdcContextStorage.MDC_SPAN_ID;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.MdcContextStorage.MDC_TRACE_ID;
-import static org.apache.hadoop.hdds.tracing.TracingUtil.SUPPRESSED_SPAN_AS_STRING;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createClientProxy;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.exportCurrentSpan;
@@ -569,7 +568,10 @@ public class TestTracingUtil {
     conf.setBoolean("ozone.tracing.internal.enabled", false);
     try (TestSpanCollector collector = TestSpanCollector.install("test", conf)) {
       TracingUtil.executeInternalSpan("root", () -> {
-        assertEquals(SUPPRESSED_SPAN_AS_STRING, exportCurrentSpan());
+        SpanContext ctx = Span.current().getSpanContext();
+        assertTrue(ctx.isValid());
+        assertFalse(ctx.isSampled());
+        assertTrue(exportCurrentSpan().endsWith("-00;"));
         TracingUtil.executeInNewSpan("child", () -> { });
         Service proxy = createClientProxy(new ServiceImpl(), Service.class, conf);
         proxy.normalMethod();
@@ -584,8 +586,10 @@ public class TestTracingUtil {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean("ozone.tracing.enabled", true);
     try (TestSpanCollector collector = TestSpanCollector.install("scm", conf)) {
+      String nonSampledCarrier =
+          "traceparent=00-11111111111111111111111111111111-2222222222222222-00;";
       Span server = TracingUtil.importAndCreateSpan(
-          "DeleteScmKeyBlocks", SUPPRESSED_SPAN_AS_STRING, SpanKind.SERVER);
+          "DeleteScmKeyBlocks", nonSampledCarrier, SpanKind.SERVER);
       try (Scope ignored = server.makeCurrent()) {
         assertFalse(server.isRecording());
         TracingUtil.executeInNewSpan("DeletedBlockLog.addTransactions", () -> { });
