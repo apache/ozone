@@ -273,22 +273,19 @@ public class TestOzoneStoragePolicy {
     writeFile(bucket, keyName, multiBlockData(), 0, false, OzoneStoragePolicy.COLD);
     OmKeyInfo original = lookupKey(bucket, keyName);
     assertThat(original.getStoragePolicy()).as("layout %s", bucketLayout).isEqualTo(OzoneStoragePolicy.COLD);
-    List<OmKeyLocationInfo> blocks = original.getLatestVersionLocations().getBlocksLatestVersionOnly();
-    assertThat(blocks.size())
+    int numOfBlocks = original.getLatestVersionLocations().getBlocksLatestVersionOnly().size();
+    assertThat(numOfBlocks)
         .withFailMessage("Expected more than one block so a later allocation is exercised, "
-            + "but the file in a %s bucket has %d", bucketLayout, blocks.size())
+            + "but the file in a %s bucket has %d", bucketLayout, numOfBlocks)
         .isGreaterThan(1);
     assertAllBlocksOnTier(original, OzoneStoragePolicy.COLD.getCreationTier());
-    // Block 0 is pre-allocated by OM and the rest come from client allocateBlock calls, so each block needs its own
-    // datanode check. Looping is only needed here because this file spans several blocks.
-    for (int i = 0; i < blocks.size(); i++) {
-      assertDatanodeContainerAndBlock(original, i, OzoneStoragePolicy.COLD.getCreationTier());
-    }
+    assertAllBlocksOnDatanodes(original, OzoneStoragePolicy.COLD.getCreationTier());
 
     writeFile(bucket, keyName, multiBlockData(), 0, true, OzoneStoragePolicy.HOT);
     OmKeyInfo overwritten = lookupKey(bucket, keyName);
     assertThat(overwritten.getStoragePolicy()).as("layout %s", bucketLayout).isEqualTo(OzoneStoragePolicy.HOT);
     assertAllBlocksOnTier(overwritten, OzoneStoragePolicy.HOT.getCreationTier());
+    assertAllBlocksOnDatanodes(overwritten, OzoneStoragePolicy.HOT.getCreationTier());
   }
 
   /**
@@ -491,7 +488,7 @@ public class TestOzoneStoragePolicy {
 
   /**
    * Checks every block of a key landed on a container of the expected tier. This reads SCM's container record
-   * only; to check the datanode volume of a block, use {@code assertDatanodeContainerAndBlock} with a block index.
+   * only; to check the datanode volumes, use {@code assertAllBlocksOnDatanodes}.
    */
   private void assertAllBlocksOnTier(OmKeyInfo keyInfo, StorageTier expectedTier)
       throws IOException {
@@ -505,6 +502,19 @@ public class TestOzoneStoragePolicy {
       assertEquals(expectedStorageType,
           containerInfo.getStorageTier().getUniformStorageType(),
           "block " + i + " of " + blocks.size() + " landed on the wrong tier");
+    }
+  }
+
+  /**
+   * Checks every block of a key on the datanodes, not just in SCM's records. Looping is only needed for
+   * a file that spans several blocks; for the single-block files in the other createFile scenarios, the
+   * one-argument {@code assertDatanodeContainerAndBlock} (block 0) is enough.
+   */
+  private void assertAllBlocksOnDatanodes(OmKeyInfo keyInfo, StorageTier expectedTier)
+      throws IOException {
+    int blockCount = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().size();
+    for (int i = 0; i < blockCount; i++) {
+      assertDatanodeContainerAndBlock(keyInfo, i, expectedTier);
     }
   }
 
