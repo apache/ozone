@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -59,7 +60,11 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -432,10 +437,18 @@ public class TestOzoneStoragePolicy {
         assertEquals(expectedStorageType, containerData.getStorageType());
         assertEquals(expectedStorageType,
             containerData.getVolume().getStorageType());
+        assertEquals(expectedStorageType,
+            ContainerDataYaml.readContainerFile(container.getContainerFile()).getStorageType());
         assertTrue(pipeline.getNodeSet().contains(datanode.getDatanodeDetails()));
 
+        KeyValueContainerData kvData = (KeyValueContainerData) containerData;
+        try (DBHandle db = BlockUtils.getDB(kvData, conf)) {
+          assertNull(db.getStore().getBlockDataTable().get(kvData.getBlockKey(block.getLocalID()))
+              .getBlockID().getStorageType(), "Storage type must be stored on the container, not each block");
+        }
         ContainerProtos.BlockData blockData = ContainerProtocolCalls.getBlock(
             client, block.getBlockID(), null, client.getPipeline()).getBlockData();
+        assertTrue(blockData.getBlockID().hasStorageTypeID());
         assertEquals(expectedStorageType, StorageTypeUtils
             .getStorageTypeFromID(blockData.getBlockID().getStorageTypeID()));
         replicasChecked++;
