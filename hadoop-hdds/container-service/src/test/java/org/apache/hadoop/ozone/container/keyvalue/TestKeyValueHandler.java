@@ -78,12 +78,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -99,6 +101,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -118,6 +122,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -130,6 +135,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
@@ -147,6 +153,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -1329,6 +1337,72 @@ public class TestKeyValueHandler {
     when(ozoneContainer.getReadDomainSocketChannel()).thenReturn(domainSocketServer);
     when(domainSocketServer.isStarted()).thenReturn(true);
     return ozoneContainer;
+  }
+
+  private static Stream<Arguments> blockResponseStorageTypes() {
+    return Stream.of(null, StorageType.DISK, StorageType.SSD, StorageType.ARCHIVE)
+        .flatMap(recordedType -> Stream.of(null, StorageType.DISK, StorageType.SSD, StorageType.ARCHIVE)
+            .map(storedType -> Arguments.of(recordedType, storedType)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("blockResponseStorageTypes")
+  public void testBlockResponsesUseContainerStorageType(StorageType recordedType, StorageType storedType)
+      throws Exception {
+    ContainerTestVersionInfo.setTestSchemaVersion(OzoneConsts.SCHEMA_V2, conf);
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(tempDir);
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+    try {
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainer container = createOpenContainer(containerID, handlerWithVolume.getVolumeSet(),
+          handlerWithVolume.getContainerSet());
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      writeTestBlockForGetBlock(kvHandler, container, blockID);
+      KeyValueContainerData containerData = container.getContainerData();
+      ContainerProtos.BlockData oldRecord;
+      try (DBHandle db = BlockUtils.getDB(containerData, conf)) {
+        oldRecord = db.getStore().getBlockDataTable().get(containerData.getBlockKey(blockID.getLocalID()))
+            .getProtoBufMessage(storedType);
+        // Reproduce old records, including a stale per-block type, without using the new database writer.
+        Table<byte[], byte[]> raw = db.getStore().getStore().getTable(db.getStore().getBlockDataTable().getName());
+        raw.put(StringCodec.get().toPersistedFormat(containerData.getBlockKey(blockID.getLocalID())),
+            oldRecord.toByteArray());
+      }
+      // The recorded type can differ from the volume label; responses must not substitute the volume type.
+      containerData.setStorageType(recordedType);
+      assertEquals(StorageType.DISK, containerData.getVolume().getStorageType());
+      ContainerProtos.BlockData.Builder expectedBuilder = oldRecord.toBuilder();
+      expectedBuilder.getBlockIDBuilder().clearStorageTypeID();
+      if (recordedType != null) {
+        expectedBuilder.getBlockIDBuilder().setStorageTypeID(StorageTypeUtils.getID(recordedType));
+      }
+      ContainerProtos.BlockData expected = expectedBuilder.build();
+      ContainerCommandRequestProto request = newGetBlockRequest(containerID, blockID, false);
+      ContainerCommandResponseProto get = kvHandler.handleGetBlock(request, container, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, get.getResult());
+      assertEquals(expected, get.getGetBlock().getBlockData());
+
+      ContainerCommandResponseProto list = kvHandler.handleListBlock(request.toBuilder()
+          .setCmdType(ContainerProtos.Type.ListBlock).clearGetBlock()
+          .setListBlock(ContainerProtos.ListBlockRequestProto.newBuilder().setCount(10)).build(), container);
+      assertEquals(ContainerProtos.Result.SUCCESS, list.getResult());
+      assertEquals(Collections.singletonList(expected), list.getListBlock().getBlockDataList());
+
+      ContainerCommandResponseProto finalize = kvHandler.handleFinalizeBlock(request.toBuilder()
+          .setCmdType(ContainerProtos.Type.FinalizeBlock).clearGetBlock()
+          .setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto.newBuilder()
+              .setBlockID(blockID.getDatanodeBlockIDProtobuf())).build(), container);
+      assertEquals(ContainerProtos.Result.SUCCESS, finalize.getResult());
+      assertEquals(expected, finalize.getFinalizeBlock().getBlockData());
+      try (DBHandle db = BlockUtils.getDB(containerData, conf)) {
+        assertEquals(storedType, db.getStore().getBlockDataTable().get(containerData.getBlockKey(blockID.getLocalID()))
+            .getBlockID().getStorageType(), "Response construction must not rewrite old block records");
+      }
+    } finally {
+      BlockUtils.shutdownCache(conf);
+      handlerWithVolume.getVolumeSet().shutdown();
+      ContainerMetrics.remove();
+    }
   }
 
   @Test

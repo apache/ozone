@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import static org.apache.commons.collections4.CollectionUtils.intersection;
 import static org.apache.hadoop.hdds.client.StorageTypeUtils.getStorageTypeProto;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
@@ -75,6 +77,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -241,6 +244,158 @@ public class TestRatisPipelineProvider {
 
     assertPipelineProperties(pipeline, ReplicationFactor.THREE,
         REPLICATION_TYPE, Pipeline.PipelineState.ALLOCATED, StorageTier.SSD);
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageTiers")
+  public void testPipelineCeilingUsesOnlyNodesSupportingTier(StorageTier storageTier) throws Exception {
+    init(2, storageTier);
+    List<DatanodeDetails> tierNodes = datanodeList.subList(0, 3);
+    StorageTier otherTier = storageTier == StorageTier.DISK ? StorageTier.SSD : StorageTier.DISK;
+    for (DatanodeDetails dn : datanodeList.subList(3, datanodeList.size())) {
+      nodeManager.setStorageTypeForNode(dn.getID(), otherTier.getUniformStorageType());
+    }
+    // Neither closed pipelines nor pipelines for another tier consume this tier's ceiling.
+    addPipeline(tierNodes, Pipeline.PipelineState.CLOSED,
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), storageTier);
+    addPipeline(datanodeList.subList(3, 6), Pipeline.PipelineState.OPEN,
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), otherTier);
+    addPipeline(tierNodes, Pipeline.PipelineState.OPEN,
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), storageTier);
+
+    Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE), storageTier);
+    assertThat(pipeline.getNodes()).containsExactlyInAnyOrderElementsOf(tierNodes);
+    stateManager.addPipeline(pipeline.getProtobufMessage(ClientVersion.CURRENT));
+    nodeManager.addPipeline(pipeline);
+
+    SCMException ex = assertThrows(SCMException.class,
+        () -> provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE), storageTier));
+    assertThat(ex.getMessage()).contains("exceed the limit per datanode: 2");
+  }
+
+  @Test
+  public void testMixedStorageNodesContributeToEachTierCeilingOnce() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    init(2, conf, StorageTier.DISK);
+    List<DatanodeInfo> mixedNodes = datanodeList.stream()
+        .map(TestRatisPipelineProvider::datanodeInfoWithDiskAndSsd)
+        .collect(Collectors.toList());
+    // Multiple matching volumes still represent one datanode, not additional pipeline memberships.
+    for (DatanodeInfo dn : mixedNodes) {
+      List<StorageReportProto> reports = new ArrayList<>(dn.getStorageReports());
+      reports.add(reports.get(0).toBuilder().setStorageUuid("extra-disk-" + dn.getUuidString()).build());
+      dn.updateStorageReports(reports);
+    }
+    MockNodeManager nodeManagerSpy = spy(nodeManager);
+    doAnswer(invocation -> mixedNodes).when(nodeManagerSpy).getNodes(IN_SERVICE, HEALTHY);
+    RatisPipelineProvider localProvider = new RatisPipelineProvider(
+        nodeManagerSpy, stateManager, conf, new EventQueue(), SCMContext.emptyContext());
+    int ceiling = mixedNodes.size() * 2 / ReplicationFactor.THREE.getNumber();
+    for (StorageTier tier : new StorageTier[] {StorageTier.DISK, StorageTier.SSD}) {
+      for (int i = 0; i < ceiling; i++) {
+        addPipeline(datanodeList.subList(0, 3), Pipeline.PipelineState.OPEN,
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE), tier);
+      }
+      SCMException ex = assertThrows(SCMException.class,
+          () -> localProvider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE), tier));
+      assertThat(ex.getMessage()).contains("exceed the limit per datanode: 2");
+    }
+  }
+
+  @Test
+  public void testNodesWithoutStorageReportsDoNotIncreaseTierCeiling() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    init(2, conf, StorageTier.DISK);
+    List<DatanodeInfo> nodes = datanodeList.stream().map(nodeManager::getDatanodeInfo)
+        .collect(Collectors.toList());
+    for (DatanodeInfo dn : nodes.subList(3, nodes.size())) {
+      dn.updateStorageReports(Collections.emptyList());
+    }
+    MockNodeManager nodeManagerSpy = spy(nodeManager);
+    doAnswer(invocation -> nodes).when(nodeManagerSpy).getNodes(IN_SERVICE, HEALTHY);
+    RatisPipelineProvider localProvider = new RatisPipelineProvider(
+        nodeManagerSpy, stateManager, conf, new EventQueue(), SCMContext.emptyContext());
+    for (int i = 0; i < 2; i++) {
+      addPipeline(datanodeList.subList(0, 3), Pipeline.PipelineState.OPEN,
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.DISK);
+    }
+
+    SCMException ex = assertThrows(SCMException.class,
+        () -> localProvider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.DISK));
+    assertThat(ex.getMessage()).contains("exceed the limit per datanode: 2");
+  }
+
+  @Test
+  public void testUnhealthyAndDecommissioningNodesDoNotIncreaseTierCeiling() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    init(2, conf, StorageTier.DISK);
+    NodeStateMap nodes = new NodeStateMap();
+    for (int i = 0; i < datanodeList.size(); i++) {
+      DatanodeInfo dn = nodeManager.getDatanodeInfo(datanodeList.get(i));
+      if (i < 3 || i >= 5) {
+        dn.updateStorageReports(Collections.singletonList(dn.getStorageReports().get(0).toBuilder()
+            .setStorageType(getStorageTypeProto(StorageType.SSD)).build()));
+      }
+      nodes.addNode(dn);
+    }
+    nodes.updateNodeHealthState(datanodeList.get(5).getID(), HddsProtos.NodeState.STALE);
+    nodes.updateNodeHealthState(datanodeList.get(6).getID(), HddsProtos.NodeState.DEAD);
+    nodes.updateNodeOperationalState(datanodeList.get(7).getID(), HddsProtos.NodeOperationalState.DECOMMISSIONING, 0);
+    MockNodeManager nodeManagerSpy = spy(nodeManager);
+    doAnswer(invocation -> nodes.getDatanodeInfos(invocation.getArgument(0), invocation.getArgument(1)))
+        .when(nodeManagerSpy).getNodes(any(HddsProtos.NodeOperationalState.class), any(HddsProtos.NodeState.class));
+    doAnswer(invocation -> nodes.getNodeCount(invocation.getArgument(0)))
+        .when(nodeManagerSpy).getNodeCount(any(NodeStatus.class));
+    RatisPipelineProvider localProvider = new RatisPipelineProvider(
+        nodeManagerSpy, stateManager, conf, new EventQueue(), SCMContext.emptyContext());
+    for (int i = 0; i < 2; i++) {
+      addPipeline(datanodeList.subList(0, 3), Pipeline.PipelineState.OPEN,
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.SSD);
+    }
+
+    SCMException ex = assertThrows(SCMException.class,
+        () -> localProvider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.SSD));
+    assertThat(ex.getMessage()).contains("exceed the limit per datanode: 2");
+  }
+
+  @Test
+  public void testStorageReportsWithoutTypeRetainDiskDefault() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    init(2, conf, StorageTier.DISK);
+    List<DatanodeInfo> nodes = datanodeList.stream().map(nodeManager::getDatanodeInfo)
+        .collect(Collectors.toList());
+    for (DatanodeInfo dn : nodes) {
+      dn.updateStorageReports(Collections.singletonList(dn.getStorageReports().get(0).toBuilder()
+          .clearStorageType().build()));
+    }
+    MockNodeManager nodeManagerSpy = spy(nodeManager);
+    doAnswer(invocation -> nodes).when(nodeManagerSpy).getNodes(IN_SERVICE, HEALTHY);
+    RatisPipelineProvider localProvider = new RatisPipelineProvider(
+        nodeManagerSpy, stateManager, conf, new EventQueue(), SCMContext.emptyContext());
+
+    Pipeline pipeline = localProvider.create(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.DISK);
+    assertPipelineProperties(pipeline, ReplicationFactor.THREE,
+        REPLICATION_TYPE, Pipeline.PipelineState.ALLOCATED, StorageTier.DISK);
+  }
+
+  @Test
+  public void testUnavailableTierReachesCeilingBeforePlacement() throws Exception {
+    init(2, StorageTier.DISK);
+
+    SCMException ex = assertThrows(SCMException.class,
+        () -> provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.ARCHIVE));
+    assertThat(ex.getMessage()).contains("exceed the limit per datanode: 2");
+  }
+
+  @Test
+  public void testNullTierKeepsExistingValidation() throws Exception {
+    init(2, StorageTier.DISK);
+
+    // PipelineStateMap rejects a null tier before placement validation.
+    NullPointerException ex = assertThrows(NullPointerException.class,
+        () -> provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE), (StorageTier) null));
+    assertEquals("Pipeline storageTier cannot be null", ex.getMessage());
   }
 
   @Test
