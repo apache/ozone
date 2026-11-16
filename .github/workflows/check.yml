@@ -138,6 +138,7 @@ env:
   HADOOP_IMAGE: ghcr.io/apache/hadoop
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
+  MVNW_VERBOSE: true
   OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_VOLUME_OWNER: 1000
@@ -230,9 +231,10 @@ jobs:
         # TODO remove hard-code in HDDS-17509
         if: ${{ inputs.script == 'acceptance' }}
         run: |
-          HADOOP_VERSION=$(mvn help:evaluate -N -Dexpression=hadoop.version -q -DforceStdout -Dscan=false)
+          source hadoop-ozone/dev-support/checks/_lib.sh
+          HADOOP_VERSION=$(get_version hadoop)
           echo "HADOOP_VERSION=$HADOOP_VERSION" >> $GITHUB_ENV
-          RANGER_VERSION=$(mvn help:evaluate -N -Dexpression=ranger.version -q -DforceStdout -Dscan=false)
+          RANGER_VERSION=$(get_version ranger)
           echo "RANGER_VERSION=$RANGER_VERSION" >> $GITHUB_ENV
 
       - name: Restore Hadoop
