@@ -4139,6 +4139,16 @@
   </property>
 
   <property>
+    <name>hdds.heartbeat.re-register.missed-count-threshold</name>
+    <value>100</value>
+    <tag>OZONE, DATANODE, HA</tag>
+    <description>Consecutive heartbeat failures the DataNode tolerates
+      against one SCM endpoint before forcing that endpoint back to
+      GETVERSION and re-running registration.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
