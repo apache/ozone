@@ -64,6 +64,10 @@ jobs:
           java-version: ${{ env.TEST_JAVA_VERSION }}
           only-exact-hit: true
 
+      - name: Fetch plugin dependencies
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: ./mvnw $MAVEN_ARGS --no-transfer-progress --show-version dependency:resolve-plugins
+
       - name: Get versions
         id: versions
         run: |
@@ -135,10 +139,6 @@ jobs:
       - name: Download NodeJS
         if: steps.restore-cache.outputs.cache-hit != 'true' && steps.restore-nodejs.outputs.cache-hit != 'true'
         run: dev-support/ci/download-nodejs.sh
-
-      - name: Fetch plugin dependencies
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: ./mvnw $MAVEN_ARGS --no-transfer-progress --show-version dependency:resolve-plugins
 
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
