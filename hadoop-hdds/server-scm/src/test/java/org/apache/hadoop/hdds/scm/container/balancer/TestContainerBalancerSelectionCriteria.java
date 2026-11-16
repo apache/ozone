@@ -40,7 +40,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -82,7 +82,7 @@ public class TestContainerBalancerSelectionCriteria {
     replicationManager = mock(ReplicationManager.class);
     findSourceStrategy = mock(FindSourceStrategy.class);
 
-    source = MockDatanodeDetails.randomDatanodeDetails();
+    source = DatanodeDetailsTestUtils.randomDatanodeDetails();
     containerInfo = ReplicationTestUtil.createContainerInfo(RatisReplicationConfig.getInstance(THREE), 1L,
         HddsProtos.LifeCycleState.CLOSED, 1L, OzoneConsts.GB);
     containerID = containerInfo.containerID();
@@ -206,9 +206,9 @@ public class TestContainerBalancerSelectionCriteria {
 
   @Test
   public void shouldIncludeOverReplicatedClosedContainers() throws Exception {
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn4 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     // Over-replicated CLOSED container with 3 CLOSED + 1 QUASI_CLOSED replica (non-empty)
     Set<ContainerReplica> replicas = new HashSet<>();
@@ -255,9 +255,9 @@ public class TestContainerBalancerSelectionCriteria {
   @Test
   public void shouldExcludeOverReplicatedClosedReplicasWhenBelowMinClosedReplicas()
       throws Exception {
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn4 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     // Over-replicated with 2 CLOSED + 2 QUASI_CLOSED (RF=3): not enough CLOSED
     // to satisfy min required; CLOSED replicas must not be movable.
@@ -288,9 +288,9 @@ public class TestContainerBalancerSelectionCriteria {
 
   @Test
   public void shouldExcludeEmptyQuasiClosedReplicas() throws Exception {
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn4 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     // Over-replicated CLOSED container with 3 CLOSED + 1 QUASI_CLOSED replica (empty)
     Set<ContainerReplica> replicas = new HashSet<>();
@@ -334,8 +334,8 @@ public class TestContainerBalancerSelectionCriteria {
 
   @Test
   public void shouldIncludeQuasiClosedContainers() throws Exception {
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     // QUASI_CLOSED container with all QUASI_CLOSED replicas
     ContainerInfo quasiClosedContainer = ReplicationTestUtil.createContainerInfo(

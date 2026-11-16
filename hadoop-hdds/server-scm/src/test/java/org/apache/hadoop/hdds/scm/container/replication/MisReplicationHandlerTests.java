@@ -47,7 +47,7 @@ import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -207,7 +207,7 @@ public abstract class MisReplicationHandlerTests {
                     .collect(Collectors.toSet());
     List<DatanodeDetails> targetNodes =
             IntStream.range(0, expectedNumberOfNodes)
-                    .mapToObj(i -> MockDatanodeDetails.createDatanodeDetails("target" + i, TARGET_RACK))
+                    .mapToObj(i -> DatanodeDetailsTestUtils.createDatanodeDetails("target" + i, TARGET_RACK))
                     .collect(Collectors.toList());
     if (expectedNumberOfNodes > 0) {
       when(mockedPlacementPolicy.chooseDatanodes(

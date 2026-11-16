@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ public class TestReplicateContainerCommand {
 
   @Test
   public void testApparentVersionRoundTrip() {
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(1L, target, HDDSVersion.ZDU);
@@ -54,7 +54,7 @@ public class TestReplicateContainerCommand {
     // Pre-ZDU datanodes report a layout feature as their apparent version.
     // The type must survive serialization rather than being erased to an
     // HDDSVersion.
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(1L, target,
@@ -70,7 +70,7 @@ public class TestReplicateContainerCommand {
 
   @Test
   public void testApparentVersionDefaultWhenAbsent() {
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(1L, target, HDDSVersion.ZDU);

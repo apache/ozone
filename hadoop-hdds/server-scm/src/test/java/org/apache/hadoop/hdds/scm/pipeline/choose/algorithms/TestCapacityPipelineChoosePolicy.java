@@ -27,13 +27,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -47,7 +47,7 @@ public class TestCapacityPipelineChoosePolicy {
     // given 4 datanode
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < 4; i++) {
-      datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      datanodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
     //          dn0   dn1   dn2   dn3
     // used       0   10    20    30
@@ -82,7 +82,7 @@ public class TestCapacityPipelineChoosePolicy {
           dns.add(datanodes.get(j));
         }
       }
-      Pipeline pipeline = MockPipeline.createPipeline(dns);
+      Pipeline pipeline = PipelineTestUtils.createPipeline(dns);
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);
       pipelines.add(pipeline);
     }

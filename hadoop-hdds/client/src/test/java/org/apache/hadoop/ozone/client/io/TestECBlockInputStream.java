@@ -54,7 +54,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -141,7 +141,7 @@ public class TestECBlockInputStream {
     Map<DatanodeDetails, Integer> dnMap = new HashMap<>();
 
     // EC-3-2, 1 byte short of 1MB with 1 location
-    dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
+    dnMap.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 1);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB - 1, dnMap);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, null, null, new TestBlockInputStreamFactory(),
@@ -152,7 +152,7 @@ public class TestECBlockInputStream {
     // EC-3-2, 5MB blocks, only 2 locations passed so we do not have sufficient
     // locations.
     dnMap.clear();
-    dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
+    dnMap.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 1);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5 * ONEMB, dnMap);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, null, null, new TestBlockInputStreamFactory(),
@@ -163,9 +163,9 @@ public class TestECBlockInputStream {
     // EC-3-2, 5MB blocks, only 1 data and 2 parity locations present. For now
     // this will fail as we don't support reconstruction reads yet.
     dnMap.clear();
-    dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
-    dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 4);
-    dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 5);
+    dnMap.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 1);
+    dnMap.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 4);
+    dnMap.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 5);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5 * ONEMB, dnMap);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, null, null, new TestBlockInputStreamFactory(),
@@ -481,10 +481,10 @@ public class TestECBlockInputStream {
         ONEMB);
     Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
     for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
-      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+      datanodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i);
     }
     // Add a second index = 1
-    datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
+    datanodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 1);
 
     BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 8 * ONEMB, datanodes);
@@ -535,7 +535,7 @@ public class TestECBlockInputStream {
     BlockID blockID = new BlockID(1, 1);
     Map<DatanodeDetails, Integer> dnMap = new HashMap<>();
     for (int i = 1; i <= 5; i++) {
-      dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+      dnMap.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i);
     }
 
     // Create a refreshFunction that returns a hard-coded EC pipeline.
@@ -575,7 +575,7 @@ public class TestECBlockInputStream {
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, ONEMB);
     Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
     for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
-      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+      datanodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i);
     }
 
     BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 8 * ONEMB, datanodes);
@@ -757,10 +757,10 @@ public class TestECBlockInputStream {
     int blockLength = 3 * 300;
     Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
     for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
-      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+      datanodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i);
     }
     // a spare location for index 2
-    datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), 2);
+    datanodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 2);
     BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, datanodes);
     ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
     dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
@@ -867,10 +867,10 @@ public class TestECBlockInputStream {
     int blockLength = 3 * 300;
     Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
     for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
-      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+      datanodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i);
     }
     // a spare location for index 2, which a positioned read must not switch to
-    DatanodeDetails spare = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails spare = DatanodeDetailsTestUtils.randomDatanodeDetails();
     datanodes.put(spare, 2);
     BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, datanodes);
     ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);

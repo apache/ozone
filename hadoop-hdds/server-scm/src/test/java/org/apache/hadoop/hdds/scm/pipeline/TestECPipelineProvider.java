@@ -45,8 +45,8 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -86,7 +86,7 @@ public class TestECPipelineProvider {
         .thenAnswer(invocation -> {
           List<DatanodeDetails> dns = new ArrayList<>();
           for (int i = 0; i < (int) invocation.getArguments()[2]; i++) {
-            dns.add(MockDatanodeDetails.randomDatanodeDetails());
+            dns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
           }
           return dns;
         });
@@ -162,13 +162,13 @@ public class TestECPipelineProvider {
       replicas.add(replica);
       healthyNodes.add(replica.getDatanodeDetails());
 
-      DatanodeDetails decomNode = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails decomNode = DatanodeDetailsTestUtils.randomDatanodeDetails();
       replicas.add(replica.toBuilder().setDatanodeDetails(decomNode).build());
       when(nodeManager.getNodeStatus(decomNode))
           .thenReturn(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
       decomNodes.add(decomNode);
 
-      DatanodeDetails staleNode = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails staleNode = DatanodeDetailsTestUtils.randomDatanodeDetails();
       replicas.add(replica.toBuilder().setDatanodeDetails(staleNode).build());
       when(nodeManager.getNodeStatus(staleNode))
           .thenReturn(NodeStatus.inServiceStale());
@@ -190,10 +190,10 @@ public class TestECPipelineProvider {
     ECReplicationConfig ecConf = new ECReplicationConfig(3, 2);
 
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
-    excludedNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    excludedNodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     List<DatanodeDetails> favoredNodes = new ArrayList<>();
-    favoredNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    favoredNodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     Pipeline pipeline = provider.create(ecConf, excludedNodes, favoredNodes);
     assertEquals(EC, pipeline.getType());
@@ -215,7 +215,7 @@ public class TestECPipelineProvider {
           .setOriginNodeId(DatanodeID.randomID())
           .setSequenceId(1)
           .setReplicaIndex(i + 1)
-          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setDatanodeDetails(DatanodeDetailsTestUtils.randomDatanodeDetails())
           .build();
       replicas.add(r);
     }

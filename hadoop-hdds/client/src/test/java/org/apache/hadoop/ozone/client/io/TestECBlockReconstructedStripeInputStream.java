@@ -49,7 +49,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
@@ -524,7 +524,7 @@ public class TestECBlockReconstructedStripeInputStream {
     // No indexes missing
     locations.add(ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
 
-    DatanodeDetails spare = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails spare = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     for (Map<DatanodeDetails, Integer> dnMap : locations) {
       streamFactory = new TestBlockInputStreamFactory();
@@ -572,7 +572,7 @@ public class TestECBlockReconstructedStripeInputStream {
 
     // Index 1 has a spare replica, index 3 is missing and recovered from parity.
     Map<DatanodeDetails, Integer> dnMap = ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
-    dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
+    dnMap.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), 1);
     BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 

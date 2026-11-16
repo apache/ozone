@@ -50,8 +50,8 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -516,10 +516,11 @@ public class TestSCMCommonPlacementPolicy {
    */
   @Test
   public void testValidatePlacementWithDeadMaintenanceNode() throws NodeNotFoundException {
-    DatanodeDetails maintenanceDn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails maintenanceDn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     // create 4 Datanodes: 2 in-service healthy + 1 extra in-service healthy + 1 dead and in-maintenance
-    List<DatanodeDetails> allNodes = ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails(), maintenanceDn);
+    List<DatanodeDetails> allNodes = ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        maintenanceDn);
     Map<Integer, Integer> datanodeRackMap = new HashMap<>();
     // dead, in-maintenance dn does not get any rack to simulate that it was removed from topology on dying
     datanodeRackMap.put(0, 0); // dn0 on rack 0
@@ -556,9 +557,9 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void testValidateContainerPlacementWithZeroRackTopology() {
     List<DatanodeDetails> nodes = ImmutableList.of(
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails());
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getAllNodes()).thenAnswer(inv -> nodes);
 

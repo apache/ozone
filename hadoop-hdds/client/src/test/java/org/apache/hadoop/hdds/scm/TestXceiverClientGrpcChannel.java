@@ -25,10 +25,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -48,7 +48,7 @@ class TestXceiverClientGrpcChannel {
     conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, useHostname);
 
     DatanodeDetails dn = datanodeWithDistinctHostAndIp();
-    Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dn));
+    Pipeline pipeline = PipelineTestUtils.createPipeline(Collections.singletonList(dn));
 
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
       ManagedChannel channel = client.createChannel(dn, PORT).build();
@@ -68,7 +68,7 @@ class TestXceiverClientGrpcChannel {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, value);
     conf.set(OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT, value);
-    Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(datanodeWithDistinctHostAndIp()));
+    Pipeline pipeline = PipelineTestUtils.createPipeline(Collections.singletonList(datanodeWithDistinctHostAndIp()));
 
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
          XceiverClientGrpc ecClient = new ECXceiverClientGrpc(pipeline, conf, null)) {
@@ -78,7 +78,7 @@ class TestXceiverClientGrpcChannel {
   }
 
   private static DatanodeDetails datanodeWithDistinctHostAndIp() {
-    return MockDatanodeDetails.createDatanodeDetails(
+    return DatanodeDetailsTestUtils.createDatanodeDetails(
         DatanodeID.randomID(), HOSTNAME, IP_ADDRESS, "/rack");
   }
 

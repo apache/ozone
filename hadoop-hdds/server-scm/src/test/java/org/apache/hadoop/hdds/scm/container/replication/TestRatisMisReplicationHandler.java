@@ -44,7 +44,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -185,7 +185,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = Collections.singletonList(
             new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
-                    MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+                    DatanodeDetailsTestUtils.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
     pendingOp = Collections.singletonList(new ContainerReplicaOp(
@@ -223,7 +223,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
     List<DatanodeDetails> nodes = new ArrayList<>();
     List<DatanodeInfo> nodeInfos = new ArrayList<>();
     for (int i = 0; i < 6; i++) {
-      DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails("node" + i, "/rack" + i / 4);
+      DatanodeDetails node = DatanodeDetailsTestUtils.createDatanodeDetails("node" + i, "/rack" + i / 4);
       topology.add(node);
       NodeStatus status = i < 4 ? NodeStatus.inServiceHealthy() : NodeStatus.valueOf(DECOMMISSIONED, HEALTHY);
       DatanodeInfo nodeInfo =

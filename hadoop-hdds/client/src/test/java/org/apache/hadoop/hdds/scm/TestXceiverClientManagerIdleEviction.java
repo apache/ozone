@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.XceiverClientManagerConfigBuilder;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
@@ -55,7 +55,7 @@ class TestXceiverClientManagerIdleEviction {
   @Test
   void idleClientIsClosedWithoutFurtherCacheAccess() throws Exception {
     try (XceiverClientManager manager = newManager()) {
-      XceiverClientSpi client = manager.acquireClient(MockPipeline.createPipeline(1));
+      XceiverClientSpi client = manager.acquireClient(PipelineTestUtils.createPipeline(1));
       manager.releaseClient(client, false);
 
       // nothing uses the cache any more, like a JVM whose application has finished writing
@@ -66,7 +66,7 @@ class TestXceiverClientManagerIdleEviction {
   @Test
   void idleClientIsClosedWhenTheCacheIsCleanedUp() throws Exception {
     try (XceiverClientManager manager = newManager()) {
-      XceiverClientSpi client = manager.acquireClient(MockPipeline.createPipeline(1));
+      XceiverClientSpi client = manager.acquireClient(PipelineTestUtils.createPipeline(1));
       manager.releaseClient(client, false);
       Thread.sleep(2 * IDLE_THRESHOLD_MS);
 
@@ -79,7 +79,7 @@ class TestXceiverClientManagerIdleEviction {
   @Test
   void idleClientInUseIsNotClosed() throws Exception {
     try (XceiverClientManager manager = newManager()) {
-      XceiverClientSpi client = manager.acquireClient(MockPipeline.createPipeline(1));
+      XceiverClientSpi client = manager.acquireClient(PipelineTestUtils.createPipeline(1));
       Thread.sleep(2 * IDLE_THRESHOLD_MS);
       manager.getClientCache().cleanUp();
 
@@ -99,13 +99,13 @@ class TestXceiverClientManagerIdleEviction {
     try (XceiverClientManager manager = newManager()) {
       List<XceiverClientSpi> idle = new ArrayList<>();
       for (int i = 0; i < 16; i++) {
-        XceiverClientSpi client = manager.acquireClient(MockPipeline.createPipeline(1));
+        XceiverClientSpi client = manager.acquireClient(PipelineTestUtils.createPipeline(1));
         manager.releaseClient(client, false);
         idle.add(client);
       }
       Thread.sleep(2 * IDLE_THRESHOLD_MS);
 
-      XceiverClientSpi other = manager.acquireClient(MockPipeline.createPipeline(1));
+      XceiverClientSpi other = manager.acquireClient(PipelineTestUtils.createPipeline(1));
       manager.releaseClient(other, false);
       GenericTestUtils.waitFor(() -> idle.stream().allMatch(XceiverClientSpi::isClosed), 50, WAIT_MS);
     }

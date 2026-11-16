@@ -24,8 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
@@ -41,9 +41,9 @@ public class ReplicationSupervisorSchedulingBenchmark {
 
   @Test
   public void test() throws InterruptedException {
-    DatanodeDetails source1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails source2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails source2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     //locks representing the limited resource of local disks on the source
     final Map<DatanodeID, Map<Integer, Object>> volumeLocks = new HashMap<>();

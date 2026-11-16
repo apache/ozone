@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;

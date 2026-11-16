@@ -36,7 +36,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -175,7 +175,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     List<ContainerReplicaOp> pendingOps =
         ImmutableList.of(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+            DatanodeDetailsTestUtils.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container)
         .setPendingOps(pendingOps);
@@ -208,7 +208,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     List<ContainerReplicaOp> pendingOps =
         ImmutableList.of(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+            DatanodeDetailsTestUtils.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container)
         .setPendingOps(pendingOps);

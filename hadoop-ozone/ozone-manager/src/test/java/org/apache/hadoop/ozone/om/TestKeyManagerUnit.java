@@ -55,7 +55,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -63,9 +63,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -517,10 +517,10 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @Test
   @SuppressWarnings ({"unchecked", "varargs"})
   public void testGetKeyInfo() throws IOException {
-    final DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dn3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dn4 = DatanodeDetailsTestUtils.randomDatanodeDetails();
     final long containerID = CONTAINER_ID.incrementAndGet();
     Set<Long> containerIDs = newHashSet(containerID);
 
@@ -620,13 +620,13 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
   @Test
   public void testLookupFileWithDnFailure() throws IOException {
-    final DatanodeDetails dnOne = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dnTwo = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dnThree = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dnOne = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dnTwo = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dnThree = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
-    final DatanodeDetails dnFour = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dnFive = MockDatanodeDetails.randomDatanodeDetails();
-    final DatanodeDetails dnSix = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dnFour = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dnFive = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    final DatanodeDetails dnSix = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
@@ -742,7 +742,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     OMRequestTestUtils.addBucketToDB(volume, bucket, metadataManager);
 
-    final Pipeline pipeline = MockPipeline.createPipeline(3);
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(3);
 
     Set<Long> containerIDs = new HashSet<>();
     List<ContainerWithPipeline> containersWithPipeline = new ArrayList<>();
@@ -809,7 +809,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
     OMRequestTestUtils.addVolumeToDB(volume, OzoneConsts.OZONE, metadataManager);
     OMRequestTestUtils.addBucketToDB(volume, bucket, metadataManager);
 
-    final Pipeline pipeline = MockPipeline.createPipeline(3);
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(3);
     for (long i = 1; i <= 5; i++) {
       final long containerID = CONTAINER_ID.incrementAndGet();
       final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()

@@ -51,7 +51,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -128,7 +128,7 @@ public class TestSCMContainerPlacementRackScatter {
     // add a datanode per rack to each rack except the last one
     for (int i = 0; i < rackCount - 1; i++) {
       DatanodeDetails datanodeDetails =
-          MockDatanodeDetails.createDatanodeDetails(
+          DatanodeDetailsTestUtils.createDatanodeDetails(
               hostname + i, rack + i);
       setupDatanode(datanodeDetails);
     }
@@ -136,7 +136,7 @@ public class TestSCMContainerPlacementRackScatter {
     // add datanodesInLastRackCount number of datanodes to the last rack
     for (int i = 0; i < datanodesInLastRackCount; i++) {
       DatanodeDetails datanodeDetails =
-          MockDatanodeDetails.createDatanodeDetails(
+          DatanodeDetailsTestUtils.createDatanodeDetails(
               hostname + (rackCount - 1 + i), rack + (rackCount - 1));
       setupDatanode(datanodeDetails);
     }
@@ -165,7 +165,7 @@ public class TestSCMContainerPlacementRackScatter {
     for (int i = 0; i < datanodeCount; i++) {
       // Totally 6 racks, each has 5 datanodes
       DatanodeDetails datanodeDetails =
-          MockDatanodeDetails.createDatanodeDetails(
+          DatanodeDetailsTestUtils.createDatanodeDetails(
               hostname + i, rack + (i / nodesPerRack));
       setupDatanode(datanodeDetails);
     }
@@ -510,7 +510,7 @@ public class TestSCMContainerPlacementRackScatter {
         new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     for (int i = 0; i < 30; i++) {
       // Totally 6 racks, each has 5 datanodes
-      DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(
+      DatanodeDetails dn = DatanodeDetailsTestUtils.createDatanodeDetails(
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;

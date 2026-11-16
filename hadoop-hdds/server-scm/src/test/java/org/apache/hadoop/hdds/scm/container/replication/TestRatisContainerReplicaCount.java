@@ -41,7 +41,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -835,7 +835,7 @@ class TestRatisContainerReplicaCount {
       HddsProtos.NodeOperationalState... states) {
     Set<ContainerReplica> replica = new HashSet<>();
     for (HddsProtos.NodeOperationalState s : states) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
       dn.setPersistedOpState(s);
       replica.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(ContainerID.valueOf(1))

@@ -59,7 +59,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
@@ -907,7 +907,7 @@ public class TestContainerCommandsEC {
     targetNodeMap.put(1, goodTargetNode);
     // Replace one of the target node with wrong to simulate failure at target.
     DatanodeDetails invalidTargetNode =
-        MockDatanodeDetails.randomDatanodeDetails();
+        DatanodeDetailsTestUtils.randomDatanodeDetails();
     targetNodeMap.put(3, invalidTargetNode);
 
     assertThrows(IOException.class, () -> {

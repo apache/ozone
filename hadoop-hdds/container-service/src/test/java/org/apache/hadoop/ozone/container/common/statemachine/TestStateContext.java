@@ -49,7 +49,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -746,10 +746,13 @@ public class TestStateContext {
   @Test
   public void testCommandQueueSummary() throws IOException {
     StateContext ctx = createSubject();
-    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(1, MockDatanodeDetails.randomDatanodeDetails()));
+    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(1,
+        DatanodeDetailsTestUtils.randomDatanodeDetails()));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(2, MockDatanodeDetails.randomDatanodeDetails()));
-    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(3, MockDatanodeDetails.randomDatanodeDetails()));
+    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(2,
+        DatanodeDetailsTestUtils.randomDatanodeDetails()));
+    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(3,
+        DatanodeDetailsTestUtils.randomDatanodeDetails()));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
     ctx.addCommand(new ReconcileContainerCommand(4, Collections.emptySet()));
@@ -816,7 +819,7 @@ public class TestStateContext {
   }
 
   private static SCMCommand<?> someCommand() {
-    return ContainerTestUtils.getReplicateContainerCommand(1, MockDatanodeDetails.randomDatanodeDetails());
+    return ContainerTestUtils.getReplicateContainerCommand(1, DatanodeDetailsTestUtils.randomDatanodeDetails());
   }
 
 }

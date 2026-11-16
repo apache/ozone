@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -125,7 +125,7 @@ public class TestBlockInputStreamFactoryImpl {
       int nodeCount, long blockLength) {
     Map<DatanodeDetails, Integer> datanodes = new HashMap<>();
     for (int i = 0; i < nodeCount; i++) {
-      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i + 1);
+      datanodes.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), i + 1);
     }
     return createKeyLocationInfo(repConf, blockLength, datanodes);
   }

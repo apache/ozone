@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;

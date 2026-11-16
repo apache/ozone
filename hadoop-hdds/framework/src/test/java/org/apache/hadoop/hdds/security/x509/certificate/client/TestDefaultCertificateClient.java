@@ -57,7 +57,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -116,7 +116,7 @@ public class TestDefaultCertificateClient {
     }
 
     dnCertClient = new DNCertificateClient(dnSecurityConfig, scmSecurityClient,
-        MockDatanodeDetails.randomDatanodeDetails(), certSerialId, null,
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), certSerialId, null,
         () -> System.exit(1));
   }
 
@@ -313,7 +313,7 @@ public class TestDefaultCertificateClient {
     if (dnCertClient != null) {
       dnCertClient.close();
     }
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     dnCertClient = new DNCertificateClient(dnSecurityConfig, null, dn,
         certSerialId, null, null);
 

@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -235,7 +235,7 @@ class TestReplicasVerify {
   }
 
   private static OmKeyLocationInfo createKeyLocationInfo(long containerId, long localId) {
-    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode = DatanodeDetailsTestUtils.randomDatanodeDetails();
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))

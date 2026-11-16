@@ -56,7 +56,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -975,7 +975,7 @@ public class TestOmMetrics {
     int dataLength = 10;
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
-        .setPipeline(MockPipeline.createSingleNodePipeline())
+        .setPipeline(PipelineTestUtils.createSingleNodePipeline())
         .setLength(dataLength)
         .build();
     keyLocationInfo.setCreateVersion(0);

@@ -39,8 +39,8 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
@@ -80,9 +80,9 @@ public class TestContainerReplicaPendingOps {
     pendingOps = new ContainerReplicaPendingOps(clock, rmConf);
     metrics = ReplicationManagerMetrics.create(rm);
     pendingOps.setReplicationMetrics(metrics);
-    dn1 = MockDatanodeDetails.randomDatanodeDetails();
-    dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    dn3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     addCmd = ContainerTestUtils.getReplicateContainerCommand(1, dn3);
     deleteCmd =  new DeleteContainerCommand(1, false);

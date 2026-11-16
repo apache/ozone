@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -225,7 +225,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
           return NodeStatus.inServiceHealthy();
         });
     replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.UNHEALTHY,
-        container.getNumberOfKeys(), container.getUsedBytes(), MockDatanodeDetails.randomDatanodeDetails(),
+        container.getNumberOfKeys(), container.getUsedBytes(), DatanodeDetailsTestUtils.randomDatanodeDetails(),
         unhealthy.getOriginDatanodeId(), container.getSequenceId()));
     requestBuilder.setContainerReplicas(replicas).setContainerInfo(container);
 

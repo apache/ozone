@@ -29,7 +29,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -79,7 +79,7 @@ public class TestNodeDecommissionMetrics {
    */
   @Test
   public void testDecommMonitorCollectTrackedNodes() {
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodeManager.register(dn1,
         NodeStatus.valueOf(ENTERING_MAINTENANCE,
             HddsProtos.NodeState.HEALTHY));
@@ -94,7 +94,7 @@ public class TestNodeDecommissionMetrics {
    */
   @Test
   public void testDecommMonitorCollectRecommissionNodes() {
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodeManager.register(dn1,
         NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
@@ -114,7 +114,7 @@ public class TestNodeDecommissionMetrics {
    */
   @Test
   public void testDecommMonitorCollectPipelinesWaitingClosed() {
-    DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.createDatanodeDetails(
         "datanode_host1",
         "/r1/ng1");
     nodeManager.register(dn1,
@@ -147,7 +147,7 @@ public class TestNodeDecommissionMetrics {
   @Test
   public void testDecommMonitorCollectUnderReplicated()
           throws ContainerNotFoundException, NodeNotFoundException {
-    DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.createDatanodeDetails(
         "datanode_host1",
         "/r1/ng1");
     nodeManager.register(dn1,
@@ -187,7 +187,7 @@ public class TestNodeDecommissionMetrics {
   @Test
   public void testDecommMonitorCollectSufficientlyReplicated()
           throws ContainerNotFoundException, NodeNotFoundException {
-    DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.createDatanodeDetails(
         "datanode_host1",
         "/r1/ng1");
     nodeManager.register(dn1,
@@ -225,7 +225,7 @@ public class TestNodeDecommissionMetrics {
   @Test
   public void testDecommMonitorCollectUnclosedContainers()
       throws ContainerNotFoundException, NodeNotFoundException {
-    DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.createDatanodeDetails(
         "datanode_host1",
         "/r1/ng1");
     nodeManager.register(dn1,
@@ -261,8 +261,8 @@ public class TestNodeDecommissionMetrics {
   public void testDecommMonitorCollectionMultipleDnContainers()
       throws ContainerNotFoundException, NodeNotFoundException {
     // test metric aggregation over several datanodes
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     nodeManager.register(dn1,
         NodeStatus.valueOf(DECOMMISSIONING,
@@ -304,8 +304,8 @@ public class TestNodeDecommissionMetrics {
   @Test
   public void testDecommMonitorCollectionMultipleDnPipelines() {
     // test metric aggregation over several datanodes
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     nodeManager.register(dn1,
         NodeStatus.valueOf(DECOMMISSIONING,
@@ -327,7 +327,7 @@ public class TestNodeDecommissionMetrics {
   @Test
   public void testDecommMonitorStartTimeForHost() {
     // test metric aggregation over several datanodes
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     nodeManager.register(dn1,
         NodeStatus.valueOf(DECOMMISSIONING,

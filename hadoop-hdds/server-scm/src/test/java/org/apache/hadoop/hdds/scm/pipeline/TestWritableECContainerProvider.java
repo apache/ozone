@@ -54,7 +54,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -111,7 +111,7 @@ public class TestWritableECContainerProvider {
         new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     int count = 10;
     List<DatanodeDetails> datanodes = IntStream.range(0, count)
-        .mapToObj(i -> MockDatanodeDetails.randomDatanodeDetails())
+        .mapToObj(i -> DatanodeDetailsTestUtils.randomDatanodeDetails())
         .collect(Collectors.toList());
     nodeManager = new MockNodeManager(cluster, datanodes, false, count);
 
@@ -544,7 +544,7 @@ public class TestWritableECContainerProvider {
 
     // If nodes are excluded then the excluded nodes should be passed through to
     // the create pipeline call.
-    excludeList.addDatanode(MockDatanodeDetails.randomDatanodeDetails());
+    excludeList.addDatanode(DatanodeDetailsTestUtils.randomDatanodeDetails());
     List<DatanodeDetails> excludedNodes =
         new ArrayList<>(excludeList.getDatanodes());
 

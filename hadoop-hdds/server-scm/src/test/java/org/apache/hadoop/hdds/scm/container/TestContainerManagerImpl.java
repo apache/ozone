@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -356,7 +356,7 @@ public class TestContainerManagerImpl {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     containerManager.updateContainerReplica(container.containerID(),
         ContainerReplica.newBuilder()
             .setContainerState(OPEN)
@@ -376,7 +376,7 @@ public class TestContainerManagerImpl {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     containerManager.removeContainerReplica(container.containerID(),
         ContainerReplica.newBuilder()
             .setContainerState(OPEN)

@@ -57,7 +57,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -665,7 +665,7 @@ public class TestContainerBalancerTask {
     for (int i = 0; i < numberOfNodes; i++) {
       Set<ContainerID> containerIDSet = new HashSet<>();
       DatanodeUsageInfo usageInfo =
-          new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(),
+          new DatanodeUsageInfo(DatanodeDetailsTestUtils.randomDatanodeDetails(),
               new SCMNodeStat());
 
       int sizeMultiple = 0;

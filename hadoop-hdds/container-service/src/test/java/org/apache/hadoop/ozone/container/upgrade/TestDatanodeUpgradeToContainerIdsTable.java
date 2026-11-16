@@ -27,8 +27,8 @@ import java.util.Collections;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -87,7 +87,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
-    final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
     // add a container
     final long containerID = UpgradeTestHelper.addContainer(dispatcher, pipeline);
@@ -124,7 +124,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
-    final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
     // add a container
     final long containerID = UpgradeTestHelper.addContainer(dispatcher, pipeline);

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.server;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
@@ -36,15 +36,15 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
@@ -96,7 +96,7 @@ public class TestContainerServer {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, testDir.toString());
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     caClient = new DNCertificateClient(new SecurityConfig(CONF), null,
         dn, null, null, null);
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(CONF);
@@ -161,7 +161,7 @@ public class TestContainerServer {
     XceiverClientSpi client = null;
     try {
       final Pipeline pipeline =
-          MockPipeline.createPipeline(numDatanodes);
+          PipelineTestUtils.createPipeline(numDatanodes);
       initConf.accept(pipeline, CONF);
 
       for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -220,7 +220,7 @@ public class TestContainerServer {
 
   @Test
   public void testClientServerWithContainerDispatcher() throws Exception {
-    DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dd = DatanodeDetailsTestUtils.randomDatanodeDetails();
     HddsDispatcher hddsDispatcher = createDispatcher(dd,
         UUID.randomUUID(), CONF);
     runTestClientServer(1, (pipeline, conf) -> conf

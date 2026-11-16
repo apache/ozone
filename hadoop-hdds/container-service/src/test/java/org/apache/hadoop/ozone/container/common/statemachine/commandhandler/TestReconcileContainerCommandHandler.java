@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import static java.util.Collections.singletonMap;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;

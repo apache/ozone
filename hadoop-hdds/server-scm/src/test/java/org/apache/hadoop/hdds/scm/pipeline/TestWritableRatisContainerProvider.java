@@ -75,7 +75,7 @@ class TestWritableRatisContainerProvider {
 
   @Test
   void returnsExistingContainer() throws Exception {
-    Pipeline pipeline = MockPipeline.createPipeline(3);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(3);
     ContainerInfo existingContainer = pipelineHasContainer(pipeline);
 
     existingPipelines(pipeline);
@@ -88,10 +88,10 @@ class TestWritableRatisContainerProvider {
 
   @RepeatedTest(100)
   void skipsPipelineWithoutContainer() throws Exception {
-    Pipeline pipeline = MockPipeline.createPipeline(3);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(3);
     ContainerInfo existingContainer = pipelineHasContainer(pipeline);
 
-    Pipeline pipelineWithoutContainer = MockPipeline.createPipeline(3);
+    Pipeline pipelineWithoutContainer = PipelineTestUtils.createPipeline(3);
     existingPipelines(pipelineWithoutContainer, pipeline);
 
     ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
@@ -122,7 +122,7 @@ class TestWritableRatisContainerProvider {
 
   @Test
   void reportsMissingAllocatedPipelineIfNoReplacementIsAvailable() throws Exception {
-    Pipeline allocated = MockPipeline.createPipeline(3);
+    Pipeline allocated = PipelineTestUtils.createPipeline(3);
     throwWhenCreatePipeline();
     when(pipelineManager.getPipelines(REPLICATION_CONFIG, ALLOCATED, emptySet(), emptySet()))
         .thenReturn(singletonList(allocated));
@@ -139,8 +139,8 @@ class TestWritableRatisContainerProvider {
 
   @Test
   void usesReplacementContainerEvenIfAllocatedPipelineDisappears() throws Exception {
-    Pipeline allocated = MockPipeline.createPipeline(3);
-    Pipeline replacementPipeline = MockPipeline.createPipeline(3);
+    Pipeline allocated = PipelineTestUtils.createPipeline(3);
+    Pipeline replacementPipeline = PipelineTestUtils.createPipeline(3);
     ContainerInfo replacement = pipelineHasContainer(replacementPipeline);
     throwWhenCreatePipeline();
     when(pipelineManager.getPipelines(REPLICATION_CONFIG, ALLOCATED, emptySet(), emptySet()))
@@ -176,7 +176,7 @@ class TestWritableRatisContainerProvider {
   }
 
   private ContainerInfo createNewContainerOnDemand() throws IOException {
-    Pipeline newPipeline = MockPipeline.createPipeline(3);
+    Pipeline newPipeline = PipelineTestUtils.createPipeline(3);
     when(pipelineManager.createPipeline(REPLICATION_CONFIG))
         .thenReturn(newPipeline);
 

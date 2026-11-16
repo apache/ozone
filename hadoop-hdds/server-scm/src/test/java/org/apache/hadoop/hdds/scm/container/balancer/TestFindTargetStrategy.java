@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -52,11 +52,11 @@ public class TestFindTargetStrategy {
     List<DatanodeUsageInfo> overUtilizedDatanodes = new ArrayList<>();
 
     //create three datanodes with different usageinfo
-    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
+    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(DatanodeDetailsTestUtils
         .randomDatanodeDetails(), new SCMNodeStat(100, 0, 40, 0, 30, 0));
-    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
+    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(DatanodeDetailsTestUtils
         .randomDatanodeDetails(), new SCMNodeStat(100, 0, 60, 0, 30, 0));
-    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
+    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(DatanodeDetailsTestUtils
         .randomDatanodeDetails(), new SCMNodeStat(100, 0, 80, 0, 30, 0));
 
     //insert in ascending order
@@ -68,7 +68,7 @@ public class TestFindTargetStrategy {
 
     //no need to set the datanode usage for source.
     findTargetStrategyByUsageInfo.sortTargetForSource(
-        MockDatanodeDetails.randomDatanodeDetails());
+        DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     Collection<DatanodeUsageInfo> potentialTargets =
         findTargetStrategyByUsageInfo.getPotentialTargets();
@@ -91,11 +91,11 @@ public class TestFindTargetStrategy {
   @Test
   public void testResetPotentialTargets() {
     // create three datanodes with different usage infos
-    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
+    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(DatanodeDetailsTestUtils
         .randomDatanodeDetails(), new SCMNodeStat(100, 30, 70, 0, 50, 0));
-    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
+    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(DatanodeDetailsTestUtils
         .randomDatanodeDetails(), new SCMNodeStat(100, 20, 80, 0, 60, 0));
-    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
+    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(DatanodeDetailsTestUtils
         .randomDatanodeDetails(), new SCMNodeStat(100, 10, 90, 0, 70, 0));
 
     List<DatanodeUsageInfo> potentialTargets = new ArrayList<>();
@@ -135,20 +135,20 @@ public class TestFindTargetStrategy {
         new NetworkTopologyImpl(manager);
 
     DatanodeDetails source =
-        MockDatanodeDetails.createDatanodeDetails("1.1.1.1", "/r1/ng1");
+        DatanodeDetailsTestUtils.createDatanodeDetails("1.1.1.1", "/r1/ng1");
     //create one target in the same rack and same node group
     DatanodeDetails target1 =
-        MockDatanodeDetails.createDatanodeDetails("2.2.2.2", "/r1/ng1");
+        DatanodeDetailsTestUtils.createDatanodeDetails("2.2.2.2", "/r1/ng1");
     //create tree targets in the same rack but different node group
     DatanodeDetails target2 =
-        MockDatanodeDetails.createDatanodeDetails("3.3.3.3", "/r1/ng2");
+        DatanodeDetailsTestUtils.createDatanodeDetails("3.3.3.3", "/r1/ng2");
     DatanodeDetails target3 =
-        MockDatanodeDetails.createDatanodeDetails("4.4.4.4", "/r1/ng2");
+        DatanodeDetailsTestUtils.createDatanodeDetails("4.4.4.4", "/r1/ng2");
     DatanodeDetails target4 =
-        MockDatanodeDetails.createDatanodeDetails("5.5.5.5", "/r1/ng2");
+        DatanodeDetailsTestUtils.createDatanodeDetails("5.5.5.5", "/r1/ng2");
     //create one target in different rack
     DatanodeDetails target5 =
-        MockDatanodeDetails.createDatanodeDetails("6.6.6.6", "/r2/ng1");
+        DatanodeDetailsTestUtils.createDatanodeDetails("6.6.6.6", "/r2/ng1");
 
     //add all datanode to cluster map
     newCluster.add(source);

@@ -38,8 +38,8 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -80,9 +80,9 @@ public class TestSCMBlockDeletingService {
 
     DatanodeDeletedBlockTransactions ddbt =
         new DatanodeDeletedBlockTransactions();
-    DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
     datanodeDetails = Arrays.asList(datanode1, datanode2, datanode3);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(
         datanodeDetails);

@@ -27,7 +27,7 @@ import java.util.Collections;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -75,8 +75,8 @@ public class TestStatisticsUpdate {
   @Test
   public void testStatisticsUpdate() throws Exception {
     //GIVEN
-    DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode1 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
         datanode1.getID(), datanode1.getUuidString(), 100, 10, 90, null);

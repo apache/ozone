@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.junit.jupiter.api.Test;
@@ -41,7 +41,7 @@ class TestDatanodeIdYaml {
 
   @Test
   void testWriteRead(@TempDir File dir) throws IOException {
-    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails original = DatanodeDetailsTestUtils.randomDatanodeDetails();
     File file = new File(dir, "datanode.yaml");
 
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -60,7 +60,7 @@ class TestDatanodeIdYaml {
   @Test
   void testWriteReadBeforeRatisDatastreamPortLayoutVersion(@TempDir File dir)
       throws IOException {
-    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails original = DatanodeDetailsTestUtils.randomDatanodeDetails();
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
@@ -82,7 +82,7 @@ class TestDatanodeIdYaml {
   @Test
   void testWriteReadAfterRatisDatastreamPortLayoutVersion(@TempDir File dir)
       throws IOException {
-    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails original = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -104,7 +104,7 @@ class TestDatanodeIdYaml {
   @Test
   void testWriteReadBeforeWebUIPortLayoutVersion(@TempDir File dir)
       throws IOException {
-    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails original = DatanodeDetailsTestUtils.randomDatanodeDetails();
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
@@ -125,7 +125,7 @@ class TestDatanodeIdYaml {
   @Test
   void testWriteReadAfterWebUIPortLayoutVersion(@TempDir File dir)
       throws IOException {
-    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails original = DatanodeDetailsTestUtils.randomDatanodeDetails();
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());

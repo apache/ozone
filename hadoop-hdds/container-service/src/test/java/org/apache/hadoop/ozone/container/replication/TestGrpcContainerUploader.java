@@ -31,7 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -129,7 +129,7 @@ class TestGrpcContainerUploader {
 
   private static OutputStream startUpload(GrpcContainerUploader subject,
       CompletableFuture<Void> callback) throws IOException {
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
     return subject.startUpload(1, target, callback, NO_COMPRESSION);
   }
 

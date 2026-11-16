@@ -21,7 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -55,7 +55,7 @@ public class TestContainerActionsHandler {
 
     ContainerActionsFromDatanode containerActions =
         new ContainerActionsFromDatanode(
-            MockDatanodeDetails.randomDatanodeDetails(), cap);
+            DatanodeDetailsTestUtils.randomDatanodeDetails(), cap);
 
     queue.fireEvent(SCMEvents.CONTAINER_ACTIONS, containerActions);
     queue.processAll(1000L);

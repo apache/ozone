@@ -28,14 +28,14 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 
 /**
  * Provides {@link Pipeline} factory methods for testing.
  */
-public final class MockPipeline {
+public final class PipelineTestUtils {
   /**
    * Create a pipeline with single node replica.
    *
@@ -54,7 +54,7 @@ public final class MockPipeline {
     Preconditions.checkArgument(numNodes >= 1);
     final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
     for (int i = 0; i < numNodes; i++) {
-      ids.add(MockDatanodeDetails.randomLocalDatanodeDetails());
+      ids.add(DatanodeDetailsTestUtils.randomLocalDatanodeDetails());
     }
     return createPipeline(ids);
   }
@@ -76,9 +76,9 @@ public final class MockPipeline {
   public static Pipeline createRatisPipeline() {
 
     List<DatanodeDetails> nodes = new ArrayList<>();
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
+    nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
@@ -98,7 +98,7 @@ public final class MockPipeline {
 
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < repConfig.getRequiredNodes(); i++) {
-      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
     Map<DatanodeDetails, Integer> nodeIndexes = new HashMap<>();
 
@@ -117,7 +117,7 @@ public final class MockPipeline {
         .build();
   }
 
-  private MockPipeline() {
+  private PipelineTestUtils() {
     throw new UnsupportedOperationException("no instances");
   }
 }

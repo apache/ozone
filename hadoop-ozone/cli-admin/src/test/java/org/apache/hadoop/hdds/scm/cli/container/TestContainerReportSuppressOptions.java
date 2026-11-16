@@ -39,8 +39,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -72,7 +72,7 @@ public class TestContainerReportSuppressOptions {
   @BeforeEach
   public void setup() throws IOException {
     scmClient = mock(ScmClient.class);
-    MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
+    DatanodeDetailsTestUtils.createDatanodeDetails(DatanodeID.randomID());
     containers = new ArrayList<>();
 
     containers.add(createEmptyContainer(1L)); // EMPTY container (0 keys, no replicas)

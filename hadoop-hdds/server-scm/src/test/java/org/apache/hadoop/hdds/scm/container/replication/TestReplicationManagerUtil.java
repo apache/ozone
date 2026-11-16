@@ -40,8 +40,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -113,8 +113,8 @@ public class TestReplicationManagerUtil {
 
     // Finally, add a pending add and delete. The add should go onto the used
     // list and the delete added to the excluded nodes.
-    DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails pendingAdd = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails pendingDelete = DatanodeDetailsTestUtils.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
@@ -187,7 +187,7 @@ public class TestReplicationManagerUtil {
     // this one should be on the excluded nodes list
     ContainerReplica unhealthyWithNonUniqueOrigin = createContainerReplica(cid, 0, IN_SERVICE,
         ContainerReplicaProto.State.UNHEALTHY, container.getNumberOfKeys(), container.getUsedBytes(),
-        MockDatanodeDetails.randomDatanodeDetails(), good.getOriginDatanodeId());
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), good.getOriginDatanodeId());
     replicas.add(unhealthyWithNonUniqueOrigin);
 
     ContainerReplica decommissioning =
@@ -202,8 +202,8 @@ public class TestReplicationManagerUtil {
 
     // Finally, add a pending add and delete. The add should go onto the used
     // list and the delete added to the excluded nodes.
-    DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails pendingAdd = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails pendingDelete = DatanodeDetailsTestUtils.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
@@ -285,8 +285,8 @@ public class TestReplicationManagerUtil {
 
     // Add a pending add and delete. The add should go onto the used
     // list and the delete added to the excluded nodes.
-    DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails pendingAdd = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails pendingDelete = DatanodeDetailsTestUtils.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
@@ -300,17 +300,17 @@ public class TestReplicationManagerUtil {
     ConcurrentHashMap<DatanodeID, SizeAndTime> sizeScheduledMap = new ConcurrentHashMap<>();
 
     // fullDn has 10GB size scheduled, 30GB available and 20GB min free space, so it should be excluded
-    DatanodeDetails fullDnDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails fullDnDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
     DatanodeInfo fullDn = new DatanodeInfo(fullDnDetails, NodeStatus.inServiceHealthy(),
         UpgradeUtils.defaultVersionProto(), 1);
     sizeScheduledMap.put(fullDn.getID(), new SizeAndTime(10 * oneGb, clock.millis()));
     // spaceAvailableDn should not be excluded as it has sufficient space
-    DatanodeDetails spaceAvailableDnDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails spaceAvailableDnDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
     DatanodeInfo spaceAvailableDn = new DatanodeInfo(spaceAvailableDnDetails, NodeStatus.inServiceHealthy(),
         UpgradeUtils.defaultVersionProto(), 1);
     sizeScheduledMap.put(spaceAvailableDn.getID(), new SizeAndTime(10 * oneGb, clock.millis()));
     // expiredOpDn is the same as fullDn, however its op has expired - so it should not be excluded
-    DatanodeDetails expiredOpDnDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails expiredOpDnDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
     DatanodeInfo expiredOpDn = new DatanodeInfo(expiredOpDnDetails, NodeStatus.inServiceHealthy(),
         UpgradeUtils.defaultVersionProto(), 1);
     sizeScheduledMap.put(expiredOpDn.getID(), new SizeAndTime(10 * oneGb,

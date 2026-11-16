@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result;
 import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.success;
 import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.unknownFailure;

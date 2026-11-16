@@ -26,12 +26,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -49,7 +49,7 @@ public class TestRoundRobinPipelineChoosePolicy {
 
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < NUM_DATANODES; i++) {
-      datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      datanodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
 
     NodeManager mockNodeManager = mock(NodeManager.class);
@@ -70,7 +70,7 @@ public class TestRoundRobinPipelineChoosePolicy {
           dns.add(datanodes.get(j));
         }
       }
-      Pipeline pipeline = MockPipeline.createPipeline(dns);
+      Pipeline pipeline = PipelineTestUtils.createPipeline(dns);
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);
       allPipelines.add(pipeline);
     }

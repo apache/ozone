@@ -36,7 +36,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
@@ -230,7 +230,7 @@ public class TestEmptyContainerHandler {
             1, 2, 3, 4);
 
     // add a non-empty replica
-    DatanodeDetails mockDn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails mockDn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     containerReplicas.add(
         ReplicationTestUtil.createContainerReplica(containerInfo.containerID(),
             5, HddsProtos.NodeOperationalState.IN_SERVICE,

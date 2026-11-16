@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -95,7 +95,7 @@ public class TestPipelineStateManagerImpl {
       HddsProtos.ReplicationFactor factor, int numNodes) {
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < numNodes; i++) {
-      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      nodes.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
     return Pipeline.newBuilder()
         .setReplicationConfig(

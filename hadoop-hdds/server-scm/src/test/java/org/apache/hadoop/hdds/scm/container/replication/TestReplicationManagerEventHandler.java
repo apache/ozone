@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +64,7 @@ public class TestReplicationManagerEventHandler {
       boolean isExpectedToNotify) {
     when(scmContext.isLeaderReady()).thenReturn(isLeaderReady);
     when(scmContext.isInSafeMode()).thenReturn(isInSafeMode);
-    DatanodeDetails dataNodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dataNodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
     replicationManagerEventHandler.onMessage(dataNodeDetails, publisher);
 
     verify(replicationManager, times(isExpectedToNotify ? 1 : 0)).notifyNodeStateChange();

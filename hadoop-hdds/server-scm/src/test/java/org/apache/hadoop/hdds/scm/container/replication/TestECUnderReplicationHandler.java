@@ -71,7 +71,7 @@ import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -231,7 +231,7 @@ public class TestECUnderReplicationHandler {
 
   private Set<DatanodeDetails> excludeInReplicationManager(int count) {
     Set<DatanodeDetails> excluded = IntStream.range(0, count)
-        .mapToObj(i -> MockDatanodeDetails.randomDatanodeDetails())
+        .mapToObj(i -> DatanodeDetailsTestUtils.randomDatanodeDetails())
         .collect(toSet());
     when(replicationManager.getExcludedNodes())
         .thenReturn(excluded);
@@ -248,7 +248,7 @@ public class TestECUnderReplicationHandler {
         ecPlacementPolicy, conf, replicationManager);
     UnderReplicatedHealthResult result = mockUnderReplicated(ec);
 
-    DatanodeDetails excludedByRM = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails excludedByRM = DatanodeDetailsTestUtils.randomDatanodeDetails();
     Set<DatanodeDetails> excluded = singleton(excludedByRM);
     when(replicationManager.getExcludedNodes())
         .thenReturn(excluded);
@@ -282,7 +282,7 @@ public class TestECUnderReplicationHandler {
         mock(UnderReplicatedHealthResult.class);
     when(result.getContainerInfo()).thenReturn(container);
 
-    DatanodeDetails excludedByRM = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails excludedByRM = DatanodeDetailsTestUtils.randomDatanodeDetails();
     when(replicationManager.getExcludedNodes())
         .thenReturn(singleton(excludedByRM));
 
@@ -643,7 +643,7 @@ public class TestECUnderReplicationHandler {
           int nodesRequired = invocation.getArgument(3);
           List<DatanodeDetails> targets = new ArrayList<>();
           for (int i = 0; i < nodesRequired; i++) {
-            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+            targets.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
           }
           return targets;
         });
@@ -687,12 +687,12 @@ public class TestECUnderReplicationHandler {
         .thenAnswer(invocation -> {
           int nodesRequired = invocation.getArgument(3);
           if (nodesRequired == 2) {
-            return singletonList(MockDatanodeDetails.randomDatanodeDetails());
+            return singletonList(DatanodeDetailsTestUtils.randomDatanodeDetails());
           }
           int count = nodesRequired;
           List<DatanodeDetails> targets = new ArrayList<>();
           for (int i = 0; i < count; i++) {
-            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+            targets.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
           }
           return targets;
         });
@@ -1135,7 +1135,7 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderRepWithDecommissionAndNotEnoughNodes()
       throws IOException {
-    DatanodeDetails newNode = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails newNode = DatanodeDetailsTestUtils.randomDatanodeDetails();
     PlacementPolicy sameNodePolicy = ReplicationTestUtil
         .getSameNodeTestPlacementPolicy(nodeManager, conf, newNode);
     
@@ -1241,7 +1241,7 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testMissingAndDecomIndexWithOnlyOneNewNodeAvailable()
       throws IOException {
-    DatanodeDetails newDn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails newDn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     PlacementPolicy sameNodePolicy = ReplicationTestUtil
         .getSameNodeTestPlacementPolicy(nodeManager, conf, newDn);
     // Just have a missing index, this should return OK.
@@ -1308,7 +1308,7 @@ public class TestECUnderReplicationHandler {
           int numNodes = invocationOnMock.getArgument(3);
           List<DatanodeDetails> targets = new ArrayList<>();
           for (int i = 0; i < numNodes; i++) {
-            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+            targets.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
           }
           return targets;
         });
@@ -1335,7 +1335,7 @@ public class TestECUnderReplicationHandler {
   public void testDatanodesPendingAddAreNotSelectedAsTargets()
       throws IOException {
     Set<ContainerReplica> availableReplicas = createReplicas(3);
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD, dn, 4, null, System.currentTimeMillis(), 0));
 
@@ -1352,7 +1352,7 @@ public class TestECUnderReplicationHandler {
           List<DatanodeDetails> excludeList = invocationOnMock.getArgument(1);
           List<DatanodeDetails> targets = new ArrayList<>(1);
           if (usedList.contains(dn) || excludeList.contains(dn)) {
-            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+            targets.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
           } else {
             targets.add(dn);
           }
@@ -1483,7 +1483,7 @@ public class TestECUnderReplicationHandler {
 
         final List<DatanodeDetails> targets = new ArrayList<>();
         for (int i = 0; i < Math.min(nodesRequired, availableNodes); i++) {
-          targets.add(MockDatanodeDetails.randomDatanodeDetails());
+          targets.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
         }
         if (targets.isEmpty()) {
           throw new SCMException("not enough nodes",

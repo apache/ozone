@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -327,7 +327,7 @@ public class TestDatanodeConfiguration {
 
   static void assertWaitTimeMin(TimeDuration expected,
       OzoneConfiguration conf) throws Exception {
-    final DatanodeDetails dn = MockPipeline.createPipeline(1).getFirstNode();
+    final DatanodeDetails dn = PipelineTestUtils.createPipeline(1).getFirstNode();
     final RaftProperties p = ContainerTestUtils.newXceiverServerRatis(dn, conf)
         .newRaftProperties();
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
@@ -366,7 +366,7 @@ public class TestDatanodeConfiguration {
   }
 
   static void assertAppendEntriesComposeEnabled(boolean expected, OzoneConfiguration conf) throws Exception {
-    final DatanodeDetails dn = MockPipeline.createPipeline(1).getFirstNode();
+    final DatanodeDetails dn = PipelineTestUtils.createPipeline(1).getFirstNode();
     final RaftProperties p = ContainerTestUtils.newXceiverServerRatis(dn, conf).newRaftProperties();
     assertEquals(expected, RaftServerConfigKeys.Log.appendEntriesComposeEnabled(p),
         RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);

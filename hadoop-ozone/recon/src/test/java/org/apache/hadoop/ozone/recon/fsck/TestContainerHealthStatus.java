@@ -30,7 +30,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -416,7 +416,7 @@ public class TestContainerHealthStatus {
     for (ContainerReplicaProto.State s : states) {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(cont.containerID())
-          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setDatanodeDetails(DatanodeDetailsTestUtils.randomDatanodeDetails())
           .setChecksums(ContainerChecksums.of(1234L, 0L))
           .setContainerState(s)
           .build());
@@ -431,7 +431,7 @@ public class TestContainerHealthStatus {
     for (ContainerReplicaProto.State s : states) {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(cont.containerID())
-          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setDatanodeDetails(DatanodeDetailsTestUtils.randomDatanodeDetails())
           .setContainerState(s)
           .setChecksums(ContainerChecksums.of(checksum, 0L))
           .build());

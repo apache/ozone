@@ -60,7 +60,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -69,8 +69,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -153,7 +153,7 @@ public class TestSecureContainerServer {
 
   @Test
   public void testClientServer() throws Exception {
-    DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dd = DatanodeDetailsTestUtils.randomDatanodeDetails();
     HddsDispatcher hddsDispatcher = createDispatcher(dd,
         UUID.randomUUID(), CONF);
     runTestClientServer(1, (pipeline, conf) -> conf
@@ -239,7 +239,7 @@ public class TestSecureContainerServer {
       throws Exception {
     final List<XceiverServerSpi> servers = new ArrayList<>();
     final Pipeline pipeline =
-        MockPipeline.createPipeline(numDatanodes);
+        PipelineTestUtils.createPipeline(numDatanodes);
 
     initConf.accept(pipeline, CONF);
 

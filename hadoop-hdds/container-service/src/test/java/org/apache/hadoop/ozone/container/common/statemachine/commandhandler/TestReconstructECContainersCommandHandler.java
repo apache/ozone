@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
@@ -133,7 +133,7 @@ public class TestReconstructECContainersCommandHandler {
   private List<DatanodeDetails> getDNDetails(int numDns) {
     List<DatanodeDetails> dns = new ArrayList<>();
     for (int i = 0; i < numDns; i++) {
-      dns.add(MockDatanodeDetails.randomDatanodeDetails());
+      dns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
     return dns;
   }

@@ -35,7 +35,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -50,8 +50,8 @@ import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -105,7 +105,7 @@ class TestBlockOutputStreamCorrectness {
     OzoneClientConfig config = new OzoneClientConfig();
     ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
     BlockID blockID = new BlockID(1, 1);
-    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(datanodeDetails.getID())
         .setReplicationConfig(replicationConfig)
@@ -139,7 +139,7 @@ class TestBlockOutputStreamCorrectness {
     OzoneClientConfig config = new OzoneClientConfig();
     ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
     BlockID blockID = new BlockID(1, 1);
-    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(datanodeDetails.getID())
         .setReplicationConfig(replicationConfig)
@@ -159,7 +159,7 @@ class TestBlockOutputStreamCorrectness {
     OzoneClientConfig config = new OzoneClientConfig();
     ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
     BlockID blockID = new BlockID(1, 1);
-    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(datanodeDetails.getID())
         .setReplicationConfig(replicationConfig)
@@ -195,7 +195,7 @@ class TestBlockOutputStreamCorrectness {
   private BlockOutputStream createBlockOutputStream(BufferPool bufferPool)
       throws IOException {
 
-    final Pipeline pipeline = MockPipeline.createRatisPipeline();
+    final Pipeline pipeline = PipelineTestUtils.createRatisPipeline();
 
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
     when(xcm.acquireClient(any()))

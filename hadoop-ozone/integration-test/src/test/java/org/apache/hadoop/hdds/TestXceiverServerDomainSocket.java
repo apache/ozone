@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.XceiverClientShortCircuit.vintPrefixed;
@@ -71,13 +71,13 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -171,7 +171,7 @@ public class TestXceiverServerDomainSocket {
         new File(dir.getAbsolutePath() + System.nanoTime(), "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
     try {
-      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+      new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
       fail("non-existing domain parent path.");
     } catch (Throwable e) {
@@ -190,7 +190,7 @@ public class TestXceiverServerDomainSocket {
     try {
       File file = new File(dir, "ozone-socket");
       assertTrue(file.createNewFile());
-      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+      new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
     } catch (Throwable e) {
       fail("an existing domain path is supported but not recommended.");
@@ -209,7 +209,7 @@ public class TestXceiverServerDomainSocket {
         new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
     try {
-      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+      new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
       fail("write from everyone is not allowed.");
     } catch (Throwable e) {
@@ -225,7 +225,7 @@ public class TestXceiverServerDomainSocket {
         new File(dir, "ozone-socket").getAbsolutePath());
     factory = DomainSocketFactory.getInstance(conf);
     try {
-      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+      new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
       fail("write from owner is required.");
     } catch (Throwable e) {
@@ -242,7 +242,7 @@ public class TestXceiverServerDomainSocket {
     factory = DomainSocketFactory.getInstance(conf);
     XceiverServerDomainSocket server = null;
     try {
-      server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+      server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
     } catch (Throwable e) {
       fail("write from owner is required.");
@@ -261,7 +261,7 @@ public class TestXceiverServerDomainSocket {
         new File(dir, "ozone-socket-execute").getAbsolutePath());
     factory = DomainSocketFactory.getInstance(conf);
     try {
-      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+      new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
       fail("execute from owner is required.");
     } catch (Throwable e) {
@@ -280,7 +280,7 @@ public class TestXceiverServerDomainSocket {
         new File(dir, "ozone-socket-read").getAbsolutePath());
     factory = DomainSocketFactory.getInstance(conf);
     try {
-      server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+      server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
     } catch (Throwable e) {
       fail("read from owner is not required.");
@@ -309,7 +309,7 @@ public class TestXceiverServerDomainSocket {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, containerMetrics, factory);
     DomainSocket sock = null;
     try {
@@ -385,7 +385,7 @@ public class TestXceiverServerDomainSocket {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, containerMetrics, factory);
     try {
       File volume = new File(dir, "dn-volume");
@@ -499,7 +499,7 @@ public class TestXceiverServerDomainSocket {
   public void testServerNotStart() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     DomainSocket sock = null;
     DataOutputStream outputStream = null;
@@ -533,7 +533,7 @@ public class TestXceiverServerDomainSocket {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, "2s");
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     DomainSocket sock = null;
     try {
@@ -567,7 +567,7 @@ public class TestXceiverServerDomainSocket {
   public void testReceiverDaemonStartSlow() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     FaultInjectorImpl injector = new FaultInjectorImpl();
     server.setInjector(injector);
@@ -597,7 +597,7 @@ public class TestXceiverServerDomainSocket {
     datanodeConfiguration.setNumReadThreadPerVolume(10);
     conf.setFromObject(datanodeConfiguration);
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     List<DomainSocket> list = new ArrayList<>();
     GenericTestUtils.LogCapturer logCapturer =
@@ -692,7 +692,7 @@ public class TestXceiverServerDomainSocket {
   public void testSendIrrelevantMessage() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     DomainSocket sock = null;
     DataOutputStream outputStream = null;
@@ -718,7 +718,7 @@ public class TestXceiverServerDomainSocket {
   public void testSendUnsupportedRequest() throws IOException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     DomainSocket sock = null;
     try {
@@ -758,7 +758,7 @@ public class TestXceiverServerDomainSocket {
     conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, "1m");
     conf.set(OzoneConfigKeys.OZONE_CLIENT_WRITE_TIMEOUT, "1s");
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     DomainSocket sock = null;
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
@@ -802,7 +802,7 @@ public class TestXceiverServerDomainSocket {
   public void testResponseWithoutBlockFile() throws IOException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     // Receiver is package-private, so its logger is looked up by name
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
@@ -840,7 +840,7 @@ public class TestXceiverServerDomainSocket {
   public void testGetBlockWithoutShortCircuitAccess() throws IOException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     DomainSocket sock = null;
     try {
@@ -875,14 +875,14 @@ public class TestXceiverServerDomainSocket {
   public void testClientReleasesStreamOfAbandonedRequest() throws Exception {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     XceiverClientShortCircuit client = null;
     try {
       server.setContainerDispatcher(createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics));
       server.start();
-      XceiverClientShortCircuit c = new XceiverClientShortCircuit(MockPipeline.createSingleNodePipeline(), conf,
-          MockDatanodeDetails.randomDatanodeDetails());
+      XceiverClientShortCircuit c = new XceiverClientShortCircuit(PipelineTestUtils.createSingleNodePipeline(), conf,
+          DatanodeDetailsTestUtils.randomDatanodeDetails());
       List<FileInputStream> received = Collections.synchronizedList(new ArrayList<>());
       FieldUtils.writeField(c, "blockStreamCache", new ConcurrentHashMap<Object, FileInputStream>() {
         @Override
@@ -945,14 +945,14 @@ public class TestXceiverServerDomainSocket {
   public void testShortCircuitGetBlockIncrementsNumOpsOnce() throws Exception {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+    XceiverServerDomainSocket server = new XceiverServerDomainSocket(DatanodeDetailsTestUtils.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     XceiverClientShortCircuit client = null;
     try {
       server.setContainerDispatcher(createDispatcherAndPrepareData(new File(dir, "dn-volume"), server, metrics));
       server.start();
-      XceiverClientShortCircuit c = new XceiverClientShortCircuit(MockPipeline.createSingleNodePipeline(), conf,
-          MockDatanodeDetails.randomDatanodeDetails());
+      XceiverClientShortCircuit c = new XceiverClientShortCircuit(PipelineTestUtils.createSingleNodePipeline(), conf,
+          DatanodeDetailsTestUtils.randomDatanodeDetails());
       c.connect();
       client = c;
 
@@ -1102,7 +1102,7 @@ public class TestXceiverServerDomainSocket {
     ContainerProtos.ChunkInfo.Builder chunkInfo = ContainerProtos.ChunkInfo.newBuilder()
         .setChunkName("chunk_" + value).setOffset(0).setLen(chunkSize).setChecksumData(checksumProtobuf);
     blockData.addChunks(chunkInfo);
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = PipelineTestUtils.createSingleNodePipeline();
     ContainerProtos.WriteChunkRequestProto.Builder writeChunk =
         ContainerProtos.WriteChunkRequestProto.newBuilder()
             .setBlockID(blockId).setChunkData(chunkInfo)

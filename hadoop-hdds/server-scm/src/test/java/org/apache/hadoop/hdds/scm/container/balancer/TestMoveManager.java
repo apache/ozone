@@ -64,7 +64,7 @@ import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -171,8 +171,8 @@ public class TestMoveManager {
 
   @Test
   public void testMoveSourceDoesNotExist() throws Exception {
-    src = MockDatanodeDetails.randomDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    src = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -200,7 +200,7 @@ public class TestMoveManager {
         .createReplicas(containerInfo.containerID(), 0, 0, 0));
     Iterator<ContainerReplica> iterator = replicas.iterator();
     src = iterator.next().getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -225,7 +225,7 @@ public class TestMoveManager {
         .createReplicas(containerInfo.containerID(), 0, 0, 0));
     Iterator<ContainerReplica> iterator = replicas.iterator();
     src = iterator.next().getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -245,7 +245,7 @@ public class TestMoveManager {
         .createReplicas(containerInfo.containerID(), 0, 0, 0));
     ContainerReplica sourceReplica = replicas.iterator().next();
     src = sourceReplica.getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -284,7 +284,7 @@ public class TestMoveManager {
     replicas.addAll(ReplicationTestUtil
         .createReplicas(containerInfo.containerID(), 0, 0));
     src = replicas.iterator().next().getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
     assertMoveFailsWith(REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
@@ -367,7 +367,7 @@ public class TestMoveManager {
     Iterator<ContainerReplica> iterator = replicas.iterator();
     ContainerReplica srcReplica = iterator.next();
     src = srcReplica.getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -516,7 +516,7 @@ public class TestMoveManager {
     Iterator<ContainerReplica> iterator = replicas.iterator();
     ContainerReplica srcReplica = iterator.next();
     src = srcReplica.getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -556,7 +556,7 @@ public class TestMoveManager {
         .createReplicas(containerInfo.containerID(), 0, 0, 0));
     Iterator<ContainerReplica> iterator = replicas.iterator();
     src = iterator.next().getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -614,7 +614,7 @@ public class TestMoveManager {
   public void testMoveQuasiClosedContainerWithConfigDisabled() throws Exception {
     ContainerInfo qcContainer = setupQuasiClosedContainer(1);
     src = replicas.iterator().next().getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -629,7 +629,7 @@ public class TestMoveManager {
   public void testMoveQuasiClosedContainerWithConfigEnabled() throws Exception {
     ContainerInfo qcContainer = setupQuasiClosedContainer(2);
     src = replicas.iterator().next().getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -652,7 +652,7 @@ public class TestMoveManager {
     when(replicationManager.getPendingReplicationOps(qcContainer.containerID()))
         .thenReturn(new ArrayList<>());
     src = replicas.iterator().next().getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -674,9 +674,9 @@ public class TestMoveManager {
         HddsProtos.LifeCycleState.QUASI_CLOSED, 1L, OzoneConsts.GB);
     ContainerID cid = qcContainer.containerID();
 
-    DatanodeDetails dnWithEmpty = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dnWithEmpty = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn2 = DatanodeDetailsTestUtils.randomDatanodeDetails();
+    DatanodeDetails dn3 = DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     replicas.clear();
     replicas.add(ContainerReplica.newBuilder()
@@ -700,7 +700,7 @@ public class TestMoveManager {
         .thenReturn(new ContainerHealthResult.HealthyResult(qcContainer));
 
     src = dnWithEmpty;
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
@@ -712,7 +712,7 @@ public class TestMoveManager {
     replicas.clear();
     replicas.addAll(ReplicationTestUtil.createReplicas(containerInfo.containerID(), 0, 0, 0, 0));
     src = replicas.iterator().next().getDatanodeDetails();
-    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    tgt = DatanodeDetailsTestUtils.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 

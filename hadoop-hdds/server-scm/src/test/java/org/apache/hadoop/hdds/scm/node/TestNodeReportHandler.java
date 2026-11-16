@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -80,7 +80,7 @@ public class TestNodeReportHandler implements EventPublisher {
 
   @Test
   public void testNodeReport() throws IOException {
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     StorageReportProto storageOne = HddsTestUtils
         .createStorageReport(dn.getID(), storagePath.getPath(), 100, 10, 90, null);
     MetadataStorageReportProto metaStorageOne = HddsTestUtils

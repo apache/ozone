@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
@@ -210,7 +210,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
 
     BlockID blockID = getTestBlockID(1);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
-        getWriteChunkRequest(MockPipeline.createSingleNodePipeline(),
+        getWriteChunkRequest(PipelineTestUtils.createSingleNodePipeline(),
             blockID, 123);
     ContainerProtos.ContainerCommandResponseProto response =
         subject.handle(

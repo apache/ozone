@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;

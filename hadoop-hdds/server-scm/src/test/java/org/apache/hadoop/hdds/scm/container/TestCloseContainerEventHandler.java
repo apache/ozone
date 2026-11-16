@@ -43,8 +43,8 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -225,7 +225,7 @@ public class TestCloseContainerEventHandler {
     List<DatanodeDetails> dns = new ArrayList<>();
 
     for (int i = 0; i < nodes; i++) {
-      dns.add(MockDatanodeDetails.randomDatanodeDetails());
+      dns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
     builder.setNodes(dns);
     builder.setLeaderId(dns.get(0).getID());

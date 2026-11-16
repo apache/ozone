@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 public class TestMeasuredReplicator {
 
   private static final DatanodeDetails TARGET =
-      MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeDetailsTestUtils.randomDatanodeDetails();
 
   private MeasuredReplicator measuredReplicator;
   private ContainerReplicator replicator;

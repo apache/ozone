@@ -62,7 +62,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -394,7 +394,7 @@ public class TestDeleteBlocksCommandHandler {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     DatanodeDetails datanodeDetails =
-        MockDatanodeDetails.randomDatanodeDetails();
+        DatanodeDetailsTestUtils.randomDatanodeDetails();
     when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     StateContext context = new StateContext(conf,
         DatanodeStateMachine.DatanodeStates.RUNNING, stateMachine, "");
@@ -454,7 +454,7 @@ public class TestDeleteBlocksCommandHandler {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toString());
     configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
-    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = DatanodeDetailsTestUtils.randomDatanodeDetails();
     DatanodeConfiguration dnConf =
         configuration.getObject(DatanodeConfiguration.class);
     OzoneContainer container = ContainerTestUtils.getOzoneContainer(datanodeDetails, configuration);

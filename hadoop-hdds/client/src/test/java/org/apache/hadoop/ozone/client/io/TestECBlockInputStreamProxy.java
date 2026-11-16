@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -516,7 +516,7 @@ public class TestECBlockInputStreamProxy {
     Map<DatanodeDetails, Integer> locations = new LinkedHashMap<>();
     int[] indexes = "failover".equals(mode) ? new int[] {1, 1, 2, 3, 4, 5} : new int[] {1, 1, 3, 4, 5};
     for (int index : indexes) {
-      locations.put(MockDatanodeDetails.randomDatanodeDetails(), index);
+      locations.put(DatanodeDetailsTestUtils.randomDatanodeDetails(), index);
     }
     BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(replication, blockLength, locations);
     ECStreamTestUtil.TestBlockInputStreamFactory replicaFactory = new ECStreamTestUtil.TestBlockInputStreamFactory();

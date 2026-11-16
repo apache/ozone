@@ -22,7 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +42,7 @@ public class TestDatanodeCommandCountUpdatedHandler {
 
   @Test
   public void testReplicationManagerNotified() {
-    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode = DatanodeDetailsTestUtils.randomDatanodeDetails();
     handler.onMessage(datanode, null);
     verify(replicationManager).datanodeCommandCountUpdated(eq(datanode));
   }

@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -76,7 +76,7 @@ public class TestCommandStatusReportHandler implements EventPublisher {
       List<CommandStatus> reports) {
     CommandStatusReportsProto report = HddsTestUtils.createCommandStatusReport(
         reports);
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn = DatanodeDetailsTestUtils.randomDatanodeDetails();
     return new SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode(
         dn, report);
   }

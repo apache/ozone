@@ -28,7 +28,7 @@ import org.apache.ozone.test.GenericTestUtils;
 /**
  * Provides {@link DatanodeDetails} factory methods for testing.
  */
-public final class MockDatanodeDetails {
+public final class DatanodeDetailsTestUtils {
 
   /**
    * Creates DatanodeDetails with random ID and random IP address.
@@ -118,7 +118,7 @@ public final class MockDatanodeDetails {
         GenericTestUtils.PortAllocator.getFreePort());
   }
 
-  private MockDatanodeDetails() {
+  private DatanodeDetailsTestUtils() {
     throw new UnsupportedOperationException("no instances");
   }
 }

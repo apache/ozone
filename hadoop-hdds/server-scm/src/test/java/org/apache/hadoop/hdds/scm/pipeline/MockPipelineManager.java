@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -81,9 +81,9 @@ public class MockPipelineManager implements PipelineManager {
           replicationConfig, excludedNodes, favoredNodes);
     } else {
       pipeline = createPipeline(replicationConfig,
-          ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
-              MockDatanodeDetails.randomDatanodeDetails(),
-              MockDatanodeDetails.randomDatanodeDetails()));
+          ImmutableList.of(DatanodeDetailsTestUtils.randomDatanodeDetails(),
+              DatanodeDetailsTestUtils.randomDatanodeDetails(),
+              DatanodeDetailsTestUtils.randomDatanodeDetails()));
     }
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
@@ -95,7 +95,7 @@ public class MockPipelineManager implements PipelineManager {
   public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes) {
     final List<DatanodeDetails> nodes = Stream.generate(
-            MockDatanodeDetails::randomDatanodeDetails)
+            DatanodeDetailsTestUtils::randomDatanodeDetails)
         .limit(replicationConfig.getRequiredNodes())
         .collect(Collectors.toList());
     final Pipeline pipeline = Pipeline.newBuilder()

@@ -51,24 +51,24 @@ public class TestPipelineStateMap {
     Pipeline p;
 
     // Open Stanadlone Pipelines
-    map.addPipeline(MockPipeline.createPipeline(1));
-    map.addPipeline(MockPipeline.createPipeline(1));
-    p = MockPipeline.createPipeline(1);
+    map.addPipeline(PipelineTestUtils.createPipeline(1));
+    map.addPipeline(PipelineTestUtils.createPipeline(1));
+    p = PipelineTestUtils.createPipeline(1);
     map.addPipeline(p);
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
 
     // Ratis pipeline
-    map.addPipeline(MockPipeline.createRatisPipeline());
-    p = MockPipeline.createRatisPipeline();
+    map.addPipeline(PipelineTestUtils.createRatisPipeline());
+    p = PipelineTestUtils.createRatisPipeline();
     map.addPipeline(p);
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
 
     // EC Pipelines
-    map.addPipeline(MockPipeline.createEcPipeline(
+    map.addPipeline(PipelineTestUtils.createEcPipeline(
         new ECReplicationConfig(3, 2)));
-    map.addPipeline(MockPipeline.createEcPipeline(
+    map.addPipeline(PipelineTestUtils.createEcPipeline(
         new ECReplicationConfig(3, 2)));
-    p = MockPipeline.createEcPipeline(new ECReplicationConfig(3, 2));
+    p = PipelineTestUtils.createEcPipeline(new ECReplicationConfig(3, 2));
     map.addPipeline(p);
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
 

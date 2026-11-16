@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -97,7 +97,7 @@ public class TestPipelinePlacementFactory {
     String hostname = "node";
     for (int i = 0; i < datanodeCount; i++) {
       DatanodeDetails datanodeDetails =
-          MockDatanodeDetails.createDatanodeDetails(
+          DatanodeDetailsTestUtils.createDatanodeDetails(
               hostname + i, firstRackLessNode ?
                   rack + ((i + 1) / nodesPerRack) : rack + (i / nodesPerRack));
 

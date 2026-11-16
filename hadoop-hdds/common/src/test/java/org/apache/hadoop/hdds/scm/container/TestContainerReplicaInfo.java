@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +39,7 @@ public class TestContainerReplicaInfo {
             .setContainerID(567)
             .setPlaceOfBirth(UUID.randomUUID().toString())
             .setSequenceID(5)
-            .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails()
+            .setDatanodeDetails(DatanodeDetailsTestUtils.randomDatanodeDetails()
                 .getProtoBufMessage())
             .setState("OPEN")
             .build();
@@ -68,7 +68,7 @@ public class TestContainerReplicaInfo {
             .setContainerID(567)
             .setPlaceOfBirth(UUID.randomUUID().toString())
             .setSequenceID(5)
-            .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails()
+            .setDatanodeDetails(DatanodeDetailsTestUtils.randomDatanodeDetails()
                 .getProtoBufMessage())
             .setState("OPEN")
             .setReplicaIndex(4)

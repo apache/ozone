@@ -25,8 +25,8 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -173,7 +173,7 @@ public class TestNodeStateMap {
   @Test
   public void testConcurrency() throws Exception {
     final DatanodeDetails datanodeDetails =
-        MockDatanodeDetails.randomDatanodeDetails();
+        DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     addNode(datanodeDetails, NodeStatus.inServiceHealthy());
 

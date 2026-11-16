@@ -43,8 +43,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -426,7 +426,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     dsm.getVersionManager().finalizeUpgrade();
 
-    final Pipeline pipeline = MockPipeline.createPipeline(
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
     // Create a container to write data.
     final long containerID1 = UpgradeTestHelper.addContainer(dispatcher, pipeline);
@@ -473,7 +473,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
-    final Pipeline pipeline = MockPipeline.createPipeline(
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
 
     // Add data to read.
@@ -536,7 +536,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
 
     // Write some data.
-    final Pipeline pipeline = MockPipeline.createPipeline(
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
     final long containerID = UpgradeTestHelper.addContainer(dispatcher, pipeline);
     ContainerProtos.WriteChunkRequestProto writeChunk =

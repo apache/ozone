@@ -61,8 +61,8 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
@@ -147,15 +147,15 @@ public class TestOmContainerLocationCache {
   private static XceiverClientGrpc mockDn2Protocol;
   private static XceiverClientGrpc mockDnEcProtocol;
   private static final DatanodeDetails DN1 =
-      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
+      DatanodeDetailsTestUtils.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN2 =
-      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
+      DatanodeDetailsTestUtils.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN3 =
-      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
+      DatanodeDetailsTestUtils.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN4 =
-      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
+      DatanodeDetailsTestUtils.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN5 =
-      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
+      DatanodeDetailsTestUtils.createDatanodeDetails(DatanodeID.randomID());
   private static final AtomicLong CONTAINER_ID = new AtomicLong(1);
   private static OzoneClient ozoneClient;
 

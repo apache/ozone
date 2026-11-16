@@ -40,7 +40,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -96,7 +96,7 @@ public class TestContainerPlacementFactory {
     String hostname = "node";
     for (int i = 0; i < 15; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeDetails datanodeDetails = MockDatanodeDetails
+      DatanodeDetails datanodeDetails = DatanodeDetailsTestUtils
           .createDatanodeDetails(hostname + i, rack + (i / 5));
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),

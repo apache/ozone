@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +45,7 @@ public class TestReconstructionECContainersCommands {
     final ByteString missingContainerIndexes = UnsafeByteOperations.unsafeWrap(new byte[]{1, 2});
 
     List<DatanodeDetails> targetDns = new ArrayList<>();
-    targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
+    targetDns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
 
     assertThrows(IllegalArgumentException.class,
         () -> new ReconstructECContainersCommand(1L, Collections.emptyList(),
@@ -108,7 +108,7 @@ public class TestReconstructionECContainersCommands {
   private List<DatanodeDetails> getDNDetails(int numDns) {
     List<DatanodeDetails> dns = new ArrayList<>();
     for (int i = 0; i < numDns; i++) {
-      dns.add(MockDatanodeDetails.randomDatanodeDetails());
+      dns.add(DatanodeDetailsTestUtils.randomDatanodeDetails());
     }
     return dns;
   }

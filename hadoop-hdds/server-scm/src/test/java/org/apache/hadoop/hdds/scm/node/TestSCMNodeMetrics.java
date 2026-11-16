@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -101,7 +101,7 @@ public class TestSCMNodeMetrics {
   @Test
   public void testHBProcessingFailure() {
     long hbProcessedFailed = getCounter("NumHBProcessingFailed");
-    nodeManager.processHeartbeat(MockDatanodeDetails.randomDatanodeDetails());
+    nodeManager.processHeartbeat(DatanodeDetailsTestUtils.randomDatanodeDetails());
     assertEquals(hbProcessedFailed + 1, getCounter("NumHBProcessingFailed"),
         "NumHBProcessingFailed");
   }
@@ -135,7 +135,7 @@ public class TestSCMNodeMetrics {
 
     long nrProcessed = getCounter("NumNodeReportProcessingFailed");
     DatanodeDetails randomDatanode =
-        MockDatanodeDetails.randomDatanodeDetails();
+        DatanodeDetailsTestUtils.randomDatanodeDetails();
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
         randomDatanode.getID(), "/tmp", 100, 10, 90, null);

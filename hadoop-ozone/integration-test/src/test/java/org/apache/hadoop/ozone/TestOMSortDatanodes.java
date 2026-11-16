@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -44,8 +44,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -128,7 +128,7 @@ public class TestOMSortDatanodes {
 
     // A key whose only block is in a pipeline of all datanodes, so listStatus sorts all of them for the client.
     OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME, BUCKET, om.getMetadataManager(), BucketLayout.LEGACY);
-    Pipeline pipeline = MockPipeline.createPipeline(new ArrayList<>(nodeManager.getAllNodes()));
+    Pipeline pipeline = PipelineTestUtils.createPipeline(new ArrayList<>(nodeManager.getAllNodes()));
     OmKeyLocationInfo location = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(CONTAINER_ID, 1))
         .setPipeline(pipeline)

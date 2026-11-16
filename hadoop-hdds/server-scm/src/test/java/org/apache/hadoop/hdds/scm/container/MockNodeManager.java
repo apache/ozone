@@ -39,8 +39,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -144,7 +144,7 @@ public class MockNodeManager implements NodeManager {
     }
     if (initializeFakeNodes) {
       for (int x = 0; x < nodeCount; x++) {
-        DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
+        DatanodeDetails dd = DatanodeDetailsTestUtils.randomDatanodeDetails();
         register(dd, null, null);
         populateNodeMetric(dd, x);
       }

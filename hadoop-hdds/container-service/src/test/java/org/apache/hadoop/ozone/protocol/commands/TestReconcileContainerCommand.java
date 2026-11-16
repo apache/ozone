@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.HDDSVersion;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.junit.jupiter.api.Test;
@@ -82,7 +82,7 @@ public class TestReconcileContainerCommand {
 
   private ReconcileContainerCommand createCommand() {
     return new ReconcileContainerCommand(1L, ImmutableSet.of(
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails()));
+        DatanodeDetailsTestUtils.randomDatanodeDetails(),
+        DatanodeDetailsTestUtils.randomDatanodeDetails()));
   }
 }

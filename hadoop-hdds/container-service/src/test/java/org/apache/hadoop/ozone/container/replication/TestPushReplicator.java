@@ -34,7 +34,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.ozone.test.SpyOutputStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +62,7 @@ class TestPushReplicator {
     // GIVEN
     compression.setOn(conf);
     long containerID = randomContainerID();
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
     Consumer<CompletableFuture<Void>> completion =
         fut -> fut.complete(null);
     SpyOutputStream output = new SpyOutputStream(NULL_OUTPUT_STREAM);
@@ -83,7 +83,7 @@ class TestPushReplicator {
   void uploadFailsWithException() throws IOException {
     // GIVEN
     long containerID = randomContainerID();
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
     SpyOutputStream output = new SpyOutputStream(NULL_OUTPUT_STREAM);
     Consumer<CompletableFuture<Void>> completion =
         fut -> fut.completeExceptionally(new Exception("testing"));
@@ -104,7 +104,7 @@ class TestPushReplicator {
   void packFailsWithException() throws IOException {
     // GIVEN
     long containerID = randomContainerID();
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = DatanodeDetailsTestUtils.randomDatanodeDetails();
     SpyOutputStream output = new SpyOutputStream(NULL_OUTPUT_STREAM);
     Consumer<CompletableFuture<Void>> completion = fut -> {
       throw new RuntimeException();

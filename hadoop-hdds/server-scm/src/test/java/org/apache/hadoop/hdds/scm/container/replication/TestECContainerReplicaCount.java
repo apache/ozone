@@ -39,7 +39,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -93,7 +93,7 @@ public class TestECContainerReplicaCount {
     // appears missing
     ContainerReplicaOp op = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0);
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0);
     rcnt.addPendingOp(op);
     assertTrue(rcnt.isSufficientlyReplicated(true));
     assertEquals(0, rcnt.unavailableIndexes(true).size());
@@ -214,7 +214,7 @@ public class TestECContainerReplicaCount {
     // as not over replicated.
     rcnt.addPendingOp(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
     assertFalse(rcnt.isOverReplicated(true));
   }
 
@@ -230,7 +230,7 @@ public class TestECContainerReplicaCount {
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
     pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
 
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica, pending, 1);
@@ -539,14 +539,14 @@ public class TestECContainerReplicaCount {
     for (Integer addIndex : addIndexes) {
       pending.add(new ContainerReplicaOp(
           ContainerReplicaOp.PendingOpType.ADD,
-          MockDatanodeDetails.randomDatanodeDetails(), addIndex,
+          DatanodeDetailsTestUtils.randomDatanodeDetails(), addIndex,
           null, Long.MAX_VALUE, 0));
     }
 
     for (Integer deleteIndex : deleteIndexes) {
       pending.add(new ContainerReplicaOp(
           ContainerReplicaOp.PendingOpType.DELETE,
-          MockDatanodeDetails.randomDatanodeDetails(), deleteIndex,
+          DatanodeDetailsTestUtils.randomDatanodeDetails(), deleteIndex,
           null, Long.MAX_VALUE, 0));
     }
     return pending;
@@ -693,7 +693,7 @@ public class TestECContainerReplicaCount {
 
     // A random DN not hosting a replica for this container should return false.
     assertFalse(rcnt.isSufficientlyReplicatedForOffline(
-        MockDatanodeDetails.randomDatanodeDetails(), null));
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), null));
 
     // Passing the IN_SERVICE node should return false even though the
     // replica is on a healthy node
@@ -726,7 +726,7 @@ public class TestECContainerReplicaCount {
     // Add another pending delete to an index that is not an unhealthy index
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(), 2, null, System.currentTimeMillis(), 0));
+        DatanodeDetailsTestUtils.randomDatanodeDetails(), 2, null, System.currentTimeMillis(), 0));
 
     rcnt = new ECContainerReplicaCount(container, replica, pendingOps, 1);
     assertFalse(rcnt.isSufficientlyReplicated(false));

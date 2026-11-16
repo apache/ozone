@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -113,7 +113,7 @@ public class TestRatisOverReplicationHandler {
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+            DatanodeDetailsTestUtils.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     // 1 replica is already pending delete, so only 1 new command should be
     // created
@@ -194,10 +194,10 @@ public class TestRatisOverReplicationHandler {
         createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
             State.UNHEALTHY, container.getNumberOfKeys(),
             container.getUsedBytes(),
-            MockDatanodeDetails.randomDatanodeDetails(),
+            DatanodeDetailsTestUtils.randomDatanodeDetails(),
             unhealthyReplica.getOriginDatanodeId()));
     DatanodeDetails staleNode =
-        MockDatanodeDetails.randomDatanodeDetails();
+        DatanodeDetailsTestUtils.randomDatanodeDetails();
     replicas.add(
         createContainerReplica(container.containerID(), 0, IN_SERVICE,
             State.UNHEALTHY, container.getNumberOfKeys(),
@@ -220,7 +220,7 @@ public class TestRatisOverReplicationHandler {
         State.UNHEALTHY, 0, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+            DatanodeDetailsTestUtils.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     // 1 replica is already pending delete, so only 1 new command should be
     // created
@@ -403,7 +403,7 @@ public class TestRatisOverReplicationHandler {
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+            DatanodeDetailsTestUtils.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
   }

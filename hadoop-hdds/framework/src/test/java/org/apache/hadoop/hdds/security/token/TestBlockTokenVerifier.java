@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -60,14 +60,14 @@ public class TestBlockTokenVerifier
   @Override
   protected ContainerCommandRequestProto unverifiedRequest()
       throws IOException {
-    Pipeline pipeline = MockPipeline.createPipeline(1);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(1);
     return ContainerTestHelper.getCloseContainer(pipeline, 1);
   }
 
   @Override
   protected ContainerCommandRequestProto verifiedRequest(
       OzoneBlockTokenIdentifier tokenId) throws IOException {
-    Pipeline pipeline = MockPipeline.createPipeline(1);
+    Pipeline pipeline = PipelineTestUtils.createPipeline(1);
     return getWriteChunkRequest(
         pipeline, new BlockID(1, 0), 1024);
   }
@@ -127,7 +127,7 @@ public class TestBlockTokenVerifier
 
   private static ContainerCommandRequestProto newStreamInit(
       ContainerProtos.Type streamInitType, BlockID blockId) throws IOException {
-    final Pipeline pipeline = MockPipeline.createPipeline(1);
+    final Pipeline pipeline = PipelineTestUtils.createPipeline(1);
     final WriteChunkRequestProto writeChunk = WriteChunkRequestProto.newBuilder()
         .setBlockID(blockId.getDatanodeBlockIDProtobuf())
         .build();

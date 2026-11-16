@@ -21,7 +21,7 @@ import static java.util.Collections.singleton;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.pipeline.MockPipeline.createPipeline;
+import static org.apache.hadoop.hdds.scm.pipeline.PipelineTestUtils.createPipeline;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.createContainer;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;

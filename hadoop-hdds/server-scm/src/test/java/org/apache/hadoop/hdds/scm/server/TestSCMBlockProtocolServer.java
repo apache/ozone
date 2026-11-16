@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetailsTestUtils.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.assertj.core.api.Assertions.assertThat;
