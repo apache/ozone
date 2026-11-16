@@ -49,7 +49,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -89,7 +88,6 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.util.ExitUtils;
-import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -104,7 +102,6 @@ public class TestSCMStateMachine {
 
   private final AtomicBoolean commitIndexAvailable = new AtomicBoolean();
   private final AtomicBoolean scmStopped = new AtomicBoolean();
-  private final AtomicReference<LifeCycle.State> divisionState = new AtomicReference<>(LifeCycle.State.RUNNING);
   private final AtomicLong lastAppliedIndex = new AtomicLong(5L);
   private final AtomicLong leaderCommitIndex = new AtomicLong(5L);
   private final AtomicLong retryClock = new AtomicLong(1000L);
@@ -149,7 +146,6 @@ public class TestSCMStateMachine {
     when(haManager.getRatisServer()).thenReturn(ratisServer);
     when(ratisServer.getDivision()).thenReturn(division);
     when(division.getInfo()).thenReturn(divisionInfo);
-    when(divisionInfo.getLifeCycleState()).thenAnswer(invocation -> divisionState.get());
     when(divisionInfo.getLeaderId()).thenReturn(leaderId);
     when(divisionInfo.getLastAppliedIndex()).thenAnswer(invocation -> lastAppliedIndex.get());
     when(division.getCommitInfos()).thenAnswer(invocation -> commitIndexAvailable.get()
@@ -185,25 +181,43 @@ public class TestSCMStateMachine {
   }
 
   @Test
-  void testForcedExitWhenScmStopHangs() throws Exception {
-    ExitUtils.disableSystemExit();
-    ExitUtils.clear();
-    CountDownLatch release = new CountDownLatch(1);
-    try {
-      mockScm.getConfiguration().setTimeDuration("ozone.service.shutdown.timeout", 1, TimeUnit.SECONDS);
-      doAnswer(invocation -> {
-        release.await();
-        return null;
-      }).when(mockScm).shutDown(anyString());
+  void testCloseByRatisDoesNotTerminateImmediately() throws Exception {
+    stateMachine.close();
 
-      stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+    verify(mockScm, never()).shutDown(anyString());
+    verify(mockScm, never()).stop();
+  }
 
-      GenericTestUtils.waitFor(ExitUtils::isTerminated, 100, 10_000);
-      verify(mockScm).shutDown(anyString());
-    } finally {
-      release.countDown();
-      ExitUtils.clear();
-    }
+  @Test
+  void testRatisShutdownTimerStartedOnce() {
+    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+
+    verify(mockScm, timeout(5000).times(1)).shutDown(anyString());
+    verify(mockScm, after(500).times(1)).shutDown(anyString());
+  }
+
+  @Test
+  void testRatisShutdownIgnoredWhenNotAllServers() {
+    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), false);
+
+    verify(mockScm, after(1500).never()).shutDown(anyString());
+  }
+
+  @Test
+  void testRatisShutdownIgnoredWhenScmStopped() {
+    scmStopped.set(true);
+    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+
+    verify(mockScm, after(1500).never()).shutDown(anyString());
+  }
+
+  @Test
+  void testRatisShutdownSkippedWhenScmStoppedDuringWait() {
+    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+    scmStopped.set(true);
+
+    verify(mockScm, after(1500).never()).shutDown(anyString());
   }
 
   @Test
