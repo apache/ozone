@@ -158,7 +158,7 @@ public class ClosePipelineCommandHandler implements CommandHandler {
                     }
                   });
               // Remove group locally, might throw GroupMismatchException as well.
-              ratisServer.removeGroup(pipelineID.getGroupId());
+              ratisServer.removeGroup(raftGroupId);
             }
             LOG.info("Close Pipeline {} command on datanode {}.", pipelineID, dn);
           } else {

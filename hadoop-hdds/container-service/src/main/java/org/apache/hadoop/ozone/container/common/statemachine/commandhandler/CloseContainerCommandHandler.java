@@ -115,7 +115,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
         switch (container.getContainerState()) {
         case OPEN:
         case CLOSING:
-          final PipelineID pipelineID = PipelineID.getFromProtobuf(closeCommand.getPipelineID());
+          final PipelineID pipelineID = ((CloseContainerCommand) command).getPipelineID();
           // If the container is part of open pipeline, close it via write channel
           if (ozoneContainer.getWriteChannel().isExist(pipelineID)) {
             ContainerCommandRequestProto request =
