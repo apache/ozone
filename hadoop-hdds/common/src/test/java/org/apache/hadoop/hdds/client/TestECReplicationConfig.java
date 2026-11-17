@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -36,6 +37,11 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Unit test for ECReplicationConfig.
  */
 class TestECReplicationConfig {
+
+  @BeforeEach
+  void clearCache() {
+    ECReplicationConfig.clearCache();
+  }
 
   @Test
   void testSuccessfulStringParsing() {
@@ -78,29 +84,23 @@ class TestECReplicationConfig {
     assertNotSame(config, ECReplicationConfig.getInstance("rs-6-3-2048k"));
   }
 
-  /** Every config allowed by default by ozone.replication.allowed-configs, with each codec, is shared. */
-  @Test
-  void testGetInstanceReturnsPredefinedConfigs() {
-    for (ECReplicationConfig.EcCodec codec : ECReplicationConfig.EcCodec.values()) {
-      for (int[] scheme : new int[][] {{3, 2}, {6, 3}, {10, 4}}) {
-        for (int chunkKB : new int[] {512, 1024, 2048, 4096}) {
-          final String prefix = codec + "-" + scheme[0] + "-" + scheme[1] + "-";
-          final ECReplicationConfig config = ECReplicationConfig.getInstance(prefix + chunkKB + "k");
-          assertEquals(new ECReplicationConfig(scheme[0], scheme[1], codec, chunkKB * 1024), config);
+  /** Any config is shared, not only the ones allowed by default, whichever form it is decoded from. */
+  @ParameterizedTest
+  @ValueSource(strings = {"rs-3-2-1024k", "rs-6-3-1024k", "rs-10-4-4096k", "rs-4-2-1024k", "xor-3-1-512k"})
+  void testGetInstanceSharesAnyConfig(String string) {
+    final ECReplicationConfig config = ECReplicationConfig.getInstance(string);
+    assertEquals(new ECReplicationConfig(string), config);
 
-          assertSame(config, ECReplicationConfig.getInstance(prefix + chunkKB + "k"));
-          // other spellings are parsed with the regex, then shared as well
-          assertSame(config, ECReplicationConfig.getInstance(prefix.toUpperCase() + chunkKB + "K"));
-          assertSame(config, ECReplicationConfig.getInstance(prefix + chunkKB * 1024));
-          assertSame(config, ECReplicationConfig.getInstance(config.toProto()));
-          assertSame(config, ECReplicationConfig.getInstance(config.toProto().toBuilder()
-              .setCodec(codec.name()).build()));
-        }
-      }
-    }
+    assertSame(config, ECReplicationConfig.getInstance(string));
+    assertSame(config, ECReplicationConfig.getInstance(string.toUpperCase()));
+    assertSame(config, ECReplicationConfig.getInstance(config.getCodec() + "-" + config.getData() + "-"
+        + config.getParity() + "-" + config.getEcChunkSize()));
+    assertSame(config, ECReplicationConfig.getInstance(config.toProto()));
+    assertSame(config, ECReplicationConfig.getInstance(config.toProto().toBuilder()
+        .setCodec(config.getCodec().name()).build()));
   }
 
-  /** The constructor still creates a new object, also for the predefined configs. */
+  /** The constructor still creates a new object, also for a shared config. */
   @ParameterizedTest
   @ValueSource(strings = {"rs-6-3-1024k", "RS-6-3-1024K", "rs-4-2-1024k"})
   void testConstructorCreatesNewInstance(String string) {
@@ -110,19 +110,32 @@ class TestECReplicationConfig {
     assertNotSame(new ECReplicationConfig(string), config);
   }
 
-  /** Other configs are created as before, for example from a client sending arbitrary values. */
-  @ParameterizedTest
-  @ValueSource(strings = {"rs-4-2-1024k", "rs-6-3-8192k", "rs-6-3-1000", "xor-3-1-1024k", "rs-10-4-256k"})
-  void testGetInstanceCreatesOtherConfigs(String string) {
-    final ECReplicationConfig expected = new ECReplicationConfig(string);
+  /** The cache is bounded, so a client sending arbitrary configs cannot grow it without limit. */
+  @Test
+  void testGetInstanceIsBounded() {
+    final ECReplicationConfig cachedFromString = ECReplicationConfig.getInstance("rs-6-3-1024k");
+    final ECReplicationConfig cachedFromProto = ECReplicationConfig.getInstance(new ECReplicationConfig(3, 2)
+        .toProto());
+    for (int data = 1; data <= 2 * ECReplicationConfig.MAX_CACHED; data++) {
+      final String string = "rs-" + data + "-1-1024k";
+      assertEquals(new ECReplicationConfig(string), ECReplicationConfig.getInstance(string));
+    }
 
+    // a new config is still decoded, but not shared any more
+    final String string = "rs-6-1-8192k";
+    final ECReplicationConfig expected = new ECReplicationConfig(string);
     final ECReplicationConfig fromString = ECReplicationConfig.getInstance(string);
     assertEquals(expected, fromString);
     assertNotSame(fromString, ECReplicationConfig.getInstance(string));
-
     final ECReplicationConfig fromProto = ECReplicationConfig.getInstance(expected.toProto());
     assertEquals(expected, fromProto);
     assertNotSame(fromProto, ECReplicationConfig.getInstance(expected.toProto()));
+
+    // the configs cached before are still shared
+    assertSame(cachedFromString, ECReplicationConfig.getInstance("rs-6-3-1024k"));
+    assertSame(cachedFromString, ECReplicationConfig.getInstance(cachedFromString.toProto()));
+    assertSame(cachedFromProto, ECReplicationConfig.getInstance(cachedFromProto.toProto()));
+    assertSame(cachedFromProto, ECReplicationConfig.getInstance("rs-3-2-1024k"));
   }
 
   @Test
