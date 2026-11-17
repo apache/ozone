@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -46,7 +45,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftGroup;
-import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.exceptions.AlreadyExistsException;
 import org.slf4j.Logger;
@@ -115,17 +113,14 @@ public class CreatePipelineCommandHandler implements CommandHandler {
         invocationCount.incrementAndGet();
         final long startTime = Time.monotonicNow();
         final DatanodeDetails dn = context.getParent().getDatanodeDetails();
-        final HddsProtos.PipelineID pipelineIdProto = pipelineID.getProtobuf();
         final List<DatanodeDetails> peers = createCommand.getNodeList();
         final List<Integer> priorityList = createCommand.getPriorityList();
 
         try {
           XceiverServerSpi server = ozoneContainer.getWriteChannel();
-          if (!server.isExist(pipelineIdProto)) {
-            final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
-            final RaftGroup group =
-                RatisHelper.newRaftGroup(groupId, peers, priorityList);
-            server.addGroup(pipelineIdProto, peers, priorityList);
+          if (!server.isExist(pipelineID)) {
+            final RaftGroup group = RatisHelper.newRaftGroup(pipelineID.getGroupId(), peers, priorityList);
+            server.addGroup(pipelineID, peers, priorityList);
             peers.stream().filter(d -> !d.getID().equals(dn.getID()))
                 .forEach(d -> {
                   final RaftPeer peer = RatisHelper.toRaftPeer(d);

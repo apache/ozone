@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -29,6 +31,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
@@ -42,7 +45,9 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests the S3Utils APIs.
@@ -75,6 +80,55 @@ public class TestS3Utils {
       "",
       "rs-6-3-1024k"
   );
+
+  @ParameterizedTest
+  @EmptySource
+  @ValueSource(strings = {
+      "invalid",
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff",
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeffff",
+      "g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      " 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  })
+  void testRejectMalformedContentSha256(String hash) {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+
+    OS3Exception error = assertThrows(OS3Exception.class,
+        () -> S3Utils.validateSignatureHeader(headers, "key", true));
+
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), error.getCode());
+    assertEquals(400, error.getHttpCode());
+    assertEquals("An error occurred (InvalidArgument): The " + S3Consts.X_AMZ_CONTENT_SHA256 +
+        " header must contain 64 hexadecimal characters", error.getErrorMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      S3Consts.UNSIGNED_PAYLOAD,
+      S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER,
+      S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD,
+      S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER,
+      S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD,
+      S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER
+  })
+  void testAcceptContentSha256(String hash) throws OS3Exception {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+
+    assertEquals(hash, S3Utils.validateSignatureHeader(headers, "key", true));
+  }
+
+  @Test
+  void testMissingContentSha256() throws OS3Exception {
+    HttpHeaders headers = mock(HttpHeaders.class);
+
+    assertEquals(S3Consts.UNSIGNED_PAYLOAD, S3Utils.validateSignatureHeader(headers, "key", false));
+    OS3Exception error = assertThrows(OS3Exception.class,
+        () -> S3Utils.validateSignatureHeader(headers, "key", true));
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), error.getCode());
+  }
 
   public static List<Arguments> validS3ReplicationConfigs() {
     List<Arguments> args = new ArrayList<>();

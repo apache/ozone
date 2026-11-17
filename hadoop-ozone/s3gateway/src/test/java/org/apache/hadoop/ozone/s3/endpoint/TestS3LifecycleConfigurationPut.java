@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
@@ -62,7 +61,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -116,6 +114,51 @@ public class TestS3LifecycleConfigurationPut {
       assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
       assertEquals(MALFORMED_XML.getCode(), ex.getCode());
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"<Key>a</Key>", "<Value>b</Value>", ""})
+  public void testMissingTagFieldsPreserveConfiguration(String fields) throws Exception {
+    bucketEndpoint.put("bucket1", onePrefix());
+    for (String filter : new String[] {"<Tag>" + fields + "</Tag>",
+        "<And><Prefix>prefix/</Prefix><Tag>" + fields + "</Tag></And>"}) {
+      OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+          () -> bucketEndpoint.put("bucket1", lifecycleWithFilter(filter)));
+      assertEquals(HTTP_BAD_REQUEST, exception.getHttpCode());
+
+      // make sure the bucket keeps its current configuration
+      try (Response response = bucketEndpoint.get("bucket1")) {
+        S3LifecycleConfiguration configuration = (S3LifecycleConfiguration) response.getEntity();
+        assertThat(configuration.getRules()).hasSize(1);
+        assertThat(configuration.getRules().get(0).getId()).isEqualTo("remove logs after 30 days");
+        assertThat(configuration.getRules().get(0).getPrefix()).isEqualTo("prefix/");
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testEmptyTagValue(boolean and) throws Exception {
+    String tagString = "<Tag><Key>a</Key><Value/></Tag>";
+    String filterString = and ? "<And><Prefix>prefix/</Prefix>" + tagString + "</And>" : tagString;
+    try (Response response = bucketEndpoint.put("bucket1", lifecycleWithFilter(filterString))) {
+      assertThat(response.getStatus()).isEqualTo(HTTP_OK);
+    }
+
+    // Verify the empty tag value is preserved.
+    try (Response response = bucketEndpoint.get("bucket1")) {
+      S3LifecycleConfiguration configuration = (S3LifecycleConfiguration) response.getEntity();
+      S3LifecycleConfiguration.Filter filter = configuration.getRules().get(0).getFilter();
+      S3LifecycleConfiguration.Tag tag = and ? filter.getAndOperator().getTags().get(0) : filter.getTag();
+      assertThat(tag.getKey()).isEqualTo("a");
+      assertThat(tag.getValue()).isEmpty();
+    }
+  }
+
+  private static InputStream lifecycleWithFilter(String filter) {
+    String xml = "<LifecycleConfiguration><Rule><ID>rule</ID><Filter>" + filter
+        + "</Filter><Status>Enabled</Status><Expiration><Days>1</Days></Expiration></Rule></LifecycleConfiguration>";
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
@@ -282,7 +325,6 @@ public class TestS3LifecycleConfigurationPut {
   private OS3Exception putLifecycleConfigurationThrowingOm(OMException omException) throws Exception {
     OzoneClient mockClient = mock(OzoneClient.class);
     ObjectStore mockObjectStore = mock(ObjectStore.class);
-    OzoneVolume mockVolume = mock(OzoneVolume.class);
     OzoneBucket mockBucket = mock(OzoneBucket.class);
     when(mockBucket.getVolumeName()).thenReturn("s3v");
     when(mockBucket.getName()).thenReturn("bucket1");
@@ -292,8 +334,7 @@ public class TestS3LifecycleConfigurationPut {
     when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
     when(mockClient.getProxy()).thenReturn(clientProtocol);
     when(mockObjectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
-    when(mockVolume.getBucket("bucket1")).thenReturn(mockBucket);
+    when(clientProtocol.getBucketDetails(null, "bucket1")).thenReturn(mockBucket);
 
     BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(mockClient)
@@ -880,7 +921,7 @@ public class TestS3LifecycleConfigurationPut {
       assertThat(response.getStatus()).isEqualTo(HTTP_OK);
     }
 
-    verify(proxy).getBucketDetails("volume1", "bucket1");
+    verify(proxy).getBucketDetails(null, "bucket1");
     ArgumentCaptor<OmLifecycleConfiguration> config = ArgumentCaptor.forClass(OmLifecycleConfiguration.class);
     verify(proxy).setLifecycleConfiguration(config.capture());
     assertThat(config.getValue().getVolume()).isEqualTo("volume1");
@@ -910,7 +951,7 @@ public class TestS3LifecycleConfigurationPut {
     HttpHeaders requestHeaders = mock(HttpHeaders.class);
     when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
     BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenThrow(new OMException("Lookup failed", code));
+    when(proxy.getBucketDetails(null, "bucket1")).thenThrow(new OMException("Lookup failed", code));
     assertErrorResponse(expected, () -> endpoint.put("bucket1", null));
     verify(proxy, never()).setLifecycleConfiguration(any());
   }
@@ -1176,13 +1217,12 @@ public class TestS3LifecycleConfigurationPut {
   private BucketEndpoint newProtocolEndpoint(ClientProtocol proxy, HttpHeaders requestHeaders, BucketLayout layout)
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    OzoneVolume volume = OzoneVolume.newBuilder(conf, proxy)
-        .setName("volume1").setAcls(Collections.emptyList()).build();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").setBucketLayout(layout).build();
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    when(proxy.getBucketDetails(null, "bucket1")).thenReturn(bucket);
     ObjectStore store = mock(ObjectStore.class);
-    when(store.getS3Volume()).thenReturn(volume);
+    // The bucket lookup resolves the volume, so no separate S3 volume lookup is expected.
+    when(store.getS3Volume()).thenThrow(new AssertionError("Unexpected S3 volume lookup"));
     when(store.getClientProxy()).thenReturn(proxy);
     OzoneClient client = mock(OzoneClient.class);
     when(client.getObjectStore()).thenReturn(store);

@@ -19,10 +19,16 @@ package org.apache.hadoop.ozone.om;
 
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.ENABLED;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.service.CompactionServiceConfig.Keys.TIMEOUT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.mock;
@@ -46,6 +52,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -93,6 +100,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Unit test key manager.
@@ -104,7 +113,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
   private OMMetadataManager metadataManager;
   private StorageContainerLocationInternalInterface containerClient;
-  private KeyManagerImpl keyManager;
+  private KeyManager keyManager;
 
   private Instant startDate;
   private ScmBlockLocationProtocol blockClient;
@@ -127,7 +136,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         = new OmTestManagers(configuration, blockClient, containerClient);
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
-    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
+    keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
   }
 
@@ -140,6 +149,28 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @AfterAll
   public void cleanup() throws Exception {
     om.stop();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {RUN_INTERVAL, TIMEOUT})
+  void testDisabledCompactionIgnoresInvalidConfiguration(String property) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ENABLED, false);
+    conf.set(property, "invalid");
+
+    assertDoesNotThrow(() -> keyManager.start(conf));
+    assertNull(keyManager.getCompactionService());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {RUN_INTERVAL, TIMEOUT})
+  void testEnabledCompactionRejectsInvalidConfiguration(String property) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ENABLED, true);
+    conf.set(property, "invalid");
+
+    assertThrows(ConfigurationException.class, () -> keyManager.start(conf));
+    assertNull(keyManager.getCompactionService());
   }
 
   @Test

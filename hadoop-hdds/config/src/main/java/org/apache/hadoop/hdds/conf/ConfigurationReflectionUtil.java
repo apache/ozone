@@ -87,7 +87,9 @@ public final class ConfigurationReflectionUtil {
 
     try {
       final Object oldValue = forcedFieldGet(field, configuration);
-      setField(klass, configuration, field, configAnnotation, key, value);
+      // null means the property was unset, which restores its default value
+      final String newValue = value != null ? value : configAnnotation.defaultValue();
+      setField(klass, configuration, field, configAnnotation, key, newValue);
       try {
         callPostConstruct(configuration);
       } catch (Exception e) {

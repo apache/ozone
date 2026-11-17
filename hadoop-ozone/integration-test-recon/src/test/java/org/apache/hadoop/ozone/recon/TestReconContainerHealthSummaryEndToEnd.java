@@ -76,7 +76,7 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li><b>Container State Summary</b> — per lifecycle-state counts (OPEN, CLOSING,
  *       QUASI_CLOSED, CLOSED) are identical between SCM and Recon after a full sync.</li>
- *   <li><b>Container Health Summary</b> — UNHEALTHY_CONTAINERS derby table counts in
+ *   <li><b>Container Health Summary</b> — UNHEALTHY_CONTAINERS SQL table counts in
  *       Recon match exactly the health states classified by SCM's ReplicationManager
  *       after both process the same container replica state.</li>
  * </ol>
@@ -312,7 +312,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
 
   /**
    * Validates that Container Health Summary counts match exactly between SCM's
-   * {@link ReplicationManagerReport} and Recon's UNHEALTHY_CONTAINERS derby
+   * {@link ReplicationManagerReport} and Recon's UNHEALTHY_CONTAINERS SQL
    * table after both process the same injected container states.
    *
    * <p>The test also explicitly validates the lifecycle-state boundary that
@@ -361,7 +361,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
     ReplicationManagerReport scmReport =
         scm.getReplicationManager().getContainerReport();
 
-    // Run Recon RM (writes to UNHEALTHY_CONTAINERS derby table).
+    // Run Recon RM (writes to UNHEALTHY_CONTAINERS SQL table).
     reconScm.getReplicationManager().processAll();
     ReconHealthRecords records = loadReconHealthRecords(reconCm);
 

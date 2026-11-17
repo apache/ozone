@@ -19,9 +19,11 @@ package org.apache.hadoop.hdds.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemErrCapturer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,18 +36,22 @@ import picocli.CommandLine;
 class TestOzoneAdminDeprecatedOptions {
 
   private CommandLine cli;
-  private StringWriter err;
+  private PrintStreamCapturer err;
 
   @BeforeEach
   public void setup() {
-    err = new StringWriter();
+    err = new SystemErrCapturer();
     cli = createCommandLine();
+  }
+
+  @AfterEach
+  void close() {
+    IOUtils.closeQuietly(err);
   }
 
   private CommandLine createCommandLine() {
     OzoneAdmin command = new OzoneAdmin();
     CommandLine cmd = command.getCmd();
-    cmd.setErr(new PrintWriter(err, true));
     cmd.setExecutionStrategy(parseResult -> CommandLine.ExitCode.OK);
     return cmd;
   }

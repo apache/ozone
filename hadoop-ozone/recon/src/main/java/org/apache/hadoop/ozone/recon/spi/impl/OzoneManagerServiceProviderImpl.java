@@ -278,20 +278,7 @@ public class OzoneManagerServiceProviderImpl
     ReconTaskStatusUpdater fullSnapshotReconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
         OmSnapshotTaskName.OmSnapshotRequest.name());
 
-    Map<String, ReconOmTask> reconOmTaskMap = reconTaskController.getRegisteredTasks()
-        .entrySet()
-        .stream()
-        .filter(entry -> {
-          String taskName = entry.getKey();
-          ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
-
-          return !taskName.equals(OmSnapshotTaskName.OmDeltaRequest.name())  // Condition 1
-              && !taskName.equals(OmSnapshotTaskName.OmSnapshotRequest.name())  // Condition 2
-              &&
-              taskStatusUpdater.getLastUpdatedSeqNumber().compareTo(
-                  deltaTaskStatusUpdater.getLastUpdatedSeqNumber()) < 0; // Condition 3
-        })
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));  // Collect into desired Map
+    Map<String, ReconOmTask> reconOmTaskMap = getTasksToReprocessOnStartup(deltaTaskStatusUpdater);
     if (!reconOmTaskMap.isEmpty() && omMetadataManager.getStore() == null) {
       // Fresh start (or the local OM snapshot DB is missing) while stale task
       // status rows still exist in the Recon SQL DB. There is no local OM DB to
@@ -333,6 +320,34 @@ public class OzoneManagerServiceProviderImpl
     LOG.info("Ozone Manager Service Provider is started.");
   }
 
+  /**
+   * Selects the registered derived OM tasks that must be reprocessed at startup because their
+   * persisted sequence cursor does not match the OmDeltaRequest cursor. A derived task is
+   * reprocessed whenever the two cursors differ, not only when the derived cursor lags. After a
+   * full-snapshot swap onto a different OM lineage (for example a disaster-recovery restore or
+   * re-bootstrap), the freshly installed OM DB copy can carry a sequence number lower than what the
+   * derived task last recorded against the previous lineage. If the async reprocess queued by the
+   * full snapshot is lost to a restart, a strict "less than" check would read the higher stale cursor
+   * as "caught up" and skip the rebuild, leaving the derived tables permanently built against the old
+   * lineage. A new lineage that lands on exactly the same sequence number cannot be detected here.
+   */
+  Map<String, ReconOmTask> getTasksToReprocessOnStartup(ReconTaskStatusUpdater deltaTaskStatusUpdater) {
+    return reconTaskController.getRegisteredTasks()
+        .entrySet()
+        .stream()
+        .filter(entry -> {
+          String taskName = entry.getKey();
+          ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
+
+          return !taskName.equals(OmSnapshotTaskName.OmDeltaRequest.name())  // Condition 1
+              && !taskName.equals(OmSnapshotTaskName.OmSnapshotRequest.name())  // Condition 2
+              &&
+              taskStatusUpdater.getLastUpdatedSeqNumber().compareTo(
+                  deltaTaskStatusUpdater.getLastUpdatedSeqNumber()) != 0; // Condition 3
+        })
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));  // Collect into desired Map
+  }
+
   private void startSyncDataFromOM(long initialDelay) {
     long interval = configuration.getTimeDuration(
         OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
@@ -358,8 +373,12 @@ public class OzoneManagerServiceProviderImpl
         TimeUnit.MILLISECONDS);
   }
 
-  private void stopSyncDataFromOMThread() {
-    scheduler.shutdown();
+  private void stopSyncDataFromOMThread(boolean interrupt) {
+    if (interrupt) {
+      scheduler.shutdownNow();
+    } else {
+      scheduler.shutdown();
+    }
     try {
       if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
         scheduler.shutdownNow();
@@ -380,7 +399,7 @@ public class OzoneManagerServiceProviderImpl
       // We are shutting down the scheduler and then starting another one,
       // setting the initialDelay to 0, which triggers an OM DB sync
       // immediately.
-      stopSyncDataFromOMThread();
+      stopSyncDataFromOMThread(false);
       scheduler = Executors.newScheduledThreadPool(1, threadFactory);
       startSyncDataFromOM(0L);
       return true;
@@ -393,9 +412,9 @@ public class OzoneManagerServiceProviderImpl
   @Override
   public void stop() throws Exception {
     LOG.info("Stopping Ozone Manager Service Provider.");
+    stopSyncDataFromOMThread(true);
     reconTaskController.stop();
     omMetadataManager.stop();
-    scheduler.shutdownNow();
     reconSnapshotProvider.close();
     metrics.unRegister();
     reconSyncMetrics.unRegister();

@@ -55,7 +55,8 @@ public class InterSCMGrpcService extends
   public void download(CopyDBCheckpointRequestProto request,
       StreamObserver<CopyDBCheckpointResponseProto> responseObserver) {
     try {
-      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+      // Do not flush a partially applied transaction into the checkpoint.
+      scm.getScmHAManager().asSCMHADBTransactionBuffer().flushIfNeeded(0);
       // Look up the store per request because installing a checkpoint replaces it.
       final DBStore store = scm.getScmMetadataStore().getStore();
       TransactionInfo transactionInfo =

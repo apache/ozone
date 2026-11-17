@@ -25,6 +25,8 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -72,6 +74,8 @@ public class OMInterServiceProtocolServerSideImpl implements
         throw new OMException("Only administrators are authorized to perform bootstrap.", PERMISSION_DENIED);
       }
       omRatisServer.addOMToRatisRing(newOmNode);
+    } catch (OMNotLeaderException | OMLeaderNotReadyException ex) {
+      throw new ServiceException(ex);
     } catch (IOException ex) {
       return BootstrapOMResponse.newBuilder()
           .setSuccess(false)

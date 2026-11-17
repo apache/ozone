@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
@@ -488,7 +489,9 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
   private void renameKeyInBucket(String volumeName, String bucketName, String fromKey, String toKey, long offset)
       throws IOException {
     OmKeyInfo toKeyInfo = addKeyInBucket(volumeName, bucketName, toKey, offset + 1L);
-    OmKeyInfo fromKeyInfo = addKeyInBucket(volumeName, bucketName, fromKey, offset + 2L);
+    OmKeyInfo fromKeyInfo = addKeyInBucket(volumeName, bucketName, fromKey, toKeyInfo.getObjectID());
+    String fromDbKey = getOmMetadataManager().getOzoneKey(volumeName, bucketName, fromKey);
+    getOmMetadataManager().getKeyTable(BucketLayout.DEFAULT).put(fromDbKey, fromKeyInfo);
 
     OMResponse omResponse = OMResponse
         .newBuilder()
@@ -514,7 +517,9 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
         .build();
 
     OmKeyInfo toKeyInfo = addKeyInBucket(volumeName, bucketName, toKey, offset + 4L);
-    OmKeyInfo fromKeyInfo = addKeyInBucket(volumeName, bucketName, fromKey, offset + 5L);
+    OmKeyInfo fromKeyInfo = addKeyInBucket(volumeName, bucketName, fromKey, toKeyInfo.getObjectID());
+    getOmMetadataManager().getDirectoryTable().put(getDBKeyName(fromKeyInfo),
+        OMFileRequest.getDirectoryInfo(fromKeyInfo));
     OMResponse omResponse = OMResponse
         .newBuilder()
         .setRenameKeyResponse(
@@ -533,8 +538,8 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
 
   protected String getDBKeyName(OmKeyInfo keyInfo) throws IOException {
     return getOmMetadataManager().getOzonePathKey(
-        getOmMetadataManager().getVolumeId(getVolumeName()),
-        getOmMetadataManager().getBucketId(getVolumeName(), getBucketName()),
+        getOmMetadataManager().getVolumeId(keyInfo.getVolumeName()),
+        getOmMetadataManager().getBucketId(keyInfo.getVolumeName(), keyInfo.getBucketName()),
         keyInfo.getParentObjectID(), keyInfo.getKeyName());
   }
 

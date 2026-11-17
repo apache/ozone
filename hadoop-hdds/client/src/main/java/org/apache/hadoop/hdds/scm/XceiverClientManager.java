@@ -23,20 +23,24 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -74,9 +78,13 @@ public class XceiverClientManager extends XceiverClientCreator {
       LoggerFactory.getLogger(XceiverClientManager.class);
 
   private final Cache<String, XceiverClientSpi> clientCache;
+  // The cache expires idle clients only while it is used, so this cleans it up periodically to close them anyway.
+  private final ScheduledExecutorService cleanupExecutor;
   private final CacheMetrics cacheMetrics;
   private static XceiverClientMetrics metrics;
   private final ConcurrentHashMap<String, DatanodeDetails> localDNCache;
+  /** Unreferenced clients evicted by {@link #close()}, to be closed by it; guarded by {@link #clientCache}. */
+  private List<XceiverClientSpi> clientsToClose;
   private final ExecutorService closeExecutor;
 
   /**
@@ -101,28 +109,44 @@ public class XceiverClientManager extends XceiverClientCreator {
     // at most one thread, which exits when idle
     this.closeExecutor = new ThreadPoolExecutor(0, 1, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat("XceiverClientManager-close-%d").build());
-    this.clientCache = CacheBuilder.newBuilder()
+    this.clientCache = Caffeine.newBuilder()
         .recordStats()
         .expireAfterAccess(staleThresholdMs, MILLISECONDS)
         .maximumSize(clientConf.getMaxSize())
-        .removalListener(
-            new RemovalListener<String, XceiverClientSpi>() {
-            @Override
-            public void onRemoval(
-                RemovalNotification<String, XceiverClientSpi>
-                  removalNotification) {
-              synchronized (clientCache) {
-                // Mark the entry as evicted
-                XceiverClientSpi info = removalNotification.getValue();
-                if (info.setEvicted()) {
-                  closeAsync(info);
-                }
-              }
-            }
-          }).build();
+        // run the maintenance and the removal listener on the calling thread, so that close() collects the clients
+        .executor(Runnable::run)
+        .<String, XceiverClientSpi>removalListener((key, info, cause) -> onRemoval(info))
+        .build();
+    cleanupExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder()
+        .setNameFormat("XceiverClientManager-cleanup-%d").setDaemon(true).build());
+    if (staleThresholdMs > 0) {
+      cleanupExecutor.scheduleWithFixedDelay(this::cleanUpCache, staleThresholdMs, staleThresholdMs, MILLISECONDS);
+    }
 
     cacheMetrics = CacheMetrics.create(clientCache, this);
     this.localDNCache = new ConcurrentHashMap<>();
+  }
+
+  private void onRemoval(XceiverClientSpi info) {
+    synchronized (clientCache) {
+      // Mark the entry as evicted
+      if (info != null && info.setEvicted()) {
+        if (clientsToClose == null) {
+          closeAsync(info);
+        } else {
+          clientsToClose.add(info);
+        }
+      }
+    }
+  }
+
+  private void cleanUpCache() {
+    try {
+      clientCache.cleanUp();
+    } catch (RuntimeException e) {
+      // keep the task scheduled
+      LOG.warn("Failed to close idle clients", e);
+    }
   }
 
   @VisibleForTesting
@@ -223,7 +247,13 @@ public class XceiverClientManager extends XceiverClientCreator {
     try {
       // create different client different pipeline node based on network topology
       String key = getPipelineCacheKey(pipeline, topologyAware, allowShortCircuit);
-      return clientCache.get(key, () -> newClient(pipeline, localDNCache.get(key)));
+      return clientCache.get(key, k -> {
+        try {
+          return newClient(pipeline, localDNCache.get(k));
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      });
     } catch (Exception e) {
       throw new IOException(
           "Exception getting XceiverClient: " + e, e);
@@ -311,9 +341,19 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public void close() {
     super.close();
-    //closing is done through RemovalListener
-    clientCache.invalidateAll();
-    clientCache.cleanUp();
+    cleanupExecutor.shutdown();
+    final List<XceiverClientSpi> unreferenced = new ArrayList<>();
+    synchronized (clientCache) {
+      // the RemovalListener collects the unreferenced clients instead of closing them one by one
+      clientsToClose = unreferenced;
+      try {
+        clientCache.invalidateAll();
+        clientCache.cleanUp();
+      } finally {
+        clientsToClose = null;
+      }
+    }
+    closeInParallel(unreferenced);
     ConcurrentUtils.shutdownAndWait(closeExecutor);
     if (LOG.isDebugEnabled()) {
       LOG.debug("XceiverClient cache stats: {}", clientCache.stats());
@@ -323,6 +363,27 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     if (metrics != null) {
       metrics.unRegister();
+    }
+  }
+
+  /**
+   * Close the clients concurrently. Closing a Ratis client can wait seconds for its gRPC channels to shut down
+   * gracefully, and closing the clients one after another adds those waits up (HDDS-15255).
+   */
+  private static void closeInParallel(List<XceiverClientSpi> clients) {
+    if (clients.size() <= 1) {
+      clients.forEach(XceiverClientManager::closeAndLog);
+      return;
+    }
+    // one thread per client, so all the waits overlap; the cache size bounds the number of clients
+    final ExecutorService executor = Executors.newFixedThreadPool(clients.size(),
+        new ThreadFactoryBuilder().setNameFormat("XceiverClientManager-close-%d").setDaemon(true).build());
+    try {
+      CompletableFuture.allOf(clients.stream()
+          .map(client -> CompletableFuture.runAsync(() -> closeAndLog(client), executor))
+          .toArray(CompletableFuture[]::new)).join();
+    } finally {
+      executor.shutdown();
     }
   }
 

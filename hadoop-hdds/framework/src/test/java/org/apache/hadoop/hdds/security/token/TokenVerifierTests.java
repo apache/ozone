@@ -169,7 +169,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
   }
 
   @Nonnull
-  private SecretKeyVerifierClient mockSecretKeyClient(boolean validSignature)
+  protected SecretKeyVerifierClient mockSecretKeyClient(boolean validSignature)
       throws IOException {
     SecretKeyVerifierClient secretKeyClient =
         mock(SecretKeyVerifierClient.class);
@@ -221,7 +221,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     return tokenId;
   }
 
-  private T valid(T tokenId) {
+  protected T valid(T tokenId) {
     tokenId.setExpiry(Instant.now().plusSeconds(3600));
     return tokenId;
   }
@@ -247,7 +247,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
   /**
    * Mock secret manager for test.  No private key etc.
    */
-  private class MockTokenManager extends ShortLivedTokenSecretManager<T> {
+  protected class MockTokenManager extends ShortLivedTokenSecretManager<T> {
 
     MockTokenManager() {
       super(TimeUnit.HOURS.toMillis(1),
