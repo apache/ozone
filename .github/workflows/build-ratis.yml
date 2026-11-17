@@ -89,16 +89,16 @@ jobs:
       - name: Get component versions
         id: versions
         run: |
-          thirdparty_version="$(./mvnw help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=ratis.thirdparty.version)"
+          thirdparty_version="$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=ratis.thirdparty.version)"
           echo "thirdparty=${thirdparty_version}" >> $GITHUB_OUTPUT
 
           ratis_sha=$(git rev-parse --short HEAD)
-          ratis_version="$(./mvnw help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=project.version | sed -e "s/-SNAPSHOT/-${ratis_sha}-SNAPSHOT/")"
+          ratis_version="$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=project.version | sed -e "s/-SNAPSHOT/-${ratis_sha}-SNAPSHOT/")"
           echo "ratis=${ratis_version}" >> $GITHUB_OUTPUT
           echo "ratis_version=${ratis_version}" >> $GITHUB_ENV
       - name: Run a full build
         run: |
-          ./mvnw -B --no-transfer-progress -Dscan=false versions:set -DnewVersion="$ratis_version"
+          mvn -B --no-transfer-progress -Dscan=false versions:set -DnewVersion="$ratis_version"
           dev-support/checks/build.sh
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@v7
@@ -126,9 +126,9 @@ jobs:
       - name: Get component versions
         id: versions
         run: |
-          echo "grpc=$(./mvnw help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.grpc.version)" >> $GITHUB_OUTPUT
-          echo "netty=$(./mvnw help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
-          echo "protobuf=$(./mvnw help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
+          echo "grpc=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.grpc.version)" >> $GITHUB_OUTPUT
+          echo "netty=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
+          echo "protobuf=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
   summary:
     runs-on: ubuntu-slim
     needs:
