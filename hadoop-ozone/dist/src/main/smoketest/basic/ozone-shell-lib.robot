@@ -400,4 +400,4 @@ Test Delete key with Trash
     Execute Later ozone sh    key delete ${protocol}${server}/${volume}/obsbkt/key2
 
     ${result} =    Execute Later ozone sh    key list ${protocol}${server}/${volume}/obsbkt
-    Assert Later    File ${result} Filtered By ${filter} Should    not contain      key2
+    Assert Later    File ${result} Should    not contain      key2
