@@ -20,15 +20,9 @@ set -e -u -o pipefail
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-if [[ -z "${RANGER_VERSION:-}" ]]; then
-  export RANGER_VERSION="${ranger.version}"
-fi
-
 # shellcheck source=/dev/null
 source "${COMPOSE_DIR}/../testlib.sh"
 
-: "${POLARIS_IMAGE:=apache/polaris:1.4.1}"
-: "${SPARK_SQL_IMAGE:=apache/spark:3.5.7-scala2.12-java17-ubuntu}"
 : "${POLARIS_CATALOG_NAME:=quickstart_catalog}"
 : "${POLARIS_STORAGE_LOCATION:=s3://iceberg-obs/polaris-smoke}"
 : "${POLARIS_ICEBERG_SPARK_RUNTIME_VERSION:=1.10.1}"
@@ -36,7 +30,7 @@ source "${COMPOSE_DIR}/../testlib.sh"
 : "${ICEBERG_SVC_CATALOG_PRINCIPAL:=${ICEBERG_SVC_CATALOG_USER}/s3g@EXAMPLE.COM}"
 : "${ICEBERG_SVC_CATALOG_KEYTAB:=/etc/security/keytabs/${ICEBERG_SVC_CATALOG_USER}.keytab}"
 
-export POLARIS_IMAGE SPARK_SQL_IMAGE POLARIS_CATALOG_NAME POLARIS_STORAGE_LOCATION
+export POLARIS_CATALOG_NAME POLARIS_STORAGE_LOCATION
 
 if [[ "${COMPOSE_FILE:-}" != *polaris.yaml* ]]; then
   export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml:ranger.yaml:../common/ranger.yaml}:polaris.yaml"
@@ -63,7 +57,7 @@ fi
 
 export POLARIS_AWS_ACCESS_KEY_ID POLARIS_AWS_SECRET_ACCESS_KEY
 
-echo "Starting Polaris (${POLARIS_IMAGE})..."
+echo "Starting Polaris..."
 docker-compose --ansi never up -d polaris
 
 wait_for_port polaris 8181 120

@@ -107,7 +107,8 @@ public class MappedBufferManager {
           LOG.debug("find buffer for key {}", key);
         }
         releaseQuota(1);
-        return cached;
+        // Each caller gets its own position and limit while keeping the mapped buffer reachable.
+        return cached.duplicate();
       }
 
       ByteBuffer buffer = supplier.get();
@@ -117,7 +118,7 @@ public class MappedBufferManager {
           LOG.debug("add buffer for key {}", key);
         }
       }
-      return buffer;
+      return buffer == null ? null : buffer.duplicate();
     } finally {
       fileLock.unlock();
     }

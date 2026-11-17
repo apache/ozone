@@ -37,12 +37,6 @@ Setup headers
     Kinit test user    testuser     testuser.keytab
     Setup secure v4 headers
 
-Setup aws credentials
-    ${accessKey} =      Execute     aws configure get aws_access_key_id
-    ${secret} =         Execute     aws configure get aws_secret_access_key
-    Set Environment Variable        AWS_SECRET_ACCESS_KEY  ${secret}
-    Set Environment Variable        AWS_ACCESS_KEY_ID  ${accessKey}
-
 Verify endpoint is up
     [arguments]         ${url}
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
@@ -52,10 +46,16 @@ Verify endpoint is up
 Setup bucket1
     Execute AWSS3APICli             create-bucket --bucket bucket1
 
-Freon s3kg
-    [arguments]         ${prefix}=s3bg      ${n}=1000       ${threads}=10       ${args}=${EMPTY}
-    ${result} =         Execute             ozone freon s3kg -e ${S3_ENDPOINT_URL} -t ${threads} -n ${n} -p ${prefix} ${args}
-                        Should contain      ${result}       Successful executions: ${n}
+Generate S3 load
+    [arguments]         ${n}=100
+    # one aws process uploads all the files, several at a time
+    ${dir} =            Execute             mktemp -d
+                        Execute             for i in $(seq 1 ${n}); do echo "$i" > ${dir}/key-$i; done
+    ${result} =         Execute AWSS3Cli    cp --recursive ${dir} s3://bucket1/fcq/
+                        Should contain      ${result}       upload:
+    # count the objects: the CLI merges the pages of the listing, which drops KeyCount
+    ${count} =          Execute AWSS3APICli    list-objects-v2 --bucket bucket1 --prefix fcq/ --query 'length(Contents)'
+                        Should Be Equal As Integers    ${count}    ${n}
 
 Check metrics caller
     ${result} =         Execute             curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${DECAY_RPC_SCHEDULER_METRICS_NAME}/,/}/p' | grep 'Caller('
@@ -64,9 +64,6 @@ Check metrics caller
 *** Test Cases ***
 Test setup headers
     Setup headers
-
-Test setup credentials
-    Setup aws credentials
 
 Test create bucket 1
     Setup bucket1
@@ -78,8 +75,8 @@ Test metrics are registered
     ${result} =         Execute                             curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | grep ${DECAY_RPC_SCHEDULER_METRICS_NAME}
                         Should contain      ${result}       ${DECAY_RPC_SCHEDULER_METRICS_NAME}
 
-Run freon s3kg
-    Freon s3kg
+Run S3 load
+    Generate S3 load
 
 Test caller from metrics
     Check metrics caller
