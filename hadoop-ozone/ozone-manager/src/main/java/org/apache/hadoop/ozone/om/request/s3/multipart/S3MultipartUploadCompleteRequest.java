@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -125,9 +124,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
     OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
-    if (keyArgs.hasExcludedETag()) {
-      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
-    }
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -195,6 +191,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       // parts are validated, so a complete that fails with INVALID_PART must not leak it.
       OmBucketInfo omBucketInfo = getBucketInfoForUpdate(omMetadataManager,
           volumeName, bucketName);
+      // Before the cache updates below, and before getDBOzoneKey, which cannot resolve a path through a file.
+      checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName, omMetadataManager);
 
       List<OmDirectoryInfo> missingParentInfos;
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
@@ -274,11 +272,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       String dbOzoneKey =
           getDBOzoneKey(omMetadataManager, volumeName, bucketName, keyName);
-
-      // Check for directory exists with same name for the LEGACY_FS,
-      // if it exists throw error.
-      checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName,
-          omMetadataManager);
 
       if (multipartKeyInfo == null) {
         throw new OMException(

@@ -18,21 +18,12 @@
 # This script confirms that pr_title_check.sh works correctly
 # against some valid and invalid examples.
 #
-# Prerequisites:
-#
-# 1. Install bats-core, see:
-#    https://bats-core.readthedocs.io/en/stable/installation.html
-#
-# 2. Clone libraries into dev-support/ci:
-#    cd dev-support/ci
-#    git clone https://github.com/bats-core/bats-assert
-#    git clone https://github.com/bats-core/bats-support
-#
 # Usage:
-#    bats dev-support/ci/pr_title_check.bats
+#     hadoop-ozone/dev-support/checks/bats.sh dev-support/ci/pr_title_check.bats
 
-load bats-support/load.bash
-load bats-assert/load.bash
+: ${TOOLS_DIR:="${BATS_ROOT}/../.."}
+load ${TOOLS_DIR}/bats/bats-support/load.bash
+load ${TOOLS_DIR}/bats/bats-assert/load.bash
 
 @test "check legal PR title examples" {
   # 1 digit Jira
