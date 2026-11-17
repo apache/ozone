@@ -24,7 +24,7 @@ import { DownOutlined } from '@ant-design/icons';
 import { showDataFetchError } from '@/utils/common';
 import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/heatmap.constants';
-import { HeatmapChild, HeatmapResponse, HeatmapState, InputPathState, InputPathValidTypes, IResponseError } from '@/v2/types/heatmap.types';
+import { HeatmapChild, HeatmapResponse, HeatmapState, InputPathState } from '@/v2/types/heatmap.types';
 import HeatmapPlot from '@/v2/components/plots/heatmapPlot';
 
 import './heatmap.less';
@@ -41,6 +41,15 @@ const DEFAULT_HEATMAP_RESPONSE: HeatmapResponse = {
   minAccessCount: 0
 };
 
+const INPUT_PATH_REGEX = /^[a-zA-Z0-9_./-]*$/;
+
+function getInputPathValidation(path: string): Pick<InputPathState, 'isInputPathValid' | 'helpMessage'> {
+  if (!INPUT_PATH_REGEX.test(path)) {
+    return { isInputPathValid: 'error', helpMessage: 'Please enter valid path' };
+  }
+  return { isInputPathValid: undefined, helpMessage: '' };
+}
+
 const Heatmap: React.FC<{}> = () => {
   const [state, setState] = useState<HeatmapState>({
     heatmapResponse: DEFAULT_HEATMAP_RESPONSE,
@@ -48,11 +57,7 @@ const Heatmap: React.FC<{}> = () => {
     date: CONSTANTS.TIME_PERIODS[0]
   });
 
-  const [inputPathState, setInputPathState] = useState<InputPathState>({
-    inputPath: CONSTANTS.ROOT_PATH,
-    isInputPathValid: undefined,
-    helpMessage: ''
-  });
+  const [inputPath, setInputPath] = useState<string>(CONSTANTS.ROOT_PATH);
 
   const [searchPath, setSearchPath] = useState<string>(CONSTANTS.ROOT_PATH);
   const [treeEndpointFailed, setTreeEndpointFailed] = useState<boolean>(false);
@@ -76,10 +81,7 @@ const Heatmap: React.FC<{}> = () => {
         }
         showDataFetchError(error.message.toString());
         setTreeEndpointFailed(true);
-        setInputPathState(prevState => ({
-          ...prevState,
-          inputPath: CONSTANTS.ROOT_PATH
-        }));
+        setInputPath(CONSTANTS.ROOT_PATH);
         setSearchPath(CONSTANTS.ROOT_PATH);
       }
     }
@@ -100,29 +102,15 @@ const Heatmap: React.FC<{}> = () => {
   }, [heatmapData.data]);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value;
-    // Only allow letters, numbers,underscores and forward slashes and hyphen
-    const regex = /^[a-zA-Z0-9_/-]*$/;
-
-    let inputValid = undefined;
-    let helpMessage = '';
-    if (!regex.test(value)) {
-      helpMessage = 'Please enter valid path';
-      inputValid = 'error';
-    }
-    setInputPathState({
-      inputPath: value,
-      isInputPathValid: inputValid as InputPathValidTypes,
-      helpMessage: helpMessage
-    });
+    setInputPath(e.target.value);
   }
 
   function handleSubmit() {
-    if (inputPathState.isInputPathValid === 'error') {
+    if (getInputPathValidation(inputPath).isInputPathValid === 'error') {
       return;
     }
-    if (isHeatmapEnabled && state.date && inputPathState.inputPath && state.entityType) {
-      setSearchPath(inputPathState.inputPath);
+    if (isHeatmapEnabled && state.date && inputPath && state.entityType) {
+      setSearchPath(inputPath);
     }
   }
 
@@ -177,10 +165,7 @@ const Heatmap: React.FC<{}> = () => {
   };
 
   const updateHeatmapParent = (path: string) => {
-    setInputPathState(prevState => ({
-      ...prevState,
-      inputPath: path
-    }));
+    setInputPath(path);
     setSearchPath(path);
   }
 
@@ -216,7 +201,7 @@ const Heatmap: React.FC<{}> = () => {
   };
 
   const { date, entityType, heatmapResponse } = state;
-  const { inputPath, helpMessage, isInputPathValid } = inputPathState;
+  const { isInputPathValid, helpMessage } = getInputPathValidation(inputPath);
   const loading = heatmapData.loading;
 
   const menuCalendar = (
@@ -292,7 +277,10 @@ const Heatmap: React.FC<{}> = () => {
                 <div className='heatmap-filter-section'>
                   <div className='path-input-container'>
                     <h4 style={{ paddingTop: '2%' }}>Path</h4>
-                    <Form.Item className='path-input-element' validateStatus={isInputPathValid} help={helpMessage}>
+                    <Form.Item
+                      className='path-input-element'
+                      validateStatus={isInputPathValid}
+                      help={isInputPathValid === 'error' ? helpMessage : undefined}>
                       <Input.Search
                         allowClear
                         placeholder={CONSTANTS.ROOT_PATH}
