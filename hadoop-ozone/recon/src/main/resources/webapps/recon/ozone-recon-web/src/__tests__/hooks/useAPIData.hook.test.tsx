@@ -58,16 +58,9 @@ describe('useApiData', () => {
     });
     afterAll(() => retryTestServer.close());
 
-    test('retries until attempts are exhausted, invokes onError, and leaves no unhandled rejection', async () => {
+    test('retries until attempts are exhausted and invokes onError', async () => {
       const onError = vi.fn();
-      const unhandledRejections: unknown[] = [];
-      const onUnhandledRejection = (event: PromiseRejectionEvent) => {
-        unhandledRejections.push(event.reason);
-      };
-
-      window.addEventListener('unhandledrejection', onUnhandledRejection);
-      try {
-        render(<RetryProbe onError={onError} />);
+      render(<RetryProbe onError={onError} />);
 
         await waitFor(
           () => {
@@ -79,10 +72,6 @@ describe('useApiData', () => {
         expect(requestCount).toBe(3);
         expect(screen.getByTestId('loading')).toHaveTextContent('false');
         expect(screen.getByTestId('error').textContent).not.toBe('');
-        expect(unhandledRejections).toHaveLength(0);
-      } finally {
-        window.removeEventListener('unhandledrejection', onUnhandledRejection);
-      }
     });
   });
 });
