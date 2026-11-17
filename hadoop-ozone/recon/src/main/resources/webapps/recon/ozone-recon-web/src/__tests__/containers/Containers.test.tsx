@@ -49,8 +49,8 @@ vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
   return {
     ...actual,
-    useApiData: <T,>(url: string, defaultValue: T, options = {}) => {
-      return actual.useApiData(url, defaultValue, {
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
+      actual.useApiData(url, defaultValue, {
         ...options,
         retryAttempts: 0,
         retryDelay: 0,
