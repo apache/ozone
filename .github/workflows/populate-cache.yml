@@ -23,12 +23,6 @@ on:
       - master
       - ozone-2.1
       - ozone-2.2
-    paths:
-      - 'pom.xml'
-      - '**/pom.xml'
-      - '.github/actions/setup-java-with-cache/action.yml'
-      - '.github/workflows/populate-cache.yml'
-      - '.mvn/extensions.xml'
   workflow_call:
   workflow_dispatch:
 
