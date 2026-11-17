@@ -287,11 +287,11 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           if (!flushAndCommitNSToDB(nsSummaryMap)) {
             return new ImmutablePair<>(seekPos, false);
           }
-          seekPos = eventCounter + 1;
+          seekPos = itrPos + eventCounter;
         }
-      } catch (IOException ioEx) {
+      } catch (IOException | RuntimeException ex) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
+            ex);
         nsSummaryMap.clear();
         return new ImmutablePair<>(seekPos, false);
       }
@@ -303,7 +303,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithOBS");
-    return new ImmutablePair<>(seekPos, true);
+    return new ImmutablePair<>(itrPos + eventCounter, true);
   }
 
 }

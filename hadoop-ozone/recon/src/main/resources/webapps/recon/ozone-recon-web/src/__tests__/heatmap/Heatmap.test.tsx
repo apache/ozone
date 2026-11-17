@@ -54,22 +54,12 @@ vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
   return {
     ...actual,
-    useApiData: <T,>(url: string, defaultValue: T, options = {}) => {
-      // The hook's own initial GET does not handle a rejected request, so a 404/500 on mount surfaces as an
-      // unhandled rejection in tests. Skip it and issue the initial request with a handled promise instead.
-      const api = actual.useApiData(url, defaultValue, {
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
+      actual.useApiData(url, defaultValue, {
         ...options,
-        initialFetch: false,
         retryAttempts: 0,
         retryDelay: 0,
-      });
-      React.useEffect(() => {
-        if (url) {
-          api.execute().catch(() => undefined);
-        }
-      }, []); // eslint-disable-line react-hooks/exhaustive-deps
-      return api;
-    },
+      }),
   };
 });
 
