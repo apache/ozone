@@ -34,7 +34,7 @@ if [[ "${OZONE_TEST_SELECTOR}" == "xcompat/test-old.sh" ]]; then
 
   # use JDK8 image for Rebot in compat-old, to avoid pulling JDK25 image just for generating reports
   # TODO after HDDS-17509 this can be moved to env: of compat-old job
-  export OZONE_RUNNER_VERSION=$(get_version "docker.ozone-runner.client" -pl :ozone-dist)
+  export OZONE_RUNNER_VERSION=$(get_version "docker.ozone-runner.client" -f hadoop-ozone/dist)
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/acceptance"}
