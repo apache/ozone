@@ -51,6 +51,7 @@ find hadoop-ozone/dist/target/*/share/ozone/lib -name 'hdds-*.jar' -or -name 'oz
 #Exclude some classes from the coverage
 find target/coverage-classes -type d \( -name proto -or -name codegen -or -name generated -or -name v1 -or -name freon \) \
   | xargs rm -rf
+rm -rf target/coverage-classes/org/apache/hadoop/ipc_/protobuf
 
 #generate the reports
 src=$(find hadoop-* -path '*/src/main/java' | sed 's/^/--sourcefiles /g' | xargs echo)

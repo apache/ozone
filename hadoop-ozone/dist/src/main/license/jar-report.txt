@@ -65,6 +65,7 @@ share/ozone/lib/hdds-interface-client.jar
 share/ozone/lib/hdds-interface-server.jar
 share/ozone/lib/hdds-managed-rocksdb.jar
 share/ozone/lib/hdds-rocks-native.jar
+share/ozone/lib/hdds-rocksdb-checkpoint-differ.jar
 share/ozone/lib/hdds-server-framework.jar
 share/ozone/lib/hdds-server-scm.jar
 share/ozone/lib/hk2-api.jar
@@ -275,7 +276,6 @@ share/ozone/lib/reactive-streams.jar
 share/ozone/lib/reflections.jar
 share/ozone/lib/reload4j.jar
 share/ozone/lib/retrofit.jar
-share/ozone/lib/rocksdb-checkpoint-differ.jar
 share/ozone/lib/rocksdbjni.jar
 share/ozone/lib/simpleclient.jar
 share/ozone/lib/simpleclient_common.jar
