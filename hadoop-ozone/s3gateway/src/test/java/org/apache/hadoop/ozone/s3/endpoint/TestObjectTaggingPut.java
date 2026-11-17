@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -89,7 +90,7 @@ public class TestObjectTaggingPut {
     putTagging(endpoint, BUCKET_NAME, KEY_NAME, twoTags());
 
     verify(volume, never()).getBucket(anyString());
-    verify(protocol, never()).getBucketDetails(anyString(), anyString());
+    verify(protocol, never()).getBucketDetails(any(), anyString());
     verify(protocol).putObjectTagging("s3Volume", BUCKET_NAME, KEY_NAME, TAGS);
   }
 

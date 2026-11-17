@@ -150,6 +150,16 @@ class TestBlockDataStreamOutput {
   }
 
   @Test
+  void flushAfterFailedPutBlockBoundaryStillThrows() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    byte[] data = randomBytes(400);
+    pipeline.failChunkAfter(3, () -> new IOException("injected"));
+    BlockDataStreamOutput stream = createStream(pipeline);
+    assertThrows(IOException.class, () -> stream.write(ByteBuffer.wrap(data), 0, data.length));
+    assertThrows(IOException.class, stream::flush);
+  }
+
+  @Test
   void midStreamPutBlockUsesStreamCommandWhenEnabled() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     OzoneClientConfig config = createConfig();
@@ -312,6 +322,21 @@ class TestBlockDataStreamOutput {
     assertThat(e)
         .hasRootCauseInstanceOf(IOException.class)
         .hasRootCauseMessage("chunk write failed due to injected failure");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void failedStreamCloseIsNotRetried(boolean putBlockWithoutRaft) throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline().failStreamClose();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
+    BlockDataStreamOutput stream = createStream(pipeline, config);
+    byte[] data = randomBytes(50);
+    stream.write(ByteBuffer.wrap(data), 0, data.length);
+
+    IOException e = assertThrows(IOException.class, stream::close);
+    assertThat(e).hasStackTraceContaining("Failed to close the data stream");
+    assertEquals(1, pipeline.getStreamCloseCount(), "A failed stream close must not be retried");
   }
 
   @Test

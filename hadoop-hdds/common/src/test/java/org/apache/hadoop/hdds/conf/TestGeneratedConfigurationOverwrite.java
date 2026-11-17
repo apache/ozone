@@ -20,37 +20,16 @@ package org.apache.hadoop.hdds.conf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
  * In HDDS-5035, we met the case that ozone-default-generated.xml got
  * overwritten in an assemble jar, here we are trying to simulate this case
- * by rename the generated config file.
+ * by not loading the generated config file.
  */
 public class TestGeneratedConfigurationOverwrite {
 
-  private final Path generatedConfigurationPath =
-      Paths.get("target/test-classes/hdds-common-default.xml");
-  private final Path generatedConfigurationPathBak =
-      Paths.get("target/test-classes/hdds-common-default.xml.bak");
-
-  private OzoneConfiguration conf;
-
-  @BeforeEach
-  public void overwriteConfigFile() throws Exception {
-    Files.move(generatedConfigurationPath, generatedConfigurationPathBak);
-    conf = new OzoneConfiguration();
-  }
-
-  @AfterEach
-  public void recoverConfigFile() throws Exception {
-    Files.move(generatedConfigurationPathBak, generatedConfigurationPath);
-  }
+  private final OzoneConfiguration conf = new OzoneConfiguration();
 
   @Test
   public void getConfigurationObject() {

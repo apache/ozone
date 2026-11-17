@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CreatePipelineCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
 /**
  * Asks datanode to create a pipeline.
@@ -38,29 +37,14 @@ public class CreatePipelineCommand
 
   private static final Integer HIGH_PRIORITY = 1;
   private static final Integer LOW_PRIORITY = 0;
+  private static final List<Integer> DEFAULT_PRIORITY_LIST
+      = Collections.nCopies(ReplicationFactor.THREE_VALUE, LOW_PRIORITY);
 
   private final PipelineID pipelineID;
   private final ReplicationFactor factor;
   private final ReplicationType type;
   private final List<DatanodeDetails> nodelist;
   private final List<Integer> priorityList;
-
-  public CreatePipelineCommand(final PipelineID pipelineID,
-      final ReplicationType type, final ReplicationFactor factor,
-      final List<DatanodeDetails> datanodeList) {
-    super();
-    this.pipelineID = pipelineID;
-    this.factor = factor;
-    this.type = type;
-    this.nodelist = datanodeList;
-    if (datanodeList.size() ==
-        XceiverServerRatis.getDefaultPriorityList().size()) {
-      this.priorityList = XceiverServerRatis.getDefaultPriorityList();
-    } else {
-      this.priorityList =
-          new ArrayList<>(Collections.nCopies(datanodeList.size(), 0));
-    }
-  }
 
   public CreatePipelineCommand(final PipelineID pipelineID,
       final ReplicationType type, final ReplicationFactor factor,
@@ -71,19 +55,27 @@ public class CreatePipelineCommand
     this.factor = factor;
     this.type = type;
     this.nodelist = datanodeList;
-    this.priorityList = new ArrayList<>();
-    initPriorityList(datanodeList, suggestedLeader);
+    this.priorityList = newPriorityList(datanodeList, suggestedLeader);
   }
 
-  private void initPriorityList(
-      List<DatanodeDetails> dns, DatanodeDetails suggestedLeader) {
-    for (DatanodeDetails dn : dns) {
-      if (dn.equals(suggestedLeader)) {
-        priorityList.add(HIGH_PRIORITY);
+  static List<Integer> newPriorityList(List<DatanodeDetails> dns, DatanodeDetails suggestedLeader) {
+    if (suggestedLeader == null) {
+      if (dns.size() == DEFAULT_PRIORITY_LIST.size()) {
+        return DEFAULT_PRIORITY_LIST;
       } else {
-        priorityList.add(LOW_PRIORITY);
+        return Collections.nCopies(dns.size(), LOW_PRIORITY);
       }
     }
+
+    final List<Integer> priorities = new ArrayList<>();
+    for (DatanodeDetails dn : dns) {
+      if (dn.equals(suggestedLeader)) {
+        priorities.add(HIGH_PRIORITY);
+      } else {
+        priorities.add(LOW_PRIORITY);
+      }
+    }
+    return Collections.unmodifiableList(priorities);
   }
 
   public CreatePipelineCommand(long cmdId, final PipelineID pipelineID,

@@ -312,6 +312,40 @@ public class TestContainerReconciliationWithMockDatanodes {
   }
 
   @Test
+  public void testContainerReconciliationVerifiesPeerDataWhenClientChecksumVerifyDisabled() throws Exception {
+    long containerID = CONTAINER_ID + 2;
+    for (MockDatanode dn : datanodes) {
+      dn.addContainerWithBlocks(containerID, 5, false);
+      dn.scanContainer(containerID);
+    }
+    long healthyChecksum = assertUniqueChecksumCount(containerID, datanodes, 1);
+    MockDatanode laggingNode = datanodes.get(0);
+    MockDatanode corruptPeer = datanodes.get(1);
+    MockDatanode healthyPeer = datanodes.get(2);
+
+    laggingNode.introduceCorruption(containerID, 1, 0, false);
+    laggingNode.scanContainer(containerID);
+    // Corrupt the peer after its last scan so its Merkle tree still advertises healthy data.
+    corruptPeer.introduceCorruption(containerID, 0, 1, false);
+
+    // The datanode should override this configuration value to true and always verify checksums during reconciliation.
+    String verifyChecksumKey = "ozone.client.verify.checksum";
+    laggingNode.conf.setBoolean(verifyChecksumKey, false);
+    try {
+      laggingNode.reconcileContainerSuccess(dnClient,
+          Arrays.asList(corruptPeer.getDnDetails(), healthyPeer.getDnDetails()), containerID);
+    } finally {
+      laggingNode.conf.unset(verifyChecksumKey);
+    }
+
+    // Reject the corrupt peer's bytes and repair from the healthy peer in the same reconciliation task.
+    laggingNode.scanContainer(containerID);
+    assertEquals(healthyChecksum, laggingNode.checkAndGetDataChecksum(containerID));
+    assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+        laggingNode.getContainer(containerID).getContainerData().getState());
+  }
+
+  @Test
   public void testContainerReconciliationFailureContainerScan()
       throws Exception {
     // Use synchronous on-demand scans to re-build the merkle trees after corruption.

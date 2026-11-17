@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -211,6 +212,7 @@ public class TestSCMDbCheckpointServlet {
     conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.set(OZONE_ADMINISTRATORS, "scmadmin");
     conf.set(HDDS_SCM_HTTP_AUTH_TYPE, "kerberos");
+    conf.set(OZONE_RECON_KERBEROS_PRINCIPAL_KEY, "recon/localhost@REALM");
     cluster.restartStorageContainerManager(true);
 
     ServletContext servletContextMock = mock(ServletContext.class);
@@ -238,6 +240,12 @@ public class TestSCMDbCheckpointServlet {
     doEndpoint();
     verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
     verify(scmDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
+
+    // Recon gets past the permission check, to download the SCM DB.
+    when(userPrincipalMock.getName()).thenReturn("recon/localhost@REALM");
+    doEndpoint();
+    verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
+    verify(scmDbCheckpointServletMock, times(2)).getCheckpoint(any(), anyBoolean());
   }
 
   /**

@@ -90,8 +90,22 @@ public abstract class ComponentVersionManager implements Closeable {
   public abstract int getPersistedApparentVersion();
 
   public void finalizeUpgrade() throws UpgradeException {
+    finalizeUpgrade(softwareVersion);
+  }
+
+  /**
+   * Finalizes each version after the current apparent version, up to and including {@code targetVersion}. Does nothing
+   * if {@code targetVersion} is already finalized.
+   *
+   * @param targetVersion The last version to finalize. Must be supported by the software version.
+   */
+  public void finalizeUpgrade(ComponentVersion targetVersion) throws UpgradeException {
+    if (!targetVersion.isSupportedBy(softwareVersion)) {
+      throw new IllegalArgumentException("Cannot finalize to version " + targetVersion
+          + " which is newer than software version " + softwareVersion + ".");
+    }
     ComponentVersion prevVersion = apparentVersion;
-    for (ComponentVersion newVersion : getUnfinalizedVersions()) {
+    for (ComponentVersion newVersion : getUnfinalizedVersions(targetVersion)) {
       validateForFinalization(newVersion);
       runUpgradeAction(newVersion);
       persistApparentVersion(newVersion, prevVersion);
@@ -110,16 +124,18 @@ public abstract class ComponentVersionManager implements Closeable {
   public abstract ComponentVersion getVersionForClient();
 
   /**
-   * @return An Iterable of all versions after the current apparent version which still need to be finalized. If this
-   *    component is already finalized, the Iterable will be empty.
+   * @return An Iterable of all versions after the current apparent version, up to and including
+   *    {@code targetVersion}, which still need to be finalized. If {@code targetVersion} is already finalized, the
+   *    Iterable will be empty.
    */
-  private Iterable<ComponentVersion> getUnfinalizedVersions() {
+  private Iterable<ComponentVersion> getUnfinalizedVersions(ComponentVersion targetVersion) {
     return () -> new Iterator<ComponentVersion>() {
       private ComponentVersion currentVersion = apparentVersion;
 
       @Override
       public boolean hasNext() {
-        return currentVersion.nextVersion() != null;
+        ComponentVersion nextVersion = currentVersion.nextVersion();
+        return nextVersion != null && nextVersion.isSupportedBy(targetVersion);
       }
 
       @Override

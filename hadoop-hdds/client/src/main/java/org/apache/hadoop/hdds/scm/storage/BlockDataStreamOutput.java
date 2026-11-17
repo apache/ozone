@@ -137,14 +137,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final String tokenString;
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
-  private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
   private final long syncSize;
   private long syncPosition = 0;
   private StreamBuffer currentBuffer;
   private XceiverClientMetrics metrics;
-  // buffers for which putBlock is yet to be executed
-  private List<StreamBuffer> buffersForPutBlock;
   private boolean isDatastreamPipelineMode;
+  private PendingFlush pendingFlush = new PendingFlush();
   // Whether PutBlock is committed through the data stream instead of the Raft log; fixed for the stream lifetime.
   private final boolean putBlockWithoutRaft;
 
@@ -308,10 +306,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   private void writeChunk(StreamBuffer sb) throws IOException {
     bufferList.add(sb);
-    if (buffersForPutBlock == null) {
-      buffersForPutBlock = new ArrayList<>();
-    }
-    buffersForPutBlock.add(sb);
+    pendingFlush.addBuffer(sb);
     ByteBuffer dup = sb.duplicate();
     dup.position(0);
     dup.limit(sb.position());
@@ -336,7 +331,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     long streamWindow = config.getStreamWindowSize() / config
         .getDataStreamMinPacketSize();
     if (!bufferList.isEmpty() && bufferList.size() % boundary == 0 &&
-        buffersForPutBlock != null && !buffersForPutBlock.isEmpty()) {
+        pendingFlush.hasBuffersForPutBlock()) {
       updateFlushLength();
       executePutBlock(false, false);
     }
@@ -381,10 +376,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     while (len > 0) {
       final StreamBuffer buf = bufferList.get(count);
       final long writeLen = Math.min(buf.position(), len);
-      if (buffersForPutBlock == null) {
-        buffersForPutBlock = new ArrayList<>();
-      }
-      buffersForPutBlock.add(buf);
+      pendingFlush.addBuffer(buf);
       final ByteBuffer duplicated = buf.duplicate();
       duplicated.position(0);
       duplicated.limit(buf.position());
@@ -436,16 +428,16 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     checkOpen();
     long flushPos = totalDataFlushedLength;
     final List<StreamBuffer> byteBufferList;
-    if (buffersForPutBlock != null) {
+    if (pendingFlush.hasBuffersForPutBlock()) {
       Objects.requireNonNull(bufferList, "bufferList == null");
-      byteBufferList = buffersForPutBlock;
-      buffersForPutBlock = null;
+      byteBufferList = pendingFlush.consumeBuffersForPutBlock();
       Objects.requireNonNull(byteBufferList, "byteBufferList == null");
     } else {
       // no data was written since the most recent putBlock
       byteBufferList = null;
     }
-    waitFuturesComplete();
+    waitFuturesComplete(pendingFlush);
+    pendingFlush = new PendingFlush();
     if (close && putBlockWithoutRaft) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
       waitPutBlockCommandFuturesComplete();
@@ -459,18 +451,16 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
               xceiverClient.getPipeline(), blockData, false, true, tokenString);
-      dataStreamCloseReply = executePutBlockClose(putBlockRequest,
-          PUT_BLOCK_REQUEST_LENGTH_MAX, out);
-      dataStreamCloseReply.whenComplete((reply, e) -> {
-        if (e != null || reply == null || !reply.isSuccess()) {
-          LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
-          try {
-            executePutBlock(false, true);
-          } catch (IOException ex) {
-            throw new CompletionException(ex);
-          }
-        }
-      });
+      dataStreamCloseReply = executePutBlockClose(putBlockRequest, PUT_BLOCK_REQUEST_LENGTH_MAX, out)
+          .whenComplete((reply, e) -> {
+            if (e != null || reply == null || !reply.isSuccess()) {
+              LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
+              final IOException ioe = new IOException("Failed to close the data stream for blockID " + blockID
+                  + ", reply=" + reply, e);
+              setIoException(ioe);
+              throw new CompletionException(ioe);
+            }
+          });
       if (putBlockWithoutRaft) {
         // PutBlock is supposed to be committed after the data stream close so there
         // is no need to continue.
@@ -611,7 +601,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   public void flush() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null
         && !config.isStreamBufferFlushDelay()) {
-      waitFuturesComplete();
+      waitFuturesComplete(pendingFlush);
     }
   }
 
@@ -638,10 +628,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
-  public void waitFuturesComplete() throws IOException {
+  public void waitFuturesComplete(PendingFlush flush) throws IOException {
     try {
-      CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
-      futures.clear();
+      flush.waitForChunkFutures();
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
       throw new IOException(e);
@@ -836,7 +825,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               }
             }, responseExecutor);
 
-    futures.add(future);
+    pendingFlush.addChunkFuture(future);
     containerBlockData.addChunks(chunkInfo);
   }
 

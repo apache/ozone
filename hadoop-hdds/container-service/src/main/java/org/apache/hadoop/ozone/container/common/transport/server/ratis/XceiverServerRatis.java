@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -85,8 +84,10 @@ import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
-import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
+import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
+import org.apache.ratis.proto.RaftProtos.ServerRpcProto;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
@@ -123,8 +124,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory.getLogger(XceiverServerRatis.class);
 
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
-  private static final List<Integer> DEFAULT_PRIORITY_LIST =
-      new ArrayList<>(Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
   private int serverPort;
   private int adminPort;
@@ -616,16 +615,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return clientPort;
   }
 
-  /**
-   * Returns the Replication type supported by this end-point.
-   *
-   * @return enum -- {Stand_Alone, Ratis, Chained}
-   */
-  @Override
-  public HddsProtos.ReplicationType getServerType() {
-    return HddsProtos.ReplicationType.RATIS;
-  }
-
   @VisibleForTesting
   public RaftServer getServer() {
     return server;
@@ -661,8 +650,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @Override
-  public void submitRequest(ContainerCommandRequestProto request,
-      HddsProtos.PipelineID pipelineID) throws IOException {
+  public void submitRequest(ContainerCommandRequestProto request, PipelineID pipelineID) throws IOException {
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
@@ -689,25 +677,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private RaftClientRequest createRaftClientRequest(
-      ContainerCommandRequestProto request, HddsProtos.PipelineID pipelineID,
+      ContainerCommandRequestProto request, PipelineID pipelineID,
       RaftClientRequest.Type type) {
     return RaftClientRequest.newBuilder()
         .setClientId(clientId)
         .setServerId(server.getId())
-        .setGroupId(
-            RaftGroupId.valueOf(
-                PipelineID.getFromProtobuf(pipelineID).getId()))
+        .setGroupId(pipelineID.getGroupId())
         .setCallId(nextCallId())
         .setMessage(ContainerCommandRequestMessage.toMessage(request, null))
         .setType(type)
         .build();
-  }
-
-  private GroupInfoRequest createGroupInfoRequest(
-      HddsProtos.PipelineID pipelineID) {
-    return new GroupInfoRequest(clientId, server.getId(),
-        RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineID).getId()),
-        nextCallId());
   }
 
   private void handlePipelineFailure(RaftGroupId groupId, RoleInfoProto roleInfoProto, String reason) {
@@ -729,7 +708,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       break;
     case LEADER:
       final long followerSlownessTimeoutMs = ratisServerConfig.getFollowerSlownessTimeout();
-      for (RaftProtos.ServerRpcProto follower : roleInfoProto.getLeaderInfo().getFollowerInfoList()) {
+      for (ServerRpcProto follower : roleInfoProto.getLeaderInfo().getFollowerInfoList()) {
         final long lastRpcElapsedTimeMs = follower.getLastRpcElapsedTimeMs();
         final boolean slow = lastRpcElapsedTimeMs > followerSlownessTimeoutMs;
         final RaftPeerId followerId = RaftPeerId.valueOf(follower.getId().getId());
@@ -786,9 +765,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @Override
-  public boolean isExist(HddsProtos.PipelineID pipelineId) {
-    return activePipelines.containsKey(
-        RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()));
+  public boolean isExist(PipelineID pipelineId) {
+    return activePipelines.containsKey(pipelineId.getGroupId());
   }
 
   @Override
@@ -813,24 +791,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @Override
-  public void addGroup(HddsProtos.PipelineID pipelineId,
-      List<DatanodeDetails> peers) throws IOException {
-    if (peers.size() == getDefaultPriorityList().size()) {
-      addGroup(pipelineId, peers, getDefaultPriorityList());
-    } else {
-      addGroup(pipelineId, peers,
-          new ArrayList<>(Collections.nCopies(peers.size(), 0)));
-    }
-  }
-
-  @Override
-  public void addGroup(HddsProtos.PipelineID pipelineId,
+  public void addGroup(PipelineID pipelineID,
       List<DatanodeDetails> peers,
       List<Integer> priorityList) throws IOException {
-    final PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineId);
-    final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
-    final RaftGroup group =
-        RatisHelper.newRaftGroup(groupId, peers, priorityList);
+    final RaftGroup group = RatisHelper.newRaftGroup(pipelineID.getGroupId(), peers, priorityList);
     GroupManagementRequest request = GroupManagementRequest.newAdd(
         clientId, server.getId(), nextCallId(), group);
 
@@ -846,15 +810,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     LOG.info("Created group {}", pipelineID);
   }
 
-  @Override
-  public void removeGroup(HddsProtos.PipelineID pipelineId)
-      throws IOException {
+  public void removeGroup(RaftGroupId groupId) throws IOException {
     // if shouldDeleteRatisLogDirectory is set to false, the raft log
     // directory will be renamed and kept aside for debugging.
     // In case, its set to true, the raft log directory will be removed
     GroupManagementRequest request = GroupManagementRequest.newRemove(
-        clientId, server.getId(), nextCallId(),
-        RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()),
+        clientId, server.getId(), nextCallId(), groupId,
         shouldDeleteRatisLogDirectory, !shouldDeleteRatisLogDirectory);
 
     RaftClientReply reply;
@@ -874,8 +835,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     handlePipelineFailure(groupId, roleInfoProto, "no leader");
   }
 
-  void handleApplyTransactionFailure(RaftGroupId groupId,
-      RaftProtos.RaftPeerRole role) {
+  void handleApplyTransactionFailure(RaftGroupId groupId, RaftPeerRole role) {
     UUID dnId = RatisHelper.toDatanodeId(getServer().getId());
     String msg =
         "Ratis Transaction failure in datanode " + dnId + " with role " + role
@@ -921,14 +881,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   public long getMinReplicatedIndex(PipelineID pipelineID) throws IOException {
-    GroupInfoReply reply = getServer()
-        .getGroupInfo(createGroupInfoRequest(pipelineID.getProtobuf()));
-    Long minIndex = RatisHelper.getMinReplicatedIndex(reply.getCommitInfos());
-    return minIndex == null ? -1 : minIndex;
+    final GroupInfoReply reply = getServer().getGroupInfo(
+        new GroupInfoRequest(clientId, server.getId(), pipelineID.getGroupId(), nextCallId()));
+    return reply.getCommitInfos().stream()
+        .map(CommitInfoProto::getCommitIndex)
+        .min(Long::compareTo)
+        .orElse(-1L);
   }
 
-  public Collection<RaftPeer> getRaftPeersInPipeline(PipelineID pipelineId) throws IOException {
-    final RaftGroupId groupId = RaftGroupId.valueOf(pipelineId.getId());
+  public Collection<RaftPeer> getRaftPeers(RaftGroupId groupId) throws IOException {
     return server.getDivision(groupId).getGroup().getPeers();
   }
 
@@ -990,12 +951,5 @@ public final class XceiverServerRatis implements XceiverServerSpi {
           0, TimeUnit.SECONDS, workQueue, threadFactory);
     }
     return ImmutableList.copyOf(executors);
-  }
-
-  /**
-   * @return list of default priority
-   */
-  public static List<Integer> getDefaultPriorityList() {
-    return DEFAULT_PRIORITY_LIST;
   }
 }
