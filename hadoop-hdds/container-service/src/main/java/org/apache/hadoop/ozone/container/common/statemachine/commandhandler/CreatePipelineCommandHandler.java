@@ -110,55 +110,61 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     
     try {
       queuedCount.incrementAndGet();
-      CompletableFuture.runAsync(() -> {
-        invocationCount.incrementAndGet();
-        final long startTime = Time.monotonicNow();
-        final DatanodeDetails dn = context.getParent().getDatanodeDetails();
-        final List<DatanodeDetails> peers = createCommand.getNodeList();
-        final List<Integer> priorityList = createCommand.getPriorityList();
-        final ReplicationType type = createCommand.getReplicationType();
-
-        try {
-          XceiverServerSpi server = ozoneContainer.getWriteChannel();
-          if (!server.isExist(pipelineID)) {
-            final RaftGroup group = RatisHelper.newRaftGroup(pipelineID.getGroupId(), peers, priorityList);
-            server.addGroup(pipelineID, type, peers, priorityList);
-            // For CHAINED, each datanode adds the group from its own command; see XceiverServerRatis.addGroup.
-            peers.stream().filter(d -> type != ReplicationType.CHAINED && !d.getID().equals(dn.getID()))
-                .forEach(d -> {
-                  final RaftPeer peer = RatisHelper.toRaftPeer(d);
-                  try (RaftClient client = newRaftClient.apply(peer,
-                      ozoneContainer.getTlsClientConfig())) {
-                    client.getGroupManagementApi(peer.getId()).add(group);
-                  } catch (AlreadyExistsException ae) {
-                    // do not log
-                  } catch (IOException ioe) {
-                    LOG.warn("Add group failed for {}", d, ioe);
-                  }
-                });
-            LOG.info("Created {}/{} {}: {}", type, createCommand.getFactor(), pipelineID, group);
-          }
-        } catch (IOException e) {
-          // The server.addGroup may exec after a getGroupManagementApi call
-          // from another peer, so we may got an AlreadyExistsException.
-          if (!(e.getCause() instanceof AlreadyExistsException)) {
-            LOG.error("Can't create pipeline {} {} {}",
-                createCommand.getReplicationType(),
-                createCommand.getFactor(), pipelineID, e);
-          }
-        } finally {
-          long endTime = Time.monotonicNow();
-          this.opsLatencyMs.add(endTime - startTime);
-        }
-      }, executor).whenComplete((v, e) -> {
-        queuedCount.decrementAndGet();
-        pipelinesInProgress.remove(pipelineUUID);
-      });
+      CompletableFuture.runAsync(
+          () -> addGroup(createCommand, context.getParent().getDatanodeDetails(), ozoneContainer), executor)
+          .whenComplete((v, e) -> {
+            queuedCount.decrementAndGet();
+            pipelinesInProgress.remove(pipelineUUID);
+          });
     } catch (RejectedExecutionException ex) {
       queuedCount.decrementAndGet();
       pipelinesInProgress.remove(pipelineUUID);
       LOG.warn("Create Pipeline command for pipeline {} is rejected as " +
           "command queue has reached max size.", pipelineID);
+    }
+  }
+
+  private void addGroup(CreatePipelineCommand command, DatanodeDetails dn, OzoneContainer container) {
+    invocationCount.incrementAndGet();
+    final long startTime = Time.monotonicNow();
+    final PipelineID pipelineID = command.getPipelineID();
+    final ReplicationType type = command.getReplicationType();
+
+    try {
+      final XceiverServerSpi server = container.getWriteChannel();
+      if (!server.isExist(pipelineID)) {
+        final List<DatanodeDetails> peers = command.getNodeList();
+        final List<Integer> priorityList = command.getPriorityList();
+        final RaftGroup group = RatisHelper.newRaftGroup(pipelineID.getGroupId(), peers, priorityList);
+        server.addGroup(pipelineID, type, peers, priorityList);
+        // For RATIS  , fan-out to addGroup for the other datanodes (faster)
+        // For CHAINED, fan-out not working since it needs ReplicationType from CreatePipelineCommand
+        if (type == ReplicationType.RATIS) {
+          peers.stream()
+              .filter(d -> !d.getID().equals(dn.getID()))
+              .map(RatisHelper::toRaftPeer)
+              .forEach(peer -> sendAddGroup(peer, group, container.getTlsClientConfig()));
+        }
+        LOG.info("Created {}/{} {}: {}", type, command.getFactor(), pipelineID, group);
+      }
+    } catch (IOException e) {
+      // Ignore AlreadyExistsException since server.addGroup may be called from another peer
+      if (!(e.getCause() instanceof AlreadyExistsException)) {
+        LOG.error("Failed to create {}/{} {}", type, command.getFactor(), pipelineID, e);
+      }
+    } finally {
+      long endTime = Time.monotonicNow();
+      this.opsLatencyMs.add(endTime - startTime);
+    }
+  }
+
+  private void sendAddGroup(RaftPeer peer, RaftGroup group, GrpcTlsConfig tlsConfig) {
+    try (RaftClient client = newRaftClient.apply(peer, tlsConfig)) {
+      client.getGroupManagementApi(peer.getId()).add(group);
+    } catch (AlreadyExistsException ae) {
+      // do not log
+    } catch (IOException ioe) {
+      LOG.warn("Add group failed for datanode {}", peer, ioe);
     }
   }
 

@@ -116,7 +116,7 @@ public class TestXceiverServerRatisReplicationType {
     assertEquals(type == ReplicationType.CHAINED, hasGroup(peerServer, groupId));
   }
 
-  private static boolean hasGroup(XceiverServerRatis s, RaftGroupId groupId) throws Exception {
+  private static boolean hasGroup(XceiverServerRatis s, RaftGroupId groupId) {
     for (RaftGroupId id : s.getServer().getGroupIds()) {
       if (id.equals(groupId)) {
         return true;

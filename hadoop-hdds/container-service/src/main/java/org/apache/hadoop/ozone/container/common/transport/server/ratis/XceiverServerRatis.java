@@ -248,7 +248,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     ReplicationType type = addingGroups.get(gid);
     if (type == null) {
       // The type is unknown when the group is reloaded on restart or added by a peer.
-      // TODO: support CHAINED for these cases.
+      // TODO HDDS-17845: support restart for CHAINED.
       LOG.info("{}: ReplicationType is unknown, use {}", gid, ReplicationType.RATIS);
       type = ReplicationType.RATIS;
     }
@@ -846,8 +846,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   public void removeGroup(RaftGroupId groupId, GrpcTlsConfig tlsConfig) throws IOException {
-    // For RATIS, send a Raft group remove request
-    // For CHAINED, just remove it locally.
+    // For RATIS  , fan-out to removeGroup for the other datanodes (faster)
+    // For CHAINED, just remove it locally and don't fan-out
     if (getReplicationType(groupId) == ReplicationType.RATIS) {
       final Collection<RaftPeer> peers = getRaftPeers(groupId);
       // For RATIS pipeline, send remove group to the other datanodes first
