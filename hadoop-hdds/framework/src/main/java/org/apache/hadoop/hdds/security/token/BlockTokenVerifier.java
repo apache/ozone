@@ -96,5 +96,10 @@ public class BlockTokenVerifier extends
       throw new BlockTokenException("Block token with " + tokenId.getService()
           + " doesn't have " + accessMode + " permission");
     }
+    // the datanode acts on the request's container, which must hold the token's block
+    if (cmd.getContainerID() != HddsUtils.getBlockID(cmd).getContainerID()) {
+      throw new BlockTokenException("Block token with " + tokenId.getService()
+          + " can't be used to access container " + cmd.getContainerID());
+    }
   }
 }
