@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1320,12 +1321,8 @@ public class OzoneBucket extends WithMetadata {
   /**
    * OzoneFS api to create an output stream for a file.
    *
-   * @param keyName   Key name
-   * @param overWrite if true existing file at the location will be overwritten
-   * @param recursive if true file would be created even if parent directories
-   *                    do not exist
-   * @param fileStoragePolicy The StoragePolicy of the file, or null to use the
-   *                          bucket's policy
+   * @param keyName Key name
+   * @param options Size, replication config, overwrite, recursive flags and storage policy of the file
    * @throws OMException if given key is a directory
    *                     if file exists and isOverwrite flag is false
    *                     if an ancestor exists as a file
@@ -1333,12 +1330,9 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
-  public OzoneOutputStream createFile(String keyName, long size,
-      ReplicationConfig replicationConfig, boolean overWrite,
-      boolean recursive, StoragePolicy fileStoragePolicy) throws IOException {
-    return proxy
-        .createFile(volumeName, name, keyName, size, replicationConfig,
-            overWrite, recursive, fileStoragePolicy);
+  public OzoneOutputStream createFile(String keyName, CreateFileOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    return proxy.createFile(volumeName, name, keyName, options);
   }
 
   public OzoneDataStreamOutput createStreamFile(String keyName, long size,

@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -129,7 +130,10 @@ public class TestOMFileStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgra
       throws IOException {
     OzoneBucket bucket = client.getObjectStore().getVolume(VOLUME_NAME).getBucket(bucketName);
     String keyName = "file-" + UUID.randomUUID();
-    bucket.createFile(keyName, 0, REPLICATION, false, false, requestedPolicy).close();
+    bucket.createFile(keyName, new CreateFileOptions.Builder()
+        .setReplicationConfig(REPLICATION)
+        .setStoragePolicy(requestedPolicy)
+        .build()).close();
     return bucket.getKey(keyName);
   }
 

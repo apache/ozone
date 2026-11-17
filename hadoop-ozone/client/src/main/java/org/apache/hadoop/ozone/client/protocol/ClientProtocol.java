@@ -1298,13 +1298,7 @@ public interface ClientProtocol {
    * @param volumeName Volume name
    * @param bucketName Bucket name
    * @param keyName    Absolute path of the file to be written
-   * @param size       Size of data to be written
-   * @param replicationConfig Replication config
-   * @param overWrite  if true existing file at the location will be overwritten
-   * @param recursive  if true file would be created even if parent directories
-   *                   do not exist
-   * @param storagePolicy storage policy for the file, or null to let the OM
-   *                      use the bucket's policy
+   * @param options    Size, replication config, overwrite, recursive flags and storage policy of the file
    * @return Output stream for writing to the file
    * @throws OMException if given key is a directory
    *                     if file exists and isOverwrite flag is false
@@ -1313,10 +1307,8 @@ public interface ClientProtocol {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
-  @SuppressWarnings("checkstyle:parameternumber")
   OzoneOutputStream createFile(String volumeName, String bucketName,
-      String keyName, long size, ReplicationConfig replicationConfig,
-      boolean overWrite, boolean recursive, @Nullable StoragePolicy storagePolicy) throws IOException;
+      String keyName, CreateFileOptions options) throws IOException;
 
   @SuppressWarnings("checkstyle:parameternumber")
   OzoneDataStreamOutput createStreamFile(String volumeName, String bucketName,

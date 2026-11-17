@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
@@ -673,11 +674,9 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
-  public OzoneOutputStream createFile(String volumeName, String bucketName, String keyName, long size,
-      ReplicationConfig replicationConfig, boolean overWrite, boolean recursive, StoragePolicy storagePolicy)
-      throws IOException {
-    return delegate.createFile(volumeName, bucketName, keyName, size, replicationConfig, overWrite, recursive,
-        storagePolicy);
+  public OzoneOutputStream createFile(String volumeName, String bucketName, String keyName,
+      CreateFileOptions options) throws IOException {
+    return delegate.createFile(volumeName, bucketName, keyName, options);
   }
 
   @Override

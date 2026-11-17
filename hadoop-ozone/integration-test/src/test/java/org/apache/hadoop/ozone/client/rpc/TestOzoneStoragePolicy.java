@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -683,8 +684,12 @@ public class TestOzoneStoragePolicy {
 
   private void writeFile(OzoneBucket bucket, String keyName, byte[] data, long size, boolean overWrite,
       OzoneStoragePolicy storagePolicy) throws IOException {
-    try (OzoneOutputStream out = bucket.createFile(keyName, size,
-        RATIS_THREE, overWrite, false, storagePolicy)) {
+    try (OzoneOutputStream out = bucket.createFile(keyName, new CreateFileOptions.Builder()
+        .setSize(size)
+        .setReplicationConfig(RATIS_THREE)
+        .setOverWrite(overWrite)
+        .setStoragePolicy(storagePolicy)
+        .build())) {
       out.write(data);
     }
   }

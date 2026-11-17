@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -821,10 +822,11 @@ public class TestRpcClient {
     RpcClient client = createRpcClient(createFileCapturingTransport(version, requests));
     try {
       ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      CreateFileOptions.Builder options = new CreateFileOptions.Builder().setSize(1L).setReplicationConfig(replication);
       IOException withoutPolicyError = assertThrows(IOException.class,
-          () -> client.createFile("vol", "bucket", "key", 1L, replication, false, false, null));
+          () -> client.createFile("vol", "bucket", "key", options.setStoragePolicy(null).build()));
       IOException withPolicyError = assertThrows(IOException.class,
-          () -> client.createFile("vol", "bucket", "key", 1L, replication, false, false, OzoneStoragePolicy.COLD));
+          () -> client.createFile("vol", "bucket", "key", options.setStoragePolicy(OzoneStoragePolicy.COLD).build()));
 
       assertThat(withoutPolicyError).hasMessage("captured");
       assertThat(requests.get(0).hasStoragePolicy()).isFalse();
