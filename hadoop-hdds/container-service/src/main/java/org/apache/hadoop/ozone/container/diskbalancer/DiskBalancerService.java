@@ -441,6 +441,7 @@ public class DiskBalancerService extends BackgroundService {
       return queue;
     }
 
+    boolean rejectedCandidate = false;
     for (int i = 0; i < availableTaskCount; i++) {
       ContainerCandidate candidate = volumeContainerChoosingPolicy.chooseVolumesAndContainer(
           ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold, movableContainerStates);
@@ -449,6 +450,18 @@ public class DiskBalancerService extends BackgroundService {
         HddsVolume destVolume = candidate.getDestVolume();
         ContainerData toBalanceContainer = candidate.getContainerData();
         if (toBalanceContainer != null) {
+          if (sourceVolume.getStorageType() != destVolume.getStorageType()) {
+            long startTime = Time.monotonicNow();
+            LOG.warn("Container {}: Source volume storage type ({}) differs from destination volume storage type ({}). "
+                    + "Skipping the disk balancing move.",
+                toBalanceContainer.getContainerID(), sourceVolume.getStorageType(), destVolume.getStorageType());
+            // The policy reserved destination space, but no task will run postCall() to release it.
+            destVolume.incCommittedBytes(0 - toBalanceContainer.getBytesUsed());
+            metrics.incrFailureCount(1);
+            metrics.getMoveFailureTime().add(Time.monotonicNow() - startTime);
+            rejectedCandidate = true;
+            continue;
+          }
           DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
               destVolume);
           queue.add(task);
@@ -459,7 +472,7 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     if (queue.isEmpty() && inProgressContainers.isEmpty()) {
-      if (stopAfterDiskEven) {
+      if (stopAfterDiskEven && !rejectedCandidate) {
         // Containers only move between volumes of the same StorageType, so no volume pair is also
         // reported when every StorageType has fewer than two volumes, even if those volumes are
         // unevenly used.
@@ -473,7 +486,10 @@ public class DiskBalancerService extends BackgroundService {
           LOG.warn("Failed to persist updated DiskBalancerInfo to file.", e);
         }
       }
-      metrics.incrIdleLoopNoAvailableVolumePairCount();
+      // Rejection by the service does not mean the policy found no balancing work.
+      if (!rejectedCandidate) {
+        metrics.incrIdleLoopNoAvailableVolumePairCount();
+      }
       cleanupPendingDeletionContainers();
     }
 
@@ -544,13 +560,6 @@ public class DiskBalancerService extends BackgroundService {
           LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
-        if (sourceVolume.getStorageType() != destVolume.getStorageType()) {
-          LOG.warn("Container {}: Source volume storage type ({}) differs from destination volume storage type ({}). "
-                  + "Skipping the disk balancing move.",
-              containerId, sourceVolume.getStorageType(), destVolume.getStorageType());
-          return BackgroundTaskResult.EmptyTaskResult.newResult();
-        }
-
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
             .resolve(String.valueOf(containerId));
