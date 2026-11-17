@@ -63,7 +63,6 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
@@ -623,9 +622,9 @@ public class OzoneManagerServiceProviderImpl
       long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     LOG.debug("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
-    ImmutablePair<Boolean, Long> dbUpdatesLatestSeqNumOfOMDB =
+    DeltaUpdatesResult dbUpdatesLatestSeqNumOfOMDB =
         innerGetAndApplyDeltaUpdatesFromOM(fromSequenceNumber, omdbUpdatesHandler);
-    if (!dbUpdatesLatestSeqNumOfOMDB.getLeft()) {
+    if (!dbUpdatesLatestSeqNumOfOMDB.success()) {
       LOG.error(
           "Retrieve OM DB delta update failed for sequence number : {}, " +
               "so falling back to full snapshot.", fromSequenceNumber);
@@ -634,7 +633,7 @@ public class OzoneManagerServiceProviderImpl
               fromSequenceNumber);
     }
     omdbUpdatesHandler.setLatestSequenceNumber(getCurrentOMDBSequenceNumber());
-    return dbUpdatesLatestSeqNumOfOMDB.getRight();
+    return dbUpdatesLatestSeqNumOfOMDB.lag();
   }
 
   /**
@@ -643,13 +642,13 @@ public class OzoneManagerServiceProviderImpl
    *
    * @param fromSequenceNumber from sequence number to request from.
    * @param omdbUpdatesHandler OM DB updates handler to buffer updates.
-   * @return Pair of dbUpdatesSuccess, lag (lag between OM and Recom)
+   * @return dbUpdatesSuccess and lag (lag between OM and Recom)
    * @throws IOException      when OM RPC request fails.
    * @throws RocksDBException when writing to RocksDB fails.
    */
   @VisibleForTesting
-  ImmutablePair<Boolean, Long> innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
-                                                                  OMDBUpdatesHandler omdbUpdatesHandler)
+  DeltaUpdatesResult innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
+                                                        OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     // Track delta fetch operation
     long deltaFetchStartTime = Time.monotonicNow();
@@ -720,7 +719,7 @@ public class OzoneManagerServiceProviderImpl
             "SequenceNumber diff: {}, SequenceNumber Lag from OM {}, isDBUpdateSuccess: {}",
         fromSequenceNumber, getCurrentOMDBSequenceNumber(), numUpdates,
         getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag, null != dbUpdates && dbUpdates.isDBUpdateSuccess());
-    return new ImmutablePair<>(null != dbUpdates && dbUpdates.isDBUpdateSuccess(), lag);
+    return new DeltaUpdatesResult(null != dbUpdates && dbUpdates.isDBUpdateSuccess(), lag);
   }
 
   /**
@@ -1039,5 +1038,11 @@ public class OzoneManagerServiceProviderImpl
     this.reconSnapshotProvider = reconSnapshotProvider;
   }
 
+  /**
+   * Whether the OM DB delta updates were applied successfully paired with the sequence number lag from OM,
+   * used as the result of fetching and applying delta updates.
+   */
+  record DeltaUpdatesResult(boolean success, long lag) {
+  }
 }
 

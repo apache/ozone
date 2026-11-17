@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
 /**
@@ -80,18 +79,17 @@ public interface OmTableHandler {
 
 
   /**
-   * Returns a triple with the total count of records (left), total unreplicated
-   * size (middle), and total replicated size (right) for the given table.
+   * Returns the total count of records, total unreplicated size, and total
+   * replicated size for the given table.
    * Increments count for each record and adds the dataSize if a record's value
    * is an instance of OmKeyInfo,RepeatedOmKeyInfo.
    *
    * @param tableName The name of the table to process.
    * @param omMetadataManager The OM metadata manager to get the table.
-   * @return A Triple with three Long values representing the count,
-   * unReplicated size and replicated size.
+   * @return the count, unReplicated size and replicated size.
    * @throws IOException If an I/O error occurs during the iterator traversal.
    */
-  Triple<Long, Long, Long> getTableSizeAndCount(String tableName, 
+  TableSizeAndCount getTableSizeAndCount(String tableName,
       OMMetadataManager omMetadataManager) throws IOException;
 
   /**
@@ -122,5 +120,12 @@ public interface OmTableHandler {
    */
   default String getUnReplicatedSizeKeyFromTable(String tableName) {
     return tableName + "UnReplicatedDataSize";
+  }
+
+  /**
+   * A table's record count paired with its unreplicated and replicated size,
+   * used as the totals computed by a table handler for OM Insights.
+   */
+  record TableSizeAndCount(long count, long unReplicatedSize, long replicatedSize) {
   }
 }

@@ -27,8 +27,6 @@ import java.sql.ResultSet;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.Test;
@@ -52,22 +50,22 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
         RECON_TASK_STATUS_TABLE_NAME, null);
 
     // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
-    List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
+    List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("task_name", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("last_updated_timestamp",
+    expectedPairs.add(new ColumnNameAndType("task_name", Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("last_updated_timestamp",
         Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("last_updated_seq_number",
+    expectedPairs.add(new ColumnNameAndType("last_updated_seq_number",
         Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("last_task_run_status",
+    expectedPairs.add(new ColumnNameAndType("last_task_run_status",
         Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("is_current_task_running",
+    expectedPairs.add(new ColumnNameAndType("is_current_task_running",
         Types.INTEGER));
 
-    List<Pair<String, Integer>> actualPairs = new ArrayList<>();
+    List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ImmutablePair<>(
+      actualPairs.add(new ColumnNameAndType(
           resultSet.getString("COLUMN_NAME"),
           resultSet.getInt("DATA_TYPE")));
     }

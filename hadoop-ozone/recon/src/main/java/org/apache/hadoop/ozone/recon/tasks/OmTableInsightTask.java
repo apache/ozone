@@ -34,7 +34,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -48,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
+import org.apache.hadoop.ozone.recon.tasks.OmTableHandler.TableSizeAndCount;
 import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -133,11 +133,11 @@ public class OmTableInsightTask implements ReconOmTask {
     for (String tableName : tables) {
       try {
         if (tableHandlers.containsKey(tableName)) {
-          Triple<Long, Long, Long> details = 
+          TableSizeAndCount details =
               tableHandlers.get(tableName).getTableSizeAndCount(tableName, omMetadataManager);
-          objectCountMap.put(getTableCountKeyFromTable(tableName), details.getLeft());
-          unReplicatedSizeMap.put(getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
-          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName), details.getRight());
+          objectCountMap.put(getTableCountKeyFromTable(tableName), details.count());
+          unReplicatedSizeMap.put(getUnReplicatedSizeKeyFromTable(tableName), details.unReplicatedSize());
+          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName), details.replicatedSize());
         } else {
           if (usesNonStringKeys(tableName)) {
             processTableSequentially(tableName, omMetadataManager);

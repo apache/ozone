@@ -34,8 +34,6 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.recon.upgrade.ReconVersion;
 import org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager;
 import org.apache.ozone.recon.schema.SchemaVersionTableDefinition;
@@ -63,15 +61,15 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
         SCHEMA_VERSION_TABLE_NAME, null);
 
     // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
-    List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
+    List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("version_number", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("applied_on", Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("version_number", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("applied_on", Types.VARCHAR));
 
-    List<Pair<String, Integer>> actualPairs = new ArrayList<>();
+    List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ImmutablePair<>(resultSet.getString("COLUMN_NAME"),
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"),
           resultSet.getInt("DATA_TYPE")));
     }
 
