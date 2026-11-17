@@ -69,23 +69,23 @@ public abstract class XceiverClientSpi implements Closeable {
     this.referenceCount.incrementAndGet();
   }
 
-  void decrementReference() {
+  /** @return true if the caller should now close this client. */
+  boolean decrementReference() {
     this.referenceCount.decrementAndGet();
-    cleanup();
+    return shouldClose();
   }
 
-  void setEvicted() {
+  /** @return true if the caller should now close this client. */
+  boolean setEvicted() {
     isEvicted = true;
-    cleanup();
+    return shouldClose();
   }
 
   // close the xceiverClient only if,
   // 1) there is no refcount on the client
   // 2) it has been evicted from the cache.
-  private void cleanup() {
-    if (referenceCount.get() == 0 && isEvicted) {
-      close();
-    }
+  private boolean shouldClose() {
+    return referenceCount.get() == 0 && isEvicted;
   }
 
   @VisibleForTesting
@@ -157,6 +157,37 @@ public abstract class XceiverClientSpi implements Closeable {
     } catch (ExecutionException e) {
       throw getIOExceptionForSendCommand(request, e);
     }
+  }
+
+  /**
+   * Sends a given command to the given datanode only, without failing over
+   * to the other datanodes in the pipeline.
+   * Implementations which cannot target a specific datanode fall back to
+   * {@link #sendCommand(ContainerCommandRequestProto, List)}.
+   * @param request Request
+   * @param validators functions to validate the response
+   * @param datanode the datanode to send the command to
+   * @return Response to the command
+   */
+  public ContainerCommandResponseProto sendCommand(
+      ContainerCommandRequestProto request,
+      List<Validator> validators,
+      DatanodeDetails datanode)
+      throws IOException {
+    return sendCommand(request, validators);
+  }
+
+  /**
+   * Returns the datanodes of the pipeline in the order they should be tried
+   * for a command on the given block.
+   * @param blockID the block the command operates on
+   * @param cmdType type of the command
+   * @return datanodes of the pipeline, in the order to try
+   */
+  public List<DatanodeDetails> getDatanodesInOrder(
+      ContainerProtos.DatanodeBlockID blockID, ContainerProtos.Type cmdType)
+      throws IOException {
+    return getPipeline().getNodesInOrder();
   }
 
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {

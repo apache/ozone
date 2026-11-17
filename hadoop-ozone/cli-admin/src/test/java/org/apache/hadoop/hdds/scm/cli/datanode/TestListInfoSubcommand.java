@@ -221,6 +221,28 @@ public class TestListInfoSubcommand {
         "Expected UUID " + nodes.get(0).getNodeID().getUuid() + " but got: " + uuid);
   }
 
+  @Test
+  public void testDataNodeByIpv6AddressTextForm() throws Exception {
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    HddsProtos.Node original = nodes.get(0);
+    HddsProtos.DatanodeDetailsProto nodeId = original.getNodeID().toBuilder()
+        .setIpAddress("2001:db8:0:0:0:0:0:1")
+        .build();
+    nodes.set(0, HddsProtos.Node.newBuilder(original).setNodeID(nodeId).build());
+
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodes);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--ip", "2001:db8::1", "--json");
+    cmd.execute(scmClient);
+
+    JsonNode root = mapper.readTree(outContent.toString(DEFAULT_ENCODING));
+    assertEquals(1, root.size());
+    assertEquals(nodes.get(0).getNodeID().getUuid(), root.get(0).get("id").asText());
+  }
+
   @ParameterizedTest
   @CsvSource({
       "true, --most-used, descending",

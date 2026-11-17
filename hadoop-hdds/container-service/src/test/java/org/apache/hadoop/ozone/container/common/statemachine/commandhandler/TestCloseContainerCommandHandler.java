@@ -104,8 +104,8 @@ public class TestCloseContainerCommandHandler {
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
-    when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(true);
-    when(writeChannel.isExist(nonExistentPipelineID.getProtobuf()))
+    when(writeChannel.isExist(pipelineID)).thenReturn(true);
+    when(writeChannel.isExist(nonExistentPipelineID))
         .thenReturn(false);
   }
 
@@ -119,7 +119,7 @@ public class TestCloseContainerCommandHandler {
     verify(containerHandler)
         .markContainerForClose(container);
     verify(writeChannel)
-        .submitRequest(any(), eq(pipelineID.getProtobuf()));
+        .submitRequest(any(), eq(pipelineID));
     verify(containerHandler, never())
         .quasiCloseContainer(eq(container), any());
   }

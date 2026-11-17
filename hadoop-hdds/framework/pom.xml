@@ -27,7 +27,7 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
-    <!-- hdds-server-framework is used by ozone-tools -->
+    <!-- hdds-server-framework is used by ozone-cli-other -->
     <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
 
@@ -51,6 +51,10 @@
     <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.jnr</groupId>
@@ -87,16 +91,6 @@
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-api</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>

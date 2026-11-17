@@ -98,8 +98,16 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
-        ozoneManager, ACLType.CREATE);
+    KeyArgs newKeyArgsProto = newKeyArgs.build();
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgsProto, ozoneManager, ACLType.CREATE);
+    } catch (IOException ex) {
+      // The upload ID generated above is not audited, as no upload exists for a rejected request.
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.INITIATE_MULTIPART_UPLOAD,
+          buildKeyArgsAuditMap(newKeyArgsProto), ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
     int schemaVersion = resolveMultipartSchemaVersion(ozoneManager);
     MultipartInfoInitiateRequest.Builder requestBuilder =
         multipartInfoInitiateRequest.toBuilder()

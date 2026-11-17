@@ -190,6 +190,20 @@ public final class TestContainerBalancerClusterAnalyzer {
   }
 
   @Test
+  void testIncludeAndExcludeByEquivalentIpv6Address() {
+    DatanodeDetails datanode = DatanodeDetails.newBuilder()
+        .setHostName("dn-host")
+        .setIpAddress("2001:db8:0:0:0:0:0:1")
+        .setUuid(UUID.randomUUID())
+        .build();
+
+    assertTrue(ContainerBalancerClusterAnalyzer.shouldExcludeDatanode(
+        datanode, Collections.singleton("2001:db8::1"), Collections.emptySet()));
+    assertFalse(ContainerBalancerClusterAnalyzer.shouldExcludeDatanode(
+        datanode, Collections.emptySet(), Collections.singleton("2001:db8::1")));
+  }
+
+  @Test
   void testExcludeWinsOverInclude() {
     List<DatanodeUsageInfoProto> nodes = Collections.singletonList(
         proto("both-lists", 100, 10));

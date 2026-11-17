@@ -25,12 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
@@ -39,6 +41,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
@@ -46,6 +50,8 @@ import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * This class tests the behavior of SCMDatanodeHeartbeatDispatcher.
@@ -53,7 +59,7 @@ import org.junit.jupiter.api.Test;
 public class TestSCMDatanodeHeartbeatDispatcher {
 
   @Test
-  public void testNodeReportDispatcher() throws IOException {
+  public void testNodeReportDispatcher() throws IOException, NodeNotFoundException {
 
     AtomicInteger eventReceived = new AtomicInteger();
 
@@ -62,6 +68,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.isNodeRegistered(any()))
         .thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
 
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(mockNodeManager,
@@ -89,7 +96,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
   }
 
   @Test
-  public void testContainerReportDispatcher() throws IOException {
+  public void testContainerReportDispatcher() throws IOException, NodeNotFoundException {
 
 
     AtomicInteger eventReceived = new AtomicInteger();
@@ -102,6 +109,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.isNodeRegistered(any()))
         .thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
 
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(
@@ -141,9 +149,10 @@ public class TestSCMDatanodeHeartbeatDispatcher {
   }
 
   @Test
-  public void testVersionReportProcessedOnlyWhenPresent() throws IOException {
+  public void testVersionReportProcessedOnlyWhenPresent() throws IOException, NodeNotFoundException {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
 
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
@@ -164,6 +173,84 @@ public class TestSCMDatanodeHeartbeatDispatcher {
         .setDatanodeVersion(version)
         .build());
     verify(mockNodeManager, times(1)).processVersionReport(any(), any());
+  }
+
+  private static Stream<NodeStatus> unhealthyNodeStatuses() {
+    return Stream.of(NodeStatus.inServiceStale(), NodeStatus.inServiceDead());
+  }
+
+  @Test
+  public void testHealthyNodeWithVersionReportIsNeverFenced() throws Exception {
+    // Healthy nodes passed the version gate at registration; their version only changes on restart,
+    // which causes re-registration on its own. The dispatcher must never fence a healthy node.
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
+
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
+
+    DatanodeVersionProto version = DatanodeVersionProto.newBuilder()
+        .setApparentVersion(1).setSoftwareVersion(1).build();
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(randomDatanodeDetails().getProtoBufMessage())
+        .setDatanodeVersion(version)
+        .build();
+
+    dispatcher.dispatch(heartbeat);
+
+    verify(mockNodeManager, never()).addDatanodeCommand(any(DatanodeID.class), any(ReregisterCommand.class));
+    verify(mockNodeManager, times(1)).processHeartbeat(any(), any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("unhealthyNodeStatuses")
+  public void testUnhealthyNodeWithIncompatibleVersionGetsReregisterCommand(
+      NodeStatus nodeStatus) throws Exception {
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(nodeStatus);
+    when(mockNodeManager.shouldFenceDatanode(any(), any())).thenReturn(true);
+
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
+
+    DatanodeVersionProto version = DatanodeVersionProto.newBuilder()
+        .setApparentVersion(1).setSoftwareVersion(1).build();
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(randomDatanodeDetails().getProtoBufMessage())
+        .setDatanodeVersion(version)
+        .build();
+
+    dispatcher.dispatch(heartbeat);
+
+    verify(mockNodeManager, times(1)).addDatanodeCommand(any(DatanodeID.class), any(ReregisterCommand.class));
+    verify(mockNodeManager, never()).processHeartbeat(any(), any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("unhealthyNodeStatuses")
+  public void testUnhealthyNodeWithCompatibleVersionProcessesHeartbeatNormally(
+      NodeStatus nodeStatus) throws Exception {
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(nodeStatus);
+    when(mockNodeManager.shouldFenceDatanode(any(), any())).thenReturn(false);
+
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
+
+    DatanodeVersionProto version = DatanodeVersionProto.newBuilder()
+        .setApparentVersion(1).setSoftwareVersion(1).build();
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(randomDatanodeDetails().getProtoBufMessage())
+        .setDatanodeVersion(version)
+        .build();
+
+    dispatcher.dispatch(heartbeat);
+
+    verify(mockNodeManager, never()).addDatanodeCommand(any(DatanodeID.class), any(ReregisterCommand.class));
+    verify(mockNodeManager, times(1)).processHeartbeat(any(), any());
   }
 
   /**

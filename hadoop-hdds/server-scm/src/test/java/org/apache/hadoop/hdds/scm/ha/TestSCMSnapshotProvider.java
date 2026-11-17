@@ -18,19 +18,30 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedConstruction;
 
 /**
  * Test cases for {@link SCMSnapshotProvider}.
@@ -98,6 +109,47 @@ class TestSCMSnapshotProvider {
         () -> new SCMSnapshotProvider(conf, null, certClient));
 
     assertTrue(exception.getMessage().contains("Ratis storage directory does not exist"));
+  }
+
+  @Test
+  void testFailedDownloadDoesNotInterruptThread(@TempDir Path tempDir) throws Exception {
+    SCMSnapshotProvider provider = createProvider(tempDir);
+    CompletableFuture<Path> download = new CompletableFuture<>();
+    download.completeExceptionally(new IOException("Download failed"));
+    try (MockedConstruction<InterSCMGrpcClient> ignored = mockConstruction(InterSCMGrpcClient.class,
+        (client, context) -> when(client.download(any(Path.class))).thenReturn(download))) {
+      IOException exception = assertThrows(IOException.class, () -> provider.getSCMDBSnapshot("leader"));
+      assertInstanceOf(ExecutionException.class, exception.getCause());
+      assertFalse(Thread.currentThread().isInterrupted());
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
+  void testInterruptedDownloadKeepsInterruptFlag(@TempDir Path tempDir) throws Exception {
+    SCMSnapshotProvider provider = createProvider(tempDir);
+    CompletableFuture<Path> download = new CompletableFuture<>();
+    try (MockedConstruction<InterSCMGrpcClient> ignored = mockConstruction(InterSCMGrpcClient.class,
+        (client, context) -> when(client.download(any(Path.class))).thenReturn(download))) {
+      Thread.currentThread().interrupt();
+      IOException exception = assertThrows(IOException.class, () -> provider.getSCMDBSnapshot("leader"));
+      assertInstanceOf(InterruptedException.class, exception.getCause());
+      assertTrue(Thread.currentThread().isInterrupted());
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  private SCMSnapshotProvider createProvider(Path tempDir) {
+    OzoneConfiguration conf = createConfig(tempDir);
+    assertTrue(new File(SCMHAUtils.getSCMRatisDirectory(conf)).mkdirs());
+    assertTrue(new File(SCMHAUtils.getSCMRatisSnapshotDirectory(conf)).mkdirs());
+    SCMNodeDetails leader = new SCMNodeDetails.Builder()
+        .setSCMNodeId("leader")
+        .setRpcAddress(new InetSocketAddress("127.0.0.1", 0))
+        .build();
+    return new SCMSnapshotProvider(conf, Collections.singletonList(leader), mock(CertificateClient.class));
   }
 
   /**

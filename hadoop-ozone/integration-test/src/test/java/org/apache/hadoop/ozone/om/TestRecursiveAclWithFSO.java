@@ -44,13 +44,13 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.AclTests;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test recursive acl checks for delete and rename for FSO Buckets.
  */
-public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
+public abstract class TestRecursiveAclWithFSO implements ClusterForTests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();
   private static final String VOLUME_NAME = "vol-" + UNIQUE;

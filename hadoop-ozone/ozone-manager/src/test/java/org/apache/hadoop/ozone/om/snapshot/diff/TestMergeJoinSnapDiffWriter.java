@@ -23,7 +23,9 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME;
 import static org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter.writeReport;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -163,7 +166,7 @@ class TestMergeJoinSnapDiffWriter {
 
       SnapshotDiffManager manager = mockManagerPassthroughDeletes();
       assertThrows(IOException.class,
-          () -> writeReport(manager, store, BUCKET_OBJECT_ID, false, false));
+          () -> writeReport(manager, store, BUCKET_OBJECT_ID, false, false, null));
     }
   }
 
@@ -207,7 +210,7 @@ class TestMergeJoinSnapDiffWriter {
       }).when(store).multiGetFromEdgeValues(any());
 
       long reportIndex = writeReport(mockManagerWithRealDeleteRetention(), store,
-          BUCKET_OBJECT_ID, true, false).getKey();
+          BUCKET_OBJECT_ID, true, false, null).getKey();
 
       assertEquals(2, multiGetCalls.get());
       assertEquals(1001, reportIndex);
@@ -250,6 +253,7 @@ class TestMergeJoinSnapDiffWriter {
         assertEquals("parent1", new String(entries.get(3).getSourcePath(), StandardCharsets.UTF_8));
         assertEquals(CREATE, entries.get(4).getType());
         assertEquals("parent1/child", new String(entries.get(4).getSourcePath(), StandardCharsets.UTF_8));
+        assertTrue(store.isReportDependencyOrdered());
       } else {
         assertEquals(DELETE, entries.get(0).getType());
         assertEquals("parent1", new String(entries.get(0).getSourcePath(), StandardCharsets.UTF_8));
@@ -262,8 +266,45 @@ class TestMergeJoinSnapDiffWriter {
         assertEquals("parent1", new String(entries.get(3).getSourcePath(), StandardCharsets.UTF_8));
         assertEquals(CREATE, entries.get(4).getType());
         assertEquals("parent1/child", new String(entries.get(4).getSourcePath(), StandardCharsets.UTF_8));
+        assertFalse(store.isReportDependencyOrdered());
       }
 
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRenameIntoDeletedDirectoryReportsDeleteOfSource(boolean ordering) throws Exception {
+    byte[] sig = signature("s");
+    try (SnapDiffJobStore store = newStore(true)) {
+      // From: file "a" and directories "b" and "c" under the bucket, file "a" under "c",
+      // and file 302 whose parent 400 has no edge.
+      // To: those files are moved under "b". "b" and "c" are deleted before their children
+      // are purged, so neither has a to edge. File 302's source path cannot be resolved.
+      store.putFromEdge(BUCKET_OBJECT_ID, 300L, nameBytes("b"));
+      store.putOldList(300L, entry(BUCKET_OBJECT_ID, "b", true, sig));
+      store.putOldList(301L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+      store.putNewList(301L, entry(300L, "a", false, sig));
+      store.putOldList(302L, entry(400L, "c", false, sig));
+      store.putNewList(302L, entry(300L, "c", false, sig));
+      store.putFromEdge(BUCKET_OBJECT_ID, 310L, nameBytes("c"));
+      store.putOldList(310L, entry(BUCKET_OBJECT_ID, "c", true, sig));
+      store.putOldList(311L, entry(310L, "a", false, sig));
+      store.putNewList(311L, entry(300L, "a", false, sig));
+      store.flushWrites();
+
+      List<DiffReportEntry> entries = runWriteReportWithManager(store, BUCKET_OBJECT_ID, true,
+          mockManagerWithRealDeleteRetention(), ordering);
+      assertThat(entries).containsExactlyInAnyOrder(
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "b"),
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "a"),
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c"),
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c/a"));
+      if (ordering) {
+        assertThat(entries).containsSubsequence(
+            SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c/a"),
+            SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c"));
+      }
     }
   }
 
@@ -286,7 +327,7 @@ class TestMergeJoinSnapDiffWriter {
       }).when(store).multiGetDependencyReportEntries(any());
 
       writeReport(mockManagerPassthroughDeletes(), store,
-          BUCKET_OBJECT_ID, true, true);
+          BUCKET_OBJECT_ID, true, true, null);
 
       assertEquals(2, batchLookups.get());
     }
@@ -302,8 +343,8 @@ class TestMergeJoinSnapDiffWriter {
       store.putNewList(202L, entry(200L, "child2", false, sig));
       store.flushWrites();
 
-      writeReport(mockManagerPassthroughDeletes(), store,
-          BUCKET_OBJECT_ID, true, true);
+      writeReport(mockManagerPassthroughDeletes(), store, BUCKET_OBJECT_ID, true, true, null);
+      assertFalse(store.isReportDependencyOrdered());
 
       List<DiffReportEntry> entries = store.readReportEntriesForTest();
       assertEquals(2, entries.size());
@@ -319,7 +360,7 @@ class TestMergeJoinSnapDiffWriter {
 
   private static List<DiffReportEntry> runWriteReportWithManager(SnapDiffJobStore store,
       long bucketObjectId, boolean fso, SnapshotDiffManager manager, boolean ordering) throws IOException {
-    writeReport(manager, store, bucketObjectId, fso, ordering);
+    writeReport(manager, store, bucketObjectId, fso, ordering, null);
     return store.readReportEntriesForTest();
   }
 

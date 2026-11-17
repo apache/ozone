@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.protocol;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.security.KerberosInfo;
@@ -25,8 +26,9 @@ import org.apache.hadoop.security.KerberosInfo;
  * The protocol spoken between datanodes and Recon. For specifics please see
  * the Protoc file that defines the parent protocol.
  */
-@KerberosInfo(serverPrincipal =
-        ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY)
+@KerberosInfo(
+    serverPrincipal = ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
+    clientPrincipal = HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public interface ReconDatanodeProtocol
     extends StorageContainerDatanodeProtocol {

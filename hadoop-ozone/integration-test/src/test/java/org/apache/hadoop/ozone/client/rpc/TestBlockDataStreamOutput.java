@@ -97,7 +97,6 @@ public class TestBlockDataStreamOutput {
 
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
-    conf.setQuietMode(false);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, 4, StorageUnit.MB);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 3);
 

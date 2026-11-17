@@ -116,6 +116,10 @@ public final class OmLifecycleUtils {
             MAX_TAG_KEY_LENGTH, OMException.ResultCodes.INVALID_REQUEST);
       }
 
+      if (value == null) {
+        throw new OMException("A Tag must have a Value.", OMException.ResultCodes.INVALID_REQUEST);
+      }
+
       if (!StringUtils.isEmpty(value) && value.getBytes(StandardCharsets.UTF_8).length > MAX_TAG_VALUE_LENGTH) {
         throw new OMException("A Tag's Value must be a length between 0 and " +
             MAX_TAG_VALUE_LENGTH, OMException.ResultCodes.INVALID_REQUEST);

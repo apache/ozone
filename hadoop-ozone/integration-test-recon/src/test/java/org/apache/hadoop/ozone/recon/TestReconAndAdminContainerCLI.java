@@ -410,9 +410,9 @@ class TestReconAndAdminContainerCLI {
     assertEquals(1, containerIDs.size());
     long containerID = containerIDs.get(0);
 
-    // Verify Recon picked up the new container.
-    assertEquals(scmContainerManager.getContainers(),
-        reconContainerManager.getContainers());
+    // Wait for Recon to pick up the new container, the datanode reports it to Recon on the next Recon heartbeat.
+    GenericTestUtils.waitFor(() -> scmContainerManager.getContainers().equals(reconContainerManager.getContainers()),
+        100, 20000);
 
     ReconContainerMetadataManager reconContainerMetadataManager =
         reconService.getReconServer().getReconContainerMetadataManager();

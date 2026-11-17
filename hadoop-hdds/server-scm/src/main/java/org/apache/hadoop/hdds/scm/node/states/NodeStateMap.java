@@ -92,7 +92,7 @@ public class NodeStateMap {
     try {
       final DatanodeEntry oldEntry = getExisting(id);
       oldInfo = oldEntry.getInfo();
-      nodeMap.put(id, new DatanodeEntry(datanode, oldEntry.copyContainers()));
+      nodeMap.put(id, new DatanodeEntry(datanode, oldEntry));
     } finally {
       lock.writeLock().unlock();
     }
