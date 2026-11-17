@@ -70,6 +70,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunk
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -78,6 +79,7 @@ import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.DatanodeTracingAttributes;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -1174,6 +1176,186 @@ public class TestHddsDispatcher {
 
     verify(streamObserver, never()).onNext(any());
     verify(containerSet, never()).scanContainer(anyLong(), any());
+  }
+
+  @Test
+  public void testFailedCommandRecordsStatusOnSpan() throws IOException {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null).getResult());
+      ContainerCommandRequestProto getBlock = ContainerCommandRequestProto.newBuilder()
+          .setCmdType(ContainerProtos.Type.GetBlock)
+          .setContainerID(1L)
+          .setDatanodeUuid(dd.getUuidString())
+          .setGetBlock(ContainerProtos.GetBlockRequestProto.newBuilder()
+              .setBlockID(new BlockID(1L, 2L).getDatanodeBlockIDProtobuf()))
+          .build();
+
+      assertEquals(ContainerProtos.Result.NO_SUCH_BLOCK, hddsDispatcher.dispatch(getBlock, null).getResult());
+
+      collector.assertAttribute("GetBlock", DatanodeTracingAttributes.STATUS, "FAILURE");
+      collector.assertError("GetBlock",
+          "Unable to find the block. BlockID : conID: 1 locID: 2 bcsId: 0 replicaIndex: null");
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testRejectedCommandRecordsExceptionOnSpan() throws IOException {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+      ContainerCommandRequestProto readChunk = getReadChunkRequest(getWriteChunkRequest(dd.getUuidString(), 1L, 1L));
+
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, hddsDispatcher.dispatch(readChunk, null).getResult());
+
+      collector.assertError("ReadChunk", "ContainerID 1 does not exist");
+      collector.assertExceptionRecorded("ReadChunk", StorageContainerException.class);
+      collector.assertAttribute("ReadChunk", DatanodeTracingAttributes.STATUS, "FAILURE");
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testSuccessfulCommandRecordsStatusOnSpan() throws IOException {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null).getResult());
+
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.STATUS, "SUCCESS");
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testWriteChunkRecordsCommandAttributesOnSpan() throws IOException {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+
+      ContainerCommandRequestProto writeChunk = getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+      assertEquals(ContainerProtos.Result.SUCCESS, hddsDispatcher.dispatch(writeChunk,
+          newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA)).getResult());
+
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.DN_CMD_TYPE, "WriteChunk");
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.HDDS_CONTAINER_ID, 1L);
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.DN_STAGE, "WRITE_DATA");
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID, 1L);
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.HDDS_CHUNK_OFFSET,
+          writeChunk.getWriteChunk().getChunkData().getOffset());
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.HDDS_CHUNK_LENGTH,
+          writeChunk.getWriteChunk().getChunkData().getLen());
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.HDDS_DATANODE_HOSTNAME, dd.getHostName());
+      collector.assertAttribute("WriteChunk", DatanodeTracingAttributes.HDDS_DATANODE_UUID, dd.getUuidString());
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testPutBlockRecordsBcsIdAssignedByDatanode() throws IOException {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+      ContainerCommandRequestProto writeChunk = getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+      assertEquals(ContainerProtos.Result.SUCCESS, hddsDispatcher.dispatch(writeChunk, null).getResult());
+
+      long logIndex = 42;
+      DispatcherContext context = DispatcherContext.newBuilder(Op.APPLY_TRANSACTION)
+          .setTerm(1)
+          .setLogIndex(logIndex)
+          .setStage(WriteChunkStage.COMBINED)
+          .setContainer2BCSIDMap(new HashMap<>(Collections.singletonMap(1L, 0L)))
+          .build();
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          hddsDispatcher.dispatch(ContainerTestHelper.getPutBlockRequest(writeChunk), context).getResult());
+
+      collector.assertAttribute("PutBlock", DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID, 1L);
+      collector.assertAttribute("PutBlock", DatanodeTracingAttributes.HDDS_BLOCK_BCS_ID, logIndex);
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testContainerAutoCreateIsTraced() throws IOException {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null).getResult());
+
+      collector.assertParent("HddsDispatcher.createContainer", "WriteChunk");
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testFailedReadBlockRecordsExceptionOnSpan() throws IOException {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    try (TestSpanCollector collector = TestSpanCollector.install("datanode")) {
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+      ContainerCommandRequestProto readBlock = ContainerCommandRequestProto.newBuilder()
+          .setCmdType(ContainerProtos.Type.ReadBlock)
+          .setContainerID(1L)
+          .setDatanodeUuid(dd.getUuidString())
+          .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+              .setBlockID(new BlockID(1L, 1L).getDatanodeBlockIDProtobuf())
+              .setOffset(0))
+          .build();
+      @SuppressWarnings("unchecked")
+      StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
+
+      hddsDispatcher.streamDataReadOnly(readBlock, streamObserver, null, null);
+
+      collector.assertError("ReadBlock", "ContainerID 1 does not exist");
+      collector.assertExceptionRecorded("ReadBlock", StorageContainerException.class);
+      collector.assertAttribute("ReadBlock", DatanodeTracingAttributes.STATUS, "FAILURE");
+      collector.assertAttribute("ReadBlock", DatanodeTracingAttributes.DN_CMD_TYPE, "ReadBlock");
+      collector.assertAttribute("ReadBlock", DatanodeTracingAttributes.HDDS_CONTAINER_ID, 1L);
+      collector.assertAttribute("ReadBlock", DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID, 1L);
+      collector.assertAttribute("ReadBlock", DatanodeTracingAttributes.HDDS_DATANODE_UUID, dd.getUuidString());
+    } finally {
+      ContainerMetrics.remove();
+    }
   }
 
   static DispatcherContext newContext(Op op) {

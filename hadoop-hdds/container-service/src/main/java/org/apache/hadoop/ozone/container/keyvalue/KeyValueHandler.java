@@ -66,6 +66,7 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -121,6 +122,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -138,6 +140,7 @@ import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerDiffReport;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
+import org.apache.hadoop.ozone.container.common.DatanodeTracingAttributes;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -236,14 +239,15 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     this.ozoneContainer = ozoneContainer;
     this.clock = clock;
-    blockManager = new BlockManagerImpl(config);
+    blockManager = TracingUtil.createProxy(new BlockManagerImpl(config), BlockManager.class, SpanKind.INTERNAL);
     validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
-    chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
-        volSet);
+    chunkManager = TracingUtil.createProxy(ChunkManagerFactory.createChunkManager(config, blockManager, volSet),
+        ChunkManager.class, SpanKind.INTERNAL);
     this.checksumManager = checksumManager;
     this.volumeChoosingPolicy = volumeChoosingPolicy != null ? volumeChoosingPolicy
-        : VolumeChoosingPolicyFactory.getPolicy(config);
+        : TracingUtil.createProxy(VolumeChoosingPolicyFactory.getPolicy(config), VolumeChoosingPolicy.class,
+            SpanKind.INTERNAL);
 
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -703,6 +707,7 @@ public class KeyValueHandler extends Handler {
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_BLOCK_BCS_ID, bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
       if (request.getPutBlock().getSync()) {
         kvContainer.flushAndSyncDB();

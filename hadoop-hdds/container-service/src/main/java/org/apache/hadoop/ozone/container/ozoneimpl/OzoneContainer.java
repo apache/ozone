@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfig
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.StartupProgress;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -242,7 +244,8 @@ public class OzoneContainer {
 
     SecurityConfig secConf = new SecurityConfig(conf);
     hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
-        handlers, context, metrics, TokenVerifier.create(secConf, secretKeyClient));
+        handlers, context, metrics, TracingUtil.createProxy(TokenVerifier.create(secConf, secretKeyClient),
+            TokenVerifier.class, SpanKind.INTERNAL));
 
     /*
      * ContainerController is the control plane

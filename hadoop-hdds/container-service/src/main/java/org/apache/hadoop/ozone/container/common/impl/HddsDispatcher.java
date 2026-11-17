@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -66,12 +68,14 @@ import org.apache.hadoop.ozone.audit.AuditMarker;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.DNAction;
+import org.apache.hadoop.ozone.container.common.DatanodeTracingAttributes;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -225,7 +229,22 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     ContainerCommandResponseProto responseProto = null;
     long startTime = Time.monotonicNowNanos();
     Type cmdType = msg.getCmdType();
+    TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.DN_CMD_TYPE, cmdType.name());
     long containerID = msg.getContainerID();
+    TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_CONTAINER_ID, containerID);
+    addDatanodeToCurrentSpan();
+    if (cmdType == Type.WriteChunk) {
+      ContainerProtos.WriteChunkRequestProto writeChunk = msg.getWriteChunk();
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          writeChunk.getBlockID().getLocalID());
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_CHUNK_OFFSET,
+          writeChunk.getChunkData().getOffset());
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_CHUNK_LENGTH,
+          writeChunk.getChunkData().getLen());
+    } else if (cmdType == Type.PutBlock) {
+      ContainerProtos.DatanodeBlockID blockID = msg.getPutBlock().getBlockData().getBlockID();
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID, blockID.getLocalID());
+    }
     Container container = getContainer(containerID);
     boolean isWriteStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
@@ -237,6 +256,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
             == DispatcherContext.WriteChunkStage.COMMIT_DATA);
+    Optional.ofNullable(dispatcherContext).filter(ctx -> cmdType == Type.WriteChunk)
+        .ifPresent(ctx -> TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.DN_STAGE,
+            ctx.getStage().name()));
 
     if (dispatcherContext == null) {
       // increase all op not through ratis
@@ -320,7 +342,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         }
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
-        responseProto = createContainer(msg);
+        responseProto = TracingUtil.executeInNewSpan("HddsDispatcher.createContainer", () -> createContainer(msg));
         metrics.incContainerOpsMetrics(Type.CreateContainer);
         metrics.incContainerOpsLatencies(Type.CreateContainer,
                 Time.monotonicNowNanos() - startTime);
@@ -423,6 +445,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // For container to be moved to unhealthy state here, the container can
         // only be in open, closing, or recovering state.
         State containerState = container.getContainerData().getState();
+        TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.DN_CONTAINER_STATE, containerState.name());
         Preconditions.checkState(
             containerState == State.OPEN
                 || containerState == State.CLOSING
@@ -618,6 +641,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
+  private void addDatanodeToCurrentSpan() {
+    DatanodeStateMachine parent = context != null ? context.getParent() : null;
+    DatanodeDetails dn = parent != null ? parent.getDatanodeDetails() : null;
+    if (dn != null) {
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_DATANODE_HOSTNAME, dn.getHostName());
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_DATANODE_UUID, dn.getUuidString());
+    }
+  }
+
   /**
    * If the container usage reaches the close threshold or the container is
    * marked unhealthy we send Close ContainerAction to SCM.
@@ -747,6 +779,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       AuditEventStatus result, Throwable exception) {
     Map<String, String> params;
     AuditMessage amsg;
+    TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.STATUS, result.name());
     switch (result) {
     case SUCCESS:
       if (isAllowed(action.getAction())) {
@@ -764,6 +797,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       break;
 
     case FAILURE:
+      TracingUtil.recordExceptionInCurrentSpan(exception);
       params = getAuditParams(msg, dispatcherContext);
       if (eventType == EventType.READ &&
           AUDIT.getLogger().isErrorEnabled(AuditMarker.READ.getMarker())) {
@@ -881,9 +915,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     Type cmdType = msg.getCmdType();
     String traceID = msg.getTraceID();
     Span span = TracingUtil.importAndCreateSpan(cmdType.toString(), traceID);
+    span.setAttribute(DatanodeTracingAttributes.DN_CMD_TYPE, cmdType.name());
     AuditAction action = getAuditAction(msg.getCmdType());
     EventType eventType = getEventType(msg);
 
+    Scope scope = span.makeCurrent();
     try (UncheckedAutoCloseable ignored = protocolMetrics.measure(cmdType)) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Command {}, trace ID: {}.", msg.getCmdType(), traceID);
@@ -892,6 +928,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       PerformanceStringBuilder perf = new PerformanceStringBuilder();
       ContainerCommandResponseProto responseProto = null;
       long containerID = msg.getContainerID();
+      TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_CONTAINER_ID, containerID);
+      addDatanodeToCurrentSpan();
+      if (msg.hasReadBlock()) {
+        TracingUtil.addAttributesToCurrentSpan(DatanodeTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+            msg.getReadBlock().getBlockID().getLocalID());
+      }
       Container container = getContainer(containerID);
       long startTime = Time.monotonicNow();
 
@@ -942,12 +984,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
     } catch (IOException ioe) {
+      TracingUtil.recordExceptionInCurrentSpan(ioe);
       final String s = ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED
           + " for " + dispatcherContext + ": " + ioe.getMessage();
       final StorageContainerException sce = new StorageContainerException(
           s, ioe, ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
     } finally {
+      scope.close();
       span.end();
     }
   }
