@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -108,6 +109,9 @@ public class TestSCMStateMachine {
   private final RaftPeerId followerId = RaftPeerId.valueOf("follower");
   private final RaftPeerId leaderId = RaftPeerId.valueOf("leader");
 
+  private volatile List<RaftPeer> currentPeers = Collections.singletonList(
+      RaftPeer.newBuilder().setId(followerId).build());
+
   private StorageContainerManager mockScm;
   private SCMMetrics metrics;
   private SCMDatanodeProtocolServer datanodeProtocolServer;
@@ -127,17 +131,12 @@ public class TestSCMStateMachine {
     SCMRatisServer ratisServer = mock(SCMRatisServer.class);
     RaftServer.Division division = mock(RaftServer.Division.class);
     DivisionInfo divisionInfo = mock(DivisionInfo.class);
-
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration("hdds.scm.ratis.shutdown.timeout", 1, TimeUnit.SECONDS);
     RaftConfiguration raftConf = mock(RaftConfiguration.class);
 
     when(mockScm.getMetrics()).thenReturn(metrics);
-    when(mockScm.getConfiguration()).thenReturn(conf);
-    when(mockScm.getScmId()).thenReturn("follower");
+    when(mockScm.getScmId()).thenReturn(followerId.toString());
     when(division.getRaftConf()).thenReturn(raftConf);
-    when(raftConf.getCurrentPeers()).thenReturn(
-        Collections.singletonList(RaftPeer.newBuilder().setId(followerId).build()));
+    when(raftConf.getCurrentPeers()).thenAnswer(invocation -> currentPeers);
     when(mockScm.isStopped()).thenAnswer(invocation -> scmStopped.get());
     when(mockScm.getScmContext()).thenReturn(scmContext);
     when(mockScm.getScmHAManager()).thenReturn(haManager);
@@ -173,51 +172,34 @@ public class TestSCMStateMachine {
   }
 
   @Test
-  void testRatisShutdownTerminatesScmAfterTimeout() {
+  void testNotifyServerShutdownTerminatesScm() {
     stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
 
-    verify(mockScm, after(300).never()).shutDown(anyString());
     verify(mockScm, timeout(5000)).shutDown(anyString());
   }
 
   @Test
-  void testCloseByRatisDoesNotTerminateImmediately() throws Exception {
-    stateMachine.close();
+  void testNotifyServerShutdownExitsCleanlyWhenScmIsDecommissioned() {
+    ExitUtils.disableSystemExit();
+    ExitUtils.clear();
+    try {
+      currentPeers = Collections.singletonList(RaftPeer.newBuilder().setId(leaderId).build());
+      stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
 
-    verify(mockScm, never()).shutDown(anyString());
-    verify(mockScm, never()).stop();
+      verify(mockScm, timeout(5000)).stop();
+      verify(mockScm, never()).shutDown(anyString());
+      assertThat(ExitUtils.getFirstExitException().getStatus()).isZero();
+    } finally {
+      ExitUtils.clear();
+    }
   }
 
   @Test
-  void testRatisShutdownTimerStartedOnce() {
-    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
-    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
-
-    verify(mockScm, timeout(5000).times(1)).shutDown(anyString());
-    verify(mockScm, after(500).times(1)).shutDown(anyString());
-  }
-
-  @Test
-  void testRatisShutdownIgnoredWhenNotAllServers() {
-    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), false);
-
-    verify(mockScm, after(1500).never()).shutDown(anyString());
-  }
-
-  @Test
-  void testRatisShutdownIgnoredWhenScmStopped() {
+  void testNotifyServerShutdownIgnoredWhenScmStopped() {
     scmStopped.set(true);
     stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
 
-    verify(mockScm, after(1500).never()).shutDown(anyString());
-  }
-
-  @Test
-  void testRatisShutdownSkippedWhenScmStoppedDuringWait() {
-    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
-    scmStopped.set(true);
-
-    verify(mockScm, after(1500).never()).shutDown(anyString());
+    verify(mockScm, after(500).never()).shutDown(anyString());
   }
 
   @Test

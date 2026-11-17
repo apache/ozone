@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -109,8 +108,6 @@ public class SCMStateMachine extends BaseStateMachine {
   private List<ManagedSecretKey> installingSecretKeys = null;
 
   private AtomicBoolean isStateMachineReady = new AtomicBoolean();
-  private final AtomicBoolean ratisShutdownTimerStarted = new AtomicBoolean();
-  private volatile boolean ratisShutdownTimedOut;
 
   // The leader's committed index captured when this SCM (re)joins as a
   // follower. Catch-up is measured against this fixed target rather than the
@@ -258,26 +255,20 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void notifyServerShutdown(RaftProtos.RoleInfoProto roleInfo, boolean allServer) {
     // If SCM is stopped, this shutdown originates from scm.stop(); otherwise it originates from Ratis.
-    if (!allServer || !isInitialized || scm.isStopped()) {
+    if (!isInitialized || scm.isStopped()) {
       return;
     }
-    if (!ratisShutdownTimerStarted.compareAndSet(false, true)) {
-      return;
-    }
-    Duration timeout = scm.getConfiguration().getObject(ScmConfig.class).getRatisShutdownTimeout();
-    LOG.error("SCM Ratis server is shut down by Ratis, terminating SCM in {}", timeout);
+    LOG.error("SCM Ratis server is shut down by Ratis, terminating SCM");
+    // Run on a different thread, so that the Ratis server can finish closing.
     CompletableFuture.runAsync(() -> {
-      if (scm.isStopped()) {
-        return;
-      }
-      ratisShutdownTimedOut = true;
       try {
         close();
       } catch (IOException e) {
-        LOG.error("Failed to close the SCM state machine after the Ratis shutdown", e);
-        scm.shutDown("Failed to close the SCM state machine after the Ratis shutdown");
+        String message = "Failed to close the SCM state machine after the Ratis server shutdown";
+        LOG.error(message, e);
+        scm.shutDown(message);
       }
-    }, CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS));
+    });
   }
 
   @Override
@@ -740,11 +731,6 @@ public class SCMStateMachine extends BaseStateMachine {
       if (decommissioned) {
         scm.stop();
         ExitUtils.terminate(0, "SCM is decommissioned, terminate SCM", LOG);
-        return;
-      }
-      if (!ratisShutdownTimedOut) {
-        // The shutdown timer terminates SCM once the shutdown timeout elapses.
-        LOG.error("SCM statemachine is closed by ratis");
         return;
       }
       scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
