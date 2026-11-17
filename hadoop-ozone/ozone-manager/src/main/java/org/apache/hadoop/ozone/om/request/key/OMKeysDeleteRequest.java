@@ -261,10 +261,14 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       OmLifecycleScanState state = null;
       if (sourceType == RequestSource.LIFECYCLE && deleteKeyRequest.hasScanState()) {
         state = OmLifecycleScanState.getFromProtobuf(deleteKeyRequest.getScanState());
-        // Update cache
-        ozoneManager.getMetadataManager().getLifecycleScanStateTable()
-            .addCacheEntry(new CacheKey<>(state.getBucketKey()),
-                CacheValue.get(trxnLogIndex, state));
+        if (isScanStateValid(omMetadataManager, state)) {
+          // Update cache
+          omMetadataManager.getLifecycleScanStateTable()
+              .addCacheEntry(new CacheKey<>(state.getBucketKey()), CacheValue.get(trxnLogIndex, state));
+        } else {
+          LOG.debug("Skip saving scan state {} as its bucket or lifecycle configuration no longer exists", state);
+          state = null;
+        }
       }
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);

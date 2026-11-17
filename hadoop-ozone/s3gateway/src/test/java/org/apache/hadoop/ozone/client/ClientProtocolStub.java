@@ -385,6 +385,9 @@ public class ClientProtocolStub implements ClientProtocol {
 
   private OzoneBucket getBucket(String volumeName, String bucketName)
       throws IOException {
+    if (volumeName == null) {
+      return objectStoreStub.getS3Bucket(bucketName);
+    }
     return objectStoreStub.getVolume(volumeName).getBucket(bucketName);
   }
 
@@ -550,8 +553,9 @@ public class ClientProtocolStub implements ClientProtocol {
                                                      int partNumberMarker,
                                                      int maxParts)
       throws IOException {
-    return getBucket(volumeName, bucketName)
-        .listParts(keyName, uploadID, partNumberMarker, maxParts);
+    OzoneBucket bucket = volumeName == null
+        ? objectStoreStub.getS3Volume().getBucket(bucketName) : getBucket(volumeName, bucketName);
+    return bucket.listParts(keyName, uploadID, partNumberMarker, maxParts);
   }
 
   @Override
