@@ -98,6 +98,9 @@ public class MockDatanodePipeline {
   private volatile Supplier<Throwable> watchFailure = null;
   private volatile int watchFailAfter = Integer.MAX_VALUE;
 
+  private volatile boolean streamCloseFailure;
+  private final AtomicInteger streamCloseCount = new AtomicInteger(0);
+
   public MockDatanodePipeline() throws IOException {
     this(new BlockID(1, 1));
   }
@@ -190,7 +193,12 @@ public class MockDatanodePipeline {
             receivedChunks.remove(receivedChunks.size() - 1);
           }
           src.position(src.limit());
-          return CompletableFuture.completedFuture(dataStreamReply(size));
+          streamCloseCount.incrementAndGet();
+          final DataStreamReply reply = dataStreamReply(size);
+          if (streamCloseFailure) {
+            when(reply.isSuccess()).thenReturn(false);
+          }
+          return CompletableFuture.completedFuture(reply);
         }
       }
       int count = chunkCount.incrementAndGet();
@@ -270,6 +278,11 @@ public class MockDatanodePipeline {
     return streamInitType;
   }
 
+  /** @return the number of writes with {@link StandardWriteOption#CLOSE}. */
+  public int getStreamCloseCount() {
+    return streamCloseCount.get();
+  }
+
   /** Concatenate all received chunks into a single byte array. */
   public byte[] getAllReceivedData() {
     int total = receivedChunks.stream().mapToInt(c -> c.length).sum();
@@ -299,6 +312,12 @@ public class MockDatanodePipeline {
   public MockDatanodePipeline failWatchAfter(int n, Supplier<Throwable> err) {
     this.watchFailAfter = n;
     this.watchFailure = err;
+    return this;
+  }
+
+  /** Reply to the write with {@link StandardWriteOption#CLOSE} with an unsuccessful reply. */
+  public MockDatanodePipeline failStreamClose() {
+    this.streamCloseFailure = true;
     return this;
   }
 

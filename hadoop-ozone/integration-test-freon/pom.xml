@@ -120,8 +120,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-integration-test</artifactId>
-      <type>test-jar</type>
+      <artifactId>ozone-integration-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

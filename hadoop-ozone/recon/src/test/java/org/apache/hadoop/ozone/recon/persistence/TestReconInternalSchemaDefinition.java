@@ -51,13 +51,14 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSet = metaData.getColumns(null, null,
         RECON_TASK_STATUS_TABLE_NAME, null);
 
+    // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
     List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
 
     expectedPairs.add(new ImmutablePair<>("task_name", Types.VARCHAR));
     expectedPairs.add(new ImmutablePair<>("last_updated_timestamp",
-        Types.BIGINT));
+        Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("last_updated_seq_number",
-        Types.BIGINT));
+        Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("last_task_run_status",
         Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("is_current_task_running",

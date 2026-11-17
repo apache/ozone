@@ -47,6 +47,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
@@ -114,6 +115,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -1077,6 +1079,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     boolean useFullDiff = snapshotForceFullDiff || forceFullDiff;
     boolean performNonNativeDiff = diffDisableNativeLibs || disableNativeDiff || !isNativeLibsLoaded;
 
+    MultiSnapshotLocks snapshotLocks =
+        new MultiSnapshotLocks(activeOmMetadataManager.getLock(), SNAPSHOT_DB_LOCK, false, 2);
     Consumer<SubStatus> activityReporter = (jobStatus) -> recordActivity(jobKey, jobStatus);
     try (CompositeDeltaDiffComputer deltaDiffComputer = new CompositeDeltaDiffComputer(
         ozoneManager.getOmSnapshotManager(), activeOmMetadataManager, diffJobPath,
@@ -1090,12 +1094,16 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           fromSnapshotName, toSnapshotName)) {
         return;
       }
+      // Acquire both stripes in order before opening either snapshot to avoid inversion with checkpoint locking.
+      if (!snapshotLocks.acquireLock(Arrays.asList(fsInfo.getSnapshotId(), tsInfo.getSnapshotId())).isLockAcquired()) {
+        throw new IOException("Unable to acquire snapshot DB read locks for snapshot diff");
+      }
       rcFromSnapshot =
           ozoneManager.getOmSnapshotManager()
-              .getActiveSnapshot(volumeName, bucketName, fromSnapshotName);
+              .getActiveSnapshot(volumeName, bucketName, fromSnapshotName, fsInfo.getSnapshotId());
       rcToSnapshot =
           ozoneManager.getOmSnapshotManager()
-              .getActiveSnapshot(volumeName, bucketName, toSnapshotName);
+              .getActiveSnapshot(volumeName, bucketName, toSnapshotName, tsInfo.getSnapshotId());
 
       OMMetadataManager fromMeta = rcFromSnapshot.get().getMetadataManager();
       OMMetadataManager toMeta = rcToSnapshot.get().getMetadataManager();
@@ -1182,12 +1190,13 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       //  throw this exception.
       throw new RuntimeException(exception);
     } finally {
-      // Decrement ref counts
-      if (rcFromSnapshot != null) {
-        rcFromSnapshot.close();
-      }
-      if (rcToSnapshot != null) {
-        rcToSnapshot.close();
+      try {
+        // Decrement ref counts
+        IOUtils.close(LOG, rcFromSnapshot, rcToSnapshot);
+      } finally {
+        if (snapshotLocks.isLockAcquired()) {
+          snapshotLocks.releaseLock();
+        }
       }
     }
   }
@@ -1381,7 +1390,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       throws Exception {
     List<Path> deltaFiles = getDeltaFiles(tableName, deltaDiffComputer, fsInfo, tsInfo, jobId)
         .stream().map(Pair::getLeft).collect(Collectors.toList());
-    if (deltaFiles.isEmpty()) {
+    // The directory stage also builds the path edges of the file entries, so it runs whenever there are any.
+    if (deltaFiles.isEmpty() && !(DIRECTORY_TABLE.equals(tableName) && store.hasListEntries())) {
       updateProgress(jobKey, 1.0);
       LOG.info("Skipped scan tables stage for table '{}' because there are no delta files, jobId: {}",
           tableName, jobId);
@@ -1410,7 +1420,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     long estimatedFromTableKeys = Math.max(1L, fromTable.getEstimatedKeyCount());
 
     if (fullDiff) {
-      FullDiffSequentialReader reader = new FullDiffSequentialReader(store, resolveFullDiffUpdateIdGate(fsInfo));
+      FullDiffSequentialReader reader =
+          new FullDiffSequentialReader(store, resolveFullDiffUpdateIdGate(fsInfo, tsInfo));
       if (fromTable.getName().equals(DIRECTORY_TABLE)) {
         reader.scanDirectoryTables(fromTable, toTable, tablePrefix, stageProgress,
             estimatedToTableKeys, estimatedFromTableKeys);
@@ -1430,11 +1441,19 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
   }
 
-  private Long resolveFullDiffUpdateIdGate(SnapshotInfo fromSnapshot) throws IOException {
-    if (fromSnapshot.getLastTransactionInfo() == null || fromSnapshot.getLastTransactionInfo().isEmpty()) {
+  private Long resolveFullDiffUpdateIdGate(SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot) throws IOException {
+    // Not lastTransactionInfo: purges and moves into the snapshot advance it past later changes.
+    Long fromIndex = getCreateTransactionIndex(fromSnapshot);
+    Long toIndex = getCreateTransactionIndex(toSnapshot);
+    // A from snapshot newer than the to snapshot (reverse diff) has every to row at or below its index.
+    return fromIndex != null && toIndex != null && fromIndex < toIndex ? fromIndex : null;
+  }
+
+  private static Long getCreateTransactionIndex(SnapshotInfo snapshot) throws IOException {
+    if (snapshot.getCreateTransactionInfo() == null || snapshot.getCreateTransactionInfo().isEmpty()) {
       return null;
     }
-    return TransactionInfo.fromByteString(fromSnapshot.getLastTransactionInfo()).getTransactionIndex();
+    return TransactionInfo.fromByteString(snapshot.getCreateTransactionInfo()).getTransactionIndex();
   }
 
   private long resolveFromSnapshotDbTxSequenceNumber(SnapshotInfo fromSnapshot) throws IOException {

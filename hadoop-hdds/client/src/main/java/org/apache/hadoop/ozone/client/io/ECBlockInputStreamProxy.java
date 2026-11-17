@@ -54,8 +54,8 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   private final BlockLocationInfo blockInfo;
   private final ECBlockInputStreamFactory ecBlockInputStreamFactory;
 
-  private BlockExtendedInputStream blockReader;
-  private boolean reconstructionReader = false;
+  private volatile BlockExtendedInputStream blockReader;
+  private volatile boolean reconstructionReader = false;
   private final CopyOnWriteArrayList<DatanodeDetails> failedLocations;
   private volatile boolean closed = false;
   private OzoneClientConfig config;
@@ -215,6 +215,26 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
     }
     if (position >= blockInfo.getLength()) {
       return EOF;
+    }
+    // Read blockReader before reconstructionReader: failover sets the flag before it replaces the reader.
+    BlockExtendedInputStream healthyReader = blockReader;
+    if (!reconstructionReader && failedLocations.isEmpty()) {
+      int bufferPosition = buffer.position();
+      try {
+        return healthyReader.read(position, buffer);
+      } catch (IOException e) {
+        if (e instanceof BadDataLocationException) {
+          failedLocations.addAllAbsent(((BadDataLocationException) e).getFailedLocations());
+        }
+        // a new reader below reconstructs the failed locations
+        String message = "Retrying positioned read with a new reader due to an error in ECBlockReader.";
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(message, e);
+        } else {
+          LOG.warn("{} Exception Class: {} , Exception Message: {}", message, e.getClass().getName(), e.getMessage());
+        }
+        buffer.position(bufferPosition);
+      }
     }
     // Each request owns its cursor and reconstruction buffers; failed locations are shared.
     try (ECBlockInputStreamProxy reader = new ECBlockInputStreamProxy(repConfig, blockInfo,

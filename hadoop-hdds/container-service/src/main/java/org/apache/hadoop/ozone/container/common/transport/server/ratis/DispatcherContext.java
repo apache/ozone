@@ -129,8 +129,6 @@ public final class DispatcherContext {
       case APPLY_TRANSACTION:
       case WRITE_STATE_MACHINE_DATA:
       case READ_STATE_MACHINE_DATA:
-      case STREAM_LINK:
-      case STREAM_COMMAND:
         return false;
       default:
         return true;

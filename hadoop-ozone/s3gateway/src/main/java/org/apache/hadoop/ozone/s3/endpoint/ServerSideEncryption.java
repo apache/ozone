@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_ALGORITHM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_KEY_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_SSE_CUSTOMER_KEY_MD5_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CONTEXT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_ALGORITHM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.SSE_CUSTOMER_KEY_HEADER;
@@ -38,6 +39,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -54,6 +56,12 @@ final class ServerSideEncryption {
   static final String AES256 = "AES256";
   static final String AWS_KMS = "aws:kms";
   static final String AWS_KMS_DSSE = "aws:kms:dsse";
+
+  /**
+   * The key metadata that stores the algorithm an object was written with. A user metadata key can never be equal to
+   * it, in any version, because a header name cannot contain {@code ':'}.
+   */
+  static final String ALGORITHM_METADATA_KEY = RESERVED_USER_METADATA_KEY_PREFIX + "sse:algorithm";
 
   private static final List<String> CUSTOMER_KEY_HEADERS = ImmutableList.of(
       SSE_CUSTOMER_ALGORITHM_HEADER, SSE_CUSTOMER_KEY_HEADER, SSE_CUSTOMER_KEY_MD5_HEADER,
@@ -108,6 +116,34 @@ final class ServerSideEncryption {
     return AWS_KMS.equals(algorithm)
         ? ImmutableMap.of(SSE_HEADER, algorithm, SSE_KMS_KEY_ID_HEADER, bucketKey)
         : ImmutableMap.of(SSE_HEADER, algorithm);
+  }
+
+  /**
+   * Stores the algorithm accepted by {@link #checkWrite} in the metadata of the key being written, for
+   * {@link #readHeaders}. A copy does not keep the algorithm of its source: like a new object, it gets the algorithm
+   * of its own request.
+   */
+  static void putAlgorithm(Map<String, String> metadata, Map<String, String> sseHeaders) {
+    metadata.remove(ALGORITHM_METADATA_KEY);
+    final String algorithm = sseHeaders.get(SSE_HEADER);
+    if (algorithm != null) {
+      metadata.put(ALGORITHM_METADATA_KEY, algorithm);
+    }
+  }
+
+  /**
+   * Returns the SSE headers of a GetObject or HeadObject response. Like in AWS, an encrypted object reports its
+   * encryption: the algorithm it was written with, or {@code aws:kms} if it was written without one (or before the
+   * algorithm was stored), and for {@code aws:kms} the KMS key. An object that is not encrypted reports none.
+   */
+  static Map<String, String> readHeaders(OzoneKey key) {
+    final String kmsKey = key.getEncryptionKeyName();
+    if (kmsKey == null) {
+      return ImmutableMap.of();
+    }
+    return AES256.equals(key.getMetadata().get(ALGORITHM_METADATA_KEY))
+        ? ImmutableMap.of(SSE_HEADER, AES256)
+        : ImmutableMap.of(SSE_HEADER, AWS_KMS, SSE_KMS_KEY_ID_HEADER, kmsKey);
   }
 
   /** Adds the SSE headers returned by {@link #checkWrite} to {@code response}. */

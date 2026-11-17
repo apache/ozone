@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -48,7 +49,10 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -76,14 +80,18 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
   @TempDir
   private Path temporaryFolder;
+  private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconStorageContainerManagerFacade reconScm;
+  private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
   private OMDBInsightEndpoint omdbInsightEndpoint;
 
   @BeforeEach
   public void setUp() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 100);
-    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
+    omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("OmMetataDir")).toFile());
@@ -101,7 +109,18 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
             .addBinding(OMDBInsightEndpoint.class)
             .build();
     omdbInsightEndpoint = reconTestInjector.getInstance(OMDBInsightEndpoint.class);
+    reconScm = (ReconStorageContainerManagerFacade) reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+    replicaHistoryDBProvider = reconTestInjector.getInstance(ReconReplicaHistoryDBProvider.class);
     populateOMDB();
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+    IOUtils.closeQuietly(replicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, omMetadataManager);
   }
 
   private static OMMetadataManager initializeNewOmMetadataManager(File omDbDir) throws IOException {

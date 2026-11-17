@@ -123,7 +123,7 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
     Path dbDir = Files.createTempDirectory(tempDir, directoryPrefix);
     File configDir = Files.createDirectory(dbDir.resolve("Config")).toFile();
     Provider<DataSourceConfiguration> configProvider =
-        new AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider(configDir);
+        new AbstractReconSqlDBTest.SqliteDataSourceConfigurationProvider(configDir);
     return Guice.createInjector(
         new JooqPersistenceModule(configProvider),
         new AbstractModule() {

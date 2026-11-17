@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,7 @@ import org.junit.jupiter.api.TestInstance;
  * Test allocate container calls.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestAllocateContainer implements NonHATests.TestCase {
+public abstract class TestAllocateContainer implements ClusterForTests.TestCase {
 
   private OzoneConfiguration conf;
   private StorageContainerLocationProtocolClientSideTranslatorPB
