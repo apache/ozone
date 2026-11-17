@@ -116,7 +116,7 @@ class TestECReplicationConfig {
     final ECReplicationConfig cachedFromString = ECReplicationConfig.getInstance("rs-6-3-1024k");
     final ECReplicationConfig cachedFromProto = ECReplicationConfig.getInstance(new ECReplicationConfig(3, 2)
         .toProto());
-    for (int data = 1; data <= 2 * ECReplicationConfig.MAX_CACHED; data++) {
+    for (int data = 1; data <= ECReplicationConfig.MAX_CACHED_STRINGS; data++) {
       final String string = "rs-" + data + "-1-1024k";
       assertEquals(new ECReplicationConfig(string), ECReplicationConfig.getInstance(string));
     }
@@ -136,6 +136,20 @@ class TestECReplicationConfig {
     assertSame(cachedFromString, ECReplicationConfig.getInstance(cachedFromString.toProto()));
     assertSame(cachedFromProto, ECReplicationConfig.getInstance(cachedFromProto.toProto()));
     assertSame(cachedFromProto, ECReplicationConfig.getInstance("rs-3-2-1024k"));
+  }
+
+  /** Once the configs are full, a string is still cached, so the same string returns the same instance. */
+  @Test
+  void testGetInstanceCachesStringsAfterConfigsAreFull() {
+    for (int data = 1; data <= ECReplicationConfig.MAX_CACHED_CONFIGS; data++) {
+      ECReplicationConfig.getInstance(new ECReplicationConfig(data, 1).toProto());
+    }
+
+    final String string = "rs-6-1-8192k";
+    final ECReplicationConfig config = ECReplicationConfig.getInstance(string);
+    assertEquals(new ECReplicationConfig(string), config);
+    assertSame(config, ECReplicationConfig.getInstance(string));
+    assertNotSame(config, ECReplicationConfig.getInstance(config.toProto()));
   }
 
   @Test

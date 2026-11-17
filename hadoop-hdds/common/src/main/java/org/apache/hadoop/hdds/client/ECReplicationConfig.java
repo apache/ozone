@@ -42,9 +42,12 @@ public class ECReplicationConfig implements ReplicationConfig {
   // rs-6-3-1048576 are accepted too.
   private static final Pattern STRING_FORMAT = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)([kK])?");
 
-  /** The maximum number of configs, and of strings, cached by {@link #getInstance}. */
+  /** The maximum number of configs cached by {@link #getInstance}. */
   @VisibleForTesting
-  static final int MAX_CACHED = 64;
+  static final int MAX_CACHED_CONFIGS = 64;
+  /** The maximum number of strings cached by {@link #getInstance(String)}, more than configs for other spellings. */
+  @VisibleForTesting
+  static final int MAX_CACHED_STRINGS = 256;
   /**
    * The shared instance of each config by value. Only a few configs are used in practice, so they are shared instead
    * of creating equal objects; the size is bounded since a client may send arbitrary configs.
@@ -83,16 +86,16 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   /**
    * Same as {@link #ECReplicationConfig(String)}, but returns a shared instance for a config seen before, up to
-   * {@link #MAX_CACHED} configs.
+   * {@link #MAX_CACHED_CONFIGS} configs and {@link #MAX_CACHED_STRINGS} strings.
    */
   public static ECReplicationConfig getInstance(String string) {
     final ECReplicationConfig cached = BY_STRING.get(string);
     if (cached != null) {
       return cached;
     }
-    final ECReplicationConfig config = intern(parse(string));
+    final ECReplicationConfig config = intern(new ECReplicationConfig(string));
     // The size check is not atomic with the put, so concurrent callers may exceed the bound by a few entries.
-    if (BY_STRING.size() < MAX_CACHED) {
+    if (BY_STRING.size() < MAX_CACHED_STRINGS) {
       BY_STRING.putIfAbsent(string, config);
     }
     return config;
@@ -100,7 +103,7 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   /**
    * Same as {@link #ECReplicationConfig(HddsProtos.ECReplicationConfig)}, but returns a shared instance for a config
-   * seen before, up to {@link #MAX_CACHED} configs.
+   * seen before, up to {@link #MAX_CACHED_CONFIGS} configs.
    */
   public static ECReplicationConfig getInstance(HddsProtos.ECReplicationConfig proto) {
     return intern(new ECReplicationConfig(proto));
@@ -113,7 +116,7 @@ public class ECReplicationConfig implements ReplicationConfig {
       return cached;
     }
     // The size check is not atomic with the put, so concurrent callers may exceed the bound by a few entries.
-    if (INSTANCES.size() >= MAX_CACHED) {
+    if (INSTANCES.size() >= MAX_CACHED_CONFIGS) {
       return config;
     }
     final ECReplicationConfig previous = INSTANCES.putIfAbsent(config, config);
@@ -161,20 +164,6 @@ public class ECReplicationConfig implements ReplicationConfig {
    *         invalid
    */
   public ECReplicationConfig(String string) {
-    this(parse(string));
-  }
-
-  private ECReplicationConfig(ECReplicationConfig other) {
-    this(other.data, other.parity, other.codec, other.ecChunkSize);
-  }
-
-  /**
-   * Extracts the codec, data, parity and chunk size from a string such as rs-6-3-1024k.
-   *
-   * @return a new instance for these values
-   * @throws IllegalArgumentException if the string is not a valid EC replication config
-   */
-  private static ECReplicationConfig parse(String string) {
     final Matcher matcher = STRING_FORMAT.matcher(string);
     if (!matcher.matches()) {
       throw new IllegalArgumentException("EC replication config should be " +
@@ -182,7 +171,6 @@ public class ECReplicationConfig implements ReplicationConfig {
           " Provided configuration was: " + string);
     }
 
-    final EcCodec codec;
     try {
       codec = EcCodec.valueOf(matcher.group(1).toUpperCase());
     } catch (IllegalArgumentException e) {
@@ -191,8 +179,8 @@ public class ECReplicationConfig implements ReplicationConfig {
           e);
     }
 
-    final int data = Integer.parseInt(matcher.group(2));
-    final int parity = Integer.parseInt(matcher.group(3));
+    data = Integer.parseInt(matcher.group(2));
+    parity = Integer.parseInt(matcher.group(3));
     if (data <= 0 || parity <= 0) {
       throw new IllegalArgumentException("Data and parity part in EC " +
           "replication config supposed to be positive numbers");
@@ -207,7 +195,7 @@ public class ECReplicationConfig implements ReplicationConfig {
       // The "k" modifier is present, so multiply by 1024
       chunkSize = chunkSize * 1024;
     }
-    return new ECReplicationConfig(data, parity, codec, chunkSize);
+    ecChunkSize = chunkSize;
   }
 
   public ECReplicationConfig(

@@ -40,7 +40,8 @@ import org.junit.jupiter.api.Test;
  * throughput with several threads.
  *
  * <p>The last case decodes configs that are not allowed by default by {@code ozone.replication.allowed-configs}, as a
- * client sending arbitrary values could; they are shared as well, up to {@link ECReplicationConfig#MAX_CACHED} configs.
+ * client sending arbitrary values could; they are shared as well, up to
+ * {@link ECReplicationConfig#MAX_CACHED_CONFIGS} configs.
  *
  * <p>Only public API is used, so the same class can be run before and after a change for an A/B comparison.
  *
