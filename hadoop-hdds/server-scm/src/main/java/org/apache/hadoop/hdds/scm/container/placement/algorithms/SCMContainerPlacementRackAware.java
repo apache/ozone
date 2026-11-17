@@ -124,7 +124,7 @@ public final class SCMContainerPlacementRackAware
     int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
     int unavailableNodesCount = countUnavailableNodes(usedNodes, excludedNodes);
     if (datanodeCount < nodesRequired + unavailableNodesCount) {
-      throw new SCMException("No enough datanodes to choose. TotalNode = " + datanodeCount +
+      throw new SCMException("Not enough datanodes to choose. TotalNode = " + datanodeCount +
           " RequiredNode = " + nodesRequired + " UnavailableNode = " + unavailableNodesCount +
           " (UsedNode = " + usedNodesCount + ", ExcludedNode = " + excludedNodesCount + ")", null);
     }
@@ -292,7 +292,7 @@ public final class SCMContainerPlacementRackAware
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     if (datanodeCount < nodesRequired + excludedNodesCount) {
-      throw new SCMException("No enough datanodes to choose. " +
+      throw new SCMException("Not enough datanodes to choose. " +
           "TotalNode = " + datanodeCount +
           " RequiredNode = " + nodesRequired +
           " ExcludedNode = " + excludedNodesCount, null);

@@ -300,13 +300,12 @@ public final class OzoneTestHelper {
 
     // wait for the pipeline to get destroyed in the datanodes
     for (Pipeline pipeline : pipelineList) {
-      HddsProtos.PipelineID pipelineId = pipeline.getId().getProtobuf();
       for (DatanodeDetails dn : pipeline.getNodes()) {
         XceiverServerSpi server =
             cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
                 .getDatanodeStateMachine().getContainer().getWriteChannel();
         assertInstanceOf(XceiverServerRatis.class, server);
-        GenericTestUtils.waitFor(() -> !server.isExist(pipelineId),
+        GenericTestUtils.waitFor(() -> !server.isExist(pipeline.getId()),
             100, 30_000);
       }
     }
@@ -324,8 +323,8 @@ public final class OzoneTestHelper {
                       .getWriteChannel();
       assertInstanceOf(XceiverServerRatis.class, server);
       try {
-        server.addGroup(pipeline.getId().getProtobuf(), Collections.
-                unmodifiableList(pipeline.getNodes()));
+        final List<DatanodeDetails> peers = Collections.unmodifiableList(pipeline.getNodes());
+        server.addGroup(pipeline.getId(), peers, Collections.nCopies(peers.size(), 0));
       } catch (Exception e) {
         //ignore exception
       }
