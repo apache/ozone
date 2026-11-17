@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +59,12 @@ public class ContainerController {
       final Map<ContainerType, Handler> handlers) {
     this.containerSet = containerSet;
     this.handlers = handlers;
+  }
+
+  /** @return the {@link WitnessedContainerMetadataStore}, or null if it is unavailable. */
+  @Nullable
+  public WitnessedContainerMetadataStore getContainerMetadataStore() {
+    return containerSet.getContainerMetadataStore();
   }
 
   /**

@@ -28,11 +28,18 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineCreateInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,13 +51,18 @@ import org.junit.jupiter.params.provider.EnumSource;
 /**
  * Test that {@link XceiverServerRatis#addGroup} passes the {@link ReplicationType} to {@link ContainerStateMachine},
  * and that {@link XceiverServerRatis#removeGroup(RaftGroupId, org.apache.ratis.grpc.GrpcTlsConfig)}
- * removes the group from the peers only for {@link ReplicationType#RATIS}.
+ * removes the group from the peers only for {@link ReplicationType#RATIS},
+ * and that the {@link ReplicationType} is persisted for restart.
  */
 public class TestXceiverServerRatisReplicationType {
   @TempDir
   private File dir;
   @TempDir
   private File peerDir;
+  @TempDir
+  private File restartDir;
+  @TempDir
+  private File metadataDir;
   private DatanodeDetails dn;
   private XceiverServerRatis server;
   private XceiverServerRatis peerServer;
@@ -125,11 +137,76 @@ public class TestXceiverServerRatisReplicationType {
     return false;
   }
 
+  @ParameterizedTest
+  @EnumSource(value = ReplicationType.class, names = {"RATIS", "CHAINED"})
+  void testRestart(ReplicationType type) throws Exception {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, restartDir.getAbsolutePath());
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, metadataDir.getAbsolutePath());
+    final WitnessedContainerMetadataStore store = WitnessedContainerMetadataStoreImpl.get(conf);
+    try {
+      final Table<PipelineID, PipelineCreateInfoProto> table = store.getPipelineCreateInfoTable();
+      final ContainerController controller = new ContainerController(
+          ContainerSet.newRwContainerSet(store, 1000), Collections.emptyMap());
+      final DatanodeDetails datanode = MockPipeline.createPipeline(1).getFirstNode();
+      final PipelineID pipelineID = PipelineID.randomId();
+
+      XceiverServerRatis s = newServer(datanode, conf, controller);
+      try {
+        s.addGroup(pipelineID, type, Collections.singletonList(datanode), Collections.singletonList(0));
+        // only non-RATIS pipelines are stored
+        assertEquals(type == ReplicationType.CHAINED, table.isExist(pipelineID));
+        if (type == ReplicationType.CHAINED) {
+          final PipelineCreateInfoProto info = table.get(pipelineID);
+          assertEquals(pipelineID, PipelineID.getFromProtobuf(info.getId()));
+          assertEquals(type, info.getReplicationType());
+        }
+      } finally {
+        s.stop();
+      }
+
+      // an entry without a group, e.g. the datanode crashed during addGroup
+      final PipelineID noGroup = PipelineID.randomId();
+      table.put(noGroup, PipelineCreateInfoProto.newBuilder()
+          .setId(noGroup.getProtobuf())
+          .setReplicationType(ReplicationType.CHAINED)
+          .build());
+
+      // restart: the group is reloaded from the Ratis storage
+      s = newServer(datanode, conf, controller);
+      try {
+        assertReplicationType(type, pipelineID, s);
+        assertFalse(table.isExist(noGroup));
+
+        s.removeGroup(pipelineID.getGroupId(), null);
+        assertFalse(table.isExist(pipelineID));
+      } finally {
+        s.stop();
+      }
+    } finally {
+      store.stop();
+    }
+  }
+
+  private static XceiverServerRatis newServer(DatanodeDetails datanode, OzoneConfiguration conf,
+      ContainerController controller) throws Exception {
+    final XceiverServerRatis s = XceiverServerRatis.newXceiverServerRatis(null, datanode, conf,
+        ContainerTestUtils.getNoopContainerDispatcher(), controller, null, null);
+    s.start();
+    return s;
+  }
+
   private void assertReplicationType(ReplicationType expected, PipelineID pipelineID) throws Exception {
+    assertReplicationType(expected, pipelineID, server);
+  }
+
+  private static void assertReplicationType(ReplicationType expected, PipelineID pipelineID, XceiverServerRatis s)
+      throws Exception {
     final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
     final ContainerStateMachine stateMachine = assertInstanceOf(ContainerStateMachine.class,
-        server.getServerDivision(groupId).getStateMachine());
+        s.getServerDivision(groupId).getStateMachine());
     assertEquals(expected, stateMachine.getReplicationType());
-    assertEquals(expected, server.getReplicationType(pipelineID.getGroupId()));
+    assertEquals(expected, s.getReplicationType(pipelineID.getGroupId()));
   }
 }
