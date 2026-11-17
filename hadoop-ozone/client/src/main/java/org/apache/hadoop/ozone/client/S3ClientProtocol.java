@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -455,6 +456,12 @@ final class S3ClientProtocol implements ClientProtocol {
   public OmMultipartInfo initiateMultipartUpload(String volumeName, String bucketName, String keyName,
       ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags) throws IOException {
     return delegate.initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig, metadata, tags);
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName, String bucketName, String keyName,
+      MultipartUploadOptions options) throws IOException {
+    return delegate.initiateMultipartUpload(volumeName, bucketName, keyName, options);
   }
 
   @Override

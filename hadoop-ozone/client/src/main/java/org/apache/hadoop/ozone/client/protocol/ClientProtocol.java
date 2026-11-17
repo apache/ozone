@@ -853,6 +853,19 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Initiate Multipart upload.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param options Replication config, metadata, tags and storage policy of the key
+   * @return {@link OmMultipartInfo}
+   * @throws IOException
+   */
+  OmMultipartInfo initiateMultipartUpload(String volumeName, String
+      bucketName, String keyName, MultipartUploadOptions options)
+      throws IOException;
+
+  /**
    * Create a part key for a multipart upload key.
    * @param volumeName
    * @param bucketName
