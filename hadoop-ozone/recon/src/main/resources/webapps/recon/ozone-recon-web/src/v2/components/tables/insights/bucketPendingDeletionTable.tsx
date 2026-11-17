@@ -92,8 +92,13 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
+  // The search is applied by Recon, so it covers all buckets and not only the largest ones fetched
+  const bucketPendingDeletionParams = new URLSearchParams({ limit: String(limit.value) });
+  if (debouncedSearch) {
+    bucketPendingDeletionParams.set('startPrefix', debouncedSearch);
+  }
   const bucketPendingDeletionData = useApiData<BucketPendingDeletion[]>(
-    `/api/v1/keys/deletePending/buckets?limit=${limit.value}`,
+    `/api/v1/keys/deletePending/buckets?${bucketPendingDeletionParams}`,
     [],
     {
       retryAttempts: 2,
@@ -196,7 +201,8 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
       }
     } catch (error) {
       message.error({
-        content: `Failed to start snapshot trapped bytes calculation for ${bucketKey(record)}: ${getErrorMessage(error)}`,
+        content: `Failed to start snapshot trapped and purgeable data calculation for ${bucketKey(record)}: `
+          + getErrorMessage(error),
         duration: 6
       });
     }
@@ -204,16 +210,20 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
 
   function confirmCalculation(record: BucketPendingDeletion) {
     Modal.confirm({
-      title: `Calculate snapshot trapped bytes for ${bucketKey(record)}?`,
+      title: `Calculate snapshot trapped and purgeable data for ${bucketKey(record)}?`,
       icon: <ExclamationCircleOutlined />,
       content: (
         <>
+          <p>
+            OM calculates the bytes, keys and directories pending deletion in this bucket that are trapped by
+            snapshots and that are purgeable.
+          </p>
           <p>
             This is an expensive operation. OM scans the deleted keys and directories of this bucket
             in the active OM DB and in every snapshot of the bucket, which adds load on OM and may take a long time
             for buckets with many deleted entries or snapshots.
           </p>
-          <p>The calculation runs in the background, the result is shown here once it is ready.</p>
+          <p>The calculation runs in the background, the results are shown here once they are ready.</p>
         </>
       ),
       okText: 'Calculate',
@@ -303,7 +313,8 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
   {
     title: (
       <Tooltip title={'Replicated size of deleted data that cannot be reclaimed because snapshots still reference it.'
-        + ' Calculated on demand by OM, including the deleted data held in the snapshots of the bucket.'}>
+        + ' Calculated on demand by OM together with the other snapshot trapped and purgeable columns,'
+        + ' including the deleted data held in the snapshots of the bucket.'}>
         Snapshot Trapped Bytes
       </Tooltip>
     ),
@@ -321,7 +332,7 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
   calculatedColumn('Purgeable Directories', 'purgeableDirs',
     'Deleted directories that are not referenced by any snapshot and can be reclaimed')];
 
-  // Column for a value of the snapshot trapped bytes calculation, shown once the calculation has completed
+  // Column for a value of the snapshot trapped and purgeable data calculation, shown once it has completed
   function calculatedColumn(title: string, field: keyof SnapshotTrappedBytesResult, description: string,
     isBytes = false) {
     return {
@@ -342,12 +353,6 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
     };
   }
 
-  function filterData(data: BucketPendingDeletion[] | undefined) {
-    return data?.filter(
-      (data: BucketPendingDeletion) => bucketKey(data).includes(debouncedSearch)
-    );
-  }
-
   return (<>
     <div className='table-header-section'>
       <div className='table-filter-section'>
@@ -358,7 +363,7 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
           onChange={handleLimitChange} />
       </div>
       <Search
-        disabled={(data?.length ?? 0) < 1}
+        disabled={(data?.length ?? 0) < 1 && !searchTerm}
         searchInput={searchTerm}
         onSearchChange={
           (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
@@ -367,7 +372,7 @@ const BucketPendingDeletionTable: React.FC<BucketPendingDeletionTableProps> = ({
     </div>
     <Table
       loading={bucketPendingDeletionData.loading}
-      dataSource={filterData(data)}
+      dataSource={data}
       columns={columns}
       pagination={paginationConfig}
       rowKey={bucketKey}

@@ -147,4 +147,21 @@ describe('BucketPendingDeletionTable', () => {
     expect(within(screen.getByRole('table')).queryByRole('button', { name: 'Calculate' })).not.toBeInTheDocument();
     expect(submittedRequests).toHaveLength(0);
   });
+
+  test('searches all buckets in Recon, not only the fetched ones', async () => {
+    const searchedPrefixes: (string | null)[] = [];
+    server.use(http.get('/api/v1/keys/deletePending/buckets', ({ request }) => {
+      const startPrefix = new URL(request.url).searchParams.get('startPrefix');
+      searchedPrefixes.push(startPrefix);
+      return HttpResponse.json(startPrefix ? [] : BUCKETS);
+    }));
+    renderTable();
+    expect(await screen.findByText('bucket1')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'vol2/' } });
+    await waitFor(() => expect(searchedPrefixes).toContain('vol2/'));
+    await waitFor(() => expect(screen.queryByText('bucket1')).not.toBeInTheDocument());
+    // The search box stays usable when nothing matches, so the search can be changed
+    expect(screen.getByTestId('search-input')).not.toBeDisabled();
+  });
 });
