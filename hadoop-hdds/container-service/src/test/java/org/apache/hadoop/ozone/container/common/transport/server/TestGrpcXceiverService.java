@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
+import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
@@ -83,7 +84,7 @@ class TestGrpcXceiverService {
       Runnable inFlight) throws Exception {
     ContainerDispatcher dispatcher = mock(ContainerDispatcher.class);
     doAnswer(inv -> {
-      RandomAccessFileChannel channel = inv.getArgument(2);
+      RandomAccessFileChannel channel = inv.<ReadBlockContext>getArgument(2).getBlockFile();
       channelRef.set(channel);
       if (!channel.isOpen()) {
         channel.open(blockFile);
