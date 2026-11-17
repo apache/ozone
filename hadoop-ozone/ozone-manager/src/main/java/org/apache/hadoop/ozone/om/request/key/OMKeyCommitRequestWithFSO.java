@@ -274,6 +274,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     final boolean isHSync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
     final String clientIdString = String.valueOf(commitKeyRequest.getClientID());
 
+    // Keep the allocated locations for metrics before rebuilding the committed key with client locations.
+    prepared.allocatedKeyInfo = prepared.omKeyInfo;
     prepared.omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
     if (isHSync) {
@@ -500,6 +502,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     private OmKeyInfo newOpenKeyInfo;
     private List<OmKeyLocationInfo> uncommitted;
     private OmKeyInfo omKeyInfo;
+    private OmKeyInfo allocatedKeyInfo;
   }
 
   /**
@@ -528,7 +531,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
               exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, commitKeyArgs.getVolumeName(), commitKeyArgs.getBucketName(),
-          commitKeyArgs.getKeyName(), ozoneManager.getMetrics(), exception, prepared.omKeyInfo, result);
+          commitKeyArgs.getKeyName(), ozoneManager.getMetrics(), exception, prepared.omKeyInfo,
+          prepared.allocatedKeyInfo, result);
     }
   }
 }
