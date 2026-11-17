@@ -49,28 +49,12 @@ vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
   return {
     ...actual,
-    useApiData: <T,>(url: string, defaultValue: T, options = {}) => {
-      // Containers fetches clusterState with initialFetch: true and again via useAutoReload on mount;
-      // the second call aborts the first, which surfaces as unhandled CanceledError in tests.
-      if (url === '/api/v1/clusterState') {
-        return {
-          data: ClusterState as T,
-          loading: false,
-          error: null,
-          lastUpdated: Date.now(),
-          success: true,
-          execute: vi.fn(),
-          refetch: vi.fn(() => Promise.resolve({ data: ClusterState })),
-          clearError: vi.fn(),
-          reset: vi.fn(),
-        };
-      }
-      return actual.useApiData(url, defaultValue, {
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
+      actual.useApiData(url, defaultValue, {
         ...options,
         retryAttempts: 0,
         retryDelay: 0,
-      });
-    },
+      }),
   };
 });
 
