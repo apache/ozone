@@ -38,12 +38,12 @@
     <module>erasurecode</module>
     <module>framework</module>
     <module>hadoop-dependency-client</module>
-    <module>hdds-rocksdb-checkpoint-differ</module>
     <module>interface-admin</module>
     <module>interface-client</module>
     <module>interface-server</module>
     <module>managed-rocksdb</module>
     <module>rocks-native</module>
+    <module>rocksdb-checkpoint-differ</module>
     <module>server-scm</module>
     <module>test-utils</module>
   </modules>
