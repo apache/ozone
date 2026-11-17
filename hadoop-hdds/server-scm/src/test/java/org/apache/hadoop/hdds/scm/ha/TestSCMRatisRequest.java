@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.PIPELINE;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -47,6 +50,21 @@ public class TestSCMRatisRequest {
         new Class[]{pipelineID.getProtobuf().getClass()}, args);
     assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
     assertEquals(args[0], SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+  }
+
+  @Test
+  public void testEncodeCarriesTheCurrentTrace() throws Exception {
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test", new Class[0]);
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-ratis-request-test")) {
+      Message traced = TracingUtil.executeInNewSpan("submit", request::encode);
+      assertFalse(traceIdOf(traced).isEmpty());
+      assertEquals("", traceIdOf(request.encode()));
+      assertEquals("test", SCMRatisRequest.decode(traced).getOperation());
+    }
+  }
+
+  private static String traceIdOf(Message message) throws InvalidProtocolBufferException {
+    return SCMRatisProtocol.SCMRatisRequestProto.parseFrom(message.getContent().asReadOnlyByteBuffer()).getTraceID();
   }
 
   @Test

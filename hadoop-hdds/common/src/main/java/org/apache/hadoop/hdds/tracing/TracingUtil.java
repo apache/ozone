@@ -510,7 +510,7 @@ public final class TracingUtil {
    *
    * @return the value returned by {@code supplier}
    */
-  private static <R, E extends Exception> R executeInSpan(Span span,
+  public static <R, E extends Exception> R executeInSpan(Span span,
       CheckedSupplier<R, E> supplier) throws E {
     try (Scope ignored = span.makeCurrent()) {
       return supplier.get();

@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -67,6 +68,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.scm.upgrade.FinalizationStateManagerTestImpl;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -77,7 +80,9 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -442,6 +447,35 @@ public class TestSCMStateMachine {
   }
 
   @Test
+  public void testStartAndApplyTransactionContinueTheRequestTrace() throws Exception {
+    SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
+    SCMRatisRequest request = SCMRatisRequest.of(RequestType.PIPELINE, "op", new Class<?>[0]);
+
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-state-machine-test")) {
+      // Encoded under a span like SCMRatisServerImpl#submitRequest does; Ratis then runs the state machine on its
+      // own threads, which are simulated here by calling it outside of the span.
+      Message message = TracingUtil.executeInNewSpan("submit", request::encode);
+      RaftClientRequest clientRequest = RaftClientRequest.newBuilder()
+          .setClientId(ClientId.randomId())
+          .setServerId(RaftPeerId.valueOf("scm1"))
+          .setGroupId(RaftGroupId.randomId())
+          .setCallId(1)
+          .setMessage(message)
+          .setType(RaftClientRequest.writeRequestType())
+          .build();
+
+      applyingStateMachine.startTransaction(clientRequest);
+      applyingStateMachine.applyTransaction(newTransaction(message, 7)).get();
+
+      for (String name : Arrays.asList("SCMStateMachine.startTransaction", "SCMStateMachine.applyTransaction")) {
+        spans.assertParent(name, "submit");
+        spans.assertAttribute(name, ScmTracingAttributes.SCM_RATIS_METHOD, "op");
+      }
+    }
+  }
+
+  @Test
   public void testFlushCheckedForEveryAppliedTransaction() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
@@ -570,8 +604,12 @@ public class TestSCMStateMachine {
   }
 
   private static TransactionContext newTransaction(SCMRatisRequest request, long index) throws Exception {
+    return newTransaction(request.encode(), index);
+  }
+
+  private static TransactionContext newTransaction(Message message, long index) {
     StateMachineLogEntryProto smLogEntry = StateMachineLogEntryProto.newBuilder()
-        .setLogData(request.encode().getContent())
+        .setLogData(message.getContent())
         .build();
     LogEntryProto logEntry = LogEntryProto.newBuilder()
         .setTerm(1)

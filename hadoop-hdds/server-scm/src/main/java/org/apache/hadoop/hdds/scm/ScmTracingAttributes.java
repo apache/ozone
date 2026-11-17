@@ -42,6 +42,9 @@ public final class ScmTracingAttributes {
   /** Event added when SCM could not find a container for a block and returns no block. */
   public static final String SCM_ALLOCATE_FAILED = "scm.allocate.failed";
 
+  /** Name of the replicated method of an SCM Ratis request, for example {@code addContainer}. */
+  public static final String SCM_RATIS_METHOD = "scm.ratis.method";
+
   private ScmTracingAttributes() {
   }
 }
