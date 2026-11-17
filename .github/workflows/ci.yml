@@ -510,8 +510,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
+        id: archive
         uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: target/coverage
         continue-on-error: true
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 dev-support/ci/coverage_summary.py >> "$GITHUB_STEP_SUMMARY"
+        env:
+          COVERAGE_REPORT_URL: ${{ steps.archive.outputs.artifact-url }}
