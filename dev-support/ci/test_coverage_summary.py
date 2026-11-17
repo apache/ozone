@@ -29,6 +29,13 @@ SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">
 <report name="JaCoCo Coverage Report">
   <sessioninfo id="localhost-6cb2dcd8" start="1794287847378" dump="1794287848330"/>
+  <package name="org/apache/hadoop/ozone/om/snapshot/diff/helper">
+    <counter type="INSTRUCTION" missed="85" covered="0"/>
+    <counter type="LINE" missed="15" covered="0"/>
+    <counter type="COMPLEXITY" missed="5" covered="0"/>
+    <counter type="METHOD" missed="5" covered="0"/>
+    <counter type="CLASS" missed="2" covered="0"/>
+  </package>
   <package name="org/apache/hadoop/ozone/recon/persistence">
     <class name="org/apache/hadoop/ozone/recon/persistence/ContainerHistory" sourcefilename="ContainerHistory.java">
       <method name="getLastBcsId" desc="()J" line="55">
@@ -107,7 +114,9 @@ class TestParseReport(unittest.TestCase):
     _, packages = parse_sample()
     by_name = {p.name: p for p in packages}
     self.assertEqual(sorted(by_name),
-                     ["org.apache.hadoop.ozone.recon.persistence", "org.apache.ozone.hdfs.web"])
+                     ["org.apache.hadoop.ozone.om.snapshot.diff.helper",
+                      "org.apache.hadoop.ozone.recon.persistence",
+                      "org.apache.ozone.hdfs.web"])
     package_persistence = by_name["org.apache.hadoop.ozone.recon.persistence"]
     self.assertEqual(package_persistence.counter(coverage_summary.JACOCO_LINE).missed, 75)
     self.assertEqual(package_persistence.missed, 75 + 34)
@@ -150,11 +159,12 @@ class TestRenderSummary(unittest.TestCase):
 
   def test_package_table_sorted_by_missed(self):
     out = self.render()
-    self.assertIn("<details><summary><b>Coverage by package (2)</b></summary>\n\n|Package|", out)
+    self.assertIn("<details><summary><b>Coverage by package (3)</b></summary>\n\n|Package|", out)
     rows = self.table_rows(out)[3:]
-    # most untested code first: persistence misses 75 lines + 34 branches, web misses 0 lines
+    # most untested code first: persistence misses 75 lines + 34 branches, helper misses 15 lines, web misses 0 lines
     self.assertEqual(rows, ["|Package|Coverage|Lines|Missed lines|Branches|Missed branches|",
                             "|org.apache.hadoop.ozone.recon.persistence|75.7%|79.2%|75|61.4%|34|",
+                            "|org.apache.hadoop.ozone.om.snapshot.diff.helper|0.0%|0.0%|15|n/a|0|",
                             "|org.apache.ozone.hdfs.web|100.0%|100.0%|0|n/a|0|"])
     self.assertTrue(out.endswith("|\n\n</details>\n\n"))
 
