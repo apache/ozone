@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToLongFunction;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -456,9 +457,20 @@ public class ContainerSet implements Iterable<Container<?>> {
   public void handleVolumeFailures(StateContext context) throws StorageContainerException {
     AtomicBoolean failedVolume = new AtomicBoolean(false);
     AtomicInteger containerCount = new AtomicInteger(0);
+    AtomicInteger openEcCount = new AtomicInteger(0);
     for (Container<?> c : containerMap.values()) {
       ContainerData data = c.getContainerData();
       if (data.getVolume().isFailed()) {
+        if (data.getReplicaIndex() > 0 && data.isOpen()) {
+          // An open Ratis container's pipeline is closed when its next write fails. Nothing does that for an open
+          // EC container, so SCM would keep allocating it: ask SCM to close it.
+          context.addContainerActionIfAbsent(ContainerAction.newBuilder()
+              .setContainerID(data.getContainerID())
+              .setAction(ContainerAction.Action.CLOSE)
+              .setReason(ContainerAction.Reason.CONTAINER_UNHEALTHY)
+              .build());
+          openEcCount.incrementAndGet();
+        }
         removeMissingContainer(data.getContainerID());
         LOG.debug("Removing Container {} as the Volume {} " +
             "has failed", data.getContainerID(), data.getVolume());
@@ -470,8 +482,8 @@ public class ContainerSet implements Iterable<Container<?>> {
 
     if (failedVolume.get()) {
       try {
-        LOG.info("Removed {} containers on failed volumes",
-            containerCount.get());
+        LOG.info("Removed {} containers on failed volumes, asked SCM to close {} open EC containers among them",
+            containerCount.get(), openEcCount.get());
         // There are some failed volume(container), send FCR to SCM
         Message report = context.getFullContainerReportDiscardPendingICR();
         context.refreshFullReport(report);

@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.HDDSVersion.SOFTWARE_VERSION;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HBASE_SUPPORT;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE;
+import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,27 +38,38 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.invoker.FinalizationStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
+import org.apache.hadoop.hdds.scm.upgrade.FinalizationStateManagerTestImpl;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.util.concurrent.ExecutorHelper;
 import org.apache.ozone.test.GenericTestUtils;
@@ -73,6 +89,7 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InOrder;
 
 /**
@@ -339,6 +356,76 @@ public class TestSCMStateMachine {
     }
   }
 
+  /**
+   * Raft log entries written by the pre-ZDU finalization must still apply after the upgrade, for example on an SCM
+   * that was down while the other SCMs finalized. They finalize up to their layout version, but not beyond it.
+   */
+  @Test
+  public void testPreZduFinalizationEntriesFinalizeUpToTheirLayoutVersion(@TempDir Path tempDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, tempDir.toString());
+    SCMStorageConfig storage = new SCMStorageConfig(conf);
+    storage.setScmId("scm");
+    storage.setApparentVersion(HBASE_SUPPORT.serialize());
+    storage.initialize();
+    ExitUtils.disableSystemExit();
+    try (ScmVersionManager versionManager =
+        new ScmVersionManager(storage, mock(StorageContainerManager.class), HashMap::new)) {
+      SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+      @SuppressWarnings("unchecked")
+      Table<String, String> finalizationStore = mock(Table.class);
+      FinalizationStateManager finalizationStateManager = new FinalizationStateManagerTestImpl.Builder()
+          .setFinalizationStore(finalizationStore)
+          .setTransactionBuffer(buffer)
+          .setVersionManager(versionManager)
+          .build();
+      SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.FINALIZE,
+          new FinalizationStateManagerInvoker(finalizationStateManager, mock(SCMRatisServer.class)));
+
+      long index = 0;
+      for (SCMRatisRequest request : Arrays.asList(
+          finalizeRequest("addFinalizingMark"),
+          finalizeRequest("finalizeLayoutFeature", WITNESSED_CONTAINER_DB_PROTO_VALUE.serialize()),
+          finalizeRequest("finalizeLayoutFeature", STORAGE_SPACE_DISTRIBUTION.serialize()),
+          finalizeRequest("removeFinalizingMark"),
+          // Test that a commit with an older layout version does not move the apparent version backwards.
+          finalizeRequest("finalizeLayoutFeature", WITNESSED_CONTAINER_DB_PROTO_VALUE.serialize()))) {
+        assertThat(applyingStateMachine.applyTransaction(newTransaction(request, ++index)))
+            .isCompletedWithValue(Message.EMPTY);
+      }
+      assertThat(versionManager.getApparentVersion()).isEqualTo(STORAGE_SPACE_DISTRIBUTION);
+      assertThat(versionManager.getPersistedApparentVersion()).isEqualTo(STORAGE_SPACE_DISTRIBUTION.serialize());
+      InOrder order = inOrder(buffer);
+      order.verify(buffer).addToBuffer(finalizationStore, APPARENT_VERSION_KEY,
+          String.valueOf(WITNESSED_CONTAINER_DB_PROTO_VALUE.serialize()));
+      // Every apply will call finalize upgrade and write the resulting apparent version to the DB.
+      // When an older apparent version is encountered, finalize will be a no-op, but the current apparent version is
+      // still added to the buffer.
+      order.verify(buffer, times(2))
+          .addToBuffer(finalizationStore, APPARENT_VERSION_KEY, String.valueOf(STORAGE_SPACE_DISTRIBUTION.serialize()));
+
+      assertThat(applyingStateMachine.applyTransaction(newTransaction(finalizeRequest("finalizeUpgrade"), ++index)))
+          .isCompletedWithValue(Message.EMPTY);
+      assertThat(versionManager.getApparentVersion()).isEqualTo(SOFTWARE_VERSION);
+
+      final long unknownIndex = ++index;
+      assertThrows(ExitUtils.ExitException.class,
+          () -> applyingStateMachine.applyTransaction(newTransaction(finalizeRequest("unknownMethod"), unknownIndex)));
+
+      ExitUtils.clear();
+      final long unknownLayoutIndex = ++index;
+      SCMRatisRequest unknownLayoutRequest =
+          finalizeRequest("finalizeLayoutFeature", STORAGE_SPACE_DISTRIBUTION.serialize() + 1);
+      ExitUtils.ExitException unknownLayout = assertThrows(ExitUtils.ExitException.class,
+          () -> applyingStateMachine.applyTransaction(newTransaction(unknownLayoutRequest, unknownLayoutIndex)));
+      // Verify that the previous cases would have failed and caught a compatibility issue if the request type or
+      // layout feature was not known.
+      assertThat(unknownLayout).hasMessageContaining("Unknown pre-ZDU layout version 11");
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
   @Test
   public void testApplyTransactionFlushesAfterRecordingTransactionInfo() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
@@ -473,7 +560,16 @@ public class TestSCMStateMachine {
   private static TransactionContext newTransaction(RequestType type, long index) throws Exception {
     // The operation name is only used by ScmInvoker#invokeLocal to pick a method to call. The invokers
     // here are mocked and stubbed for any operation, so any non-empty name works.
-    SCMRatisRequest request = SCMRatisRequest.of(type, "op", new Class<?>[0]);
+    return newTransaction(SCMRatisRequest.of(type, "op", new Class<?>[0]), index);
+  }
+
+  private static SCMRatisRequest finalizeRequest(String operation, Integer... layoutVersions) {
+    Class<?>[] parameterTypes = new Class<?>[layoutVersions.length];
+    Arrays.fill(parameterTypes, Integer.class);
+    return SCMRatisRequest.of(RequestType.FINALIZE, operation, parameterTypes, (Object[]) layoutVersions);
+  }
+
+  private static TransactionContext newTransaction(SCMRatisRequest request, long index) throws Exception {
     StateMachineLogEntryProto smLogEntry = StateMachineLogEntryProto.newBuilder()
         .setLogData(request.encode().getContent())
         .build();

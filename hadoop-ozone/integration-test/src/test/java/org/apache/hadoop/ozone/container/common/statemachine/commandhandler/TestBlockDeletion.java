@@ -162,7 +162,6 @@ public class TestBlockDeletion {
         100, TimeUnit.MILLISECONDS);
     conf.setInt(OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 100);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
-    conf.setQuietMode(false);
     conf.setTimeDuration("hdds.scm.replication.event.timeout", 2,
         TimeUnit.SECONDS);
     conf.setTimeDuration("hdds.scm.replication.event.timeout.datanode.offset",

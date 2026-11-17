@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getNotLe
 import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getReadException;
 import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getReadIndexException;
 
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
@@ -31,6 +30,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.ratis.protocol.exceptions.ReadException;
 import org.apache.ratis.protocol.exceptions.ReadIndexException;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
@@ -65,10 +65,12 @@ public class GrpcOMFollowerReadFailoverProxyProvider extends FollowerReadFailove
 
   /**
    * Submit the request to an OM follower if follower read is used, otherwise to the leader OM.
+   * A failure that needs the OM retry policy, such as
+   * {@link org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException}, is thrown to the caller.
    *
    * @param payload the request to submit.
    * @param submitToHost submits a request to the OM at the given gRPC address.
-   * @param submitToLeader submits a request to the leader OM, failing over between the OMs if needed.
+   * @param submitToLeader submits a request to the current leader OM.
    * @return the response of the request.
    */
   public OMResponse submitRequest(OMRequest payload,
@@ -100,7 +102,7 @@ public class GrpcOMFollowerReadFailoverProxyProvider extends FollowerReadFailove
             break;
           }
           if (getLeaderNotReadyException(unwrapped) != null) {
-            break;
+            throw e;
           }
           ReadIndexException readIndexException = getReadIndexException(unwrapped);
           ReadException readException = getReadException(unwrapped);

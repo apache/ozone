@@ -269,6 +269,22 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
       final S3SecretValue s3SecretValue = S3SecretValue.of(accessId, awsSecret, transactionLogIndex);
 
+      // Expect accessId absence from S3SecretTable
+      ozoneManager.getS3SecretManager()
+          .doUnderLock(accessId, s3SecretManager -> {
+            if (s3SecretManager.hasS3Secret(accessId)) {
+              LOG.error("accessId '{}' already exists in S3SecretTable",
+                  accessId);
+              throw new OMException("accessId '" + accessId +
+                  "' already exists in S3SecretTable",
+                  ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+            }
+
+            s3SecretManager
+                .updateCache(accessId, s3SecretValue);
+            return null;
+          });
+
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
           .setTenantId(tenantId)
@@ -291,22 +307,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal),
           CacheValue.get(transactionLogIndex, principalInfo));
-
-      // Expect accessId absence from S3SecretTable
-      ozoneManager.getS3SecretManager()
-          .doUnderLock(accessId, s3SecretManager -> {
-            if (s3SecretManager.hasS3Secret(accessId)) {
-              LOG.error("accessId '{}' already exists in S3SecretTable",
-                  accessId);
-              throw new OMException("accessId '" + accessId +
-                  "' already exists in S3SecretTable",
-                  ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
-            }
-
-            s3SecretManager
-                .updateCache(accessId, s3SecretValue);
-            return null;
-          });
 
       // Update tenant cache
       multiTenantManager.getCacheOp()

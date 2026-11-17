@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -329,6 +330,37 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
     // s2 was purged before the fault.
     assertNull(snapshotInfoTable.get(snapshotKeys.get(1)));
     assertEquals(2, getOmMetrics().getNumSnapshotDeleted());
+  }
+
+  /**
+   * A failure after an earlier snapshot in the same request updated the cache and snapshot chain must be reported
+   * as INTERNAL_ERROR, so that OM terminates instead of continuing with the partial purge. A failure before any
+   * update keeps its original status.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testNextSnapshotNotFoundStatus(boolean partialPurge) throws Exception {
+    List<String> snapshotKeys = createSnapshots(3);
+    // s3 has no next snapshot, so purging it first updates the cache and chain before the lookup of s2 fails.
+    List<String> keysToPurge = partialPurge ? Arrays.asList(snapshotKeys.get(2), snapshotKeys.get(0))
+        : Collections.singletonList(snapshotKeys.get(0));
+    OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(createPurgeKeysRequest(keysToPurge));
+
+    // s2 is still in the snapshot chain but missing from snapshotInfoTable, so the next snapshot of s1 is not found.
+    Table<String, SnapshotInfo> snapshotInfoTable = spy(getOmMetadataManager().getSnapshotInfoTable());
+    doReturn(null).when(snapshotInfoTable).get(snapshotKeys.get(1));
+    doReturn(snapshotInfoTable).when(getOmMetadataManager()).getSnapshotInfoTable();
+
+    OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
+        omSnapshotPurgeRequest.validateAndUpdateCache(getOzoneManager(), 200L);
+
+    assertEquals(partialPurge ? INTERNAL_ERROR : FILE_NOT_FOUND, omSnapshotPurgeResponse.getOMResponse().getStatus());
+    if (partialPurge) {
+      assertNull(snapshotInfoTable.get(snapshotKeys.get(2)));
+      assertThat(omSnapshotPurgeResponse.getOMResponse().getMessage()).contains("transaction index 200 ");
+    } else {
+      assertNotNull(snapshotInfoTable.get(snapshotKeys.get(2)));
+    }
   }
 
   // TODO: clean up: Do we this test after

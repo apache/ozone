@@ -81,8 +81,8 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -95,7 +95,7 @@ import org.slf4j.LoggerFactory;
  * Abstract class for OmSnapshot file system tests.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOmSnapshotFileSystem implements NonHATests.TestCase {
+public abstract class TestOmSnapshotFileSystem implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   private ObjectStore objectStore;

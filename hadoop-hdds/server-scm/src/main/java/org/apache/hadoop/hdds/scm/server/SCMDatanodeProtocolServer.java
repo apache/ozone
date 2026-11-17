@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
@@ -238,6 +239,8 @@ public class SCMDatanodeProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeDetails", datanodeDetails.toString());
 
+    // Read before the decision, so that a rejection made before this SCM became the ready leader is not final.
+    final boolean leaderReady = scmContext == null || scmContext.isLeaderReady();
     // TODO : Return the list of Nodes that forms the SCM HA.
     RegisteredCommand registeredCommand = scm.getScmNodeManager()
         .register(datanodeDetails, nodeReport, pipelineReportsProto,
@@ -255,6 +258,13 @@ public class SCMDatanodeProtocolServer implements
                       pipelineReportsProto));
     }
     try {
+      if (registeredCommand.getError() == SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted && !leaderReady) {
+        // The datanode shuts down on this error. An SCM that is not the ready leader may not have applied the
+        // latest state yet, for example a finalization the leader already sent to the datanode, so let the
+        // datanode retry and leave the final decision to the leader. The RPC server does not log this exception.
+        throw new ServerNotLeaderException("SCM is not the ready leader, so its rejection of datanode "
+            + datanodeDetails + " is not final. The datanode should retry the registration.");
+      }
       return getRegisteredResponse(registeredCommand);
     } catch (Exception ex) {
       auditSuccess = false;

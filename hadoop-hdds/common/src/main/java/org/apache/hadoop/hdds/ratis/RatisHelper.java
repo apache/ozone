@@ -201,8 +201,7 @@ public final class RatisHelper {
   }
 
   public static RaftGroup newRaftGroup(Pipeline pipeline) {
-    return RaftGroup.valueOf(RaftGroupId.valueOf(pipeline.getId().getId()),
-        toRaftPeers(pipeline));
+    return RaftGroup.valueOf(pipeline.getId().getGroupId(), toRaftPeers(pipeline));
   }
 
   /**
@@ -222,7 +221,7 @@ public final class RatisHelper {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
         toRaftPeer(pipeline.getClosestNode()),
-        newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
+        newRaftGroup(pipeline.getId().getGroupId(),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
 
@@ -435,12 +434,6 @@ public final class RatisHelper {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  public static Long getMinReplicatedIndex(
-      Collection<RaftProtos.CommitInfoProto> commitInfos) {
-    return commitInfos.stream().map(RaftProtos.CommitInfoProto::getCommitIndex)
-        .min(Long::compareTo).orElse(null);
   }
 
   private static boolean datanodeUseHostName() {

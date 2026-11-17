@@ -23,15 +23,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SSL_
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
-import io.grpc.Context;
-import io.grpc.ManagedChannel;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyChannelBuilder;
-import io.netty.handler.ssl.SslContextBuilder;
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -50,7 +43,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -59,10 +51,19 @@ import org.apache.hadoop.ozone.om.ha.GrpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressClientInterceptor;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OzoneManagerServiceGrpcBinding;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.thirdparty.io.grpc.Channel;
+import org.apache.ratis.thirdparty.io.grpc.Context;
+import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
+import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,8 +82,7 @@ public class GrpcOmTransport implements OmTransport {
   // gRPC specific
   private static List<X509Certificate> caCerts = null;
 
-  private final Map<String,
-      OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub> clients;
+  private final Map<String, Channel> clients;
   private final Map<String, ManagedChannel> channels;
   private final ConfigurationSource conf;
 
@@ -180,9 +180,7 @@ public class GrpcOmTransport implements OmTransport {
       channels.put(hostaddr,
           channelBuilder.intercept(new ClientAddressClientInterceptor())
               .build());
-      clients.put(hostaddr,
-          OzoneManagerServiceGrpc
-              .newBlockingStub(channels.get(hostaddr)));
+      clients.put(hostaddr, channels.get(hostaddr));
     }
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
@@ -194,12 +192,6 @@ public class GrpcOmTransport implements OmTransport {
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
-    return followerReadFailoverProxyProvider.submitRequest(payload, this::submitRequestToHost,
-        this::submitRequestToLeader);
-  }
-
-  private OMResponse submitRequestToLeader(OMRequest payload)
-      throws IOException {
     int requestFailoverCount = 0;
     boolean tryOtherHost = true;
     int expectedFailoverCount = 0;
@@ -208,7 +200,8 @@ public class GrpcOmTransport implements OmTransport {
       tryOtherHost = false;
       expectedFailoverCount = globalFailoverCount.get();
       try {
-        return submitRequestToHost(payload, host.get());
+        return followerReadFailoverProxyProvider.submitRequest(payload, this::submitRequestToHost,
+            this::submitRequestToLeader);
       } catch (StatusRuntimeException e) {
         LOG.error("Failed to submit request", e);
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
@@ -220,13 +213,17 @@ public class GrpcOmTransport implements OmTransport {
         }
         Exception exp = new Exception(e);
         tryOtherHost = shouldRetry(unwrapException(exp),
-            expectedFailoverCount, ++requestFailoverCount);
+            expectedFailoverCount, requestFailoverCount++);
         if (!tryOtherHost) {
           throw new OMException(resultCode);
         }
       }
     }
     throw new OMException(resultCode);
+  }
+
+  private OMResponse submitRequestToLeader(OMRequest payload) throws IOException {
+    return submitRequestToHost(payload, host.get());
   }
 
   private OMResponse submitRequestToHost(OMRequest payload, String targetHost)
@@ -238,50 +235,26 @@ public class GrpcOmTransport implements OmTransport {
             inetAddress.getHostAddress())
         .withValue(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY,
             inetAddress.getHostName())
-        .run(() -> resp.set(clients.get(targetHost)
-            .submitRequest(payload)));
+        .run(() -> resp.set(OzoneManagerServiceGrpcBinding.submitRequest(clients.get(targetHost), payload)));
     return resp.get();
   }
 
   public static Exception unwrapException(Exception ex) {
-    Exception grpcException = null;
-    try {
-      StatusRuntimeException srexp =
-          (StatusRuntimeException)ex.getCause();
-      Status status = srexp.getStatus();
-      LOG.debug("GRPC exception wrapped: {}", status.getDescription());
-      if (status.getCode() == Status.Code.INTERNAL) {
-        // exception potentially generated by OzoneManagerServiceGrpc
-        Class<?> realClass = Class.forName(status.getDescription()
-            .substring(0, status.getDescription()
-                .indexOf(':')));
-        Class<? extends Exception> cls = realClass
-            .asSubclass(Exception.class);
-        Constructor<? extends Exception> cn = cls.getConstructor(String.class);
-        cn.setAccessible(true);
-        grpcException = cn.newInstance(status.getDescription());
-        IOException remote = null;
-        try {
-          String description = status.getDescription();
-          int colonIndex = description.indexOf(':');
-          remote = new RemoteException(description.substring(0, colonIndex),
-              description.substring(colonIndex + 2));
-          grpcException.initCause(remote);
-        } catch (Exception e) {
-          LOG.error("cannot get cause for remote exception");
-        }
-      } else if ((status.getCode() == Status.Code.RESOURCE_EXHAUSTED) ||
-              (status.getCode() == Status.Code.DATA_LOSS)) {
-        grpcException = srexp;
-      } else {
-        // exception generated by connection failure, gRPC
-        grpcException = ex;
+    StatusRuntimeException srexp = (StatusRuntimeException) ex.getCause();
+    Status status = srexp.getStatus();
+    LOG.debug("GRPC exception wrapped: {}", status.getDescription());
+    if (status.getCode() == Status.Code.INTERNAL) {
+      OMGrpcError omError = OMGrpcError.fromStatusRuntimeException(srexp);
+      if (omError != null) {
+        // exception generated by OzoneManagerServiceGrpc
+        return new ServiceException(omError.toException());
       }
-    } catch (Exception e) {
-      grpcException = new IOException(e);
-      LOG.error("error unwrapping exception from OMResponse {}");
+    } else if ((status.getCode() == Status.Code.RESOURCE_EXHAUSTED) ||
+            (status.getCode() == Status.Code.DATA_LOSS)) {
+      return srexp;
     }
-    return grpcException;
+    // exception generated by gRPC, e.g. a connection failure
+    return ex;
   }
 
   private boolean shouldRetry(Exception ex, int expectedFailoverCount, int requestFailoverCount) {
@@ -395,9 +368,7 @@ public class GrpcOmTransport implements OmTransport {
     for (String nodeId : omFailoverProxyProvider.getOMProxyMap().getNodeIds()) {
       String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
 
-      clients.put(hostaddr,
-          OzoneManagerServiceGrpc
-              .newBlockingStub(testChannel));
+      clients.put(hostaddr, testChannel);
     }
     LOG.info("{}: started", CLIENT_NAME);
   }
@@ -405,9 +376,7 @@ public class GrpcOmTransport implements OmTransport {
   @VisibleForTesting
   public void startClient(String nodeId, ManagedChannel testChannel) throws IOException {
     String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
-    clients.put(hostaddr,
-        OzoneManagerServiceGrpc
-            .newBlockingStub(testChannel));
+    clients.put(hostaddr, testChannel);
     LOG.info("{}: started test client for {}", CLIENT_NAME, nodeId);
   }
 

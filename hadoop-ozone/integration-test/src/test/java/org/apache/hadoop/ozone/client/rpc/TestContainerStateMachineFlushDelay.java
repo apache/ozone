@@ -86,7 +86,6 @@ public class TestContainerStateMachineFlushDelay {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
-    conf.setQuietMode(false);
     OzoneManager.setTestSecureOmFlag(true);
     conf.setLong(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     //  conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());

@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -299,6 +300,7 @@ public final class ECStreamTestUtil {
     private IOException errorToThrow = null;
     private int ecReplicaIndex = 0;
     private CountDownLatch readBarrier;
+    private final AtomicInteger positionedReads = new AtomicInteger();
     private static final byte EOF = -1;
 
     TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data) {
@@ -338,14 +340,23 @@ public final class ECStreamTestUtil {
       return ecReplicaIndex;
     }
 
+    public int getPositionedReads() {
+      return positionedReads.get();
+    }
+
     @Override
-    protected int readPositioned(long position, ByteBuffer buffer) {
+    protected int readPositioned(long position, ByteBuffer buffer) throws IOException {
+      positionedReads.incrementAndGet();
       if (position >= length) {
         return EOF;
       }
+      int n = (int) Math.min(buffer.remaining(), length - position);
+      awaitReadBarrier();
+      if (shouldError && position + n > shouldErrorPosition) {
+        throwError();
+      }
       ByteBuffer source = data.duplicate();
       source.position((int) position);
-      int n = (int) Math.min(buffer.remaining(), length - position);
       source.limit(source.position() + n);
       buffer.put(source);
       return n;
@@ -372,17 +383,7 @@ public final class ECStreamTestUtil {
       if (shouldError && data.position() >= shouldErrorPosition) {
         throwError();
       }
-      if (readBarrier != null) {
-        readBarrier.countDown();
-        try {
-          if (!readBarrier.await(10, TimeUnit.SECONDS)) {
-            throw new IOException("Timed out waiting for " + readBarrier.getCount() + " concurrent reads");
-          }
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new IOException(e);
-        }
-      }
+      awaitReadBarrier();
       if (getRemaining() == 0) {
         return EOF;
       }
@@ -394,6 +395,20 @@ public final class ECStreamTestUtil {
         buf.put(data.get());
       }
       return toRead;
+    }
+
+    private void awaitReadBarrier() throws IOException {
+      if (readBarrier != null) {
+        readBarrier.countDown();
+        try {
+          if (!readBarrier.await(10, TimeUnit.SECONDS)) {
+            throw new IOException("Timed out waiting for " + readBarrier.getCount() + " concurrent reads");
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException(e);
+        }
+      }
     }
 
     private void throwError() throws IOException {

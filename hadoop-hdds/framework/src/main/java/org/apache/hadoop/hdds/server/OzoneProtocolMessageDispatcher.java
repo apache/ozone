@@ -101,6 +101,9 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE extends Enum
       }
       return response;
 
+    } catch (Throwable t) {
+      TracingUtil.recordException(span, t);
+      throw t;
     } finally {
       span.end();
     }

@@ -227,6 +227,49 @@ public class TestStateContext {
         StateContext.CONTAINER_REPORTS_PROTO_NAME);
   }
 
+  @Test
+  public void testGetAllAvailableReportsRespectsLimit() throws IOException {
+    StateContext ctx = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    ctx.addEndpoint(scm1);
+
+    // Queue 10 ICRs; no full report is refreshed, so only ICRs are returned.
+    batchAddIncrementalReport(ctx,
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 10);
+
+    // A limited collection returns at most the limit and leaves the rest.
+    assertEquals(4, ctx.getAllAvailableReports(scm1, 4).size());
+    assertTrue(ctx.hasPendingReports(scm1));
+    assertEquals(4, ctx.getAllAvailableReports(scm1, 4).size());
+    assertTrue(ctx.hasPendingReports(scm1));
+    // Last chunk drains the queue.
+    assertEquals(2, ctx.getAllAvailableReports(scm1, 4).size());
+    assertFalse(ctx.hasPendingReports(scm1));
+    assertEquals(0, ctx.getAllAvailableReports(scm1, 4).size());
+  }
+
+  @Test
+  public void testHasPendingReportsWithFullReports() throws IOException {
+    StateContext ctx = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    ctx.addEndpoint(scm1);
+
+    // addEndpoint marks the full-report ready flags true, but no full report
+    // value has been generated yet, so nothing is actually pending.
+    assertFalse(ctx.hasPendingReports(scm1));
+
+    // Generate all three full reports; now values exist and flags are ready.
+    batchRefreshfullReports(ctx, StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
+    batchRefreshfullReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 1);
+    batchRefreshfullReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
+    assertTrue(ctx.hasPendingReports(scm1));
+
+    // With a cap of one, a heartbeat takes a single full report but the others
+    // stay ready, so a follow-up is still needed.
+    assertEquals(1, ctx.getAllAvailableReports(scm1, 1).size());
+    assertTrue(ctx.hasPendingReports(scm1));
+  }
+
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
     for (int i = 0; i < count; i++) {
       ctx.refreshFullReport(newMockReport(reportName));
