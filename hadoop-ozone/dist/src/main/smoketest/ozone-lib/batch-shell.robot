@@ -28,6 +28,6 @@ Put and Get Key Later
 
 Get Key Later
     [arguments]    ${get_from}
-    ${get_to} =    Get Next Filename    ${TEMP_DIR}/key-get
+    ${get_to} =    Get Next Filename    ${BATCH_OUTPUT_DIR}/key-get
     Execute Later ozone sh    key get -f ${get_from} ${get_to}
     [return]    ${get_to}
