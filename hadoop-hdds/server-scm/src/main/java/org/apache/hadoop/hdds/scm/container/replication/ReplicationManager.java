@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
@@ -576,6 +577,14 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
       throws CommandTargetOverloadedException, NotLeaderException {
+    sendThrottledReplicationCommand(containerInfo, sources, target, replicaIndex, null);
+  }
+
+  /** Sends a throttled copy command requesting the given destination type, or the default selection when null. */
+  public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
+      List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex,
+      @Nullable StorageType targetVolumeStorageType)
+      throws CommandTargetOverloadedException, NotLeaderException {
     long containerID = containerInfo.getContainerID();
     List<Pair<Integer, DatanodeDetails>> sourceWithCmds =
         getAvailableDatanodesForReplication(sources);
@@ -591,6 +600,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
         containerID, target, computeVersionForReplication(source, target));
     cmd.setReplicaIndex(replicaIndex);
+    cmd.setTargetVolumeStorageType(targetVolumeStorageType);
     sendDatanodeCommand(cmd, containerInfo, source);
   }
 
@@ -741,10 +751,19 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
       DatanodeDetails target, long scmDeadlineEpochMs)
       throws NotLeaderException {
+    sendLowPriorityReplicateContainerCommand(container, replicaIndex, source, target, scmDeadlineEpochMs, null);
+  }
+
+  /** Sends a low-priority copy requesting the given destination type, or the default selection when null. */
+  public void sendLowPriorityReplicateContainerCommand(
+      final ContainerInfo container, int replicaIndex, DatanodeDetails source,
+      DatanodeDetails target, long scmDeadlineEpochMs, @Nullable StorageType targetVolumeStorageType)
+      throws NotLeaderException {
     final ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
         container.getContainerID(), target, computeVersionForReplication(source, target));
     command.setReplicaIndex(replicaIndex);
     command.setPriority(ReplicationCommandPriority.LOW);
+    command.setTargetVolumeStorageType(targetVolumeStorageType);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
 
@@ -816,7 +835,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
       long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
-      StorageType storageType = getStorageType(containerInfo);
+      StorageType storageType = rcc.getTargetVolumeStorageType();
+      if (storageType == null) {
+        storageType = getStorageType(containerInfo);
+      }
 
       containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
           rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize,

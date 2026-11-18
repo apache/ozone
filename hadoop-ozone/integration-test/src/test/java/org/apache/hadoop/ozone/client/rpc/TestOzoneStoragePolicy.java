@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -30,7 +31,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
@@ -43,9 +49,13 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.cli.storagepolicy.CheckStoragePolicySubCommand;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -53,24 +63,35 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Verifies that a key honours its storage policy end to end: the policy is
@@ -321,6 +342,151 @@ public class TestOzoneStoragePolicy {
   }
 
   /**
+   * A multipart key honours its storage policy: it inherits the bucket policy unless the upload is
+   * initiated with one, and every block of every part lands on the tier of that policy.
+   *
+   * <p>No block is allocated when a part is opened. The client allocates them one by one while writing,
+   * sending the storage policy of the part open key with each call, and OM falls back to the bucket
+   * policy when none is sent. So the part open key must carry the policy of the multipart key. The
+   * COLD upload on a WARM bucket is what catches a missing policy: with the fallback, its blocks would
+   * land on the WARM tier instead of the COLD one. The first part spans two blocks so that more than
+   * one allocateBlock call is checked.
+   */
+  @Test
+  public void testMultipartUploadStoragePolicy() throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    for (BucketLayout layout : Arrays.asList(BucketLayout.OBJECT_STORE, BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, layout);
+
+      assertMultipartKey(doMultipartUpload(bucket, UUID.randomUUID().toString(), null),
+          OzoneStoragePolicy.WARM);
+      assertMultipartKey(doMultipartUpload(bucket, UUID.randomUUID().toString(), OzoneStoragePolicy.COLD),
+          OzoneStoragePolicy.COLD);
+    }
+  }
+
+  /**
+   * The policy of a multipart key is fixed when the upload is initiated, so changing the bucket policy
+   * while the upload is open does not move the blocks of the parts uploaded afterwards.
+   */
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
+  public void testMultipartUploadKeepsStoragePolicyOfInitiate(BucketLayout layout) throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    for (OzoneStoragePolicy changedPolicy : Arrays.asList(OzoneStoragePolicy.HOT, OzoneStoragePolicy.COLD)) {
+      OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, layout);
+      String keyName = UUID.randomUUID().toString();
+      String uploadID = initiateMultipartUpload(bucket, keyName, null);
+      bucket.setStoragePolicy(changedPolicy);
+      uploadPartsAndComplete(bucket, keyName, uploadID);
+
+      assertMultipartKey(lookupKey(bucket, keyName), OzoneStoragePolicy.WARM);
+    }
+  }
+
+  /**
+   * Overwriting a key must leave it with the storage policy of the write that produced its blocks,
+   * not the policy of the key it replaced, the same rule as for a plain key overwrite.
+   */
+  @Test
+  public void testMultipartUploadOverwriteWithDifferentStoragePolicy() throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
+    String keyName = UUID.randomUUID().toString();
+
+    writeKey(bucket, keyName, OzoneStoragePolicy.HOT);
+    assertThat(lookupKey(bucket, keyName).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+
+    assertMultipartKey(doMultipartUpload(bucket, keyName, OzoneStoragePolicy.COLD), OzoneStoragePolicy.COLD);
+    assertMultipartKey(doMultipartUpload(bucket, keyName, OzoneStoragePolicy.HOT), OzoneStoragePolicy.HOT);
+
+    writeKey(bucket, keyName, OzoneStoragePolicy.COLD);
+    OmKeyInfo plainKey = lookupKey(bucket, keyName);
+    assertThat(plainKey.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertAllBlocksOnTier(plainKey, OzoneStoragePolicy.COLD.getCreationTier());
+
+    String hotUpload = initiateMultipartUpload(bucket, keyName, OzoneStoragePolicy.HOT);
+    String coldUpload = initiateMultipartUpload(bucket, keyName, OzoneStoragePolicy.COLD);
+    uploadPartsAndComplete(bucket, keyName, hotUpload);
+    assertMultipartKey(lookupKey(bucket, keyName), OzoneStoragePolicy.HOT);
+    uploadPartsAndComplete(bucket, keyName, coldUpload);
+    assertMultipartKey(lookupKey(bucket, keyName), OzoneStoragePolicy.COLD);
+  }
+
+  /**
+   * {@code storagepolicy check} must report YES for a key whose replicas sit on the policy's creation
+   * tier, using the real OM key locations and the real SCM replica reports.
+   */
+  @Test
+  public void testCheckReportsMatchForEveryPolicy() throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    try (ScmClient scmClient = new ContainerOperationClient(cluster.getConf())) {
+      for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
+        OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
+        String keyName = UUID.randomUUID().toString();
+        writeKey(bucket, keyName, storagePolicy);
+        OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+        waitForReplicaReports(scmClient, keyDetails);
+
+        String report = new CheckStoragePolicySubCommand().buildReport(keyDetails, scmClient, true);
+
+        assertThat(report).as("report for %s", storagePolicy)
+            .contains("  Key Match Storage Policy: YES")
+            .doesNotContain("Replica Match: NO");
+        assertThat(StringUtils.countMatches(report, "Replica Match: YES"))
+            .isEqualTo(RATIS_THREE.getRequiredNodes());
+      }
+    }
+  }
+
+  /**
+   * A HOT key on a cluster without SSD volumes falls back to DISK (the bucket allows fallback by
+   * default). The strict rule must report that as NO and name the volume type.
+   */
+  @Test
+  public void testCheckReportsMismatchWhenKeyFellBackToFallbackTier() throws Exception {
+    startCluster(Collections.nCopies(RATIS_THREE.getRequiredNodes(),
+        Arrays.asList(StorageType.DISK, StorageType.ARCHIVE)));
+
+    try (ScmClient scmClient = new ContainerOperationClient(cluster.getConf())) {
+      OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
+      String keyName = UUID.randomUUID().toString();
+      writeKey(bucket, keyName, OzoneStoragePolicy.HOT);
+      OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+      waitForReplicaReports(scmClient, keyDetails);
+
+      String report = new CheckStoragePolicySubCommand().buildReport(keyDetails, scmClient, true);
+
+      assertThat(report)
+          .contains("  Key Match Storage Policy: NO")
+          .contains("volumeStorageType DISK != expected SSD")
+          .doesNotContain("Replica Match: YES");
+    }
+  }
+
+  /**
+   * Waits until SCM knows every replica of every container of the key, including the storage types
+   * the datanodes report in their heartbeats.
+   */
+  private void waitForReplicaReports(ScmClient scmClient, OzoneKeyDetails keyDetails) throws Exception {
+    for (OzoneKeyLocation location : keyDetails.getOzoneKeyLocations()) {
+      GenericTestUtils.waitFor((BooleanSupplier) () -> {
+        try {
+          List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(location.getContainerID());
+          return replicas.size() == RATIS_THREE.getRequiredNodes()
+              && replicas.stream().allMatch(r -> r.getStorageType() != null && r.getVolumeStorageType() != null);
+        } catch (IOException e) {
+          return false;
+        }
+      }, 500, 30000);
+    }
+  }
+
+  /**
    * An older client does not send the storage policy in allocateBlock. If the bucket policy changes
    * while such a client writes a key, the next blocks must stay on the tier of the key's policy.
    *
@@ -395,6 +561,54 @@ public class TestOzoneStoragePolicy {
           containerInfo.getStorageTier().getUniformStorageType(),
           "block " + i + " of " + blocks.size() + " landed on the wrong tier");
     }
+  }
+
+  /** Initiates an upload, completes it with two parts and returns the completed key. */
+  private OmKeyInfo doMultipartUpload(OzoneBucket bucket, String keyName,
+      OzoneStoragePolicy storagePolicy) throws Exception {
+    String uploadID = initiateMultipartUpload(bucket, keyName, storagePolicy);
+    uploadPartsAndComplete(bucket, keyName, uploadID);
+    return lookupKey(bucket, keyName);
+  }
+
+  private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
+      OzoneStoragePolicy storagePolicy) throws IOException {
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
+        new MultipartUploadOptions.Builder().setReplicationConfig(RATIS_THREE).setStoragePolicy(storagePolicy).build());
+    assertThat(multipartInfo.getUploadID()).isNotNull();
+    return multipartInfo.getUploadID();
+  }
+
+  /**
+   * Uploads a part of the minimum size, which spans more than one block, and a small last part,
+   * then completes the upload.
+   */
+  private void uploadPartsAndComplete(OzoneBucket bucket, String keyName, String uploadID)
+      throws IOException {
+    Map<Integer, String> partsMap = new TreeMap<>();
+    int[] partSizes = {OzoneConsts.OM_MULTIPART_MIN_SIZE, 1024};
+    for (int i = 0; i < partSizes.length; i++) {
+      int partNumber = i + 1;
+      byte[] data = new byte[partSizes[i]];
+      Arrays.fill(data, (byte) ('a' + i));
+      OzoneOutputStream out = bucket.createMultipartKey(keyName, data.length, partNumber, uploadID);
+      out.write(data);
+      out.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(data));
+      out.close();
+      partsMap.put(partNumber, out.getCommitUploadPartInfo().getETag());
+    }
+    bucket.completeMultipartUpload(keyName, uploadID, partsMap);
+  }
+
+  /** Checks the key records the policy and that all of its several blocks sit on the tier of that policy. */
+  private void assertMultipartKey(OmKeyInfo keyInfo, OzoneStoragePolicy expectedPolicy)
+      throws IOException {
+    assertThat(keyInfo.getStoragePolicy()).isEqualTo(expectedPolicy);
+    assertThat(keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().size())
+        .withFailMessage("Expected more than one block so that several allocations are exercised")
+        .isGreaterThan(1);
+    assertAllBlocksOnTier(keyInfo, expectedPolicy.getCreationTier());
+    assertDatanodeContainerAndBlock(keyInfo, expectedPolicy.getCreationTier());
   }
 
   private OzoneBucket createBucket(OzoneStoragePolicy storagePolicy,
@@ -493,10 +707,18 @@ public class TestOzoneStoragePolicy {
         assertEquals(expectedStorageType, containerData.getStorageType());
         assertEquals(expectedStorageType,
             containerData.getVolume().getStorageType());
+        assertEquals(expectedStorageType,
+            ContainerDataYaml.readContainerFile(container.getContainerFile()).getStorageType());
         assertTrue(pipeline.getNodeSet().contains(datanode.getDatanodeDetails()));
 
+        KeyValueContainerData kvData = (KeyValueContainerData) containerData;
+        try (DBHandle db = BlockUtils.getDB(kvData, conf)) {
+          assertNull(db.getStore().getBlockDataTable().get(kvData.getBlockKey(block.getLocalID()))
+              .getBlockID().getStorageType(), "Storage type must be stored on the container, not each block");
+        }
         ContainerProtos.BlockData blockData = ContainerProtocolCalls.getBlock(
             client, block.getBlockID(), null, client.getPipeline()).getBlockData();
+        assertTrue(blockData.getBlockID().hasStorageTypeID());
         assertEquals(expectedStorageType, StorageTypeUtils
             .getStorageTypeFromID(blockData.getBlockID().getStorageTypeID()));
         replicasChecked++;

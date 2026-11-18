@@ -166,6 +166,15 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     return parentID;
   }
 
+  /** A top-level key is a child of the bucket, so the bucket is its parent. */
+  @Override
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
+                                       String keyName, String multipartUploadID) throws IOException {
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    return omMetadataManager.getMultipartKey(omMetadataManager.getVolumeId(volumeName),
+        bucketId, bucketId, keyName, multipartUploadID);
+  }
+
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
       OMRequest initiateMPURequest) throws IOException {

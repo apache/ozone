@@ -101,6 +101,17 @@ public class TestSCMCommonPlacementPolicy {
     assertNotEquals(1, resultSet.size());
   }
 
+  @Test
+  void testStorageTypeSelectionDelegatesToExistingPolicy() throws SCMException {
+    DummyPlacementPolicy policy = Mockito.spy(new DummyPlacementPolicy(nodeManager, conf, 5));
+    List<DatanodeDetails> nodes = getAllNodes(nodeManager);
+
+    List<DatanodeDetails> result = policy.getResultSet(3, nodes, StorageType.SSD);
+
+    assertThat(result).hasSize(3).doesNotHaveDuplicates();
+    Mockito.verify(policy, Mockito.times(3)).chooseNode(Mockito.anyList());
+  }
+
   private Set<ContainerReplica> testReplicasToFixMisreplication(
           List<ContainerReplica> replicas,
           DummyPlacementPolicy placementPolicy,

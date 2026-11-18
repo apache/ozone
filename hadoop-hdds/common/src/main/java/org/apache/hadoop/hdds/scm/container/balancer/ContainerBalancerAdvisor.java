@@ -147,13 +147,23 @@ public final class ContainerBalancerAdvisor {
 
       int[] involved = computeInvolvedDatanodeCounts(snapshot.getSourceCount(), snapshot.getTargetCount(), maxInvolved);
 
-      long bytesToMove = snapshot.getBytesToMove();
+      long bytesToMove = snapshot.getTotalBytesToMove();
       long perIterationBytes = computePerIterationBytes(
           bytesToMove,
           maxSizeToMovePerIteration,
           maxSizeLeavingSource,
           maxSizeEnteringTarget,
           involved);
+      if (!snapshot.getStorageTypeSnapshots().isEmpty()) {
+        long perIterationBytesAcrossStorageTypes = 0;
+        for (StorageTypeSnapshot typeSnapshot : snapshot.getStorageTypeSnapshots().values()) {
+          perIterationBytesAcrossStorageTypes += Math.min(typeSnapshot.getBytesToMove(), Math.min(
+              typeSnapshot.getSourceCount() * maxSizeLeavingSource,
+              typeSnapshot.getTargetCount() * maxSizeEnteringTarget));
+        }
+        // The shared datanode/traffic caps above still apply across all types; do not grant each type a new budget.
+        perIterationBytes = Math.min(perIterationBytes, perIterationBytesAcrossStorageTypes);
+      }
       long estimatedIterations = computeEstimatedIterations(perIterationBytes, bytesToMove);
       long cycleTimeMillis = computeCycleTimeMillis(moveTimeoutMillis, balancingIntervalMillis);
       long estimatedDurationMillis = estimatedIterations * cycleTimeMillis;
@@ -246,13 +256,21 @@ public final class ContainerBalancerAdvisor {
   }
 
   private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot) {
+    if (snapshot.hasIncompleteStorageTypeUsage()) {
+      throw new IllegalArgumentException("Per-storage-type estimates require storage-type usage from all eligible "
+          + "datanodes. Some datanodes report missing or incomplete storage-type usage.");
+    }
+    if (!snapshot.getStorageTypeSnapshots().isEmpty() && snapshot.getTotalBytesToMove() <= 0) {
+      throw new IllegalArgumentException(
+          "No bytes to move between source and target datanodes of the same storage type.");
+    }
     if (snapshot.getSourceCount() < 1) {
       throw new IllegalArgumentException("No over-utilized datanodes (sources) found.");
     }
     if (snapshot.getTargetCount() < 1) {
       throw new IllegalArgumentException("No under-utilized datanodes (targets) found.");
     }
-    if (snapshot.getBytesToMove() <= 0) {
+    if (snapshot.getTotalBytesToMove() <= 0) {
       throw new IllegalArgumentException("No bytes to move.");
     }
     if (snapshot.getTotalEligibleDatanodes() < 2) {
