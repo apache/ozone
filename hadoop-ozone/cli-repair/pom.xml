@@ -156,7 +156,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>rocksdb-checkpoint-differ</artifactId>
+      <artifactId>hdds-rocksdb-checkpoint-differ</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>

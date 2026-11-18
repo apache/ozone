@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_IS_REFERENCED;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
@@ -172,6 +173,14 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
     }
 
+    // A volume can only be used by one tenant
+    if (forceCreationWhenVolumeExists) {
+      final OmVolumeArgs existingVolumeArgs = ozoneManager.getMetadataManager().getVolumeTable().get(dbVolumeKey);
+      if (existingVolumeArgs != null && existingVolumeArgs.getRefCount() != 0L) {
+        throw new OMException("Volume '" + volumeName + "' is already used by a tenant", VOLUME_IS_REFERENCED);
+      }
+    }
+
     // TODO: Refactor this and OMVolumeCreateRequest to improve maintainability.
     final VolumeInfo volumeInfo = VolumeInfo.newBuilder()
         .setVolume(volumeName)
@@ -270,6 +279,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
         LOG.debug("volume: '{}' already exists", volumeName);
         if (forceCreationWhenVolumeExists) {
+          // A volume can only be used by one tenant
+          if (getVolumeInfo(omMetadataManager, volumeName).getRefCount() != 0L) {
+            throw new OMException("Volume '" + volumeName + "' is already used by a tenant", VOLUME_IS_REFERENCED);
+          }
           LOG.warn("forceCreationWhenVolumeExists = true. Resuming "
               + "tenant creation despite volume '{}' existence", volumeName);
           skipVolumeCreation = true;
@@ -277,6 +290,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           // forceCreationWhenVolumeExists is false, throw
           throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
         }
+      }
+
+      // Check tenant existence in tenantStateTable
+      if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {
+        LOG.debug("tenant: '{}' already exists", tenantId);
+        throw new OMException("Tenant already exists", TENANT_ALREADY_EXISTS);
       }
 
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
@@ -325,12 +344,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
       // Audit
       auditMap = volumeBuilder.toAuditMap();
-
-      // Check tenant existence in tenantStateTable
-      if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {
-        LOG.debug("tenant: '{}' already exists", tenantId);
-        throw new OMException("Tenant already exists", TENANT_ALREADY_EXISTS);
-      }
 
       // Create tenant
       // Add to tenantStateTable. Redundant assignment for clarity

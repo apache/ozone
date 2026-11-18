@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
@@ -74,7 +74,7 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
   }
 
   /** Basic, non-verbose human-readable status. */
-  static void printBasic(QueryUpgradeStatusResponse status, PrintWriter out) {
+  static void printBasic(QueryUpgradeStatusResponse status, PrintStream out) {
     out.println("Upgrade finalization status:");
     out.println("    Cluster: " + status.getClusterFinalizationStatus().name());
     out.println("    OM: " + status.getOmFinalizationStatus().name());
@@ -87,7 +87,7 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
    * Verbose human-readable status that includes the apparent versions reported by OM and SCM, and the
    * range of apparent versions across healthy datanodes.
    */
-  static void printVerbose(QueryUpgradeStatusResponse status, PrintWriter out) {
+  static void printVerbose(QueryUpgradeStatusResponse status, PrintStream out) {
     HddsProtos.UpgradeStatus hdds = status.getHddsStatus();
     out.println("Upgrade finalization status:");
     out.println("    Cluster:                 " + status.getClusterFinalizationStatus().name());

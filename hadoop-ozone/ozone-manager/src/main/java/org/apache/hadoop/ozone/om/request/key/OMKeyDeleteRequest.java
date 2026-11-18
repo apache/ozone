@@ -156,6 +156,11 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
 
       validateIfMatchETag(keyArgs, omKeyInfo);
+      if (deleteKeyRequest.hasUpdateID() && omKeyInfo.getUpdateID() != deleteKeyRequest.getUpdateID()) {
+        throw new OMException("UpdateID does not match. Key: " + keyName +
+            ", Expected UpdateID: " + omKeyInfo.getUpdateID() +
+            ", Given UpdateID: " + deleteKeyRequest.getUpdateID(), OMException.ResultCodes.UPDATE_ID_NOT_MATCH);
+      }
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
