@@ -58,6 +58,8 @@ import org.junit.jupiter.api.Test;
 public class TestHeartbeatEndpointTaskRecovery {
 
   private static final HostAndPort SCM = new HostAndPort("test-scm-1", 9861);
+  private static final HostAndPort HEALTHY_SCM =
+      new HostAndPort("test-scm-2", 9861);
 
   @Test
   public void thresholdFailureResetsEndpointAndClearsCommandStatusQueue() throws Exception {
@@ -131,6 +133,52 @@ public class TestHeartbeatEndpointTaskRecovery {
       List<Message> pendingReports = context.getAllAvailableReports(SCM);
       assertEquals(1, pendingReports.size());
       assertTrue(pendingReports.get(0) instanceof CommandStatusReportsProto);
+    }
+  }
+
+  @Test
+  public void failingEndpointCleanupDoesNotAffectHealthyEndpoint() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD, 1);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD, 50);
+    DatanodeStateMachine dsm = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, dsm, "");
+    StorageContainerDatanodeProtocolClientSideTranslatorPB failingProxy =
+        failingProxy();
+    StorageContainerDatanodeProtocolClientSideTranslatorPB healthyProxy =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+
+    try (EndpointStateMachine failingEndpoint =
+             new EndpointStateMachine(SCM, failingProxy, conf, "");
+         EndpointStateMachine healthyEndpoint =
+             new EndpointStateMachine(HEALTHY_SCM, healthyProxy, conf, "")) {
+      failingEndpoint.setState(HEARTBEAT);
+      healthyEndpoint.setState(HEARTBEAT);
+      context.addEndpoint(SCM);
+      context.addEndpoint(HEALTHY_SCM);
+      context.addIncrementalReport(newCommandStatusReport(21L));
+      context.addIncrementalReport(IncrementalContainerReportProto.getDefaultInstance());
+
+      newHeartbeatTask(failingEndpoint, conf, context).call();
+
+      assertEquals(GETVERSION, failingEndpoint.getState());
+      assertEquals(HEARTBEAT, healthyEndpoint.getState());
+      verify(dsm).setNextHB(anyLong());
+
+      List<Message> failedEndpointReports = context.getAllAvailableReports(SCM);
+      assertEquals(1, failedEndpointReports.size());
+      assertTrue(failedEndpointReports.get(0) instanceof IncrementalContainerReportProto);
+
+      List<Message> healthyEndpointReports = context.getAllAvailableReports(HEALTHY_SCM);
+      assertEquals(2, healthyEndpointReports.size());
+      long healthyCommandStatusCount = healthyEndpointReports.stream()
+          .filter(CommandStatusReportsProto.class::isInstance)
+          .count();
+      long healthyIncrementalContainerCount = healthyEndpointReports.stream()
+          .filter(IncrementalContainerReportProto.class::isInstance)
+          .count();
+      assertEquals(1L, healthyCommandStatusCount);
+      assertEquals(1L, healthyIncrementalContainerCount);
     }
   }
 
