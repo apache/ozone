@@ -2,10 +2,10 @@
 
 | Field   | Value                                     |
 |---------|-------------------------------------------|
-| Status  | Draft 2026-11-02                          |
+| Status  | Draft 2026-11-18                          |
 | Author  | Tsz-Wo Nicholas Sze, Rui Wang             |
 | AI      | Claude                                    |
-| Related | HDDS-15757, HDDS-16008, HDDS-16746, HDDS-16910, HDDS-17093 |
+| Related | HDDS-15757, HDDS-16008, HDDS-16746, HDDS-16910, HDDS-17093, HDDS-17543, HDDS-17809, HDDS-17845 |
 
 ---
 
@@ -38,6 +38,8 @@ V3 is identified by the previously unused `ReplicationType.CHAINED` (`= 3` in `h
 
 - **Keys and containers.** CHAINED keys are written to CHAINED containers.
 - **Pipelines.** CHAINED containers live on dedicated CHAINED pipelines.
+  A CHAINED pipeline is short-lived and holds **one** container, as an EC pipeline does:
+  the pipeline is closed when its container closes, and SCM keeps a pool of spare pipelines ready.
 - **Raft group.** Each CHAINED pipeline keeps its Raft group.
   The group provides peer membership, the datastream server and pipeline management.
   It is never used for write log entries.
@@ -59,6 +61,8 @@ with SCM, OM and ReplicationManager support.
    - Selected through the bucket/key replication config, as with EC.
    - Accepted by `ozone.replication.allowed-configs`.
 5. **Dedicated CHAINED pipelines and containers.** They are never mixed with RATIS pipelines or containers.
+   Each CHAINED pipeline holds exactly one container,
+   so a failure (for example, a bad disk) affects only that container.
 6. **CHAINED containers are never QUASI_CLOSED.** Lifecycle: `OPEN → CLOSING → CLOSED`.
 7. **Full ReplicationManager coverage.** Under-, over- and mis-replication handling for CHAINED containers,
    using the existing replicated-container (Ratis-style) handlers.
@@ -76,7 +80,7 @@ with SCM, OM and ReplicationManager support.
 | Leader CPU | No per-block work on the Raft leader. Work is spread along the chain. |
 | RocksDB writes | No more than V2 (one PutBlock per flush/close per replica) |
 | Durability | Ack only after data + PutBlock are synced on all replicas (HDDS-17093) |
-| Compatibility | No change to existing RATIS/EC data paths. No new protobuf fields. No RocksDB layout change. |
+| Compatibility | No change to RATIS/EC data paths or wire formats. One new datanode column family (§5.1). |
 | Availability | One failed or slow datanode fails the in-flight block. The client retries on another pipeline (§4.1.3). |
 
 ---
@@ -191,9 +195,11 @@ Client                    Primary DN               DN2                 DN3      
 
 #### 4.1.2 Stream output
 - **`RpcClient#createDataStreamOutput` / `KeyDataStreamOutput`.**
-  A CHAINED key always uses the stream path, with `putBlockWithoutRaft = true`,
-  whatever `ozone.client.datastream.putblock.without.raft.enabled` says.
-  That flag keeps its V2 meaning for RATIS keys.
+  A CHAINED key always uses the stream path, with `putBlockWithoutRaft = true`.
+  - `ozone.client.datastream.putblock.without.raft.enabled` (HDDS-16008) is unreleased and only for V3.
+    It doesn't apply to RATIS keys: `BlockDataStreamOutput` commits PutBlock without Raft only on CHAINED pipelines,
+    and a RATIS state machine doesn't accept stream commands.
+  - Since a CHAINED key always commits PutBlock through the stream, V3 doesn't need the flag either (open question 9).
 - **`XceiverClientCreator`.** `case CHAINED` returns `XceiverClientRatis`,
   which provides the DataStream API for the pipeline.
 - **`BlockDataStreamOutput`:**
@@ -219,25 +225,71 @@ Client                    Primary DN               DN2                 DN3      
 
 ### 4.2 Datanode
 
+A CHAINED pipeline creates only CHAINED containers, so the datanode goes by the pipeline's type.
+Each Raft group's `ContainerStateMachine` is built with that type,
+and the type is fixed for the group's lifetime (HDDS-17809).
+
 | Area | Behavior for CHAINED |
 |---|---|
-| Stream init | `ContainerStateMachine#stream` → `HddsDispatcher` (op `STREAM_INIT`) validates the block token. Auto-creating the container works as for V2. **Change:** for a `StreamInitWithPutBlock` request, the container is added to `container2BCSIDMap` only when the group's recorded type is RATIS. When the type is CHAINED or unknown, it is not added. Plain `StreamInit` (V2) is unchanged. |
+| State machine type | **Change (HDDS-17809):** `ContainerStateMachine` takes a `ReplicationType`, RATIS or CHAINED, and keeps it in a final field. `XceiverServerRatis#getStateMachine(gid)` (the Ratis `StateMachine.Registry`) picks the type as described below. |
+| Raft transactions | **Change (HDDS-17543):** a CHAINED state machine rejects both `startTransaction(RaftClientRequest)` (appending a client request to the Raft log) and `applyTransaction` with `UNSUPPORTED_REQUEST`. So no write can enter or be applied from a CHAINED group's Raft log. A path that still tries, such as a V2-style stream link, `CloseContainer` through Raft or `FinalizeBlock` (§5.3), fails fast instead of writing a log entry. Ratis itself adds no entry for a stream CLOSE: the datastream server only closes the channel and replies (`DataStreamManagement#readImpl`). |
+| Stream init | `ContainerStateMachine#stream` → `HddsDispatcher` (op `STREAM_INIT`) validates the block token. Auto-creating the container works as for V2. **Change:** a CHAINED state machine does not pass `container2BCSIDMap` to the dispatcher, so CHAINED containers are never added to it. |
 | Data | `KeyValueStreamDataChannel` writes packets to the FILE_PER_BLOCK block file. |
 | Flush/hsync | `ContainerStateMachine#streamCommand` persists the PutBlock (`ContainerStateMachine#streamPutBlock`) and syncs it before replying. |
 | Close | `KeyValueStreamDataChannel#closeWithStreamPutBlock` parses the tail, writes the remaining data, persists the PutBlock with bcsId 0 (`BlockManagerImpl#persistPutBlock`), and syncs data and metadata before replying (HDDS-17093). |
-| Container close | **Change:** `CloseContainerCommandHandler` closes CHAINED containers directly (`controller.closeContainer`) even if the pipeline's Raft group exists. It never submits CloseContainer through Raft and never quasi-closes them. |
+| Container close | **Change:** `CloseContainerCommandHandler` closes CHAINED containers directly (`controller.closeContainer`) even if the pipeline's Raft group exists, choosing by the group's type (`XceiverServerRatis#getReplicationType`). Submitting CloseContainer through Raft would be rejected (see Raft transactions). CHAINED containers are never quasi-closed. If the group no longer exists, `force=true` (sent by SCM for every non-RATIS container) closes the container directly, as today. |
+| Pipeline creation | **Change (HDDS-17809):** `CreatePipelineCommandHandler` calls `XceiverServerRatis#addGroup(pipelineID, type, peers, priorities)` with `CreatePipelineCommandProto.type`. For CHAINED, the handler does **not** fan out `getGroupManagementApi(peer).add(group)` to the other datanodes; every datanode adds the group from its own command. |
+| Pipeline close | **Change (HDDS-17809):** `ClosePipelineCommandHandler` calls `XceiverServerRatis#removeGroup(groupId, tlsConfig)`. For RATIS it first sends the group remove to the peers (as today); for CHAINED it removes the group locally only. |
 | Raft group removal | `ContainerStateMachine#notifyGroupRemove` only goes through `container2BCSIDMap`. CHAINED containers are not in it, so they are never quasi-closed. |
-| Restart | `ContainerSet#buildMissingContainerSetAndValidate` checks containers against the Raft snapshot's bcsId map. CHAINED containers are not in it, so they are not marked UNHEALTHY. The recorded group types are in memory only, so every group reloaded at startup has an unknown type. SCM closes the restarted datanode's CHAINED pipelines (§4.3.2). |
-| Pipeline creation | **Change:** `CreatePipelineCommandHandler` creates the Raft group (`XceiverServerRatis#addGroup`) as today. It also records `CreatePipelineCommandProto.type` for the group in `XceiverServerRatis`, on every command, including when the group already exists (`isExist`). |
+| Threads | **Change:** today each `ContainerStateMachine` creates its own executor of `hdds.container.ratis.num.container.op.executors` (10) threads. CHAINED pipelines are short-lived and numerous, so all CHAINED state machines share **one** executor pool owned by `XceiverServerRatis`. RATIS state machines keep their own executors. The chunk executors are already shared by all groups. |
+| Restart | **Change (HDDS-17845):** the type of every CHAINED group is persisted in the datanode's `PipelineCreateInfoTable`, so a restarted datanode rebuilds its CHAINED groups as CHAINED. See "Restart" below. `ContainerSet#buildMissingContainerSetAndValidate` checks containers against the Raft snapshot's bcsId map; CHAINED containers are not in it, so they are not marked UNHEALTHY. |
 
-**How the datanode knows a container is CHAINED.** A CHAINED pipeline creates only CHAINED containers, so the datanode goes by the pipeline's type.
-- **Recording the type.** `XceiverServerRatis` keeps an in-memory `RaftGroupId → ReplicationType` map, filled from `CreatePipelineCommandProto.type`. It is not persisted. Nothing is added to disk and the protobuf doesn't change.
-  - The type must be recorded even when the group already exists. The datanode that handles the command first adds the group on its peers through `getGroupManagementApi(peer).add(group)`. When a peer's own command arrives, `isExist` is already true, and today the handler skips its body.
-  - So the state machine can exist before its type is known. The type is looked up at stream init, from the request's group (`ContainerStateMachine#getGroupId`), not when the state machine is built.
-- **Stream init.** A `StreamInitWithPutBlock` request adds its container to `container2BCSIDMap` only when the group is known to be RATIS. CHAINED and unknown groups are treated the same way: the container is not added.
-  - **Unknown type for CHAINED.** This can happen just after pipeline creation, or after a restart until SCM's `ClosePipelineCommand` arrives. The Ratis and DataStream servers start in `VersionEndpointTask` (`ozoneContainer.start`), before the datanode registers. Not adding the container is exactly the CHAINED behavior, so this window is harmless.
-  - **Unknown type for RATIS.** This only happens after a restart. A RATIS container that is first auto-created by `StreamInitWithPutBlock` (`ozone.client.datastream.putblock.without.raft.enabled`) in this state is not tracked in `container2BCSIDMap`, so the bcsId check at restart skips it. That costs nothing: such writes have no Raft write entries, so the bcsId is 0 anyway.
-- **Close.** SCM sends `force=true` for every non-RATIS container. The datanode closes directly when `force` is set and the container is not tracked in `container2BCSIDMap`, i.e. it was never written through Raft. This holds whether the group's type is known or not. A RATIS container written through Raft is always in that map, so a forced close of a RATIS container keeps today's behavior.
+**How the type reaches the state machine.** Ratis creates a group's state machine through the registry,
+which only gets the `RaftGroupId`. `getStateMachine(gid)` looks the type up in this order:
+1. **Adding a group.** `XceiverServerRatis#addGroup` puts `groupId → type` into an in-memory `addingGroups` map
+   before `server.groupManagement(add)` and removes it afterwards.
+   `groupManagement` calls the registry before it returns, so the type is always found.
+2. **Reloading a group on restart.** `PipelineCreateInfoTable` (HDDS-17845).
+3. **Otherwise RATIS.** This covers RATIS groups reloaded on restart and RATIS groups added by a peer's fan-out.
+
+**Why CHAINED does not fan out.**
+- **Add.** A Ratis group add (`GroupManagementRequest.newAdd`) carries only the `RaftGroup` (group ID and peers),
+  not the type. A peer that received the group through the fan-out would build it as RATIS and would not record it.
+  SCM already sends `CreatePipelineCommand` to every datanode of the pipeline (`RatisPipelineProvider#create`),
+  so the fan-out is only a speed-up, and CHAINED does without it.
+- **Remove.** A remote group remove would bypass the peer's own `removeGroup`, which also deletes the peer's
+  `PipelineCreateInfoTable` entry. SCM sends `ClosePipelineCommand` to every datanode when it deletes the pipeline,
+  and a datanode that misses it gets one later when it reports the unknown pipeline (`PipelineReportHandler`).
+
+**Restart (HDDS-17845).** Without a persisted type, a restarted datanode would rebuild every group as RATIS.
+After a short restart (shorter than `ozone.scm.stale.node.interval`), SCM keeps using the pipeline,
+so its CHAINED writes would be rejected.
+- **Where the type is stored.** `PipelineCreateInfoTable` is a new column family in the datanode-level
+  `WitnessedContainerMetadataStore`, next to `ContainerCreateInfoTable`.
+  - Key: `PipelineID`.
+  - Value: `PipelineCreateInfoProto { PipelineID id; ReplicationType replicationType }`,
+    defined in `hdds.proto` and stored with `Proto2Codec`.
+  - Only CHAINED pipelines are stored.
+    A pipeline that is not in the table is RATIS, so existing groups need no migration.
+- **Why it is available in time.** The store is opened in the `OzoneContainer` constructor.
+  Ratis reloads the groups later, in `writeChannel.start()` (`RaftServerProxy#initGroups`),
+  which calls the registry before any log is replayed.
+- **Why per pipeline.** Recording the type per pipeline also covers an empty CHAINED pipeline.
+  A per-container marker would miss a pipeline that has no container yet.
+- **Write.** `addGroup` writes the entry for CHAINED **before** `server.groupManagement(add)`,
+  so a group never exists without its entry.
+- **Delete.** `removeGroup(groupId, tlsConfig)` deletes the entry after the group is removed locally.
+  A failed add does not delete the entry: the failure may be `AlreadyExistsException` for a running CHAINED group.
+- **Cleanup.** After `server.start()`, `XceiverServerRatis` deletes the entries whose group was not reloaded,
+  for example after a crash between writing the entry and adding the group.
+  Pipeline IDs are random UUIDs and never reused, so such an entry is harmless until then.
+- **Read errors.** If the table cannot be read, the registry fails the group,
+  instead of silently building a CHAINED group as RATIS.
+- **Alternatives rejected.**
+  - *Ask SCM after restart.* It needs a protobuf change, a state machine type that can be set after it is built,
+    and a window after restart in which the type is unknown.
+  - *bcsId == 0 as a CHAINED marker.* RATIS containers also have bcsId 0 before their first Raft PutBlock,
+    and before Raft log replay at restart. So it cannot tell the two types apart.
 
 ### 4.3 SCM
 
@@ -257,36 +309,84 @@ Client                    Primary DN               DN2                 DN3      
   - **Datastream port.** The `RATIS_DATASTREAM` port is required strictly.
     RATIS falls back to datanodes without it in `chooseThreeFactorDatanodes`; CHAINED does not.
   - **Datanode version.** Only datanodes at `HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT` or later are eligible.
-  - **Pipeline limit.** The per-datanode limit (`ozone.scm.datanode.pipeline.limit`) counts **both** RATIS/THREE and CHAINED/THREE Raft groups. Today `PipelinePlacementPolicy#currentRatisThreePipelineCount` and `RatisPipelineProvider#exceedPipelineNumberLimit` count RATIS/THREE only.
+  - **One container per pipeline.** A CHAINED pipeline holds exactly one container (§4.3.3), like an EC pipeline.
+  - **Pipeline limit.** CHAINED has its own per-datanode limit, separate from `ozone.scm.datanode.pipeline.limit`,
+    which keeps limiting RATIS/THREE only (`PipelinePlacementPolicy#currentRatisThreePipelineCount`,
+    `RatisPipelineProvider#exceedPipelineNumberLimit`).
+    - EC already works this way: it ignores `ozone.scm.datanode.pipeline.limit`,
+      and uses `ozone.scm.ec.pipeline.minimum` and `ozone.scm.ec.pipeline.per.volume.factor`
+      (`WritableECContainerProvider#getMaximumPipelines`).
+    - Each CHAINED pipeline holds one container, and containers go to disks,
+      so the CHAINED limit is volume-based. Per datanode, it is
+      `max(ozone.scm.chained.pipeline.per.volume.factor × healthy volumes, ozone.scm.chained.pipeline.minimum)`
+      (names and defaults TBD, open question 8).
+    - Only non-closed CHAINED pipelines count, as for RATIS (`PipelinePlacementPolicy#isNonClosedRatisThreePipeline`).
+  - **Health without a leader.** `Pipeline#isHealthy` requires every datanode to have reported the pipeline,
+    **and** a known leader (`leaderId != null`).
+    A pipeline moves from ALLOCATED to OPEN only when it is healthy.
+    - CHAINED writes never use the Raft leader,
+      so for CHAINED, `isHealthy` requires only that every datanode has reported.
+    - The pipeline then opens without waiting for a leader election.
+    - EC already skips the leader check.
 
 #### 4.3.2 Other SCM pipeline changes
 - **`PipelineFactory`** registers `CHAINED → ChainedPipelineProvider`.
-- **`BackgroundPipelineCreator#getReplicationConfigs`** also creates CHAINED pipelines
-  when CHAINED is in `ozone.replication.allowed-configs`:
-  - THREE always;
-  - ONE under the existing `ozone.scm.pipeline.creation.auto.factor.one` rule.
+- **Spare pipeline pool.** CHAINED pipelines are short-lived, and creating one takes time:
+  the commands travel on the datanode heartbeat (`hdds.heartbeat.interval`, 30s),
+  and the pipeline opens only after every datanode reports it.
+  So SCM keeps a pool of OPEN CHAINED pipelines **without** a container,
+  `ozone.scm.chained.pipeline.spare.count` per CHAINED config (name and default TBD, open question 8).
+  - `BackgroundPipelineCreator#getReplicationConfigs` also creates CHAINED pipelines
+    when CHAINED is in `ozone.replication.allowed-configs`: THREE always; ONE under the existing
+    `ozone.scm.pipeline.creation.auto.factor.one` rule.
+  - It refills the pool up to the spare count, within the CHAINED limit (§4.3.1).
+  - When a spare pipeline is taken for a new container,
+    SCM triggers the creator right away (`BackgroundPipelineCreator#notifyEventTriggered`),
+    without waiting for `ozone.scm.pipeline.creation.interval` (120s).
+- **Shorter timeouts for CHAINED.** The pipeline timeouts are sized for long-lived RATIS pipelines.
+  CHAINED gets its own, shorter values (names and defaults TBD, open question 8):
+
+  | RATIS key (default) | CHAINED key | Why it can be shorter for CHAINED |
+  |---|---|---|
+  | `ozone.scm.pipeline.allocated.timeout` (5m) | `ozone.scm.chained.pipeline.allocated.timeout` | A pipeline that doesn't open soon is replaced from the pool. |
+  | `ozone.scm.pipeline.destroy.timeout` (300s) | `ozone.scm.chained.pipeline.destroy.timeout` | The RATIS delay leaves time for containers to close through Raft before the group is removed. CHAINED containers close directly (§4.2), so a CLOSED CHAINED pipeline can be deleted, and its Raft groups removed, soon after. |
+  | `ozone.scm.pipeline.scrub.interval` (150s) | used for CHAINED too, or a shorter `ozone.scm.chained.pipeline.scrub.interval` | The scrubber is what applies the two timeouts above. |
 - **`PipelineManagerImpl`:**
   - `closePipelinesMissingDataStreamPort` includes CHAINED.
   - `factorOne` handles CHAINED.
   - Remove `case CHAINED: // Not supported`.
-- **Datanode restart.** When a datanode SCM already knows registers again (the `else` branch of `SCMNodeManager#register`),
-  the leader SCM closes every CHAINED pipeline that contains it. That datanode has lost its in-memory group types (§4.2).
-  - Today that branch fires no pipeline event. `StaleNodeHandler` closes pipelines only after `ozone.scm.stale.node.interval`,
-    which a fast restart never reaches. So this needs a new event and handler.
-  - RATIS pipelines are not closed.
-  - Re-registering without a restart (for example after a `ReregisterCommand`) also triggers the close.
-    That is unnecessary, but safe.
-  - If SCM restarts as well, the datanode registers as a new node, so this trigger doesn't fire.
-    The datanode stays correct, because unknown-type groups are handled safely (§4.2).
+- **Datanode restart.** No SCM change. A restarted datanode rebuilds its CHAINED groups as CHAINED
+  from its `PipelineCreateInfoTable` (§4.2), so SCM keeps using its CHAINED pipelines, as for RATIS.
+  As today, a datanode that stays down longer than `ozone.scm.stale.node.interval`
+  has its pipelines closed by `StaleNodeHandler`.
 - **`PipelineReportHandler#setPipelineLeaderId`.** A CHAINED/ONE pipeline has no leader flag, the same as RATIS/ONE.
 - **Safe mode.** The pipeline rules count RATIS/THREE only, so safe mode is unchanged.
 - **Admin CLI.** `CreatePipelineSubcommand` accepts CHAINED.
 
 #### 4.3.3 Containers
-- **Allocation.** `WritableContainerFactory#getContainer` adds `case CHAINED`, which uses `WritableRatisContainerProvider`.
-  That provider is already typed on `ReplicationConfig`, so it finds or creates an OPEN container on an OPEN CHAINED pipeline.
+- **One container per pipeline.** Today SCM keeps many open containers on each RATIS pipeline:
+  `SCMNodeManager#openContainerLimit` = min over the pipeline's datanodes of
+  `ceil(ozone.scm.pipeline.owner.container.count (3) × healthy volumes / pipeline limit)`,
+  and the datanodes spread them over their disks.
+  - For RATIS, a failure on **one** disk can close the **whole** pipeline and every container on it.
+    A failed write marks the group's state machine unhealthy,
+    and a failed `applyTransaction` closes the pipeline (`XceiverServerRatis#handleApplyTransactionFailure`,
+    `STATEMACHINE_TRANSACTION_FAILED`). The client also excludes the whole pipeline after an I/O error.
+  - A CHAINED pipeline holds exactly one container, so such a failure affects only that container.
+    This is the EC model: `WritableECContainerProvider` keeps one container per EC pipeline,
+    closes the pipeline when the container is full, and creates a new pipeline on demand.
+  - `ozone.scm.pipeline.owner.container.count` does not apply to CHAINED.
+- **Allocation.** `WritableContainerFactory#getContainer` adds `case CHAINED`,
+  which uses a new `WritableChainedContainerProvider`, modeled on `WritableECContainerProvider`:
+  1. Pick an OPEN CHAINED pipeline whose container has space for the block and is not excluded.
+  2. Otherwise take a spare pipeline from the pool (§4.3.2) and allocate its container.
+  3. A pipeline whose container is full is closed (as for EC).
   No new allocation field is needed: `AllocateScmBlockRequestProto` already carries type and factor.
-- **Close.** No change. `CloseContainerEventHandler` already sets `force=true` for any non-RATIS type.
+- **Close.** Closing the container and closing its pipeline go together:
+  - SCM closes a full container by closing its pipeline,
+    and a pipeline close (for example, a stale datanode) closes its one container.
+  - `CloseContainerEventHandler` already sets `force=true` for any non-RATIS type,
+    and each datanode closes the container directly (§4.2).
 - **All replicas unhealthy.** No change. `ClosingContainerHandler` quasi-closes only RATIS containers, so CHAINED goes to CLOSED.
 - **ReplicationManager.** Most `ReplicationType.RATIS` checks need an audit; there are about 41 in 34 main source files.
   - **Treat CHAINED like RATIS (must change).** Without these changes CHAINED containers get no replication handling:
@@ -317,7 +417,8 @@ Client                    Primary DN               DN2                 DN3      
 | Pipeline create (SCM → DN) | heartbeat command | existing `CreatePipelineCommandProto { pipelineID, type=CHAINED, factor, datanode[], priority[] }` | pipeline report |
 | Container close (SCM → DN) | heartbeat command | existing `CloseContainerCommandProto { containerID, pipelineID, force=true }` | container report (`CLOSED`) |
 
-**No protobuf schema changes.** CHAINED (=3) already exists in `ReplicationType`. Every message above uses existing fields.
+**No wire-format changes.** CHAINED (=3) already exists in `ReplicationType`. Every message above uses existing fields.
+The only new protobuf message, `PipelineCreateInfoProto`, is stored on the datanode and never sent over RPC (§5.1).
 
 ---
 
@@ -333,15 +434,24 @@ Client                    Primary DN               DN2                 DN3      
 | `KeyInfo`, `BucketInfo` (OM DB) | `type=CHAINED`. Existing fields. |
 | `BlockData` (datanode RocksDB) | Unchanged. `blockCommitSequenceId = 0`. |
 | Container bcsId (datanode RocksDB, `ContainerInfoProto.sequenceId`, `ContainerReplicaProto.blockCommitSequenceId`) | Always `0` for CHAINED |
-| RocksDB layout / column families | Unchanged |
+| `PipelineCreateInfoProto` (`hdds.proto`) | **New.** `{ id, replicationType }`, stored only in the datanode. |
+| `PipelineCreateInfoTable` (datanode witnessed DB) | **New column family.** CHAINED pipelines only (§4.2). |
+| Other RocksDB layouts / column families | Unchanged |
 
 ### 5.2 Lifecycles
 
 ```
-CHAINED pipeline:  ALLOCATED ──(all DNs report group)──► OPEN ──(close/scrub)──► CLOSED ──► removed
-CHAINED container: OPEN ──(full / pipeline close / DN failure)──► CLOSING ──(force close, direct)──► CLOSED
+CHAINED pipeline:  ALLOCATED ──(all DNs report group; no leader needed)──► OPEN, spare (no container)
+                   ──(taken from the pool)──► OPEN, one container
+                   ──(container full / DN stale or dead / failure)──► CLOSED
+                   ──(ozone.scm.chained.pipeline.destroy.timeout)──► removed (groups removed on every DN)
+CHAINED container: OPEN ──(full / pipeline close)──► CLOSING ──(force close, direct)──► CLOSED
                    (never QUASI_CLOSED; UNHEALTHY replicas handled by ReplicationManager as today)
 ```
+
+A CHAINED pipeline and its container are closed together (§4.3.3).
+The pipeline's datanodes keep the closed container's replicas;
+only the Raft group is removed.
 
 **Why QUASI_CLOSED never applies.** QUASI_CLOSED exists for RATIS containers
 whose replicas may have applied the Raft log to different indexes,
@@ -359,36 +469,48 @@ which guarantees all replicas have persisted and synced the block.
 3. Later bytes are not visible to OM until the next acked PutBlock.
 
 **Container close (SCM-initiated).** Triggered when the container is full, the pipeline closes, or a datanode goes stale or dead.
-1. SCM moves the container to CLOSING and sends `CloseContainerCommand(force=true)`.
+The container and its pipeline close together (§4.3.3).
+1. SCM closes the pipeline, moves the container to CLOSING and sends `CloseContainerCommand(force=true)`.
 2. Each datanode marks the container CLOSING and closes it directly.
 3. Streams still in flight get `CONTAINER_NOT_OPEN` / `CLOSED_CONTAINER_IO` and retry on a new block (§4.1.3).
    Container close is not ordered with streams, and it doesn't need to be: an unacked block is never committed.
 4. Replicas report CLOSED, and SCM moves the container to CLOSED.
+5. New blocks go to a pipeline taken from the spare pool (§4.3.2).
 
 **Datanode failure during a write.**
 1. The chain breaks, and the CLOSE or command reply fails or times out.
 2. The client excludes the pipeline and rewrites the unacked data to a new block on another CHAINED pipeline.
-3. SCM detects the stale datanode, closes the pipeline, and force-closes its containers.
+3. SCM detects the stale datanode, closes its pipelines, and force-closes their containers, one per pipeline.
+   Pipelines without that datanode, and their containers, are not affected.
 4. ReplicationManager re-replicates under-replicated CHAINED containers using the Ratis-style handlers.
 
-**Pipeline creation.**
-1. `BackgroundPipelineCreator` or the admin CLI calls `ChainedPipelineProvider#create`.
+**Pipeline creation (refilling the spare pool).**
+1. `BackgroundPipelineCreator` (at its interval, or triggered when a spare pipeline is taken) or the admin CLI
+   calls `ChainedPipelineProvider#create`, within the CHAINED limit (§4.3.1).
 2. `CreatePipelineCommand(type=CHAINED)` is sent to each datanode.
-3. Each datanode adds the Raft group, or finds it was already added by a peer.
-   Either way it records the type CHAINED for the group. The pipeline reports move the pipeline to OPEN.
+3. Each datanode writes the pipeline to its `PipelineCreateInfoTable`,
+   then adds the Raft group with a CHAINED state machine.
+   It does not add the group on its peers; each peer adds it from its own command (§4.2).
+4. When every datanode has reported the pipeline, it moves to OPEN without waiting for a Raft leader (§4.3.1),
+   and joins the spare pool.
+5. A pipeline that is still ALLOCATED after `ozone.scm.chained.pipeline.allocated.timeout` is scrubbed and replaced.
+
+**Pipeline close.**
+1. SCM closes the pipeline and force-closes its container; each datanode closes it directly (§4.2).
+2. After `ozone.scm.chained.pipeline.destroy.timeout`, SCM deletes the pipeline
+   and sends `ClosePipelineCommand` to each datanode.
+3. Each datanode removes the Raft group locally and deletes the `PipelineCreateInfoTable` entry.
+   `notifyGroupRemove` quasi-closes nothing, because no CHAINED container is in `container2BCSIDMap`.
 
 **Datanode restart.**
-1. The datanode reloads its Raft groups from Ratis storage.
-   Their types are unknown, because the recorded types were in memory only.
-2. Its Ratis and DataStream servers start before it registers. Until step 4,
-   a stream on a CHAINED group is still handled correctly:
-   an unknown type keeps the container out of `container2BCSIDMap` (§4.2).
-3. The datanode registers again.
-   The leader SCM closes every CHAINED pipeline containing it and force-closes their containers.
-   Each one closes directly, because it is not in `container2BCSIDMap`.
-4. The datanode receives `ClosePipelineCommand` and removes the groups.
-   `notifyGroupRemove` quasi-closes nothing, because no CHAINED container is in the map.
-5. `BackgroundPipelineCreator` creates new CHAINED pipelines, and the restarted datanode is eligible for them.
+1. The `OzoneContainer` constructor opens the witnessed container DB, which holds `PipelineCreateInfoTable`.
+2. Ratis reloads the Raft groups from Ratis storage. For each group, the registry finds CHAINED in the table,
+   or uses RATIS when the group is not in it, so every CHAINED group gets a CHAINED state machine again (§4.2).
+3. Entries whose group was not reloaded are deleted.
+4. The datanode registers again. Its CHAINED pipelines stay OPEN in SCM and keep serving writes.
+   If the datanode was down longer than `ozone.scm.stale.node.interval`,
+   SCM has already closed its pipelines, as for RATIS,
+   and the pipeline close flow above removes the groups and their entries.
 
 **Lease recovery of an hsync'd CHAINED key.**
 1. OM `recoverLease` runs; `LeaseRecoveryClientDNHandler` finalizes the last block.
@@ -397,7 +519,8 @@ which guarantees all replicas have persisted and synced the block.
      or the OM-recorded hsync length.
    - It must not come from one replica.
    - `FinalizeBlock` is a Raft write today (`HddsUtils#isReadOnly` returns false),
-     so CHAINED needs a non-Raft path: a stream command, or a direct call to each replica.
+     which a CHAINED state machine rejects (§4.2).
+     So CHAINED needs a non-Raft path: a stream command, or a direct call to each replica.
 
 ### 5.4 Replica Consistency
 
@@ -453,7 +576,20 @@ and data and metadata are synced before the reply. Therefore:
     which brings back what V3 removes.
 - **Rejected for V3** (open question 2).
 
-### 6.5 Trade-off Summary
+### 6.5 (e) Long-lived CHAINED pipelines with many containers (the RATIS model)
+- **Pros:** fewer pipeline creations and Raft groups; no spare pool;
+  the existing `WritableRatisContainerProvider` works unchanged.
+- **Cons:**
+  - **Blast radius.** One pipeline holds many open containers spread over different disks.
+    A failure on one disk closes the pipeline and all of its containers,
+    and the client excludes the whole pipeline (§4.3.3).
+  - Long-lived pipelines have been a problem in the past, for example pipelines stuck with stale state.
+    Short-lived pipelines bound how long any problem can last.
+- **Rejected.** CHAINED follows the EC model: one container per pipeline, short-lived pipelines and a spare pool.
+  It also needs its own pipeline limit, shorter timeouts, a shared thread pool,
+  and health without a leader (§4.2, §4.3).
+
+### 6.6 Trade-off Summary
 
 | Option | Raft entries/block | Client egress | Latency | Consistency of committed data | Complexity |
 |---|---|---|---|---|---|
@@ -461,6 +597,7 @@ and data and metadata are synced before the reply. Therefore:
 | (b) EC-style direct | 0 | N× | Lowest (parallel) | All-ack | High (new stream + pipeline) |
 | (c) Shared / -1 marker | 0 | 1× | Chain | All-ack | Medium, but brittle special cases |
 | (d) Majority ack | 0 | 1× | Lower p99 | **Divergent** without repair | High |
+| (e) Long-lived, many containers | 0 | 1× | Chain, no Raft | All-ack, synced | Lower; bad disk closes many |
 | **V3 (CHAINED)** | **0** | **1×** | **Chain, no Raft** | **All-ack, synced** | **Medium (reuses `am` path)** |
 
 ---
@@ -504,14 +641,20 @@ and data and metadata are synced before the reply. Therefore:
 | Key | Default | Notes |
 |---|---|---|
 | `ozone.replication.allowed-configs` | existing | Must include `CHAINED/ONE` and/or `CHAINED/THREE` to enable them. |
-| `ozone.client.datastream.putblock.without.raft.enabled` | `false` | V2 RATIS keys only. CHAINED keys always commit PutBlock through the stream. |
+| `ozone.client.datastream.putblock.without.raft.enabled` | `false` | Unreleased, V3 only (§4.1.2). |
 | `ozone.client.datastream.pipeline.mode` | `true` | Chain routing from the closest node. |
 | `ozone.client.datastream.window.size` | `64MB` | Client retry buffer for unacked data. |
 | `ozone.client.datastream.buffer.flush.size` | `16MB` | PutBlock (stream command) boundary. |
 | `ozone.client.datastream.min.packet.size` | `1MB` | Packet size. |
 | `hdds.container.ratis.datastream.enabled` | existing | Must be `true` on datanodes. |
-| `ozone.scm.datanode.pipeline.limit` | existing | Now limits RATIS/THREE and CHAINED/THREE Raft groups combined. |
+| `ozone.scm.datanode.pipeline.limit` | existing | RATIS/THREE only. CHAINED has its own limit. |
 | `ozone.scm.pipeline.creation.auto.factor.one` | existing | Also controls whether CHAINED/ONE pipelines are created automatically. |
+| `ozone.scm.pipeline.owner.container.count` | existing | RATIS only. A CHAINED pipeline holds one container. |
+| `ozone.scm.chained.pipeline.per.volume.factor` | TBD | **New.** CHAINED pipeline limit (§4.3.1). |
+| `ozone.scm.chained.pipeline.minimum` | TBD | **New.** CHAINED pipeline limit (§4.3.1). |
+| `ozone.scm.chained.pipeline.spare.count` | TBD | **New.** Spare CHAINED pipelines, per CHAINED config (§4.3.2). |
+| `ozone.scm.chained.pipeline.allocated.timeout` | TBD (< 5m) | **New.** Shorter than the RATIS one (§4.3.2). |
+| `ozone.scm.chained.pipeline.destroy.timeout` | TBD (< 300s) | **New.** Shorter than the RATIS one (§4.3.2). |
 
 ### 8.2 Metrics (new or extended)
 - **Datanode:**
@@ -523,9 +666,11 @@ and data and metadata are synced before the reply. Therefore:
   - CHAINED block retries / excluded pipelines
   - CLOSE reply latency (p50/p99)
 - **SCM:**
-  - CHAINED pipelines by state
+  - CHAINED pipelines by state, including spare (OPEN without a container)
+  - spare-pool misses: allocations that found no spare CHAINED pipeline
+  - CHAINED pipeline creation latency (ALLOCATED → OPEN)
   - CHAINED containers by state; QUASI_CLOSED **must be 0**, so alert if it isn't
-  - Raft groups per datanode (RATIS + CHAINED)
+  - Raft groups per datanode, by type (RATIS, CHAINED)
 - **OM:** CHAINED lease recoveries.
 
 ### 8.3 Deployment and Upgrade
@@ -533,6 +678,10 @@ and data and metadata are synced before the reply. Therefore:
    - new `HDDSVersion` / `OzoneManagerVersion` entries;
    - a new layout feature on SCM and OM (name TBD);
    - the existing `STREAM_PUTBLOCK_WITHOUT_RAFT(101)` covers the datanode.
+   - The datanode's new `PipelineCreateInfoTable` needs no layout feature. It is a new column family;
+     existing tables and value formats don't change. Released datanodes (2.0.0 and later) open column families
+     they don't define (`RocksDatabase#getExtraColumnFamilies`). Entries are written only for CHAINED pipelines,
+     which SCM creates only after finalization.
 2. **Finalize** SCM and OM. Before finalization, CHAINED configs are rejected.
 3. **Enable** `CHAINED/THREE` in `ozone.replication.allowed-configs`.
    SCM's background creator starts creating CHAINED pipelines.
@@ -549,8 +698,14 @@ and data and metadata are synced before the reply. Therefore:
   - Existing CHAINED keys stay readable.
 
 ### 8.5 Capacity
-- **Raft groups.** Raft groups per datanode now cover RATIS and CHAINED together under one limit.
-  Running both types splits the pipeline budget between them.
+- **Raft groups.** CHAINED Raft groups have their own per-datanode limit (§4.3.1),
+  so they don't take from the RATIS budget.
+  With one container per pipeline, a datanode holds about one CHAINED group per open CHAINED container,
+  plus the spare pool, plus closed groups not yet removed (short, `ozone.scm.chained.pipeline.destroy.timeout`).
+- **Threads.** All CHAINED state machines share one executor pool (§4.2),
+  so the thread count doesn't grow with the number of CHAINED groups beyond what Ratis needs for each group.
+- **Storage.** A CHAINED group's Raft directory holds only configuration entries and metadata (a few KB),
+  and is removed with the group.
 - **Memory.** Each CHAINED Raft group has an idle log and its state machine, but no write traffic.
 
 ### 8.6 Gotchas
@@ -560,6 +715,9 @@ and data and metadata are synced before the reply. Therefore:
 - **Held-back tail.** The last ≤ 1 MB PutBlock plus data is held back for the CLOSE packet, which adds memory per open stream.
 - **hsync visibility.** Readers of an hsync'd, still-open CHAINED block may see bytes that were not all-acked (§5.4).
 - **Lease recovery** must use the all-acked length (§5.3).
+- **Spare pool exhaustion.** If the spare pool is empty, an allocation has to wait for a new CHAINED pipeline,
+  which takes at least a heartbeat round trip.
+  Watch the spare-pool-miss metric, and size `ozone.scm.chained.pipeline.spare.count`.
 - **Mixing types.** RATIS and CHAINED containers never share pipelines.
   Admin tooling that lists pipelines or containers by type must include CHAINED.
 
@@ -576,3 +734,8 @@ and data and metadata are synced before the reply. Therefore:
 6. **Lease recovery.** Use the minimum length across replicas, or the OM-recorded hsync length?
    And which non-Raft path should replace `FinalizeBlock` for CHAINED?
 7. **Layout feature.** The name and number for the SCM/OM layout feature that gates CHAINED.
+8. **CHAINED pipeline settings.** Names and defaults for the CHAINED pipeline limit, spare count,
+   allocated timeout and destroy timeout (§4.3.1, §4.3.2, §8.1). Should the destroy timeout be close to 0,
+   since CHAINED containers close directly? And should the spare count depend on cluster size or write rate?
+9. **`ozone.client.datastream.putblock.without.raft.enabled`.** It is unreleased, and CHAINED keys always commit
+   PutBlock through the stream. Remove it, or keep it only as a test switch (§4.1.2)?
