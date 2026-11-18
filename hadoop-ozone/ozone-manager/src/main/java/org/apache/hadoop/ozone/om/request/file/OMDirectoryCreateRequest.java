@@ -99,10 +99,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = createDirectoryRequest.getKeyArgs();
 
-    String keyName = keyArgs.getKeyName();
-    if (getBucketLayout().shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
+    final boolean enableFileSystemPaths = ozoneManager.getEnableFileSystemPaths();
+    String keyName = normalizeKeyPath(enableFileSystemPaths, keyArgs.getKeyName(), getBucketLayout());
+    if (getBucketLayout().shouldNormalizePaths(enableFileSystemPaths)) {
       // Directory names allow characters such as ':' (HDDS-12911), but must not retain dot components.
-      keyName = OmUtils.normalizeKey(keyName, false);
       if (Arrays.asList(keyName.split(OM_KEY_PREFIX)).contains("..")) {
         throw new OMException("Invalid KeyPath " + keyName, OMException.ResultCodes.INVALID_KEY_NAME);
       }
