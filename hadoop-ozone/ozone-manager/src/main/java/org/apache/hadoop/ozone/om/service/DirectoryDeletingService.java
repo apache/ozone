@@ -56,7 +56,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -326,7 +325,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   void optimizeDirDeletesAndSubmitRequest(
-      List<Pair<String, OmKeyInfo>> allSubDirList,
+      List<PendingSubDir> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime,
       KeyManager keyManager,
@@ -344,11 +343,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     int subDirRecursiveCnt = 0;
     while (subDirRecursiveCnt < allSubDirList.size() && remainNum.get() > 0) {
       try {
-        Pair<String, OmKeyInfo> stringOmKeyInfoPair = allSubDirList.get(subDirRecursiveCnt++);
-        Boolean subDirectoryReclaimable = reclaimableDirChecker.apply(Table.newKeyValue(stringOmKeyInfoPair.getKey(),
-            stringOmKeyInfoPair.getValue()));
+        PendingSubDir subDir = allSubDirList.get(subDirRecursiveCnt++);
+        Boolean subDirectoryReclaimable = reclaimableDirChecker.apply(Table.newKeyValue(subDir.deleteKey(),
+            subDir.dirInfo()));
         Optional<PurgePathRequest> request = prepareDeleteDirRequest(
-            stringOmKeyInfoPair.getValue(), stringOmKeyInfoPair.getKey(), subDirectoryReclaimable, allSubDirList,
+            subDir.dirInfo(), subDir.deleteKey(), subDirectoryReclaimable, allSubDirList,
             keyManager, reclaimableFileChecker, remainNum);
         if (!request.isPresent()) {
           continue;
@@ -452,7 +451,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   private Optional<PurgePathRequest> prepareDeleteDirRequest(
       OmKeyInfo pendingDeletedDirInfo, String delDirName, boolean purgeDir,
-      List<Pair<String, OmKeyInfo>> subDirList,
+      List<PendingSubDir> subDirList,
       KeyManager keyManager,
       CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileFilter,
       AtomicInteger remainNum) throws IOException {
@@ -482,7 +481,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           volumeBucketId.getBucketId(), dirInfo.getParentObjectID(), dirInfo.getFileName());
       String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
           dirInfo.getObjectID(), ozoneDbKey);
-      subDirList.add(Pair.of(ozoneDeleteKey, dirInfo));
+      subDirList.add(new PendingSubDir(ozoneDeleteKey, dirInfo));
       LOG.debug("Moved sub dir name: {}", dirInfo.getKeyName());
     }
 
@@ -680,7 +679,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         volume = null; bucket = null; snapshotTableKey = null;
       }
 
-      Map<UUID, Pair<Long, Long>> exclusiveSizeMap = Maps.newConcurrentMap();
+      Map<UUID, ExclusiveSize> exclusiveSizeMap = Maps.newConcurrentMap();
       boolean processedAllDeletedDirs;
       try (DeletedDirSupplier dirSupplier = new DeletedDirSupplier(currentSnapshotInfo == null ?
           keyManager.getDeletedDirEntries() : keyManager.getDeletedDirEntries(volume, bucket))) {
@@ -699,10 +698,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       if (processedAllDeletedDirs) {
         List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
 
-        for (Map.Entry<UUID, Pair<Long, Long>> entry : exclusiveSizeMap.entrySet()) {
+        for (Map.Entry<UUID, ExclusiveSize> entry : exclusiveSizeMap.entrySet()) {
           UUID snapshotID = entry.getKey();
-          long exclusiveSize = entry.getValue().getLeft();
-          long exclusiveReplicatedSize = entry.getValue().getRight();
+          long exclusiveSize = entry.getValue().exclusiveSize();
+          long exclusiveReplicatedSize = entry.getValue().exclusiveReplicatedSize();
           setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(
               exclusiveSize, exclusiveReplicatedSize, snapshotID));
         }
@@ -726,7 +725,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     @SuppressWarnings("checkstyle:ParameterNumber")
     private boolean runDeletionWorkers(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         DeletedDirSupplier dirSupplier, UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot,
-        UUID expectedPreviousSnapshotId, Map<UUID, Pair<Long, Long>> exclusiveSizeMap, long rnCnt, int remainNum)
+        UUID expectedPreviousSnapshotId, Map<UUID, ExclusiveSize> exclusiveSizeMap, long rnCnt, int remainNum)
         throws ExecutionException, InterruptedException {
       int parallelThreads = numberOfParallelThreadsPerStore.get();
       CountDownLatch snapshotDbHandlesClosed = currentSnapshotInfo == null ? null : new CountDownLatch(parallelThreads);
@@ -811,7 +810,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     @SuppressWarnings("checkstyle:ParameterNumber")
     private boolean processDeletedDirectories(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         DeletedDirSupplier dirSupplier, UUID expectedPreviousSnapshotId,
-        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount, int remaining,
+        Map<UUID, ExclusiveSize> totalExclusiveSizeMap, long runCount, int remaining,
         Runnable afterSnapshotDbHandlesClosed) {
       OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
       IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
@@ -825,7 +824,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         Map<VolumeBucketId, BucketNameInfo> bucketNameInfos = new HashMap<>();
         AtomicInteger remainNum = new AtomicInteger(remaining);
 
-        List<Pair<String, OmKeyInfo>> allSubDirList = new ArrayList<>();
+        List<PendingSubDir> allSubDirList = new ArrayList<>();
         while (remainNum.get() > 0) {
           KeyValue<String, OmKeyInfo> pendingDeletedDirInfo = dirSupplier.get();
           if (pendingDeletedDirInfo == null) {
@@ -873,9 +872,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             long exclusiveSize = exclusiveSizeMap.getOrDefault(snapshot, 0L);
             long exclusiveReplicatedSize = exclusiveReplicatedSizeMap.getOrDefault(snapshot, 0L);
             if (v == null) {
-              return Pair.of(exclusiveSize, exclusiveReplicatedSize);
+              return new ExclusiveSize(exclusiveSize, exclusiveReplicatedSize);
             }
-            return Pair.of(v.getLeft() + exclusiveSize, v.getRight() + exclusiveReplicatedSize);
+            return new ExclusiveSize(v.exclusiveSize() + exclusiveSize,
+                v.exclusiveReplicatedSize() + exclusiveReplicatedSize);
           });
         }
 
@@ -960,5 +960,19 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       // By design, no one cares about the results of this call back.
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
+  }
+
+  /**
+   * A sub-directory's delete table key paired with its directory info,
+   * used as a pending sub-directory to purge by the directory deleting service.
+   */
+  record PendingSubDir(String deleteKey, OmKeyInfo dirInfo) {
+  }
+
+  /**
+   * A snapshot's exclusive size paired with its exclusive replicated size,
+   * used as the per-snapshot size delta accumulated by the directory deleting workers.
+   */
+  record ExclusiveSize(long exclusiveSize, long exclusiveReplicatedSize) {
   }
 }

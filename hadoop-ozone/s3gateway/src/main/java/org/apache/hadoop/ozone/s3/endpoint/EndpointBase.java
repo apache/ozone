@@ -113,7 +113,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
-import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
+import org.apache.hadoop.ozone.s3.TrailerHeader;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.commontypes.RequestParameters;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -348,7 +348,7 @@ public abstract class EndpointBase {
    */
   protected OS3Exception newDuplicateBucketError(String bucketName, OMException cause) {
     try {
-      OzoneBucket existingBucket = getVolume().getBucket(bucketName);
+      OzoneBucket existingBucket = getClientProtocol().getBucketDetails(null, bucketName);
       if (isSameBucketOwner(existingBucket.getOwner())) {
         return newError(BUCKET_ALREADY_OWNED_BY_YOU, bucketName, cause);
       }
@@ -513,6 +513,7 @@ public abstract class EndpointBase {
       String metadataKey = entry.getKey();
       // System metadata is not user metadata; only remapped user values are rebuilt below.
       if (RESERVED_METADATA_KEYS.containsKey(metadataKey)
+          || ServerSideEncryption.ALGORITHM_METADATA_KEY.equals(metadataKey)
           || (metadataKey.startsWith(RESERVED_USER_METADATA_KEY_PREFIX)
               && !REBUILT_RESERVED_KEYS.containsKey(metadataKey))) {
         continue;

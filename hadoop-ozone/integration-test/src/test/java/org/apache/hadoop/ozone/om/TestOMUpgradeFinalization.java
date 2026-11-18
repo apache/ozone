@@ -162,7 +162,8 @@ class TestOMUpgradeFinalization {
         assertEquals(OzoneManagerVersion.SOFTWARE_VERSION.serialize(), Integer.parseInt(dbVersion));
 
         // Confirm finalization happened via snapshot install, not log replay.
-        assertThat(versionManagerLogCapture.getOutput()).contains("New snapshot received with higher apparent version");
+        assertThat(versionManagerLogCapture.getOutput()).contains(
+            "Version file has lower apparent version (INITIAL_VERSION (0)) than DB");
         versionManagerLogCapture.stopCapturing();
       }
     }
@@ -234,7 +235,7 @@ class TestOMUpgradeFinalization {
 
         // Every OM is pre-finalized for ZDU. The version returned to clients should reflect the last software
         // version before ZDU to remain compatible with the old version framework.
-        assertAllOmServiceInfoVersions(cluster, OzoneManagerVersion.S3_DERIVED_KEY);
+        assertAllOmServiceInfoVersions(cluster, OzoneManagerVersion.CONDITIONAL_DELETE);
 
         omClient.finalizeUpgrade();
         OMUpgradeTestUtils.waitForFinalization(omClient);

@@ -45,7 +45,7 @@ if [[ "$@" =~ -Ptest-([a-z]+) ]]; then
     fi
   fi
 
-elif [[ "$@" =~ "-pl :([a-z0-9-]+)" ]]; then
+elif [[ "$@" =~ -pl\ :([a-z0-9-]+) ]]; then
   # specific module
   split="${BASH_REMATCH[1]}"
   args="$args -Dscan.value.testset=${split}"

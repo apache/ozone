@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -31,6 +33,7 @@ import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS3SecretRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeSTSTokenRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -38,11 +41,14 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles RevokeS3Secret request.
+ *
+ * <p>The leader attaches an STS revocation cutoff so tokens stay revoked after the secret is recreated.</p>
  */
 public class S3RevokeSecretRequest extends OMClientRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3RevokeSecretRequest.class);
+  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
 
   public S3RevokeSecretRequest(OMRequest omRequest) {
     super(omRequest);
@@ -64,8 +70,14 @@ public class S3RevokeSecretRequest extends OMClientRequest {
             RevokeS3SecretRequest.newBuilder()
                     .setKerberosID(accessId).build();
 
+    final RevokeSTSTokenRequest stsRevocationCutoff = RevokeSTSTokenRequest.newBuilder()
+        .setOriginalAccessKeyId(accessId)
+        .setRevocationTimeMillis(CLOCK.millis())
+        .build();
+
     return omRequest.toBuilder()
         .setRevokeS3SecretRequest(revokeS3SecretRequest)
+        .setRevokeSTSTokenRequest(stsRevocationCutoff)
         .build();
   }
 
@@ -87,23 +99,24 @@ public class S3RevokeSecretRequest extends OMClientRequest {
             if (s3SecretManager.hasS3Secret(kerberosID)) {
               LOG.info("Secret for {} exists in table, removing it.",
                   kerberosID);
+              final Long stsRevocationCutoff = S3SecretRequestHelper.updateStsRevocationCutoff(
+                  ozoneManager.getMetadataManager(), getOmRequest(), kerberosID, context.getIndex());
               // Invalid entry in table cache immediately
               s3SecretManager.invalidateCacheEntry(kerberosID);
-              return new S3RevokeSecretResponse(kerberosID,
-                  s3SecretManager,
+              return new S3RevokeSecretResponse(kerberosID, stsRevocationCutoff, s3SecretManager,
                   omResponse.setStatus(Status.OK).build());
             } else {
               LOG.info(
                   "Secret for {} doesn't exist in table hence cannot" +
                       " invalidate it", kerberosID);
-              return new S3RevokeSecretResponse(null,
+              return new S3RevokeSecretResponse(null, null,
                   s3SecretManager,
                   omResponse.setStatus(Status.S3_SECRET_NOT_FOUND).build());
             }
           });
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new S3RevokeSecretResponse(null,
+      omClientResponse = new S3RevokeSecretResponse(null, null,
           ozoneManager.getS3SecretManager(),
           createErrorOMResponse(omResponse, ex));
     }

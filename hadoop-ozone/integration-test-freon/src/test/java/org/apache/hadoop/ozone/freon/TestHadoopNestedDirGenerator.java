@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for HadoopNestedDirGenerator.
  */
-public abstract class TestHadoopNestedDirGenerator implements NonHATests.TestCase {
+public abstract class TestHadoopNestedDirGenerator implements ClusterForTests.TestCase {
   private ObjectStore store = null;
   private static final Logger LOG =
           LoggerFactory.getLogger(TestHadoopNestedDirGenerator.class);

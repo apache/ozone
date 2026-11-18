@@ -34,6 +34,8 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
@@ -41,7 +43,10 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -58,12 +63,17 @@ public class TestHeatMapInfo {
   private boolean isSetupDone = false;
   private String auditRespStr;
   private HeatMapUtil heatMapUtil;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconStorageContainerManagerFacade reconScm;
+  private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
 
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    omMetadataManager = initializeNewOmMetadataManager(Files.createDirectory(
+        temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
 
     ReconTestInjector reconTestInjector =
@@ -80,6 +90,10 @@ public class TestHeatMapInfo {
                 mock(StorageContainerServiceProviderImpl.class))
             .build();
     heatMapUtil = reconTestInjector.getInstance(HeatMapUtil.class);
+    // HeatMapUtil already provisioned these singletons, so this does not open new DBs.
+    reconScm = (ReconStorageContainerManagerFacade) reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+    replicaHistoryDBProvider = reconTestInjector.getInstance(ReconReplicaHistoryDBProvider.class);
     auditRespStr = "{\n" +
         "  \"responseHeader\": {\n" +
         "    \"zkConnected\": true,\n" +
@@ -735,6 +749,37 @@ public class TestHeatMapInfo {
     }
   }
 
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+    IOUtils.closeQuietly(replicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, omMetadataManager);
+  }
+
+  @Test
+  public void testHeatMapSerializesZeroColorOnLeaves() throws IOException {
+    EntityMetaData hot = new EntityMetaData();
+    hot.setVal("vol1/bucket1/hot-key");
+    hot.setReadAccessCount(5000);
+    EntityMetaData cold = new EntityMetaData();
+    cold.setVal("vol1/bucket1/cold-key");
+    cold.setReadAccessCount(1);
+
+    JsonNode root = JsonUtils.readTree(JsonUtils.toJsonString(heatMapUtil.generateHeatMap(Arrays.asList(hot, cold))));
+    JsonNode volume = root.path("children").get(0);
+    JsonNode bucket = volume.path("children").get(0);
+    JsonNode hotKey = bucket.path("children").get(0);
+    JsonNode coldKey = bucket.path("children").get(1);
+
+    assertThat(coldKey.has("color")).isTrue();
+    assertEquals(0.0, coldKey.path("color").doubleValue());
+    assertEquals(1.0, hotKey.path("color").doubleValue());
+    assertThat(root.has("color")).isFalse();
+    assertThat(volume.has("color")).isFalse();
+    assertThat(bucket.has("color")).isFalse();
+  }
+
   @Test
   public void testHeatMapGeneratedInfo() throws IOException {
     // Setup
@@ -763,8 +808,7 @@ public class TestHeatMapInfo {
       assertEquals(2924, entityReadAccessHeatMapResponse.getMinAccessCount());
       assertEquals(155074, entityReadAccessHeatMapResponse.getMaxAccessCount());
       assertEquals("root", entityReadAccessHeatMapResponse.getLabel());
-      assertEquals(0.0,
-          entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+      assertNull(entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
       assertEquals(0.442,
           entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
               .get(0).getChildren().get(1).getColor());
@@ -1095,8 +1139,7 @@ public class TestHeatMapInfo {
             0);
         assertEquals(2,
             entityReadAccessHeatMapResponse.getChildren().size());
-        assertEquals(0.0,
-            entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+        assertNull(entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
         String path =
             entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
                 .get(0).getPath();
