@@ -19,17 +19,17 @@ package org.apache.hadoop.ozone.container.stream;
 
 import static org.apache.hadoop.ozone.container.stream.DirstreamServerHandler.END_MARKER;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.util.ByteProcessor;
-import io.netty.util.ReferenceCountUtil;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.thirdparty.io.netty.channel.ChannelHandlerContext;
+import org.apache.ratis.thirdparty.io.netty.channel.ChannelInboundHandlerAdapter;
+import org.apache.ratis.thirdparty.io.netty.util.ByteProcessor;
+import org.apache.ratis.thirdparty.io.netty.util.ReferenceCountUtil;
 
 /**
  * Protocol definition from streaming binary files.

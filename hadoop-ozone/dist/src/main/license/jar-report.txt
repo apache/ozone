@@ -182,15 +182,6 @@ share/ozone/lib/listenablefuture-empty-to-avoid-conflict-with-guava.jar
 share/ozone/lib/log4j-api.jar
 share/ozone/lib/log4j-core.jar
 share/ozone/lib/metrics-core.jar
-share/ozone/lib/netty-buffer.Final.jar
-share/ozone/lib/netty-codec.Final.jar
-share/ozone/lib/netty-common.Final.jar
-share/ozone/lib/netty-handler.Final.jar
-share/ozone/lib/netty-resolver.Final.jar
-share/ozone/lib/netty-transport-classes-epoll.Final.jar
-share/ozone/lib/netty-transport-native-epoll.Final.jar
-share/ozone/lib/netty-transport-native-unix-common.Final.jar
-share/ozone/lib/netty-transport.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp-jvm.jar
 share/ozone/lib/okhttp-sse.jar
