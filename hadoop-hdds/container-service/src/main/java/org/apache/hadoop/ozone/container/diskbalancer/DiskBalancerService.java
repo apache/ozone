@@ -469,12 +469,18 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     if (queue.isEmpty() && inProgressContainers.isEmpty()) {
-      if (stopAfterDiskEven && !rejectedCandidate) {
+      if (stopAfterDiskEven) {
         // Containers only move between volumes of the same StorageType, so no volume pair is also
         // reported when every StorageType has fewer than two volumes, even if those volumes are
         // unevenly used.
-        LOG.info("Disk balancer is stopped because no volume pair of the same StorageType needs" +
-            " balancing as the property StopAfterDiskEven is set to true.");
+        if (rejectedCandidate) {
+          LOG.warn("Disk balancer is stopped because the container choosing policy {} provided no valid" +
+                  " same-StorageType move candidates as the property StopAfterDiskEven is set to true.",
+              volumeContainerChoosingPolicy.getClass().getName());
+        } else {
+          LOG.info("Disk balancer is stopped because no volume pair of the same StorageType needs" +
+              " balancing as the property StopAfterDiskEven is set to true.");
+        }
         this.operationalState = DiskBalancerRunningStatus.STOPPED;
         try {
           // Persist the updated shouldRun status into the YAML file
@@ -483,10 +489,7 @@ public class DiskBalancerService extends BackgroundService {
           LOG.warn("Failed to persist updated DiskBalancerInfo to file.", e);
         }
       }
-      // Rejection by the service does not mean the policy found no balancing work.
-      if (!rejectedCandidate) {
-        metrics.incrIdleLoopNoAvailableVolumePairCount();
-      }
+      metrics.incrIdleLoopNoAvailableVolumePairCount();
       cleanupPendingDeletionContainers();
     }
 
