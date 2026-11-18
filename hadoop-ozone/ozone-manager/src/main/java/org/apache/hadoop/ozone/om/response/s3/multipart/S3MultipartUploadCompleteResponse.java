@@ -70,20 +70,18 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   }
 
   /**
-   * For failed requests or retries of completed uploads, which require no database changes.
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
    */
   public S3MultipartUploadCompleteResponse(@Nonnull OMResponse omResponse,
                                            @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    if (omKeyInfo == null) {
-      return;
-    }
-
     // 1. Delete multipart key from OpenKeyTable, MPUTable
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .deleteWithBatch(batchOperation, multipartOpenKey);

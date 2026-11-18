@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.OzoneConsts.COMPLETED_UPLOAD_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.COMPLETED_UPLOAD_PARTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
@@ -65,6 +67,7 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
@@ -90,9 +93,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequest.class);
-
-  private static final String COMPLETED_UPLOAD_ID = "ozone-s3-internal-multipart-upload-id";
-  private static final String COMPLETED_UPLOAD_PARTS = "ozone-s3-internal-multipart-parts";
 
   private BiFunction<OzoneManagerProtocolProtos.Part, PartKeyInfo, MultipartCommitRequestPart> eTagBasedValidator =
       (part, partKeyInfo) -> {
@@ -283,7 +283,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           omResponse.setCompleteMultiPartUploadResponse(MultipartUploadCompleteResponse.newBuilder()
               .setVolume(requestedVolume).setBucket(requestedBucket).setKey(keyName)
               .setHash(completedKey.getMetadata().get(OzoneConsts.ETAG)));
-          omClientResponse = new S3MultipartUploadCompleteResponse(omResponse.build(), getBucketLayout());
+          omClientResponse = new DummyOMClientResponse(omResponse.build());
           logResult(ozoneManager, multipartUploadCompleteRequest, partsList, auditMap,
               volumeName, bucketName, keyName, null, Result.SUCCESS);
           return omClientResponse;
