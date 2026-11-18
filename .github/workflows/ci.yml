@@ -44,6 +44,7 @@ env:
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
+  MVNW_VERBOSE: true
   OZONE_WITH_COVERAGE: ${{ github.event_name != 'pull_request' }}
 
 permissions: { }
@@ -348,6 +349,7 @@ jobs:
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: acceptance
@@ -374,6 +376,7 @@ jobs:
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: kubernetes
@@ -510,8 +513,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
+        id: archive
         uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: target/coverage
         continue-on-error: true
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 dev-support/ci/coverage_summary.py >> "$GITHUB_STEP_SUMMARY"
+        env:
+          COVERAGE_REPORT_URL: ${{ steps.archive.outputs.artifact-url }}
