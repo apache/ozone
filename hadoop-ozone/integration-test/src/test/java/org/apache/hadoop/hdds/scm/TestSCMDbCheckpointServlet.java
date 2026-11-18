@@ -177,14 +177,17 @@ public class TestSCMDbCheckpointServlet {
     scmDbCheckpointServletMock.init();
     long initialCheckpointCount =
         scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();
+    // Durations are in milliseconds and can be 0 for the small SCM DB; the sentinel checks that they were set.
+    scmMetrics.getDBCheckpointMetrics().setLastCheckpointCreationTimeTaken(-1);
+    scmMetrics.getDBCheckpointMetrics().setLastCheckpointStreamingTimeTaken(-1);
 
     doEndpoint();
 
     assertThat(outputPath.toFile().length()).isGreaterThan(0);
     assertThat(scmMetrics.getDBCheckpointMetrics().getLastCheckpointCreationTimeTaken())
-        .isGreaterThan(0);
+        .isGreaterThanOrEqualTo(0);
     assertThat(scmMetrics.getDBCheckpointMetrics().getLastCheckpointStreamingTimeTaken())
-        .isGreaterThan(0);
+        .isGreaterThanOrEqualTo(0);
     assertThat(scmMetrics.getDBCheckpointMetrics().getNumCheckpoints())
         .isGreaterThan(initialCheckpointCount);
 
