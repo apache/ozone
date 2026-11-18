@@ -291,6 +291,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-rocksdb-checkpoint-differ</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-framework</artifactId>
       <scope>test</scope>
     </dependency>
@@ -391,11 +396,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-multitenancy-ranger</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>rocksdb-checkpoint-differ</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

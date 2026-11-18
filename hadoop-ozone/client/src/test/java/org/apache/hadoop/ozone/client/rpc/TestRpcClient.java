@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -663,6 +664,90 @@ public class TestRpcClient {
       assertThat(owners).containsExactly("alice");
     } finally {
       client.clearThreadLocalS3Auth();
+      client.close();
+    }
+  }
+
+  static Stream<Arguments> multipartListingContextCases() {
+    return Arrays.stream(OzoneManagerVersion.values())
+        .flatMap(version -> Stream.of(
+            Arguments.of(version, true, null),
+            Arguments.of(version, true, "explicit-volume"),
+            Arguments.of(version, false, null),
+            Arguments.of(version, false, "explicit-volume")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("multipartListingContextCases")
+  void testMultipartListingS3Context(OzoneManagerVersion version, boolean s3Client, String volumeName)
+      throws Exception {
+    List<OMRequest> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          OMResponse response = super.submitRequest(request);
+          return response.toBuilder().setServiceListResponse(response.getServiceListResponse().toBuilder()
+              .clearServiceInfo().addServiceInfo(om(version).getProtobuf())).build();
+        }
+        requests.add(request);
+        OMResponse.Builder response = OMResponse.newBuilder()
+            .setCmdType(request.getCmdType()).setSuccess(true).setStatus(Status.OK);
+        if (request.getCmdType() == Type.ListMultipartUploads) {
+          return response.setListMultipartUploadsResponse(
+              OzoneManagerProtocolProtos.ListMultipartUploadsResponse.newBuilder()).build();
+        }
+        if (request.getCmdType() == Type.ListMultiPartUploadParts) {
+          return response.setListMultipartUploadPartsResponse(
+              OzoneManagerProtocolProtos.MultipartUploadListPartsResponse.newBuilder()
+                  .setType(HddsProtos.ReplicationType.RATIS).setFactor(HddsProtos.ReplicationFactor.ONE)).build();
+        }
+        throw new IOException("Unexpected request: " + request.getCmdType());
+      }
+    };
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(S3Auth.S3_AUTH_CHECK, s3Client);
+    RpcClient client = spy(createRpcClient(transport, config));
+    try {
+      boolean assumeContext = volumeName == null
+          && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version);
+      if (volumeName == null && !assumeContext) {
+        assertThrows(NullPointerException.class,
+            () -> client.listMultipartUploads(null, "bucket", "prefix/", "previous", "previous-upload", 2));
+        assertThrows(NullPointerException.class, () -> client.listParts(null, "bucket", "key", "upload-id", 3, 2));
+        assertThat(requests).isEmpty();
+        verify(client, never()).getS3VolumeContext();
+        return;
+      }
+      String expectedVolume = assumeContext ? "s3v" : volumeName;
+
+      assertThat(client.listMultipartUploads(volumeName, "bucket", "prefix/", "previous", "previous-upload", 2)
+          .getUploads()).isEmpty();
+      assertThat(client.listParts(volumeName, "bucket", "key", "upload-id", 3, 2).getPartInfoList()).isEmpty();
+
+      assertThat(requests).hasSize(2);
+      for (OMRequest request : requests) {
+        assertEquals(assumeContext, request.getAssumeS3Context());
+      }
+      OzoneManagerProtocolProtos.ListMultipartUploadsRequest uploads = requests.get(0).getListMultipartUploadsRequest();
+      assertEquals(expectedVolume, uploads.getVolume());
+      assertEquals("bucket", uploads.getBucket());
+      assertEquals("prefix/", uploads.getPrefix());
+      assertEquals("previous", uploads.getKeyMarker());
+      assertEquals("previous-upload", uploads.getUploadIdMarker());
+      assertEquals(2, uploads.getMaxUploads());
+      assertEquals(OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION.isSupportedBy(version),
+          uploads.getWithPagination());
+      OzoneManagerProtocolProtos.MultipartUploadListPartsRequest parts =
+          requests.get(1).getListMultipartUploadPartsRequest();
+      assertEquals(expectedVolume, parts.getVolume());
+      assertEquals("bucket", parts.getBucket());
+      assertEquals("key", parts.getKey());
+      assertEquals("upload-id", parts.getUploadID());
+      assertEquals(3, parts.getPartNumbermarker());
+      assertEquals(2, parts.getMaxParts());
+      verify(client, never()).getS3VolumeContext();
+    } finally {
       client.close();
     }
   }

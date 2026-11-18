@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -111,10 +110,9 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   }
 
   /**
-   * Returns a pair of long values representing the unreplicated size and
-   * replicated size of all the keys in the list.
+   * Returns the unreplicated size and replicated size of all the keys in the list.
    */
-  public ImmutablePair<Long, Long> getTotalSize() {
+  public TotalSize getTotalSize() {
     long replicatedSize = 0;
     long unreplicatedSize = 0;
 
@@ -124,7 +122,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
       }
       unreplicatedSize += omKeyInfo.getDataSize();
     }
-    return new ImmutablePair<>(unreplicatedSize, replicatedSize);
+    return new TotalSize(unreplicatedSize, replicatedSize);
   }
 
   // HDDS-7041. Return a new ArrayList to avoid ConcurrentModifyException
@@ -209,5 +207,27 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   @Override
   public RepeatedOmKeyInfo copyObject() {
     return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList), bucketId);
+  }
+
+  /**
+   * The unreplicated size of all the keys paired with their replicated size,
+   * used to account for the space held by keys pending deletion.
+   */
+  public static final class TotalSize {
+    private final long unreplicatedSize;
+    private final long replicatedSize;
+
+    public TotalSize(long unreplicatedSize, long replicatedSize) {
+      this.unreplicatedSize = unreplicatedSize;
+      this.replicatedSize = replicatedSize;
+    }
+
+    public long getUnreplicatedSize() {
+      return unreplicatedSize;
+    }
+
+    public long getReplicatedSize() {
+      return replicatedSize;
+    }
   }
 }

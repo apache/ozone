@@ -19,10 +19,14 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.spy;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,11 +37,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -380,14 +386,14 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
           nSSummaryTask.process(batch, legacySeekOnly);
 
       assertTrue(result.isTaskSuccess());
-      // Each sub-task reports its resume position independently. Legacy was
-      // told to skip the first three stream indices; FSO/OBS consumed from 0.
+      // Each sub-task reports its resume position independently. A sub-task
+      // that succeeds reports the end of the batch, wherever it started from.
       assertNotNull(result.getSubTaskSeekPositions());
-      assertEquals(0, result.getSubTaskSeekPositions()
+      assertEquals(5, result.getSubTaskSeekPositions()
           .get(NSSummaryTask.BucketType.FSO.name()).intValue());
-      assertEquals(3, result.getSubTaskSeekPositions()
+      assertEquals(5, result.getSubTaskSeekPositions()
           .get(NSSummaryTask.BucketType.LEGACY.name()).intValue());
-      assertEquals(0, result.getSubTaskSeekPositions()
+      assertEquals(5, result.getSubTaskSeekPositions()
           .get(NSSummaryTask.BucketType.OBS.name()).intValue());
 
       // FSO/OBS processed from the start; Legacy only picked up the update.
@@ -401,6 +407,46 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
           .getNSSummary(BUCKET_THREE_OBJECT_ID).getNumOfFiles());
       assertEquals(KEY_FOUR_SIZE, getReconNamespaceSummaryManager()
           .getNSSummary(BUCKET_THREE_OBJECT_ID).getSizeOfFiles());
+    }
+
+    @Test
+    public void testRetryWithReturnedSeekPositionsDoesNotReapply() throws IOException {
+      // A retry passes the seek positions of the failed attempt. Sub-tasks that
+      // succeeded must not apply their events a second time.
+      OMUpdateEventBatch batch = new OMUpdateEventBatch(Arrays.asList(
+          legacyPutEvent(KEY_FIVE, KEY_FIVE_OBJECT_ID, KEY_FIVE_SIZE),
+          obsPutEvent(KEY_FOUR, KEY_FOUR_OBJECT_ID, KEY_FOUR_SIZE)),
+          0L);
+
+      ReconOmTask.TaskResult result = nSSummaryTask.process(batch, Collections.emptyMap());
+      assertTrue(result.isTaskSuccess());
+      assertTrue(nSSummaryTask.process(batch, result.getSubTaskSeekPositions()).isTaskSuccess());
+
+      assertEquals(2, getReconNamespaceSummaryManager()
+          .getNSSummary(BUCKET_TWO_OBJECT_ID).getNumOfFiles());
+      assertEquals(2, getReconNamespaceSummaryManager()
+          .getNSSummary(BUCKET_THREE_OBJECT_ID).getNumOfFiles());
+    }
+
+    @Test
+    public void testRetryAfterFailedFinalFlushResumesAfterThresholdFlush() throws IOException {
+      // With a flush threshold of 1 the put is committed by a threshold flush, then the final flush fails
+      // before its commit. The failed attempt must report the committed position so the retry skips the put.
+      ReconNamespaceSummaryManager failingManager = spy(getReconNamespaceSummaryManager());
+      doCallRealMethod().doThrow(new IllegalStateException("injected")).when(failingManager)
+          .commitBatchOperation(any());
+      OMUpdateEventBatch batch = new OMUpdateEventBatch(Collections.singletonList(
+          obsPutEvent(KEY_FOUR, KEY_FOUR_OBJECT_ID, KEY_FOUR_SIZE)), 0L);
+
+      Pair<Integer, Boolean> result = new NSSummaryTaskWithOBS(failingManager, getReconOMMetadataManager(),
+          1, 5, 20, 2000).processWithOBS(batch, 0);
+      assertFalse(result.getRight());
+      assertEquals(1, result.getLeft());
+
+      assertTrue(new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(), getReconOMMetadataManager(),
+          1, 5, 20, 2000).processWithOBS(batch, result.getLeft()).getRight());
+      assertEquals(2, getReconNamespaceSummaryManager()
+          .getNSSummary(BUCKET_THREE_OBJECT_ID).getNumOfFiles());
     }
 
     @Test

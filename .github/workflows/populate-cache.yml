@@ -133,6 +133,10 @@ jobs:
         if: steps.restore-cache.outputs.cache-hit != 'true' && steps.restore-nodejs.outputs.cache-hit != 'true'
         run: dev-support/ci/download-nodejs.sh
 
+      - name: Fetch plugin dependencies
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: mvn $MAVEN_ARGS --no-transfer-progress --show-version dependency:resolve-plugins
+
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: mvn $BUILD_ARGS $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline clean verify
