@@ -257,6 +257,8 @@ final class Receiver implements Runnable {
       }
     } catch (Throwable e) {
       LOG.error("Failed to send response {} {}", responseProto.getCmdType(), peer.getDomainSocket(), e);
+      // A partial response frame may already be on the wire; close the peer so the next response is not appended to it.
+      IOUtils.closeStream(peer);
     } finally {
       lock.unlock();
       entry.setSendFinishTimeNs();

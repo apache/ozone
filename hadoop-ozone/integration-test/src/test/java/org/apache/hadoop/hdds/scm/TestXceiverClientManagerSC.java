@@ -98,7 +98,7 @@ public class TestXceiverClientManagerSC {
       assertEquals(client1, client2);
       clientManager.releaseClient(client1, true);
       clientManager.releaseClient(client2, true);
-      assertEquals(0, clientManager.getClientCache().size());
+      assertEquals(0, clientManager.getClientCache().estimatedSize());
 
       XceiverClientSpi client3 = clientManager.acquireClientForReadData(container1.getPipeline(), false);
       assertTrue(client3 instanceof XceiverClientGrpc);

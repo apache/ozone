@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
@@ -114,16 +115,15 @@ public class CloseContainerCommandHandler implements CommandHandler {
         switch (container.getContainerState()) {
         case OPEN:
         case CLOSING:
-          // If the container is part of open pipeline, close it via
-          // write channel
-          if (ozoneContainer.getWriteChannel()
-              .isExist(closeCommand.getPipelineID())) {
+          final PipelineID pipelineID = ((CloseContainerCommand) command).getPipelineID();
+          // If the container is part of open pipeline, close it via write channel
+          if (ozoneContainer.getWriteChannel().isExist(pipelineID)) {
             ContainerCommandRequestProto request =
                 getContainerCommandRequestProto(datanodeDetails,
                     closeCommand.getContainerID(),
                     command.getEncodedToken());
             ozoneContainer.getWriteChannel()
-                .submitRequest(request, closeCommand.getPipelineID());
+                .submitRequest(request, pipelineID);
           } else if (closeCommand.getForce()) {
             // Non-RATIS containers should have the force close flag set, so
             // they are moved to CLOSED immediately rather than going to
