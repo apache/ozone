@@ -303,8 +303,7 @@ public class ReconGlobalMetricsService {
     return record != null ? record.getValue() : 0L;
   }
 
-  private RepeatedOmKeyInfo.TotalSize fetchSizeForDeletedDirectory(long objectId)
-      throws IOException {
+  private RepeatedOmKeyInfo.TotalSize fetchSizeForDeletedDirectory(long objectId) throws IOException {
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     if (nsSummary != null) {
       return new RepeatedOmKeyInfo.TotalSize(nsSummary.getSizeOfFiles(), nsSummary.getReplicatedSizeOfFiles());

@@ -53,21 +53,15 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
     List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
     expectedPairs.add(new ColumnNameAndType("task_name", Types.VARCHAR));
-    expectedPairs.add(new ColumnNameAndType("last_updated_timestamp",
-        Types.INTEGER));
-    expectedPairs.add(new ColumnNameAndType("last_updated_seq_number",
-        Types.INTEGER));
-    expectedPairs.add(new ColumnNameAndType("last_task_run_status",
-        Types.INTEGER));
-    expectedPairs.add(new ColumnNameAndType("is_current_task_running",
-        Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("last_updated_timestamp", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("last_updated_seq_number", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("last_task_run_status", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("is_current_task_running", Types.INTEGER));
 
     List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ColumnNameAndType(
-          resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(5, actualPairs.size());

@@ -642,13 +642,12 @@ public class OzoneManagerServiceProviderImpl
    *
    * @param fromSequenceNumber from sequence number to request from.
    * @param omdbUpdatesHandler OM DB updates handler to buffer updates.
-   * @return dbUpdatesSuccess and lag (lag between OM and Recom)
-   * @throws IOException      when OM RPC request fails.
+   * @return dbUpdatesSuccess and lag (lag between OM and Recon)
+   * @throws IOException when OM RPC request fails.
    * @throws RocksDBException when writing to RocksDB fails.
    */
   @VisibleForTesting
-  DeltaUpdatesResult innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
-                                                        OMDBUpdatesHandler omdbUpdatesHandler)
+  DeltaUpdatesResult innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     // Track delta fetch operation
     long deltaFetchStartTime = Time.monotonicNow();

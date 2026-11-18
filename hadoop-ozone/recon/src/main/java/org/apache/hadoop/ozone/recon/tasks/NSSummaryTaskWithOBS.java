@@ -189,8 +189,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  public ProcessResult processWithOBS(OMUpdateEventBatch events,
-                                               int seekPos) {
+  public ProcessResult processWithOBS(OMUpdateEventBatch events, int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
@@ -273,8 +272,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
             // an UPDATE event — that would be a delete+put).
             handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, parentObjectID);
           } else {
-            LOG.warn("Update event does not have the old keyInfo for {}.",
-                updatedKey);
+            LOG.warn("Update event does not have the old keyInfo for {}.", updatedKey);
           }
           handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, parentObjectID);
           break;
@@ -288,8 +286,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           seekPos = itrPos + eventCounter;
         }
       } catch (IOException | RuntimeException ex) {
-        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ex);
+        LOG.error("Unable to process Namespace Summary data in Recon DB. ", ex);
         nsSummaryMap.clear();
         return new ProcessResult(seekPos, false);
       }

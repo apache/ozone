@@ -89,8 +89,7 @@ public interface OmTableHandler {
    * @return the count, unReplicated size and replicated size.
    * @throws IOException If an I/O error occurs during the iterator traversal.
    */
-  TableSizeAndCount getTableSizeAndCount(String tableName,
-      OMMetadataManager omMetadataManager) throws IOException;
+  TableSizeAndCount getTableSizeAndCount(String tableName, OMMetadataManager omMetadataManager) throws IOException;
 
   /**
    * Returns the count key for the given table.

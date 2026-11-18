@@ -77,8 +77,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(8, actualPairs.size());
@@ -88,14 +87,10 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
         FILE_COUNT_BY_SIZE_TABLE_NAME, null);
 
     List<ColumnNameAndType> expectedPairsFileCount = new ArrayList<>();
-    expectedPairsFileCount.add(
-        new ColumnNameAndType("volume", Types.VARCHAR));
-    expectedPairsFileCount.add(
-        new ColumnNameAndType("bucket", Types.VARCHAR));
-    expectedPairsFileCount.add(
-        new ColumnNameAndType("file_size", Types.INTEGER));
-    expectedPairsFileCount.add(
-        new ColumnNameAndType("count", Types.INTEGER));
+    expectedPairsFileCount.add(new ColumnNameAndType("volume", Types.VARCHAR));
+    expectedPairsFileCount.add(new ColumnNameAndType("bucket", Types.VARCHAR));
+    expectedPairsFileCount.add(new ColumnNameAndType("file_size", Types.INTEGER));
+    expectedPairsFileCount.add(new ColumnNameAndType("count", Types.INTEGER));
 
     List<ColumnNameAndType> actualPairsFileCount = new ArrayList<>();
     while (resultSetFileCount.next()) {
@@ -113,10 +108,8 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
         CONTAINER_COUNT_BY_SIZE_TABLE_NAME, null);
 
     List<ColumnNameAndType> expectedPairsContainerCount = new ArrayList<>();
-    expectedPairsContainerCount.add(
-        new ColumnNameAndType("container_size", Types.INTEGER));
-    expectedPairsContainerCount.add(
-        new ColumnNameAndType("count", Types.INTEGER));
+    expectedPairsContainerCount.add(new ColumnNameAndType("container_size", Types.INTEGER));
+    expectedPairsContainerCount.add(new ColumnNameAndType("count", Types.INTEGER));
 
     List<ColumnNameAndType> actualPairsContainerCount = new ArrayList<>();
     while (resultSetContainerCount.next()) {

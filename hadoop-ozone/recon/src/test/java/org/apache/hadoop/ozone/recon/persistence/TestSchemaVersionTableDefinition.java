@@ -69,8 +69,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(2, actualPairs.size(), "Unexpected number of columns");

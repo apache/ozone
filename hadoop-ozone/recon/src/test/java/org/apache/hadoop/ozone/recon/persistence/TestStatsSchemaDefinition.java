@@ -56,14 +56,12 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     expectedPairs.add(new ColumnNameAndType("key", Types.VARCHAR));
     expectedPairs.add(new ColumnNameAndType("value", Types.INTEGER));
-    expectedPairs.add(new ColumnNameAndType("last_updated_timestamp",
-        Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("last_updated_timestamp", Types.VARCHAR));
 
     List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(3, actualPairs.size());

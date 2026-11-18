@@ -78,8 +78,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE, DELETED_DIR_TABLE);
   }
 
-  public ProcessResult processWithFSO(OMUpdateEventBatch events,
-                                               int seekPos) {
+  public ProcessResult processWithFSO(OMUpdateEventBatch events, int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int itrPos = 0;
     while (eventIterator.hasNext() && itrPos < seekPos) {
