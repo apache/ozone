@@ -22,10 +22,13 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -45,10 +48,18 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy;
+import org.apache.hadoop.metrics2.AbstractMetric;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -74,6 +85,17 @@ class TestWritableRatisContainerProvider {
   @Mock
   private ContainerManager containerManager;
 
+  @BeforeEach
+  void resetMetrics() {
+    SCMPipelineMetrics.unRegister();
+    SCMPipelineMetrics.create();
+  }
+
+  @AfterEach
+  void unregisterMetrics() {
+    SCMPipelineMetrics.unRegister();
+  }
+
   @Test
   void returnsExistingContainer() throws Exception {
     Pipeline pipeline = MockPipeline.createPipeline(3);
@@ -86,6 +108,9 @@ class TestWritableRatisContainerProvider {
 
     assertSame(existingContainer, container);
     verifyPipelineNotCreated();
+    assertFailureCount("no_space", 0);
+    assertFailureCount("no_suitable_node", 0);
+    assertFailureCount("other", 0);
   }
 
   @RepeatedTest(100)
@@ -112,6 +137,7 @@ class TestWritableRatisContainerProvider {
 
     assertSame(newContainer, container);
     verifyPipelineCreated();
+    assertFailureCount("other", 0);
   }
 
   @Test
@@ -123,6 +149,123 @@ class TestWritableRatisContainerProvider {
             CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
 
     verifyPipelineCreated();
+    assertFailureCount("no_suitable_node", 1);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"FAILED_TO_FIND_NODES_WITH_SPACE, no_space", "FAILED_TO_FIND_HEALTHY_NODES, no_suitable_node",
+      "INTERNAL_ERROR, other"})
+  void countsOneTerminalFailureAndPreservesException(ResultCodes code, String reason) throws Exception {
+    when(pipelineManager.createPipeline(REPLICATION_CONFIG, StorageTier.getDefaultTier()))
+        .thenThrow(new SCMException("original failure", code));
+
+    IOException failure = assertThrows(IOException.class, () -> createSubject().getContainer(
+        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
+
+    assertEquals(IOException.class, failure.getClass());
+    assertEquals("Unable to allocate a container to the block of size: " + CONTAINER_SIZE
+        + ", replicationConfig: " + REPLICATION_CONFIG + " for storageTier: " + StorageTier.getDefaultTier()
+        + ". original failure", failure.getMessage());
+    assertFailureCount(reason, 1);
+    verifyPipelineCreated();
+  }
+
+  @Test
+  void successfulRetryDoesNotCountCreationFailure() throws Exception {
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    ContainerInfo expected = pipelineHasContainer(pipeline);
+    throwWhenCreatePipeline();
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet(), StorageTier.getDefaultTier()))
+        .thenReturn(emptyList()).thenReturn(new ArrayList<>(singletonList(pipeline)));
+
+    assertSame(expected, createSubject().getContainer(
+        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
+    assertFailureCount("no_suitable_node", 0);
+    assertFailureCount("other", 0);
+    verifyPipelineCreated();
+  }
+
+  @Test
+  void successfulWaitForAllocatedPipelineDoesNotCountFailure() throws Exception {
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    ContainerInfo expected = pipelineHasContainer(pipeline);
+    throwWhenCreatePipeline();
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, Pipeline.PipelineState.ALLOCATED,
+        emptySet(), emptySet(), StorageTier.getDefaultTier())).thenReturn(singletonList(pipeline));
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet(), StorageTier.getDefaultTier()))
+        .thenReturn(emptyList()).thenReturn(new ArrayList<>(singletonList(pipeline)));
+
+    assertSame(expected, createSubject().getContainer(
+        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
+    verify(pipelineManager).waitOnePipelineReady(singletonList(pipeline.getId()), 0);
+    assertFailureCount("no_suitable_node", 0);
+    assertFailureCount("other", 0);
+  }
+
+  @Test
+  void waitFailureReplacesEarlierPlacementReason() throws Exception {
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    throwWhenCreatePipeline();
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, Pipeline.PipelineState.ALLOCATED,
+        emptySet(), emptySet(), StorageTier.getDefaultTier())).thenReturn(singletonList(pipeline));
+    doThrow(new IOException("wait timed out")).when(pipelineManager)
+        .waitOnePipelineReady(singletonList(pipeline.getId()), 0);
+
+    IOException failure = assertThrows(IOException.class, () -> createSubject().getContainer(
+        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
+    assertTrue(failure.getMessage().endsWith("Waiting for one of pipelines to be OPEN failed. wait timed out"));
+    assertFailureCount("other", 1);
+    assertFailureCount("no_suitable_node", 0);
+  }
+
+  @Test
+  void successfulWaitWithoutContainerDoesNotReuseObsoletePlacementReason() throws Exception {
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    throwWhenCreatePipeline();
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, Pipeline.PipelineState.ALLOCATED,
+        emptySet(), emptySet(), StorageTier.getDefaultTier())).thenReturn(singletonList(pipeline));
+
+    assertThrows(IOException.class, () -> createSubject().getContainer(
+        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
+    assertFailureCount("other", 1);
+    assertFailureCount("no_suitable_node", 0);
+  }
+
+  @Test
+  void countsReadinessTimeoutOnce() throws Exception {
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    when(pipelineManager.createPipeline(REPLICATION_CONFIG, StorageTier.getDefaultTier())).thenReturn(pipeline);
+    doThrow(new IOException("pipeline not ready")).when(pipelineManager).waitPipelineReady(pipeline.getId(), 0);
+
+    assertThrows(IOException.class, () -> createSubject().getContainer(
+        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
+    assertFailureCount("other", 1);
+    verifyPipelineCreated();
+  }
+
+  @Test
+  void countsNoContainerAfterSuccessfulPipelineCreationAsOther() throws Exception {
+    when(pipelineManager.createPipeline(REPLICATION_CONFIG, StorageTier.getDefaultTier()))
+        .thenReturn(MockPipeline.createPipeline(3));
+
+    assertThrows(IOException.class, () -> createSubject().getContainer(
+        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
+    assertFailureCount("other", 1);
+    verifyPipelineCreated();
+  }
+
+  private void assertFailureCount(String reason, long expected) {
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    SCMPipelineMetrics.create().getMetrics(collector, true);
+    MetricsRecordImpl record = collector.getRecords().stream()
+        .filter(r -> r.tags().stream().anyMatch(t -> t.name().equals("RequestedTier")
+            && t.value().equals(StorageTier.getDefaultTier().name())))
+        .filter(r -> r.tags().stream().anyMatch(t -> t.name().equals("Reason") && t.value().equals(reason)))
+        .findFirst().orElseThrow(AssertionError::new);
+    for (AbstractMetric metric : record.metrics()) {
+      assertEquals("TierPlacementFailures", metric.name());
+      assertEquals(expected, metric.value().longValue());
+    }
   }
 
   private void existingPipelines(Pipeline... pipelines) {

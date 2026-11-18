@@ -45,6 +45,7 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
+  private final SCMPipelineMetrics metrics;
 
   public WritableRatisContainerProvider(
       PipelineManager pipelineManager,
@@ -53,6 +54,7 @@ public class WritableRatisContainerProvider
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
+    this.metrics = SCMPipelineMetrics.create();
   }
 
   @Override
@@ -75,6 +77,7 @@ public class WritableRatisContainerProvider
     */
 
     String failureReason = null;
+    IOException allocationFailure = null;
 
     //TODO we need to continue the refactor to use repConfig everywhere
     //in downstream managers.
@@ -97,6 +100,7 @@ public class WritableRatisContainerProvider
       pipelineManager.waitPipelineReady(pipeline.getId(), 0);
 
     } catch (SCMException se) {
+      allocationFailure = se;
       LOG.warn("Pipeline creation failed for repConfig: {} storageTier: {} " +
           "Datanodes may be used up. Try to see if any pipeline is in " +
               "ALLOCATED state, and then will wait for it to be OPEN",
@@ -105,6 +109,8 @@ public class WritableRatisContainerProvider
               excludeList,
               Pipeline.PipelineState.ALLOCATED, storageTier);
       if (!allocatedPipelines.isEmpty()) {
+        // Creation may fail while an existing pipeline becomes usable. Do not retain that obsolete reason.
+        allocationFailure = null;
         List<PipelineID> allocatedPipelineIDs =
                 allocatedPipelines.stream()
                         .map(p -> p.getId())
@@ -113,6 +119,7 @@ public class WritableRatisContainerProvider
           pipelineManager
                   .waitOnePipelineReady(allocatedPipelineIDs, 0);
         } catch (IOException e) {
+          allocationFailure = e;
           LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
                   allocatedPipelineIDs, e);
           failureReason = "Waiting for one of pipelines to be OPEN failed. "
@@ -122,6 +129,7 @@ public class WritableRatisContainerProvider
         failureReason = se.getMessage();
       }
     } catch (IOException e) {
+      allocationFailure = e;
       LOG.warn("Pipeline creation failed for repConfig: {} storageTier: {}. "
           + "Retrying get pipelines call once.", repConfig, storageTier, e);
       failureReason = e.getMessage();
@@ -139,6 +147,7 @@ public class WritableRatisContainerProvider
     LOG.error(
         "Unable to allocate a block for the size: {}, repConfig: {}, storageTier: {}.",
         size, repConfig, storageTier);
+    metrics.incTierPlacementFailure(storageTier, allocationFailure);
     throw new IOException(
         "Unable to allocate a container to the block of size: " + size
             + ", replicationConfig: " + repConfig
