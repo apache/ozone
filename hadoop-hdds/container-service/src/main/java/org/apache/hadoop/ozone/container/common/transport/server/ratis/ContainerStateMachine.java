@@ -767,7 +767,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   /**
    * Commit the PutBlock appended to a StreamInitWithPutBlock stream when the stream is closed.
-   * Such a stream is closed without a Raft log entry, so it is released here instead of by {@link #link}.
+   * Such a stream is closed without a Raft log entry, so the Raft log worker never removes it from the
+   * {@link org.apache.ratis.server.DataStreamMap}; it is removed here.
    */
   void streamPutBlock(RaftClientRequest stream, ContainerCommandRequestProto streamInit,
       ContainerCommandRequestProto request) throws IOException {
