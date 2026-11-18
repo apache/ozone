@@ -476,3 +476,14 @@ load ${TOOLS_DIR}/bats/bats-assert/load.bash
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
 }
+
+@test "python helper change" {
+  run dev-support/ci/selective_ci_checks.sh c917a6e60d
+
+  assert_output -p 'basic-checks=["rat","pyunit"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
