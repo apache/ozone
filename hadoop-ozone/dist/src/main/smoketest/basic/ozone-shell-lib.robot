@@ -214,25 +214,35 @@ Test Bucket Acls
 Test key handling
     [arguments]     ${protocol}         ${server}       ${volume}
 
-    Put and Get Key Later    ${protocol}${server}/${volume}/bb1/key1    put_from=/opt/hadoop/NOTICE.txt
+    ${key0_src} =    Set Variable    /etc/passwd
+    Put and Get Key Later    ${protocol}${server}/${volume}/bb1/key0    put_from=${key0_src}
 
-    Execute Later ozone sh    key put -t RATIS ${protocol}${server}/${volume}/bb1/key1_ratis /opt/hadoop/NOTICE.txt
+    ${key1_src} =    Set Variable    /opt/hadoop/NOTICE.txt
+    Put and Get Key Later    ${protocol}${server}/${volume}/bb1/key1    put_from=${key1_src}
+
+    Execute Later ozone sh    key put -t RATIS ${protocol}${server}/${volume}/bb1/key1_ratis ${key1_src}
     ${file2} =    Get Key Later    ${protocol}${server}/${volume}/bb1/key1_ratis
-    Assert Later    Compare Files    /opt/hadoop/NOTICE.txt    ${file2}
+    Assert Later    Compare Files    ${key1_src}    ${file2}
 
     Execute Later ozone sh    key cp ${protocol}${server}/${volume}/bb1 key1 key1-copy
-    ${file3} =    Get Key Later    ${protocol}${server}/${volume}/bb1/key1-copy
-    Assert Later    Compare Files    /opt/hadoop/NOTICE.txt    ${file3}
+    ${key1_copy} =    Get Key Later    ${protocol}${server}/${volume}/bb1/key1-copy
+    Assert Later    Compare Files    ${key1_src}    ${key1_copy}
 
     ${result} =    Execute Later ozone sh    key info ${protocol}${server}/${volume}/bb1/key1_ratis
     ${filter} =    Set Variable    jq -r '. | select(.name=="key1_ratis")'
     Assert Later    File ${result} Filtered By ${filter} Should    Contain    RATIS
 
-    ${result} =    Execute Later ozone sh    key get ${protocol}${server}/${volume}/bb1/key1 ${file3}
-    Assert Later    File ${result} Should    Contain    ${file3} exists
+    # get does not overwrite existing local
+    ${existing_local} =    Get Key Later    ${protocol}${server}/${volume}/bb1/key0
+    ${result} =    Execute Later ozone sh    key get ${protocol}${server}/${volume}/bb1/key1 ${existing_local}
+    Assert Later    File ${result} Should    Contain    ${existing_local} exists
+    Assert Later    Compare Files    ${key0_src}    ${existing_local}
 
-    ${result} =    Execute Later ozone sh    key get --force ${protocol}${server}/${volume}/bb1/key1 ${file3}
-    Assert Later    File ${result} Should    Not Contain    ${file3} exists
+    # get --force overwrites existing local
+    ${gets_overwritten} =    Get Key Later    ${protocol}${server}/${volume}/bb1/key0
+    ${result} =    Execute Later ozone sh    key get --force ${protocol}${server}/${volume}/bb1/key1 ${gets_overwritten}
+    Assert Later    File ${result} Should    Not Contain    ${gets_overwritten} exists
+    Assert Later    Compare Files    ${key1_src}    ${gets_overwritten}
 
     ${result} =    Execute Later ozone sh    key put ${protocol}${server}/${volume}/bb1/key1 no-such-file
     Assert Later    File ${result} Should    Contain    File not found: no-such-file
