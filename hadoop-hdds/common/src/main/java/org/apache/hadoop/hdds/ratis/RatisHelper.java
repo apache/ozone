@@ -257,7 +257,7 @@ public final class RatisHelper {
       ConfigurationSource configuration) {
     return newRaftClient(rpcType, leader.getId(), leader,
         newRaftGroup(Collections.singletonList(leader)), retryPolicy,
-        tlsConfig, configuration, false);
+        tlsConfig, configuration);
   }
 
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
@@ -265,13 +265,20 @@ public final class RatisHelper {
       ConfigurationSource ozoneConfiguration) {
     return newRaftClient(rpcType, leader.getId(), leader,
         newRaftGroup(Collections.singletonList(leader)), retryPolicy, null,
-        ozoneConfiguration, false);
+        ozoneConfiguration);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader,
       RaftPeer primary, RaftGroup group, RetryPolicy retryPolicy,
-      GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration, boolean skipSendForward) {
+      GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration) {
+    return newRaftClient(rpcType, leader, primary, group, retryPolicy, tlsConfig, ozoneConfiguration, false);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader, RaftPeer primary, RaftGroup group,
+      RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration,
+      boolean skipSendForward) {
     if (LOG.isTraceEnabled()) {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
@@ -554,7 +561,7 @@ public final class RatisHelper {
 
     LOG.info("Start transferring leadership to {}", targetPeerId);
     try (RaftClient client = newRaftClient(SupportedRpcType.GRPC, null,
-        null, group, createRetryPolicy(conf), tlsConfig, conf, false)) {
+        null, group, createRetryPolicy(conf), tlsConfig, conf)) {
       final GroupInfoReply info = client.getGroupManagementApi(targetPeerId)
           .info(group.getGroupId());
       if (!info.isSuccess()) {
