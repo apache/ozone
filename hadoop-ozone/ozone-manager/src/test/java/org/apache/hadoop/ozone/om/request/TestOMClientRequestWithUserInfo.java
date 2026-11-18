@@ -285,7 +285,7 @@ public class TestOMClientRequestWithUserInfo {
         final String volumeName = UUID.randomUUID().toString();
         final BucketInfo.Builder bucketInfo =
             newBucketInfoBuilder(bucketName, volumeName)
-                .setIsVersionEnabled(true)
+                .setIsVersionEnabled(false)
                 .setStorageType(StorageTypeProto.DISK);
 
         final OMRequest omRequest = newCreateBucketRequest(bucketInfo)
