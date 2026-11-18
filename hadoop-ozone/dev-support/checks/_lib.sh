@@ -99,5 +99,14 @@ create_aws_dir() {
 get_version() {
   local dep="$1"
   shift
-  MVNW_VERBOSE=false ./mvnw --non-recursive --quiet help:evaluate -Dexpression="${dep}.version" -DforceStdout -Dscan=false "$@"
+
+  if [[ "${CI:-}" == "true" ]]; then
+    # output version/transfer etc. to stderr first
+    ./mvnw --batch-mode --non-recursive --show-version \
+      help:evaluate -Dexpression="${dep}.version" -Dscan=false "$@" >&2
+  fi
+
+  # now print only the version to stdout
+  MVNW_VERBOSE=false ./mvnw --non-recursive --no-transfer-progress --quiet \
+    help:evaluate -Dexpression="${dep}.version" -DforceStdout -Dscan=false "$@"
 }
