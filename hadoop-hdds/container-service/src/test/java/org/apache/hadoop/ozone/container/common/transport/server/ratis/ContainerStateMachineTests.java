@@ -59,11 +59,14 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.ClientInvocationId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.server.DataStreamMap;
 import org.apache.ratis.server.DivisionInfo;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
@@ -85,7 +88,11 @@ import org.mockito.InOrder;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class ContainerStateMachineTests {
+  private static final ClientId STREAM_CLIENT_ID = ClientId.randomId();
+  private static final long STREAM_CALL_ID = 1;
+
   private ContainerDispatcher dispatcher;
+  private DataStreamMap dataStreamMap;
   private final OzoneConfiguration conf = new OzoneConfiguration();
   private ContainerStateMachine stateMachine;
   private final List<ThreadPoolExecutor> executor = IntStream.range(0, 2).mapToObj(i -> new ThreadPoolExecutor(1, 1,
@@ -119,6 +126,8 @@ abstract class ContainerStateMachineTests {
     when(division.getInfo()).thenReturn(info);
     when(info.isLeader()).thenReturn(isLeader);
     when(ratisServer.getServerDivision(any())).thenReturn(division);
+    dataStreamMap = mock(DataStreamMap.class);
+    when(division.getDataStreamMap()).thenReturn(dataStreamMap);
     stateMachine = new ContainerStateMachine(null,
         RaftGroupId.randomId(), dispatcher, controller, executor, ratisServer, conf, "containerOp");
     try {
@@ -342,10 +351,31 @@ abstract class ContainerStateMachineTests {
       assertEquals(ContainerProtos.Result.MALFORMED_REQUEST, e.getResult());
     }
     verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
+    verify(dataStreamMap, never()).remove(any());
 
     closePutBlock.get().accept(newPutBlock(1, newBlockID()));
     verify(dispatcher).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
         argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_LINK));
+    // The stream is closed without a Raft log entry, so it must be released once its PutBlock is committed.
+    verify(dataStreamMap).remove(ClientInvocationId.valueOf(STREAM_CLIENT_ID, STREAM_CALL_ID));
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ContainerProtos.Type.class, names = {"StreamInit", "StreamInitWithPutBlock"})
+  public void testLinkWithoutStream(ContainerProtos.Type streamInitType) throws Exception {
+    final RaftProtos.LogEntryProto entry = RaftProtos.LogEntryProto.newBuilder()
+        .setStateMachineLogEntry(RaftProtos.StateMachineLogEntryProto.newBuilder()
+            .setLogData(newStreamInit(streamInitType).toByteString()))
+        .build();
+
+    final CompletableFuture<?> linked = stateMachine.link(null, entry);
+    if (streamInitType == ContainerProtos.Type.StreamInitWithPutBlock) {
+      // A forwarded StreamInitWithPutBlock entry: the stream was released on close.
+      linked.get();
+    } else {
+      final ExecutionException e = assertThrows(ExecutionException.class, linked::get);
+      assertInstanceOf(IllegalStateException.class, e.getCause());
+    }
   }
 
   private StateMachine.DataStream setUpStream(StateMachine.DataChannel channel) throws Exception {
@@ -365,16 +395,21 @@ abstract class ContainerStateMachineTests {
   }
 
   private RaftClientRequest newStreamRequest(ContainerProtos.Type streamInitType) {
-    final ContainerProtos.ContainerCommandRequestProto streamInit = ContainerProtos.ContainerCommandRequestProto
-        .newBuilder()
+    final RaftClientRequest request = mock(RaftClientRequest.class);
+    when(request.getMessage())
+        .thenReturn(ContainerCommandRequestMessage.toMessage(newStreamInit(streamInitType), null));
+    when(request.getClientId()).thenReturn(STREAM_CLIENT_ID);
+    when(request.getCallId()).thenReturn(STREAM_CALL_ID);
+    return request;
+  }
+
+  private static ContainerProtos.ContainerCommandRequestProto newStreamInit(ContainerProtos.Type streamInitType) {
+    return ContainerProtos.ContainerCommandRequestProto.newBuilder()
         .setCmdType(streamInitType)
         .setWriteChunk(ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(newBlockID()).build())
         .setContainerID(1)
         .setDatanodeUuid(UUID.randomUUID().toString())
         .build();
-    final RaftClientRequest request = mock(RaftClientRequest.class);
-    when(request.getMessage()).thenReturn(ContainerCommandRequestMessage.toMessage(streamInit, null));
-    return request;
   }
 
   private static ByteBuffer newPutBlockCommand() {

@@ -87,6 +87,7 @@ import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
 import org.apache.ratis.proto.RaftProtos.StateMachineEntryProto;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
+import org.apache.ratis.protocol.ClientInvocationId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroup;
@@ -721,7 +722,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
   }
 
-  private StateMachine.DataChannel getStreamDataChannel(
+  private StateMachine.DataChannel getStreamDataChannel(RaftClientRequest request,
           ContainerCommandRequestProto requestProto,
           DispatcherContext context) throws StorageContainerException {
     if (LOG.isDebugEnabled()) {
@@ -735,7 +736,8 @@ public class ContainerStateMachine extends BaseStateMachine {
       throw new StorageContainerException(response.getMessage(), response.getResult());
     }
     final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock
-        = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? r -> streamPutBlock(requestProto, r) : null;
+        = requestProto.getCmdType() == Type.StreamInitWithPutBlock
+        ? r -> streamPutBlock(request, requestProto, r) : null;
     return dispatcher.getStreamDataChannel(requestProto, putBlock);
   }
 
@@ -763,14 +765,19 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
   }
 
-  void streamPutBlock(ContainerCommandRequestProto streamInit, ContainerCommandRequestProto request)
-      throws IOException {
+  /**
+   * Commit the PutBlock appended to a StreamInitWithPutBlock stream when the stream is closed.
+   * Such a stream is closed without a Raft log entry, so it is released here instead of by {@link #link}.
+   */
+  void streamPutBlock(RaftClientRequest stream, ContainerCommandRequestProto streamInit,
+      ContainerCommandRequestProto request) throws IOException {
     checkStreamPutBlock(streamInit, request);
     final DispatcherContext context = DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_LINK)
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
         .build();
     dispatchCommand(request, context);
+    ratisServer.getServerDivision(getGroupId()).getDataStreamMap().remove(ClientInvocationId.valueOf(stream));
   }
 
   /**
@@ -814,7 +821,7 @@ public class ContainerStateMachine extends BaseStateMachine {
                 .setContainer2BCSIDMap(container2BCSIDMap)
                 .setWriteVersion(ClientCommandsUtils.getWritePipelineVersion(requestProto))
                 .build();
-        final DataChannel channel = getStreamDataChannel(requestProto, context);
+        final DataChannel channel = getStreamDataChannel(request, requestProto, context);
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
         return new LocalStream(channel, chunkExecutor, command -> streamCommand(requestProto, command, channel));
@@ -827,6 +834,10 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<?> link(DataStream stream, LogEntryProto entry) {
     if (stream == null) {
+      if (isStreamInitWithPutBlock(entry)) {
+        // Sent by a client which still forwards the stream: the stream was already released by streamPutBlock.
+        return CompletableFuture.completedFuture(null);
+      }
       return JavaUtils.completeExceptionally(new IllegalStateException(
           "DataStream is null"));
     } else if (!(stream instanceof LocalStream)) {
@@ -851,6 +862,15 @@ public class ContainerStateMachine extends BaseStateMachine {
           "PutBlock was not committed on stream close: " + kvStreamDataChannel));
     }
     return CompletableFuture.completedFuture(null);
+  }
+
+  private static boolean isStreamInitWithPutBlock(LogEntryProto entry) {
+    try {
+      return ContainerCommandRequestProto.parseFrom(entry.getStateMachineLogEntry().getLogData())
+          .getCmdType() == Type.StreamInitWithPutBlock;
+    } catch (InvalidProtocolBufferException e) {
+      return false;
+    }
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
