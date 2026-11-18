@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
@@ -35,6 +36,7 @@ import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -48,6 +50,8 @@ import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.rpc.RpcType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 /**
@@ -67,13 +71,38 @@ class TestXceiverClientRatis {
   void setUp() throws Exception {
     when(raftClient.async()).thenReturn(async);
     when(async.watch(INDEX, ReplicationLevel.ALL_COMMITTED)).thenReturn(allCommitted);
+    client = connect(new OzoneConfiguration(), null);
+  }
+
+  private XceiverClientRatis connect(OzoneConfiguration conf, AtomicReference<Boolean> skipSendForward)
+      throws Exception {
     Pipeline pipeline = MockPipeline.createRatisPipeline();
-    client = XceiverClientRatis.newXceiverClientRatis(pipeline, new OzoneConfiguration());
+    XceiverClientRatis xceiverClient = XceiverClientRatis.newXceiverClientRatis(pipeline, conf);
     try (MockedStatic<RatisHelper> ratisHelper = mockStatic(RatisHelper.class, CALLS_REAL_METHODS)) {
-      ratisHelper.when(() -> RatisHelper.newRaftClient(any(RpcType.class), any(Pipeline.class), any(), any(), any()))
-          .thenReturn(raftClient);
-      client.connect();
+      ratisHelper.when(() -> RatisHelper.newRaftClient(
+              any(RpcType.class), any(Pipeline.class), any(), any(), any(), anyBoolean()))
+          .thenAnswer(invocation -> {
+            if (skipSendForward != null) {
+              skipSendForward.set(invocation.getArgument(5));
+            }
+            return raftClient;
+          });
+      xceiverClient.connect();
     }
+    return xceiverClient;
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void dataStreamSkipsSendForwardOnlyWithPutBlockWithoutRaft(boolean putBlockWithoutRaft) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
+    conf.setFromObject(clientConfig);
+    AtomicReference<Boolean> skipSendForward = new AtomicReference<>();
+
+    connect(conf, skipSendForward).close();
+    assertEquals(putBlockWithoutRaft, skipSendForward.get());
   }
 
   /** The client is closed (for example evicted and released) while the ALL_COMMITTED watch is pending. */

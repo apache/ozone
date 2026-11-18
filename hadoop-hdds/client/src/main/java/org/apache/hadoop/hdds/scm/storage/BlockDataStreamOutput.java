@@ -164,8 +164,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.isDatastreamPipelineMode = config.isDatastreamPipelineMode();
-    this.putBlockWithoutRaft = config.isDatastreamPutBlockWithoutRaftEnabled()
-        && allDatanodesSupportStreamPutBlock(pipeline);
+    this.putBlockWithoutRaft = isPutBlockWithoutRaft(config, pipeline);
     this.syncSize = config.getDataStreamSyncSize();
     this.blockID = new AtomicReference<>(blockID);
     KeyValue keyValue =
@@ -201,6 +200,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
     metrics = XceiverClientManager.getXceiverClientMetrics();
+  }
+
+  /**
+   * @return whether the data streams on the given pipeline commit PutBlock through the stream instead of the Raft log.
+   *         Such a stream is opened with StreamInitWithPutBlock and is closed without a Raft log entry.
+   */
+  public static boolean isPutBlockWithoutRaft(OzoneClientConfig config, Pipeline pipeline) {
+    return config.isDatastreamPutBlockWithoutRaftEnabled() && allDatanodesSupportStreamPutBlock(pipeline);
   }
 
   private static boolean allDatanodesSupportStreamPutBlock(Pipeline pipeline) {
