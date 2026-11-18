@@ -451,14 +451,11 @@ public class DiskBalancerService extends BackgroundService {
         ContainerData toBalanceContainer = candidate.getContainerData();
         if (toBalanceContainer != null) {
           if (sourceVolume.getStorageType() != destVolume.getStorageType()) {
-            long startTime = Time.monotonicNow();
             LOG.warn("Container {}: Source volume storage type ({}) differs from destination volume storage type ({}). "
                     + "Skipping the disk balancing move.",
                 toBalanceContainer.getContainerID(), sourceVolume.getStorageType(), destVolume.getStorageType());
             // The policy reserved destination space, but no task will run postCall() to release it.
             destVolume.incCommittedBytes(0 - toBalanceContainer.getBytesUsed());
-            metrics.incrFailureCount(1);
-            metrics.getMoveFailureTime().add(Time.monotonicNow() - startTime);
             rejectedCandidate = true;
             continue;
           }

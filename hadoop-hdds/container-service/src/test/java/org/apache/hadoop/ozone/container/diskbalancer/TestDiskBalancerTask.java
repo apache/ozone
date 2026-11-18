@@ -321,9 +321,15 @@ public class TestDiskBalancerTask {
     diskBalancerService.setStopAfterDiskEven(true);
     ContainerSet observedContainers = spy(containerSet);
     when(ozoneContainer.getContainerSet()).thenReturn(observedContainers);
-    setCustomPolicyCandidate(container);
+    AtomicInteger selections = new AtomicInteger();
+    diskBalancerService.setVolumeContainerChoosingPolicy((ozone, volumes, deltas, inProgress, threshold, states) -> {
+      selections.incrementAndGet();
+      destVolume.incCommittedBytes(container.getContainerData().getBytesUsed());
+      return new ContainerCandidate(container.getContainerData(), sourceVolume, destVolume);
+    });
 
     assertTrue(diskBalancerService.getTasks().isEmpty());
+    assertEquals(1, selections.get());
     verify(observedContainers, never()).getContainer(CONTAINER_ID);
 
     verify(controller, never()).copyContainer(any(), any());
@@ -339,23 +345,23 @@ public class TestDiskBalancerTask {
     assertEquals(destCommitted, destVolume.getCommittedBytes());
     assertEquals(17L, diskBalancerService.getDeltaSizes().get(sourceVolume));
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
-    assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(0, diskBalancerService.getMetrics().getSuccessCount());
     assertEquals(0, diskBalancerService.getMetrics().getSuccessBytes());
-    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
+    assertCounter("MoveFailureTimeNumOps", 0L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
     assertEquals(0, diskBalancerService.getMetrics().getIdleLoopNoAvailableVolumePairCount());
     assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerService.getDiskBalancerInfo().getOperationalState());
 
     // Wait for another eligible cycle: a back-to-back call can hit the existing same-millisecond delay.
     GenericTestUtils.waitFor(() -> {
       assertTrue(diskBalancerService.getTasks().isEmpty());
-      return diskBalancerService.getMetrics().getFailureCount() == 2;
+      return selections.get() == 2;
     }, 10, 5000);
     assertEquals(destCommitted, destVolume.getCommittedBytes());
     assertEquals(17L, diskBalancerService.getDeltaSizes().get(sourceVolume));
     assertTrue(diskBalancerService.getInProgressContainers().isEmpty());
-    assertEquals(2, diskBalancerService.getMetrics().getFailureCount());
-    assertCounter("MoveFailureTimeNumOps", 2L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 0L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
     assertEquals(0, diskBalancerService.getMetrics().getIdleLoopNoAvailableVolumePairCount());
     assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerService.getDiskBalancerInfo().getOperationalState());
     verify(observedContainers, never()).getContainer(CONTAINER_ID);
@@ -403,6 +409,9 @@ public class TestDiskBalancerTask {
     long initialCommitted = destVolume.getCommittedBytes();
     diskBalancerService.setParallelThread(2);
     diskBalancerService.setStopAfterDiskEven(true);
+    // Rejection and a later successful task must preserve metrics from earlier failed tasks.
+    diskBalancerService.getMetrics().incrFailureCount(1);
+    diskBalancerService.getMetrics().getMoveFailureTime().add(10);
     AtomicInteger selections = new AtomicInteger();
     diskBalancerService.setVolumeContainerChoosingPolicy((ozone, volumes, deltas, inProgress, threshold, states) -> {
       assertFalse(inProgress.contains(ContainerID.valueOf(CONTAINER_ID)));
@@ -420,6 +429,7 @@ public class TestDiskBalancerTask {
     assertEquals(1, diskBalancerService.getInProgressContainers().size());
     assertTrue(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
     assertEquals(0, diskBalancerService.getMetrics().getIdleLoopNoAvailableVolumePairCount());
     assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerService.getDiskBalancerInfo().getOperationalState());
 
@@ -433,6 +443,7 @@ public class TestDiskBalancerTask {
     assertEquals(0L, diskBalancerService.getDeltaSizes().get(sourceVolume));
     assertTrue(diskBalancerService.getInProgressContainers().isEmpty());
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
     assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
     assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
   }
@@ -601,6 +612,7 @@ public class TestDiskBalancerTask {
     assertTrue(new File(oldContainerPath).exists());
     assertFalse(Files.exists(tempContainerDir), "Temp container directory should be cleaned up");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
@@ -665,6 +677,7 @@ public class TestDiskBalancerTask {
     assertTrue(Files.exists(destDirPath), "Dest container directory should not be cleaned up");
     assertTrue(testfile.toFile().exists(), "testfile should not be cleaned up");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
