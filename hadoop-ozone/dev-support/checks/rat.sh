@@ -16,6 +16,8 @@
 
 #checks:basic
 
+set -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -29,8 +31,9 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 
 mvn -B --no-transfer-progress -fn org.apache.rat:apache-rat-plugin:check "$@" \
     | tee "${REPORT_DIR}/output.log"
+rc=$?
 
-grep -r --include=rat.txt "!????" $dirs | tee "$REPORT_FILE"
+grep -r --include=rat.txt "!????" . | tee "$REPORT_FILE"
 
 ERROR_PATTERN="\[ERROR\]"
 source "${DIR}/_post_process.sh"

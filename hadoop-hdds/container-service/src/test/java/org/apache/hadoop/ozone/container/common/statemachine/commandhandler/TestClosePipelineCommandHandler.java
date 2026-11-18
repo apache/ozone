@@ -97,20 +97,20 @@ public class TestClosePipelineCommandHandler {
     XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
     when(writeChannel.getShouldDeleteRatisLogDirectory()).thenReturn(shouldDeleteRatisLogDirectory);
-    when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(true);
+    when(writeChannel.isExist(pipelineID)).thenReturn(true);
     Collection<RaftPeer> raftPeers = datanodes.stream()
         .map(RatisHelper::toRaftPeer)
         .collect(Collectors.toList());
     when(writeChannel.getServer()).thenReturn(mock(RaftServer.class));
     when(writeChannel.getServer().getId()).thenReturn(RatisHelper.toRaftPeerId(currentDatanode));
-    when(writeChannel.getRaftPeersInPipeline(pipelineID)).thenReturn(raftPeers);
+    when(writeChannel.getRaftPeers(pipelineID.getGroupId())).thenReturn(raftPeers);
 
     final ClosePipelineCommandHandler commandHandler =
         new ClosePipelineCommandHandler((leader, tls) -> raftClient, MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
 
     verify(writeChannel, times(1))
-        .removeGroup(pipelineID.getProtobuf());
+        .removeGroup(pipelineID.getGroupId());
 
     verify(raftClientGroupManager, times(2))
         .remove(any(), eq(shouldDeleteRatisLogDirectory), eq(!shouldDeleteRatisLogDirectory));
@@ -128,14 +128,14 @@ public class TestClosePipelineCommandHandler {
     XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
     // When the pipeline has been closed earlier by other datanode that received a close pipeline command
-    when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(false);
+    when(writeChannel.isExist(pipelineID)).thenReturn(false);
 
     final ClosePipelineCommandHandler commandHandler =
         new ClosePipelineCommandHandler(conf, MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
 
     verify(writeChannel, times(0))
-        .removeGroup(pipelineID.getProtobuf());
+        .removeGroup(pipelineID.getGroupId());
 
     verify(raftClientGroupManager, times(0))
         .remove(any(), anyBoolean(), anyBoolean());
@@ -155,13 +155,13 @@ public class TestClosePipelineCommandHandler {
     XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
     when(writeChannel.getShouldDeleteRatisLogDirectory()).thenReturn(shouldDeleteRatisLogDirectory);
-    when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(true);
+    when(writeChannel.isExist(pipelineID)).thenReturn(true);
     Collection<RaftPeer> raftPeers = datanodes.stream()
         .map(RatisHelper::toRaftPeer)
         .collect(Collectors.toList());
     when(writeChannel.getServer()).thenReturn(mock(RaftServer.class));
     when(writeChannel.getServer().getId()).thenReturn(RatisHelper.toRaftPeerId(currentDatanode));
-    when(writeChannel.getRaftPeersInPipeline(pipelineID)).thenReturn(raftPeers);
+    when(writeChannel.getRaftPeers(pipelineID.getGroupId())).thenReturn(raftPeers);
 
     CountDownLatch firstCommandStarted = new CountDownLatch(1);
     CountDownLatch secondCommandSubmitted = new CountDownLatch(1);
@@ -170,7 +170,7 @@ public class TestClosePipelineCommandHandler {
       firstCommandStarted.countDown();
       secondCommandSubmitted.await();
       return null;
-    }).when(writeChannel).removeGroup(pipelineID.getProtobuf());
+    }).when(writeChannel).removeGroup(pipelineID.getGroupId());
 
     ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
 

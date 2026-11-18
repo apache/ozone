@@ -437,11 +437,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       // Assertions
       Assertions.assertNotNull(result, "Result should not be null");
-      // Why seekPos should be 7 ? because we have threshold value for flush is set as 3,
-      // and we have total 7 events, so nsSummaryMap will be flushed in 2 batches and
-      // during second batch flush, eventCounter will be 6, then last event7 alone will
-      // be flushed out of loop as remaining event. At every batch flush based on threshold,
-      // seekPos is set as equal to eventCounter + 1, so  seekPos will be 7.
+      // Why seekPos should be 7 ? because all 7 events of the batch are committed,
+      // so a retry has nothing left to apply.
       Assertions.assertEquals(7, result.getLeft(), "seekPos should be 7");
       Assertions.assertTrue(result.getRight(), "The processing should fail due to flush failure");
     }
@@ -517,7 +514,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       // Assertions
       Assertions.assertNotNull(result1, "Result should not be null");
-      Assertions.assertEquals(0, result1.getLeft(), "seekPos should be 4");
+      Assertions.assertEquals(3, result1.getLeft(), "seekPos should be 3");
 
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();

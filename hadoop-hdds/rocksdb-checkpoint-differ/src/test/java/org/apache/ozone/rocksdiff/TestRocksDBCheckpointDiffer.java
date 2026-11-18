@@ -93,7 +93,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -1740,10 +1739,10 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(0L, sstFilePruningMetrics.getCompactionsProcessed());
     assertEquals(0L, sstFilePruningMetrics.getFilesRemovedTotal());
 
-    List<Pair<String, Integer>> keys = new ArrayList<Pair<String, Integer>>();
-    keys.add(Pair.of("key1", Integer.valueOf(1)));
-    keys.add(Pair.of("key2", Integer.valueOf(0)));
-    keys.add(Pair.of("key3", Integer.valueOf(1)));
+    List<KeyType> keys = new ArrayList<KeyType>();
+    keys.add(new KeyType("key1", Integer.valueOf(1)));
+    keys.add(new KeyType("key2", Integer.valueOf(0)));
+    keys.add(new KeyType("key3", Integer.valueOf(1)));
 
     String inputFile78 = "000078";
     String inputFile73 = "000073";
@@ -1777,10 +1776,10 @@ public class TestRocksDBCheckpointDiffer {
         MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
             ManagedRawSSTFileReader.class, (mock, context) -> {
               ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
-              Iterator<Pair<CodecBuffer, Integer>> keyItr = keys.stream().map(i -> {
+              Iterator<RocksDBCheckpointDiffer.CodecBufferAndType> keyItr = keys.stream().map(i -> {
                 keyCodecBuffer.clear();
-                keyCodecBuffer.put(ByteBuffer.wrap(i.getKey().getBytes(UTF_8)));
-                return Pair.of(keyCodecBuffer, i.getValue());
+                keyCodecBuffer.put(ByteBuffer.wrap(i.key().getBytes(UTF_8)));
+                return new RocksDBCheckpointDiffer.CodecBufferAndType(keyCodecBuffer, i.type());
               }).iterator();
               doAnswer(i -> keyItr.hasNext()).when(mockedRawSSTFileItr).hasNext();
               doAnswer(i -> keyItr.next()).when(mockedRawSSTFileItr).next();
@@ -1831,16 +1830,16 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(1L, sstFilePruningMetrics.getFilesRemovedTotal());
   }
 
-  private void createSSTFileWithKeys(File file, List<Pair<String, Integer>> keys) throws RocksDatabaseException {
+  private void createSSTFileWithKeys(File file, List<KeyType> keys) throws RocksDatabaseException {
     byte[] value = "dummyValue".getBytes(UTF_8);
     try (RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(file)) {
-      Iterator<Pair<String, Integer>> itr = keys.iterator();
+      Iterator<KeyType> itr = keys.iterator();
       while (itr.hasNext()) {
-        Pair<String, Integer> entry = itr.next();
-        if (entry.getValue() == 0) {
-          sstFileWriter.delete(entry.getKey().getBytes(UTF_8));
+        KeyType entry = itr.next();
+        if (entry.type() == 0) {
+          sstFileWriter.delete(entry.key().getBytes(UTF_8));
         } else {
-          sstFileWriter.put(entry.getKey().getBytes(UTF_8), value);
+          sstFileWriter.put(entry.key().getBytes(UTF_8), value);
         }
       }
     }
@@ -2075,4 +2074,10 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(expectedResult, rocksDBCheckpointDiffer
         .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
   }
+
+  /**
+   * An SST key paired with its entry type (0 = delete, otherwise put),
+   * used to build SST files containing both puts and deletes.
+   */
+  private record KeyType(String key, int type) { }
 }
