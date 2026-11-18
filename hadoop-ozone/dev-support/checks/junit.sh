@@ -58,7 +58,7 @@ fi
 
 if [[ ${CI:-} != "true" ]]; then
   # Local run, remove leftover artifacts from all modules
-  mvn ${MAVEN_OPTIONS} -Dscan=false clean
+  ./mvnw ${MAVEN_OPTIONS} -Dscan=false clean
 fi
 
 CLEAN="clean"
@@ -68,7 +68,7 @@ if [[ ${ITERATIONS} -gt 1 ]] || [[ ${CHECK} == "flaky" ]]; then
     # Need to build for local run.  In flaky-test-check the jars come from separate workflow job.
     # Test may be limited to specific modules, also build dependencies.
     # `clean` is included for cacheability.
-    mvn ${MAVEN_OPTIONS} -DskipTests --also-make "$@" clean install
+    ./mvnw ${MAVEN_OPTIONS} -DskipTests --also-make "$@" clean install
   fi
 
   # Keep outputs from previous iterations
@@ -98,7 +98,7 @@ for i in $(seq 1 ${ITERATIONS}); do
 
   log=$(mktemp)
   set -x
-  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" ${CLEAN} "${PHASE}" \
+  ./mvnw ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" ${CLEAN} "${PHASE}" \
       | tee "${log}"
   irc=$?
   set +x
@@ -138,7 +138,7 @@ done
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   #Archive combined jacoco records
-  mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec -Dscan=false
+  ./mvnw -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec -Dscan=false
 fi
 
 source "${DIR}/_post_process.sh"
