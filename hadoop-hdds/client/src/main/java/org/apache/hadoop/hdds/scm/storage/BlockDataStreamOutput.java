@@ -463,15 +463,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               setIoException(ioe);
               throw new CompletionException(ioe);
             }
+            if (putBlockWithoutRaft) {
+              addBuffersCommittedWithoutRaft(byteBufferList);
+            }
           });
       if (putBlockWithoutRaft) {
         // PutBlock is supposed to be committed after the data stream close so there
         // is no need to continue.
-        putBlockCommandFutures.add(dataStreamCloseReply.whenComplete((reply, e) -> {
-          if (e == null && reply != null && reply.isSuccess()) {
-            addBuffersCommittedWithoutRaft(byteBufferList);
-          }
-        }));
+        putBlockCommandFutures.add(dataStreamCloseReply);
         return;
       }
     } else if (putBlockWithoutRaft) {

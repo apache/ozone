@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
@@ -273,13 +274,23 @@ class TestBlockDataStreamOutput {
     final MockDatanodePipeline pipeline = new MockDatanodePipeline().failStreamClose().withDelayedStreamClose();
     final OzoneClientConfig config = createConfig();
     config.setDatastreamPutBlockWithoutRaftEnabled(true);
-    final BlockDataStreamOutput stream = createStream(pipeline, config);
+    final List<StreamBuffer> bufferList = new ArrayList<>();
+    final BlockDataStreamOutput stream = createStream(pipeline, config, bufferList);
     // The boundary PutBlock commits the first 400B; the stream close, which fails, would commit the last 50B.
     final byte[] data = randomBytes(450);
     stream.write(ByteBuffer.wrap(data), 0, data.length);
 
     assertThrows(IOException.class, stream::close);
     assertEquals(400, stream.getTotalAckDataLength());
+
+    // Only the last 50B are left in the buffer list, to be written again by the retry.
+    final ByteBuffer unacked = ByteBuffer.allocate(50);
+    for (StreamBuffer buffer : bufferList) {
+      final ByteBuffer dup = buffer.duplicate();
+      dup.flip();
+      unacked.put(dup);
+    }
+    assertArrayEquals(Arrays.copyOfRange(data, 400, 450), unacked.array());
   }
 
   @Test
