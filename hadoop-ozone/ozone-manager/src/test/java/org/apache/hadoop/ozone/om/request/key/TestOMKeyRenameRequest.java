@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -46,6 +47,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -106,6 +109,44 @@ public class TestOMKeyRenameRequest extends OMKeyRequestTests {
     addKeyToTable(fromKeyInfo);
     doPreExecute(createRenameKeyRequest(
         volumeName, bucketName, fromKeyName, toKeyName));
+  }
+
+  /** A rename that requires a FILE_SYSTEM_OPTIMIZED bucket passes preExecute only on one. */
+  @Test
+  public void testPreExecuteRequireFileSystemOptimized() throws Exception {
+    addKeyToTable(fromKeyInfo);
+    OMRequest request = requireFileSystemOptimized(
+        createRenameKeyRequest(volumeName, bucketName, fromKeyName, toKeyName), true);
+    if (getBucketLayout().isFileSystemOptimized()) {
+      assertThat(doPreExecute(request).getRenameKeyRequest().getRequireFileSystemOptimized()).isTrue();
+    } else {
+      OMException e = assertThrows(OMException.class, () -> getOMKeyRenameRequest(request).preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION, e.getResult());
+      assertThat(e.getMessage()).contains(bucketName).contains(getBucketLayout().name());
+    }
+  }
+
+  /**
+   * The OBJECT_STORE request class also serves LEGACY: with the field set, both layouts are rejected before Ratis;
+   * without it, both are served as before, as for the shell, trash and lifecycle callers.
+   */
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"LEGACY", "OBJECT_STORE"})
+  public void testPreExecuteNonFileSystemOptimizedLayouts(BucketLayout layout) throws Exception {
+    OMRequest request = createRenameKeyRequest(volumeName, bucketName, fromKeyName, toKeyName);
+
+    OMException e = assertThrows(OMException.class,
+        () -> new OMKeyRenameRequest(requireFileSystemOptimized(request, true), layout).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION, e.getResult());
+
+    OMRequest served = new OMKeyRenameRequest(requireFileSystemOptimized(request, false), layout)
+        .preExecute(ozoneManager);
+    assertThat(served.getRenameKeyRequest().getRequireFileSystemOptimized()).isFalse();
+  }
+
+  private static OMRequest requireFileSystemOptimized(OMRequest request, boolean require) {
+    return request.toBuilder().setRenameKeyRequest(
+        request.getRenameKeyRequest().toBuilder().setRequireFileSystemOptimized(require)).build();
   }
 
   @Test

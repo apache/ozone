@@ -25,6 +25,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
@@ -48,6 +50,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -57,6 +61,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -65,6 +70,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -80,6 +86,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -93,11 +100,13 @@ import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -131,6 +140,23 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     ReplicationConfig ratis3Config =
         ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
     preExecuteTest(false, 0, ratis3Config);
+  }
+
+  @Test
+  public void testMissingPipelineDuringCreateKeyReturnsRetryableErrorBeforeRatisSubmission() throws Exception {
+    OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
+        anyString(), any(ExcludeList.class), anyString()))
+        .thenThrow(new SCMException("waited pipeline disappeared", SCMException.ResultCodes.PIPELINE_NOT_FOUND));
+    OMRequest request = createKeyRequest(false, 0, 100, replicationConfig, null).toBuilder()
+        .setVersion(ClientVersion.CURRENT.serialize()).build();
+
+    OzoneManagerProtocolProtos.OMResponse response = new OMExecutionFlow(ozoneManager).submit(request, true);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALLOCATION_ERROR, response.getStatus());
+    assertFalse(response.getSuccess());
+    verify(ozoneManager, never()).getOmRatisServer();
   }
 
   @Test
@@ -198,6 +224,53 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     } else {
       assertThat(partKeyArgs).noneMatch(KeyArgs::hasPartIv);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPreExecuteReleasesBucketLockBeforeResolvingSourceBucket(boolean isMultipartKey) throws Exception {
+    when(ozoneManager.getKmsProvider()).thenReturn(mock(KeyProviderCryptoExtension.class));
+    final IOzoneManagerLock lock = omMetadataManager.getLock();
+    final String sourceBucket = newBucketOnOtherStripe(lock, bucketName);
+    addVolumeAndBucketToDB(volumeName, sourceBucket, omMetadataManager, getBucketLayout());
+    addBucketToDB(
+        omMetadataManager,
+        OmBucketInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSourceVolume(volumeName)
+            .setSourceBucket(sourceBucket));
+
+    final List<String[]> buckets = Arrays.asList(
+        new String[] {volumeName, sourceBucket},
+        new String[] {volumeName, bucketName});
+    when(ozoneManager.resolveBucketLink(any(Pair.class))).thenAnswer(i -> {
+      assertThat(CompletableFuture.runAsync(() -> {
+        lock.acquireWriteLocks(BUCKET_LOCK, buckets);
+        lock.releaseWriteLocks(BUCKET_LOCK, buckets);
+      })).succeedsWithin(Duration.ofSeconds(5));
+      return new ResolvedBucket(volumeName, bucketName, volumeName, sourceBucket, "owner", getBucketLayout());
+    });
+
+    if (isMultipartKey) {
+      doAnswer(i -> {
+        assertThat(lock.getReadHoldCount(BUCKET_LOCK, volumeName, sourceBucket)).isPositive();
+        return i.callRealMethod();
+      }).when(omMetadataManager).getOpenKeyTable(getBucketLayout());
+    }
+
+    doPreExecute(createKeyRequest(isMultipartKey, 1));
+    verify(ozoneManager).resolveBucketLink(any(Pair.class));
+    if (isMultipartKey) {
+      verify(omMetadataManager, atLeastOnce()).getOpenKeyTable(getBucketLayout());
+    }
+  }
+
+  @Test
+  public void testPreExecuteWithKmsToleratesMissingBucket() throws Exception {
+    when(ozoneManager.getKmsProvider()).thenReturn(mock(KeyProviderCryptoExtension.class));
+    final OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(false, 0));
+    assertFalse(modifiedOmRequest.getCreateKeyRequest().getKeyArgs().hasFileEncryptionInfo());
   }
 
   @Test
@@ -1002,6 +1075,23 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
       assertEquals(expectedValue, kv.getValue(),
           "Metadata value mismatch for key: " + kv.getKey());
     });
+  }
+
+  /**
+   * Returns a new bucket name in {@code volumeName} whose BUCKET_LOCK stripe differs from that of {@code bucket}.
+   */
+  private String newBucketOnOtherStripe(IOzoneManagerLock lock, String bucket) {
+    while (true) {
+      final String candidate = UUID.randomUUID().toString();
+      lock.acquireReadLock(BUCKET_LOCK, volumeName, bucket);
+      try {
+        if (lock.getReadHoldCount(BUCKET_LOCK, volumeName, candidate) == 0) {
+          return candidate;
+        }
+      } finally {
+        lock.releaseReadLock(BUCKET_LOCK, volumeName, bucket);
+      }
+    }
   }
 
   /**

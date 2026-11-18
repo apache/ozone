@@ -102,10 +102,39 @@ public class TestRevokedSTSTokenCleanupService {
       final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
           omRequest.getDeleteRevokedSTSTokensRequest();
       assertThat(deleteRevokedSTSTokensRequest.getOriginalAccessKeyIdList()).containsExactly("original-access-key-a");
-      final long cleanupThresholdMillis = TimeUnit.SECONDS.toMillis(S3STSUtils.MAX_DURATION_SECONDS);
+      final long cleanupThresholdMillis = TimeUnit.SECONDS.toMillis(S3STSUtils.MAX_DURATION_SECONDS)
+          + TimeUnit.MINUTES.toMillis(30);
       assertThat(deleteRevokedSTSTokensRequest.hasPurgeBeforeMillis()).isTrue();
       assertThat(deleteRevokedSTSTokensRequest.getPurgeBeforeMillis())
           .isBetween(nowMillis - cleanupThresholdMillis, System.currentTimeMillis() - cleanupThresholdMillis);
+    }
+  }
+
+  @Test
+  public void testKeepsCutoffForClockSkewMarginPastMaxTokenLifetime() throws Exception {
+    final long nowMillis = testClock.millis();
+    revokedStsTokenTable.put(
+        "original-access-key-within-margin",
+        nowMillis - TimeUnit.HOURS.toMillis(12) - TimeUnit.MINUTES.toMillis(1));
+    revokedStsTokenTable.put(
+        "original-access-key-past-margin",
+        nowMillis - TimeUnit.HOURS.toMillis(12) - TimeUnit.MINUTES.toMillis(31));
+
+    final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      mockRatisSubmitAndCapture(ozoneManagerRatisUtilsMock, capturedRequest);
+
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+
+      assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(1);
+
+      final OMRequest omRequest = capturedRequest.get();
+      assertThat(omRequest).isNotNull();
+      assertThat(
+          omRequest.getDeleteRevokedSTSTokensRequest().getOriginalAccessKeyIdList())
+          .containsExactly("original-access-key-past-margin");
     }
   }
 

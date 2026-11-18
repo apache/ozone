@@ -93,6 +93,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -1462,11 +1463,15 @@ public class SCMClientProtocolServer implements
       // get datanodes by ip or uuid
       List<DatanodeDetails> nodes = new ArrayList<>();
       if (!Strings.isNullOrEmpty(uuid)) {
-        nodes.add(scm.getScmNodeManager().getNode(DatanodeID.fromUuidString(uuid)));
+        DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.fromUuidString(uuid));
+        if (node == null) {
+          throw new NonRetriableException("Datanode " + uuid + " not found");
+        }
+        nodes.add(node);
       } else if (!Strings.isNullOrEmpty(address)) {
         nodes = scm.getScmNodeManager().getNodesByAddress(address);
       } else {
-        throw new IOException(
+        throw new NonRetriableException(
             "Could not get datanode with the specified parameters."
         );
       }

@@ -19,6 +19,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - ".github/actions/**"
       - ".github/workflows/**"
   push:
     branches-ignore:
@@ -26,6 +27,7 @@ on:
     tags:
       - '**'
     paths:
+      - ".github/actions/**"
       - ".github/workflows/**"
 
 permissions:
@@ -46,4 +48,4 @@ jobs:
       - name: Check actions
         uses: apache/infrastructure-actions/allowlist-check@allowlist-check/v1
         with:
-          scan-glob: ".github/workflows/*.y*ml"
+          scan-glob: ".github/**/*.y*ml"

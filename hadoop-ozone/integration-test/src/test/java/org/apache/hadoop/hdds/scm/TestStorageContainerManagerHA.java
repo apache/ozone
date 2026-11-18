@@ -151,6 +151,7 @@ public class TestStorageContainerManagerHA {
     // started again, so the running SCM is left as is.
     List<StorageContainerManager> inactiveSCMs = new ArrayList<>();
     cluster.getInactiveSCM().forEachRemaining(inactiveSCMs::add);
+    assertEquals(2, inactiveSCMs.size());
     CountDownLatch scmInstancesCounter = new CountDownLatch(inactiveSCMs.size());
     AtomicInteger failedSCMs = new AtomicInteger();
     for (StorageContainerManager scm : inactiveSCMs) {
