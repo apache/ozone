@@ -34,8 +34,8 @@ public final class ContainerBalancerMetrics {
 
   private final MetricsSystem ms;
 
-  @Metric("Number of times scheduling reached the shared iteration byte limit")
-  private MutableCounterLong numIterationLimitsSkipped;
+  @Metric("Number of iterations that stopped scheduling moves after reaching maxSizeToMovePerIteration")
+  private MutableCounterLong numIterationsReachedMaxSizeToMoveLimit;
 
   @Metric(about = "Amount of Gigabytes that Container Balancer moved" +
       " in the latest iteration.")
@@ -260,13 +260,13 @@ public final class ContainerBalancerMetrics {
     numContainerMovesTimeoutInLatestIteration.incr(-getNumContainerMovesTimeoutInLatestIteration());
   }
 
-  /** Returns the number of times scheduling reached the shared iteration byte limit. */
-  public long getNumIterationLimitsSkipped() {
-    return numIterationLimitsSkipped.value();
+  /** Returns the number of iterations that stopped scheduling moves after reaching maxSizeToMovePerIteration. */
+  public long getNumIterationsReachedMaxSizeToMoveLimit() {
+    return numIterationsReachedMaxSizeToMoveLimit.value();
   }
 
-  public void incrementNumIterationLimitsSkipped() {
-    numIterationLimitsSkipped.incr();
+  public void incrementNumIterationsReachedMaxSizeToMoveLimit() {
+    numIterationsReachedMaxSizeToMoveLimit.incr();
   }
 
   /**

@@ -669,7 +669,7 @@ public class ContainerBalancerTask implements Runnable {
     if (!isBalancerRunning()) {
       iterationResult = IterationResult.ITERATION_INTERRUPTED;
     } else if (reachedMaxSizeToMovePerIteration()) {
-      metrics.incrementNumIterationLimitsSkipped();
+      metrics.incrementNumIterationsReachedMaxSizeToMoveLimit();
     }
 
     checkIterationResults(isMoveGeneratedInThisIteration);

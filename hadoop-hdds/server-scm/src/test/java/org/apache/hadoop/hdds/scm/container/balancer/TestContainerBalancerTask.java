@@ -846,7 +846,7 @@ public class TestContainerBalancerTask {
     startBalancer(balancerConfiguration);
 
     assertThat(order).containsExactly(iteration == 0 ? StorageType.SSD : StorageType.DISK);
-    assertEquals(nodeLimit ? 0 : 1, containerBalancerTask.getMetrics().getNumIterationLimitsSkipped());
+    assertEquals(nodeLimit ? 0 : 1, containerBalancerTask.getMetrics().getNumIterationsReachedMaxSizeToMoveLimit());
     assertEquals(2, containerBalancerTask.getMetrics().getNumDatanodesInvolvedInLatestIteration());
   }
 
@@ -869,6 +869,62 @@ public class TestContainerBalancerTask {
         .map(node -> node.getDatanodeID().toString()).collect(Collectors.toSet()));
     assertEquals(snapshot.getTargetDatanodes(), containerBalancerTask.getUnderUtilizedNodes().stream()
         .map(node -> node.getDatanodeID().toString()).collect(Collectors.toSet()));
+  }
+
+  /**
+   * A node outside the threshold band is reported as unbalanced even when its storage type has no target, as in
+   * aggregate balancing. Only the storage type with both a source and a target produces a move.
+   */
+  @Test
+  public void testOneSidedStorageTypeIsReportedButNotMoved() throws Exception {
+    // SSD 95/70/70: average 78.3%, so only 95% is outside the 10% band and SSD has a source but no target.
+    // DISK 50/90/10: average 50%, so 90% is a source and 10% is a target.
+    DatanodeUsageInfo ssdOnlySource = storageTypeNode(95, 50);
+    DatanodeUsageInfo diskSource = storageTypeNode(70, 90);
+    DatanodeUsageInfo diskTarget = storageTypeNode(70, 10);
+    addStorageTypeContainer(ssdOnlySource, 1000, StorageType.SSD, 10 * STORAGE_UNIT);
+    addStorageTypeContainer(diskSource, 1001, StorageType.DISK, 10 * STORAGE_UNIT);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(ssdOnlySource, diskSource, diskTarget), 0, order);
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).containsExactly(StorageType.DISK);
+    assertThat(containerBalancerTask.getContainerToSourceMap()).containsOnlyKeys(ContainerID.valueOf(1001));
+    assertEquals(new HashSet<>(Arrays.asList(ssdOnlySource.getDatanodeDetails(), diskSource.getDatanodeDetails())),
+        containerBalancerTask.getOverUtilizedNodes().stream()
+            .map(DatanodeUsageInfo::getDatanodeDetails).collect(Collectors.toSet()));
+    assertEquals(Collections.singleton(diskTarget.getDatanodeDetails()),
+        containerBalancerTask.getUnderUtilizedNodes().stream()
+            .map(DatanodeUsageInfo::getDatanodeDetails).collect(Collectors.toSet()));
+    assertEquals(3, containerBalancerTask.getMetrics().getNumDatanodesUnbalanced());
+  }
+
+  /**
+   * When every storage type has only sources or only targets, the nodes are still reported as unbalanced, no move
+   * is made, and the balancer stops because nothing more can be balanced, as in aggregate balancing.
+   */
+  @Test
+  public void testEveryStorageTypeOneSidedMakesNoMove() throws Exception {
+    // SSD 95/70/70: average 78.3%, so SSD has a source but no target.
+    // DISK 30/10/30: average 23.3%, so 10% is a target and DISK has no source.
+    DatanodeUsageInfo ssdSource = storageTypeNode(95, 30);
+    DatanodeUsageInfo diskTarget = storageTypeNode(70, 10);
+    DatanodeUsageInfo balanced = storageTypeNode(70, 30);
+    addStorageTypeContainer(ssdSource, 1000, StorageType.SSD, 10 * STORAGE_UNIT);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(ssdSource, diskTarget, balanced), 0, order);
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).isEmpty();
+    assertThat(containerBalancerTask.getContainerToSourceMap()).isEmpty();
+    assertEquals(Collections.singleton(ssdSource.getDatanodeDetails()),
+        containerBalancerTask.getOverUtilizedNodes().stream()
+            .map(DatanodeUsageInfo::getDatanodeDetails).collect(Collectors.toSet()));
+    assertEquals(Collections.singleton(diskTarget.getDatanodeDetails()),
+        containerBalancerTask.getUnderUtilizedNodes().stream()
+            .map(DatanodeUsageInfo::getDatanodeDetails).collect(Collectors.toSet()));
+    assertEquals(2, containerBalancerTask.getMetrics().getNumDatanodesUnbalanced());
+    assertEquals(ContainerBalancerStopReason.CAN_NOT_BALANCE_ANY_MORE.name(), containerBalancerTask.getStopReason());
   }
 
   @ParameterizedTest

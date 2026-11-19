@@ -466,8 +466,7 @@ public class ContainerBalancerSelectionCriteria {
       DatanodeDetails node, StorageType storageType) {
     for (ContainerReplica replica : replicas) {
       if (replica.getDatanodeDetails().equals(node)) {
-        if (replica.getStorageType() != null && replica.getVolumeStorageType() != null
-            && replica.getStorageType() != replica.getVolumeStorageType()) {
+        if (replica.hasConflictingStorageTypes()) {
           LOG.debug("Skipping container {} on {}: recorded type {} differs from reported volume type {}",
               replica.getContainerID(), node, replica.getStorageType(), replica.getVolumeStorageType());
           return false;

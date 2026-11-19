@@ -43,6 +43,17 @@ class TestContainerReplica {
     assertEquals(expected, replica.getTargetStorageTypeForCopy());
   }
 
+  @ParameterizedTest
+  @CsvSource(value = {"SSD,DISK,true", "SSD,SSD,false", "SSD,NULL,false", "NULL,SSD,false", "NULL,NULL,false"},
+      nullValues = "NULL")
+  void detectsConflictOnlyWhenBothTypesAreKnownAndDiffer(StorageType recorded, StorageType volume,
+      boolean expected) {
+    ContainerReplica replica = ContainerReplica.newBuilder().setContainerID(ContainerID.valueOf(1))
+        .setContainerState(CLOSED).setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+        .setStorageType(recorded).setVolumeStorageType(volume).build();
+    assertEquals(expected, replica.hasConflictingStorageTypes());
+  }
+
   @Test
   void toBuilder() {
     ContainerReplica subject = ContainerReplica.newBuilder()

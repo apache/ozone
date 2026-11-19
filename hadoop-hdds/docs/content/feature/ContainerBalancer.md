@@ -98,8 +98,9 @@ and the distinct-datanode limit are shared across all types. A datanode that sen
 replicas and receives DISK replicas counts once toward the datanode limit.
 
 For an existing replica without a recorded storage type, the balancer uses its reported
-volume type. It skips replicas whose type is unknown or whose recorded type conflicts
-with their reported volume type. It does not rewrite container metadata to resolve these cases.
+volume type. It skips replicas whose recorded type and reported volume type are both unknown,
+or whose recorded type conflicts with their reported volume type. It does not rewrite container
+metadata to resolve these cases.
 If usage reports contain an incomplete type breakdown, the balancer stops before selecting moves.
 When every report has only aggregate usage, it retains the existing aggregate balancing behavior.
 

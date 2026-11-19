@@ -206,8 +206,7 @@ public final class MoveManager implements
       }
 
       if (storageType != null && (srcReplica.getTargetStorageTypeForCopy() != storageType
-          || (srcReplica.getStorageType() != null && srcReplica.getVolumeStorageType() != null
-              && srcReplica.getStorageType() != srcReplica.getVolumeStorageType()))) {
+          || srcReplica.hasConflictingStorageTypes())) {
         LOG.warn("Cannot move container {} from {} to {} on {}: source reports replica type {} and volume type {}",
             cid, src, tgt, storageType, srcReplica.getStorageType(), srcReplica.getVolumeStorageType());
         ret.complete(MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH);
