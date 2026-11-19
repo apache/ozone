@@ -262,7 +262,8 @@ public class XceiverClientManager extends XceiverClientCreator {
   }
 
   private static boolean isECReplica(Pipeline pipeline) {
-    return pipeline.getReplicaIndexes().values().stream().anyMatch(index -> index > 0);
+    return pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
+        && pipeline.getReplicaIndexes().values().stream().anyMatch(index -> index > 0);
   }
 
   private String getPipelineCacheKey(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit) {
@@ -274,7 +275,7 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     // Short-circuit reads are not supported for EC keys. EC key reads use a single-node STAND_ALONE pipeline per
     // replica, which is recognized by its non-zero replica index.
-    if (!isEC && !isECReplica(pipeline) && allowShortCircuit && isShortCircuitEnabled()) {
+    if (allowShortCircuit && !isEC && isShortCircuitEnabled() && !isECReplica(pipeline)) {
       int port = 0;
       InetSocketAddress localAddr = null;
       for (DatanodeDetails dn : pipeline.getNodes()) {
