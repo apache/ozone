@@ -245,7 +245,7 @@ public class TestStateContext {
 
     long firstBytes = commandStatusReportWireSize(first);
     CommandStatusReportSelection selection =
-        context.getCommandStatusReports(scm, 10, firstBytes, firstBytes, firstBytes);
+        context.getCommandStatusReports(scm, 10, firstBytes, firstBytes);
     assertEquals(Collections.singletonList(first), selection.getReports());
     assertEquals(firstBytes, selection.getSelectedBytes());
     assertEquals(commandStatusReportWireSize(second), context.getCommandStatusReportQueueBytes(scm));
@@ -270,15 +270,13 @@ public class TestStateContext {
 
     CommandStatusReportSelection selection = context.getCommandStatusReports(
         scm, 10, commandStatusReportWireSize(single),
-        commandStatusReportWireSize(single),
-        commandStatusReportWireSize(single));
+        commandStatusReportWireSize(aggregate));
     assertTrue(selection.getReports().isEmpty());
     assertEquals(commandStatusReportWireSize(aggregate),
         context.getCommandStatusReportQueueBytes(scm));
 
     selection = context.getCommandStatusReports(
         scm, 10, commandStatusReportWireSize(aggregate),
-        commandStatusReportWireSize(aggregate),
         commandStatusReportWireSize(aggregate));
     assertEquals(Collections.singletonList(aggregate),
         selection.getReports());
@@ -304,7 +302,7 @@ public class TestStateContext {
   }
 
   @Test
-  public void testOversizedCommandStatusMakesProgressWhenSafe() throws IOException {
+  public void testOversizedCommandStatusIsReported() throws IOException {
     StateContext context = createSubject();
     HostAndPort scm = new HostAndPort("scm", 9001);
     context.addEndpoint(scm);
@@ -313,21 +311,15 @@ public class TestStateContext {
     long reportBytes = commandStatusReportWireSize(report);
 
     CommandStatusReportSelection selection =
-        context.getCommandStatusReports(scm, 10, reportBytes - 1, reportBytes, reportBytes - 1);
-    assertEquals(Collections.singletonList(report), selection.getReports());
-    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
-    assertEquals(reportBytes, selection.getOversizedBytes());
-
-    context.addIncrementalReport(report);
-    selection = context.getCommandStatusReports(
-        scm, 10, reportBytes - 1, reportBytes - 1, reportBytes - 1);
+        context.getCommandStatusReports(
+            scm, 10, reportBytes - 1, reportBytes - 1);
     assertTrue(selection.getReports().isEmpty());
     assertEquals(reportBytes, context.getCommandStatusReportQueueBytes(scm));
     assertEquals(reportBytes, selection.getOversizedBytes());
   }
 
   @Test
-  public void testOversizedCommandStatusPreservesReportOrder() throws IOException {
+  public void testCommandStatusReportsPreserveOrder() throws IOException {
     StateContext context = createSubject();
     HostAndPort scm = new HostAndPort("scm", 9001);
     context.addEndpoint(scm);
@@ -347,17 +339,20 @@ public class TestStateContext {
     context.addIncrementalReport(lastSmallReport);
 
     CommandStatusReportSelection selection =
-        context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+        context.getCommandStatusReports(
+            scm, 10, smallBytes, oversizedBytes);
     assertEquals(Collections.singletonList(firstSmallReport), selection.getReports());
     assertEquals(oversizedBytes + smallBytes,
         context.getCommandStatusReportQueueBytes(scm));
 
-    selection = context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+    selection = context.getCommandStatusReports(
+        scm, 10, oversizedBytes, oversizedBytes);
     assertEquals(Collections.singletonList(oversizedReport), selection.getReports());
-    assertEquals(oversizedBytes, selection.getOversizedBytes());
+    assertEquals(0, selection.getOversizedBytes());
     assertEquals(commandStatusReportWireSize(lastSmallReport), context.getCommandStatusReportQueueBytes(scm));
 
-    selection = context.getCommandStatusReports(scm, 10, smallBytes, oversizedBytes, smallBytes);
+    selection = context.getCommandStatusReports(
+        scm, 10, smallBytes, oversizedBytes);
     assertEquals(Collections.singletonList(lastSmallReport), selection.getReports());
     assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
   }

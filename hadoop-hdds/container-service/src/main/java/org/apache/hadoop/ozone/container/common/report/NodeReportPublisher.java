@@ -22,8 +22,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DE
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -58,8 +56,7 @@ public class NodeReportPublisher extends ReportPublisher<NodeReportProto> {
   }
 
   @Override
-  protected List<NodeReportProto> getReports() throws IOException {
-    return Collections.singletonList(
-        getContext().getParent().getContainer().getNodeReport());
+  protected NodeReportProto getReport() throws IOException {
+    return getContext().getParent().getContainer().getNodeReport();
   }
 }

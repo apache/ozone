@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.report;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -26,7 +25,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Message;
 import java.util.Collections;
 import java.util.List;
@@ -40,7 +38,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -77,9 +74,9 @@ public class TestReportPublisher {
     }
 
     @Override
-    protected List<Message> getReports() {
+    protected Message getReport() {
       getReportCount++;
-      return Collections.singletonList(null);
+      return CommandStatusReportsProto.getDefaultInstance();
     }
   }
 
@@ -129,7 +126,8 @@ public class TestReportPublisher {
     executorService.shutdown();
     assertEquals(1,
         ((DummyReportPublisher) publisher).getReportCount);
-    verify(dummyContext, times(1)).refreshFullReport(null);
+    verify(dummyContext, times(1)).refreshFullReport(
+        CommandStatusReportsProto.getDefaultInstance());
     // After executor shutdown, no new reports should be published
     Thread.sleep(100);
     assertEquals(1,
@@ -150,7 +148,8 @@ public class TestReportPublisher {
                 .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     assertTrue(
-        ((CommandStatusReportPublisher) publisher).getReports().isEmpty());
+        ((CommandStatusReportPublisher) publisher)
+            .getIncrementalReports().isEmpty());
 
     // Insert to status object to state context map and then get the report.
     CommandStatus obj1 = CommandStatus.CommandStatusBuilder.newBuilder()
@@ -167,16 +166,16 @@ public class TestReportPublisher {
     cmdStatusMap.put(obj2.getCmdId(), obj2);
     // We will sending the commands whose status is PENDING and EXECUTED
     List<CommandStatusReportsProto> reports =
-        ((CommandStatusReportPublisher) publisher).getReports();
-    assertEquals(1, reports.size());
-    assertEquals(2,
-        reports.get(0).getCmdStatusCount(),
-        "Should publish report with 2 status objects");
+        ((CommandStatusReportPublisher) publisher).getIncrementalReports();
+    assertEquals(2, reports.size());
+    assertTrue(reports.stream()
+        .allMatch(report -> report.getCmdStatusCount() == 1),
+        "Should publish one report for each status object");
     executorService.shutdown();
   }
 
   @Test
-  public void testCommandStatusPublisherSplitsReportsBySize() {
+  public void testCommandStatusPublisherReturnsOneStatusPerReport() {
     StateContext context = mock(StateContext.class);
     Map<Long, CommandStatus> commandStatuses = new ConcurrentHashMap<>();
     when(context.getCommandStatusMap()).thenReturn(commandStatuses);
@@ -188,32 +187,18 @@ public class TestReportPublisher {
     commandStatuses.put(second.getCmdId(), second);
     commandStatuses.put(third.getCmdId(), third);
 
-    CommandStatusReportsProto singleReport =
-        CommandStatusReportsProto.newBuilder()
-            .addCmdStatus(first.getProtoBufMessage())
-            .build();
-    long maxReportSize = CodedOutputStream.computeMessageSize(
-        SCMHeartbeatRequestProto.COMMANDSTATUSREPORTS_FIELD_NUMBER,
-        singleReport);
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE,
-        maxReportSize + "B");
     CommandStatusReportPublisher publisher =
         new CommandStatusReportPublisher();
-    publisher.setConf(conf);
+    publisher.setConf(config);
     ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
     publisher.init(context, executor);
 
-    List<CommandStatusReportsProto> reports = publisher.getReports();
+    List<CommandStatusReportsProto> reports =
+        publisher.getIncrementalReports();
 
     assertEquals(3, reports.size());
-    assertEquals(3, reports.stream()
-        .mapToInt(CommandStatusReportsProto::getCmdStatusCount)
-        .sum());
-    assertTrue(reports.stream().allMatch(report ->
-        CodedOutputStream.computeMessageSize(
-            SCMHeartbeatRequestProto.COMMANDSTATUSREPORTS_FIELD_NUMBER,
-            report) <= maxReportSize));
+    assertTrue(reports.stream()
+        .allMatch(report -> report.getCmdStatusCount() == 1));
   }
 
   private static CommandStatus newCommandStatus(

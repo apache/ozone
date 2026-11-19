@@ -21,13 +21,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
-import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
@@ -102,7 +99,6 @@ public class HeartbeatEndpointTask
   private final HDDSVersion testCurrentVersion;
   private final boolean resolveOnFailureEnabled;
   private final int refreshThreshold;
-  private final long maxCommandStatusReportBytes;
   private final long safeHeartbeatSize;
 
   /**
@@ -122,11 +118,6 @@ public class HeartbeatEndpointTask
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
     this.maxReportsPerHB = Math.max(1, conf.getInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT,
         HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT));
-    this.maxCommandStatusReportBytes = (long) conf.getStorageSize(
-        HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE,
-        HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE_DEFAULT, BYTES);
-    Preconditions.checkArgument(maxCommandStatusReportBytes > 0,
-        HDDS_HEARTBEAT_COMMAND_STATUS_REPORT_MAX_SIZE + " must be positive");
     int ipcMaximumDataLength = conf.getInt(
         HDDS_IPC_MAXIMUM_DATA_LENGTH,
         HDDS_IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
@@ -279,12 +270,9 @@ public class HeartbeatEndpointTask
       int remainingReportCount, long currentHeartbeatSize) {
     long remainingSafeBytes = Math.max(
         0, safeHeartbeatSize - currentHeartbeatSize);
-    long commandStatusReportBudget = Math.min(maxCommandStatusReportBytes, remainingSafeBytes);
-    long oversizedThreshold = Math.min(maxCommandStatusReportBytes, safeHeartbeatSize);
     CommandStatusReportSelection selection =
         context.getCommandStatusReports(rpcEndpoint.getAddress(),
-            remainingReportCount, commandStatusReportBudget,
-            remainingSafeBytes, oversizedThreshold);
+            remainingReportCount, remainingSafeBytes, safeHeartbeatSize);
     for (CommandStatusReportsProto report : selection.getReports()) {
       requestBuilder.addCommandStatusReports(report);
     }
@@ -295,10 +283,10 @@ public class HeartbeatEndpointTask
           rpcEndpoint.getAddress(), currentHeartbeatSize, safeHeartbeatSize);
     }
     if (selection.getOversizedBytes() > 0) {
-      LOG.warn("A command status report for {} is {} bytes, exceeding the effective "
-              + "limit of {} bytes (configured limit: {}, safe heartbeat size: {})",
+      LOG.warn("A command status report for {} is {} bytes, exceeding the safe "
+              + "heartbeat size of {} bytes",
           rpcEndpoint.getAddress(), selection.getOversizedBytes(),
-          oversizedThreshold, maxCommandStatusReportBytes, safeHeartbeatSize);
+          safeHeartbeatSize);
     }
     if (context.getQueueMetrics() != null) {
       context.getQueueMetrics().setOversizedCommandStatusReportBytes(

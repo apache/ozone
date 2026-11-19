@@ -21,8 +21,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -66,8 +64,7 @@ public class PipelineReportPublisher extends
   }
 
   @Override
-  protected List<PipelineReportsProto> getReports() {
-    return Collections.singletonList(
-        getContext().getParent().getContainer().getPipelineReport());
+  protected PipelineReportsProto getReport() {
+    return getContext().getParent().getContainer().getPipelineReport();
   }
 }

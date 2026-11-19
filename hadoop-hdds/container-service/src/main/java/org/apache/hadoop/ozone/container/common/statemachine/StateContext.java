@@ -397,12 +397,11 @@ public class StateContext {
 
   /**
    * Selects command status reports within both the report count and serialized
-   * byte limits. To guarantee progress, one report may exceed {@code maxBytes}
-   * when it still fits within {@code maxSingleReportBytes}.
+   * byte limits.
    */
   public CommandStatusReportSelection getCommandStatusReports(
       HostAndPort endpoint, int maxLimit, long maxBytes,
-      long maxSingleReportBytes, long oversizedThreshold) {
+      long oversizedThreshold) {
     List<CommandStatusReportsProto> selected = new LinkedList<>();
     long selectedBytes = 0;
     long oversizedBytes = 0;
@@ -421,8 +420,7 @@ public class StateContext {
               (CommandStatusReportsProto) message;
           long remainingBytes = maxBytes - selectedBytes;
           long reportBytes = getCommandStatusReportWireSize(report);
-          if (reportBytes <= remainingBytes ||
-              (selected.isEmpty() && reportBytes <= maxSingleReportBytes)) {
+          if (reportBytes <= remainingBytes) {
             selected.add(report);
             selectedBytes += reportBytes;
             iterator.remove();

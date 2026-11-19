@@ -1812,21 +1812,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.heartbeat.command.status.report.max.size</name>
-    <value>64MB</value>
-    <tag>DATANODE</tag>
-    <description>
-      Maximum serialized size of each command status report and the cumulative
-      command status reports included in one heartbeat. Command statuses are
-      published in reports bounded by this size. The effective heartbeat limit
-      can be lower when other fields consume the safe RPC payload budget.
-      Reports beyond the limit stay queued for a later heartbeat. A single
-      command status that exceeds this limit is published alone and sent when
-      it still fits within the remaining safe RPC payload, ensuring that it
-      does not block all later command statuses.
-    </description>
-  </property>
-  <property>
     <name>hdds.db.profile</name>
     <value>DISK</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
