@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -804,6 +805,119 @@ public class TestRpcClient {
       } else {
         assertThat(withPolicyError).hasMessage("OzoneManager does not support storage policy");
         assertThat(requests).hasSize(1);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * A storage policy field is sent only to an OM that supports it, and a request without one is never rejected.
+   */
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateBucketWithStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
+      throws IOException {
+    List<BucketInfo> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == Type.CreateBucket) {
+          requests.add(request.getCreateBucketRequest().getBucketInfo());
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      IOException withoutPolicyError = assertThrows(IOException.class, () -> client.createBucket(
+          "vol", "bucket", BucketArgs.newBuilder().build()));
+      IOException withPolicyError = assertThrows(IOException.class, () -> client.createBucket(
+          "vol", "bucket", BucketArgs.newBuilder().setStoragePolicy(OzoneStoragePolicy.COLD).build()));
+      IOException withFallbackError = assertThrows(IOException.class, () -> client.createBucket(
+          "vol", "bucket", BucketArgs.newBuilder().setAllowFallbackStoragePolicy(false).build()));
+
+      assertThat(withoutPolicyError).hasMessage("captured");
+      assertThat(requests.get(0).hasStoragePolicy()).isFalse();
+      assertThat(requests.get(0).hasAllowFallbackStoragePolicy()).isFalse();
+      if (OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(version)) {
+        assertThat(withPolicyError).hasMessage("captured");
+        assertThat(withFallbackError).hasMessage("captured");
+        assertThat(requests).hasSize(3);
+        assertThat(requests.get(1).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+        assertThat(requests.get(2).hasAllowFallbackStoragePolicy()).isTrue();
+        assertThat(requests.get(2).getAllowFallbackStoragePolicy()).isFalse();
+      } else {
+        assertThat(withPolicyError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(withFallbackError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(requests).hasSize(1);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * Setting a storage policy needs an OM that supports it, whatever the arguments are. This includes
+   * arguments that carry no storage policy field, since the method is a public storage policy API.
+   */
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testSetBucketStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
+      throws IOException {
+    List<OzoneManagerProtocolProtos.BucketArgs> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == Type.SetBucketProperty) {
+          requests.add(request.getSetBucketPropertyRequest().getBucketArgs());
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      IOException withPolicyError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
+          "vol", "bucket", OzoneStoragePolicy.COLD));
+      IOException withFallbackError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
+          OmBucketArgs.newBuilder().setVolumeName("vol").setBucketName("bucket")
+              .setAllowFallbackStoragePolicy(true).build()));
+      IOException withUnsetError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
+          OmBucketArgs.newBuilder().setVolumeName("vol").setBucketName("bucket")
+              .setUnsetStoragePolicy(true).build()));
+      IOException withEmptyArgsError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
+          OmBucketArgs.newBuilder().setVolumeName("vol").setBucketName("bucket").build()));
+
+      if (OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(version)) {
+        assertThat(withPolicyError).hasMessage("captured");
+        assertThat(withFallbackError).hasMessage("captured");
+        assertThat(withUnsetError).hasMessage("captured");
+        assertThat(withEmptyArgsError).hasMessage("captured");
+        assertThat(requests).hasSize(4);
+        assertThat(requests.get(0).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+        assertThat(requests.get(1).getAllowFallbackStoragePolicy()).isTrue();
+        assertThat(requests.get(2).getUnsetStoragePolicy()).isTrue();
+        assertThat(requests.get(3).hasStoragePolicy()).isFalse();
+        assertThat(requests.get(3).hasAllowFallbackStoragePolicy()).isFalse();
+        assertThat(requests.get(3).hasUnsetStoragePolicy()).isFalse();
+      } else {
+        assertThat(withPolicyError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(withFallbackError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(withUnsetError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(withEmptyArgsError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(requests).isEmpty();
       }
     } finally {
       client.close();

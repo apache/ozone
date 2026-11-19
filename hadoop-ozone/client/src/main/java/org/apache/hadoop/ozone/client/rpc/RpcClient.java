@@ -636,6 +636,10 @@ public class RpcClient implements ClientProtocol {
             + " not support Erasure Coded replication.");
       }
     }
+    if ((bucketArgs.getStoragePolicy() != null || bucketArgs.getAllowFallbackStoragePolicy() != null)
+        && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
+    }
 
     final String owner;
     // If S3 auth exists, set owner name to the short user name derived from the
@@ -1250,6 +1254,9 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(storagePolicy, "storagePolicy == null");
+    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
+    }
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1262,6 +1269,9 @@ public class RpcClient implements ClientProtocol {
     Objects.requireNonNull(args, "args == null");
     verifyVolumeName(args.getVolumeName());
     verifyBucketName(args.getBucketName());
+    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
+    }
     ozoneManagerClient.setBucketProperty(args);
   }
 
