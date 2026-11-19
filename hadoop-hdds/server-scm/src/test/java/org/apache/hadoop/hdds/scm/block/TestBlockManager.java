@@ -82,6 +82,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineMetrics;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -89,6 +90,9 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.metrics2.AbstractMetric;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.lease.LeaseManager;
@@ -99,6 +103,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 /**
@@ -257,6 +263,54 @@ public class TestBlockManager {
         assertTrue(block.isFallBack());
       }
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testTierFailureIsCountedWhetherFallbackIsAllowed(boolean allowFallback) throws Exception {
+    staleDatanodeForStorageType(StorageType.SSD, nodeManager.getNodes(NodeStatus.inServiceHealthy()));
+
+    if (allowFallback) {
+      AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
+          new ExcludeList(), OzoneStoragePolicy.HOT, true);
+      assertNotNull(block);
+      assertEquals(StorageTier.DISK, block.getStorageTier());
+      assertTrue(block.isFallBack());
+    } else {
+      assertThrows(IOException.class, () -> blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
+          OzoneConsts.OZONE, new ExcludeList(), OzoneStoragePolicy.HOT, false));
+    }
+    assertTierPlacementFailures(StorageTier.SSD, 1);
+    assertTierPlacementFailures(StorageTier.DISK, 0);
+  }
+
+  @Test
+  void testPreferredAndFallbackTierFailuresAreCountedSeparately() throws Exception {
+    List<DatanodeDetails> healthyNodes = nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    staleDatanodeForStorageType(StorageType.SSD, healthyNodes);
+    staleDatanodeForStorageType(StorageType.DISK, nodeManager.getNodes(NodeStatus.inServiceHealthy()));
+
+    assertThrows(IOException.class, () -> blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
+        OzoneConsts.OZONE, new ExcludeList(), OzoneStoragePolicy.HOT, true));
+    assertTierPlacementFailures(StorageTier.SSD, 1);
+    assertTierPlacementFailures(StorageTier.DISK, 1);
+    assertTierPlacementFailures(StorageTier.ARCHIVE, 0);
+  }
+
+  private void assertTierPlacementFailures(StorageTier tier, long expected) {
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    SCMPipelineMetrics.create().getMetrics(collector, true);
+    long failures = 0;
+    for (MetricsRecordImpl record : collector.getRecords()) {
+      if (record.tags().stream().anyMatch(t -> t.name().equals("RequestedTier") && t.value().equals(tier.name()))) {
+        for (AbstractMetric metric : record.metrics()) {
+          if (metric.name().equals("TierPlacementFailures")) {
+            failures += metric.value().longValue();
+          }
+        }
+      }
+    }
+    assertEquals(expected, failures);
   }
 
   @Test
