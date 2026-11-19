@@ -126,13 +126,6 @@
       </modules>
     </profile>
     <profile>
-      <id>go-offline</id>
-      <modules>
-        <module>ozonefs-hadoop2</module>
-        <module>ozonefs-shaded</module>
-      </modules>
-    </profile>
-    <profile>
       <id>CI</id>
       <modules>
         <!-- assuming ozonefs-shaded is available from repo -->

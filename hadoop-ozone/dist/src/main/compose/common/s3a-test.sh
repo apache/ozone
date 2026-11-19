@@ -48,6 +48,13 @@ if ! download_hadoop_aws; then
   exit 1
 fi
 
+if [[ "${BUILD_ONLY:-}" == "true" ]]; then
+  cd "${HADOOP_AWS_DIR}"
+  mvn ${MAVEN_ARGS:-} --show-version -Dtest=void clean test
+  echo "[INFO] Skip S3A tests"
+  exit 0
+fi
+
 ## @description Run S3A contract tests against Ozone.
 ## @param       Ozone S3 bucket
 execute_s3a_tests() {
