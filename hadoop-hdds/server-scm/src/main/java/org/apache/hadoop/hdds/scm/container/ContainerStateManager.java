@@ -199,6 +199,14 @@ public interface ContainerStateManager extends SCMHandler {
       throws IOException;
 
   /**
+   * Kept to apply Raft log entries written by SCM 2.0 and 2.1.
+   * Same as {@link #transitionDeletingOrDeletedToTargetState} with CLOSED.
+   */
+  @Deprecated
+  @Replicate
+  void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
+
+  /**
    *
    */
   ContainerInfo getMatchingContainer(long size, String owner,

@@ -27,11 +27,13 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.response.OMResponseTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,14 +88,18 @@ public class TestOMBucketDeleteResponse {
                 DeleteBucketResponse.getDefaultInstance()).build(),
             volumeName, bucketName);
 
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    omMetadataManager.getLifecycleScanStateTable().put(bucketKey,
+        new OmLifecycleScanState.Builder().setBucketKey(bucketKey).setScanStartTime(Time.now()).build());
+
     omBucketCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
     omBucketDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    assertNull(omMetadataManager.getBucketTable().get(
-            omMetadataManager.getBucketKey(volumeName, bucketName)));
+    assertNull(omMetadataManager.getBucketTable().get(bucketKey));
+    assertNull(omMetadataManager.getLifecycleScanStateTable().get(bucketKey));
   }
 
 }

@@ -21,6 +21,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT;
@@ -83,11 +87,13 @@ public class HeartbeatEndpointTask
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
+  private int maxReportsPerHB;
   private final DatanodeVersionManager versionManager;
   // Test-only override for the version this datanode advertises to clients; null in production.
   private final HDDSVersion testCurrentVersion;
   private final boolean resolveOnFailureEnabled;
-  private final int refreshThreshold;
+  private final int addressRefreshThreshold;
+  private final int reRegisterThreshold;
 
   /**
    * Constructs a SCM heart beat.
@@ -104,6 +110,8 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
+    this.maxReportsPerHB = Math.max(1, conf.getInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT,
+        HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT));
     this.datanodeDetails = context.getParent().getDatanodeDetails();
     this.versionManager = context.getParent().getVersionManager();
 
@@ -117,8 +125,10 @@ public class HeartbeatEndpointTask
 
     this.resolveOnFailureEnabled = conf.getBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
         OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
-    this.refreshThreshold = Math.max(1, conf.getInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD,
+    this.addressRefreshThreshold = Math.max(1, conf.getInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD,
         HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT));
+    this.reRegisterThreshold = Math.max(1, conf.getInt(HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD,
+        HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD_DEFAULT));
   }
 
   /**
@@ -154,16 +164,42 @@ public class HeartbeatEndpointTask
       processResponse(response, datanodeDetailsProto);
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
+      if (context.hasPendingReports(rpcEndpoint.getAddress())) {
+        // addReports was capped at maxReportsPerHB and left reports queued. Trigger immediately.
+        context.getParent().setNextHB(Time.monotonicNow());
+      }
     } catch (IOException ex) {
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
       rpcEndpoint.logIfNeeded(ex);
+      resetEndpointToGetVersion();
       maybeRefreshScmAddress(ex);
     } finally {
       rpcEndpoint.unlock();
     }
     return rpcEndpoint.getState();
+  }
+
+  /**
+   * After repeated heartbeat failures, force this endpoint back to
+   * GETVERSION so it re-enters normal registration flow. To mimic DN restart
+   * behavior for this endpoint, queued command status reports are dropped.
+   */
+  private void resetEndpointToGetVersion() {
+    if (rpcEndpoint.isPassive()
+        || rpcEndpoint.getState() != EndPointStates.HEARTBEAT
+        || rpcEndpoint.getMissedCount() < reRegisterThreshold) {
+      return;
+    }
+    int droppedCommandStatusReports =
+        context.clearCommandStatusReports(rpcEndpoint.getAddress());
+    LOG.info("Resetting SCM endpoint {} to GETVERSION after {} consecutive heartbeat failures, "
+            + "dropped {} queued command status reports", rpcEndpoint.getAddress(),
+        rpcEndpoint.getMissedCount(), droppedCommandStatusReports);
+    rpcEndpoint.setState(EndPointStates.GETVERSION);
+    // trigger immediate GETVERSION
+    context.getParent().setNextHB(Time.monotonicNow());
   }
 
   /**
@@ -173,7 +209,7 @@ public class HeartbeatEndpointTask
   private void maybeRefreshScmAddress(IOException heartbeatFailure) {
     if (!resolveOnFailureEnabled
         || rpcEndpoint.isPassive()
-        || rpcEndpoint.getMissedCount() < refreshThreshold
+        || rpcEndpoint.getMissedCount() < addressRefreshThreshold
         || !ConnectionFailureUtils.isConnectionFailure(heartbeatFailure)) {
       return;
     }
@@ -209,7 +245,7 @@ public class HeartbeatEndpointTask
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
     for (Message report :
-        context.getAllAvailableReports(rpcEndpoint.getAddress())) {
+        context.getAllAvailableReports(rpcEndpoint.getAddress(), maxReportsPerHB)) {
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
           SCMHeartbeatRequestProto.getDescriptor().getFields()) {
