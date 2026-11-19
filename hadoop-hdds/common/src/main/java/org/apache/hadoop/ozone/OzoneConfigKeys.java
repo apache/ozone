@@ -741,6 +741,12 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_S3G_STS_HTTP_ENABLED_DEFAULT = false;
 
   /**
+   * Test-only: override the minimum AssumeRole {@code DurationSeconds} accepted by OM and S3 Gateway STS.
+   * Values may only lower the AWS-compatible minimum of 900 seconds.  Valid range is 1-900.
+   */
+  public static final String OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY = "ozone.s3g.sts.test.min.duration.seconds";
+
+  /**
    * There is no need to instantiate this class.
    */
   private OzoneConfigKeys() {
