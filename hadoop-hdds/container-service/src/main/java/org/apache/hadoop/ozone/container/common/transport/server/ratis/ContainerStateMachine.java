@@ -585,6 +585,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     return response;
   }
 
+  private ContainerCommandResponseProto dispatchCommandOrThrow(ContainerCommandRequestProto requestProto,
+      DispatcherContext context) throws StorageContainerException {
+    final ContainerCommandResponseProto response = dispatchCommand(requestProto, context);
+    if (response.getResult() != ContainerProtos.Result.SUCCESS) {
+      throw new StorageContainerException(response.getMessage(), response.getResult());
+    }
+    return response;
+  }
+
   private CompletableFuture<Message> writeStateMachineData(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
@@ -740,10 +749,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               requestProto.getContainerID(), requestProto.getPipelineID(),
               requestProto.getTraceID());
     }
-    final ContainerCommandResponseProto response = dispatchCommand(requestProto, context);  // stream init
-    if (response.getResult() != ContainerProtos.Result.SUCCESS) {
-      throw new StorageContainerException(response.getMessage(), response.getResult());
-    }
+    dispatchCommandOrThrow(requestProto, context);  // stream init
     final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock
         = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? r -> streamPutBlock(requestProto, r) : null;
     return dispatcher.getStreamDataChannel(requestProto, putBlock);
@@ -780,7 +786,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
         .build();
-    dispatchCommand(request, context);
+    dispatchCommandOrThrow(request, context);
   }
 
   /**
@@ -804,10 +810,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
         .build();
-    final ContainerCommandResponseProto response = dispatchCommand(request, context);
-    if (response.getResult() != ContainerProtos.Result.SUCCESS) {
-      throw new StorageContainerException(response.getMessage(), response.getResult());
-    }
+    final ContainerCommandResponseProto response = dispatchCommandOrThrow(request, context);
     return response.toByteString().asReadOnlyByteBuffer();
   }
 

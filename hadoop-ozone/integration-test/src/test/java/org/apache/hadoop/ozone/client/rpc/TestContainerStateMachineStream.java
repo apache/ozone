@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.container.OzoneTestHelper.createStreamKey;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.getDatanodeService;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.getDatanodeServices;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.validateData;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForContainerClose;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -152,6 +153,36 @@ public abstract class TestContainerStateMachineStream implements ClusterForTests
   }
 
   @ParameterizedTest
+  @MethodSource("streamCloseParameters")
+  void testContainerClosedBeforeStreamCloseWithPutBlockWithoutRaft(boolean hsyncFirst, boolean pipelineMode)
+      throws Exception {
+    final int size = 1000;
+    final OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    final OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(true);
+    clientConfig.setDatastreamPipelineMode(pipelineMode);
+    conf.setFromObject(clientConfig);
+
+    final String keyName = "closed-" + hsyncFirst + "-" + pipelineMode + "-" + UUID.randomUUID();
+    final byte[] data = ContainerTestHelper.generateData(size, true);
+    try (OzoneClient streamingClient = OzoneClientFactory.getRpcClient(conf);
+         OzoneDataStreamOutput key = createStreamKey(
+             keyName, ReplicationType.RATIS, size, streamingClient.getObjectStore(), volumeName, bucketName)) {
+      if (hsyncFirst) {
+        key.write(ByteBuffer.wrap(data, 0, size / 2));
+        assertInstanceOf(KeyDataStreamOutput.class, key.getByteBufStreamOutput()).hsync();
+        key.write(ByteBuffer.wrap(data, size / 2, size / 2));
+      } else {
+        key.write(ByteBuffer.wrap(data));
+      }
+      // The datanodes reject the PutBlock committed on stream close, so the client has to write the data again.
+      waitForContainerClose(key, cluster());
+    }
+
+    validateData(keyName, data, client.getObjectStore(), volumeName, bucketName);
+  }
+
+  @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testPutBlockWithoutRaftCommittedOnAllDatanodes(boolean pipelineMode) throws Exception {
     final int size = 1000;
@@ -190,5 +221,10 @@ public abstract class TestContainerStateMachineStream implements ClusterForTests
       assertEquals(expectedLength, handler.getBlockManager().getCommittedBlockLength(container, info.getBlockID()),
           () -> "Unexpected committed block length on " + dn.getDatanodeDetails());
     }
+  }
+
+  private static Stream<Arguments> streamCloseParameters() {
+    return Stream.of(false, true).flatMap(
+        hsyncFirst -> Stream.of(false, true).map(pipelineMode -> Arguments.of(hsyncFirst, pipelineMode)));
   }
 }

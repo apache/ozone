@@ -349,6 +349,26 @@ abstract class ContainerStateMachineTests {
         argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_LINK));
   }
 
+  @Test
+  public void testStreamClosePutBlockFailsIfDispatchFails() throws Exception {
+    final AtomicReference<CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException>> closePutBlock
+        = new AtomicReference<>();
+    setUpStream(mock(KeyValueStreamDataChannel.class), ContainerProtos.Type.StreamInitWithPutBlock, closePutBlock);
+    when(dispatcher.dispatch(any(), any())).thenReturn(
+        ContainerProtos.ContainerCommandResponseProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.PutBlock)
+            .setResult(ContainerProtos.Result.CLOSED_CONTAINER_IO)
+            .setMessage("Requested operation not allowed as ContainerState is CLOSED")
+            .build());
+
+    final StorageContainerException e = assertThrows(
+        StorageContainerException.class, () -> closePutBlock.get().accept(newPutBlock(1, newBlockID())));
+    assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO, e.getResult());
+    verify(dispatcher).dispatch(
+        argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
+        argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_LINK));
+  }
+
   private StateMachine.DataStream setUpStream(StateMachine.DataChannel channel) throws Exception {
     return setUpStream(channel, ContainerProtos.Type.StreamInit, new AtomicReference<>());
   }
