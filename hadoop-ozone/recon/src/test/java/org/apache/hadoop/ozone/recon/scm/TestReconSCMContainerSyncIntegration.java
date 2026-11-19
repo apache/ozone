@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLEANUP;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
@@ -36,6 +38,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -52,8 +55,10 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
@@ -187,6 +192,30 @@ public class TestReconSCMContainerSyncIntegration
    * Seeds Recon with {@code count} OPEN containers and then transitions each
    * one to CLOSING so that Pass 1 can exercise the CLOSING→CLOSED correction.
    */
+  /** Seeds a container Recon retired to DELETED while a datanode still reported a replica of it. */
+  private ContainerID seedDeletedWithReplica(long id) throws Exception {
+    seedRecon(id, 1, CLOSED);
+    ContainerID containerID = ContainerID.valueOf(id);
+    ReconContainerManager containerManager = getContainerManager();
+    containerManager.updateContainerReplica(containerID, ContainerReplica.newBuilder()
+        .setContainerID(containerID)
+        .setContainerState(ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(randomDatanodeDetails())
+        .build());
+    containerManager.updateContainerState(containerID, DELETE);
+    containerManager.updateContainerState(containerID, CLEANUP);
+    return containerID;
+  }
+
+  /** Stubs SCM's CLOSED list to contain exactly the given container. */
+  private void stubClosedInScm(ContainerID containerID) throws IOException {
+    when(mockScm.getContainerCount(CLOSED)).thenReturn(1L);
+    when(mockScm.getListOfContainerIDs(eq(ContainerID.valueOf(1L)), eq(1), eq(CLOSED)))
+        .thenReturn(Collections.singletonList(containerID));
+    when(mockScm.getListOfContainerInfos(eq(containerID), eq(1), eq(CLOSED)))
+        .thenReturn(Collections.singletonList(containerInfo(containerID.getId(), CLOSED)));
+  }
+
   private void seedReconAsClosing(long startId, int count) throws Exception {
     seedRecon(startId, count, OPEN);
     ReconContainerManager cm = getContainerManager();
@@ -295,6 +324,33 @@ public class TestReconSCMContainerSyncIntegration
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       // Container is now CLOSED in Recon (corrected by Pass 1 via FORCE_CLOSE)
       assertEquals(CLOSED, getContainerManager().getContainer(cid).getState());
+    }
+
+    @Test
+    void containerDeletedInReconButClosedInScmKeepsReplicas() throws Exception {
+      // SCM moved the container back from DELETED to CLOSED. Recon must follow without losing the
+      // replica it already knows.
+      ContainerID cid = seedDeletedWithReplica(40L);
+      stubClosedInScm(cid);
+
+      assertTrue(syncHelper.syncWithSCMContainerInfo());
+      assertThat(getContainerManager().getContainer(cid).getState()).isEqualTo(CLOSED);
+      assertThat(getContainerManager().getContainerReplicas(cid)).hasSize(1);
+    }
+
+    @Test
+    void failedCorrectionFromDeletedKeepsContainerInRecon() throws Exception {
+      ContainerID cid = seedDeletedWithReplica(41L);
+      stubClosedInScm(cid);
+      ReconContainerManager failingManager = spy(getContainerManager());
+      doThrow(new IOException("injected")).when(failingManager)
+          .transitionDeletingOrDeletedToTargetState(any(), any());
+
+      assertTrue(new ReconStorageContainerSyncHelper(mockScm, getConf(), failingManager, metrics)
+          .syncWithSCMContainerInfo());
+      assertThat(getContainerManager().containerExist(cid)).isTrue();
+      assertThat(getContainerManager().getContainer(cid).getState()).isEqualTo(DELETED);
+      assertThat(getContainerManager().getContainerReplicas(cid)).hasSize(1);
     }
 
     @Test

@@ -63,7 +63,7 @@ import org.slf4j.LoggerFactory;
  *   <li><b>QUASI_CLOSED and CLOSED:</b> paginate SCM state lists; add absent
  *       containers and advance existing Recon containers through valid local
  *       state-machine transitions. If Recon has DELETED but SCM reports one of
- *       these states, Recon rebuilds the container record from SCM metadata.</li>
+ *       these states, Recon moves its record back to that state.</li>
  *   <li><b>DELETED:</b> paginates SCM's DELETED ID list. For IDs already in
  *       Recon, Recon drives the container to DELETED in a single call. Full
  *       {@code ContainerInfo} is fetched only for IDs missing from Recon. The
@@ -349,9 +349,10 @@ class ReconStorageContainerSyncHelper {
             containerID, scmState);
         return 0;
       }
-      containerManager.deleteContainer(containerID);
-      containerManager.addNewContainer(new ContainerWithPipeline(infos.get(0), null));
-      LOG.info("Rebuilt container {} in Recon from DELETED to SCM state {}.",
+      // Move the existing record back in place, as SCM's report handler does, so the replicas Recon
+      // already knows are kept. If the update fails the container stays in the map and the next sync retries.
+      containerManager.transitionDeletingOrDeletedToTargetState(containerID, scmState);
+      LOG.info("Moved container {} in Recon from DELETED back to SCM state {}.",
           containerID, scmState);
       return 1;
     } catch (IOException e) {
