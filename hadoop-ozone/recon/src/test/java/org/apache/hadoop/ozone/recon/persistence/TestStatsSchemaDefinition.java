@@ -30,8 +30,6 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.Test;
@@ -54,18 +52,16 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
         GLOBAL_STATS_TABLE_NAME, null);
 
     // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
-    List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
+    List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("key", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("value", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("last_updated_timestamp",
-        Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("key", Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("value", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("last_updated_timestamp", Types.VARCHAR));
 
-    List<Pair<String, Integer>> actualPairs = new ArrayList<>();
+    List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ImmutablePair<>(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(3, actualPairs.size());
