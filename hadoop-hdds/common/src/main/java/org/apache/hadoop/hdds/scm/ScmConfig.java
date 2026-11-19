@@ -109,7 +109,8 @@ public class ScmConfig extends ReconfigurableConfig {
       description = "If true, when allocating a Ratis block for a client that runs on a datanode host, SCM prefers "
           + "an open pipeline that contains that datanode, so one replica is local to the writer (like the HDFS "
           + "first replica). Falls back to the pipeline choose policy when no such pipeline has a usable container. "
-          + "OM reads the same key to pass the client address to SCM on every block allocation."
+          + "OM reads the same key to pass the client address to SCM on every block allocation, so it must be set "
+          + "on both OM and SCM, and changing it needs a restart of both."
   )
   private boolean preferClientLocalPipeline;
 

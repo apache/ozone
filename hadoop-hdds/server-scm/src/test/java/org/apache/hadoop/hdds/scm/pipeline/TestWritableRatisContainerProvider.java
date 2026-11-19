@@ -23,6 +23,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -165,6 +166,31 @@ class TestWritableRatisContainerProvider {
 
     assertSame(existingContainer, container);
     verifyPipelineNotCreated();
+  }
+
+  @Test
+  void skipsPreferenceWhenClientDatanodeIsExcluded() throws Exception {
+    DatanodeDetails client = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline leaderPipeline = MockPipeline.createPipeline(Arrays.asList(client,
+        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails()))
+        .toBuilder().setLeaderId(client.getID()).build();
+    pipelineHasContainer(leaderPipeline);
+    Pipeline remotePipeline = MockPipeline.createPipeline(3);
+    ContainerInfo remoteContainer = pipelineHasContainer(remotePipeline);
+    // No pipeline survives the exclusion, so the provider retries without it and sees both pipelines.
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN))
+        .thenAnswer(inv -> new ArrayList<>(asList(leaderPipeline, remotePipeline)));
+    ExcludeList excludeList = new ExcludeList();
+    excludeList.addDatanode(client);
+
+    List<ContainerInfo> chosen = new ArrayList<>();
+    for (int i = 0; i < 50; i++) {
+      chosen.add(createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, excludeList, client));
+    }
+
+    // With the preference applied, the leader pipeline would win every time.
+    assertThat(chosen).contains(remoteContainer);
+    verify(pipelineManager, never()).createPipeline(REPLICATION_CONFIG);
   }
 
   @Test

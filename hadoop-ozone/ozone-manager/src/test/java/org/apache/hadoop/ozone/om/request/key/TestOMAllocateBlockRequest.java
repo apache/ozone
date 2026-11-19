@@ -364,6 +364,21 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   }
 
   @Test
+  public void testAllocateBlockSendsClientMachineToScmWhenPreferClientLocalWithoutSort() throws Exception {
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isPreferClientLocalPipeline()).thenReturn(true);
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    preExecuteWithClient(request, "1.2.3.4");
+
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
+        any(), any(), clientMachine.capture());
+    assertEquals("1.2.3.4", clientMachine.getValue());
+  }
+
+  @Test
   public void testAllocateBlockFallsBackToScmWhenTopologyUnavailable() throws Exception {
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);

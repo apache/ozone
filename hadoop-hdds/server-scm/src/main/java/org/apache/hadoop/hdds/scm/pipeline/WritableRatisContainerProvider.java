@@ -171,26 +171,29 @@ public class WritableRatisContainerProvider
     try {
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
           excludeList, Pipeline.PipelineState.OPEN);
-      if (client != null) {
+      // Skip the preference if the client just failed to write to its own datanode.
+      if (client != null && !excludeList.getDatanodes().contains(client)) {
         // Try pipelines with a replica on the writer's datanode first, like the HDFS first replica.
         // Among those, prefer pipelines led by that datanode, since Ratis writes go through the leader.
         List<Pipeline> leaderPipelines = new ArrayList<>();
         List<Pipeline> localPipelines = new ArrayList<>();
+        List<Pipeline> otherPipelines = new ArrayList<>();
         for (Pipeline pipeline : availablePipelines) {
           if (client.getID().equals(pipeline.getLeaderId())) {
             leaderPipelines.add(pipeline);
-          } else if (pipeline.getNodes().contains(client)) {
+          } else if (pipeline.getNodeSet().contains(client)) {
             localPipelines.add(pipeline);
+          } else {
+            otherPipelines.add(pipeline);
           }
         }
-        availablePipelines.removeAll(leaderPipelines);
-        availablePipelines.removeAll(localPipelines);
         for (List<Pipeline> preferred : Arrays.asList(leaderPipelines, localPipelines)) {
           ContainerInfo containerInfo = selectContainer(preferred, req, owner, excludeList);
           if (containerInfo != null) {
             return containerInfo;
           }
         }
+        availablePipelines = otherPipelines;
       }
       return selectContainer(availablePipelines, req, owner, excludeList);
     } finally {
