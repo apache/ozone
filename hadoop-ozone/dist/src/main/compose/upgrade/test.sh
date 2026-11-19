@@ -34,19 +34,19 @@ RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 # Rolling upgrade test. This requires both the start and end version to support rolling upgrade.
 # Since we have not yet done a release with rolling upgrade support, it is just doing a rolling
 # restart in the same version for now.
-# run_test ha     rolling-upgrade "$OZONE_CURRENT_VERSION" "$OZONE_CURRENT_VERSION"
+# run_test ha     rolling "$OZONE_CURRENT_VERSION" "$OZONE_CURRENT_VERSION"
 
 # This is the version of Ozone that should use the runner image to run the
 # code that was built. Other versions will pull images from docker hub.
-run_test ha     non-rolling-upgrade 2.2.1 "$OZONE_CURRENT_VERSION"
-# run_test ha     non-rolling-upgrade 2.1.1 "$OZONE_CURRENT_VERSION"
-# run_test ha     non-rolling-upgrade 2.0.0 "$OZONE_CURRENT_VERSION"
-# run_test non-ha non-rolling-upgrade 1.4.1 "$OZONE_CURRENT_VERSION"
-# run_test ha     non-rolling-upgrade 1.4.1 "$OZONE_CURRENT_VERSION"
-# run_test ha non-rolling-upgrade 1.4.0 "$OZONE_CURRENT_VERSION"
-# run_test ha non-rolling-upgrade 1.3.0 "$OZONE_CURRENT_VERSION"
-# run_test ha non-rolling-upgrade 1.2.1 "$OZONE_CURRENT_VERSION"
-# run_test om-ha non-rolling-upgrade 1.1.0 "$OZONE_CURRENT_VERSION"
+run_test ha     non-rolling 2.2.1 "$OZONE_CURRENT_VERSION"
+# run_test ha     non-rolling 2.1.1 "$OZONE_CURRENT_VERSION"
+# run_test ha     non-rolling 2.0.0 "$OZONE_CURRENT_VERSION"
+# run_test non-ha non-rolling 1.4.1 "$OZONE_CURRENT_VERSION"
+# run_test ha     non-rolling 1.4.1 "$OZONE_CURRENT_VERSION"
+# run_test ha non-rolling 1.4.0 "$OZONE_CURRENT_VERSION"
+# run_test ha non-rolling 1.3.0 "$OZONE_CURRENT_VERSION"
+# run_test ha non-rolling 1.2.1 "$OZONE_CURRENT_VERSION"
+# run_test om-ha non-rolling 1.1.0 "$OZONE_CURRENT_VERSION"
 
 generate_report "upgrade" "$ALL_RESULT_DIR"
 
