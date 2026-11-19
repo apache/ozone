@@ -100,13 +100,12 @@ get_version() {
   local dep="$1"
   shift
 
-  if [[ "${CI:-}" == "true" ]]; then
-    # output version/transfer etc. to stderr first
-    ./mvnw --batch-mode --non-recursive --show-version \
-      help:evaluate -Dexpression="${dep}.version" -Dscan=false "$@" >&2
-  fi
+  local tempfile=$(mktemp)
 
-  # now print only the version to stdout
-  MVNW_VERBOSE=false ./mvnw --non-recursive --no-transfer-progress --quiet \
-    help:evaluate -Dexpression="${dep}.version" -DforceStdout -Dscan=false "$@"
+  # output version/transfer etc. to stderr first
+  ./mvnw --batch-mode --non-recursive --show-version \
+      help:evaluate -Dexpression="${dep}.version" -Doutput="${tempfile}" \
+      -Dscan=false "$@" >&2 \
+    && cat "${tempfile}" \
+    && rm -f "${tempfile}"
 }
