@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -725,18 +726,27 @@ public class TestKeyValueHandler {
       assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
       assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
 
-      KeyValueContainer containerSpy = spy(container);
-      doThrow(new StorageContainerException("Failed to update .container file",
-          ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR))
-          .doCallRealMethod()
-          .when(containerSpy).markContainerForClose();
-      StorageContainerException ex = assertThrows(StorageContainerException.class,
-          () -> keyValueHandler.markContainerForClose(containerSpy));
-      assertEquals(ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR, ex.getResult());
+      File metadataDir = new File(container.getContainerData().getMetadataPath());
+      assumeThat(metadataDir.setWritable(false)).isTrue();
+      File writeProbe = new File(metadataDir, "write-probe");
+      try {
+        assumeThat(writeProbe.createNewFile()).isFalse();
+      } finally {
+        if (writeProbe.exists()) {
+          writeProbe.delete();
+        }
+      }
+      try {
+        StorageContainerException ex = assertThrows(StorageContainerException.class,
+            () -> keyValueHandler.markContainerForClose(container));
+        assertEquals(ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR, ex.getResult());
+      } finally {
+        assertThat(metadataDir.setWritable(true)).isTrue();
+      }
       assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
       assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
 
-      keyValueHandler.markContainerForClose(containerSpy);
+      keyValueHandler.markContainerForClose(container);
       assertThat(container.getContainerState()).isEqualTo(State.CLOSING);
       assertThat(containerSet.getRecoveringContainerMap()).doesNotContainKey(DUMMY_CONTAINER_ID);
     } finally {
@@ -748,30 +758,9 @@ public class TestKeyValueHandler {
   @Test
   public void testFailedCloseRecoveringContainerScrubbedToUnhealthy() throws Exception {
     MockClock testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
-    final ContainerSet containerSet = newContainerSet(1000, testClock);
-    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-
-    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString()).conf(conf)
-        .clusterID(CLUSTER_ID).datanodeUuid(DATANODE_UUID)
-        .volumeSet(volumeSet)
-        .build();
-    hddsVolume.format(CLUSTER_ID);
-    hddsVolume.createWorkingDir(CLUSTER_ID, null);
-    hddsVolume.createTmpDirs(CLUSTER_ID);
-    when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
-    final KeyValueHandler keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf,
-        DATANODE_UUID, containerSet, volumeSet);
-    keyValueHandler.setClusterID(CLUSTER_ID);
-    hddsVolume.getVolumeInfoStats().unregister();
-    hddsVolume.getVolumeIOStats().unregister();
-    ContainerMetrics.remove();
-
-    ContainerController controller = new ContainerController(containerSet,
-        Collections.singletonMap(ContainerType.KeyValueContainer, keyValueHandler));
-    OnDemandContainerScanner onDemandScanner = new OnDemandContainerScanner(
-        conf.getObject(ContainerScannerConfiguration.class), controller);
-    containerSet.registerOnDemandScanner(onDemandScanner);
-
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir, newContainerSet(1000, testClock));
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
     try {
       ContainerCommandRequestProto.Builder request = createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID)
           .toBuilder();
@@ -781,12 +770,22 @@ public class TestKeyValueHandler {
       KeyValueContainer container = (KeyValueContainer) containerSet.getContainer(DUMMY_CONTAINER_ID);
       assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
 
-      KeyValueContainer containerSpy = spy(container);
-      doThrow(new StorageContainerException("Failed to update .container file",
-          ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR))
-          .when(containerSpy).markContainerForClose();
-      assertThrows(StorageContainerException.class,
-          () -> keyValueHandler.markContainerForClose(containerSpy));
+      File metadataDir = new File(container.getContainerData().getMetadataPath());
+      assumeThat(metadataDir.setWritable(false)).isTrue();
+      File writeProbe = new File(metadataDir, "write-probe");
+      try {
+        assumeThat(writeProbe.createNewFile()).isFalse();
+      } finally {
+        if (writeProbe.exists()) {
+          writeProbe.delete();
+        }
+      }
+      try {
+        assertThrows(StorageContainerException.class,
+            () -> keyValueHandler.markContainerForClose(container));
+      } finally {
+        assertThat(metadataDir.setWritable(true)).isTrue();
+      }
       assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
       assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
 
@@ -800,7 +799,7 @@ public class TestKeyValueHandler {
       assertThat(container.getContainerState()).isEqualTo(UNHEALTHY);
     } finally {
       keyValueHandler.stop();
-      volumeSet.getVolumesList().forEach(StorageVolume::shutdown);
+      handlerCtx.getVolumeSet().getVolumesList().forEach(StorageVolume::shutdown);
     }
   }
 
@@ -1209,7 +1208,10 @@ public class TestKeyValueHandler {
   }
 
   private HandlerWithVolumeSet createKeyValueHandler(Path path) throws IOException {
-    final ContainerSet containerSet = newContainerSet();
+    return createKeyValueHandler(path, newContainerSet());
+  }
+
+  private HandlerWithVolumeSet createKeyValueHandler(Path path, ContainerSet containerSet) throws IOException {
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
     HddsVolume hddsVolume = new HddsVolume.Builder(path.toString()).conf(conf)

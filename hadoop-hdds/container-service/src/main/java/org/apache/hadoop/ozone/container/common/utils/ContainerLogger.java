@@ -146,7 +146,7 @@ public final class ContainerLogger {
    * @param containerData The container that was recovered on this datanode.
    */
   public static void logRecovered(ContainerData containerData) {
-    LOG.info(getMessage(containerData));
+    LOG.info(getMessage(containerData, "Container recovered"));
   }
 
   /**
