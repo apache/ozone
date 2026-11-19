@@ -1292,6 +1292,24 @@ public interface ClientProtocol {
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException;
 
+  /**
+   * Creates an output stream for writing to a file.
+   *
+   * @param volumeName Volume name
+   * @param bucketName Bucket name
+   * @param keyName    Absolute path of the file to be written
+   * @param options    Size, replication config, overwrite, recursive flags and storage policy of the file
+   * @return Output stream for writing to the file
+   * @throws OMException if given key is a directory
+   *                     if file exists and isOverwrite flag is false
+   *                     if an ancestor exists as a file
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  OzoneOutputStream createFile(String volumeName, String bucketName,
+      String keyName, CreateFileOptions options) throws IOException;
+
   @SuppressWarnings("checkstyle:parameternumber")
   OzoneDataStreamOutput createStreamFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,

@@ -129,6 +129,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -2641,6 +2642,20 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException {
+    return createFile(volumeName, bucketName, keyName, new CreateFileOptions.Builder()
+        .setSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setOverWrite(overWrite)
+        .setRecursive(recursive)
+        .build());
+  }
+
+  @Override
+  public OzoneOutputStream createFile(String volumeName, String bucketName,
+      String keyName, CreateFileOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    final ReplicationConfig replicationConfig = options.getReplicationConfig();
+    final StoragePolicy storagePolicy = options.getStoragePolicy();
     if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
       if (replicationConfig.getReplicationType()
           == HddsProtos.ReplicationType.EC) {
@@ -2649,18 +2664,22 @@ public class RpcClient implements ClientProtocol {
             + " Erasure Coded replication.");
       }
     }
+    if (storagePolicy != null && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
+    }
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setDataSize(size)
+        .setDataSize(options.getSize())
         .setReplicationConfig(replicationConfig)
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName)
+        .setStoragePolicy(storagePolicy)
         .build();
     OpenKeySession keySession =
-        ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
+        ozoneManagerClient.createFile(keyArgs, options.isOverWrite(), options.isRecursive());
     return createOutputStream(keySession);
   }
 

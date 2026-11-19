@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -101,6 +102,9 @@ public class TestOzoneStoragePolicy {
 
   private static final ReplicationConfig RATIS_THREE =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+
+  private static final List<BucketLayout> FILE_BUCKET_LAYOUTS =
+      Arrays.asList(BucketLayout.FILE_SYSTEM_OPTIMIZED, BucketLayout.LEGACY);
 
   private MiniOzoneCluster cluster;
   private OzoneClient ozClient;
@@ -207,6 +211,90 @@ public class TestOzoneStoragePolicy {
     assertKeyInfo(keyInfo, OzoneStoragePolicy.getDefaultPolicy());
     assertScmContainerAndPipeline(keyInfo,
         OzoneStoragePolicy.getDefaultPolicy().getCreationTier());
+  }
+
+  /**
+   * Creating a file with a storage policy works for every file bucket layout. All
+   * layouts share one cluster, because the scenarios differ only in the bucket
+   * they use.
+   */
+  @Test
+  public void testCreateFileWithStoragePolicy() throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    for (BucketLayout bucketLayout : FILE_BUCKET_LAYOUTS) {
+      assertFileStoragePolicyIsHonoured(bucketLayout);
+      assertFileInheritsBucketPolicyOrClusterDefault(bucketLayout);
+      assertMultiBlockFileAndOverwriteHonourPolicy(bucketLayout);
+    }
+  }
+
+  /**
+   * A file created with an explicit storage policy records that policy and lands
+   * on the policy's creation tier, in SCM and on the datanodes.
+   */
+  private void assertFileStoragePolicyIsHonoured(BucketLayout bucketLayout)
+      throws IOException {
+    for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
+      OzoneBucket bucket = createBucket(null, bucketLayout);
+      OmKeyInfo keyInfo = createFileAndLookup(bucket, storagePolicy);
+
+      assertKeyInfo(keyInfo, storagePolicy);
+      assertScmContainerAndPipeline(keyInfo, storagePolicy.getCreationTier());
+      assertDatanodeContainerAndBlock(keyInfo, storagePolicy.getCreationTier());
+    }
+  }
+
+  /**
+   * A file created without a storage policy inherits the bucket's policy, and
+   * without a bucket policy either it gets the cluster default.
+   */
+  private void assertFileInheritsBucketPolicyOrClusterDefault(BucketLayout bucketLayout)
+      throws IOException {
+    OzoneStoragePolicy bucketPolicy = OzoneStoragePolicy.COLD;
+    OmKeyInfo inherited = createFileAndLookup(createBucket(bucketPolicy, bucketLayout), null);
+    assertKeyInfo(inherited, bucketPolicy);
+    assertScmContainerAndPipeline(inherited, bucketPolicy.getCreationTier());
+    assertDatanodeContainerAndBlock(inherited, bucketPolicy.getCreationTier());
+
+    OzoneStoragePolicy defaultPolicy = OzoneStoragePolicy.getDefaultPolicy();
+    OmKeyInfo defaulted = createFileAndLookup(createBucket(null, bucketLayout), null);
+    assertKeyInfo(defaulted, defaultPolicy);
+    assertScmContainerAndPipeline(defaulted, defaultPolicy.getCreationTier());
+    assertDatanodeContainerAndBlock(defaulted, defaultPolicy.getCreationTier());
+  }
+
+  /**
+   * Tests two scenarios on a file that spans several blocks.
+   *
+   * <p>Multi-block write: Tests whether a file that needs more blocks than OM pre-allocates keeps its policy on
+   * every block. Creating the file with size 0 makes OM pre-allocate one block, so the other blocks come from
+   * allocateBlock calls. Every block, not just the first, must sit on the COLD tier.
+   *
+   * <p>Overwrite: Overwriting a file with a different storage policy updates the recorded
+   * policy and moves the new blocks to the new tier.
+   */
+  private void assertMultiBlockFileAndOverwriteHonourPolicy(BucketLayout bucketLayout)
+      throws IOException {
+    OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, bucketLayout);
+    String keyName = UUID.randomUUID().toString();
+
+    writeFile(bucket, keyName, multiBlockData(), 0, false, OzoneStoragePolicy.COLD);
+    OmKeyInfo original = lookupKey(bucket, keyName);
+    assertThat(original.getStoragePolicy()).as("layout %s", bucketLayout).isEqualTo(OzoneStoragePolicy.COLD);
+    int numOfBlocks = original.getLatestVersionLocations().getBlocksLatestVersionOnly().size();
+    assertThat(numOfBlocks)
+        .withFailMessage("Expected more than one block so a later allocation is exercised, "
+            + "but the file in a %s bucket has %d", bucketLayout, numOfBlocks)
+        .isGreaterThan(1);
+    assertAllBlocksOnTier(original, OzoneStoragePolicy.COLD.getCreationTier());
+    assertAllBlocksOnDatanodes(original, OzoneStoragePolicy.COLD.getCreationTier());
+
+    writeFile(bucket, keyName, multiBlockData(), 0, true, OzoneStoragePolicy.HOT);
+    OmKeyInfo overwritten = lookupKey(bucket, keyName);
+    assertThat(overwritten.getStoragePolicy()).as("layout %s", bucketLayout).isEqualTo(OzoneStoragePolicy.HOT);
+    assertAllBlocksOnTier(overwritten, OzoneStoragePolicy.HOT.getCreationTier());
+    assertAllBlocksOnDatanodes(overwritten, OzoneStoragePolicy.HOT.getCreationTier());
   }
 
   /**
@@ -483,9 +571,8 @@ public class TestOzoneStoragePolicy {
   }
 
   /**
-   * Checks every block of a key landed on a container of the expected tier. The
-   * {@code assertDatanodeContainerAndBlock} helper only inspects the first block, which cannot
-   * catch a tier that changes partway through a key.
+   * Checks every block of a key landed on a container of the expected tier. This reads SCM's container record
+   * only; to check the datanode volumes, use {@code assertAllBlocksOnDatanodes}.
    */
   private void assertAllBlocksOnTier(OmKeyInfo keyInfo, StorageTier expectedTier)
       throws IOException {
@@ -499,6 +586,19 @@ public class TestOzoneStoragePolicy {
       assertEquals(expectedStorageType,
           containerInfo.getStorageTier().getUniformStorageType(),
           "block " + i + " of " + blocks.size() + " landed on the wrong tier");
+    }
+  }
+
+  /**
+   * Checks every block of a key on the datanodes, not just in SCM's records. Looping is only needed for
+   * a file that spans several blocks; for the single-block files in the other createFile scenarios, the
+   * one-argument {@code assertDatanodeContainerAndBlock} (block 0) is enough.
+   */
+  private void assertAllBlocksOnDatanodes(OmKeyInfo keyInfo, StorageTier expectedTier)
+      throws IOException {
+    int blockCount = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().size();
+    for (int i = 0; i < blockCount; i++) {
+      assertDatanodeContainerAndBlock(keyInfo, i, expectedTier);
     }
   }
 
@@ -582,6 +682,33 @@ public class TestOzoneStoragePolicy {
     return lookupKey(bucket, keyName);
   }
 
+  private void writeFile(OzoneBucket bucket, String keyName, byte[] data, long size, boolean overWrite,
+      OzoneStoragePolicy storagePolicy) throws IOException {
+    try (OzoneOutputStream out = bucket.createFile(keyName, new CreateFileOptions.Builder()
+        .setSize(size)
+        .setReplicationConfig(RATIS_THREE)
+        .setOverWrite(overWrite)
+        .setStoragePolicy(storagePolicy)
+        .build())) {
+      out.write(data);
+    }
+  }
+
+  private OmKeyInfo createFileAndLookup(OzoneBucket bucket,
+      OzoneStoragePolicy storagePolicy) throws IOException {
+    String keyName = UUID.randomUUID().toString();
+    byte[] data = UUID.randomUUID().toString().getBytes(UTF_8);
+    writeFile(bucket, keyName, data, data.length, false, storagePolicy);
+    return lookupKey(bucket, keyName);
+  }
+
+  /** Data that fills more than two blocks. */
+  private byte[] multiBlockData() {
+    byte[] data = new byte[(int) (2 * ozoneManager.getScmBlockSize() + 1024)];
+    Arrays.fill(data, (byte) 'p');
+    return data;
+  }
+
   private OmKeyInfo lookupKey(OzoneBucket bucket, String keyName)
       throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -620,14 +747,21 @@ public class TestOzoneStoragePolicy {
   }
 
   /**
-   * Checks the block actually landed on a volume of the expected tier, and that
-   * the storage type travelled to the datanode on the block id.
+   * Checks the first block of a key on the datanodes. Meant for single-block keys; for a key that spans
+   * several blocks, check each block with {@link #assertDatanodeContainerAndBlock(OmKeyInfo, int, StorageTier)}.
    */
   private void assertDatanodeContainerAndBlock(OmKeyInfo keyInfo,
       StorageTier expectedTier) throws IOException {
+    assertDatanodeContainerAndBlock(keyInfo, 0, expectedTier);
+  }
+
+  /**
+   * Checks the block at {@code blockIndex} actually landed on a volume of the expected tier.
+   */
+  private void assertDatanodeContainerAndBlock(OmKeyInfo keyInfo, int blockIndex,
+      StorageTier expectedTier) throws IOException {
     StorageType expectedStorageType = expectedTier.getUniformStorageType();
-    OmKeyLocationInfo block =
-        keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
+    OmKeyLocationInfo block = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(blockIndex);
     ContainerInfo containerInfo = containerManager.getContainer(
         ContainerID.valueOf(block.getContainerID()));
     Pipeline pipeline =

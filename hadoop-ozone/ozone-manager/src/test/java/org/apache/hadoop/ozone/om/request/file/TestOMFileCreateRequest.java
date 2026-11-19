@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
+import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
+import static org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils.mockFinalizedOmVersionManager;
+import static org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
@@ -25,6 +28,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -53,6 +57,7 @@ import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.client.StoragePolicy;
@@ -71,7 +76,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -212,6 +219,121 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
         .getContainerID(), omKeyLocationInfo.getContainerID());
     assertEquals(keyLocation.getBlockID().getContainerBlockID()
         .getLocalID(), omKeyLocationInfo.getLocalID());
+  }
+
+  @Test
+  public void testStoragePolicyInRequestOverridesBucketPolicy() throws Exception {
+    assertFileCreatedWithStoragePolicy(OzoneStoragePolicy.HOT, OzoneStoragePolicy.COLD, OzoneStoragePolicy.COLD);
+  }
+
+  @Test
+  public void testStoragePolicyDefaultsToBucketPolicy() throws Exception {
+    assertFileCreatedWithStoragePolicy(OzoneStoragePolicy.COLD, null, OzoneStoragePolicy.COLD);
+  }
+
+  @Test
+  public void testStoragePolicyDefaultsToClusterDefaultWithoutBucketPolicy() throws Exception {
+    assertFileCreatedWithStoragePolicy(null, null, OzoneStoragePolicy.getDefaultPolicy());
+  }
+
+  /**
+   * An OM without storage policy support does not persist the field, so before finalization the request must be
+   * applied without one. A bucket cannot carry a policy before finalization either, so the bucket has none.
+   */
+  @Test
+  public void testStoragePolicyNotStampedBeforeFinalization() throws Exception {
+    OMVersionManager preFinalized = mockPreFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(preFinalized);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMRequest modifiedOmRequest = getOMFileCreateRequest(createFileRequestWithStoragePolicy(null))
+        .preExecute(ozoneManager);
+    assertThat(modifiedOmRequest.getCreateFileRequest().getKeyArgs().hasStoragePolicy()).isFalse();
+
+    OMClientResponse response = getOMFileCreateRequest(modifiedOmRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(keyName, modifiedOmRequest.getCreateFileRequest().getClientID(),
+        true);
+    assertThat(omKeyInfo.getStoragePolicy()).isNull();
+  }
+
+  @Test
+  public void testRejectStoragePolicyBeforeFinalization() {
+    OMRequest request = createFileRequestWithStoragePolicy(OzoneStoragePolicy.COLD);
+
+    assertThatThrownBy(() -> OMFileCreateRequest.disallowCreateFileWithStoragePolicy(request, preFinalizedContext()))
+        .isInstanceOfSatisfying(OMException.class, ex -> {
+          assertThat(ex.getResult()).isEqualTo(OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+          assertThat(ex.getMessage()).contains("Cluster does not have the storage policy feature finalized yet");
+        });
+  }
+
+  /**
+   * A request that carries no storage policy must pass through the validator untouched, since the validator's return
+   * value is chained into the next validator by the request validation framework.
+   */
+  @Test
+  public void testAllowCreateFileWithoutStoragePolicyBeforeFinalization() throws Exception {
+    OMRequest request = createFileRequestWithStoragePolicy(null);
+
+    assertThat(OMFileCreateRequest.disallowCreateFileWithStoragePolicy(request, preFinalizedContext()))
+        .isEqualTo(request);
+  }
+
+  @Test
+  public void testAllowCreateFileWithStoragePolicyAfterFinalization() throws Exception {
+    OMRequest request = createFileRequestWithStoragePolicy(OzoneStoragePolicy.COLD);
+
+    assertThat(OMFileCreateRequest.disallowCreateFileWithStoragePolicy(request,
+        of(mockFinalizedOmVersionManager(), omMetadataManager))).isEqualTo(request);
+  }
+
+  private ValidationContext preFinalizedContext() {
+    return of(mockPreFinalizedOmVersionManager(), omMetadataManager);
+  }
+
+  /** The request a client sends, asking for {@code storagePolicy} (none if null). */
+  private OMRequest createFileRequestWithStoragePolicy(StoragePolicy storagePolicy) {
+    OMRequest request = createFileRequest(volumeName, bucketName, keyName,
+        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS, false, true);
+    if (storagePolicy == null) {
+      return request;
+    }
+    KeyArgs keyArgs = request.getCreateFileRequest().getKeyArgs().toBuilder()
+        .setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy)).build();
+    return request.toBuilder()
+        .setCreateFileRequest(request.getCreateFileRequest().toBuilder().setKeyArgs(keyArgs)).build();
+  }
+
+  /**
+   * Creates a file in a bucket with {@code bucketPolicy} (none if null), asking for {@code requestedPolicy}
+   * (none if null), and checks that {@code expectedPolicy} is stamped on the request and stored on the open key.
+   */
+  private void assertFileCreatedWithStoragePolicy(StoragePolicy bucketPolicy, StoragePolicy requestedPolicy,
+      StoragePolicy expectedPolicy) throws Exception {
+    OmBucketInfo.Builder bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketLayout(getBucketLayout());
+    if (bucketPolicy != null) {
+      bucketInfo.setStoragePolicy(bucketPolicy);
+    }
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager, bucketInfo);
+    // preExecute reads the bucket through the OzoneManager, which setup mocks to return a bucket without a policy.
+    when(ozoneManager.getBucketInfo(volumeName, bucketName)).thenReturn(bucketInfo.build());
+
+    OMRequest modifiedOmRequest = getOMFileCreateRequest(createFileRequestWithStoragePolicy(requestedPolicy))
+        .preExecute(ozoneManager);
+    assertThat(modifiedOmRequest.getCreateFileRequest().getKeyArgs().getStoragePolicy())
+        .isEqualTo(OzoneStoragePolicy.toProto(expectedPolicy));
+
+    OMClientResponse response = getOMFileCreateRequest(modifiedOmRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(keyName, modifiedOmRequest.getCreateFileRequest().getClientID(),
+        true);
+    assertThat(omKeyInfo.getStoragePolicy()).isEqualTo(expectedPolicy);
   }
 
   @Test

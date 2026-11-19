@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
@@ -737,6 +738,13 @@ public class ClientProtocolStub implements ClientProtocol {
                                       String keyName, long size,
                                       ReplicationConfig replicationConfig,
                                       boolean overWrite, boolean recursive)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public OzoneOutputStream createFile(String volumeName, String bucketName,
+                                      String keyName, CreateFileOptions options)
       throws IOException {
     return null;
   }
