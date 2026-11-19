@@ -124,11 +124,6 @@ public class XceiverClientMetrics implements MetricsSource {
     return opsArray.get(type).value();
   }
 
-  @VisibleForTesting
-  public void reset() {
-    init();
-  }
-
   @Override
   public void getMetrics(MetricsCollector collector, boolean b) {
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
