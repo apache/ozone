@@ -176,6 +176,10 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     return closed;
   }
 
+  public boolean isOpen() {
+    return !closed && isDomainSocketOpen.get();
+  }
+
   @Override
   public Pipeline getPipeline() {
     return pipeline;

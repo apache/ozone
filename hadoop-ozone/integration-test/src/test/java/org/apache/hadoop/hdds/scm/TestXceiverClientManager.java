@@ -149,7 +149,7 @@ public abstract class TestXceiverClientManager implements ClusterForTests.TestCa
 
       // least recent container (i.e containerName1) is evicted
       XceiverClientSpi nonExistent1 = cache.getIfPresent(
-          container1.getContainerInfo().getPipelineID().getId().toString()
+          container1.getContainerInfo().getPipelineID().getId().toString() + "-"
               + container1.getContainerInfo().getReplicationType());
       assertNull(nonExistent1);
       // However container call should succeed because of refcount on the client
@@ -247,7 +247,7 @@ public abstract class TestXceiverClientManager implements ClusterForTests.TestCa
       clientManager.releaseClient(client1, true);
       assertEquals(1, client1.getRefcount());
       assertNull(cache.getIfPresent(
-          container1.getContainerInfo().getPipelineID().getId().toString()
+          container1.getContainerInfo().getPipelineID().getId().toString() + "-"
               + container1.getContainerInfo().getReplicationType()));
 
       // new client should be added in cache
