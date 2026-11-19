@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.ClientTracingAttributes;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
@@ -56,6 +57,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -668,23 +670,32 @@ public class BlockOutputStream extends OutputStream {
    * @param close whether the flush is happening as part of closing the stream
    */
   protected void handleFlush(boolean close) throws IOException {
-    try {
-      handleFlushInternal(close);
-      if (close) {
-        waitForAllPendingFlushes();
-      }
-    } catch (ExecutionException e) {
-      handleExecutionException(e);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      handleInterruptedException(ex, true);
-    } catch (Throwable e) {
-      String msg = "Failed to flush. error: " + e.getMessage();
-      LOG.error(msg, e);
-      throw e;
-    } finally {
-      if (close) {
-        cleanup(false);
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("BlockOutputStream.flush")) {
+      BlockID id = getBlockID();
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_CONTAINER_ID, id.getContainerID());
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID, id.getLocalID());
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.PIPELINE_ID,
+          xceiverClient.getPipeline().getId().toString());
+      TracingUtil.addAttributesToCurrentSpan(ClientTracingAttributes.CLIENT_BLOCK_BYTES_WRITTEN,
+          getWrittenDataLength());
+      try {
+        handleFlushInternal(close);
+        if (close) {
+          waitForAllPendingFlushes();
+        }
+      } catch (ExecutionException e) {
+        handleExecutionException(e);
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        handleInterruptedException(ex, true);
+      } catch (Throwable e) {
+        String msg = "Failed to flush. error: " + e.getMessage();
+        LOG.error(msg, e);
+        throw e;
+      } finally {
+        if (close) {
+          cleanup(false);
+        }
       }
     }
   }

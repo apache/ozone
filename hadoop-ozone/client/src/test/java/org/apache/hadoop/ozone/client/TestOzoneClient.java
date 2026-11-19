@@ -36,7 +36,10 @@ import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ClientTracingAttributes;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -167,6 +170,33 @@ public class TestOzoneClient {
       assertEquals(value, new String(fileContent, UTF_8));
       assertFalse(key.getCreationTime().isBefore(testStartTime));
       assertFalse(key.getModificationTime().isBefore(testStartTime));
+    }
+  }
+
+  @Test
+  public void testKeyWriteRecordsBytesAndBlocksOnCurrentSpan() throws IOException {
+    byte[] value = "sample value".getBytes(UTF_8);
+    OzoneBucket bucket = getOzoneBucket();
+    String keyName = UUID.randomUUID().toString();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("client")) {
+      TracingUtil.executeInNewSpan("put", () -> {
+        try (OzoneOutputStream out = bucket.createKey(keyName, value.length, ReplicationType.RATIS, ONE,
+            new HashMap<>())) {
+          out.write(value);
+        }
+      });
+
+      OzoneKeyLocation location = bucket.getKey(keyName).getOzoneKeyLocations().get(0);
+      collector.assertParent("BlockOutputStream.flush", "put");
+      collector.assertAttribute("BlockOutputStream.flush", ClientTracingAttributes.HDDS_CONTAINER_ID,
+          location.getContainerID());
+      collector.assertAttribute("BlockOutputStream.flush", ClientTracingAttributes.HDDS_BLOCK_LOCAL_ID,
+          location.getLocalID());
+      collector.assertAttribute("BlockOutputStream.flush", ClientTracingAttributes.CLIENT_BLOCK_BYTES_WRITTEN,
+          value.length);
+      collector.assertAttribute("put", ClientTracingAttributes.CLIENT_BYTES_WRITTEN, value.length);
+      collector.assertAttribute("put", ClientTracingAttributes.CLIENT_BLOCKS_WRITTEN, 1L);
     }
   }
 

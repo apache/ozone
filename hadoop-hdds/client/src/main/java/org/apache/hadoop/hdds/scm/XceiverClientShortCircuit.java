@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_MAGIC_C
 import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_VERSION;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -239,7 +240,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
     String spanName = "XceiverClientShortCircuit." + request.getCmdType().name();
-    return TracingUtil.executeInNewSpan(spanName,
+    return TracingUtil.executeInNewSpan(spanName, SpanKind.CLIENT,
         () -> {
           ContainerCommandRequestProto finalPayload =
               ContainerCommandRequestProto.newBuilder(request)

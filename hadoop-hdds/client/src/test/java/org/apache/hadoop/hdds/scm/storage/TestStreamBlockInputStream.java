@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -76,6 +78,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
@@ -532,6 +536,120 @@ public class TestStreamBlockInputStream {
           .build();
     });
     return client;
+  }
+
+  @Test
+  public void testSequentialReadBlockRequestIsSentInClientSpan() throws Exception {
+    byte[] data = {1, 2, 3, 4};
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    List<String> requestTraceIds = new ArrayList<>();
+    List<String> clientSpanIds = new ArrayList<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(new StreamingReadResponse(
+          MockDatanodeDetails.randomDatanodeDetails(), mock(ClientCallStreamObserver.class)));
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    doAnswer(inv -> {
+      ContainerCommandRequestProto request = inv.getArgument(0);
+      requestTraceIds.add(request.getTraceID());
+      clientSpanIds.add(TracingUtil.exportCurrentSpan());
+      readerRef.get().onNext(buildResponseProto(data, request.getReadBlock().getOffset()));
+      readerRef.get().onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("client");
+         StreamBlockInputStream sbis = new StreamBlockInputStream(newBlockInfo(new BlockID(1L, 30L), data.length),
+             mockStandalonePipeline(), null, factory, NO_REFRESH, newStreamReadConfig())) {
+      sbis.read(ByteBuffer.allocate(data.length));
+
+      assertFalse(requestTraceIds.isEmpty());
+      assertFalse(requestTraceIds.get(0).isEmpty());
+      assertEquals(clientSpanIds, requestTraceIds);
+      collector.assertKind("XceiverClientGrpc.ReadBlock", SpanKind.CLIENT);
+    }
+  }
+
+  @Test
+  public void testSequentialReadBlockSpanEndsWhenDataArrives() throws Exception {
+    byte[] data = {1, 2, 3, 4};
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    AtomicReference<Boolean> endedBeforeData = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(new StreamingReadResponse(
+          MockDatanodeDetails.randomDatanodeDetails(), mock(ClientCallStreamObserver.class)));
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+    ExecutorService datanode = Executors.newSingleThreadExecutor();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("client");
+         StreamBlockInputStream sbis = new StreamBlockInputStream(newBlockInfo(new BlockID(1L, 32L), data.length),
+             mockStandalonePipeline(), null, factory, NO_REFRESH, newStreamReadConfig())) {
+      doAnswer(inv -> {
+        ContainerCommandRequestProto request = inv.getArgument(0);
+        datanode.submit(() -> {
+          endedBeforeData.set(!collector.named("XceiverClientGrpc.ReadBlock").isEmpty());
+          readerRef.get().onNext(buildResponseProto(data, request.getReadBlock().getOffset()));
+          readerRef.get().onCompleted();
+        });
+        return null;
+      }).when(xceiverClient).streamRead(any(), any());
+
+      assertEquals(data.length, sbis.read(ByteBuffer.allocate(data.length)));
+
+      assertEquals(Boolean.FALSE, endedBeforeData.get(), "the client span must stay open until the data arrives");
+      collector.assertKind("XceiverClientGrpc.ReadBlock", SpanKind.CLIENT);
+      collector.assertNotError("XceiverClientGrpc.ReadBlock");
+    } finally {
+      datanode.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testPositionedReadBlockRequestIsSentInClientSpan() throws Exception {
+    List<String> requestTraceIds = new ArrayList<>();
+    List<String> clientSpanIds = new ArrayList<>();
+    XceiverClientGrpc client = mock(XceiverClientGrpc.class);
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any())).thenReturn(client);
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(new StreamingReadResponse(
+          MockDatanodeDetails.randomDatanodeDetails(), mock(ClientCallStreamObserver.class)));
+      readerRef.set(reader);
+      return null;
+    }).when(client).initStreamRead(any(), any(), any());
+    doAnswer(inv -> {
+      ContainerCommandRequestProto request = inv.getArgument(0);
+      requestTraceIds.add(request.getTraceID());
+      clientSpanIds.add(TracingUtil.exportCurrentSpan());
+      long offset = request.getReadBlock().getOffset();
+      readerRef.get().onNext(buildResponseProto(new byte[] {(byte) offset, (byte) (offset + 1)}, offset));
+      readerRef.get().onCompleted();
+      return null;
+    }).when(client).streamRead(any(), any());
+
+    try (TestSpanCollector collector = TestSpanCollector.install("client");
+         StreamBlockInputStream stream = new StreamBlockInputStream(newBlockInfo(new BlockID(1, 31), 100),
+             mockStandalonePipeline(), null, factory, NO_REFRESH, newStreamReadConfig())) {
+      stream.readFully(10, ByteBuffer.allocate(2));
+
+      assertEquals(1, requestTraceIds.size());
+      assertFalse(requestTraceIds.get(0).isEmpty());
+      assertEquals(clientSpanIds, requestTraceIds);
+      collector.assertKind("XceiverClientGrpc.ReadBlock", SpanKind.CLIENT);
+    }
   }
 
   private static BlockLocationInfo newBlockInfo(BlockID blockID, long length) {
