@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -119,8 +120,8 @@ abstract class ContainerStateMachineTests {
     when(division.getInfo()).thenReturn(info);
     when(info.isLeader()).thenReturn(isLeader);
     when(ratisServer.getServerDivision(any())).thenReturn(division);
-    stateMachine = new ContainerStateMachine(null,
-        RaftGroupId.randomId(), dispatcher, controller, executor, ratisServer, conf, "containerOp");
+    stateMachine = new ContainerStateMachine(null, RaftGroupId.randomId(), ReplicationType.RATIS,
+        dispatcher, controller, executor, ratisServer, conf, "containerOp");
     try {
       stateMachine.initialize(raftServer, stateMachine.getGroupId(), null);
     } catch (Exception e) {
