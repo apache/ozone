@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -80,6 +81,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
@@ -1560,6 +1562,81 @@ public class TestStreamBlockInputStream {
       executor.shutdownNow();
     }
     assertEquals(1, slots.availablePermits(), "the retried stream must release exactly the slot it took");
+  }
+
+  /**
+   * A request that cannot be sent (the stream never becomes ready) does not fail the reader by itself:
+   * the stream given up for the failover must still be cancelled, not half-closed.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testStreamAbandonedOnStreamReadTimeoutIsCancelled(boolean positioned) throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setReadRetryInterval(0);
+    byte[] data = {1, 2, 3, 4};
+    List<ClientCallStreamObserver<ContainerCommandRequestProto>> observers = new ArrayList<>();
+    Map<StreamingReadResponse, StreamingReaderSpi> readers = new ConcurrentHashMap<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      ClientCallStreamObserver<ContainerCommandRequestProto> observer = mock(ClientCallStreamObserver.class);
+      observers.add(observer);
+      StreamingReaderSpi reader = inv.getArgument(1);
+      StreamingReadResponse response = new StreamingReadResponse(
+          MockDatanodeDetails.randomDatanodeDetails(), observer);
+      reader.setStreamingReadResponse(response);
+      readers.put(response, reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    doAnswer(inv -> {
+      StreamingReadResponse response = inv.getArgument(1);
+      if (response.getRequestObserver() == observers.get(0)) {
+        throw new TimeoutIOException("Timed out waiting for stream to become ready: " + response);
+      }
+      StreamingReaderSpi reader = readers.get(response);
+      reader.onNext(buildResponseProto(data, 0));
+      reader.onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(newBlockInfo(new BlockID(1L, 26L), data.length),
+        mockStandalonePipeline(), null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, positioned ? sbis.readPositioned(0, buf) : sbis.read(buf));
+      assertArrayEquals(data, buf.array());
+    }
+
+    assertEquals(2, observers.size(), "a fresh stream should have been initialized for the retry");
+    verify(observers.get(0)).cancel(eq("StreamBlockInputStream stream failed"), isNull());
+    verify(observers.get(0), never()).onCompleted();
+    verify(observers.get(1)).onCompleted();
+    verify(observers.get(1), never()).cancel(any(), any());
+    verify(xceiverClient, times(2)).completeStreamRead();
+  }
+
+  /** The CANCELLED status that follows the cancel of a failed stream must not be logged as a failure. */
+  @Test
+  public void testCancelledAfterFailureIsNotLogged() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setMaxReadRetryCount(0);
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    XceiverClientGrpc xceiverClient = mockCapturingStreamingReadClient(requestObserver, reader -> {
+      reader.onError(Status.UNAVAILABLE.asRuntimeException());
+      reader.onError(Status.CANCELLED.asRuntimeException());
+    });
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (LogCapturer logs = LogCapturer.captureLogs(StreamBlockInputStream.class)) {
+      try (StreamBlockInputStream sbis = new StreamBlockInputStream(newBlockInfo(new BlockID(1L, 27L), 4),
+          mockStandalonePipeline(), null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+        assertThrows(IOException.class, () -> sbis.read(ByteBuffer.allocate(4)));
+      }
+      assertThat(logs.getOutput()).doesNotContain("Failed to setCompleted");
+    }
+    verify(requestObserver).cancel(eq("StreamBlockInputStream stream failed"), isNull());
+    verify(requestObserver, never()).onCompleted();
   }
 
   /**
