@@ -41,7 +41,7 @@ if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
 fi
 
 #shellcheck disable=SC2086
-mvn ${MAVEN_OPTIONS} test-compile spotbugs:spotbugs "$@" | tee "${REPORT_DIR}/output.log"
+./mvnw ${MAVEN_OPTIONS} test-compile spotbugs:spotbugs "$@" | tee "${REPORT_DIR}/output.log"
 rc=$?
 
 touch "$REPORT_FILE"

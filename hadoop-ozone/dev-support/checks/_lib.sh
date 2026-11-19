@@ -95,3 +95,9 @@ create_aws_dir() {
     popd
   fi
 }
+
+get_version() {
+  local dep="$1"
+  shift
+  MVNW_VERBOSE=false ./mvnw --non-recursive --quiet help:evaluate -Dexpression="${dep}.version" -DforceStdout -Dscan=false "$@"
+}

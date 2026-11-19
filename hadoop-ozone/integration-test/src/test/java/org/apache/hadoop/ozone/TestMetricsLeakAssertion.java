@@ -81,11 +81,13 @@ class TestMetricsLeakAssertion {
 
   @ParameterizedTest
   @ValueSource(strings = {"ContainerCacheMetrics", "ContainerCacheMetrics-1", "ContainerCacheMetrics-123",
-      "JvmMetricsOM", "RpcActivityForPort15000", "VolumeIOStats-/data/volume", "keyTableCache", "keyTableCache-1"})
+      "JvmMetricsOM", "RpcActivityForPort15000", "VolumeIOStats-/data/volume", "keyTableCache", "keyTableCache-1",
+      "XceiverClientMetrics", "XceiverClientMetrics-1"})
   void testAllowedSourcePasses(String sourceName) {
     registerSource(sourceName);
 
     assertDoesNotThrow(MetricsLeakAssertion::assertNoLeaks);
+    assertNotNull(metricsSystem.getSource(sourceName));
   }
 
   @ParameterizedTest
