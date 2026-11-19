@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
+
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -357,9 +359,12 @@ public class NSSummaryTaskDbEventHandler {
 
     // A rename is a DELETE of the old key and a PUT of the new key, which may arrive in either order. If the
     // PUT was processed first, the stored summary already describes the new key (other parent or other name).
+    // NSSummary.setDirName stores names without the trailing slash Legacy directory keys carry.
+    String deletedDirName = directoryInfo.getName() == null
+        ? null : removeTrailingSlashIfNeeded(directoryInfo.getName());
     boolean putAlreadyApplied = deletedDirSummary != null
         && (deletedDirSummary.getParentId() != parentObjectId
-            || !Objects.equals(deletedDirSummary.getDirName(), directoryInfo.getName()));
+            || !Objects.equals(deletedDirSummary.getDirName(), deletedDirName));
 
     // Remove the deleted directory ID from parent's childDir set, unless the PUT re-added it under the same parent
     if (!putAlreadyApplied || deletedDirSummary.getParentId() != parentObjectId) {
