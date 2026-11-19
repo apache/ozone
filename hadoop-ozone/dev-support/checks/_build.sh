@@ -37,7 +37,7 @@ else
 fi
 
 export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
-mvn ${MAVEN_OPTIONS} clean "$@" | tee output.log
+./mvnw ${MAVEN_OPTIONS} clean "$@" | tee output.log
 rc=$?
 
 mkdir -p "$REPORT_DIR" # after `mvn clean`

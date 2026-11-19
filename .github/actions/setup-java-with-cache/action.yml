@@ -58,7 +58,7 @@ runs:
       id: cache-key
       shell: bash
       run: |
-        echo "value=maven-repo-${{ hashFiles('**/pom.xml', '.mvn/extensions.xml') }}" >> "$GITHUB_OUTPUT"
+        echo "value=maven-repo-${{ hashFiles('**/pom.xml', '.mvn/extensions.xml', '.mvn/wrapper/maven-wrapper.properties') }}" >> "$GITHUB_OUTPUT"
 
     - name: Remove any leftover Maven repo
       id: cleanup
@@ -73,6 +73,7 @@ runs:
         path: |
           ~/.m2/repository/*/*/*
           !~/.m2/repository/org/apache/ozone
+          ~/.m2/wrapper
         key: ${{ steps.cache-key.outputs.value }}
 
     - name: Exact hit?
@@ -99,6 +100,7 @@ runs:
         path: |
           ~/.m2/repository/*/*/*
           !~/.m2/repository/org/apache/ozone
+          ~/.m2/wrapper
         key: maven-repo-
 
     - name: Any hit?

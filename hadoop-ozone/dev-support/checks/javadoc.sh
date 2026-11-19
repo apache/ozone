@@ -29,7 +29,7 @@ MAVEN_OPTIONS="-B -fae -Djacoco.skip -DskipRecon -DskipShade --no-transfer-progr
 MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 log=$(mktemp)
-mvn ${MAVEN_OPTIONS} clean javadoc:aggregate "$@" | tee "${log}"
+./mvnw ${MAVEN_OPTIONS} clean javadoc:aggregate "$@" | tee "${log}"
 rc=$?
 
 mkdir -p "$REPORT_DIR"
