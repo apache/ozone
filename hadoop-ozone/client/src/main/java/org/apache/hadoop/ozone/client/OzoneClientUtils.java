@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.VolumeBucket;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -289,36 +290,6 @@ public final class OzoneClientUtils {
               + " {} and volume {} after snapDiff op. Exception : {}", snapshot,
           bucketName, volumeName,
           exception.getMessage());
-    }
-  }
-
-  /**
-   * A volume name paired with a bucket name, used to track the visited buckets when detecting loops in bucket links.
-   */
-  public static final class VolumeBucket {
-    private final String volume;
-    private final String bucket;
-
-    public VolumeBucket(String volume, String bucket) {
-      this.volume = volume;
-      this.bucket = bucket;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      VolumeBucket that = (VolumeBucket) o;
-      return Objects.equals(volume, that.volume) && Objects.equals(bucket, that.bucket);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(volume, bucket);
     }
   }
 }

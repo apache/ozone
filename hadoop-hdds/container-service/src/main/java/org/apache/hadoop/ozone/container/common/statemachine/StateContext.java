@@ -370,6 +370,24 @@ public class StateContext {
   }
 
   /**
+   * Clears queued command status reports for one endpoint while preserving all
+   * other pending report types.
+   *
+   * @return number of queued command status report messages removed
+   */
+  public int clearCommandStatusReports(HostAndPort endpoint) {
+    synchronized (incrementalReportsQueue) {
+      List<Message> reports = incrementalReportsQueue.get(endpoint);
+      if (reports == null || reports.isEmpty()) {
+        return 0;
+      }
+      int before = reports.size();
+      reports.removeIf(CommandStatusReportsProto.class::isInstance);
+      return before - reports.size();
+    }
+  }
+
+  /**
    * Returns all the available reports from the report queue, or empty list if
    * the queue is empty.
    *
