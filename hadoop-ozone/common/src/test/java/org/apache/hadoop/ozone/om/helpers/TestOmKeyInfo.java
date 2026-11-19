@@ -57,10 +57,11 @@ public class TestOmKeyInfo {
 
   @Test
   public void objectLockProtobufConversionAndCopy() throws IOException {
-    OzoneManagerProtocolProtos.Rule rule = OzoneManagerProtocolProtos.Rule.newBuilder()
-        .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.YEARS).setDuration(1).build();
+    OzoneManagerProtocolProtos.RetentionDuration rule = OzoneManagerProtocolProtos.RetentionDuration.newBuilder()
+        .setTimeUnit(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS).setDuration(1).build();
     ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
-        1_800_000_000_000L, OzoneManagerProtocolProtos.EventHold.newBuilder().setEnabled(true).setRule(rule).build());
+        1_800_000_000_000L,
+        OzoneManagerProtocolProtos.EventHold.newBuilder().setEnabled(true).setDuration(rule).build());
     OmKeyInfo key = createOmKeyInfo(RatisReplicationConfig.getInstance(THREE)).toBuilder()
         .setRetention(retention).setLegalHold(true).setPartIv(new byte[]{1, 2, 3}).build();
     OzoneManagerProtocolProtos.KeyInfo proto = key.getProtobuf(ClientVersion.CURRENT);

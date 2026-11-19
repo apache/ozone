@@ -138,11 +138,11 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   public void testObjectLockFields(boolean hasDate) throws IOException {
-    OzoneManagerProtocolProtos.Rule rule = OzoneManagerProtocolProtos.Rule.newBuilder()
-        .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.YEARS).setDuration(1).build();
+    OzoneManagerProtocolProtos.RetentionDuration rule = OzoneManagerProtocolProtos.RetentionDuration.newBuilder()
+        .setTimeUnit(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS).setDuration(1).build();
     ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
         hasDate ? 1_800_000_000_000L : null,
-        OzoneManagerProtocolProtos.EventHold.newBuilder().setEnabled(true).setRule(rule).build());
+        OzoneManagerProtocolProtos.EventHold.newBuilder().setEnabled(true).setDuration(rule).build());
     OmKeyInfo key = getKeyInfo(1).toBuilder()
         .setRetention(retention).setLegalHold(true).build();
     for (Codec<OmKeyInfo> codec : Arrays.asList(OmKeyInfo.getOpenKeyTableCodec(), OmKeyInfo.getKeyTableCodec())) {

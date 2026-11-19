@@ -20,52 +20,51 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.protobuf.TextFormat;
 import java.util.Objects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRetention;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionDuration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Rule;
 
 /**
  * Immutable default retention configuration for a bucket.
  */
 public final class Retention {
   private final RetentionMode retentionMode;
-  private final Rule rule;
-  private final EventHold eventHold;
+  private final RetentionDuration duration;
+  private final RetentionDuration defaultEventHold;
 
-  public Retention(RetentionMode retentionMode, Rule rule, EventHold eventHold) {
+  public Retention(RetentionMode retentionMode, RetentionDuration duration, RetentionDuration defaultEventHold) {
     this.retentionMode = Objects.requireNonNull(retentionMode, "retention mode is null");
-    this.rule = rule;
-    if (eventHold != null) {
-      RetentionUtil.validateEventHoldRule(eventHold.getRule());
+    this.duration = duration;
+    if (defaultEventHold != null) {
+      RetentionUtil.validateEventHoldRule(defaultEventHold);
     }
-    this.eventHold = eventHold;
+    this.defaultEventHold = defaultEventHold;
   }
 
   public RetentionMode getRetentionMode() {
     return retentionMode;
   }
 
-  public Rule getRule() {
-    return rule;
+  public RetentionDuration getDuration() {
+    return duration;
   }
 
-  public EventHold getEventHold() {
-    return eventHold;
+  public RetentionDuration getDefaultEventHold() {
+    return defaultEventHold;
   }
 
   public static Retention fromProto(BucketRetention proto) {
     Objects.requireNonNull(proto, "retention config is null");
-    return new Retention(proto.getRetentionMode(), proto.hasRule() ? proto.getRule() : null,
-        proto.hasEventHold() ? proto.getEventHold() : null);
+    return new Retention(proto.getRetentionMode(), proto.hasDuration() ? proto.getDuration() : null,
+        proto.hasDefaultEventHold() ? proto.getDefaultEventHold() : null);
   }
 
   public BucketRetention toProto() {
     BucketRetention.Builder builder = BucketRetention.newBuilder().setRetentionMode(retentionMode);
-    if (rule != null) {
-      builder.setRule(rule);
+    if (duration != null) {
+      builder.setDuration(duration);
     }
-    if (eventHold != null) {
-      builder.setEventHold(eventHold);
+    if (defaultEventHold != null) {
+      builder.setDefaultEventHold(defaultEventHold);
     }
     return builder.build();
   }
@@ -79,8 +78,8 @@ public final class Retention {
       return false;
     }
     Retention that = (Retention) obj;
-    return retentionMode == that.retentionMode && Objects.equals(rule, that.rule) &&
-        Objects.equals(eventHold, that.eventHold);
+    return retentionMode == that.retentionMode && Objects.equals(duration, that.duration) &&
+        Objects.equals(defaultEventHold, that.defaultEventHold);
   }
 
   @Override
@@ -90,6 +89,6 @@ public final class Retention {
 
   @Override
   public int hashCode() {
-    return Objects.hash(retentionMode, rule, eventHold);
+    return Objects.hash(retentionMode, duration, defaultEventHold);
   }
 }

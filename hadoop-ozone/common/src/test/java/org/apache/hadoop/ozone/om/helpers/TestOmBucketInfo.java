@@ -45,8 +45,8 @@ public class TestOmBucketInfo {
   @Test
   public void objectLockProtobufConversionAndCopy() {
     Retention retention = new Retention(OzoneManagerProtocolProtos.RetentionMode.COMPLIANCE,
-        OzoneManagerProtocolProtos.Rule.newBuilder()
-        .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.DAYS).setDuration(30).build(), null);
+        OzoneManagerProtocolProtos.RetentionDuration.newBuilder()
+        .setTimeUnit(OzoneManagerProtocolProtos.RetentionTimeUnit.DAYS).setDuration(30).build(), null);
     OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket")
         .setObjectLockEnabled(true).setDefaultRetention(retention).build();
     OmBucketInfo decoded = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
@@ -65,15 +65,15 @@ public class TestOmBucketInfo {
   @Test
   public void comparesObjectLockFields() {
     Retention retention = new Retention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
-        OzoneManagerProtocolProtos.Rule.newBuilder()
-            .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.DAYS).setDuration(30).build(), null);
+        OzoneManagerProtocolProtos.RetentionDuration.newBuilder()
+            .setTimeUnit(OzoneManagerProtocolProtos.RetentionTimeUnit.DAYS).setDuration(30).build(), null);
     OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket")
         .setObjectLockEnabled(true).setDefaultRetention(retention).build();
     assertEquals(bucket, bucket.copyObject());
     assertNotEquals(bucket, bucket.toBuilder().setObjectLockEnabled(false).build());
     assertNotEquals(bucket, bucket.toBuilder().setDefaultRetention(null).build());
     assertNotEquals(bucket, bucket.toBuilder().setDefaultRetention(
-        new Retention(retention.getRetentionMode(), retention.getRule().toBuilder().setDuration(31).build(), null))
+        new Retention(retention.getRetentionMode(), retention.getDuration().toBuilder().setDuration(31).build(), null))
         .build());
     assertEquals("true", bucket.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
     assertEquals(retention.toString(), bucket.toAuditMap().get(OzoneConsts.DEFAULT_RETENTION));

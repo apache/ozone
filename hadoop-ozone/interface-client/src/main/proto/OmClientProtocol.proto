@@ -856,8 +856,8 @@ message BucketInfo {
 
 message BucketRetention {
     required RetentionMode retentionMode = 1;
-    optional Rule rule = 2;
-    optional EventHold eventHold = 3;
+    optional RetentionDuration duration = 2;
+    optional RetentionDuration defaultEventHold = 3;
 }
 
 message KeyRetention {
@@ -868,16 +868,16 @@ message KeyRetention {
 }
 
 message EventHold {
-    required bool enabled = 1;
-    required Rule rule = 2;
+    optional bool enabled = 1 [default = true];
+    required RetentionDuration duration = 2;
 }
 
-message Rule {
-    required TimeUnit timeUnit = 1;
+message RetentionDuration {
+    required RetentionTimeUnit timeUnit = 1;
     required uint64 duration = 2;
 }
 
-enum TimeUnit {
+enum RetentionTimeUnit {
     DAYS = 1;
     YEARS = 2;
 }
