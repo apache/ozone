@@ -19,10 +19,15 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import javax.ws.rs.WebApplicationException;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
@@ -76,6 +81,22 @@ public class TestMultiDeleteRequestUnmarshaller {
 
     assertEquals("delete-me.txt", request.getObjects().get(0).getKey());
     assertEquals(DigestUtils.md5Hex(body), request.getBodyContentMD5());
+  }
+
+  @Test
+  public void bodyReadFailureIsInvalidRequest() {
+    InputStream failing = new InputStream() {
+      @Override
+      public int read() throws IOException {
+        throw new IOException("connection reset");
+      }
+    };
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class,
+        () -> new MultiDeleteRequestUnmarshaller().readFrom(null, null, null, null, null, failing));
+
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getHttpCode(), ex.getResponse().getStatus());
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), ((OS3Exception) ex.getCause()).getCode());
   }
 
   private MultiDeleteRequest unmarshall(ByteArrayInputStream inputBody)

@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,7 +56,7 @@ public class MultiDeleteRequestUnmarshaller
     try {
       body = IOUtils.toByteArray(inputStream);
     } catch (IOException ex) {
-      throw new WebApplicationException(ex);
+      throw wrapOS3Exception(newError(INVALID_REQUEST, ex).withMessage(ex.getMessage()));
     }
     MultiDeleteRequest request = super.readFrom(clazz, type, annotations, mediaType, httpHeaders,
         new ByteArrayInputStream(body));
