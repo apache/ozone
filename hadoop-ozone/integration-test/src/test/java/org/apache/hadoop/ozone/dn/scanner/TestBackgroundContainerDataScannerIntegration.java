@@ -27,13 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -51,17 +50,14 @@ class TestBackgroundContainerDataScannerIntegration
   @BeforeAll
   static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED, true);
+    ContainerScannerConfiguration scannerConfig = ozoneConfig.getObject(ContainerScannerConfiguration.class);
+    scannerConfig.setEnabled(true);
     // Make sure the background metadata scanner does not detect failures
     // before the data scanner under test does.
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_METADATA_ENABLED,
-        false);
+    scannerConfig.setMetadataScanEnabled(false);
     // Make the background data scanner run frequently to reduce test time.
-    ozoneConfig.setTimeDuration(
-        ContainerScannerConfiguration.DATA_SCAN_INTERVAL_KEY,
-        SCAN_INTERVAL.getSeconds(), TimeUnit.SECONDS);
+    scannerConfig.setDataScanInterval(SCAN_INTERVAL.toMillis());
+    ozoneConfig.setFromObject(scannerConfig);
     buildCluster(ozoneConfig);
   }
 
@@ -72,7 +68,7 @@ class TestBackgroundContainerDataScannerIntegration
   @ParameterizedTest
   // Background container data scanner should be able to detect all errors.
   @EnumSource
-  void testCorruptionDetected(TestContainerCorruptions corruption)
+  void testCorruptionDetected(ContainerTestCorruptions corruption)
       throws Exception {
     pauseScanner();
 
@@ -99,8 +95,8 @@ class TestBackgroundContainerDataScannerIntegration
     // Wait for SCM to get a report of the unhealthy replica with a different checksum than before.
     waitForScmToSeeReplicaState(containerID, UNHEALTHY);
     ContainerChecksums newReportedChecksum = getContainerReplica(containerID).getChecksums();
-    if (corruption == TestContainerCorruptions.MISSING_METADATA_DIR ||
-        corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR) {
+    if (corruption == ContainerTestCorruptions.MISSING_METADATA_DIR ||
+        corruption == ContainerTestCorruptions.MISSING_CONTAINER_DIR) {
       // In these cases, the new tree will not be able to be written since it exists in the metadata directory.
       // When the tree write fails, the in-memory checksum should remain at its original value.
       assertEquals(initialReportedChecksum, newReportedChecksum);
@@ -113,8 +109,8 @@ class TestBackgroundContainerDataScannerIntegration
       verifyAllDataChecksumsMatch(containerData, getConf());
     }
 
-    if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||
-        corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
+    if (corruption == ContainerTestCorruptions.TRUNCATED_BLOCK ||
+        corruption == ContainerTestCorruptions.CORRUPT_BLOCK) {
       // These errors will affect multiple chunks and result in multiple log messages.
       corruption.assertLogged(containerID, getContainerLogCapturer());
     } else {

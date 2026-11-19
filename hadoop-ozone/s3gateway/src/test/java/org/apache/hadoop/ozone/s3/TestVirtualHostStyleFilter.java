@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,14 +30,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.net.URI;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
-import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -83,6 +87,17 @@ public class TestVirtualHostStyleFilter {
     when(requestContext.getHeaderString(HttpHeaders.HOST)).thenReturn(host);
     when(requestContext.getUriInfo()).thenReturn(uriInfo);
     return requestContext;
+  }
+
+  /** The request must be rejected with an S3 400 InvalidRequest, which clients do not retry, not a 500. */
+  private static void assertInvalidRequest(VirtualHostStyleFilter filter, ContainerRequestContext requestContext,
+      String expectErrorMessage) {
+    WebApplicationException exception = assertThrows(WebApplicationException.class,
+        () -> filter.filter(requestContext));
+    assertThat(exception.getResponse().getStatus()).isEqualTo(HTTP_BAD_REQUEST);
+    OS3Exception cause = assertInstanceOf(OS3Exception.class, exception.getCause());
+    assertThat(cause.getCode()).isEqualTo(INVALID_REQUEST.getCode());
+    assertThat(cause.getErrorMessage()).contains(expectErrorMessage);
   }
 
   @Test
@@ -169,15 +184,18 @@ public class TestVirtualHostStyleFilter {
   }
 
   @ParameterizedTest
-  @CsvSource(value = {"mybucket.myhost:9999,No matching domain", "mybucketlocalhost:9878,invalid format"})
+  @CsvSource(value = {
+      "mybucket.myhost:9999,No matching domain",
+      // a gateway whose own host name is missing from ozone.s3g.domain.name
+      "s3g.example.com:9878,No matching domain",
+      "mybucketlocalhost:9878,invalid format",
+  })
   public void testVirtualHostStyleWithInvalidInputs(String hostAddress,
                                                     String expectErrorMessage) throws Exception {
     VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
     virtualHostStyleFilter.setConfiguration(conf);
     ContainerRequestContext requestContext = createRequestContext(hostAddress, null);
-    InvalidRequestException exception = assertThrows(InvalidRequestException.class,
-        () -> virtualHostStyleFilter.filter(requestContext));
-    assertThat(exception).hasMessageContaining(expectErrorMessage);
+    assertInvalidRequest(virtualHostStyleFilter, requestContext, expectErrorMessage);
   }
 
   @ParameterizedTest
@@ -222,10 +240,21 @@ public class TestVirtualHostStyleFilter {
    * IPv6 Host header whether it is configured with or without brackets. Before
    * normalization a bracketed config ({@code [::1]}) failed to match
    * {@code Host: [::1]:9878}, which {@code getHost()} reduces to {@code ::1}.
+   * The client does not have to spell the address the way the operator did
+   * either, since both name the same gateway.
    */
   @ParameterizedTest
-  @CsvSource(value = {"[::1]", "::1"})
-  public void testPathStyleWithIPv6Domain(String configuredDomain)
+  @CsvSource(value = {
+      "[::1],[::1]:9878",
+      "[::1],[::1]",
+      "::1,[::1]:9878",
+      "::1,[::1]",
+      "[::1],[0:0:0:0:0:0:0:1]:9878",
+      "2001:db8::1,[2001:DB8::1]:9878",
+      "fe80::1%eth0,[fe80::1]:9878",
+      "fe80::1%eth0,[fe80:0:0:0:0:0:0:1]:9878",
+  })
+  public void testPathStyleWithIPv6Domain(String configuredDomain, String host)
       throws Exception {
     conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, configuredDomain);
     VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
@@ -233,8 +262,50 @@ public class TestVirtualHostStyleFilter {
 
     // Path-style request whose Host matches the IPv6 domain is left unchanged.
     ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
-    when(requestContext.getHeaderString(HttpHeaders.HOST)).thenReturn("[::1]:9878");
+    when(requestContext.getHeaderString(HttpHeaders.HOST)).thenReturn(host);
     virtualHostStyleFilter.filter(requestContext);
     verify(requestContext, never()).setRequestUri(any(URI.class), any(URI.class));
+  }
+
+  /**
+   * An IPv4 domain reached over IPv6 is still the same gateway: a dual stack
+   * client may write the configured address as an IPv4-mapped IPv6 literal.
+   */
+  @Test
+  public void testPathStyleWithIPv4MappedHost() throws Exception {
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, "192.168.1.10");
+    VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
+    virtualHostStyleFilter.setConfiguration(conf);
+
+    ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
+    when(requestContext.getHeaderString(HttpHeaders.HOST))
+        .thenReturn("[::ffff:192.168.1.10]:9878");
+    virtualHostStyleFilter.filter(requestContext);
+    verify(requestContext, never()).setRequestUri(any(URI.class), any(URI.class));
+  }
+
+  /**
+   * An IPv6 literal cannot carry a bucket prefix, so an address that merely
+   * ends with the configured domain is a different host, not a virtual host
+   * style request for a bucket named after the leading segments. A zone must not
+   * be sent on the wire, so a Host that carries one names no gateway, in either
+   * the plain or the URI encoded form, and is never resolved to an interface.
+   */
+  @ParameterizedTest
+  @CsvSource(value = {
+      "[::1],[2001:db8::1]:9878",
+      "[::1],[2001:db8::1]",
+      "[::1],2001:db8::1",
+      "fe80::1,[fe80::1%25eth0]:9878",
+      "fe80::1%eth0,[fe80::1%eth0]:9878",
+  })
+  public void testIPv6HostOutsideConfiguredDomain(String configuredDomain, String host) {
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, configuredDomain);
+    VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
+    virtualHostStyleFilter.setConfiguration(conf);
+
+    ContainerRequestContext requestContext =
+        createRequestContext(host, "/mybucket/myfile");
+    assertInvalidRequest(virtualHostStyleFilter, requestContext, "No matching domain");
   }
 }

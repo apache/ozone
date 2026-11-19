@@ -352,6 +352,9 @@ public class RPC {
     if (proxy instanceof ProtocolTranslator) {
       proxy = ((ProtocolTranslator)proxy).getUnderlyingProxyObject();
     }
+    if (proxy instanceof RpcProxy) {
+      return ((RpcProxy) proxy).getConnectionId();
+    }
     RpcInvocationHandler inv = (RpcInvocationHandler) Proxy
         .getInvocationHandler(proxy);
     return inv.getConnectionId();

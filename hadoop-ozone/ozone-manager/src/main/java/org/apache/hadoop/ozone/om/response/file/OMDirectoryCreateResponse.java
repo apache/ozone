@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
@@ -28,7 +26,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -37,7 +34,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Response for create directory request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class OMDirectoryCreateResponse extends OmKeyResponse {
 
   private static final Logger LOG =

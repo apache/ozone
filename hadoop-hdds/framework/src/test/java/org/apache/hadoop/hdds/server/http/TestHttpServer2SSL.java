@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -32,7 +32,6 @@ import java.net.Socket;
 import java.net.URI;
 import java.net.URL;
 import java.security.KeyStore;
-import java.util.Arrays;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
@@ -43,6 +42,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.eclipse.jetty.server.ServerConnector;
@@ -149,13 +149,15 @@ public class TestHttpServer2SSL {
 
   @Test
   public void testEnabledProtocolsRejectsOther() throws Exception {
-    // Configure server to accept only TLSv1.2, try connecting with TLSv1.1
+    // Configure server to accept only TLSv1.2, try connecting with TLSv1.1 and TLSv1.3
     HttpServer2 server = buildServer(null, null, "TLSv1.2");
     server.start();
     try {
       InetSocketAddress addr = server.getConnectorAddress(0);
       SSLSocketFactory factory = createSocketFactory(null, new String[]{"TLSv1.1"});
       assertThrows(Exception.class, () -> connectWithFactory(factory, addr));
+      SSLSocketFactory tls13Factory = createSocketFactory(null, new String[]{"TLSv1.3"});
+      assertThrows(Exception.class, () -> connectWithFactory(tls13Factory, addr));
     } finally {
       server.stop();
     }
@@ -171,6 +173,62 @@ public class TestHttpServer2SSL {
       SSLSocketFactory factory = createSocketFactory(null, null);
       int responseCode = connectWithFactory(factory, addr);
       assertEquals(HttpURLConnection.HTTP_OK, responseCode);
+      SSLSocketFactory tls13Factory = createSocketFactory(null, new String[]{"TLSv1.3"});
+      assertEquals(HttpURLConnection.HTTP_OK, connectWithFactory(tls13Factory, addr));
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
+   * Jetty 12's SecureRequestCustomizer defaults to sniHostCheck=true, which
+   * rejects any HTTPS request whose host is not carried by the served
+   * certificate with a 400 "Invalid SNI". The test keystore certificate is
+   * CN=localhost with no SubjectAlternativeName, so the "localhost" name it
+   * covers is served, but the 127.0.0.1 IP literal it does not cover -- which,
+   * being an IP address, carries no SNI -- would be rejected under that default.
+   * HttpServer2 leaves the check disabled by default to preserve Jetty 9.4
+   * behaviour (which served such requests with the default certificate), so both
+   * are served with 200.
+   */
+  @Test
+  public void testIpLiteralServedWithNonMatchingCertificate() throws Exception {
+    HttpServer2 server = buildServer(null, null, null);
+    server.start();
+    try {
+      InetSocketAddress addr = server.getConnectorAddress(0);
+      SSLSocketFactory factory = createSocketFactory(null, null);
+      // The name the certificate covers is served (sanity check).
+      assertEquals(HttpURLConnection.HTTP_OK,
+          connectWithFactory(factory, "localhost", addr));
+      // The IP literal the certificate does not cover is served too: without
+      // the host-check opt-out this would fail with a 400 "Invalid SNI".
+      assertEquals(HttpURLConnection.HTTP_OK,
+          connectWithFactory(factory, "127.0.0.1", addr));
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
+   * The mirror of {@link #testIpLiteralServedWithNonMatchingCertificate()}: with
+   * the SNI host check enabled, the same IP literal the CN=localhost test
+   * certificate does not cover is rejected with 400 "Invalid SNI", while the name
+   * it does cover is still served.
+   */
+  @Test
+  public void testIpLiteralRejectedWhenSniHostCheckEnabled() throws Exception {
+    OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    serverConf.setBoolean(OzoneConfigKeys.OZONE_HTTP_SNI_HOST_CHECK_ENABLED, true);
+    HttpServer2 server = buildServer(serverConf, null, null, null);
+    server.start();
+    try {
+      InetSocketAddress addr = server.getConnectorAddress(0);
+      SSLSocketFactory factory = createSocketFactory(null, null);
+      assertEquals(HttpURLConnection.HTTP_OK,
+          connectWithFactory(factory, "localhost", addr));
+      assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
+          connectWithFactory(factory, "127.0.0.1", addr));
     } finally {
       server.stop();
     }
@@ -180,7 +238,7 @@ public class TestHttpServer2SSL {
   public void testEnabledProtocolAppliedWhenConfigUnset() throws Exception {
     OzoneConfiguration serverConf = new OzoneConfiguration(conf);
     serverConf.unset(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY);
-    assertServerAppliesEnabledProtocol(serverConf, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT);
+    assertServerAppliesEnabledProtocol(serverConf, "TLSv1.2", "TLSv1.3");
   }
 
   @Test
@@ -197,8 +255,16 @@ public class TestHttpServer2SSL {
     assertServerAppliesEnabledProtocol(serverConf, "TLSv1.3");
   }
 
+  @Test
+  public void testOzoneEnabledProtocolsTakesPrecedence() throws Exception {
+    OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    serverConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2");
+    serverConf.set(OzoneConfigKeys.OZONE_SSL_ENABLED_PROTOCOLS, "TLSv1.3");
+    assertServerAppliesEnabledProtocol(serverConf, "TLSv1.3");
+  }
+
   private void assertServerAppliesEnabledProtocol(
-      OzoneConfiguration serverConf, String protocol) throws Exception {
+      OzoneConfiguration serverConf, String... protocols) throws Exception {
     HttpServer2 server = buildServer(serverConf, null, null, null);
     server.start();
     try {
@@ -210,11 +276,10 @@ public class TestHttpServer2SSL {
 
       SslContextFactory.Server sslContextFactory =
           (SslContextFactory.Server) connectionFactory.getSslContextFactory();
-      assertArrayEquals(new String[] {protocol},
-          sslContextFactory.getIncludeProtocols());
-      assertFalse(Arrays.asList(sslContextFactory.getExcludeProtocols())
-          .contains(protocol),
-          "Configured enabled protocol should be removed from excluded protocols");
+      assertArrayEquals(protocols, sslContextFactory.getIncludeProtocols());
+      assertThat(sslContextFactory.getExcludeProtocols())
+          .as("Configured enabled protocols should be removed from excluded protocols")
+          .doesNotContain(protocols);
     } finally {
       server.stop();
     }
@@ -285,7 +350,12 @@ public class TestHttpServer2SSL {
    * and returns the HTTP response code.
    */
   private int connectWithFactory(SSLSocketFactory factory, InetSocketAddress addr) throws IOException {
-    URL url = new URL("https://localhost:" + addr.getPort() + "/jmx");
+    return connectWithFactory(factory, "localhost", addr);
+  }
+
+  private int connectWithFactory(SSLSocketFactory factory, String host, InetSocketAddress addr)
+      throws IOException {
+    URL url = new URL("https://" + host + ":" + addr.getPort() + "/jmx");
     HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
     conn.setSSLSocketFactory(factory);
     conn.setHostnameVerifier((hostname, session) -> true);

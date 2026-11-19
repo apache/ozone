@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -43,7 +44,6 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -75,6 +77,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -132,11 +136,8 @@ public class TestFailureHandlingByClient {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferFlushDelay(false);
-    conf.setFromObject(clientConfig);
+    conf.setBoolean("ozone.client.stream.buffer.flush.delay", false);
 
-    conf.setQuietMode(false);
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(
@@ -162,8 +163,28 @@ public class TestFailureHandlingByClient {
     for (DatanodeDetails dataNode : restartDataNodes) {
       cluster.restartHddsDatanode(dataNode, false);
     }
-    restartDataNodes.clear();
     cluster.waitForClusterToBeReady();
+    // A restarted datanode can take tens of seconds to rejoin its Ratis groups, while SCM keeps allocating
+    // blocks on those pipelines. Wait for every group on it to have a leader before the next test writes.
+    for (DatanodeDetails dataNode : restartDataNodes) {
+      RaftServer server = assertInstanceOf(XceiverServerRatis.class,
+          cluster.getHddsDatanode(dataNode).getDatanodeStateMachine().getContainer().getWriteChannel()).getServer();
+      GenericTestUtils.waitFor(() -> allGroupsHaveLeader(server), 500, 120_000);
+    }
+    restartDataNodes.clear();
+  }
+
+  private static boolean allGroupsHaveLeader(RaftServer server) {
+    try {
+      for (RaftGroupId groupId : server.getGroupIds()) {
+        if (server.getDivision(groupId).getInfo().getLeaderId() == null) {
+          return false;
+        }
+      }
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   @AfterAll
@@ -199,10 +220,21 @@ public class TestFailureHandlingByClient {
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
       List<DatanodeDetails> datanodes = pipeline.getNodes();
-      cluster.shutdownHddsDatanode(datanodes.get(0));
-      cluster.shutdownHddsDatanode(datanodes.get(1));
-      restartDataNodes.add(datanodes.get(0));
-      restartDataNodes.add(datanodes.get(1));
+      // Keep the Ratis leader running. It has every entry the client counted as committed, while a lagging
+      // follower may not have the block at all, and the data must stay readable from the surviving replica.
+      DatanodeDetails leader = null;
+      for (DatanodeDetails dn : datanodes) {
+        if (RatisTestHelper.isRatisLeader(cluster.getHddsDatanode(dn), pipeline)) {
+          leader = dn;
+        }
+      }
+      assertNotNull(leader, "No Ratis leader found in pipeline " + pipeline.getId());
+      for (DatanodeDetails dn : datanodes) {
+        if (!dn.equals(leader)) {
+          cluster.shutdownHddsDatanode(dn);
+          restartDataNodes.add(dn);
+        }
+      }
       // The write will fail but exception will be handled and length will be
       // updated correctly in OzoneManager once the steam is closed
     }
@@ -266,7 +298,7 @@ public class TestFailureHandlingByClient {
       block2ExpectedChunkCount = 2;
     }
 
-    // For the first block, first 2 DNs in the pipeline are shutdown (to
+    // For the first block, the 2 follower DNs in the pipeline are shutdown (to
     // simulate a failure). It should have 1 or 2 chunks (depending on
     // whether the DN CommitWatcher successfully acknowledged the 2nd chunk
     // write or not). The 3rd chunk would not exist on the first pipeline as
@@ -317,6 +349,11 @@ public class TestFailureHandlingByClient {
     AtomicReference<KeyValueContainerData> found = new AtomicReference<>();
     GenericTestUtils.waitFor(() -> {
       for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+        // BlockUtils.getDB would reopen the closed DB of a stopped datanode and keep it cached,
+        // so restarting that datanode later fails to lock its DB and exits the JVM.
+        if (dn.isStopped()) {
+          continue;
+        }
         KeyValueContainer container = (KeyValueContainer) dn
             .getDatanodeStateMachine().getContainer().getContainerSet()
             .getContainer(containerId);

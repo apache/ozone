@@ -24,8 +24,6 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.INCREMENTAL_CONTAINER_
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import com.google.protobuf.Message;
 import java.util.List;
@@ -38,13 +36,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.IEventInfo;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
@@ -95,25 +93,32 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
       commands = nodeManager.getCommandQueue(dnID);
 
+    } else if (isUnhealthyWithIncompatibleVersion(datanodeDetails, heartbeat)) {
+      // Stale and dead nodes must pass a version compatibility check before their heartbeat
+      // timestamp is updated. Without this gate a node that went unhealthy during a rolling
+      // upgrade could resurrect at an incompatible software version. If the check fails, ask
+      // the node to re-register so the full registration fence runs with current version info.
+      LOG.info("Node {} is not healthy and reported an incompatible version {}. Asking to re-register.",
+          datanodeDetails, heartbeat.getDatanodeVersion());
+      nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
+
+      commands = nodeManager.getCommandQueue(datanodeDetails.getID());
+
     } else {
 
-      LayoutVersionProto layoutVersion = null;
-      if (!heartbeat.hasDataNodeLayoutVersion()) {
-        // Backward compatibility to make sure old Datanodes can still talk to
-        // SCM.
-        layoutVersion = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
-            INITIAL_VERSION.layoutVersion());
-      } else {
-        layoutVersion = heartbeat.getDataNodeLayoutVersion();
+      // Process the version report only after passing the fence check. Calling processVersionReport
+      // for fenced nodes would invoke shouldFenceDatanode a second time via sendFinalizeToDatanodeIfNeeded,
+      // producing duplicate log entries. Version details for fenced nodes are captured above.
+      if (heartbeat.hasDatanodeVersion()) {
+        LOG.debug("Processing DataNode version report.");
+        nodeManager.processVersionReport(datanodeDetails, heartbeat.getDatanodeVersion());
       }
-
-      LOG.debug("Processing DataNode Layout Report.");
-      nodeManager.processLayoutVersionReport(datanodeDetails, layoutVersion);
 
       CommandQueueReportProto commandQueueReport = null;
       if (heartbeat.hasCommandQueueReport()) {
         commandQueueReport = heartbeat.getCommandQueueReport();
       }
+
       // should we dispatch heartbeat through eventPublisher?
       commands = nodeManager.processHeartbeat(datanodeDetails, commandQueueReport);
       if (heartbeat.hasNodeReport()) {
@@ -193,6 +198,24 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
+   * Returns true if the node is not healthy (stale or dead) and its reported version is
+   * incompatible with this SCM. Healthy nodes are always allowed through — their version was
+   * already validated at registration. If the node status cannot be determined, returns false
+   * so the heartbeat is processed normally.
+   */
+  private boolean isUnhealthyWithIncompatibleVersion(DatanodeDetails datanodeDetails,
+      SCMHeartbeatRequestProto heartbeat) {
+    try {
+      return !nodeManager.getNodeStatus(datanodeDetails).isHealthy()
+          && nodeManager.shouldFenceDatanode(datanodeDetails, heartbeat.getDatanodeVersion());
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Node {} not found when checking for version compatibility. " +
+          "This should not happen since the node is registered.", datanodeDetails, e);
+      return false;
+    }
+  }
+
+  /**
    * Wrapper class for events with the datanode origin.
    */
   public static class ReportFromDatanode<T extends Message> {
@@ -248,18 +271,6 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public Map<SCMCommandProto.Type, Integer> getCommandsToBeSent() {
       return commandsToBeSent;
-    }
-  }
-
-  /**
-   * Layout report event payload with origin.
-   */
-  public static class LayoutReportFromDatanode
-      extends ReportFromDatanode<LayoutVersionProto> {
-
-    public LayoutReportFromDatanode(DatanodeDetails datanodeDetails,
-                                  LayoutVersionProto report) {
-      super(datanodeDetails, report);
     }
   }
 

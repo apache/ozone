@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.TimeDurationUtil;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -122,8 +123,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     super();
     Objects.requireNonNull(pipeline, "pipeline == null");
     Objects.requireNonNull(config, "config == null");
-    setTimeout(config.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
-        OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
+    setTimeout(getTimeoutMillis(config, OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
+        OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT));
     this.streamReadTimeoutNanos = config.getObject(OzoneClientConfig.class)
         .getStreamReadTimeout().toNanos();
     this.pipeline = pipeline;
@@ -327,7 +328,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
             futureHashMap = new HashMap<>();
     if (!request.hasVersion()) {
       ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto.newBuilder(request);
-      builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+      builder.setVersion(ClientVersion.CURRENT.serialize());
       request = builder.build();
     }
     for (DatanodeDetails dn : datanodeList) {
@@ -407,22 +408,57 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
+  @Override
+  public ContainerCommandResponseProto sendCommand(
+      ContainerCommandRequestProto request, List<Validator> validators,
+      DatanodeDetails datanode) throws IOException {
+    return TracingUtil.executeInNewSpan(getSpanName(request), SpanKind.CLIENT,
+        () -> {
+          final ContainerCommandRequestProto requestWithTraceID = withTraceIDAndVersion(request);
+          try {
+            return sendCommandToDatanode(requestWithTraceID, validators, datanode);
+          } catch (ExecutionException e) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Failed to execute command {} on datanode {}",
+                  processForDebug(requestWithTraceID), datanode, e);
+            }
+            throw toIOException(e);
+          } catch (InterruptedException e) {
+            LOG.error("Command execution was interrupted ", e);
+            Thread.currentThread().interrupt();
+            throw (IOException) new InterruptedIOException(
+                "Command " + processForDebug(requestWithTraceID) + " was interrupted.")
+                .initCause(e);
+          }
+        });
+  }
+
+  @Override
+  public List<DatanodeDetails> getDatanodesInOrder(DatanodeBlockID blockID,
+      ContainerProtos.Type cmdType) throws IOException {
+    return sortDatanodes(blockID, cmdType);
+  }
+
   private XceiverClientReply sendCommandWithTraceIDAndRetry(
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
+    return TracingUtil.executeInNewSpan(getSpanName(request), SpanKind.CLIENT,
+        () -> sendCommandWithRetry(withTraceIDAndVersion(request), validators));
+  }
 
-    String spanName = "XceiverClientGrpc." + request.getCmdType().name();
+  private static String getSpanName(ContainerCommandRequestProto request) {
+    return "XceiverClientGrpc." + request.getCmdType().name();
+  }
 
-    return TracingUtil.executeInNewSpan(spanName, SpanKind.CLIENT,
-        () -> {
-          ContainerCommandRequestProto.Builder builder =
-              ContainerCommandRequestProto.newBuilder(request)
-                  .setTraceID(TracingUtil.exportCurrentSpan());
-          if (!request.hasVersion()) {
-            builder.setVersion(ClientVersion.CURRENT.toProtoValue());
-          }
-          return sendCommandWithRetry(builder.build(), validators);
-        });
+  private static ContainerCommandRequestProto withTraceIDAndVersion(
+      ContainerCommandRequestProto request) {
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder(request)
+            .setTraceID(TracingUtil.exportCurrentSpan());
+    if (!request.hasVersion()) {
+      builder.setVersion(ClientVersion.CURRENT.serialize());
+    }
+    return builder.build();
   }
 
   private List<DatanodeDetails> sortDatanodes(ContainerCommandRequestProto request) throws IOException {
@@ -442,7 +478,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
       }
       // Check if the DN to which the GetBlock command was sent has been cached.
-      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
+      DatanodeDetails cachedDN = getBlockDNcache.get(toCacheKey(blockID));
       if (cachedDN != null && !topologyAwareRead) {
         datanodeList = pipeline.getNodes();
         int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
@@ -485,6 +521,53 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return blockID;
   }
 
+  /**
+   * Sends the command to the given datanode only and validates the response.
+   */
+  private ContainerCommandResponseProto sendCommandToDatanode(
+      ContainerCommandRequestProto request, List<Validator> validators,
+      DatanodeDetails dn)
+      throws IOException, ExecutionException, InterruptedException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Executing command {} on datanode {}",
+          processForDebug(request), dn);
+    }
+    final ContainerCommandResponseProto responseProto =
+        sendCommandAsync(request, dn).getResponse().get();
+    if (validators != null && !validators.isEmpty()) {
+      for (Validator validator : validators) {
+        validator.accept(request, responseProto);
+      }
+    }
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      DatanodeBlockID getBlockID = request.getGetBlock().getBlockID();
+      getBlockDNcache.put(toCacheKey(getBlockID), dn);
+    }
+    return responseProto;
+  }
+
+  /**
+   * The replicaIndex is unset or 0 depending on how the caller built the block ID,
+   * so it is dropped from the key of {@link #getBlockDNcache}.
+   */
+  private static DatanodeBlockID toCacheKey(DatanodeBlockID blockID) {
+    return blockID.hasReplicaIndex() ? blockID.toBuilder().clearReplicaIndex().build() : blockID;
+  }
+
+  /**
+   * @return the IOException for a failed command
+   * @throws SCMSecurityException if the datanode rejected the block token
+   */
+  private static IOException toIOException(ExecutionException e)
+      throws SCMSecurityException {
+    if (Status.fromThrowable(e.getCause()).getCode()
+        == Status.UNAUTHENTICATED.getCode()) {
+      throw new SCMSecurityException("Failed to authenticate with "
+          + "GRPC XceiverServer with Ozone block token.");
+    }
+    return new IOException(e);
+  }
+
   private XceiverClientReply sendCommandWithRetry(
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
@@ -498,28 +581,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     for (DatanodeDetails dn : datanodeList) {
       try {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Executing command {} on datanode {}",
-              processForDebug(request), dn);
-        }
         // In case the command gets retried on a 2nd datanode,
         // sendCommandAsyncCall will create a new channel and async stub
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
-        responseProto = sendCommandAsync(request, dn).getResponse().get();
-        if (validators != null && !validators.isEmpty()) {
-          for (Validator validator : validators) {
-            validator.accept(request, responseProto);
-          }
-        }
-        if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
-          DatanodeBlockID getBlockID = request.getGetBlock().getBlockID();
-          getBlockDNcache.put(getBlockID, dn);
-        }
+        responseProto = sendCommandToDatanode(request, validators, dn);
         break;
       } catch (IOException e) {
         ioException = e;
-        responseProto = null;
         if (LOG.isDebugEnabled()) {
           LOG.debug("Failed to execute command {} on datanode {}",
               processForDebug(request), dn, e);
@@ -529,13 +598,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           LOG.debug("Failed to execute command {} on datanode {}",
               processForDebug(request), dn, e);
         }
-        if (Status.fromThrowable(e.getCause()).getCode()
-            == Status.UNAUTHENTICATED.getCode()) {
-          throw new SCMSecurityException("Failed to authenticate with "
-              + "GRPC XceiverServer with Ozone block token.");
-        }
-
-        ioException = new IOException(e);
+        ioException = toIOException(e);
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted ", e);
         Thread.currentThread().interrupt();
@@ -618,8 +681,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
         }
         LOG.debug("initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
-        stub.withDeadlineAfter(timeout, TimeUnit.SECONDS)
-            .send(new ReadyAwareResponseObserver(dn, streamObserver));
+        // No deadline: it would bound the entire long-lived streaming call. Per-request timeliness is
+        // enforced by streamReadTimeout in streamRead() and StreamingReader.poll().
+        stub.send(new ReadyAwareResponseObserver(dn, streamObserver));
         return;
       } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
@@ -725,7 +789,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           ContainerCommandRequestProto.newBuilder(request)
               .setTraceID(TracingUtil.exportCurrentSpan());
       if (!request.hasVersion()) {
-        builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+        builder.setVersion(ClientVersion.CURRENT.serialize());
       }
       XceiverClientReply asyncReply =
           sendCommandAsync(builder.build(), pipeline.getFirstNode());
@@ -769,7 +833,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     // create a new grpc message stream pair for each call.
     final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        dnChannelInfoMap.get(dnId).getStub().withDeadlineAfter(timeout, TimeUnit.SECONDS)
+        dnChannelInfoMap.get(dnId).getStub().withDeadlineAfter(timeout, TimeUnit.MILLISECONDS)
             .send(new StreamObserver<ContainerCommandResponseProto>() {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
@@ -831,6 +895,20 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return config;
   }
 
+  /**
+   * Returns the timeout configured by {@code key} in milliseconds.
+   * A value without unit is in seconds, for compatibility.
+   */
+  static long getTimeoutMillis(ConfigurationSource config, String key, String defaultValue) {
+    return TimeDurationUtil.getDuration(key, config.get(key, defaultValue), TimeUnit.SECONDS).toMillis();
+  }
+
+  @VisibleForTesting
+  long getTimeout() {
+    return timeout;
+  }
+
+  /** Sets the deadline of each request in milliseconds. */
   public void setTimeout(long timeout) {
     this.timeout = timeout;
   }

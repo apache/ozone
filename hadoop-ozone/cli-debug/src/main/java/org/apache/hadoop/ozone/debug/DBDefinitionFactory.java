@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.container.metadata.WitnessedContainerDBDefinition
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBDefinition;
 
 /**
  * Utility class to get appropriate DBDefinition.
@@ -51,7 +52,7 @@ public final class DBDefinitionFactory {
   static {
     final Map<String, DBDefinition> map = new HashMap<>();
     Arrays.asList(SCMDBDefinition.get(), OMDBDefinition.get(), ReconSCMDBDefinition.get(),
-            WitnessedContainerDBDefinition.get())
+            WitnessedContainerDBDefinition.get(), new ReconReplicaHistoryDBDefinition())
         .forEach(dbDefinition -> map.put(dbDefinition.getName(), dbDefinition));
     DB_MAP = Collections.unmodifiableMap(map);
   }

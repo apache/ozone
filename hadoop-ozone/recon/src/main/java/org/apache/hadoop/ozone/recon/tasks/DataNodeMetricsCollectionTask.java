@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
@@ -79,9 +80,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   private String getJmxMetricsUrl() {
     String protocol = httpsEnabled ? "https" : "http";
     Name portName = httpsEnabled ?  Name.HTTPS : Name.HTTP;
-    return String.format("%s://%s:%d/jmx",
-        protocol,
-        nodeDetails.getHostName(),
-        nodeDetails.getPort(portName).getValue());
+    return protocol + "://" + HddsUtils.getHostPortString(nodeDetails.getHostName(),
+        nodeDetails.getPort(portName).getValue()) + "/jmx";
   }
 }

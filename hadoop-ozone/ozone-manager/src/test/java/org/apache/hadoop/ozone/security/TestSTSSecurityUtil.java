@@ -204,9 +204,7 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() ->
         STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
         .isInstanceOf(OMException.class)
-        .hasMessage(
-            "Invalid STS token format: Invalid STS token - could not readFromByteArray: Secret key not found for " +
-            "STS token secretKeyId: " + secretKeyId);
+        .hasMessage("Invalid STS token format: Secret key not found for STS token secretKeyId: " + secretKeyId);
   }
 
   @Test
@@ -269,9 +267,7 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() ->
         STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
         .isInstanceOf(OMException.class)
-        .hasMessage(
-            "Invalid STS token format: Invalid STS token - could not readFromByteArray: Failed to retrieve secret " +
-            "key: something went wrong");
+        .hasMessage("Invalid STS token format: Failed to retrieve secret key: something went wrong");
   }
 
   @Test
@@ -293,7 +289,33 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() ->
         STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
         .isInstanceOf(OMException.class)
-        .hasMessageContaining("Invalid STS token format: Invalid STS token - signature is not correct for token");
+        .hasMessage("Invalid STS token format: Invalid STS token - signature is not correct");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenRejectsTamperedIdentifierBeforeDecrypting() throws Exception {
+    final String validTokenString = createStsTokenString();
+
+    final Token<STSTokenIdentifier> validToken = new Token<>();
+    validToken.decodeFromUrlString(validTokenString);
+
+    // Corrupt the encrypted secretAccessKey while keeping the original signature. Decrypting these bytes would
+    // fail inside the cipher, so the signature check must reject them before readFromByteArray is ever reached.
+    final OMTokenProto proto = OMTokenProto.parseFrom(validToken.getIdentifier());
+    final byte[] tamperedSecret = proto.getSecretAccessKey().getBytes(StandardCharsets.UTF_8);
+    tamperedSecret[tamperedSecret.length - 1] ^= 0x01;
+    final OMTokenProto tamperedProto = proto.toBuilder()
+        .setSecretAccessKey(new String(tamperedSecret, StandardCharsets.UTF_8))
+        .build();
+
+    final Token<STSTokenIdentifier> tamperedToken = new Token<>(
+        tamperedProto.toByteArray(), validToken.getPassword(), validToken.getKind(), validToken.getService());
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tamperedToken.encodeToUrlString(), secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(INVALID_TOKEN))
+        .hasMessage("Invalid STS token format: Invalid STS token - signature is not correct");
   }
 
   @Test
@@ -414,6 +436,8 @@ public class TestSTSSecurityUtil {
         .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
         .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
         .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .setResolvedStsAssumedRoleId(ASSUMED_ROLE_ID)
+        .setResolvedStsAssumedRoleUserArn(ASSUMED_ROLE_USER_ARN)
         .build();
 
     final OMRequest request = OMRequest.newBuilder()
@@ -423,6 +447,78 @@ public class TestSTSSecurityUtil {
         .build();
 
     STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsSuccessWithLegacyResolvedFields() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .setResolvedStsRoleArn(ROLE_ARN)
+        .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsRejectsPartialAssumedRoleFields() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .setResolvedStsRoleArn(ROLE_ARN)
+        .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .setResolvedStsAssumedRoleId(ASSUMED_ROLE_ID)
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureResolvedStsFieldsInvariants(request))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Resolved STS assumed-role fields must both be present or both be absent");
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsRejectsPartialAssumedRoleUserArnOnly() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .setResolvedStsRoleArn(ROLE_ARN)
+        .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .setResolvedStsAssumedRoleUserArn(ASSUMED_ROLE_USER_ARN)
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureResolvedStsFieldsInvariants(request))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Resolved STS assumed-role fields must both be present or both be absent");
   }
 
   @Test

@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -40,7 +39,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -49,7 +48,7 @@ import org.junit.jupiter.api.TestInstance;
  * This class is to test the REST interface exposed by OzoneManager.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneManagerRestInterface implements NonHATests.TestCase {
+public abstract class TestOzoneManagerRestInterface implements ClusterForTests.TestCase {
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -65,8 +64,11 @@ public abstract class TestOzoneManagerRestInterface implements NonHATests.TestCa
     OzoneManagerHttpServer server =
         cluster.getOzoneManager().getHttpServer();
     HttpClient client = HttpClients.createDefault();
-    String connectionUri = "http://" +
-        NetUtils.getHostPortString(server.getHttpAddress());
+    // Connect to the loopback address rather than the wildcard bind address
+    // returned by getHttpAddress(): 0.0.0.0 is not a connectable target on
+    // macOS (connection refused), while 127.0.0.1 reaches the server on all
+    // platforms.
+    String connectionUri = "http://127.0.0.1:" + server.getHttpAddress().getPort();
     HttpGet httpGet = new HttpGet(connectionUri + "/serviceList");
     HttpResponse response = client.execute(httpGet);
     String serviceListJson = EntityUtils.toString(response.getEntity());

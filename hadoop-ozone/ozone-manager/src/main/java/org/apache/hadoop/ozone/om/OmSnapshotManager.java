@@ -55,9 +55,9 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamily
 import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_PURGED_JOB_TABLE_NAME;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
 import jakarta.annotation.Nonnull;
 import java.io.File;
@@ -92,6 +92,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -181,6 +182,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
+    // Pin format_version like DBProfile does, so db.snapdiff stays readable after a downgrade.
+    this.columnFamilyOptions.setTableFormatConfig(
+        new ManagedBlockBasedTableConfig().setFormatVersion(ManagedBlockBasedTableConfig.FORMAT_VERSION));
     this.columnFamilyDescriptors = new ArrayList<>();
     this.columnFamilyHandles = new ArrayList<>();
     CodecRegistry codecRegistry = createCodecRegistryForSnapDiff();
@@ -654,6 +658,18 @@ public final class OmSnapshotManager implements AutoCloseable {
     return getSnapshot(volumeName, bucketName, snapshotName, false);
   }
 
+  /** Opens an active snapshot only if its name still identifies the expected UUID. */
+  public UncheckedAutoCloseableSupplier<OmSnapshot> getActiveSnapshot(
+      String volumeName, String bucketName, String snapshotName, UUID expectedSnapshotId) throws IOException {
+    if (expectedSnapshotId == null) {
+      throw new OMException("expectedSnapshotId must not be null", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    if (snapshotName == null || snapshotName.isEmpty()) {
+      throw new OMException(INVALID_KEY_NAME);
+    }
+    return getSnapshot(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName), false, expectedSnapshotId);
+  }
+
   public UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(
       String volumeName,
       String bucketName,
@@ -683,14 +699,24 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   private UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(String snapshotTableKey, boolean skipActiveCheck)
       throws IOException {
+    return getSnapshot(snapshotTableKey, skipActiveCheck, null);
+  }
+
+  private UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(
+      String snapshotTableKey, boolean skipActiveCheck, UUID expectedSnapshotId) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotTableKey);
+    UUID snapshotId = snapshotInfo.getSnapshotId();
+    if (expectedSnapshotId != null && !expectedSnapshotId.equals(snapshotId)) {
+      throw new OMException("Snapshot name mapping changed for '" + snapshotTableKey + "': expected UUID "
+          + expectedSnapshotId + ", actual UUID " + snapshotId, FILE_NOT_FOUND);
+    }
     // Block FS API reads when snapshot is not active.
     if (!skipActiveCheck) {
       checkSnapshotActive(snapshotInfo, false);
     }
 
     // retrieve the snapshot from the cache
-    return snapshotCache.get(snapshotInfo.getSnapshotId());
+    return snapshotCache.get(snapshotId);
   }
 
   /**
@@ -895,7 +921,8 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                        final String fromSnapshot,
                                                        final String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
 
@@ -906,7 +933,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     SubmitSnapshotDiffResponse snapshotDiffResponse =
         snapshotDiffManager.submitSnapshotDiff(volume, bucket,
-            fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+            fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff, orderedReport);
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffResponse;

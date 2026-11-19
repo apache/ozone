@@ -21,6 +21,9 @@ VERSION=$1
 # project.build.directory
 BASEDIR=$2
 
+# project.build.outputTimestamp
+TIMESTAMP=$3
+
 ## @audience     private
 ## @stability    evolving
 function run()
@@ -38,8 +41,14 @@ function run()
   fi
 }
 
-run tar -c -f "ozone-${VERSION}.tar" "ozone-${VERSION}"
-run gzip -f "ozone-${VERSION}.tar"
+# Reproducible archive metadata requires GNU tar (used for releases); other tar implementations get a plain archive.
+if tar --version 2>/dev/null | grep -q 'GNU tar'; then
+  run tar --format=gnu --sort=name --mtime="${TIMESTAMP}" --owner=0 --group=0 --numeric-owner --mode=go+u,go-w \
+    -c -f "ozone-${VERSION}.tar" "ozone-${VERSION}"
+else
+  run tar -c -f "ozone-${VERSION}.tar" "ozone-${VERSION}"
+fi
+run gzip -n -f "ozone-${VERSION}.tar"
 echo
 echo "Ozone dist tar available at: ${BASEDIR}/ozone-${VERSION}.tar.gz"
 echo

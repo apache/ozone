@@ -96,9 +96,7 @@ public class TestOzoneManagerHttpServer {
   @MethodSource("policy")
   public void testHttpPolicy(HttpConfig.Policy policy) throws Exception {
     conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
-    OzoneManagerHttpServer server = null;
-    try {
-      server = new OzoneManagerHttpServer(conf, null);
+    try (OzoneManagerHttpServer server = new OzoneManagerHttpServer(conf, null)) {
       DefaultMetricsSystem.initialize("TestOzoneManagerHttpServer");
       server.start();
 
@@ -112,19 +110,13 @@ public class TestOzoneManagerHttpServer {
           canAccess("https", server.getHttpsAddress())));
       assertTrue(implies(policy.isHttpsEnabled(),
           !canAccess("http", server.getHttpsAddress())));
-    } finally {
-      if (server != null) {
-        server.stop();
-      }
     }
   }
 
   @Test
   // Verify if jetty-dir will be created inside ozoneMetadataDirectory path
   public void testJettyDirectoryCreation() throws Exception {
-    OzoneManagerHttpServer server = null;
-    try {
-      server = new OzoneManagerHttpServer(conf, null);
+    try (OzoneManagerHttpServer server = new OzoneManagerHttpServer(conf, null)) {
       DefaultMetricsSystem.initialize("TestOzoneManagerHttpServer");
       server.start();
       // Checking if the /webserver directory does get created
@@ -135,10 +127,6 @@ public class TestOzoneManagerHttpServer {
       String expectedJettyDirLocation =
           ozoneMetadataDirectory.getAbsolutePath() + BaseHttpServer.SERVER_DIR;
       assertEquals(expectedJettyDirLocation, server.getJettyBaseTmpDir());
-    } finally {
-      if (server != null) {
-        server.stop();
-      }
     }
   }
 

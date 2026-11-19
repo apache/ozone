@@ -27,7 +27,9 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "cancelprepare",
-    description = "Cancel prepare state in the OMs.",
+    description = "Deprecated. This command is no longer required, but is kept for backward compatibility with older" +
+        " Ozone Managers.",
+    hidden = true,
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )

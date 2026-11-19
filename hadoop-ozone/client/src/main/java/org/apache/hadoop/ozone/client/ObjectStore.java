@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -623,6 +624,16 @@ public class ObjectStore {
   }
 
   /**
+   * Get bucket-wise snapshot count distribution from snapshotInfo table.
+   * @param bucketFilter optional filter, accepts either bucket or volume/bucket
+   * @return snapshot counts aggregated by bucket
+   * @throws IOException
+   */
+  public SnapshotCountResponse snapshotCount(String bucketFilter) throws IOException {
+    return proxy.snapshotCount(bucketFilter);
+  }
+
+  /**
    * An Iterator to iterate over {@link OzoneSnapshot} list.
    */
   private final class SnapshotIterator implements Iterator<OzoneSnapshot> {
@@ -745,6 +756,7 @@ public class ObjectStore {
    * @param toSnapshot The name of the ending snapshot
    * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @param orderedReport when true, FSO diff reports apply dependency ordering
    * @return the result of submitting snapshot diff job.
    * @throws IOException in case of any exception while generating snapshot diff
    */
@@ -753,10 +765,11 @@ public class ObjectStore {
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     return proxy.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        forceFullDiff, disableNativeDiff);
+        forceFullDiff, disableNativeDiff, orderedReport);
   }
 
   /**

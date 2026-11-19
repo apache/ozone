@@ -121,7 +121,7 @@ public class DelegatingProperties extends Properties {
 
   @Override
   public boolean contains(Object value) {
-    return properties.contains(value);
+    return properties.containsValue(value);
   }
 
   @Override

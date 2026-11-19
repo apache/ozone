@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMBINED_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +35,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test for FilePerChunkStrategy.
@@ -43,6 +46,43 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
   @Override
   protected ContainerLayoutTestInfo getStrategy() {
     return ContainerLayoutTestInfo.FILE_PER_CHUNK;
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2})
+  public void testCombinedRetryDoesNotIncreaseBytesUsed(int chunkIndex) throws Exception {
+    ChunkManager chunkManager = createTestSubject();
+    long len = getChunkInfo().getLen();
+    ChunkInfo info = new ChunkInfo(getBlockID().getLocalID() + ".data." + chunkIndex, chunkIndex * len, len);
+
+    chunkManager.writeChunk(getKeyValueContainer(), getBlockID(), info, getData(), COMBINED_STAGE);
+    assertEquals(len, getKeyValueContainerData().getBytesUsed());
+    rewindBufferToDataStart();
+    chunkManager.writeChunk(getKeyValueContainer(), getBlockID(), info, getData(), COMBINED_STAGE);
+
+    checkChunkFileCount(1);
+    assertEquals(len, getKeyValueContainerData().getBytesUsed());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2})
+  public void testRepeatedCommitWithMissingTemporaryFile(int chunkIndex) throws Exception {
+    ChunkManager chunkManager = createTestSubject();
+    long len = getChunkInfo().getLen();
+    ChunkInfo info = new ChunkInfo(getBlockID().getLocalID() + ".data." + chunkIndex, chunkIndex * len, len);
+
+    chunkManager.writeChunk(getKeyValueContainer(), getBlockID(), info, getData(), WRITE_STAGE);
+    chunkManager.writeChunk(getKeyValueContainer(), getBlockID(), info, getData(), COMMIT_STAGE);
+    File chunkFile = ContainerLayoutVersion.FILE_PER_CHUNK.getChunkFile(
+        getKeyValueContainerData(), getBlockID(), info.getChunkName());
+    assertTrue(chunkFile.exists());
+    checkChunkFileCount(1);
+    assertEquals(len, getKeyValueContainerData().getBytesUsed());
+
+    chunkManager.writeChunk(getKeyValueContainer(), getBlockID(), info, getData(), COMMIT_STAGE);
+
+    checkChunkFileCount(1);
+    assertEquals(len, getKeyValueContainerData().getBytesUsed());
   }
 
   @Test

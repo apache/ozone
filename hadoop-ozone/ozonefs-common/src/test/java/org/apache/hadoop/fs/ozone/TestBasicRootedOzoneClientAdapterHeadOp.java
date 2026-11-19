@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,15 +39,24 @@ import java.lang.reflect.Field;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.UUID;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OFSPath;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,15 +74,22 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   private BasicRootedOzoneClientAdapterImpl adapter;
   private OzoneBucket bucket;
+  private ClientProtocol proxy;
 
   @BeforeEach
   public void setUp() throws Exception {
     adapter = mock(BasicRootedOzoneClientAdapterImpl.class, CALLS_REAL_METHODS);
     bucket = mock(OzoneBucket.class);
+    proxy = mock(ClientProtocol.class);
+    when(proxy.getOmVersion())
+        .thenReturn(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS);
     doReturn(bucket).when(adapter).getBucket(any(OFSPath.class), eq(false));
 
-    // Inject a mock object store so the volume/snapshot dispatch branches can
-    // run without a live OM connection.
+    Field proxyField =
+        BasicRootedOzoneClientAdapterImpl.class.getDeclaredField("proxy");
+    proxyField.setAccessible(true);
+    proxyField.set(adapter, proxy);
+
     OzoneVolume volume = mock(OzoneVolume.class);
     when(volume.getName()).thenReturn("vol");
     when(volume.getOwner()).thenReturn("user");
@@ -99,27 +118,105 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
     return new OzoneFileStatus(keyInfo, 512, isDir);
   }
 
+  /** A file with one 10 byte block, on a pipeline of datanode dn1 if {@code pipeline}. */
+  private static OzoneFileStatus fileStatusWithBlock(boolean pipeline) {
+    OmKeyLocationInfo.Builder block = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(1, 1))
+        .setLength(10);
+    if (pipeline) {
+      DatanodeDetails dn = DatanodeDetails.newBuilder()
+          .setUuid(UUID.randomUUID())
+          .setHostName("dn1")
+          .setIpAddress("10.0.0.1")
+          .addPort(DatanodeDetails.newStandalonePort(9859))
+          .build();
+      block.setPipeline(Pipeline.newBuilder()
+          .setId(PipelineID.randomId())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setState(Pipeline.PipelineState.OPEN)
+          .setNodes(Collections.singletonList(dn))
+          .build());
+    }
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setVolumeName("vol")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, Collections.singletonList(block.build()))))
+        .setDataSize(10)
+        .setCreationTime(0)
+        .setModificationTime(0)
+        .setAcls(Collections.emptyList())
+        .build();
+    return new OzoneFileStatus(keyInfo, 512, false);
+  }
+
+  /**
+   * An OM without HDDS-15678 returns the block locations of a head op, unrefreshed and without pipelines (HDDS-17714).
+   */
+  @Test
+  public void headOpIgnoresBlockLocations() throws IOException {
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), eq(true)))
+        .thenReturn(fileStatusWithBlock(false));
+
+    FileStatusAdapter status = adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR, "user", true);
+    assertEquals(10, status.getLength());
+    assertEquals(0, status.getBlockLocations().length);
+  }
+
+  @Test
+  public void fullStatusHasBlockLocations() throws IOException {
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), eq(false)))
+        .thenReturn(fileStatusWithBlock(true));
+
+    FileStatusAdapter status = adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR, "user", false);
+    assertEquals(1, status.getBlockLocations().length);
+    assertArrayEquals(new String[] {"dn1"}, status.getBlockLocations()[0].getHosts());
+  }
+
   @Test
   public void keyPathThreadsHeadOp() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenReturn(fileStatus(false));
 
     assertFalse(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
         "user", true).isDir());
 
     ArgumentCaptor<Boolean> headOp = ArgumentCaptor.forClass(Boolean.class);
-    verify(bucket).getFileStatus(anyString(), headOp.capture());
+    verify(proxy).getOzoneFileStatus(eq("vol"), eq("bucket"), eq("key"),
+        headOp.capture());
     assertTrue(headOp.getValue());
   }
 
   @Test
   public void fourArgOverloadDoesNotUseHeadOp() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenReturn(fileStatus(true));
 
     assertTrue(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
         "user").isDir());
-    verify(bucket).getFileStatus(anyString(), eq(false));
+    verify(proxy).getOzoneFileStatus(eq("vol"), eq("bucket"), eq("key"), eq(false));
+  }
+
+  @Test
+  public void olderOmFallsBackToClientSideBucketCheck() throws IOException {
+    // An OM older than GET_FILE_STATUS_REJECTS_OBS has no server-side
+    // OBJECT_STORE rejection, so the adapter must use the pre-HDDS-15925 path:
+    // fetch the bucket (which validates layout client-side) and call
+    // OzoneBucket#getFileStatus, without issuing a direct OM GetFileStatus.
+    when(proxy.getOmVersion())
+        .thenReturn(OzoneManagerVersion.S3_BUCKET_TAGGING_API);
+    when(bucket.getFileStatus(anyString(), anyBoolean()))
+        .thenReturn(fileStatus(false));
+
+    assertFalse(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
+        "user", true).isDir());
+
+    verify(bucket).getFileStatus(eq("key"), eq(true));
+    verify(proxy, never())
+        .getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean());
   }
 
   @Test
@@ -130,7 +227,7 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void fileNotFoundMappedToFileNotFoundException() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenThrow(new OMException("missing",
             OMException.ResultCodes.FILE_NOT_FOUND));
     assertThrows(FileNotFoundException.class,
@@ -140,7 +237,7 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void otherOMExceptionPropagates() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenThrow(new OMException("boom",
             OMException.ResultCodes.INTERNAL_ERROR));
     assertThrows(OMException.class,
@@ -150,7 +247,7 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void bucketNotFoundMappedToFileNotFoundException() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenThrow(new OMException("no bucket",
             OMException.ResultCodes.BUCKET_NOT_FOUND));
     assertThrows(FileNotFoundException.class,
@@ -169,7 +266,6 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
     when(bucket.getVolumeName()).thenReturn("vol");
     when(bucket.getName()).thenReturn("bucket");
     when(bucket.getCreationTime()).thenReturn(Instant.EPOCH);
-    // keyName == ".snapshot" is the snapshot indicator path.
     assertTrue(adapter.getFileStatus("/vol/bucket/.snapshot", URI_OFS,
         WORKING_DIR, "user", true).isDir());
   }

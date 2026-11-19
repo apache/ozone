@@ -59,13 +59,11 @@ public class ContainerHealthSchemaManager {
    * Maximum number of container IDs to include in a single
    * {@code DELETE … WHERE container_id IN (…)} statement.
    *
-   * <p>Derby's SQL compiler translates each prepared statement into a Java
-   * class.  A large IN-predicate generates a deeply nested expression tree
-   * whose compiled bytecode can exceed the JVM hard limit of 65,535 bytes
-   * per method (ERROR XBCM4).  Empirically, 5,000 IDs combined with the
-   * 7-state container_state IN-predicate generates ~148 KB — more than
-   * twice the limit.  1,000 IDs stays well under ~30 KB, providing a safe
-   * 2× margin.</p>
+   * <p>Each ID is a bind parameter, and SQLite rejects a statement with more
+   * than {@code SQLITE_MAX_VARIABLE_NUMBER} parameters (250,000 in the
+   * sqlite-jdbc build).  A scan cycle on a large cluster can touch more
+   * containers than that, so the IDs are chunked.  1,000 IDs per statement
+   * stays far below the limit and keeps each statement small.</p>
    */
   static final int MAX_IN_CLAUSE_CHUNK_SIZE = 1_000;
 
@@ -156,12 +154,9 @@ public class ContainerHealthSchemaManager {
    * scan cycle (just like the SCM-sourced states); omitting it would leave
    * stale REPLICA_MISMATCH records in the table after a mismatch is resolved.
    *
-   * <p><b>Derby bytecode limit:</b> Derby translates each SQL statement into
-   * a Java class whose methods must each stay under the JVM 64 KB bytecode
-   * limit.  A single {@code IN} predicate with more than ~2,000 values (when
-   * combined with the 7-state container_state filter) overflows this limit
-   * and causes {@code ERROR XBCM4}.  This method automatically partitions
-   * {@code containerIds} into chunks of at most
+   * <p><b>Bind parameter limit:</b> each container ID is a bind parameter,
+   * and SQLite limits the number of parameters per statement.  This method
+   * automatically partitions {@code containerIds} into chunks of at most
    * {@value #MAX_IN_CLAUSE_CHUNK_SIZE}
    * IDs so callers never need to worry about the limit, regardless of how
    * many containers a scan cycle processes.
@@ -232,10 +227,8 @@ public class ContainerHealthSchemaManager {
    * The key is a stable containerId + state tuple.
    *
    * <p>This method also chunks the container-id predicate internally to stay
-   * within Derby's statement compilation limits. Large scan cycles in Recon can
-   * easily touch tens of thousands of containers, and expanding all IDs into a
-   * single {@code IN (...)} predicate causes Derby to generate bytecode that
-   * exceeds the JVM constant-pool / method-size limits.</p>
+   * within SQLite's bind parameter limit. On a large cluster a scan cycle can
+   * touch more containers than one {@code IN (...)} predicate allows.</p>
    */
   public Map<ContainerStateKey, Long> getExistingInStateSinceByContainerIds(
       List<Long> containerIds) {
@@ -372,7 +365,7 @@ public class ContainerHealthSchemaManager {
     query.addOrderBy(orderField);
     query.addLimit(limit);
 
-    // Pre-buffer `limit` rows per JDBC round-trip instead of Derby's default of 1 row.
+    // Only a hint: sqlite-jdbc ignores the fetch size.
     query.fetchSize(limit);
 
     try {
@@ -418,7 +411,7 @@ public class ContainerHealthSchemaManager {
   /**
    * Returns the count of unhealthy containers matching the given state.
    *
-   * <p>A full {@code SELECT COUNT(*)} is always executed against Derby.
+   * <p>A full {@code SELECT COUNT(*)} is always executed against the Recon SQL DB.
    * The {@code limit} parameter does not restrict the DB query — it only
    * caps the returned value so the UI can display a bounded estimated total.</p>
    *
@@ -486,15 +479,15 @@ public class ContainerHealthSchemaManager {
     }
 
     // ORDER BY container_id ASC — matches composite index (state, container_id),
-    // so Derby walks it in order with no sort step.
+    // so the DB walks it in order with no sort step.
     query.addOrderBy(UNHEALTHY_CONTAINERS.CONTAINER_ID.asc());
 
     if (limit > 0) {
       query.addLimit(limit);
     }
 
-    // Controls how many rows Derby returns per JDBC round-trip.
-    // Configurable via ozone.recon.unhealthy.container.fetch.size (default 10,000).
+    // Rows returned per JDBC round-trip, configurable via ozone.recon.unhealthy.container.fetch.size
+    // (default 10,000). sqlite-jdbc ignores it.
     query.fetchSize(this.unhealthyContainersFetchSize);
 
     return query.fetchLazy();

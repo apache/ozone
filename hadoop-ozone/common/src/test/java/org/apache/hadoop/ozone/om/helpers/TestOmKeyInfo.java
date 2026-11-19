@@ -56,14 +56,19 @@ import org.junit.jupiter.api.Test;
 public class TestOmKeyInfo {
 
   @Test
-  public void objectLockProtobufConversionAndCopy() {
+  public void objectLockProtobufConversionAndCopy() throws IOException {
     OzoneManagerProtocolProtos.Rule rule = OzoneManagerProtocolProtos.Rule.newBuilder()
         .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.YEARS).setDuration(1).build();
     ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
         1_800_000_000_000L, OzoneManagerProtocolProtos.EventHold.newBuilder().setEnabled(true).setRule(rule).build());
     OmKeyInfo key = createOmKeyInfo(RatisReplicationConfig.getInstance(THREE)).toBuilder()
-        .setRetention(retention).setLegalHold(true).build();
-    OzoneManagerProtocolProtos.KeyInfo proto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
+        .setRetention(retention).setLegalHold(true).setPartIv(new byte[]{1, 2, 3}).build();
+    OzoneManagerProtocolProtos.KeyInfo proto = key.getProtobuf(ClientVersion.CURRENT);
+    OzoneManagerProtocolProtos.KeyInfoProtoLight light =
+        OzoneManagerProtocolProtos.KeyInfoProtoLight.parseFrom(proto.toByteArray());
+    assertEquals(proto.getRetention(), light.getRetention());
+    assertTrue(light.hasLegalHold());
+    assertTrue(light.getLegalHold());
     OmKeyInfo decoded = OmKeyInfo.getFromProtobuf(proto);
     for (OmKeyInfo value : new OmKeyInfo[]{decoded, key.copyObject(), key.toBuilder().build()}) {
       assertEquals(retention, value.getRetention());
@@ -73,11 +78,11 @@ public class TestOmKeyInfo {
         .clearRetention().clearLegalHold().build());
     assertNull(legacy.getRetention());
     assertNull(legacy.getLegalHold());
-    OzoneManagerProtocolProtos.KeyInfo legacyProto = legacy.getProtobuf(ClientVersion.CURRENT_VERSION);
+    OzoneManagerProtocolProtos.KeyInfo legacyProto = legacy.getProtobuf(ClientVersion.CURRENT);
     assertFalse(legacyProto.hasRetention());
     assertFalse(legacyProto.hasLegalHold());
     OmKeyInfo holdOff = legacy.toBuilder().setLegalHold(false).build();
-    OzoneManagerProtocolProtos.KeyInfo holdOffProto = holdOff.getProtobuf(ClientVersion.CURRENT_VERSION);
+    OzoneManagerProtocolProtos.KeyInfo holdOffProto = holdOff.getProtobuf(ClientVersion.CURRENT);
     assertTrue(holdOffProto.hasLegalHold());
     assertEquals(Boolean.FALSE, OmKeyInfo.getFromProtobuf(holdOffProto).getLegalHold());
   }
@@ -88,7 +93,7 @@ public class TestOmKeyInfo {
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
     OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
-        key.getProtobuf(ClientVersion.CURRENT_VERSION));
+        key.getProtobuf(ClientVersion.CURRENT));
 
     assertNotNull(keyAfterSerialization);
     assertEquals(key, keyAfterSerialization);
@@ -106,7 +111,7 @@ public class TestOmKeyInfo {
     OmKeyInfo key = createOmKeyInfo(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     OzoneManagerProtocolProtos.KeyInfo omKeyProto =
-        key.getProtobuf(ClientVersion.CURRENT_VERSION);
+        key.getProtobuf(ClientVersion.CURRENT);
 
     // No EC Config
     assertFalse(omKeyProto.hasEcReplicationConfig());
@@ -123,7 +128,7 @@ public class TestOmKeyInfo {
     // EC Config
     key = createOmKeyInfo(new ECReplicationConfig(3, 2));
     assertFalse(key.isHsync());
-    omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
+    omKeyProto = key.getProtobuf(ClientVersion.CURRENT);
 
     assertEquals(3,
         omKeyProto.getEcReplicationConfig().getData());

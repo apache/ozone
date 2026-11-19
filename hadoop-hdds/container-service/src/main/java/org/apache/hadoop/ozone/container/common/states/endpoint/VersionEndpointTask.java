@@ -18,11 +18,11 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import java.io.IOException;
-import java.net.BindException;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.ozone.DatanodeStartupPhase;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -72,20 +72,29 @@ public class VersionEndpointTask implements
 
         if (!rpcEndPoint.isPassive()) {
           // If end point is passive, datanode does not need to check volumes.
-          String scmId = response.getValue(OzoneConsts.SCM_ID);
-          String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
+          try {
+            String scmId = response.getValue(OzoneConsts.SCM_ID);
+            String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
 
-          Objects.requireNonNull(scmId, "scmId == null");
-          Objects.requireNonNull(clusterId, "clusterId == null");
+            Objects.requireNonNull(scmId, "scmId == null");
+            Objects.requireNonNull(clusterId, "clusterId == null");
 
-          // Check DbVolumes, format DbVolume at first register time.
-          checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
+            ozoneContainer.getStartupProgress().beginPhase(DatanodeStartupPhase.PREPARING_VOLUMES);
+            // Check DbVolumes, format DbVolume at first register time.
+            checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
 
-          // Check HddsVolumes
-          checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
+            // Check HddsVolumes
+            checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
 
-          // Start the container services after getting the version information
-          ozoneContainer.start(clusterId);
+            // Start the container services after getting the version information
+            ozoneContainer.start(clusterId);
+          } catch (Exception | Error ex) {
+            ozoneContainer.getStartupProgress().fail();
+            // Handle this in the task: its caller may already have timed out waiting for startup.
+            LOG.error("Failed to start required container services for SCM {}. Shutting down datanode.",
+                rpcEndPoint.getAddress(), ex);
+            return rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
+          }
         }
         EndpointStateMachine.EndPointStates nextState =
             rpcEndPoint.getState().getNextState();
@@ -95,9 +104,8 @@ public class VersionEndpointTask implements
         LOG.debug("Cannot execute GetVersion task as endpoint state machine " +
             "is in {} state", rpcEndPoint.getState());
       }
-    } catch (DiskOutOfSpaceException | BindException ex) {
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     } catch (IOException ex) {
+      // Communication failures are retryable; local initialization failures are handled above.
       rpcEndPoint.logIfNeeded(ex);
     } finally {
       rpcEndPoint.unlock();

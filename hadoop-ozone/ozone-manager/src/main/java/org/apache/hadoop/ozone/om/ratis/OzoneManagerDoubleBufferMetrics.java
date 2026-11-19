@@ -143,7 +143,10 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    synchronized (OzoneManagerDoubleBufferMetrics.class) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ms.unregisterSource(SOURCE_NAME);
+      instance = null;
+    }
   }
 }

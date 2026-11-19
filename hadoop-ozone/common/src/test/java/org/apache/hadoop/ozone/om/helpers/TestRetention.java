@@ -44,10 +44,10 @@ class TestRetention {
     Descriptor key = KeyInfo.getDescriptor();
     FieldDescriptor retention = key.findFieldByName("retention");
     assertNotNull(retention);
-    assertEquals(23, retention.getNumber());
+    assertEquals(24, retention.getNumber());
     assertEquals("KeyRetention", retention.getMessageType().getName());
     assertEquals(FieldDescriptor.Type.UINT64, retention.getMessageType().findFieldByName("retentionDate").getType());
-    assertEquals(24, key.findFieldByName("legalHold").getNumber());
+    assertEquals(25, key.findFieldByName("legalHold").getNumber());
     assertEquals(key.findFieldByName("retention").getNumber(),
         KeyInfoProtoLight.getDescriptor().findFieldByName("retention").getNumber());
     assertNotNull(BucketRetention.getDescriptor().findFieldByName("retentionMode"));

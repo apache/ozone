@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSuccee
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_RANGE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
@@ -37,6 +39,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -44,6 +47,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -52,6 +56,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -64,6 +69,9 @@ import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test get object.
@@ -114,11 +122,36 @@ public class TestObjectGet {
     assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
   }
 
-  @Test
-  public void testGetWithNegativePartNumber() throws Exception {
-    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, -1);
-    assertErrorResponse(INVALID_ARGUMENT,
-        () -> get(rest, BUCKET_NAME, KEY_NAME));
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 0})
+  public void testGetWithNonPositivePartNumber(int partNumber) {
+    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    long failureBefore = rest.getMetrics().getGetKeyFailure();
+
+    assertErrorResponse(INVALID_ARGUMENT, () -> get(rest, BUCKET_NAME, KEY_NAME));
+
+    assertThat(rest.getMetrics().getGetKeyFailure() - failureBefore).isEqualTo(1);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "1, bytes=100-200",
+      "1, ''",
+      "0, bytes=0-4",
+      "-1, bytes=0-4",
+      "abc, bytes=0-4",
+      "'', bytes=0-4"
+  })
+  public void testGetWithPartNumberAndRange(String partNumber, String range) {
+    rest.queryParamsForTest().set(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+    long failureBefore = rest.getMetrics().getGetKeyFailure();
+
+    OS3Exception exception = assertErrorResponse(INVALID_REQUEST, () -> get(rest, BUCKET_NAME, KEY_NAME));
+
+    assertThat(exception.getErrorMessage())
+        .isEqualTo("Cannot specify both Range header and partNumber query parameter");
+    assertThat(rest.getMetrics().getGetKeyFailure() - failureBefore).isEqualTo(1);
   }
 
   @Test
@@ -146,8 +179,14 @@ public class TestObjectGet {
 
     //THEN
     OzoneClientTestUtils.assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertThat(response.getStatus()).isEqualTo(Response.Status.OK.getStatusCode());
     assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
+
+    try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+      ((StreamingOutput) response.getEntity()).write(output);
+      assertThat(output.toByteArray()).isEqualTo(CONTENT.getBytes(UTF_8));
+    }
 
     DateTimeFormatter.RFC_1123_DATE_TIME
         .parse(response.getHeaderString("Last-Modified"));
@@ -333,6 +372,44 @@ public class TestObjectGet {
         response.getHeaderString("Content-Range"));
 
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @Test
+  public void getUnsatisfiableOrMalformedRange() throws IOException, OS3Exception {
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-");
+    assertErrorResponse(INVALID_RANGE, () -> get(rest, BUCKET_NAME, KEY_NAME));
+
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=-0");
+    assertErrorResponse(INVALID_RANGE, () -> get(rest, BUCKET_NAME, KEY_NAME));
+
+    // A range with neither a start nor a suffix length is ignored.
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=-");
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    assertEquals(String.valueOf(CONTENT.length()), response.getHeaderString("Content-Length"));
+    assertNull(response.getHeaderString("Content-Range"));
+  }
+
+  @Test
+  public void getRangeHeaderWithLongMaxValue() throws IOException, OS3Exception {
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-" + Long.MAX_VALUE);
+
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.PARTIAL_CONTENT.getStatusCode(), response.getStatus());
+    assertEquals(String.valueOf(CONTENT.length()), response.getHeaderString("Content-Length"));
+    assertEquals(String.format("bytes 0-%s/%s", CONTENT.length() - 1, CONTENT.length()),
+        response.getHeaderString("Content-Range"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"bytes=0-9223372036854775808", "bytes=0-99999999999999999999"})
+  public void getRangeHeaderOverflowingLongIsIgnored(String range) throws IOException, OS3Exception {
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    assertEquals(String.valueOf(CONTENT.length()), response.getHeaderString("Content-Length"));
+    assertNull(response.getHeaderString("Content-Range"));
   }
 
   @Test

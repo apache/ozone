@@ -17,15 +17,36 @@
 
 # This script runs S3A contract tests against various bucket types on
 # a Docker Compose-based Ozone cluster.
-# Requires HADOOP_AWS_DIR to point the directory containing hadoop-aws sources.
-
-if [[ -z ${HADOOP_AWS_DIR} ]] || [[ ! -e ${HADOOP_AWS_DIR} ]]; then
-  echo "Skipping S3A tests due to missing HADOOP_AWS_DIR (directory with hadoop-aws sources)" >&2
-  exit
-fi
+#
+# If you have Hadoop sources locally, set HADOOP_AWS_DIR to the directory containing `hadoop-aws`.
+# Otherwise it will try to download Hadoop ${HADOOP_VERSION}, defaults to ${hadoop.version}.
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
+
+: "${HADOOP_AWS_DIR:=${TEMP_DIR:-/tmp}/hadoop-aws-${HADOOP_VERSION}}"
+export HADOOP_AWS_DIR
+
+download_hadoop_aws() {
+  if [[ ! -e "${HADOOP_AWS_DIR}" ]] || [[ ! -d "${HADOOP_AWS_DIR}"/src/test/resources ]]; then
+    if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD:-}" != "true" ]]; then
+      import_keys https://downloads.apache.org/hadoop/common/KEYS
+    fi
+
+    (
+      tarball="$(download_hadoop)" \
+        && mkdir -p "${HADOOP_AWS_DIR}" \
+        && tar -x -z -C "${HADOOP_AWS_DIR}" --strip-components=3 -f "${tarball}" \
+            --wildcards 'hadoop-*-src/hadoop-tools/hadoop-aws'
+    ) || return 1
+    # keep tarball for caching
+  fi
+}
+
+if ! download_hadoop_aws; then
+  echo "[ERROR] Failed to download Hadoop"
+  exit 1
+fi
 
 ## @description Run S3A contract tests against Ozone.
 ## @param       Ozone S3 bucket
@@ -100,6 +121,7 @@ EOF
   # - ITestS3AContractRename: HDDS-10665
   mvn ${MAVEN_ARGS:-} --fail-never --show-version \
     -Dtest='ITestS3AContract*, ITestS3ACommitterMRJob, !ITestS3AContractBulkDelete, !ITestS3AContractCreate#testOverwrite*EmptyDirectory[*], !ITestS3AContractDistCp, !ITestS3AContractMkdirWithCreatePerf, !ITestS3AContractRename' \
+    -Dscan.value.testset=s3a \
     clean test
 
   local target="${RESULT_DIR}/junit/${bucket}/target"

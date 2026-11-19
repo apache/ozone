@@ -38,7 +38,6 @@ import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachHealthState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachPersistedOpState;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -77,7 +76,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -138,9 +137,7 @@ public class TestDecommissionAndMaintenance {
         1, SECONDS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, SECONDS);
-    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    OzoneTestUtils.setFastPipelineScrub(conf);
 
     ReplicationManagerConfiguration replicationConf =
         conf.getObject(ReplicationManagerConfiguration.class);
@@ -151,8 +148,10 @@ public class TestDecommissionAndMaintenance {
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(DATANODE_COUNT)
+        // Clusters overlap via MiniOzoneClusterProvider, so the metrics leak
+        // assertion would see a concurrent cluster's sources.
+        .setMetricsLeakAssertEnabled(false)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(maxLayoutVersion())
             .build());
 
     clusterProvider = new MiniOzoneClusterProvider(builder, 9);
@@ -241,10 +240,10 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(ecContainer, 5);
 
     cluster.restartHddsDatanode(dnIndex, true);
-    scmClient.recommissionNodes(Arrays.asList(
-        getDNHostAndPort(toDecommission)));
-    waitForDnToReachOpState(nm, toDecommission, IN_SERVICE);
-    waitForDnToReachPersistedOpState(toDecommission, IN_SERVICE);
+    DatanodeDetails newDn = nm.getNode(dnID);
+    scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(newDn)));
+    waitForDnToReachOpState(nm, newDn, IN_SERVICE);
+    waitForDnToReachPersistedOpState(newDn, IN_SERVICE);
   }
 
   @Test
@@ -486,7 +485,7 @@ public class TestDecommissionAndMaintenance {
     // has, then the SCM state should be used and the DN state updated.
     waitForDnToReachHealthState(nm, newDn, HEALTHY);
     waitForDnToReachOpState(nm, newDn, IN_SERVICE);
-    waitForDnToReachPersistedOpState(dn, IN_SERVICE);
+    waitForDnToReachPersistedOpState(newDn, IN_SERVICE);
   }
 
   @Test

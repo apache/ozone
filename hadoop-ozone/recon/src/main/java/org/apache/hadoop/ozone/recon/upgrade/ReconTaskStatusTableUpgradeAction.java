@@ -35,20 +35,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Upgrade action for TASK_STATUS_STATISTICS feature layout change, which adds
- * <code>last_task_run_status</code> and
- * <code>is_current_task_running</code> columns to
- * {@link ReconTaskSchemaDefinition} when they are missing.
+ * Upgrade action for TASK_STATUS_STATISTICS version, which adds
+ * <code>last_task_run_status</code> and <code>is_current_task_running</code> columns to
+ * {@link ReconTaskSchemaDefinition} when they are missing, completing any partially applied migration.
+ * <p>
+ * It also applies the UNHEALTHY_CONTAINERS check constraint which must be run with Recon's first version increase.
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_STATISTICS)
+@ReconUpgradeActionForVersion(version = ReconVersion.TASK_STATUS_STATISTICS)
 public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
-  private static final String LAST_TASK_RUN_STATUS =
-      "last_task_run_status";
-  private static final String IS_CURRENT_TASK_RUNNING =
-      "is_current_task_running";
+  private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
+  private static final String LAST_TASK_RUN_STATUS = "last_task_run_status";
+  private static final String IS_CURRENT_TASK_RUNNING = "is_current_task_running";
   private static final int COLUMN_MISSING = -1;
 
   /**
@@ -120,7 +118,9 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
   }
 
   @Override
-  public void execute(DataSource dataSource) throws SQLException {
+  public void execute(DataSource dataSource) throws DataAccessException, SQLException {
+    ReconUpgradeAction.updateUnhealthyContainerStatesConstraint(dataSource, LOG);
+
     try (Connection conn = dataSource.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
         LOG.info("{} table does not exist; task status schema repair is not "

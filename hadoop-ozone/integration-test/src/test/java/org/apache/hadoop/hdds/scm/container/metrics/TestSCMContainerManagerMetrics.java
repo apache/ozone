@@ -35,12 +35,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,7 +49,7 @@ import org.junit.jupiter.api.TestInstance;
  * Class used to test {@link SCMContainerManagerMetrics}.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestCase {
+public abstract class TestSCMContainerManagerMetrics implements ClusterForTests.TestCase {
 
   private StorageContainerManager scm;
   private OzoneClient client;
@@ -137,7 +136,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
     // Create key should create container on DN.
-    DataTestUtil.createKeys(cluster(), 1);
+    OzoneTestUtils.createKeys(cluster(), 1);
 
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =

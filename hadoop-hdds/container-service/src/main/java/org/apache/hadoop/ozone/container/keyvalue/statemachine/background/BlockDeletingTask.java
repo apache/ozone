@@ -495,7 +495,9 @@ public class BlockDeletingTask implements BackgroundTask {
           // TODO: handle the bytesReleased correctly for the unexpected exception.
         }
       }
-      bytesProcessed += entry.getTotalBlockSize();
+      // Release the same size that DeleteBlocksCommandHandler added to the pending deletion bytes.
+      // Transactions received before totalSizePerReplica existed were added with totalBlockSize.
+      bytesProcessed += entry.hasTotalSizePerReplica() ? entry.getTotalSizePerReplica() : entry.getTotalBlockSize();
       deletedBlocksTxs.add(entry);
       Duration execTime = Duration.between(startTime, Instant.now());
       if (deletedBlocksTxs.size() < delBlocks.size() &&

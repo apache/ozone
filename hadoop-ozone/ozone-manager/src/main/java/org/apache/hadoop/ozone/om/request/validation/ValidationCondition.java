@@ -34,23 +34,27 @@ public enum ValidationCondition {
    * Classifies validations that has to run after an upgrade until the cluster
    * is in a pre-finalized state.
    */
-  CLUSTER_NEEDS_FINALIZATION {
-    @Override
-    public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return ctx.versionManager().needsFinalization();
-    }
-  },
+  CLUSTER_NEEDS_FINALIZATION,
 
   /**
    * Classifies validations that has to run, when the client uses an older
-   * protocol version than the server.
+   * protocol version than {@link ClientVersion#BUCKET_LAYOUT_SUPPORT}, the
+   * version the validators with this condition were written for.
    */
-  OLDER_CLIENT_REQUESTS {
-    @Override
-    public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return req.getVersion() < ClientVersion.CURRENT_VERSION;
-    }
-  };
+  OLDER_CLIENT_REQUESTS,
 
-  public abstract boolean shouldApply(OMRequest req, ValidationContext ctx);
+  /**
+   * Classifies validations that has to run, when the client cannot read
+   * multipart keys whose parts have their own encryption IV.
+   */
+  CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT;
+
+  public boolean shouldApply(OMRequest req, ValidationContext ctx) {
+    return switch (this) {
+    case CLUSTER_NEEDS_FINALIZATION -> ctx.versionManager().needsFinalization();
+    case OLDER_CLIENT_REQUESTS -> !ClientVersion.BUCKET_LAYOUT_SUPPORT.isSupportedBy(req.getVersion());
+    case CLIENT_WITHOUT_MULTIPART_PART_IV_SUPPORT ->
+        !ClientVersion.MULTIPART_PART_IV_SUPPORT.isSupportedBy(req.getVersion());
+    };
+  }
 }

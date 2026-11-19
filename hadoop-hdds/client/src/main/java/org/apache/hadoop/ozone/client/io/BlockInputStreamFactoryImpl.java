@@ -17,11 +17,14 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_BLOCK_SUPPORT;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -55,15 +58,36 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
         ecReconstructExecutorSupplier);
   }
 
+  /**
+   * @param ecParallelReadExecutorSupplier executor for reading the cells of a healthy EC block in parallel, or
+   *     null to always read them one at a time
+   */
+  public static BlockInputStreamFactory getInstance(
+      ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier,
+      Supplier<ExecutorService> ecParallelReadExecutorSupplier) {
+    return new BlockInputStreamFactoryImpl(byteBufferPool,
+        ecReconstructExecutorSupplier, ecParallelReadExecutorSupplier);
+  }
+
   public BlockInputStreamFactoryImpl() {
-    this(new ElasticByteBufferPool(), Executors::newSingleThreadExecutor);
+    // These executors have no external owner. Retire idle workers as well as allowing JVM shutdown.
+    this(new ElasticByteBufferPool(), () -> new ThreadPoolExecutor(0, 1, 60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(), new ThreadFactoryBuilder()
+            .setNameFormat("EC-reconstruction-%d").setDaemon(true).build()));
   }
 
   public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,
       Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+    this(byteBufferPool, ecReconstructExecutorSupplier, null);
+  }
+
+  public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier,
+      Supplier<ExecutorService> ecParallelReadExecutorSupplier) {
     this.ecBlockStreamFactory =
         ECBlockInputStreamFactoryImpl.getInstance(this, byteBufferPool,
-            ecReconstructExecutorSupplier);
+            ecReconstructExecutorSupplier, ecParallelReadExecutorSupplier);
   }
 
   /**
@@ -90,8 +114,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
     } else if (config.isStreamReadBlock() && allDataNodesSupportStreamBlock(pipeline)) {
-      return new StreamBlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(), pipeline, token, xceiverFactory,
-          refreshFunction, config);
+      return new StreamBlockInputStream(blockInfo, pipeline, token, xceiverFactory, refreshFunction, config);
     } else {
       return new BlockInputStream(blockInfo,
           pipeline, token, xceiverFactory, refreshFunction,
@@ -103,7 +126,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports for reading a block by streaming chunks..
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (dn.getCurrentVersion() < STREAM_BLOCK_SUPPORT.toProtoValue()) {
+      if (!STREAM_BLOCK_SUPPORT.isSupportedBy(dn.getCurrentVersion())) {
         return false;
       }
     }

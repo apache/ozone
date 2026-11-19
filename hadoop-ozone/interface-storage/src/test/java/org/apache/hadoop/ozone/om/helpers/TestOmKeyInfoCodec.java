@@ -157,8 +157,8 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
       assertEquals(hasDate, light.getRetention().hasRetentionDate());
       assertTrue(light.getLegalHold());
     }
-    assertEquals(23, KeyInfo.RETENTION_FIELD_NUMBER);
-    assertEquals(24, KeyInfo.LEGALHOLD_FIELD_NUMBER);
+    assertEquals(24, KeyInfo.RETENTION_FIELD_NUMBER);
+    assertEquals(25, KeyInfo.LEGALHOLD_FIELD_NUMBER);
   }
 
   @Test

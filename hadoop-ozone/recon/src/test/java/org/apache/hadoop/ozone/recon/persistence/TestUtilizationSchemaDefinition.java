@@ -29,8 +29,9 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -63,14 +64,15 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSet = metaData.getColumns(null, null,
         CLUSTER_GROWTH_DAILY_TABLE_NAME, null);
 
+    // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
     List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("timestamp", Types.TIMESTAMP));
+    expectedPairs.add(new ImmutablePair<>("timestamp", Types.VARCHAR));
     expectedPairs.add(new ImmutablePair<>("datanode_id", Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("datanode_host", Types.VARCHAR));
     expectedPairs.add(new ImmutablePair<>("rack_id", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("available_size", Types.BIGINT));
-    expectedPairs.add(new ImmutablePair<>("used_size", Types.BIGINT));
+    expectedPairs.add(new ImmutablePair<>("available_size", Types.INTEGER));
+    expectedPairs.add(new ImmutablePair<>("used_size", Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("container_count", Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("block_count", Types.INTEGER));
 
@@ -93,9 +95,9 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     expectedPairsFileCount.add(
         new ImmutablePair<>("bucket", Types.VARCHAR));
     expectedPairsFileCount.add(
-        new ImmutablePair<>("file_size", Types.BIGINT));
+        new ImmutablePair<>("file_size", Types.INTEGER));
     expectedPairsFileCount.add(
-        new ImmutablePair<>("count", Types.BIGINT));
+        new ImmutablePair<>("count", Types.INTEGER));
 
     List<Pair<String, Integer>> actualPairsFileCount = new ArrayList<>();
     while (resultSetFileCount.next()) {
@@ -114,9 +116,9 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
 
     List<Pair<String, Integer>> expectedPairsContainerCount = new ArrayList<>();
     expectedPairsContainerCount.add(
-        new ImmutablePair<>("container_size", Types.BIGINT));
+        new ImmutablePair<>("container_size", Types.INTEGER));
     expectedPairsContainerCount.add(
-        new ImmutablePair<>("count", Types.BIGINT));
+        new ImmutablePair<>("count", Types.INTEGER));
 
     List<Pair<String, Integer>> actualPairsContainerCount = new ArrayList<>();
     while (resultSetContainerCount.next()) {
@@ -147,9 +149,10 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     }
 
     ClusterGrowthDailyDao dao = getDao(ClusterGrowthDailyDao.class);
-    long now = System.currentTimeMillis();
+    // SQLite keeps timestamps at millisecond precision.
+    LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
     ClusterGrowthDaily newRecord = new ClusterGrowthDaily();
-    newRecord.setTimestamp(new Timestamp(now));
+    newRecord.setTimestamp(now);
     newRecord.setDatanodeId(10);
     newRecord.setDatanodeHost("host1");
     newRecord.setRackId("rack1");
@@ -165,7 +168,8 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     ClusterGrowthDaily dbRecord =
         dao.findById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
-            .value1(new Timestamp(now)).value2(10));
+            .value1(now)
+            .value2(10));
 
     assertEquals("host1", dbRecord.getDatanodeHost());
     assertEquals("rack1", dbRecord.getRackId());
@@ -183,7 +187,8 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     dbRecord =
         dao.findById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
-            .value1(new Timestamp(now)).value2(10));
+            .value1(now)
+            .value2(10));
 
     assertEquals(Long.valueOf(700), dbRecord.getUsedSize());
     assertEquals(Integer.valueOf(30), dbRecord.getBlockCount());
@@ -191,13 +196,15 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     // Delete
     dao.deleteById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
         CLUSTER_GROWTH_DAILY.DATANODE_ID)
-        .value1(new Timestamp(now)).value2(10));
+        .value1(now)
+        .value2(10));
 
     // Verify
     dbRecord =
         dao.findById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
-            .value1(new Timestamp(now)).value2(10));
+            .value1(now)
+            .value2(10));
 
     assertNull(dbRecord);
   }

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -35,11 +37,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -95,8 +97,7 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
     this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
-    List<Pair<Long, OmKeyInfo>> openKeys =
-        makeOpenKeys(volumeName, bucketName, 5);
+    List<OpenKeyWithClientId> openKeys = makeOpenKeys(volumeName, bucketName, 5);
     deleteOpenKeysFromCache(openKeys);
     assertNotInOpenKeyTable(openKeys);
   }
@@ -126,20 +127,14 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
     OMRequestTestUtils.addVolumeAndBucketToDB(volume2, bucket2,
             omMetadataManager, getBucketLayout());
 
-    List<Pair<Long, OmKeyInfo>> v1b1KeysToDelete =
-        makeOpenKeys(volume1, bucket1, 3);
-    List<Pair<Long, OmKeyInfo>> v1b1KeysToKeep =
-        makeOpenKeys(volume1, bucket1, 3);
+    List<OpenKeyWithClientId> v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 3);
+    List<OpenKeyWithClientId> v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3);
 
-    List<Pair<Long, OmKeyInfo>> v1b2KeysToDelete =
-        makeOpenKeys(volume1, bucket2, 3);
-    List<Pair<Long, OmKeyInfo>> v1b2KeysToKeep =
-        makeOpenKeys(volume1, bucket2, 2);
+    List<OpenKeyWithClientId> v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 3);
+    List<OpenKeyWithClientId> v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 2);
 
-    List<Pair<Long, OmKeyInfo>> v2b2KeysToDelete =
-        makeOpenKeys(volume2, bucket2, 2);
-    List<Pair<Long, OmKeyInfo>> v2b2KeysToKeep =
-        makeOpenKeys(volume2, bucket2, 3);
+    List<OpenKeyWithClientId> v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 2);
+    List<OpenKeyWithClientId> v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 3);
 
     addToOpenKeyTableDB(
         v1b1KeysToKeep,
@@ -186,10 +181,8 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
     OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket,
             omMetadataManager, getBucketLayout());
 
-    List<Pair<Long, OmKeyInfo>> keysToKeep =
-        makeOpenKeys(volume, bucket, key, 3);
-    List<Pair<Long, OmKeyInfo>> keysToDelete =
-        makeOpenKeys(volume, bucket, key, 3);
+    List<OpenKeyWithClientId> keysToKeep = makeOpenKeys(volume, bucket, key, 3);
+    List<OpenKeyWithClientId> keysToDelete = makeOpenKeys(volume, bucket, key, 3);
 
     addToOpenKeyTableDB(keysToKeep, keysToDelete);
     deleteOpenKeysFromCache(keysToDelete);
@@ -231,19 +224,19 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
       builder.setParentObjectID(random.nextLong());
     }
 
-    List<Pair<Long, OmKeyInfo>> keysWithHigherUpdateID = new ArrayList<>(1);
-    keysWithHigherUpdateID.add(Pair.of(clientID,
+    List<OpenKeyWithClientId> keysWithHigherUpdateID = new ArrayList<>(1);
+    keysWithHigherUpdateID.add(new OpenKeyWithClientId(clientID,
         builder.setKeyName("key")
             .setUpdateID(updateId)
             .build()));
 
-    List<Pair<Long, OmKeyInfo>> keysWithSameUpdateID = new ArrayList<>(1);
-    keysWithSameUpdateID.add(Pair.of(clientID,
+    List<OpenKeyWithClientId> keysWithSameUpdateID = new ArrayList<>(1);
+    keysWithSameUpdateID.add(new OpenKeyWithClientId(clientID,
         builder.setKeyName("key2")
             .setUpdateID(transactionId)
             .build()));
 
-    List<Pair<Long, OmKeyInfo>> allKeys = new ArrayList<>(2);
+    List<OpenKeyWithClientId> allKeys = new ArrayList<>(2);
     allKeys.addAll(keysWithHigherUpdateID);
     allKeys.addAll(keysWithSameUpdateID);
 
@@ -256,6 +249,10 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, transactionId);
 
     assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
+    String expectedCleanupTable =
+        getBucketLayout().isFileSystemOptimized() ? OPEN_FILE_TABLE : OPEN_KEY_TABLE;
+    assertEquals(Collections.singleton(expectedCleanupTable),
+        omClientResponse.removeCleanupTables());
 
     assertInOpenKeyTable(keysWithHigherUpdateID);
     assertNotInOpenKeyTable(keysWithSameUpdateID);
@@ -287,10 +284,8 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
     assertEquals(metrics.getNumOpenKeysSubmittedForDeletion(), 0);
     assertEquals(metrics.getNumOpenKeysDeleted(), 0);
 
-    List<Pair<Long, OmKeyInfo>> existentKeys =
-        makeOpenKeys(volume, bucket, key, numExistentKeys);
-    List<Pair<Long, OmKeyInfo>> nonExistentKeys =
-        makeOpenKeys(volume, bucket, key, numNonExistentKeys);
+    List<OpenKeyWithClientId> existentKeys = makeOpenKeys(volume, bucket, key, numExistentKeys);
+    List<OpenKeyWithClientId> nonExistentKeys = makeOpenKeys(volume, bucket, key, numNonExistentKeys);
 
     addToOpenKeyTableDB(existentKeys);
     deleteOpenKeysFromCache(existentKeys, nonExistentKeys);
@@ -318,7 +313,7 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
     OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket,
         omMetadataManager, getBucketLayout());
 
-    List<Pair<Long, OmKeyInfo>> openKeys = makeOpenKeys(volume, bucket, 3);
+    List<OpenKeyWithClientId> openKeys = makeOpenKeys(volume, bucket, 3);
     addToOpenKeyTableDB(openKeys);
 
     OMRequest omRequest = doPreExecute(createDeleteOpenKeyRequest(openKeys));
@@ -365,28 +360,22 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
    * Asserts that the call's response status is {@link Status#OK}.
    * @throws Exception
    */
-  private void  deleteOpenKeysFromCache(List<Pair<Long, OmKeyInfo>>... allKeys)
-      throws Exception {
+  private void  deleteOpenKeysFromCache(List<OpenKeyWithClientId>... allKeys) throws Exception {
 
     deleteOpenKeysFromCache(Arrays.stream(allKeys)
         .flatMap(List::stream)
         .collect(Collectors.toList()));
   }
 
-  private void deleteOpenKeysFromCache(List<Pair<Long, OmKeyInfo>> openKeys)
-      throws Exception {
+  private void deleteOpenKeysFromCache(List<OpenKeyWithClientId> openKeys) throws Exception {
 
-    OMRequest omRequest =
-        doPreExecute(createDeleteOpenKeyRequest(openKeys));
+    OMRequest omRequest = doPreExecute(createDeleteOpenKeyRequest(openKeys));
 
-    OMOpenKeysDeleteRequest openKeyDeleteRequest =
-        new OMOpenKeysDeleteRequest(omRequest, getBucketLayout());
+    OMOpenKeysDeleteRequest openKeyDeleteRequest = new OMOpenKeysDeleteRequest(omRequest, getBucketLayout());
 
-    OMClientResponse omClientResponse =
-        openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(Status.OK,
-        omClientResponse.getOMResponse().getStatus());
-    for (OmKeyInfo openKey : openKeys.stream().map(Pair::getRight).collect(Collectors.toList())) {
+    OMClientResponse omClientResponse = openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
+    for (OmKeyInfo openKey : openKeys.stream().map(OpenKeyWithClientId::keyInfo).collect(Collectors.toList())) {
       assertEquals(0, omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(openKey.getVolumeName(), openKey.getBucketName())).getSnapshotUsedBytes());
       assertEquals(0, omMetadataManager.getBucketTable().get(
@@ -399,20 +388,18 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
    * are present after the addition.
    * @throws Exception
    */
-  private void addToOpenKeyTableDB(List<Pair<Long, OmKeyInfo>>... allKeys)
-      throws Exception {
+  private void addToOpenKeyTableDB(List<OpenKeyWithClientId>... allKeys) throws Exception {
 
     addToOpenKeyTableDB(0, Arrays.stream(allKeys)
         .flatMap(List::stream)
         .collect(Collectors.toList()));
   }
 
-  private void addToOpenKeyTableDB(long keySize,
-      List<Pair<Long, OmKeyInfo>> openKeys) throws Exception {
+  private void addToOpenKeyTableDB(long keySize, List<OpenKeyWithClientId> openKeys) throws Exception {
 
-    for (Pair<Long, OmKeyInfo> openKey : openKeys) {
-      final long clientID = openKey.getLeft();
-      final OmKeyInfo omKeyInfo = openKey.getRight();
+    for (OpenKeyWithClientId openKey : openKeys) {
+      final long clientID = openKey.clientID();
+      final OmKeyInfo omKeyInfo = openKey.keyInfo();
       if (keySize > 0) {
         OMRequestTestUtils.addKeyLocationInfo(omKeyInfo, 0, keySize);
       }
@@ -432,18 +419,16 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
   /*
    * Make open keys with randomized key name and client ID
    */
-  private List<Pair<Long, OmKeyInfo>> makeOpenKeys(
-      String volume, String bucket, int count) {
+  private List<OpenKeyWithClientId> makeOpenKeys(String volume, String bucket, int count) {
     return makeOpenKeys(volume, bucket, null, count);
   }
 
   /*
    * Make open keys with same key name and randomized client ID
    */
-  private List<Pair<Long, OmKeyInfo>> makeOpenKeys(
-      String volume, String bucket, String key, int count) {
+  private List<OpenKeyWithClientId> makeOpenKeys(String volume, String bucket, String key, int count) {
 
-    List<Pair<Long, OmKeyInfo>> keys = new ArrayList<>(count);
+    List<OpenKeyWithClientId> keys = new ArrayList<>(count);
 
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
         .setVolumeName(volume)
@@ -459,50 +444,44 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
       final String name = key != null ? key : UUID.randomUUID().toString();
       builder.setKeyName(name);
       long clientID = random.nextLong();
-      keys.add(Pair.of(clientID, builder.build()));
+      keys.add(new OpenKeyWithClientId(clientID, builder.build()));
     }
     return keys;
   }
 
-  private void assertInOpenKeyTable(List<Pair<Long, OmKeyInfo>>... allKeys)
-      throws Exception {
+  private void assertInOpenKeyTable(List<OpenKeyWithClientId>... allKeys) throws Exception {
 
     assertInOpenKeyTable(Arrays.stream(allKeys)
         .flatMap(List::stream)
         .collect(Collectors.toList()));
   }
 
-  private void assertInOpenKeyTable(List<Pair<Long, OmKeyInfo>> openKeys)
-      throws Exception {
+  private void assertInOpenKeyTable(List<OpenKeyWithClientId> openKeys) throws Exception {
 
     for (String keyName : getDBKeyNames(openKeys)) {
       assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(keyName));
     }
   }
 
-  private void assertNotInOpenKeyTable(List<Pair<Long, OmKeyInfo>>... allKeys)
-      throws Exception {
+  private void assertNotInOpenKeyTable(List<OpenKeyWithClientId>... allKeys) throws Exception {
 
     assertNotInOpenKeyTable(Arrays.stream(allKeys)
         .flatMap(List::stream)
         .collect(Collectors.toList()));
   }
 
-  private void assertNotInOpenKeyTable(List<Pair<Long, OmKeyInfo>> openKeys)
-      throws Exception {
+  private void assertNotInOpenKeyTable(List<OpenKeyWithClientId> openKeys) throws Exception {
 
     for (String keyName : getDBKeyNames(openKeys)) {
-      assertFalse(omMetadataManager.getOpenKeyTable(
-          getBucketLayout()).isExist(keyName));
+      assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(keyName));
     }
   }
 
-  private List<String> getDBKeyNames(List<Pair<Long, OmKeyInfo>> openKeys)
-          throws IOException {
+  private List<String> getDBKeyNames(List<OpenKeyWithClientId> openKeys) throws IOException {
 
     final List<String> result = new ArrayList<>();
-    for (Pair<Long, OmKeyInfo> entry : openKeys) {
-      final OmKeyInfo ki = entry.getRight();
+    for (OpenKeyWithClientId entry : openKeys) {
+      final OmKeyInfo ki = entry.keyInfo();
       if (getBucketLayout().isFileSystemOptimized()) {
         result.add(omMetadataManager.getOpenFileName(
                 omMetadataManager.getVolumeId(ki.getVolumeName()),
@@ -510,13 +489,13 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
                         ki.getBucketName()),
                 ki.getParentObjectID(),
                 ki.getFileName(),
-                entry.getLeft()));
+                entry.clientID()));
       } else {
         result.add(omMetadataManager.getOpenKey(
-                entry.getRight().getVolumeName(),
-                entry.getRight().getBucketName(),
-                entry.getRight().getKeyName(),
-                entry.getLeft()));
+                entry.keyInfo().getVolumeName(),
+                entry.keyInfo().getBucketName(),
+                entry.keyInfo().getKeyName(),
+                entry.clientID()));
       }
     }
     return result;
@@ -548,7 +527,7 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
    * {@code OpenKeyDeleteRequest}.
    */
   private OMRequest createDeleteOpenKeyRequest(
-      List<Pair<Long, OmKeyInfo>> keysToDelete) throws IOException {
+      List<OpenKeyWithClientId> keysToDelete) throws IOException {
 
     List<String> names = getDBKeyNames(keysToDelete);
 
@@ -572,4 +551,10 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
+  /**
+   * An open key's info paired with the client ID that opened it,
+   * used to derive the open key table name of the key.
+   */
+  private record OpenKeyWithClientId(long clientID, OmKeyInfo keyInfo) {
+  }
 }

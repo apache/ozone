@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -28,17 +27,13 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedMap;
@@ -64,11 +59,6 @@ public final class StringToSignProducer {
 
   private static final String[] URL_ENCODE_SEARCH_CHARS = new String[] {"+", "*", "%7E"};
   private static final String[] URL_ENCODE_REPLACE_CHARS = new String[] {"%20", "%2A", "~"};
-  /**
-   * Seconds in a week, which is the max expiration time Sig-v4 accepts.
-   */
-  private static final long PRESIGN_URL_MAX_EXPIRATION_SECONDS =
-      60 * 60 * 24 * 7;
   public static final DateTimeFormatter TIME_FORMATTER =
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
           .withZone(ZoneOffset.UTC);
@@ -81,7 +71,6 @@ public final class StringToSignProducer {
       ContainerRequestContext context
   ) throws Exception {
     return createSignatureBase(signatureInfo,
-        context.getUriInfo().getRequestUri().getScheme(),
         context.getMethod(),
         LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders()),
         fromMultiValueToSingleValueMap(
@@ -91,7 +80,6 @@ public final class StringToSignProducer {
   @VisibleForTesting
   public static String createSignatureBase(
       SignatureInfo signatureInfo,
-      String scheme,
       String method,
       LowerCaseKeyStringMap headers,
       Map<String, String> queryParams
@@ -123,7 +111,6 @@ public final class StringToSignProducer {
         .append(credentialScope).append(NEWLINE);
 
     String canonicalRequest = buildCanonicalRequest(
-        scheme,
         method,
         uri,
         signatureInfo.getSignedHeaders(),
@@ -157,7 +144,6 @@ public final class StringToSignProducer {
 
   @VisibleForTesting
   public static String buildCanonicalRequest(
-      String schema,
       String method,
       String uri,
       String signedHeaders,
@@ -166,9 +152,8 @@ public final class StringToSignProducer {
       String payloadHash
   ) throws OS3Exception {
 
-    Iterable<String> parts = split("/", uri);
     List<String> encParts = new ArrayList<>();
-    for (String p : parts) {
+    for (String p : StringUtils.splitPreserveAllTokens(uri, '/')) {
       encParts.add(urlEncode(p));
     }
     String canonicalUri = join("/", encParts);
@@ -187,15 +172,6 @@ public final class StringToSignProducer {
         }
         canonicalHeaders.append(headerValue)
             .append(NEWLINE);
-
-        // Set for testing purpose only to skip date and host validation.
-        try {
-          validateSignedHeader(schema, header, headerValue);
-        } catch (DateTimeParseException ex) {
-          LOG.error("DateTime format invalid.", ex);
-          throw newError(S3_AUTHINFO_CREATION_ERROR);
-        }
-
       } else {
         LOG.error("Header " + header + " not present in "
             + "request but requested to be signed.");
@@ -231,26 +207,6 @@ public final class StringToSignProducer {
     return result.toString();
   }
 
-  /**
-   * Returns matching strings.
-   *
-   * @param regex Regular expression to split by
-   * @param whole The string to split
-   * @return pieces
-   */
-  private static Iterable<String> split(String regex, String whole) {
-    Pattern p = Pattern.compile(regex);
-    Matcher m = p.matcher(whole);
-    List<String> result = new ArrayList<>();
-    int pos = 0;
-    while (m.find()) {
-      result.add(whole.substring(pos, m.start()));
-      pos = m.end();
-    }
-    result.add(whole.substring(pos));
-    return result;
-  }
-
   private static String urlEncode(String str) {
     try {
       return StringUtils.replaceEach(S3Utils.urlEncode(str), URL_ENCODE_SEARCH_CHARS, URL_ENCODE_REPLACE_CHARS);
@@ -281,35 +237,6 @@ public final class StringToSignProducer {
       }
     }
     return result.toString();
-  }
-
-  @VisibleForTesting
-  static void validateSignedHeader(
-      String schema,
-      String header,
-      String headerValue
-  ) throws OS3Exception, DateTimeParseException {
-    switch (header) {
-    case HOST:
-      break;
-    case X_AMAZ_DATE:
-      LocalDateTime date = LocalDateTime.parse(headerValue, TIME_FORMATTER);
-      LocalDateTime now = LocalDateTime.now();
-      if (date.isBefore(now.minus(PRESIGN_URL_MAX_EXPIRATION_SECONDS, SECONDS))
-          || date.isAfter(now.plus(PRESIGN_URL_MAX_EXPIRATION_SECONDS,
-          SECONDS))) {
-        LOG.error("AWS date not in valid range. Request timestamp:{} should "
-            + "not be older than {} seconds.",
-            headerValue, PRESIGN_URL_MAX_EXPIRATION_SECONDS);
-        throw newError(S3_AUTHINFO_CREATION_ERROR);
-      }
-      break;
-    case X_AMZ_CONTENT_SHA256:
-      // Validate x-amz-content-sha256 during upload, before committing the key.
-      break;
-    default:
-      break;
-    }
   }
 
   /**

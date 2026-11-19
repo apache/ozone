@@ -68,7 +68,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   // scmNodeId -> ProxyInfo<rpcProxy>
   private final Map<String, ProxyInfo<T>> scmProxies;
   // scmNodeId -> SCMProxyInfo
-  private final Map<String, SCMProxyInfo> scmProxyInfoMap;
+  private Map<String, SCMProxyInfo> scmProxyInfoMap;
   private List<String> scmNodeIds;
 
   // As SCM Client is shared across threads, performFailOver()
@@ -122,7 +122,6 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     this.scmVersion = RPC.getProtocolVersion(protocol);
 
     this.scmProxies = new HashMap<>();
-    this.scmProxyInfoMap = new HashMap<>();
     loadConfigs();
 
     this.currentProxyIndex = 0;
@@ -174,9 +173,19 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
 
   @VisibleForTesting
   protected synchronized void loadConfigs() {
-    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
-    scmNodeIds = new ArrayList<>();
+    ScmProxyConfig newConfig = buildConfigs();
+    scmNodeIds = newConfig.nodeIds;
+    scmProxyInfoMap = newConfig.proxyInfoMap;
+  }
 
+  /**
+   * Thread-safely resolves node addresses into an isolated holder.
+   * Fails atomically if any address is missing.
+   */
+  private ScmProxyConfig buildConfigs() {
+    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+    List<String> newScmNodeIds = new ArrayList<>();
+    Map<String, SCMProxyInfo> newScmProxyInfoMap = new HashMap<>();
 
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
       String protocolAddress = getProtocolAddress(scmNodeInfo);
@@ -188,15 +197,85 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
 
         String scmServiceId = scmNodeInfo.getServiceId();
         String scmNodeId = scmNodeInfo.getNodeId();
-        scmNodeIds.add(scmNodeId);
+        newScmNodeIds.add(scmNodeId);
         // Preserve the original config string so DNS can be re-resolved
         // on connection failure when the SCM peer is rescheduled to a
         // new IP (Kubernetes pod-IP-change recovery). See
         // refreshProxyAddressIfChanged(String).
         SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId,
             protocolAddr, protocolAddress);
-        scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
+        newScmProxyInfoMap.put(scmNodeId, scmProxyInfo);
       }
+    }
+
+    return new ScmProxyConfig(newScmNodeIds, newScmProxyInfoMap);
+  }
+
+  /**
+   * Reloads SCM nodes and proxies from updated config without a restart.
+   * Stops proxies for removed/changed nodes; fails atomically if config is invalid.
+   * In-flight calls on removed nodes persist until the next failover.
+   */
+  public void changeConfig() {
+    // Resolve DNS before locking to prevent slow lookup from blocking callers.
+    ScmProxyConfig newConfig = buildConfigs();
+
+    Map<String, ProxyInfo<T>> staleProxies = new HashMap<>();
+    synchronized (this) {
+      Map<String, SCMProxyInfo> oldProxyInfoMap = scmProxyInfoMap;
+      scmNodeIds = newConfig.nodeIds;
+      scmProxyInfoMap = newConfig.proxyInfoMap;
+
+      // Re-sync proxy index to the new list, or fall back to first node if removed.
+      int newProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
+      if (newProxyIndex < 0) {
+        newProxyIndex = 0;
+        currentProxySCMNodeId = scmNodeIds.get(newProxyIndex);
+      }
+      currentProxyIndex = newProxyIndex;
+
+      // Drop removed failover target to prevent NPE on next failover.
+      if (updatedLeaderNodeID != null
+          && !scmProxyInfoMap.containsKey(updatedLeaderNodeID)) {
+        updatedLeaderNodeID = null;
+      }
+
+      // Evict stale proxies under lock, but defer stopProxy until unlocked to avoid blocking.
+      for (Map.Entry<String, SCMProxyInfo> entry : oldProxyInfoMap.entrySet()) {
+        String nodeId = entry.getKey();
+        SCMProxyInfo newInfo = scmProxyInfoMap.get(nodeId);
+        if (newInfo == null
+            || !newInfo.getAddress().equals(entry.getValue().getAddress())) {
+          ProxyInfo<T> staleProxy = scmProxies.remove(nodeId);
+          if (staleProxy != null && staleProxy.proxy != null) {
+            staleProxies.put(nodeId, staleProxy);
+          }
+        }
+      }
+
+      getLogger().info("Reloaded SCM proxy configuration for protocol {} with {} nodes: {}",
+          protocolClass.getSimpleName(), scmNodeIds.size(), scmProxyInfoMap.values());
+    }
+
+    for (Map.Entry<String, ProxyInfo<T>> entry : staleProxies.entrySet()) {
+      try {
+        RPC.stopProxy(entry.getValue().proxy);
+      } catch (RuntimeException stopEx) {
+        getLogger().warn("Failed to stop stale proxy for SCM node {}",
+            entry.getKey(), stopEx);
+      }
+    }
+  }
+
+  /** Parsed node list and resolved addresses, built without touching shared state. */
+  private static final class ScmProxyConfig {
+    private final List<String> nodeIds;
+    private final Map<String, SCMProxyInfo> proxyInfoMap;
+
+    ScmProxyConfig(List<String> nodeIds,
+        Map<String, SCMProxyInfo> proxyInfoMap) {
+      this.nodeIds = nodeIds;
+      this.proxyInfoMap = proxyInfoMap;
     }
   }
 

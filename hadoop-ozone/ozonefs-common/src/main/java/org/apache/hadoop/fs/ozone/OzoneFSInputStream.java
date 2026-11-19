@@ -30,14 +30,18 @@ import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
  * The input stream for Ozone file system.
- *
- * TODO: Make inputStream generic for both rest and rpc clients
- * This class is not thread safe.
+ * <p>
+ * Sequential reads are NOT thread safe.
+ * <p>
+ * Positioned reads are thread safe.
+ * They delegate to the underlying {@link ByteBufferPositionedReadable} stream.
+ * <p>
+ * Applications must use either sequential reads or position reads at any given time,
+ * but not concurrent sequential/position reads
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -131,15 +135,15 @@ public class OzoneFSInputStream extends FSInputStream
       int readLen = Math.min(buf.remaining(), available());
       if (buf.hasArray()) {
         int pos = buf.position();
-        bytesRead = read(buf.array(), pos, readLen);
+        bytesRead = inputStream.read(buf.array(), buf.arrayOffset() + pos, readLen);
         if (bytesRead > 0) {
           buf.position(pos + bytesRead);
         }
       } else {
         byte[] readData = new byte[readLen];
-        bytesRead = read(readData, 0, readLen);
+        bytesRead = inputStream.read(readData, 0, readLen);
         if (bytesRead > 0) {
-          buf.put(readData);
+          buf.put(readData, 0, bytesRead);
         }
       }
     }
@@ -158,57 +162,77 @@ public class OzoneFSInputStream extends FSInputStream
   }
 
   /**
-   * @param buf the ByteBuffer to receive the results of the read operation.
+   * @param buffer to receive the results of the read operation.
    * @param position offset
    * @return the number of bytes read, possibly zero, or -1 if
    *         reach end-of-stream
    * @throws IOException if there is some error performing the read
    */
   @Override
-  public int read(long position, ByteBuffer buf) throws IOException {
-    if (!buf.hasRemaining()) {
-      return 0;
+  public int read(long position, ByteBuffer buffer) throws IOException {
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
     }
-    if (inputStream instanceof ExtendedInputStream) {
-      final int remainingBeforeRead = buf.remaining();
-      try {
-        if (((ExtendedInputStream) inputStream).readFully(position, buf)) {
-          return remainingBeforeRead - buf.remaining();
-        }
-      } catch (EOFException e) {
-        return -1;
-      }
+    if (buffer.isReadOnly()) {
+      throw new ReadOnlyBufferException();
     }
+    return buffer.hasRemaining() ? readImpl(position, buffer) : 0;
+  }
 
-    long oldPos = this.getPos();
-    int bytesRead;
-    try {
-      ((Seekable) inputStream).seek(position);
-      bytesRead = ((ByteBufferReadable) inputStream).read(buf);
-    } catch (EOFException e) {
-      // Either position is negative or it has reached EOF
-      return -1;
-    } finally {
-      ((Seekable) inputStream).seek(oldPos);
+  @Override
+  public int read(long position, byte[] array, int offset, int length) throws IOException {
+    validatePositionedReadArgs(position, array, offset, length);
+    return read(position, ByteBuffer.wrap(array, offset, length));
+  }
+
+  protected InputStream getWrappedInputStream() {
+    return inputStream;
+  }
+
+  private int readImpl(long position, ByteBuffer buffer) throws IOException {
+    if (!(inputStream instanceof ByteBufferPositionedReadable)) {
+      throw new UnsupportedOperationException("Positioned reads are not supported by "
+          + inputStream.getClass().getName());
     }
-    return bytesRead;
+    final int n = ((ByteBufferPositionedReadable) inputStream).read(position, buffer);
+    if (statistics != null && n > 0) {
+      statistics.incrementBytesRead(n);
+    }
+    return n;
   }
 
   /**
-   * @param buf the ByteBuffer to receive the results of the read operation.
+   * @param buffer to receive the results of the read operation.
    * @param position offset
    * @throws IOException if there is some error performing the read
    * @throws EOFException if end of file reached before reading fully
    */
   @Override
-  public void readFully(long position, ByteBuffer buf) throws IOException {
-    int bytesRead;
-    for (int readCount = 0; buf.hasRemaining(); readCount += bytesRead) {
-      bytesRead = this.read(position + (long)readCount, buf);
-      if (bytesRead < 0) {
-        // Still buffer has space to read but stream has already reached EOF
-        throw new EOFException("End of file reached before reading fully.");
+  public void readFully(long position, ByteBuffer buffer) throws IOException {
+    readFullyImpl(position, buffer);
+  }
+
+  @Override
+  public void readFully(long position, byte[] array, int offset, int length) throws IOException {
+    validatePositionedReadArgs(position, array, offset, length);
+    readFullyImpl(position, ByteBuffer.wrap(array, offset, length));
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer) throws IOException {
+    readFully(position, buffer, 0, buffer.length);
+  }
+
+  private void readFullyImpl(long position, ByteBuffer buffer) throws IOException {
+    do {
+      final int n = read(position, buffer);
+      if (n < 0) {
+        throw new EOFException("End of stream at position " + position);
       }
-    }
+      if (n == 0 && buffer.hasRemaining()) {
+        throw new IOException("No progress reading at position " + position);
+      }
+      position += n;
+    } while (buffer.hasRemaining());
   }
 }

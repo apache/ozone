@@ -185,12 +185,8 @@ public class RatisPipelineProvider
         .build();
 
     // Send command to datanodes to create pipeline
-    final CreatePipelineCommand createCommand = suggestedLeader != null ?
-        new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
-            factor, dns, suggestedLeader) :
-        new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
-            factor, dns);
-
+    final CreatePipelineCommand createCommand = new CreatePipelineCommand(
+        pipeline.getId(), pipeline.getType(), factor, dns, suggestedLeader);
     createCommand.setTerm(scmContext.getTermOfLeader());
 
     dns.forEach(node -> {
@@ -279,7 +275,7 @@ public class RatisPipelineProvider
       final CommandForDatanode<?> datanodeCommand =
           new CommandForDatanode<>(node, closeCommand);
       LOG.info("Send pipeline:{} close command to datanode {}",
-          pipeline.getId(), datanodeCommand.getDatanodeId());
+          pipeline.getId(), node);
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
     });
   }

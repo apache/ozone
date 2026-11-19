@@ -29,8 +29,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class TestXceiverClientGrpcChannel {
@@ -57,6 +59,21 @@ class TestXceiverClientGrpcChannel {
         channel.shutdownNow();
         channel.awaitTermination(5, TimeUnit.SECONDS);
       }
+    }
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource({"500ms, 500", "1500ms, 1500", "30s, 30000", "45, 45000"})
+  void timeoutIsInMillis(String value, long expectedMillis) throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, value);
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT, value);
+    Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(datanodeWithDistinctHostAndIp()));
+
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
+         XceiverClientGrpc ecClient = new ECXceiverClientGrpc(pipeline, conf, null)) {
+      assertThat(client.getTimeout()).isEqualTo(expectedMillis);
+      assertThat(ecClient.getTimeout()).isEqualTo(expectedMillis);
     }
   }
 

@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
@@ -479,7 +480,7 @@ public class ReconUtils {
     Timestamp now =
         using(sqlConfiguration).fetchValue(select(currentTimestamp()));
     GlobalStats record = globalStatsDao.fetchOneByKey(key);
-    GlobalStats newRecord = new GlobalStats(key, count, now);
+    GlobalStats newRecord = new GlobalStats(key, count, now.toLocalDateTime());
 
     // Insert a new record for key if it does not exist
     if (record == null) {
@@ -707,6 +708,16 @@ public class ReconUtils {
   public static <T> Map<String, T> extractKeysFromTable(
       Table<String, T> table, String startPrefix, int limit, String prevKey)
       throws IOException {
+    return extractKeysFromTable(table, startPrefix, limit, prevKey, value -> true);
+  }
+
+  /**
+   * Same as {@link #extractKeysFromTable(Table, String, int, String)}, but only returns records whose value
+   * matches {@code filter}. Records that do not match are skipped and do not count towards {@code limit}.
+   */
+  public static <T> Map<String, T> extractKeysFromTable(
+      Table<String, T> table, String startPrefix, int limit, String prevKey, Predicate<T> filter)
+      throws IOException {
 
     Map<String, T> matchedKeys = new LinkedHashMap<>();
 
@@ -752,7 +763,9 @@ public class ReconUtils {
         }
 
         // Add the valid key-value pair to the results
-        matchedKeys.put(dbKey, entry.getValue());
+        if (filter.test(entry.getValue())) {
+          matchedKeys.put(dbKey, entry.getValue());
+        }
       }
     } catch (IOException exception) {
       log.error("Error retrieving keys from table for path: {}", startPrefix, exception);

@@ -87,28 +87,38 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "OverReplicatedQueueSize",
       "Number of containers currently in the over replicated queue");
 
+  private static final MetricsInfo INFLIGHT_EC_RECONSTRUCTION = Interns.info(
+      "InflightEcReconstruction",
+      "Number of active EC reconstruction commands across the cluster.");
+
+  private static final MetricsInfo EC_RECONSTRUCTION_GLOBAL_LIMIT = Interns.info(
+      "EcReconstructionGlobalLimit",
+      "Configured maximum number of inflight EC reconstruction commands "
+          + "across the cluster (0 means unlimited).");
+
   // Setup metric names and descriptions for Container Lifecycle states
-  private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS
-      = Collections.unmodifiableMap(
-          new LinkedHashMap<LifeCycleState, MetricsInfo>() {{
-            for (LifeCycleState s : LifeCycleState.values()) {
-              String name = CaseFormat.UPPER_UNDERSCORE
-                  .to(CaseFormat.UPPER_CAMEL, s.toString());
-              String metric = name + "Containers";
-              String description = "Current count of Containers in " + name +
-                  " state";
-              put(s, Interns.info(metric, description));
-            }
-          }});
+  private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS;
 
   // Setup metric names and descriptions for
   private static final Map<ContainerHealthState, MetricsInfo>
-      CONTAINER_HEALTH_STATE_METRICS = Collections.unmodifiableMap(
-          new LinkedHashMap<ContainerHealthState, MetricsInfo>() {{
-            for (ContainerHealthState s :  ContainerHealthState.values()) {
-              put(s, Interns.info(s.getMetricName(), s.getDescription()));
-            }
-          }});
+      CONTAINER_HEALTH_STATE_METRICS;
+
+  static {
+    Map<LifeCycleState, MetricsInfo> lifecycleStateMetrics = new LinkedHashMap<>();
+    for (LifeCycleState state : LifeCycleState.values()) {
+      String name = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, state.toString());
+      String metric = name + "Containers";
+      String description = "Current count of Containers in " + name + " state";
+      lifecycleStateMetrics.put(state, Interns.info(metric, description));
+    }
+    LIFECYCLE_STATE_METRICS = Collections.unmodifiableMap(lifecycleStateMetrics);
+
+    Map<ContainerHealthState, MetricsInfo> containerHealthStateMetrics = new LinkedHashMap<>();
+    for (ContainerHealthState state : ContainerHealthState.values()) {
+      containerHealthStateMetrics.put(state, Interns.info(state.getMetricName(), state.getDescription()));
+    }
+    CONTAINER_HEALTH_STATE_METRICS = Collections.unmodifiableMap(containerHealthStateMetrics);
+  }
 
   @Metric("Number of replication commands sent.")
   private MutableCounterLong replicationCmdsSentTotal;
@@ -224,6 +234,26 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       + "to the pending commands on all source datanodes")
   private MutableCounterLong replicateContainerCmdsDeferredTotal;
 
+  @Metric("Number of EC reconstruction commands sent for decommission recovery "
+      + "because a decommissioning source datanode was highly loaded.")
+  private MutableCounterLong ecReconstructionDecommissionTriggeredTotal;
+
+  @Metric("Number of times EC decommission recovery fell back to 1-1 "
+      + "replication because the global reconstruction limit was reached.")
+  private MutableCounterLong ecReconstructionGlobalLimitReachedTotal;
+
+  @Metric("Number of times EC decommission recovery fell back to 1-1 "
+      + "replication due to insufficient non-decommission data sources.")
+  private MutableCounterLong ecDecommissionReconstructionFallbackInsufficientSourcesTotal;
+
+  @Metric("Number of times EC decommission recovery fell back to 1-1 "
+      + "replication because reconstruction was throttled on target datanodes.")
+  private MutableCounterLong ecDecommissionReconstructionFallbackTargetOverloadedTotal;
+
+  @Metric("Number of times EC decommission reconstruction was attempted but "
+      + "no reconstruction command was sent.")
+  private MutableCounterLong ecDecommissionReconstructionFallbackNoOpTotal;
+
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
@@ -247,7 +277,11 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         .addGauge(INFLIGHT_REPLICATION, getInflightReplication())
         .addGauge(INFLIGHT_DELETION, getInflightDeletion())
         .addGauge(INFLIGHT_EC_REPLICATION, getEcReplication())
-        .addGauge(INFLIGHT_EC_DELETION, getEcDeletion());
+        .addGauge(INFLIGHT_EC_DELETION, getEcDeletion())
+        .addGauge(INFLIGHT_EC_RECONSTRUCTION,
+            replicationManager.getInflightReconstructionCount())
+        .addGauge(EC_RECONSTRUCTION_GLOBAL_LIMIT,
+            replicationManager.getReconstructionInFlightLimit());
 
     builder.addGauge(UNDER_REPLICATED_QUEUE,
                     replicationManager.getQueue().underReplicatedQueueSize())
@@ -289,6 +323,11 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     partialReplicationTotal.snapshot(builder, all);
     ecPartialReplicationForMisReplicationTotal.snapshot(builder, all);
     partialReplicationForMisReplicationTotal.snapshot(builder, all);
+    ecReconstructionDecommissionTriggeredTotal.snapshot(builder, all);
+    ecReconstructionGlobalLimitReachedTotal.snapshot(builder, all);
+    ecDecommissionReconstructionFallbackInsufficientSourcesTotal.snapshot(builder, all);
+    ecDecommissionReconstructionFallbackTargetOverloadedTotal.snapshot(builder, all);
+    ecDecommissionReconstructionFallbackNoOpTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -570,6 +609,46 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getPartialReplicationForMisReplicationTotal() {
     return this.partialReplicationForMisReplicationTotal.value();
+  }
+
+  public void incrEcReconstructionDecommissionTriggeredTotal() {
+    this.ecReconstructionDecommissionTriggeredTotal.incr();
+  }
+
+  public long getEcReconstructionDecommissionTriggeredTotal() {
+    return ecReconstructionDecommissionTriggeredTotal.value();
+  }
+
+  public void incrEcReconstructionGlobalLimitReachedTotal() {
+    this.ecReconstructionGlobalLimitReachedTotal.incr();
+  }
+
+  public long getEcReconstructionGlobalLimitReachedTotal() {
+    return ecReconstructionGlobalLimitReachedTotal.value();
+  }
+
+  public void incrEcDecommissionReconstructionFallbackInsufficientSourcesTotal() {
+    this.ecDecommissionReconstructionFallbackInsufficientSourcesTotal.incr();
+  }
+
+  public long getEcDecommissionReconstructionFallbackInsufficientSourcesTotal() {
+    return ecDecommissionReconstructionFallbackInsufficientSourcesTotal.value();
+  }
+
+  public void incrEcDecommissionReconstructionFallbackTargetOverloadedTotal() {
+    this.ecDecommissionReconstructionFallbackTargetOverloadedTotal.incr();
+  }
+
+  public long getEcDecommissionReconstructionFallbackTargetOverloadedTotal() {
+    return ecDecommissionReconstructionFallbackTargetOverloadedTotal.value();
+  }
+
+  public void incrEcDecommissionReconstructionFallbackNoOpTotal() {
+    this.ecDecommissionReconstructionFallbackNoOpTotal.incr();
+  }
+
+  public long getEcDecommissionReconstructionFallbackNoOpTotal() {
+    return ecDecommissionReconstructionFallbackNoOpTotal.value();
   }
 
 }

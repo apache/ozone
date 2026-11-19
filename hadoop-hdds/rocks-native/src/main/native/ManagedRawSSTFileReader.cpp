@@ -22,7 +22,6 @@
 #include "rocksdb/raw_iterator.h"
 #include <string>
 #include "cplusplus_to_java_convert.h"
-#include <iostream>
 
 jlong Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileReader_newRawSSTFileReader(JNIEnv *env, jobject obj,
                                                                                                jlong options_handle,

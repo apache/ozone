@@ -23,10 +23,16 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.protobuf.ServiceException;
+import java.io.IOException;
 import java.util.Collection;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.RetriableWithNoFailoverException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -50,5 +56,21 @@ class TestSCMHAUtils {
 
     assertEquals(2, nodesWithoutSelf.size());
     assertThat(nodesWithoutSelf).doesNotContain(selfId);
+  }
+
+  @Test
+  void retriesSameScmOnRetriableWithNoFailoverException() {
+    Exception e = new ServiceException(new RemoteException(RetriableWithNoFailoverException.class.getName(),
+        "SCM leader is not ready"));
+    assertThat(SCMHAUtils.checkRetriableWithNoFailoverException(e)).isTrue();
+    RetryAction action = SCMHAUtils.getRetryAction(0, 0, e, 15, 2000);
+    assertEquals(RetryDecision.RETRY, action.action);
+    assertEquals(2000, action.delayMillis);
+    // Fails after max retries
+    assertEquals(RetryDecision.FAIL, SCMHAUtils.getRetryAction(0, 15, e, 15, 2000).action);
+
+    // Other exceptions are not matched
+    Exception other = new ServiceException(new RemoteException(IOException.class.getName(), "error"));
+    assertThat(SCMHAUtils.checkRetriableWithNoFailoverException(other)).isFalse();
   }
 }

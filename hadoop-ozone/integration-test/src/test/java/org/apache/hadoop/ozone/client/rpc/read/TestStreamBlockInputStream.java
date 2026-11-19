@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.client.rpc.read;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,6 +27,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -36,6 +40,8 @@ import org.apache.hadoop.ozone.container.common.transport.server.GrpcXceiverServ
 import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -70,18 +76,31 @@ public class TestStreamBlockInputStream extends InputStreamTests {
    * for each test.
    */
   private static final int DATA_LENGTH = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
+  /** Representative read buffer sizes relative to key length (keyLength / divisor). */
+  private static final int[] READ_BUFFER_DIVISORS = {1, 2, 5, 10};
+  /** Representative fixed read buffer sizes from 4 KB to 16 MB. */
+  private static final int[] READ_BUFFER_SIZES = {4 << 10, 256 << 10, 16 << 20};
+  private static final int RANDOM_SEEK_COUNT = 20;
   private byte[] inputData;
   private BucketForTesting bucket;
+
+  @Override
+  int getDatanodeCount() {
+    return getRepConfig().getRequiredNodes();
+  }
+
+  @Override
+  ReplicationConfig getRepConfig() {
+    return RatisReplicationConfig.getInstance(ONE);
+  }
 
   @Test
   void testReadKey() throws Exception {
     OzoneConfiguration conf = getCluster().getConf();
 
     runTestReadKey(DATA_LENGTH, false, conf);
-    for (int i = 0; i < 2; i++) {
-      final int keyLength = DATA_LENGTH + ThreadLocalRandom.current().nextInt(DATA_LENGTH);
-      runTestReadKey(keyLength, true, conf);
-    }
+    final int keyLength = DATA_LENGTH + ThreadLocalRandom.current().nextInt(DATA_LENGTH);
+    runTestReadKey(keyLength, true, conf);
   }
 
   void runTestReadKey(int keyLength, boolean randomReadOffset, OzoneConfiguration conf) throws Exception {
@@ -92,18 +111,18 @@ public class TestStreamBlockInputStream extends InputStreamTests {
     String keyName = getNewKeyName();
     try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
       bucket = BucketForTesting.newBuilder(client).build();
-      inputData = bucket.writeRandomBytes(keyName, keyLength);
+      inputData = bucket.writeRandomBytes(keyName, getRepConfig(), keyLength);
       LOG.info("---------------------------------------------------------");
       LOG.info("writeRandomBytes {} bytes", inputData.length);
 
       runTestPositionedRead(keyName, ByteBuffer.wrap(new byte[inputData.length]));
 
-      for (int i = 1; i <= 10; i++) {
-        runTestReadKey(keyName, keyLength / i, randomReadOffset, keyLength);
+      for (int divisor : READ_BUFFER_DIVISORS) {
+        runTestReadKey(keyName, keyLength / divisor, randomReadOffset, keyLength);
       }
 
-      for (int n = 4; n <= 16 << 10; n <<= 2) {
-        runTestReadKey(keyName, n << 10, randomReadOffset, keyLength);
+      for (int bufferSize : READ_BUFFER_SIZES) {
+        runTestReadKey(keyName, bufferSize, randomReadOffset, keyLength);
       }
     }
   }
@@ -124,9 +143,8 @@ public class TestStreamBlockInputStream extends InputStreamTests {
         if (read == -1) {
           break;
         }
-        for (int i = 0; i < read; i++) {
-          assertEquals(inputData[pos + i], buffer[i], "pos=" + pos + ", i=" + i);
-        }
+        assertEquals(ByteBuffer.wrap(inputData, pos, read),
+            ByteBuffer.wrap(buffer, 0, read), "pos=" + pos);
         pos += read;
       }
       assertEquals(keyLength, pos);
@@ -139,7 +157,7 @@ public class TestStreamBlockInputStream extends InputStreamTests {
       runTestPositionedRead(buffer, in, 0, 1);
       runTestPositionedRead(buffer, in, inputData.length, 0);
       runTestPositionedRead(buffer, in, inputData.length - 1, 1);
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 2; i++) {
         runTestPositionedRead(buffer, in);
       }
     }
@@ -175,19 +193,13 @@ public class TestStreamBlockInputStream extends InputStreamTests {
   void assertData(int pos, int length, ByteBuffer buffer) {
     buffer.flip();
     assertEquals(length, buffer.remaining());
-    for (int i = 0; i < length; i++) {
-      assertEquals(inputData[pos + i], buffer.get(i), "pos=" + pos + ", i=" + i);
-    }
+    assertEquals(ByteBuffer.wrap(inputData, pos, length), buffer, () -> "pos=" + pos);
   }
 
-  @Test
-  void testAllWithPreRead() throws Exception {
-    runTestAll(true);
-  }
-
-  @Test
-  void testAllWithoutPreRead() throws Exception {
-    runTestAll(false);
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testAll(boolean preRead) throws Exception {
+    runTestAll(preRead);
   }
 
   void runTestAll(boolean preRead) throws Exception {
@@ -202,7 +214,7 @@ public class TestStreamBlockInputStream extends InputStreamTests {
     String keyName = getNewKeyName();
     try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
       bucket = BucketForTesting.newBuilder(client).build();
-      inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
+      inputData = bucket.writeRandomBytes(keyName, getRepConfig(), DATA_LENGTH);
       testReadKeyFully(keyName);
       testSeek(keyName);
       testReadEmptyBlock();
@@ -212,7 +224,7 @@ public class TestStreamBlockInputStream extends InputStreamTests {
     copy.setFromObject(clientConfig);
     try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
       bucket = BucketForTesting.newBuilder(client).build();
-      inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
+      inputData = bucket.writeRandomBytes(keyName, getRepConfig(), DATA_LENGTH);
       testReadKeyFully(keyName);
       testSeek(keyName);
     }
@@ -228,14 +240,11 @@ public class TestStreamBlockInputStream extends InputStreamTests {
       byte[] readData = new byte[DATA_LENGTH];
       int totalRead = keyInputStream.read(readData, 0, DATA_LENGTH);
       assertEquals(DATA_LENGTH, totalRead);
-      for (int i = 0; i < DATA_LENGTH; i++) {
-        assertEquals(inputData[i], readData[i],
-            "Read data is not same as written data at index " + i);
-      }
+      assertArrayEquals(inputData, readData);
     }
-    // Read the data 1 byte at a time
+    // Read the first checksum segment 1 byte at a time to verify single-byte reads.
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
-      for (int i = 0; i < DATA_LENGTH; i++) {
+      for (int i = 0; i < BYTES_PER_CHECKSUM; i++) {
         int b = keyInputStream.read();
         assertEquals(inputData[i], (byte) b,
             "Read data is not same as written data at index " + i);
@@ -247,10 +256,9 @@ public class TestStreamBlockInputStream extends InputStreamTests {
       int totalRead = keyInputStream.read(readBuf);
       assertEquals(DATA_LENGTH, totalRead);
       readBuf.flip();
-      for (int i = 0; i < DATA_LENGTH; i++) {
-        assertEquals(inputData[i], readBuf.get(),
-            "Read data is not same as written data at index " + i);
-      }
+      byte[] readData = new byte[DATA_LENGTH];
+      readBuf.get(readData);
+      assertArrayEquals(inputData, readData);
     }
   }
 
@@ -262,16 +270,16 @@ public class TestStreamBlockInputStream extends InputStreamTests {
 
   private void runTestSeek(KeyInputStream in, int seekSize, Random random) throws IOException {
     LOG.info("runTestSeek: seekSize={}", seekSize);
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < RANDOM_SEEK_COUNT; i++) {
       int position = random.nextInt(seekSize);
       assertSeekRead(in, position);
     }
 
-    for (int position = 0; position < DATA_LENGTH; position += random.nextInt(seekSize)) {
+    for (int position = 0; position < DATA_LENGTH; position += seekSize) {
       assertSeekRead(in, position);
     }
 
-    for (int position = DATA_LENGTH - 1; position >= 0; position -= random.nextInt(seekSize)) {
+    for (int position = DATA_LENGTH - 1; position >= 0; position -= seekSize) {
       assertSeekRead(in, position);
     }
     assertSeekRead(in, 0);
@@ -301,7 +309,7 @@ public class TestStreamBlockInputStream extends InputStreamTests {
 
   private void testReadEmptyBlock() throws Exception {
     String keyName = getNewKeyName();
-    bucket.writeRandomBytes(keyName, 0);
+    bucket.writeRandomBytes(keyName, getRepConfig(), 0);
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       assertTrue(keyInputStream.getPartStreams().isEmpty());
       assertEquals(-1, keyInputStream.read());

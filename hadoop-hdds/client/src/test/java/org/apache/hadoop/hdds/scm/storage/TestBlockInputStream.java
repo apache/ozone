@@ -93,6 +93,7 @@ public class TestBlockInputStream {
   private Function<BlockID, BlockLocationInfo> refreshFunction;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
+  private OzoneClientConfig clientConfig;
 
   @BeforeEach
   @SuppressWarnings("unchecked")
@@ -101,8 +102,9 @@ public class TestBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
+    clientConfig.setReadRetryInterval(0);
 
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
@@ -275,14 +277,15 @@ public class TestBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setChecksumVerify(false);
+    // default retry interval, the retry delay is logged only if it is positive
+    OzoneClientConfig retryDelayConfig = conf.getObject(OzoneClientConfig.class);
+    retryDelayConfig.setChecksumVerify(false);
 
     try (BlockInputStream blockInputStreamWithRetry =
              new DummyBlockInputStreamWithRetry(blockID, blockSize,
                  MockPipeline.createSingleNodePipeline(), null,
                  null, chunks, chunkDataMap, isRefreshed, null,
-                 clientConfig)) {
+                 retryDelayConfig)) {
       assertFalse(isRefreshed.get());
       seekAndVerify(50);
       byte[] b = new byte[200];
@@ -433,8 +436,6 @@ public class TestBlockInputStream {
 
   private BlockInputStream createSubject(BlockID blockID, Pipeline pipeline,
       ChunkInputStream stream) throws IOException {
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setChecksumVerify(false);
     return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         null, refreshFunction, chunks, null, clientConfig) {
       @Override
@@ -472,6 +473,20 @@ public class TestBlockInputStream {
     }
   }
 
+  @Test
+  public void testPositionedReadOfClosedUninitializedStreamFailsWithIOException() throws IOException {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    BlockInputStream subject = new BlockInputStream(
+        new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
+        MockPipeline.createSingleNodePipeline(), null, mock(XceiverClientFactory.class), refreshFunction,
+        clientConfig);
+    subject.close();
+
+    // the stream has no client to initialize with, which must be reported as an IOException
+    IOException e = assertThrows(IOException.class, () -> subject.read(0, ByteBuffer.allocate(10)));
+    assertThat(e).hasMessageContaining("closed");
+  }
+
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
   public void testRefreshOnReadFailureAfterUnbuffer(IOException ex)
@@ -493,8 +508,6 @@ public class TestBlockInputStream {
         .thenReturn(blockLocationInfo);
     when(blockLocationInfo.getPipeline()).thenReturn(newPipeline);
 
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setChecksumVerify(false);
     BlockInputStream subject = new BlockInputStream(
         new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
         pipeline, null, clientFactory, refreshFunction,
@@ -539,6 +552,17 @@ public class TestBlockInputStream {
   }
 
   @Test
+  public void testPositionedReadAtEof() throws Exception {
+    ByteBuffer empty = ByteBuffer.allocate(0);
+    for (long position : new long[] {0, blockSize, blockSize + 1}) {
+      assertEquals(0, blockStream.readPositioned(position, empty));
+      assertEquals(0, blockStream.read(position, empty));
+    }
+    assertEquals(-1, blockStream.readPositioned(blockSize, ByteBuffer.allocate(1)));
+    assertEquals(-1, blockStream.readPositioned(blockSize + 1, ByteBuffer.allocate(1)));
+  }
+
+  @Test
   public void testConcurrentPositionedRead() throws Exception {
     try (BlockInputStream largeBlockStream = createLargeBlockStream()) {
       largeBlockStream.initialize();
@@ -572,8 +596,6 @@ public class TestBlockInputStream {
     chunkDataMap.put(chunkName, blockData);
     chunks.add(chunkInfo);
 
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setChecksumVerify(false);
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         null, refreshFunction, chunks, chunkDataMap, clientConfig);

@@ -217,9 +217,9 @@ const OPEN_KEY_TAB_COLUMNS = [
     render: (replicationInfo: ReplicationInfo) => (
       <div>
         {
-          (replicationInfo.replicationType === "RATIS")
-          ? replicationInfo.replicationFactor
-          : `${replicationInfo.codec}-${replicationInfo.data}-${replicationInfo.parity}`
+          (replicationInfo.replicationType === "EC")
+          ? `${replicationInfo.codec}-${replicationInfo.data}-${replicationInfo.parity}`
+          : replicationInfo.replicationFactor
         }
       </div>
     )

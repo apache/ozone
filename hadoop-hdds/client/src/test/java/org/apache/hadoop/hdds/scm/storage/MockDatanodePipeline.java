@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -77,8 +79,11 @@ public class MockDatanodePipeline {
   // Recorded state
   private final List<byte[]> receivedChunks = Collections.synchronizedList(new ArrayList<>());
   private final List<ContainerCommandRequestProto> receivedPutBlocks = Collections.synchronizedList(new ArrayList<>());
+  private final List<ContainerCommandRequestProto> receivedCommands = Collections.synchronizedList(new ArrayList<>());
   private final AtomicInteger watchForCommitCount = new AtomicInteger(0);
   private volatile Type streamInitType;
+  // When true, stream commands are replied without a payload, as a datanode which does not handle them does.
+  private volatile boolean commandUnsupported;
 
   // Commit tracking
   private final AtomicLong nextLogIndex = new AtomicLong(1);
@@ -94,6 +99,11 @@ public class MockDatanodePipeline {
 
   private volatile Supplier<Throwable> watchFailure = null;
   private volatile int watchFailAfter = Integer.MAX_VALUE;
+
+  private volatile boolean streamCloseFailure;
+  // When true, the stream close reply is completed asynchronously after a short delay.
+  private volatile boolean streamCloseDelayed;
+  private final AtomicInteger streamCloseCount = new AtomicInteger(0);
 
   public MockDatanodePipeline() throws IOException {
     this(new BlockID(1, 1));
@@ -187,7 +197,23 @@ public class MockDatanodePipeline {
             receivedChunks.remove(receivedChunks.size() - 1);
           }
           src.position(src.limit());
-          return CompletableFuture.completedFuture(dataStreamReply(size));
+          streamCloseCount.incrementAndGet();
+          final DataStreamReply reply = dataStreamReply(size);
+          if (streamCloseFailure) {
+            when(reply.isSuccess()).thenReturn(false);
+          }
+          if (!streamCloseDelayed) {
+            return CompletableFuture.completedFuture(reply);
+          }
+          return CompletableFuture.supplyAsync(() -> {
+            try {
+              TimeUnit.MILLISECONDS.sleep(50);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new CompletionException(e);
+            }
+            return reply;
+          });
         }
       }
       int count = chunkCount.incrementAndGet();
@@ -201,6 +227,26 @@ public class MockDatanodePipeline {
       receivedChunks.add(data);
       return CompletableFuture.completedFuture(dataStreamReply(data.length));
     }).when(mockDataStreamOutput).writeAsync(any(ByteBuffer.class), any(Iterable.class));
+
+    // Setup commandAsync (mid-stream PutBlock) behavior
+    doAnswer(invocation -> {
+      ByteBuffer src = invocation.getArgument(0);
+      final ContainerCommandRequestProto request = toProto(src);
+      receivedCommands.add(request);
+      if (commandUnsupported) {
+        return CompletableFuture.completedFuture(dataStreamReply(0));
+      }
+      int count = putBlockCount.incrementAndGet();
+      if (count > putBlockFailAfter && putBlockFailure != null) {
+        CompletableFuture<DataStreamReply> failed = new CompletableFuture<>();
+        failed.completeExceptionally(putBlockFailure.get());
+        return failed;
+      }
+      final DataStreamReply reply = dataStreamReply(0);
+      when(reply.nioBuffer()).thenReturn(
+          buildPutBlockResponse(blockID).toByteString().asReadOnlyByteBuffer());
+      return CompletableFuture.completedFuture(reply);
+    }).when(mockDataStreamOutput).commandAsync(any(ByteBuffer.class));
 
     // Mock XceiverClientFactory
     this.clientFactory = mock(XceiverClientFactory.class);
@@ -234,12 +280,22 @@ public class MockDatanodePipeline {
     return receivedPutBlocks;
   }
 
+  /** @return the requests received as data stream commands. */
+  public List<ContainerCommandRequestProto> getReceivedCommands() {
+    return receivedCommands;
+  }
+
   public int getWatchForCommitCount() {
     return watchForCommitCount.get();
   }
 
   public Type getStreamInitType() {
     return streamInitType;
+  }
+
+  /** @return the number of writes with {@link StandardWriteOption#CLOSE}. */
+  public int getStreamCloseCount() {
+    return streamCloseCount.get();
   }
 
   /** Concatenate all received chunks into a single byte array. */
@@ -274,17 +330,38 @@ public class MockDatanodePipeline {
     return this;
   }
 
+  /** Reply to the write with {@link StandardWriteOption#CLOSE} with an unsuccessful reply. */
+  public MockDatanodePipeline failStreamClose() {
+    this.streamCloseFailure = true;
+    return this;
+  }
+
+  /** Complete the stream close reply asynchronously, as a real Ratis pipeline does. */
+  public MockDatanodePipeline withDelayedStreamClose() {
+    this.streamCloseDelayed = true;
+    return this;
+  }
+
+  /** Reply to stream commands without a payload, as a datanode which does not handle them does. */
+  public MockDatanodePipeline withUnsupportedCommand() {
+    this.commandUnsupported = true;
+    return this;
+  }
+
   // --- Helpers ---
 
   private void captureStreamInitType(ByteBuffer buffer) {
+    streamInitType = toProto(buffer).getCmdType();
+  }
+
+  private static ContainerCommandRequestProto toProto(ByteBuffer buffer) {
     ByteBuffer dup = buffer.duplicate();
     byte[] bytes = new byte[dup.remaining()];
     dup.get(bytes);
     try {
-      streamInitType = ContainerCommandRequestMessage.toProto(
-          ByteString.copyFrom(bytes), null).getCmdType();
+      return ContainerCommandRequestMessage.toProto(ByteString.copyFrom(bytes), null);
     } catch (Exception e) {
-      throw new IllegalStateException("Failed to decode stream init request", e);
+      throw new IllegalStateException("Failed to decode container command request", e);
     }
   }
 
@@ -308,6 +385,8 @@ public class MockDatanodePipeline {
     when(reply.getBytesWritten()).thenReturn(bytesWritten);
     when(reply.getDataLength()).thenReturn(bytesWritten);
     when(reply.getCommitInfos()).thenReturn(Collections.emptyList());
+    // Ratis replies with an empty buffer unless the state machine returns a command reply.
+    when(reply.nioBuffer()).thenReturn(ByteBuffer.allocate(0).asReadOnlyBuffer());
     return reply;
   }
 }

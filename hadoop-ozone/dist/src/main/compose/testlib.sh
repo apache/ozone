@@ -27,6 +27,7 @@ RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 source ${_testlib_dir}/compose_v2_compatibility.sh
 source "${_testlib_dir}/../smoketest/testlib.sh"
 
+: ${DOWNLOAD_DIR:="${HOME}/.cache/ozone"}
 : ${OZONE_COMPOSE_RUNNING:=false}
 : "${OZONE_VOLUME_OWNER:=}"
 : ${SECURITY_ENABLED:=false}
@@ -46,6 +47,14 @@ if _is_build; then
   # version is used in bucket name, which does not allow uppercase
   # variable is replaced by Maven at build time
   OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+
+  if [[ -z ${HADOOP_VERSION:-} ]]; then
+    export HADOOP_VERSION="${hadoop.version}"
+  fi
+
+  if [[ -z "${RANGER_VERSION:-}" ]]; then
+    export RANGER_VERSION="${ranger.version}"
+  fi
 else
   OZONE_CURRENT_VERSION=src
 fi
@@ -102,7 +111,11 @@ find_tests(){
       exit 1
     fi
   elif [[ -n "${OZONE_TEST_SELECTOR:-}" ]]; then
-    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}" || echo "")
+    if [[ -f "${OZONE_TEST_SELECTOR}" ]] && [[ "$(realpath "${OZONE_TEST_SELECTOR}")" == "$(pwd -P)/${OZONE_TEST_SELECTOR}" ]]; then
+      tests="${OZONE_TEST_SELECTOR}"
+    else
+      tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}" || echo "")
+    fi
 
     if [[ -z "${tests}" ]]; then
       echo "No tests found for filter ${OZONE_TEST_SELECTOR}"
@@ -115,6 +128,23 @@ find_tests(){
 }
 
 ## @description wait until safemode exit (or 240 seconds)
+## @description wait until S3 Gateway reports ready via /health/ready (port 19878)
+## Required when HAProxy health-checks gate S3 traffic: without a wait, tests
+## start while all backends are still in DOWN state and HAProxy returns 503.
+## Only waits when the multi-instance HAProxy setup (s3g1/s3g2/s3g3) is present.
+wait_for_s3g_ready() {
+  # Not grep -q: exiting early may kill docker-compose with SIGPIPE, failing the pipeline under pipefail
+  if ! docker-compose config --services 2>/dev/null | grep "^s3g1$" > /dev/null; then
+    return 0
+  fi
+  echo "Waiting for S3 Gateway (s3g1) to report ready..."
+  # Accept 200 (ready) and 404: a 404 means the gateway predates /health/ready
+  # (the old release used in upgrade tests), so there is no readiness signal to
+  # wait for. 503 (not ready) and connection failures keep retrying.
+  local status_cmd='curl -s -o /dev/null -w "%{http_code}" http://localhost:19878/health/ready'
+  wait_for_execute_command s3g1 120 "code=\$($status_cmd); test \"\$code\" = 200 || test \"\$code\" = 404"
+}
+
 wait_for_safemode_exit(){
   local cmd="ozone admin safemode wait -t 240"
   if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
@@ -207,6 +237,7 @@ start_docker_env(){
 
   wait_for_safemode_exit
   wait_for_om_leader
+  wait_for_s3g_ready
 }
 
 has_scalable_datanode() {
@@ -292,7 +323,7 @@ reorder_om_nodes() {
   local new_order="$1"
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
-    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om' -e 's3g-haproxy'); do
       docker exec "${c}" sh -c \
         "if [ -f /etc/hadoop/ozone-site.xml ]; then \
           sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
@@ -305,11 +336,11 @@ reorder_om_nodes() {
 ## @description Create stack dump of each java process in each container
 create_stack_dumps() {
   local c pid procname
-  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm | grep -v -e prometheus); do
+  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm | grep -v -e prometheus -e s3g-haproxy); do
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
-    done < <(docker exec "${c}" bash -c "jps | grep -v Jps" || true)
+    done < <(docker exec "${c}" sh -c "jps | grep -v Jps" || true)
   done
 }
 
@@ -674,23 +705,83 @@ download_if_not_exists() {
 
   if [[ -e "${f}" ]]; then
     echo "${f} already downloaded"
-  else
-    echo "Downloading ${f} from ${url}"
-    curl --fail --location --output "${f}" --show-error --silent "${url}" || rm -fv "${f}"
+  elif ! download_with_retry "${url}" "${f}"; then
+    rm -fv "${f}"
+    return 1
   fi
+}
+
+import_keys() {
+  local url="$1"
+
+  keys=$(mktemp)
+  download_with_retry "$url" "$keys"
+  gpg --import "$keys"
+  rm -f "$keys"
+}
+
+verify_apache_release() {
+  # paths of the file to verify
+  local remote_path="$1"
+  local local_path="$2"
+
+  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" == "true" ]]; then
+    return
+  fi
+
+  local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
+
+  if download_if_not_exists "${checksum_base_url}${remote_path}.asc" "${local_path}.asc" \
+    && gpg --verify "${local_path}.asc" "${local_path}"; then
+    return 0
+  fi
+
+  rm -fv "${local_path}.asc" "${local_path}"
+  return 1
 }
 
 download_and_verify_apache_release() {
   local remote_path="$1"
 
-  local f="$(basename "${remote_path}")"
+  local local_path="${DOWNLOAD_DIR}/$(basename "${remote_path}")"
   local base_url="${APACHE_MIRROR_URL:-https://www.apache.org/dyn/closer.lua?action=download&filename=}"
-  local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
-  local download_dir="${DOWNLOAD_DIR:-/tmp}"
 
-  download_if_not_exists "${base_url}${remote_path}" "${download_dir}/${f}"
-  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
-    download_if_not_exists "${checksum_base_url}${remote_path}.asc"  "${download_dir}/${f}.asc"
-    gpg --verify "${download_dir}/${f}.asc" "${download_dir}/${f}" || exit 1
-  fi
+  download_if_not_exists "${base_url}${remote_path}" "${local_path}" >&2 \
+    && verify_apache_release "${remote_path}" "${local_path}" >&2 \
+    && echo "${local_path}"
+}
+
+# retry at two levels:
+# 1. curl --retry 3
+# 2. re-run curl 3x
+download_with_retry() {
+  local url=$1
+  local output=$2
+
+  local rc=1
+
+  mkdir -p "$(dirname "${output}")"
+
+  for i in {1..3}; do
+    echo "Downloading ${output} from ${url}, attempt ${i}"
+    if curl --connect-timeout 10 --continue-at - --fail --location -o "${output}" --retry 3 --show-error --silent "${url}"; then
+      rc=0
+      break
+    fi
+    sleep 2
+  done
+
+  return ${rc}
+}
+
+download_hadoop() {
+  download_and_verify_apache_release "hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz"
+}
+
+download_ranger() {
+  download_and_verify_apache_release "ranger/${RANGER_VERSION}/apache-ranger-${RANGER_VERSION}.tar.gz"
+}
+
+download_ranger_ozone_plugin() {
+  download_and_verify_apache_release "ranger/${RANGER_VERSION}/plugins/ozone/ranger-${RANGER_VERSION}-ozone-plugin.tar.gz"
 }

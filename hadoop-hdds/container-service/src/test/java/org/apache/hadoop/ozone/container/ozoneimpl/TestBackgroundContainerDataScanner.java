@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static com.google.common.util.concurrent.Uninterruptibles.awaitUninterruptibly;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
@@ -52,6 +54,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.util.Canceler;
@@ -285,6 +288,77 @@ public class TestBackgroundContainerDataScanner extends
     scanner.shutdown();
     // The container should remain healthy.
     verifyContainerMarkedUnhealthy(healthy, never());
+  }
+
+  @Test
+  public void testShutdownDuringVolumeFailureDoesNotDeadlock() throws Exception {
+    CountDownLatch checkingVolume = new CountDownLatch(1);
+    CountDownLatch reportVolumeFailure = new CountDownLatch(1);
+    when(vol.isFailed()).thenAnswer(invocation -> {
+      checkingVolume.countDown();
+      awaitUninterruptibly(reportVolumeFailure);
+      return true;
+    });
+    Thread shutdownThread = new Thread(scanner::shutdown, "scanner-shutdown");
+    shutdownThread.setDaemon(true);
+    try {
+      scanner.start();
+      assertTrue(checkingVolume.await(5, TimeUnit.SECONDS));
+      shutdownThread.start();
+      // Let shutdown begin waiting for the worker before the worker detects the failed volume.
+      GenericTestUtils.waitFor(() -> shutdownThread.getState() == Thread.State.WAITING, 10, 5000);
+      reportVolumeFailure.countDown();
+
+      shutdownThread.join(5000);
+      assertFalse(shutdownThread.isAlive(), "Shutdown must not deadlock with volume failure detection");
+      assertFalse(scanner.isAlive(), "Shutdown must wait for the scanner to exit");
+    } finally {
+      reportVolumeFailure.countDown();
+      shutdownThread.interrupt();
+      shutdownThread.join(5000);
+      GenericTestUtils.waitFor(() -> !scanner.isAlive(), 10, 5000);
+    }
+  }
+
+  @Test
+  public void testConcurrentShutdownWaitsForScanner() throws Exception {
+    CountDownLatch scanning = new CountDownLatch(1);
+    CountDownLatch interrupted = new CountDownLatch(1);
+    CountDownLatch finishScan = new CountDownLatch(1);
+    when(healthy.scanData(any(), any())).thenAnswer(invocation -> {
+      scanning.countDown();
+      try {
+        finishScan.await();
+      } catch (InterruptedException ex) {
+        interrupted.countDown();
+        awaitUninterruptibly(finishScan);
+      }
+      return getHealthyDataScanResult();
+    });
+    ExecutorService shutdownExecutor = Executors.newFixedThreadPool(2);
+    try {
+      scanner.start();
+      assertTrue(scanning.await(5, TimeUnit.SECONDS));
+      Future<?> firstShutdown = shutdownExecutor.submit(scanner::shutdown);
+      assertTrue(interrupted.await(5, TimeUnit.SECONDS));
+      CountDownLatch secondShutdownStarted = new CountDownLatch(1);
+      Future<?> secondShutdown = shutdownExecutor.submit(() -> {
+        secondShutdownStarted.countDown();
+        scanner.shutdown();
+      });
+      assertTrue(secondShutdownStarted.await(5, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> secondShutdown.get(100, TimeUnit.MILLISECONDS));
+
+      finishScan.countDown();
+      firstShutdown.get(5, TimeUnit.SECONDS);
+      secondShutdown.get(5, TimeUnit.SECONDS);
+      assertFalse(scanner.isAlive());
+    } finally {
+      finishScan.countDown();
+      shutdownExecutor.shutdownNow();
+      assertTrue(shutdownExecutor.awaitTermination(5, TimeUnit.SECONDS));
+      GenericTestUtils.waitFor(() -> !scanner.isAlive(), 10, 5000);
+    }
   }
 
   /**

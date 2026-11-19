@@ -20,21 +20,20 @@ package org.apache.hadoop.ozone.dn.scanner;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_DIR;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_CONTAINER_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_METADATA_DIR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.util.Collection;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
-import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerMetadataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -53,11 +52,11 @@ class TestBackgroundContainerMetadataScannerIntegration
   private final GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
-  static Collection<TestContainerCorruptions> supportedCorruptionTypes() {
-    return TestContainerCorruptions.getAllParamsExcept(
-        TestContainerCorruptions.MISSING_BLOCK,
-        TestContainerCorruptions.CORRUPT_BLOCK,
-        TestContainerCorruptions.TRUNCATED_BLOCK);
+  static Collection<ContainerTestCorruptions> supportedCorruptionTypes() {
+    return ContainerTestCorruptions.getAllParamsExcept(
+        ContainerTestCorruptions.MISSING_BLOCK,
+        ContainerTestCorruptions.CORRUPT_BLOCK,
+        ContainerTestCorruptions.TRUNCATED_BLOCK);
   }
 
   @BeforeAll
@@ -70,17 +69,14 @@ class TestBackgroundContainerMetadataScannerIntegration
     rmConf.setInterval(Duration.ofSeconds(1));
     ozoneConfig.setFromObject(rmConf);
 
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED, true);
+    ContainerScannerConfiguration scannerConfig = ozoneConfig.getObject(ContainerScannerConfiguration.class);
+    scannerConfig.setEnabled(true);
     // Make sure the background data scanner does not detect failures
     // before the metadata scanner under test does.
-    ozoneConfig.setBoolean(
-        ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED,
-        false);
+    scannerConfig.setDataScanEnabled(false);
     // Make the background metadata scanner run frequently to reduce test time.
-    ozoneConfig.setTimeDuration(
-        ContainerScannerConfiguration.METADATA_SCAN_INTERVAL_KEY,
-        SCAN_INTERVAL.getSeconds(), TimeUnit.SECONDS);
+    scannerConfig.setMetadataScanInterval(SCAN_INTERVAL.toMillis());
+    ozoneConfig.setFromObject(scannerConfig);
     buildCluster(ozoneConfig);
   }
 
@@ -90,7 +86,7 @@ class TestBackgroundContainerMetadataScannerIntegration
    */
   @ParameterizedTest
   @MethodSource("supportedCorruptionTypes")
-  void testCorruptionDetected(TestContainerCorruptions corruption)
+  void testCorruptionDetected(ContainerTestCorruptions corruption)
       throws Exception {
     // Write data to an open and closed container.
     long closedContainerID = writeDataThenCloseContainer();

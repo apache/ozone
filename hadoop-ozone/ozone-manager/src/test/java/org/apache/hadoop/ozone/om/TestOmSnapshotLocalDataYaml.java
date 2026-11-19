@@ -231,6 +231,104 @@ public class TestOmSnapshotLocalDataYaml {
         defraggedFiles.get(45));
   }
 
+  /**
+   * Writes a copy of the YAML without previousSnapshotVersions, as written before it was added.
+   */
+  private File writeWithoutPreviousSnapshotVersions(File yamlFile) throws IOException {
+    File oldLayout = new File(testRoot, "old-" + yamlFile.getName());
+    String content = FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8);
+    String oldContent = content.replaceFirst("(?m)^" + OzoneConsts.OM_SLD_PREV_SNAP_VERSIONS + ":.*\\n(  .*\\n)*", "");
+    assertThat(oldContent).isNotEqualTo(content).doesNotContain(OzoneConsts.OM_SLD_PREV_SNAP_VERSIONS);
+    FileUtils.writeStringToFile(oldLayout, oldContent, StandardCharsets.UTF_8);
+    return oldLayout;
+  }
+
+  /**
+   * Writes a copy of the YAML cut at versionSstFileInfos, followed by an unterminated mapping.
+   */
+  private File writeTruncatedAtSstFiles(File yamlFile) throws IOException {
+    File truncated = new File(testRoot, "truncated-" + yamlFile.getName());
+    String content = FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8);
+    String key = OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO + ":";
+    FileUtils.writeStringToFile(truncated, content.substring(0, content.indexOf(key)) + key + " {\n",
+        StandardCharsets.UTF_8);
+    return truncated;
+  }
+
+  @Test
+  public void testPreviousSnapshotVersionsWrittenBeforeSstFiles() throws IOException {
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot8", TransactionInfo.valueOf(1, 2)).getLeft();
+    String content = FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8);
+    int sstFilesIndex = content.indexOf("\n" + OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO + ":");
+    assertThat(sstFilesIndex).isPositive();
+    for (String key : asList(OzoneConsts.OM_SLD_SNAP_ID, OzoneConsts.OM_SLD_PREV_SNAP_ID, OzoneConsts.OM_SLD_VERSION,
+        OzoneConsts.OM_SLD_PREV_SNAP_VERSIONS)) {
+      assertThat(content.indexOf("\n" + key + ":")).as(key).isPositive().isLessThan(sstFilesIndex);
+    }
+
+    // Loading only the part before the SST file lists gives the same result as loading the whole file.
+    File oldLayout = writeWithoutPreviousSnapshotVersions(yamlFile);
+    OmSnapshotLocalData expected = OmSnapshotLocalDataYaml.loadWithoutSstFiles(oldLayout);
+    OmSnapshotLocalData loaded = OmSnapshotLocalDataYaml.loadWithoutSstFiles(writeTruncatedAtSstFiles(yamlFile));
+    assertEquals(expected.getSnapshotId(), loaded.getSnapshotId());
+    assertEquals(expected.getPreviousSnapshotId(), loaded.getPreviousSnapshotId());
+    assertEquals(expected.getVersion(), loaded.getVersion());
+    assertEquals(expected.getVersionSstFileInfos(), loaded.getVersionSstFileInfos());
+
+    // Without previousSnapshotVersions the SST file lists are parsed.
+    File oldTruncated = writeTruncatedAtSstFiles(oldLayout);
+    assertThrows(IOException.class, () -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(oldTruncated));
+  }
+
+  @Test
+  public void testChecksumWithAndWithoutPreviousSnapshotVersions() throws IOException {
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot9", TransactionInfo.valueOf(1, 2)).getLeft();
+    File oldLayout = writeWithoutPreviousSnapshotVersions(yamlFile);
+    OmSnapshotLocalData newData = omSnapshotLocalDataSerializer.load(yamlFile);
+    OmSnapshotLocalData oldData = omSnapshotLocalDataSerializer.load(oldLayout);
+
+    // previousSnapshotVersions is not part of the checksum, so a file verifies the same with or without it.
+    assertEquals(newData.getChecksum(), oldData.getChecksum());
+    assertTrue(omSnapshotLocalDataSerializer.verifyChecksum(newData));
+    assertTrue(omSnapshotLocalDataSerializer.verifyChecksum(oldData));
+
+    // Saving a file loaded without previousSnapshotVersions adds it back.
+    omSnapshotLocalDataSerializer.save(oldLayout, oldData);
+    assertEquals(FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8),
+        FileUtils.readFileToString(oldLayout, StandardCharsets.UTF_8));
+  }
+
+  @Test
+  public void testLoadWithoutSstFiles() throws IOException {
+    File newLayout = writeToYaml(UUID.randomUUID(), "snapshot7", TransactionInfo.valueOf(1, 2)).getLeft();
+    for (File yamlFile : asList(newLayout, writeWithoutPreviousSnapshotVersions(newLayout))) {
+      assertLoadWithoutSstFiles(yamlFile);
+    }
+
+    File noSnapshotId = new File(testRoot, "noSnapshotId.yaml");
+    FileUtils.writeStringToFile(noSnapshotId, FileUtils.readFileToString(newLayout, StandardCharsets.UTF_8)
+        .replaceFirst("(?m)^" + OzoneConsts.OM_SLD_SNAP_ID + ": .*\\n", ""), StandardCharsets.UTF_8);
+    IOException ex = assertThrows(IOException.class, () -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(noSnapshotId));
+    assertThat(ex).hasMessageContaining("Missing " + OzoneConsts.OM_SLD_SNAP_ID);
+  }
+
+  private void assertLoadWithoutSstFiles(File yamlFile) throws IOException {
+    OmSnapshotLocalData fullData = omSnapshotLocalDataSerializer.load(yamlFile);
+    OmSnapshotLocalData metaData = OmSnapshotLocalDataYaml.loadWithoutSstFiles(yamlFile);
+
+    assertEquals(fullData.getSnapshotId(), metaData.getSnapshotId());
+    assertEquals(fullData.getPreviousSnapshotId(), metaData.getPreviousSnapshotId());
+    assertEquals(fullData.getVersion(), metaData.getVersion());
+    assertThat(metaData.getVersionSstFileInfos()).hasSameSizeAs(fullData.getVersionSstFileInfos());
+    fullData.getVersionSstFileInfos().forEach((version, versionMeta) -> {
+      assertThat(versionMeta.getSstFiles()).isNotEmpty();
+      assertThat(metaData.getVersionSstFileInfos()).containsKey(version);
+      VersionMeta metaOnly = metaData.getVersionSstFileInfos().get(version);
+      assertEquals(versionMeta.getPreviousSnapshotVersion(), metaOnly.getPreviousSnapshotVersion());
+      assertThat(metaOnly.getSstFiles()).isEmpty();
+    });
+  }
+
   @Test
   public void testEmptyFile() throws IOException {
     File emptyFile = new File(testRoot, "empty.yaml");
@@ -239,6 +337,7 @@ public class TestOmSnapshotLocalDataYaml {
     IOException ex = assertThrows(IOException.class, () -> omSnapshotLocalDataSerializer.load(emptyFile));
 
     assertThat(ex).hasMessageContaining("Failed to load file. File is empty.");
+    assertThrows(IOException.class, () -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(emptyFile));
   }
 
   @Test

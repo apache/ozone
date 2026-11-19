@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -108,10 +109,9 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
           serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
         Map<String, Map<String, String>> omService = new HashMap<>();
         omService.put(omRoleInfo.getNodeId(),
-            new HashMap<String, String>() {{
-              put("serverRole", omRoleInfo.getServerRole());
-              put("hostname", serviceInfo.getHostname());
-            }});
+            ImmutableMap.of(
+                "serverRole", omRoleInfo.getServerRole(),
+                "hostname", serviceInfo.getHostname()));
         omServiceList.add(omService);
       }
     }

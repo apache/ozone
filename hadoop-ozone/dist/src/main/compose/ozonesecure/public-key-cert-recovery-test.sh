@@ -20,16 +20,14 @@
 #test recon
 wait_for_port recon 9888 120
 wait_for_execute_command recon 60 "find /data/metadata/recon/keys/public.pem -delete && find /data/metadata/recon/certs/*.crt -delete"
-docker-compose stop recon
-docker-compose start recon
+docker-compose restart recon
 wait_for_port recon 9888 120
 wait_for_execute_command recon 60 "find /data/metadata/recon/keys/public.pem && find /data/metadata/recon/certs/ROOTCA*.crt"
 
 #test DN
 wait_for_port datanode 19864 120
 wait_for_execute_command datanode 60 "find /data/metadata/dn/keys/public.pem -delete && find /data/metadata/dn/certs/*.crt -delete"
-docker-compose stop datanode
-docker-compose start datanode
+docker-compose restart datanode
 wait_for_port datanode 19864 120
 wait_for_execute_command datanode 60 "find /data/metadata/dn/keys/public.pem && find /data/metadata/dn/certs/ROOTCA*.crt"
 

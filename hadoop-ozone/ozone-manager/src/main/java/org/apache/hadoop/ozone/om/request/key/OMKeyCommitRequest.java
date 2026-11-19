@@ -94,14 +94,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
 
-    if (keyArgs.hasExpectedDataGeneration()) {
-      if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
-        ozoneManager.checkFeatureEnabled(
-            OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
-      } else {
-        ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
-      }
+    if (keyArgs.hasExpectedDataGeneration()
+        && keyArgs.getExpectedDataGeneration() != OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     }
 
     if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
@@ -195,7 +190,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // Check for directory exists with same name, if it exists throw error.
       if (LOG.isDebugEnabled()) {
@@ -406,6 +401,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           dbOzoneKey, omKeyInfo, trxnLogIndex);
 
       omBucketInfo.incrUsedBytes(correctedSpace);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       omResponse.setCommitKeyResponse(CommitKeyResponse.newBuilder()
           .setModificationTime(commitKeyArgs.getModificationTime())

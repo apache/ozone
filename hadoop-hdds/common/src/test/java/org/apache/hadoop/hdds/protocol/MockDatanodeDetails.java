@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORT
 
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -95,7 +96,8 @@ public final class MockDatanodeDetails {
         .setIpAddress(ipAddress)
         .setNetworkLocation(networkLocation)
         .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
-        .setPersistedOpStateExpiry(0);
+        .setPersistedOpStateExpiry(0)
+        .setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
 
     for (DatanodeDetails.Port.Name name : ALL_PORTS) {
       dn.addPort(DatanodeDetails.newPort(name, port));

@@ -59,9 +59,7 @@ public class TestXceiverClientManagerSC {
   @BeforeAll
   public static void init() throws Exception {
     config = new OzoneConfiguration();
-    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
-    clientConfig.setShortCircuit(true);
-    config.setFromObject(clientConfig);
+    config.setBoolean(OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT, true);
     config.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocket.disableBindPathValidation();
     cluster = MiniOzoneCluster.newBuilder(config)
@@ -100,7 +98,7 @@ public class TestXceiverClientManagerSC {
       assertEquals(client1, client2);
       clientManager.releaseClient(client1, true);
       clientManager.releaseClient(client2, true);
-      assertEquals(0, clientManager.getClientCache().size());
+      assertEquals(0, clientManager.getClientCache().estimatedSize());
 
       XceiverClientSpi client3 = clientManager.acquireClientForReadData(container1.getPipeline(), false);
       assertTrue(client3 instanceof XceiverClientGrpc);

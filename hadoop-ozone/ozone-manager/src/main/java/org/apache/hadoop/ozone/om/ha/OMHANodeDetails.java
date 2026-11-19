@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.slf4j.Logger;
@@ -59,6 +61,7 @@ public class OMHANodeDetails {
       OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY,
       OMConfigKeys.OZONE_OM_DB_DIRS,
       OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+      OmConfig.Keys.BIND_HOST,
   };
 
   private static final Logger LOG =
@@ -203,7 +206,8 @@ public class OMHANodeDetails {
         LOG.info("Found matching OM address with OMServiceId: {}, " +
                 "OMNodeId: {}, RPC Address: {} ,Ratis port: {} and isListener: {}",
             localOMServiceId, localOMNodeId,
-            NetUtils.getHostPortString(localRpcAddress), localRatisPort, localIsListener);
+            HddsUtils.getHostPortString(localRpcAddress.getHostName(), localRpcAddress.getPort()),
+            localRatisPort, localIsListener);
 
         ConfUtils.setNodeSpecificConfigs(genericConfigKeys, conf,
             localOMServiceId, localOMNodeId, LOG);

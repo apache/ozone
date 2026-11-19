@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,6 +41,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
@@ -48,7 +50,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.ContentSummary;
@@ -78,11 +79,11 @@ import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.OzoneClientUtils;
 import org.apache.hadoop.ozone.client.io.SelectorOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,6 +130,9 @@ public class BasicOzoneFileSystem extends FileSystem {
       "o3fs://bucket.volume.om-host.example.com:5678/key  OR " +
       "o3fs://bucket.volume.omServiceId/key";
 
+  private static final String IPV6_EXCEPTION_TEXT =
+      "Raw IPv6 literals are not supported in O3FS authorities; use an OM service ID or DNS name instead";
+
   private static final int PATH_DEPTH_TO_BUCKET = 0;
 
   @Override
@@ -162,6 +166,10 @@ public class BasicOzoneFileSystem extends FileSystem {
     String volumeStr = matcher.group(2);
     String remaining = matcher.groupCount() == 3 ? matcher.group(3) : null;
 
+    if (!isEmpty(remaining) && remaining.contains(":") && InetAddresses.isInetAddress(remaining)) {
+      throw new IllegalArgumentException(IPV6_EXCEPTION_TEXT);
+    }
+
     String omHost = null;
     int omPort = -1;
     if (!isEmpty(remaining)) {
@@ -181,9 +189,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     try {
-      uri = new URIBuilder().setScheme(OZONE_URI_SCHEME)
-          .setHost(authority)
-          .build();
+      uri = new URI(OZONE_URI_SCHEME + "://" + authority);
       LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
       ConfigurationSource source = getConfSource();
@@ -686,16 +692,15 @@ public class BasicOzoneFileSystem extends FileSystem {
     LOG.trace("listStatus() path:{}", f);
     int numEntries = listingPageSize;
     LinkedList<FileStatus> statuses = new LinkedList<>();
+    ListStatusResult<FileStatus> page;
     List<FileStatus> tmpStatusList;
     String startKey = "";
     int entriesAdded;
     do {
-      tmpStatusList =
-          adapter.listStatus(pathToKey(f), false, startKey, numEntries, uri,
-                  workingDir, getUsername(), true)
-              .stream()
-              .map(this::convertFileStatus)
-              .collect(Collectors.toList());
+      page = adapter.listStatusPage(pathToKey(f), false, startKey, numEntries, uri,
+              workingDir, getUsername(), true)
+          .map(this::convertFileStatus);
+      tmpStatusList = page.getStatuses();
       entriesAdded = 0;
       if (!tmpStatusList.isEmpty()) {
         if (startKey.isEmpty() || !statuses.getLast().getPath().toString()
@@ -708,13 +713,17 @@ public class BasicOzoneFileSystem extends FileSystem {
         }
         startKey = pathToKey(statuses.getLast().getPath());
       }
-      // listStatus returns entries numEntries in size if available.
-      // Any lesser number of entries indicate that the required entries have
-      // exhausted.
-    } while (entriesAdded > 0);
+      // OM may return fewer than numEntries even when more entries follow, as it caps the page size, so
+      // stop only when OM reports the listing complete or a page adds nothing.
+    } while (entriesAdded > 0 && !page.isComplete());
 
 
     return statuses.toArray(new FileStatus[0]);
+  }
+
+  @Override
+  public void setVerifyChecksum(boolean verifyChecksum) {
+    adapter.setVerifyChecksum(verifyChecksum);
   }
 
   @Override
@@ -839,16 +848,20 @@ public class BasicOzoneFileSystem extends FileSystem {
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
+  /**
+   * Like HDFS, the status has no block locations: OM skips the pipeline refresh (headOp).
+   * {@link #getFileBlockLocations} fetches the locations when they are asked for.
+   */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    return getFileStatus(f, false);
+    return getFileStatus(f, true);
   }
 
   /**
-   * @param headOp when true, requests a metadata-only (type) check so the OM
-   *               skips the pipeline refresh (SCM round-trip) and datanode
-   *               sorting. Used by {@link #isDirectory(Path)}/{@link #isFile(Path)},
-   *               which only need the entry type.
+   * @param headOp when true, requests a metadata-only check so the OM skips the
+   *               pipeline refresh (SCM round-trip) and datanode sorting, and the
+   *               status has no block locations. Used by {@link #getFileStatus(Path)},
+   *               {@link #isDirectory(Path)} and {@link #isFile(Path)}.
    */
   private FileStatus getFileStatus(Path f, boolean headOp) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
@@ -858,8 +871,9 @@ public class BasicOzoneFileSystem extends FileSystem {
     String key = pathToKey(qualifiedPath);
     FileStatus fileStatus = null;
     try {
-      fileStatus = convertFileStatus(
-          adapter.getFileStatus(key, uri, qualifiedPath, getUsername(), headOp));
+      FileStatusAdapter status = adapter.getFileStatus(key, uri, qualifiedPath, getUsername(), headOp);
+      fileStatus = headOp ? new FileStatusWithoutBlockLocations(convertFileStatus(status), status.isErasureCoded())
+          : convertFileStatus(status);
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         if (((OMException) ex).getResult()
@@ -877,10 +891,53 @@ public class BasicOzoneFileSystem extends FileSystem {
                                                long start, long len)
       throws IOException {
     if (fileStatus instanceof LocatedFileStatus) {
-      return ((LocatedFileStatus) fileStatus).getBlockLocations();
-    } else {
-      return super.getFileBlockLocations(fileStatus, start, len);
+      return getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
     }
+    if (needsBlockLocations(fileStatus, start, len)) {
+      // getFileStatus returns no block locations: fetch them by path, as HDFS does.
+      return getFileBlockLocations(fileStatus.getPath(), start, len);
+    }
+    return super.getFileBlockLocations(fileStatus, start, len);
+  }
+
+  @Override
+  public BlockLocation[] getFileBlockLocations(Path p, long start, long len) throws IOException {
+    checkBlockLocationsRange(start, len);
+    // One GetFileStatus with block locations, instead of getFileStatus followed by another for the locations.
+    FileStatus fileStatus = getFileStatus(p, false);
+    if (fileStatus instanceof LocatedFileStatus) {
+      return getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
+    }
+    return super.getFileBlockLocations(fileStatus, start, len);
+  }
+
+  /** Rejects the range like {@link org.apache.hadoop.fs.FileSystem#getFileBlockLocations(FileStatus, long, long)}. */
+  static void checkBlockLocationsRange(long start, long len) {
+    if (start < 0 || len < 0) {
+      throw new IllegalArgumentException("Invalid start or len parameter");
+    }
+  }
+
+  /**
+   * Whether the block locations of the range must be fetched for a status from {@link #getFileStatus(Path)}.
+   */
+  static boolean needsBlockLocations(FileStatus fileStatus, long start, long len) {
+    return fileStatus instanceof FileStatusWithoutBlockLocations && fileStatus.isFile()
+        && start >= 0 && len >= 0 && start < fileStatus.getLen();
+  }
+
+  /**
+   * Like HDFS, return only the blocks that overlap [start, start + len), or the block containing start if len is 0.
+   */
+  static BlockLocation[] getBlockLocationsInRange(LocatedFileStatus fileStatus, long start, long len) {
+    checkBlockLocationsRange(start, len);
+    BlockLocation[] blocks = fileStatus.getBlockLocations();
+    if (blocks == null) {
+      return null;
+    }
+    return Arrays.stream(blocks)
+        .filter(b -> b.getOffset() + b.getLength() > start && b.getOffset() - start < Math.max(len, 1))
+        .toArray(BlockLocation[]::new);
   }
 
   @Override
@@ -945,12 +1002,14 @@ public class BasicOzoneFileSystem extends FileSystem {
   private List<FileStatusAdapter> listStatusAdapter(Path f) throws IOException {
     int numEntries = listingPageSize;
     LinkedList<FileStatusAdapter> statuses = new LinkedList<>();
+    ListStatusResult<FileStatusAdapter> page;
     List<FileStatusAdapter> tmpStatusList;
     String startKey = "";
     int entriesAdded;
     do {
-      tmpStatusList = adapter.listStatus(pathToKey(f), false, startKey,
+      page = adapter.listStatusPage(pathToKey(f), false, startKey,
           numEntries, uri, workingDir, getUsername(), true);
+      tmpStatusList = page.getStatuses();
       entriesAdded = 0;
       if (!tmpStatusList.isEmpty()) {
         if (startKey.isEmpty() || !statuses.getLast().getPath().toString()
@@ -963,7 +1022,7 @@ public class BasicOzoneFileSystem extends FileSystem {
         }
         startKey = pathToKey(statuses.getLast().getPath());
       }
-    } while (entriesAdded > 0);
+    } while (entriesAdded > 0 && !page.isComplete());
 
     return statuses;
   }
@@ -1119,6 +1178,8 @@ public class BasicOzoneFileSystem extends FileSystem {
     private T curStat = null;
     private String startPath = "";
     private boolean lite;
+    /** True once OM reported that no entries follow the current listing. */
+    private boolean listingComplete;
     private Function<FileStatus, T> transformFunc;
 
     /**
@@ -1135,7 +1196,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       this.lite = lite;
       this.transformFunc = transformFunc;
       // fetch the first batch of entries in the directory
-      thisListing = listFileStatus(p, startPath, lite);
+      thisListing = nextListing();
       if (thisListing != null && !thisListing.isEmpty()) {
         startPath = pathToKey(
             thisListing.get(thisListing.size() - 1).getPath());
@@ -1172,9 +1233,9 @@ public class BasicOzoneFileSystem extends FileSystem {
         return false;
       }
       if (i >= thisListing.size()) {
-        if (startPath != null && (!thisListing.isEmpty())) {
+        if (startPath != null && !thisListing.isEmpty() && !listingComplete) {
           // current listing is exhausted & fetch a new listing
-          thisListing = listFileStatus(p, startPath, lite);
+          thisListing = nextListing();
           if (thisListing != null && !thisListing.isEmpty()) {
             startPath = pathToKey(
                 thisListing.get(thisListing.size() - 1).getPath());
@@ -1187,6 +1248,12 @@ public class BasicOzoneFileSystem extends FileSystem {
         }
       }
       return (i < thisListing.size());
+    }
+
+    private List<FileStatus> nextListing() throws IOException {
+      ListStatusResult<FileStatus> page = listFileStatus(p, startPath, lite);
+      listingComplete = page.isComplete();
+      return page.getStatuses();
     }
 
     /**
@@ -1210,27 +1277,25 @@ public class BasicOzoneFileSystem extends FileSystem {
    * @param f
    * @param startPath
    * @param lite if true return lightweight keys
-   * @return list of file status.
+   * @return list of file status, and whether OM reported that no entries follow.
    * @throws IOException
    */
-  private List<FileStatus> listFileStatus(Path f, String startPath, boolean lite)
+  private ListStatusResult<FileStatus> listFileStatus(Path f, String startPath, boolean lite)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listFileStatus() path:{}", f);
-    List<FileStatus> statusList;
-    statusList =
-        adapter.listStatus(pathToKey(f), false, startPath,
+    ListStatusResult<FileStatus> page =
+        adapter.listStatusPage(pathToKey(f), false, startPath,
                 listingPageSize, uri, workingDir, getUsername(), lite)
-            .stream()
-            .map(this::convertFileStatus)
-            .collect(Collectors.toList());
+            .map(this::convertFileStatus);
+    List<FileStatus> statusList = page.getStatuses();
 
     if (!statusList.isEmpty() && !startPath.isEmpty()) {
       // Excluding the 1st file status element from list.
       statusList.remove(0);
     }
-    return statusList;
+    return page;
   }
 
   /**

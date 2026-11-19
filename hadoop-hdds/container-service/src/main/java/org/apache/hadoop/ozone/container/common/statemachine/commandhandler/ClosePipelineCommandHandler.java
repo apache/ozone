@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -127,19 +126,18 @@ public class ClosePipelineCommandHandler implements CommandHandler {
         invocationCount.incrementAndGet();
         final long startTime = Time.monotonicNow();
         final DatanodeDetails dn = context.getParent().getDatanodeDetails();
-        final HddsProtos.PipelineID pipelineIdProto = pipelineID.getProtobuf();
 
         try {
           XceiverServerSpi server = ozoneContainer.getWriteChannel();
-          if (server.isExist(pipelineIdProto)) {
+          if (server.isExist(pipelineID)) {
             if (server instanceof XceiverServerRatis) {
               // TODO: Refactor Ratis logic to XceiverServerRatis
               // Propagate the group remove to the other Raft peers in the pipeline
               XceiverServerRatis ratisServer = (XceiverServerRatis) server;
-              final RaftGroupId raftGroupId = RaftGroupId.valueOf(pipelineID.getId());
+              final RaftGroupId raftGroupId = pipelineID.getGroupId();
               final boolean shouldDeleteRatisLogDirectory = ratisServer.getShouldDeleteRatisLogDirectory();
               // This might throw GroupMismatchException if the Ratis group has been closed by other datanodes
-              final Collection<RaftPeer> peers = ratisServer.getRaftPeersInPipeline(pipelineID);
+              final Collection<RaftPeer> peers = ratisServer.getRaftPeers(raftGroupId);
               // Try to send remove group for the other datanodes first, ignoring GroupMismatchException
               // if the Ratis group has been closed in the other datanodes
               peers.stream()
@@ -153,16 +151,15 @@ public class ClosePipelineCommandHandler implements CommandHandler {
                       // command in another datanode
                       LOG.debug("Failed to remove group {} for pipeline {} on peer {} since the group has " +
                           "been removed by earlier close pipeline command handled in another datanode", raftGroupId,
-                          pipelineID, peer.getId());
+                          pipelineID, peer);
                     } catch (IOException ioe) {
                       LOG.warn("Failed to remove group {} of pipeline {} on peer {}",
-                          raftGroupId, pipelineID, peer.getId(), ioe);
+                          raftGroupId, pipelineID, peer, ioe);
                     }
                   });
+              // Remove group locally, might throw GroupMismatchException as well.
+              ratisServer.removeGroup(raftGroupId);
             }
-            // Remove the Ratis group from the current datanode pipeline, might throw GroupMismatchException as
-            // well. It is a no-op for XceiverServerSpi implementations (e.g. XceiverServerGrpc)
-            server.removeGroup(pipelineIdProto);
             LOG.info("Close Pipeline {} command on datanode {}.", pipelineID, dn);
           } else {
             LOG.debug("Ignoring close pipeline command for pipeline {} on datanode {} " +

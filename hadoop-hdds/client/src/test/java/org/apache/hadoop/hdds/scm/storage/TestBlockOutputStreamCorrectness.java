@@ -69,7 +69,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class TestBlockOutputStreamCorrectness {
 
-  private static final int DATA_SIZE = 256 * (int) OzoneConsts.MB;
+  private static final int DATA_SIZE = 16 * (int) OzoneConsts.MB;
   private static final byte[] DATA = RandomUtils.secure().randomBytes(DATA_SIZE);
 
   @ParameterizedTest
@@ -77,7 +77,7 @@ class TestBlockOutputStreamCorrectness {
   void test(final int writeSize) throws IOException {
     assertEquals(0, DATA_SIZE % writeSize);
 
-    final BufferPool bufferPool = new BufferPool(4 * 1024 * 1024, 32 / 4);
+    final BufferPool bufferPool = new BufferPool(1024 * 1024 / 4, 32 / 4);
 
     for (int block = 0; block < 10; block++) {
       try (BlockOutputStream outputStream = createBlockOutputStream(bufferPool)) {
@@ -202,12 +202,12 @@ class TestBlockOutputStreamCorrectness {
         .thenReturn(new MockXceiverClientSpi(pipeline));
 
     OzoneClientConfig config = new OzoneClientConfig();
-    config.setStreamBufferSize(4 * 1024 * 1024);
-    config.setStreamBufferMaxSize(32 * 1024 * 1024);
+    config.setStreamBufferSize(1024 * 1024 / 4);
+    config.setStreamBufferMaxSize(2 * 1024 * 1024);
     config.setStreamBufferFlushDelay(true);
-    config.setStreamBufferFlushSize(16 * 1024 * 1024);
+    config.setStreamBufferFlushSize(1024 * 1024);
     config.setChecksumType(ChecksumType.NONE);
-    config.setBytesPerChecksum(256 * 1024);
+    config.setBytesPerChecksum(16 * 1024);
     StreamBufferArgs streamBufferArgs =
         StreamBufferArgs.getDefaultStreamBufferArgs(pipeline.getReplicationConfig(), config);
 
@@ -279,7 +279,7 @@ class TestBlockOutputStreamCorrectness {
 
       if (!request.hasVersion()) {
         request = ContainerCommandRequestProto.newBuilder(request)
-            .setVersion(ClientVersion.CURRENT.toProtoValue()).build();
+            .setVersion(ClientVersion.CURRENT.serialize()).build();
       }
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()

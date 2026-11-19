@@ -50,8 +50,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -68,12 +68,14 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.server.StartupProgress;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.DatanodeStartupPhase;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -85,6 +87,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerDomainSocket;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
@@ -147,7 +150,10 @@ public class OzoneContainer {
       recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
   private DiskBalancerService diskBalancerService;
-  private final AtomicReference<InitializingStatus> initializingStatus;
+  private final Object initializationLock = new Object();
+  // Guarded by initializationLock.
+  private InitializingStatus initializingStatus;
+  private Throwable initializationFailure;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
@@ -158,9 +164,10 @@ public class OzoneContainer {
   private final ContainerMetrics metrics;
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
   private final DatanodeStorageMetrics datanodeStorageMetrics;
+  private final StartupProgress<DatanodeStartupPhase> startupProgress;
 
   enum InitializingStatus {
-    UNINITIALIZED, INITIALIZING, INITIALIZED
+    UNINITIALIZED, INITIALIZING, INITIALIZED, FAILED
   }
 
   /**
@@ -181,6 +188,8 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
+    this.startupProgress = hddsDatanodeService != null && hddsDatanodeService.getStartupProgress() != null
+        ? hddsDatanodeService.getStartupProgress() : new StartupProgress<>(DatanodeStartupPhase.class);
     this.volumeChecker = new StorageVolumeChecker(conf, new Timer(), datanodeDetails.threadNamePrefix());
 
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
@@ -334,7 +343,7 @@ public class OzoneContainer {
 
     datanodeStorageMetrics = DatanodeStorageMetrics.create(volumeSet);
 
-    initializingStatus = new AtomicReference<>(InitializingStatus.UNINITIALIZED);
+    initializingStatus = InitializingStatus.UNINITIALIZED;
   }
 
   /**
@@ -346,6 +355,10 @@ public class OzoneContainer {
       StateContext context, VolumeChoosingPolicy volumeChoosingPolicy)
       throws IOException {
     this(null, datanodeDetails, conf, context, null, null, volumeChoosingPolicy);
+  }
+
+  public StartupProgress<DatanodeStartupPhase> getStartupProgress() {
+    return startupProgress;
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -373,8 +386,10 @@ public class OzoneContainer {
         .build();
     while (volumeSetIterator.hasNext()) {
       StorageVolume volume = volumeSetIterator.next();
-      ContainerReader containerReader = new ContainerReader(volumeSet,
-          (HddsVolume) volume, containerSet, config, true);
+      HddsVolume hddsVolume = (HddsVolume) volume;
+      StartupProgress.Step step = startupProgress.addStep(DatanodeStartupPhase.LOADING_CONTAINERS,
+          hddsVolume.getHddsRootDir().getPath());
+      ContainerReader containerReader = new ContainerReader(volumeSet, hddsVolume, containerSet, config, true, step);
       Thread thread = threadFactory.newThread(containerReader);
       thread.start();
       volumeThreads.add(thread);
@@ -511,19 +526,22 @@ public class OzoneContainer {
    * Stop the scanner thread and wait for thread to die.
    */
   private void stopContainerScrub() {
-    if (metadataScanner == null) {
-      return;
+    if (metadataScanner != null) {
+      metadataScanner.shutdown();
+      metadataScanner = null;
     }
-    metadataScanner.shutdown();
-    metadataScanner = null;
 
-    if (dataScanners == null) {
-      return;
+    if (dataScanners != null) {
+      for (BackgroundContainerDataScanner s : dataScanners) {
+        s.shutdown();
+      }
+      dataScanners = null;
     }
-    for (BackgroundContainerDataScanner s : dataScanners) {
-      s.shutdown();
+
+    if (onDemandScanner != null) {
+      onDemandScanner.shutdown();
+      onDemandScanner = null;
     }
-    onDemandScanner.shutdown();
   }
 
   @VisibleForTesting
@@ -547,30 +565,105 @@ public class OzoneContainer {
    * @throws IOException
    */
   public void start(String clusterId) throws IOException {
-    // If SCM HA is enabled, OzoneContainer#start() will be called multi-times
-    // from VersionEndpointTask. The first call should do the initializing job,
-    // the successive calls should wait until OzoneContainer is initialized.
-    if (!initializingStatus.compareAndSet(
-        InitializingStatus.UNINITIALIZED, InitializingStatus.INITIALIZING)) {
-
-      // wait OzoneContainer to finish its initializing.
-      while (initializingStatus.get() != InitializingStatus.INITIALIZED) {
-        try {
-          Thread.sleep(1);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
+    synchronized (initializationLock) {
+      // SCM endpoints share one initialization attempt, including its failure.
+      if (initializingStatus == InitializingStatus.INITIALIZED) {
+        LOG.info("Ignore. OzoneContainer already started.");
+        return;
       }
-      LOG.info("Ignore. OzoneContainer already started.");
+      if (initializingStatus == InitializingStatus.FAILED) {
+        throw new IOException("OzoneContainer initialization previously failed", initializationFailure);
+      }
+
+      initializingStatus = InitializingStatus.INITIALIZING;
+      try {
+        initializeContainerServicesWithTimeout(clusterId);
+        initializingStatus = InitializingStatus.INITIALIZED;
+      } catch (IOException | RuntimeException | Error ex) {
+        // Partially started services cannot safely be initialized again.
+        initializationFailure = ex;
+        initializingStatus = InitializingStatus.FAILED;
+        throw ex;
+      }
+    }
+  }
+
+  /**
+   * Runs {@link #initializeContainerServices(String)} on the calling thread,
+   * optionally guarded by a startup watchdog
+   * ({@code hdds.datanode.container.init.timeout}).
+   * <p>
+   * When the timeout is a positive duration, a watchdog is scheduled before
+   * initialization begins. If initialization has not finished by then - for
+   * example because Ratis group recovery inside {@code writeChannel.start()}
+   * has stalled on a failing volume - the watchdog terminates the datanode via
+   * {@link DatanodeStateMachine#triggerFatalShutdown(String)} (which enters JVM
+   * shutdown) instead of letting startup hang indefinitely. Because
+   * initialization runs on a single thread, no separate worker can keep starting
+   * services after the timeout. A non-positive timeout disables the watchdog,
+   * preserving the previous behavior.
+   */
+  private void initializeContainerServicesWithTimeout(String clusterId) throws IOException {
+    Duration initTimeout =
+        config.getObject(DatanodeConfiguration.class).getContainerInitTimeout();
+    if (initTimeout == null || initTimeout.isZero() || initTimeout.isNegative()) {
+      initializeContainerServices(clusterId);
       return;
     }
 
-    DatanodeLayoutStorage layoutStorage
-        = new DatanodeLayoutStorage(config);
+    // Guards against the watchdog firing just as initialization finishes.
+    AtomicBoolean initInProgress = new AtomicBoolean(true);
+    ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("OzoneContainerInitWatchdog").build());
+    watchdog.schedule(() -> {
+      if (initInProgress.compareAndSet(true, false)) {
+        terminateOnInitializationTimeout(initTimeout);
+      }
+    }, initTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    try {
+      initializeContainerServices(clusterId);
+    } finally {
+      initInProgress.set(false);
+      watchdog.shutdownNow();
+    }
+  }
+
+  /**
+   * Terminates the datanode when container initialization has stalled past the
+   * watchdog timeout. A hung step (for example a Ratis {@code join()} or a
+   * blocking disk read) cannot be interrupted reliably, so the only safe
+   * recovery is to fail the process and let it be restarted; the JVM exit also
+   * stops the stalled initialization thread.
+   */
+  private void terminateOnInitializationTimeout(Duration initTimeout) {
+    String message = "OzoneContainer initialization did not complete within " + initTimeout
+        + ". Terminating datanode; a stalled Ratis group recovery or volume I/O is the likely cause.";
+    LOG.error(message);
+    // Enter JVM shutdown directly rather than calling the datanode stop service.
+    // Its synchronous stop() can itself block on the same failing disk (for
+    // example a container scanner's Thread.join()), so it could hang before the
+    // process exits. triggerFatalShutdown() calls ExitUtils.terminate, and
+    // System.exit runs the datanode cleanup registered with ShutdownHookManager,
+    // which bounds each hook with a timeout.
+    StateContext current = context;
+    DatanodeStateMachine dsm = current == null ? null : current.getParent();
+    if (dsm != null) {
+      dsm.triggerFatalShutdown(message);
+    } else {
+      LOG.error("No datanode state machine available; cannot automatically terminate the stalled datanode.");
+    }
+  }
+
+  private void initializeContainerServices(String clusterId) throws IOException {
+    startupProgress.beginPhase(DatanodeStartupPhase.LOADING_CONTAINERS);
+    DatanodeStorage layoutStorage
+        = new DatanodeStorage(config);
     layoutStorage.setClusterId(clusterId);
     layoutStorage.persistCurrentState();
 
     buildContainerSet();
+    startupProgress.beginPhase(DatanodeStartupPhase.CHECKING_VOLUMES);
 
     // Start background volume checks, which will begin after the configured
     // delay.
@@ -586,6 +679,7 @@ public class OzoneContainer {
       dbVolumeSet.checkAllVolumes();
       dbVolumeSet.startAllVolume();
     }
+    startupProgress.beginPhase(DatanodeStartupPhase.STARTING_SERVICES);
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -607,9 +701,7 @@ public class OzoneContainer {
     recoveringContainerScrubbingService.start();
 
     initHddsVolumeContainer();
-
-    // mark OzoneContainer as INITIALIZED.
-    initializingStatus.set(InitializingStatus.INITIALIZED);
+    startupProgress.endPhase(DatanodeStartupPhase.STARTING_SERVICES);
   }
 
   /**
@@ -726,8 +818,12 @@ public class OzoneContainer {
             = StorageContainerDatanodeProtocolProtos.
             NodeReportProto.newBuilder();
 
+    Map<String, Long> openCounts = getContainerSet().getOpenContainerCountsByVolume();
     for (StorageLocationReport report : reports) {
-      nrb.addStorageReport(report.getProtoBufMessage());
+      StorageContainerDatanodeProtocolProtos.StorageReportProto proto = report.getProtoBufMessage();
+      nrb.addStorageReport(proto.toBuilder()
+          .setOpenContainerCount(openCounts.getOrDefault(proto.getStorageUuid(), 0L))
+          .build());
     }
 
     StorageLocationReport[] metaReports = metaVolumeSet.getStorageReport();

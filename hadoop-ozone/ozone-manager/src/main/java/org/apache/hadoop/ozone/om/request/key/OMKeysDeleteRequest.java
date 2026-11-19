@@ -37,10 +37,12 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -184,6 +186,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
+      Set<String> resolvedKeys = new HashSet<>();
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
@@ -224,6 +227,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysAclCheckLatency);
           OzoneFileStatus fileStatus = getOzoneKeyStatus(
               ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
+          // Different FSO path spellings can resolve to the same entry. Release its quota only once.
+          if (!resolvedKeys.add(getBucketLayout().isFileSystemOptimized() ? omKeyInfo.getPath() : objectKey)) {
+            deleteKeys.remove(keyName);
+            continue;
+          }
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
               fileStatus);
           deleteKeysInfo.add(omKeyInfo);
@@ -237,7 +245,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       OmBucketInfo omBucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
@@ -253,13 +261,23 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       OmLifecycleScanState state = null;
       if (sourceType == RequestSource.LIFECYCLE && deleteKeyRequest.hasScanState()) {
         state = OmLifecycleScanState.getFromProtobuf(deleteKeyRequest.getScanState());
-        // Update cache
-        ozoneManager.getMetadataManager().getLifecycleScanStateTable()
-            .addCacheEntry(new CacheKey<>(state.getBucketKey()),
-                CacheValue.get(trxnLogIndex, state));
+        if (isScanStateValid(omMetadataManager, state)) {
+          // Update cache
+          omMetadataManager.getLifecycleScanStateTable()
+              .addCacheEntry(new CacheKey<>(state.getBucketKey()), CacheValue.get(trxnLogIndex, state));
+        } else {
+          LOG.debug("Skip saving scan state {} as its bucket or lifecycle configuration no longer exists", state);
+          state = null;
+        }
       }
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
+
+      // A partial delete still persists the accepted keys and the bucket row, so publish here
+      // rather than only when every key was deleted.
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
       omClientResponse =
           getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
               unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
@@ -284,7 +302,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       omResponse.setDeleteKeysResponse(
           DeleteKeysResponse.newBuilder().setStatus(false)
-              .setUnDeletedKeys(unDeletedKeys).build()).build();
+              .setUnDeletedKeys(unDeletedKeys).build());
       omClientResponse =
           new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
       long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();

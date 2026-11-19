@@ -95,10 +95,14 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @throws IOException in case watchForCommit fails
    */
   XceiverClientReply watchOnFirstIndex() throws IOException {
-    if (commitIndexMap.isEmpty()) {
-      return null;
+    long firstKey;
+    synchronized (this) {
+      if (commitIndexMap.isEmpty()) {
+        return null;
+      }
+      firstKey = commitIndexMap.firstKey();
     }
-    return watchForCommit(commitIndexMap.firstKey());
+    return watchForCommit(firstKey);
   }
 
   /**
@@ -111,10 +115,14 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @throws IOException in case watchForCommit fails
    */
   XceiverClientReply watchOnLastIndex() throws IOException {
-    if (commitIndexMap.isEmpty()) {
-      return null;
+    long lastKey;
+    synchronized (this) {
+      if (commitIndexMap.isEmpty()) {
+        return null;
+      }
+      lastKey = commitIndexMap.lastKey();
     }
-    return watchForCommit(commitIndexMap.lastKey());
+    return watchForCommit(lastKey);
   }
 
   /**
@@ -183,7 +191,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     return ioException;
   }
 
-  void cleanup() {
+  synchronized void cleanup() {
     commitIndexMap.clear();
     replies.clear();
   }

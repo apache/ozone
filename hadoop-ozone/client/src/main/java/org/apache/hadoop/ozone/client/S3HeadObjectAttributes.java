@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 import java.util.Collections;
 import java.util.NavigableMap;
 import java.util.Objects;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 /**
  * Head metadata and completed multipart part sizes from a single S3 {@code GetKeyInfo} call.
@@ -28,13 +29,16 @@ public final class S3HeadObjectAttributes {
 
   private final OzoneKey key;
   private final NavigableMap<Integer, Long> completedMultipartPartSizes;
+  private final BucketLayout bucketLayout;
 
   public S3HeadObjectAttributes(OzoneKey key,
-      NavigableMap<Integer, Long> completedMultipartPartSizes) {
+      NavigableMap<Integer, Long> completedMultipartPartSizes,
+      BucketLayout bucketLayout) {
     this.key = Objects.requireNonNull(key, "key == null");
     this.completedMultipartPartSizes = completedMultipartPartSizes == null
         ? Collections.emptyNavigableMap()
         : completedMultipartPartSizes;
+    this.bucketLayout = bucketLayout == null ? BucketLayout.DEFAULT : bucketLayout;
   }
 
   public OzoneKey getKey() {
@@ -43,5 +47,9 @@ public final class S3HeadObjectAttributes {
 
   public NavigableMap<Integer, Long> getCompletedMultipartPartSizes() {
     return completedMultipartPartSizes;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
   }
 }

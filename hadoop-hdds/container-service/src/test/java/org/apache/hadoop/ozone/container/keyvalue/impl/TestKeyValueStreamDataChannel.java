@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -91,7 +92,7 @@ public class TestKeyValueStreamDataChannel {
               .setContainerID(222).setLocalID(333).build()).build()))
       .setDatanodeUuid("datanodeId")
       .setContainerID(111L)
-      .setVersion(ClientVersion.CURRENT.toProtoValue())
+      .setVersion(ClientVersion.CURRENT.serialize())
       .build();
   static final int PUT_BLOCK_PROTO_SIZE = PUT_BLOCK_PROTO.toByteString().size();
 
@@ -129,6 +130,71 @@ public class TestKeyValueStreamDataChannel {
     }
     assertEquals(data.length, tempFile.length());
     assertArrayEquals(data, Files.readAllBytes(tempFile.toPath()));
+  }
+
+  @Test
+  public void testDrainBuffers() throws Exception {
+    File tempFile = File.createTempFile("test-kv-drain", ".tmp");
+    tempFile.deleteOnExit();
+    AtomicReference<ContainerCommandRequestProto> processed = new AtomicReference<>();
+    KeyValueStreamDataChannel channel = newChannel(tempFile, true, processed);
+    final byte[] data1 = RandomUtils.secure().randomBytes(50);
+    final byte[] data2 = RandomUtils.secure().randomBytes(30);
+    final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
+        PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
+    final ByteBuffer protoLengthBuf = getProtoLength(putBlockBuf, PUT_BLOCK_REQUEST_LENGTH_MAX);
+
+    assertEquals(0, tempFile.length());
+    write(channel, data1);
+    // data1 is smaller than PUT_BLOCK_REQUEST_LENGTH_MAX, so it is still buffered
+    assertEquals(0, tempFile.length());
+    channel.drainBuffers();
+    assertEquals(data1.length, tempFile.length());
+    // draining empty buffers is a no-op
+    channel.drainBuffers();
+    assertEquals(data1.length, tempFile.length());
+
+    write(channel, data2);
+    write(channel, putBlockBuf.duplicate());
+    write(channel, protoLengthBuf.duplicate());
+    channel.close();
+
+    assertEquals(PUT_BLOCK_PROTO, processed.get());
+    final byte[] expected = new byte[data1.length + data2.length];
+    System.arraycopy(data1, 0, expected, 0, data1.length);
+    System.arraycopy(data2, 0, expected, data1.length, data2.length);
+    assertArrayEquals(expected, Files.readAllBytes(tempFile.toPath()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPollAll(boolean allowEmpty) {
+    final Buffers buffers = new Buffers(PUT_BLOCK_REQUEST_LENGTH_MAX);
+    final byte[] data = RandomUtils.secure().randomBytes(50);
+    final ReferenceCountedObject<ByteBuffer> offered =
+        ReferenceCountedObject.wrap(ByteBuffer.wrap(data), () -> { }, () -> { });
+    offered.retain();
+    assertFalse(buffers.offer(offered).iterator().hasNext());
+    offered.release();
+    assertFalse(buffers.isEmpty());
+
+    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(allowEmpty);
+    final ByteBuf buf = ref.retain();
+    try {
+      final byte[] polled = new byte[buf.readableBytes()];
+      buf.readBytes(polled);
+      assertArrayEquals(data, polled);
+    } finally {
+      ref.release();
+    }
+    assertTrue(buffers.isEmpty());
+
+    if (allowEmpty) {
+      assertNull(buffers.pollAll(true));
+    } else {
+      assertThrows(IllegalStateException.class, () -> buffers.pollAll(false));
+    }
+    assertTrue(buffers.isEmpty());
   }
 
   @Test
@@ -317,7 +383,7 @@ public class TestKeyValueStreamDataChannel {
 
     static ContainerCommandRequestProto closeBuffers(
         Buffers buffers, WriteMethod writeMethod) throws IOException {
-      final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+      final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(false);
       final ByteBuf buf = ref.retain();
       final ContainerCommandRequestProto putBlockRequest;
       try {

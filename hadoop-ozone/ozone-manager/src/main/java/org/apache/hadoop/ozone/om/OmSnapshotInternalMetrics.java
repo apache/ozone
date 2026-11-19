@@ -17,22 +17,26 @@
 
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class contains internal Snapshot Operation metrics.
  */
 @Metrics(about = "Snapshot Internal Operation Metrics", context = OzoneConsts.OZONE)
-public class OmSnapshotInternalMetrics {
+public final class OmSnapshotInternalMetrics implements MetricsSource {
 
   public static final String METRICS_SOURCE_NAME =
       OmSnapshotInternalMetrics.class.getSimpleName();
   private MetricsRegistry registry;
+  private String sourceName;
 
   /*
    * Total internal snapshot deletion operation metrics since last restart.
@@ -73,21 +77,35 @@ public class OmSnapshotInternalMetrics {
   @Metric("Total no. of delta files processed during incremental defragmentation")
   private MutableCounterLong numSnapshotIncDefragDeltaFilesProcessed;
 
-  public OmSnapshotInternalMetrics() {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+  private OmSnapshotInternalMetrics(String sourceName) {
+    this.sourceName = sourceName;
+    this.registry = new MetricsRegistry(sourceName);
   }
 
-  public static OmSnapshotInternalMetrics create() {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
-        "Metrics tracking the progress of snapshot internal operations",
-        new OmSnapshotInternalMetrics());
+  public static OmSnapshotInternalMetrics create(String omServiceId,
+      String omNodeId) {
+    String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME,
+        omServiceId, omNodeId);
+    OmSnapshotInternalMetrics metrics = new OmSnapshotInternalMetrics(sourceName);
+    metrics.register();
+    return metrics;
+  }
+
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName,
+        "Metrics tracking the progress of snapshot internal operations", this);
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    registry.snapshot(collector.addRecord(registry.info()), all);
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+  public void unregister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void incNumSnapshotPurges() {

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.EOFException;
@@ -27,7 +28,10 @@ import java.net.NoRouteToHostException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.security.AccessControlException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -115,6 +119,16 @@ public class TestConnectionFailureUtils {
   @Test
   public void testNullIsNotAConnectionFailure() {
     assertFalse(ConnectionFailureUtils.isConnectionFailure(null));
+  }
+
+  /**
+   * The shape StreamBlockInputStream's reader throws for a failed stream.
+   */
+  @Test
+  public void testUnwrapCauseThroughIOExceptionWrappingExecutionException() {
+    StorageContainerException sce = new StorageContainerException("not found", Result.CONTAINER_NOT_FOUND);
+    IOException wrapped = new IOException("Streaming read failed", new ExecutionException(sce));
+    assertSame(sce, ConnectionFailureUtils.unwrapCause(wrapped));
   }
 
   /**
