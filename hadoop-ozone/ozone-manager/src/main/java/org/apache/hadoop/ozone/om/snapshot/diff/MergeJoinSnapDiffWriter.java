@@ -105,16 +105,18 @@ public final class MergeJoinSnapDiffWriter {
       }
       store.dropEdgeColumnFamilies();
 
-      if (reportProgress != null && dependencyOrderingEnabledRef[0]) {
-        reportProgress.accept(FSO_RESOLVE_END_ORDERED);
+      if (reportProgress != null) {
+        reportProgress.accept(dependencyOrderingEnabledRef[0] ? FSO_RESOLVE_END_ORDERED : FSO_RESOLVE_END_UNORDERED);
       }
+
       if (dependencyOrderingEnabledRef[0]) {
         long orderStart = Time.monotonicNow();
         dependencyOrderingEnabledRef[0] = orderAndWriteReport(store, nodeCount, reportProgress);
         LOG.info("SnapDiff job {} ordering stage elapsed: {}ms", store.getJobId(),
             Time.monotonicNow() - orderStart);
-      } else if (reportProgress != null) {
-        reportProgress.accept(FSO_RESOLVE_END_UNORDERED);
+        if (reportProgress != null) {
+          reportProgress.accept(FSO_ORDER_END);
+        }
       }
       store.dropDependencyGraphColumnFamilies();
       orderedReportOutcome = dependencyOrderingEnabledRef[0];
@@ -554,9 +556,6 @@ public final class MergeJoinSnapDiffWriter {
       store.putOrderedReportEntries(reportEntries);
       SnapDiffProgressHelper.reportEveryTenPercentInSlice(reportProgress, FSO_RESOLVE_END_ORDERED,
           FSO_ORDER_END, end, orderDenominator, checkpoint);
-    }
-    if (reportProgress != null) {
-      reportProgress.accept(FSO_ORDER_END);
     }
     return true;
   }

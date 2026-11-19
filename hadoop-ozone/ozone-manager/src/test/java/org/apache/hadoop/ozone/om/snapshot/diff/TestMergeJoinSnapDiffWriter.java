@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME
 import static org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter.writeReport;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -372,8 +371,6 @@ class TestMergeJoinSnapDiffWriter {
       // Successful write with unordered outcome is what SnapshotDiffManager marks DONE with.
       assertEquals(2L, reportMeta.getKey().longValue());
       assertFalse(store.isReportDependencyOrdered());
-      assertEquals("Report is dependency unordered.",
-          "Report is dependency " + (store.isReportDependencyOrdered() ? "ordered" : "unordered") + ".");
 
       List<DiffReportEntry> entries = store.readReportEntriesForTest();
       assertThat(entries).extracting(DiffReportEntry::getType).containsExactly(RENAME, RENAME);
@@ -390,10 +387,7 @@ class TestMergeJoinSnapDiffWriter {
         unorderedStore.flushWrites();
         List<DiffReportEntry> explicitUnordered =
             runWriteReport(unorderedStore, BUCKET_OBJECT_ID, true, false);
-        for (int i = 0; i < entries.size(); i++) {
-          assertArrayEquals(explicitUnordered.get(i).getSourcePath(), entries.get(i).getSourcePath());
-          assertArrayEquals(explicitUnordered.get(i).getTargetPath(), entries.get(i).getTargetPath());
-        }
+        assertEquals(explicitUnordered, entries);
       }
 
       verify(store, never()).putOrderedReportEntries(anyList());
