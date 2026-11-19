@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.Time;
@@ -214,9 +215,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           RatisHelper.toRaftPeerId(pipeline.getClosestNode()));
     }
 
+    // StreamInitWithPutBlock streams commit PutBlock on stream close, so they must not be forwarded to the Raft log.
+    final boolean skipSendForward = BlockDataStreamOutput.isPutBlockWithoutRaft(
+        ozoneConfiguration.getObject(OzoneClientConfig.class), getPipeline());
     if (!client.compareAndSet(null,
         RatisHelper.newRaftClient(rpcType, getPipeline(), retryPolicy,
-            tlsConfig, ozoneConfiguration))) {
+            tlsConfig, ozoneConfiguration, skipSendForward))) {
       throw new IllegalStateException("Client is already connected.");
     }
   }

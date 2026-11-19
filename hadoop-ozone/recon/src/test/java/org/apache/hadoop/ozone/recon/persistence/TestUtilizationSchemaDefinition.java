@@ -34,8 +34,6 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ClusterGrowthDailyDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
@@ -65,22 +63,21 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
         CLUSTER_GROWTH_DAILY_TABLE_NAME, null);
 
     // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
-    List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
+    List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("timestamp", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("datanode_id", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("datanode_host", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("rack_id", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("available_size", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("used_size", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("container_count", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("block_count", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("timestamp", Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("datanode_id", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("datanode_host", Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("rack_id", Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("available_size", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("used_size", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("container_count", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("block_count", Types.INTEGER));
 
-    List<Pair<String, Integer>> actualPairs = new ArrayList<>();
+    List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ImmutablePair<>(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(8, actualPairs.size());
@@ -89,19 +86,15 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSetFileCount = metaData.getColumns(null, null,
         FILE_COUNT_BY_SIZE_TABLE_NAME, null);
 
-    List<Pair<String, Integer>> expectedPairsFileCount = new ArrayList<>();
-    expectedPairsFileCount.add(
-        new ImmutablePair<>("volume", Types.VARCHAR));
-    expectedPairsFileCount.add(
-        new ImmutablePair<>("bucket", Types.VARCHAR));
-    expectedPairsFileCount.add(
-        new ImmutablePair<>("file_size", Types.INTEGER));
-    expectedPairsFileCount.add(
-        new ImmutablePair<>("count", Types.INTEGER));
+    List<ColumnNameAndType> expectedPairsFileCount = new ArrayList<>();
+    expectedPairsFileCount.add(new ColumnNameAndType("volume", Types.VARCHAR));
+    expectedPairsFileCount.add(new ColumnNameAndType("bucket", Types.VARCHAR));
+    expectedPairsFileCount.add(new ColumnNameAndType("file_size", Types.INTEGER));
+    expectedPairsFileCount.add(new ColumnNameAndType("count", Types.INTEGER));
 
-    List<Pair<String, Integer>> actualPairsFileCount = new ArrayList<>();
+    List<ColumnNameAndType> actualPairsFileCount = new ArrayList<>();
     while (resultSetFileCount.next()) {
-      actualPairsFileCount.add(new ImmutablePair<>(resultSetFileCount.getString(
+      actualPairsFileCount.add(new ColumnNameAndType(resultSetFileCount.getString(
           "COLUMN_NAME"), resultSetFileCount.getInt(
               "DATA_TYPE")));
     }
@@ -114,16 +107,14 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSetContainerCount = metaData.getColumns(null, null,
         CONTAINER_COUNT_BY_SIZE_TABLE_NAME, null);
 
-    List<Pair<String, Integer>> expectedPairsContainerCount = new ArrayList<>();
-    expectedPairsContainerCount.add(
-        new ImmutablePair<>("container_size", Types.INTEGER));
-    expectedPairsContainerCount.add(
-        new ImmutablePair<>("count", Types.INTEGER));
+    List<ColumnNameAndType> expectedPairsContainerCount = new ArrayList<>();
+    expectedPairsContainerCount.add(new ColumnNameAndType("container_size", Types.INTEGER));
+    expectedPairsContainerCount.add(new ColumnNameAndType("count", Types.INTEGER));
 
-    List<Pair<String, Integer>> actualPairsContainerCount = new ArrayList<>();
+    List<ColumnNameAndType> actualPairsContainerCount = new ArrayList<>();
     while (resultSetContainerCount.next()) {
       actualPairsContainerCount.add(
-          new ImmutablePair<>(resultSetContainerCount.getString(
+          new ColumnNameAndType(resultSetContainerCount.getString(
           "COLUMN_NAME"), resultSetContainerCount.getInt(
           "DATA_TYPE")));
     }
