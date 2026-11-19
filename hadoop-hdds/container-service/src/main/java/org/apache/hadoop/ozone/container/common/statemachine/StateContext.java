@@ -453,7 +453,7 @@ public class StateContext {
           break;
         }
       }
-      return new CommandStatusReportSelection(selected, selectedBytes, oversizedBytes);
+      return new CommandStatusReportSelection(selected, oversizedBytes);
     }
   }
 
@@ -536,47 +536,22 @@ public class StateContext {
         + reportBytes;
   }
 
-  public long getCommandStatusReportQueueBytes(HostAndPort endpoint) {
-    synchronized (incrementalReportsQueue) {
-      List<Message> reports = incrementalReportsQueue.get(endpoint);
-      return reports == null ? 0 : reports.stream()
-          .filter(CommandStatusReportsProto.class::isInstance)
-          .map(CommandStatusReportsProto.class::cast)
-          .mapToLong(StateContext::getCommandStatusReportWireSize)
-          .sum();
-    }
-  }
-
-  public Map<HostAndPort, Long> getCommandStatusReportQueueBytes() {
-    synchronized (incrementalReportsQueue) {
-      return incrementalReportsQueue.keySet().stream()
-          .collect(Collectors.toMap(
-              endpoint -> endpoint,
-              this::getCommandStatusReportQueueBytes));
-    }
-  }
-
   /**
-   * Command status reports selected for one heartbeat and their byte metrics.
+   * Command status reports selected for one heartbeat and the size of any
+   * oversized report blocking the queue.
    */
   public static final class CommandStatusReportSelection {
     private final List<CommandStatusReportsProto> reports;
-    private final long selectedBytes;
     private final long oversizedBytes;
 
-    private CommandStatusReportSelection(List<CommandStatusReportsProto> reports, long selectedBytes,
-        long oversizedBytes) {
+    private CommandStatusReportSelection(
+        List<CommandStatusReportsProto> reports, long oversizedBytes) {
       this.reports = reports;
-      this.selectedBytes = selectedBytes;
       this.oversizedBytes = oversizedBytes;
     }
 
     public List<CommandStatusReportsProto> getReports() {
       return reports;
-    }
-
-    public long getSelectedBytes() {
-      return selectedBytes;
     }
 
     public long getOversizedBytes() {

@@ -247,8 +247,7 @@ public class TestStateContext {
     CommandStatusReportSelection selection =
         context.getCommandStatusReports(scm, 10, firstBytes, firstBytes);
     assertEquals(Collections.singletonList(first), selection.getReports());
-    assertEquals(firstBytes, selection.getSelectedBytes());
-    assertEquals(commandStatusReportWireSize(second), context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(1, context.getIncrementalReportQueueSize().get(scm));
   }
 
   @Test
@@ -272,15 +271,14 @@ public class TestStateContext {
         scm, 10, commandStatusReportWireSize(single),
         commandStatusReportWireSize(aggregate));
     assertTrue(selection.getReports().isEmpty());
-    assertEquals(commandStatusReportWireSize(aggregate),
-        context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(1, context.getIncrementalReportQueueSize().get(scm));
 
     selection = context.getCommandStatusReports(
         scm, 10, commandStatusReportWireSize(aggregate),
         commandStatusReportWireSize(aggregate));
     assertEquals(Collections.singletonList(aggregate),
         selection.getReports());
-    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(0, context.getIncrementalReportQueueSize().get(scm));
   }
 
   @Test
@@ -297,8 +295,7 @@ public class TestStateContext {
 
     assertEquals(Collections.singletonList(icr),
         context.getAvailableNonCommandStatusReports(scm, 10));
-    assertEquals(commandStatusReportWireSize(commandStatus),
-        context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(1, context.getIncrementalReportQueueSize().get(scm));
   }
 
   @Test
@@ -314,7 +311,7 @@ public class TestStateContext {
         context.getCommandStatusReports(
             scm, 10, reportBytes - 1, reportBytes - 1);
     assertTrue(selection.getReports().isEmpty());
-    assertEquals(reportBytes, context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(1, context.getIncrementalReportQueueSize().get(scm));
     assertEquals(reportBytes, selection.getOversizedBytes());
   }
 
@@ -342,19 +339,18 @@ public class TestStateContext {
         context.getCommandStatusReports(
             scm, 10, smallBytes, oversizedBytes);
     assertEquals(Collections.singletonList(firstSmallReport), selection.getReports());
-    assertEquals(oversizedBytes + smallBytes,
-        context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(2, context.getIncrementalReportQueueSize().get(scm));
 
     selection = context.getCommandStatusReports(
         scm, 10, oversizedBytes, oversizedBytes);
     assertEquals(Collections.singletonList(oversizedReport), selection.getReports());
     assertEquals(0, selection.getOversizedBytes());
-    assertEquals(commandStatusReportWireSize(lastSmallReport), context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(1, context.getIncrementalReportQueueSize().get(scm));
 
     selection = context.getCommandStatusReports(
         scm, 10, smallBytes, oversizedBytes);
     assertEquals(Collections.singletonList(lastSmallReport), selection.getReports());
-    assertEquals(0, context.getCommandStatusReportQueueBytes(scm));
+    assertEquals(0, context.getIncrementalReportQueueSize().get(scm));
   }
 
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {

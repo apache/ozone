@@ -157,7 +157,6 @@ public class HeartbeatEndpointTask
   public EndpointStateMachine.EndPointStates call() throws Exception {
     rpcEndpoint.lock();
     SCMHeartbeatRequestProto.Builder requestBuilder = null;
-    CommandStatusReportSelection commandStatusSelection = null;
     try {
       DatanodeVersionProto versionInfo = toVersionProto(
           versionManager.getApparentVersion(),
@@ -177,7 +176,7 @@ public class HeartbeatEndpointTask
       addContainerActions(requestBuilder, heartbeatSize);
       addPipelineActions(requestBuilder, heartbeatSize);
       addQueuedCommandCounts(requestBuilder, heartbeatSize);
-      commandStatusSelection = addCommandStatusReports(
+      addCommandStatusReports(
           requestBuilder, maxReportsPerHB - reportCount, heartbeatSize.get());
       SCMHeartbeatRequestProto request = requestBuilder.build();
       LOG.debug("Sending heartbeat message : {}", request);
@@ -186,21 +185,10 @@ public class HeartbeatEndpointTask
       processResponse(response, datanodeDetailsProto);
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
-      if (context.getQueueMetrics() != null) {
-        context.getQueueMetrics().incrCommandStatusReportBytesSent(
-            rpcEndpoint.getAddress(),
-            commandStatusSelection.getSelectedBytes());
-      }
     } catch (IOException ex) {
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
-      if (commandStatusSelection != null &&
-          context.getQueueMetrics() != null) {
-        context.getQueueMetrics().incrCommandStatusReportBytesRequeued(
-            rpcEndpoint.getAddress(),
-            commandStatusSelection.getSelectedBytes());
-      }
       rpcEndpoint.logIfNeeded(ex);
       resetEndpointToGetVersion();
       maybeRefreshScmAddress(ex);
@@ -292,7 +280,7 @@ public class HeartbeatEndpointTask
     return reportCount;
   }
 
-  private CommandStatusReportSelection addCommandStatusReports(
+  private void addCommandStatusReports(
       SCMHeartbeatRequestProto.Builder requestBuilder,
       int remainingReportCount, long currentHeartbeatSize) {
     long remainingSafeBytes = Math.max(
@@ -315,11 +303,6 @@ public class HeartbeatEndpointTask
           rpcEndpoint.getAddress(), selection.getOversizedBytes(),
           safeHeartbeatSize);
     }
-    if (context.getQueueMetrics() != null) {
-      context.getQueueMetrics().setOversizedCommandStatusReportBytes(
-          rpcEndpoint.getAddress(), selection.getOversizedBytes());
-    }
-    return selection;
   }
 
   /**

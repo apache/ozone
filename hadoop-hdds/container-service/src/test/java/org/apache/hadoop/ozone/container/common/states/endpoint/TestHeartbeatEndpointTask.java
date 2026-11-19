@@ -65,7 +65,6 @@ import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -492,8 +491,8 @@ public class TestHeartbeatEndpointTask {
 
     assertEquals(2, argument.getValue().getIncrementalContainerReportCount());
     assertEquals(0, argument.getValue().getCommandStatusReportsCount());
-    assertEquals(commandStatusReportWireSize(commandStatus),
-        context.getCommandStatusReportQueueBytes(TEST_SCM_ENDPOINT));
+    assertEquals(1,
+        context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
   }
 
   @Test
@@ -506,8 +505,6 @@ public class TestHeartbeatEndpointTask {
         (int) Math.floor((reportBytes - 1) / 0.9D);
     conf.setInt(HDDS_IPC_MAXIMUM_DATA_LENGTH, ipcMaximumDataLength);
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
-    DatanodeQueueMetrics queueMetrics = new DatanodeQueueMetrics(datanodeStateMachine);
-    when(datanodeStateMachine.getQueueMetrics()).thenReturn(queueMetrics);
     when(datanodeStateMachine.getQueuedCommandCount())
         .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanodeStateMachine, "");
@@ -529,11 +526,8 @@ public class TestHeartbeatEndpointTask {
     endpointTask.call();
 
     assertEquals(0, argument.getValue().getCommandStatusReportsCount());
-    assertEquals(reportBytes,
-        context.getCommandStatusReportQueueBytes(TEST_SCM_ENDPOINT));
-    assertEquals(0,
-        queueMetrics.getCommandStatusReportBytesSent(TEST_SCM_ENDPOINT));
-    assertEquals(reportBytes, queueMetrics.getOversizedCommandStatusReportBytes(TEST_SCM_ENDPOINT));
+    assertEquals(1,
+        context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
   }
 
   @Test
@@ -606,8 +600,8 @@ public class TestHeartbeatEndpointTask {
 
     assertEquals(1, argument.getValue().getCommandStatusReportsCount());
     assertTrue(argument.getValue().getSerializedSize() <= safeHeartbeatSize);
-    assertEquals(commandStatusReportWireSize(second),
-        context.getCommandStatusReportQueueBytes(TEST_SCM_ENDPOINT));
+    assertEquals(1,
+        context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
   }
 
   @Test
@@ -617,8 +611,6 @@ public class TestHeartbeatEndpointTask {
     CommandStatusReportsProto second = newCommandStatusReport(2, 128);
     long reportBytes = commandStatusReportWireSize(first);
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
-    DatanodeQueueMetrics queueMetrics = new DatanodeQueueMetrics(datanodeStateMachine);
-    when(datanodeStateMachine.getQueueMetrics()).thenReturn(queueMetrics);
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
     when(datanodeStateMachine.getQueuedCommandCount())
@@ -639,8 +631,6 @@ public class TestHeartbeatEndpointTask {
     CommandStatusReportSelection selection = context.getCommandStatusReports(
         TEST_SCM_ENDPOINT, 10, reportBytes * 2, Long.MAX_VALUE);
     assertEquals(Arrays.asList(first, second), selection.getReports());
-    assertEquals(reportBytes * 2,
-        queueMetrics.getCommandStatusReportBytesRequeued(TEST_SCM_ENDPOINT));
   }
 
   @ParameterizedTest
