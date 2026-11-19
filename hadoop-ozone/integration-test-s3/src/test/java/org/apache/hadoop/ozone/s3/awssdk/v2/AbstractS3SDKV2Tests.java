@@ -1622,6 +1622,45 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
   }
 
   @Test
+  public void testDeleteObjectsWithMD5Header() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("bar"));
+
+    // The AWS SDK sends Content-MD5 of the delete body. A match must delete the key.
+    DeleteObjectsResponse response = s3Client.deleteObjects(b -> b.bucket(bucketName)
+        .delete(d -> d.objects(ObjectIdentifier.builder().key(keyName).build())));
+
+    assertThat(response.errors()).isEmpty();
+    assertThat(response.deleted()).extracting(DeletedObject::key).containsExactly(keyName);
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testDeleteObjectsWithWrongMD5Header(String contentMD5, String expectedErrorCode) {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.deleteObjects(b -> b
+        .bucket(bucketName)
+        .delete(d -> d.objects(ObjectIdentifier.builder().key(keyName).build()))
+        .overrideConfiguration(c -> c.putHeader(S3Consts.CHECKSUM_HEADER, contentMD5))));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals(expectedErrorCode, exception.awsErrorDetails().errorCode());
+
+    HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", head.eTag());
+    assertEquals(content.length(), head.contentLength());
+    assertEquals(content, s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+  }
+
+  @Test
   public void testMultipartUploadWithMD5Header() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();

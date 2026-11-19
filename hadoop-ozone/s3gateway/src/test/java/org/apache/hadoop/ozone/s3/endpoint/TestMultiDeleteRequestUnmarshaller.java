@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
@@ -64,6 +65,17 @@ public class TestMultiDeleteRequestUnmarshaller {
 
     //THEN
     assertEquals(3, multiDeleteRequest.getObjects().size());
+  }
+
+  @Test
+  public void recordsMd5OfRawBody() throws IOException {
+    byte[] body = ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        + "<Delete><Object><Key>delete-me.txt</Key></Object></Delete>\n").getBytes(UTF_8);
+
+    MultiDeleteRequest request = unmarshall(new ByteArrayInputStream(body));
+
+    assertEquals("delete-me.txt", request.getObjects().get(0).getKey());
+    assertEquals(DigestUtils.md5Hex(body), request.getBodyContentMD5());
   }
 
   private MultiDeleteRequest unmarshall(ByteArrayInputStream inputBody)

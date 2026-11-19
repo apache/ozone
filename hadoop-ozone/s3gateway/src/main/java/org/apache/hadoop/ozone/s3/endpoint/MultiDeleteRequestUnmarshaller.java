@@ -17,10 +17,19 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Type;
 import javax.inject.Singleton;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.Provider;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.IOUtils;
 
 /**
  * Custom unmarshaller to read MultiDeleteRequest w/wo namespace.
@@ -33,6 +42,22 @@ public class MultiDeleteRequestUnmarshaller
 
   public MultiDeleteRequestUnmarshaller() {
     super(MultiDeleteRequest.class);
+  }
+
+  @Override
+  public MultiDeleteRequest readFrom(Class<MultiDeleteRequest> clazz, Type type, Annotation[] annotations,
+      MediaType mediaType, MultivaluedMap<String, String> httpHeaders, InputStream inputStream)
+      throws WebApplicationException {
+    final byte[] body;
+    try {
+      body = IOUtils.toByteArray(inputStream);
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex);
+    }
+    MultiDeleteRequest request = super.readFrom(clazz, type, annotations, mediaType, httpHeaders,
+        new ByteArrayInputStream(body));
+    request.setBodyContentMD5(DigestUtils.md5Hex(body));
+    return request;
   }
 
 }
