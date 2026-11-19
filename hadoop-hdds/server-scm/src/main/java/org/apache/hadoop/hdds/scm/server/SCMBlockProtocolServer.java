@@ -242,9 +242,8 @@ public class SCMBlockProtocolServer implements
       final DatanodeDetails localDatanode = preferClientLocalPipeline && client instanceof DatanodeDetails
           ? (DatanodeDetails) client : null;
       for (int i = 0; i < num; i++) {
-        AllocatedBlock block = localDatanode == null
-            ? scm.getScmBlockManager().allocateBlock(size, replicationConfig, owner, excludeList)
-            : scm.getScmBlockManager().allocateBlock(size, replicationConfig, owner, excludeList, localDatanode);
+        AllocatedBlock block =
+            scm.getScmBlockManager().allocateBlock(size, replicationConfig, owner, excludeList, localDatanode);
         if (block != null) {
           // Sort the datanodes if client machine is specified
           if (client != null) {
