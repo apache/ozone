@@ -35,9 +35,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.UUID;
@@ -68,8 +68,6 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.SnapshotChainInfo;
-import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -427,73 +425,45 @@ public class QuotaRepairTask {
       Map<String, CountPair> snapshotDeletedDirMap) throws IOException {
     LOG.info("Starting recalculate snapshot pending-delete from snapshot DBs");
     OMMetadataManager liveMetaManager = om.getMetadataManager();
-    SnapshotChainManager chain =
-        ((OmMetadataManagerImpl) liveMetaManager).getSnapshotChainManager();
     OmSnapshotManager snapshotManager = om.getOmSnapshotManager();
     Set<UUID> scannedSnapshotIds = new HashSet<>();
 
     for (OmBucketInfo bucket : nameBucketInfoMap.values()) {
-      String snapshotPath = buildSnapshotPath(bucket.getVolumeName(), bucket.getBucketName());
-      LinkedHashMap<UUID, SnapshotChainInfo> pathChain;
-      try {
-        pathChain = chain.getSnapshotChainPath(snapshotPath);
-      } catch (IOException ex) {
-        throw new IOException("Failed to read snapshot chain for path " + snapshotPath, ex);
-      }
-      if (pathChain == null || pathChain.isEmpty()) {
-        continue;
-      }
-      for (UUID snapshotId : pathChain.keySet()) {
-        if (!scannedSnapshotIds.add(snapshotId)) {
-          continue;
-        }
-        SnapshotInfo snapshotInfo = loadActiveSnapshot(activeMetaManager, chain, snapshotId);
-        if (snapshotInfo == null) {
-          continue;
-        }
-        if (!snapshotInfo.getVolumeName().equals(bucket.getVolumeName())
-            || !snapshotInfo.getBucketName().equals(bucket.getBucketName())) {
-          continue;
-        }
-        if (!OmSnapshotManager.isSnapshotFlushedToDB(liveMetaManager, snapshotInfo)) {
-          LOG.warn("Skipping snapshot {} for quota repair: create txn not flushed to active DB",
-              snapshotInfo.getTableKey());
-          continue;
-        }
-        String sourceLabel = "snapshot DB " + snapshotInfo.getTableKey();
-        try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshotRef =
-                 snapshotManager.getSnapshot(snapshotId)) {
-          scanDeletedTables(snapshotRef.get().getMetadataManager(), bucketById,
-              snapshotDeletedKeyMap, snapshotDeletedDirMap, sourceLabel);
+      // List the snapshots from the checkpoint, so that one removed from the live chain since then is still checked.
+      String snapshotPrefix = SnapshotInfo.getTableKey(bucket.getVolumeName(), bucket.getBucketName(), "");
+      try (Table.KeyValueIterator<String, SnapshotInfo> snapshotIter =
+               activeMetaManager.getSnapshotInfoTable().iterator(snapshotPrefix)) {
+        while (snapshotIter.hasNext()) {
+          SnapshotInfo snapshotInfo = snapshotIter.next().getValue();
+          if (snapshotInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE
+              || !scannedSnapshotIds.add(snapshotInfo.getSnapshotId())) {
+            continue;
+          }
+          if (!OmSnapshotManager.isSnapshotFlushedToDB(liveMetaManager, snapshotInfo)) {
+            LOG.warn("Skipping snapshot {} for quota repair: create txn not flushed to active DB",
+                snapshotInfo.getTableKey());
+            continue;
+          }
+          String sourceLabel = "snapshot DB " + snapshotInfo.getTableKey();
+          try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshotRef =
+                   snapshotManager.getSnapshot(snapshotInfo.getSnapshotId())) {
+            scanDeletedTables(snapshotRef.get().getMetadataManager(), bucketById,
+                snapshotDeletedKeyMap, snapshotDeletedDirMap, sourceLabel);
+          }
+          // The snapshot DB is read live, the baseline comes from the checkpoint. Every request that changes a
+          // snapshot DB or removes the snapshot updates lastTransactionInfo or deletes the entry in the cache when it
+          // is applied, so an unchanged value means the scan saw the snapshot DB as of the checkpoint.
+          SnapshotInfo liveSnapshotInfo = liveMetaManager.getSnapshotInfoTable().get(snapshotInfo.getTableKey());
+          if (liveSnapshotInfo == null
+              || !Objects.equals(snapshotInfo.getLastTransactionInfo(), liveSnapshotInfo.getLastTransactionInfo())) {
+            throw new IOException("Snapshot " + snapshotInfo.getTableKey()
+                + " changed after the quota repair checkpoint was taken, run the quota repair again");
+          }
         }
       }
     }
     LOG.info("Recalculate snapshot pending-delete from snapshot DBs completed, snapshots scanned: {}",
         scannedSnapshotIds.size());
-  }
-
-  private static String buildSnapshotPath(String volumeName, String bucketName) {
-    return volumeName + OM_KEY_PREFIX + bucketName;
-  }
-
-  private static SnapshotInfo loadActiveSnapshot(
-      OMMetadataManager metadataManager,
-      SnapshotChainManager chain,
-      UUID snapshotId) throws IOException {
-    String tableKey = chain.getTableKey(snapshotId);
-    if (tableKey == null) {
-      LOG.warn("Snapshot id {} is not present in snapshot chain table-key map", snapshotId);
-      return null;
-    }
-    SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(tableKey);
-    if (snapshotInfo == null) {
-      LOG.warn("Snapshot {} not found in snapshotInfoTable during quota repair", tableKey);
-      return null;
-    }
-    if (snapshotInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE) {
-      return null;
-    }
-    return snapshotInfo;
   }
 
   private void scanDeletedTables(
