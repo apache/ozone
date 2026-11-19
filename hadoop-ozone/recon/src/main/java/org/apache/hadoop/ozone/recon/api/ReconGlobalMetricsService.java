@@ -34,6 +34,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -225,9 +226,11 @@ public class ReconGlobalMetricsService {
    * Both tables are scanned fully on every call.
    *
    * @param limit maximum number of buckets to return; a non-positive value returns all buckets.
+   * @param startPrefix if not blank, only buckets whose volume/bucket path starts with it are returned;
+   *                    a leading '/' is ignored.
    * @return buckets that have data pending deletion, largest total pending deletion bytes first.
    */
-  public List<BucketPendingDeletion> getBucketPendingDeletion(int limit) throws IOException {
+  public List<BucketPendingDeletion> getBucketPendingDeletion(int limit, String startPrefix) throws IOException {
     Map<String, BucketPendingDeletion> buckets = new HashMap<>();
 
     Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
@@ -255,6 +258,10 @@ public class ReconGlobalMetricsService {
     }
 
     List<BucketPendingDeletion> result = new ArrayList<>(buckets.values());
+    if (isNotBlank(startPrefix)) {
+      String prefix = StringUtils.removeStart(startPrefix, OM_KEY_PREFIX);
+      result.removeIf(b -> !(b.getVolumeName() + OM_KEY_PREFIX + b.getBucketName()).startsWith(prefix));
+    }
     result.sort(Comparator.comparingLong(BucketPendingDeletion::getTotalPendingDeletionBytes).reversed());
     if (limit > 0 && result.size() > limit) {
       return new ArrayList<>(result.subList(0, limit));

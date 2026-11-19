@@ -1673,7 +1673,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     key3.setDataSize(1000L);
     reconOMMetadataManager.getDeletedTable().put("/sampleVol/bucketTwo/key3/4", new RepeatedOmKeyInfo(key3, 2));
 
-    Response response = omdbInsightEndpoint.getBucketPendingDeletion(-1);
+    Response response = omdbInsightEndpoint.getBucketPendingDeletion(-1, "");
     List<BucketPendingDeletion> buckets = (List<BucketPendingDeletion>) response.getEntity();
     assertEquals(2, buckets.size());
 
@@ -1694,9 +1694,19 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertEquals(1140L, bucketOne.getTotalPendingDeletionBytes());
 
     List<BucketPendingDeletion> limited =
-        (List<BucketPendingDeletion>) omdbInsightEndpoint.getBucketPendingDeletion(1).getEntity();
+        (List<BucketPendingDeletion>) omdbInsightEndpoint.getBucketPendingDeletion(1, "").getEntity();
     assertEquals(1, limited.size());
     assertEquals("bucketTwo", limited.get(0).getBucketName());
+
+    // The prefix is applied before the limit, so a bucket outside the largest ones is still found.
+    List<BucketPendingDeletion> searched =
+        (List<BucketPendingDeletion>) omdbInsightEndpoint.getBucketPendingDeletion(1, "/sampleVol/bucketO").getEntity();
+    assertEquals(1, searched.size());
+    assertEquals("bucketOne", searched.get(0).getBucketName());
+    assertEquals(2, ((List<BucketPendingDeletion>) omdbInsightEndpoint.getBucketPendingDeletion(-1, "sampleVol/")
+        .getEntity()).size());
+    assertEquals(0, ((List<BucketPendingDeletion>) omdbInsightEndpoint.getBucketPendingDeletion(-1, "otherVol")
+        .getEntity()).size());
   }
 
   @Test

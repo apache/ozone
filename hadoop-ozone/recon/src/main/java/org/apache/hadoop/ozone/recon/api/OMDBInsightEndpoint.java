@@ -624,13 +624,15 @@ public class OMDBInsightEndpoint {
    *   ]
    *
    * @param limit maximum number of buckets to return.
+   * @param startPrefix if set, only buckets whose volume/bucket path starts with it, e.g. "vol1/buck".
    */
   @GET
   @Path("/deletePending/buckets")
   public Response getBucketPendingDeletion(
-      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit) {
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_START_PREFIX) String startPrefix) {
     try {
-      return Response.ok(reconGlobalMetricsService.getBucketPendingDeletion(limit)).build();
+      return Response.ok(reconGlobalMetricsService.getBucketPendingDeletion(limit, startPrefix)).build();
     } catch (IOException e) {
       LOG.error("Error while aggregating pending deletion data per bucket", e);
       return createInternalServerErrorResponse("Error aggregating pending deletion per bucket: " + e.getMessage());
