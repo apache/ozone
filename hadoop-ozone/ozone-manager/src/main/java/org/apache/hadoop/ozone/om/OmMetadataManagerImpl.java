@@ -1120,7 +1120,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // Every key matching keyPrefix sorts after a startKey that sorts before keyPrefix,
     // so seek to keyPrefix; seeking to startKey would stop at the first non-matching key.
     // Compare DB keys: keyPrefix "/" maps to the DB prefix of the bucket, which also matches keys sorting before "/".
-    if (StringUtils.isNotBlank(startKey) && getOzoneKey(volumeName, bucketName, startKey).compareTo(seekPrefix) >= 0) {
+    if (StringUtils.isNotEmpty(startKey) && getOzoneKey(volumeName, bucketName, startKey).compareTo(seekPrefix) >= 0) {
       // Seek to the specified key.
       seekKey = getOzoneKey(volumeName, bucketName, startKey);
       skipStartKey = true;
