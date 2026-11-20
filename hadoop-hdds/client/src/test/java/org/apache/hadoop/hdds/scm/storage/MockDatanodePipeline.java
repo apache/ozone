@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -97,6 +99,11 @@ public class MockDatanodePipeline {
 
   private volatile Supplier<Throwable> watchFailure = null;
   private volatile int watchFailAfter = Integer.MAX_VALUE;
+
+  private volatile boolean streamCloseFailure;
+  // When true, the stream close reply is completed asynchronously after a short delay.
+  private volatile boolean streamCloseDelayed;
+  private final AtomicInteger streamCloseCount = new AtomicInteger(0);
 
   public MockDatanodePipeline() throws IOException {
     this(new BlockID(1, 1));
@@ -190,7 +197,23 @@ public class MockDatanodePipeline {
             receivedChunks.remove(receivedChunks.size() - 1);
           }
           src.position(src.limit());
-          return CompletableFuture.completedFuture(dataStreamReply(size));
+          streamCloseCount.incrementAndGet();
+          final DataStreamReply reply = dataStreamReply(size);
+          if (streamCloseFailure) {
+            when(reply.isSuccess()).thenReturn(false);
+          }
+          if (!streamCloseDelayed) {
+            return CompletableFuture.completedFuture(reply);
+          }
+          return CompletableFuture.supplyAsync(() -> {
+            try {
+              TimeUnit.MILLISECONDS.sleep(50);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new CompletionException(e);
+            }
+            return reply;
+          });
         }
       }
       int count = chunkCount.incrementAndGet();
@@ -270,6 +293,11 @@ public class MockDatanodePipeline {
     return streamInitType;
   }
 
+  /** @return the number of writes with {@link StandardWriteOption#CLOSE}. */
+  public int getStreamCloseCount() {
+    return streamCloseCount.get();
+  }
+
   /** Concatenate all received chunks into a single byte array. */
   public byte[] getAllReceivedData() {
     int total = receivedChunks.stream().mapToInt(c -> c.length).sum();
@@ -299,6 +327,18 @@ public class MockDatanodePipeline {
   public MockDatanodePipeline failWatchAfter(int n, Supplier<Throwable> err) {
     this.watchFailAfter = n;
     this.watchFailure = err;
+    return this;
+  }
+
+  /** Reply to the write with {@link StandardWriteOption#CLOSE} with an unsuccessful reply. */
+  public MockDatanodePipeline failStreamClose() {
+    this.streamCloseFailure = true;
+    return this;
+  }
+
+  /** Complete the stream close reply asynchronously, as a real Ratis pipeline does. */
+  public MockDatanodePipeline withDelayedStreamClose() {
+    this.streamCloseDelayed = true;
     return this;
   }
 

@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Provider for Recon's RDB.
  */
-public class ReconDBProvider {
+public class ReconDBProvider implements AutoCloseable {
   private static final String STAGED_EXT = ".staged";
   private static final String BACKUP_EXT = ".backup";
   private OzoneConfiguration configuration;
@@ -120,6 +120,7 @@ public class ReconDBProvider {
     return dbStore;
   }
 
+  @Override
   public void close() throws Exception {
     if (this.dbStore != null) {
       dbStore.close();

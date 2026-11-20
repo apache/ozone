@@ -28,7 +28,13 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -43,8 +49,12 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -152,6 +162,28 @@ public class TestMultipartUploadComplete {
     when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
     completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, replacementUploadID, singletonList(replacementPart));
     assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, "new-content");
+  }
+
+  @Test
+  public void testMultipartRejectsFileInParentPath() throws Exception {
+    String key = "file/child";
+    String uploadID = initiateMultipartUpload(key);
+    Part part = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
+    ObjectEndpoint endpoint = spy(rest);
+    ClientProtocol protocol = spy(rest.getClientProtocol());
+    OzoneBucket bucket = spy(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET));
+    doReturn(protocol).when(endpoint).getClientProtocol();
+    doReturn(bucket).when(protocol).getBucketDetails(any(), eq(OzoneConsts.S3_BUCKET));
+    doThrow(new OMException("File exists in path", OMException.ResultCodes.NOT_A_FILE))
+        .when(bucket).completeMultipartUpload(eq(key), eq(uploadID), anyMap(), any(), any(), any());
+
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> completeMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part)));
+
+    assertEquals(400, ex.getHttpCode());
+    assertEquals("An error occurred (InvalidRequest) when calling the CompleteMultipartUpload operation: " +
+        OmConfig.Keys.ENABLE_FILESYSTEM_PATHS + " is enabled Keys are considered as Unix Paths. " +
+        "Path has Violated FS Semantics which caused failure for MPU", ex.getErrorMessage());
   }
 
   @Test

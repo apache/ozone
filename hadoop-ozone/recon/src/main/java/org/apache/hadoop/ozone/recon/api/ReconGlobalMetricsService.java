@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,10 +34,11 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.BucketPendingDeletion;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -190,9 +193,9 @@ public class ReconGlobalMetricsService {
         keyEntityInfo.setKey(omKeyInfo.getFileName());
         keyEntityInfo.setPath(createPath(omKeyInfo));
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        Pair<Long, Long> sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
-        keyEntityInfo.setSize(sizeInfo.getLeft());
-        keyEntityInfo.setReplicatedSize(sizeInfo.getRight());
+        RepeatedOmKeyInfo.TotalSize sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+        keyEntityInfo.setSize(sizeInfo.getUnreplicatedSize());
+        keyEntityInfo.setReplicatedSize(sizeInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         deletedDirInsightInfo.setUnreplicatedDataSize(
             deletedDirInsightInfo.getUnreplicatedDataSize() +
@@ -213,6 +216,55 @@ public class ReconGlobalMetricsService {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
     return deletedDirInsightInfo;
+  }
+
+  /**
+   * Aggregates pending deletion data per bucket from the deletedTable and deletedDirTable of the Recon OM DB copy.
+   * Directory sizes come from NSSummary, the same way as {@link #getPendingForDeletionDirInfo(int, String)}.
+   * Both tables are scanned fully on every call.
+   *
+   * @param limit maximum number of buckets to return; a non-positive value returns all buckets.
+   * @return buckets that have data pending deletion, largest total pending deletion bytes first.
+   */
+  public List<BucketPendingDeletion> getBucketPendingDeletion(int limit) throws IOException {
+    Map<String, BucketPendingDeletion> buckets = new HashMap<>();
+
+    Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
+    try (TableIterator<String, Table.KeyValue<String, RepeatedOmKeyInfo>> iter = deletedTable.iterator()) {
+      while (iter.hasNext()) {
+        RepeatedOmKeyInfo repeatedOmKeyInfo = iter.next().getValue();
+        if (repeatedOmKeyInfo == null || repeatedOmKeyInfo.getOmKeyInfoList().isEmpty()) {
+          continue;
+        }
+        getOrCreateBucketEntry(buckets, repeatedOmKeyInfo.getOmKeyInfoList().get(0)).addKeys(
+            repeatedOmKeyInfo.getOmKeyInfoList().size(), repeatedOmKeyInfo.getTotalSize().getReplicatedSize());
+      }
+    }
+
+    Table<String, OmKeyInfo> deletedDirTable = omMetadataManager.getDeletedDirTable();
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iter = deletedDirTable.iterator()) {
+      while (iter.hasNext()) {
+        OmKeyInfo dirInfo = iter.next().getValue();
+        if (dirInfo == null) {
+          continue;
+        }
+        getOrCreateBucketEntry(buckets, dirInfo).addDir(
+            fetchSizeForDeletedDirectory(dirInfo.getObjectID()).getReplicatedSize());
+      }
+    }
+
+    List<BucketPendingDeletion> result = new ArrayList<>(buckets.values());
+    result.sort(Comparator.comparingLong(BucketPendingDeletion::getTotalPendingDeletionBytes).reversed());
+    if (limit > 0 && result.size() > limit) {
+      return new ArrayList<>(result.subList(0, limit));
+    }
+    return result;
+  }
+
+  private static BucketPendingDeletion getOrCreateBucketEntry(
+      Map<String, BucketPendingDeletion> buckets, OmKeyInfo keyInfo) {
+    return buckets.computeIfAbsent(keyInfo.getVolumeName() + OM_KEY_PREFIX + keyInfo.getBucketName(),
+        k -> new BucketPendingDeletion(keyInfo.getVolumeName(), keyInfo.getBucketName()));
   }
 
   public Map<String, Long> calculatePendingSizes() {
@@ -251,13 +303,12 @@ public class ReconGlobalMetricsService {
     return record != null ? record.getValue() : 0L;
   }
 
-  private Pair<Long, Long> fetchSizeForDeletedDirectory(long objectId)
-      throws IOException {
+  private RepeatedOmKeyInfo.TotalSize fetchSizeForDeletedDirectory(long objectId) throws IOException {
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     if (nsSummary != null) {
-      return Pair.of(nsSummary.getSizeOfFiles(), nsSummary.getReplicatedSizeOfFiles());
+      return new RepeatedOmKeyInfo.TotalSize(nsSummary.getSizeOfFiles(), nsSummary.getReplicatedSizeOfFiles());
     }
-    return Pair.of(0L, 0L);
+    return new RepeatedOmKeyInfo.TotalSize(0L, 0L);
   }
 
   private String createPath(OmKeyInfo omKeyInfo) {

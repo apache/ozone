@@ -24,7 +24,6 @@ import java.security.NoSuchAlgorithmException;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.hadoop.ozone.security.HmacSha256;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,15 +73,14 @@ public final class AWSV4AuthValidator {
     byte[] kService = sign(kRegion, serviceName);
     byte[] kSigning = sign(kService, "aws4_request");
     if (LOG.isDebugEnabled()) {
-      LOG.debug(Hex.encode(kSigning));
+      LOG.debug(StringUtils.byteToHexString(kSigning));
     }
     return kSigning;
   }
 
   public static boolean validateRequest(String strToSign, String signature,
       String userKey) {
-    String expectedSignature = Hex.encode(sign(getSigningKey(userKey,
-        strToSign), strToSign));
+    String expectedSignature = StringUtils.byteToHexString(sign(getSigningKey(userKey, strToSign), strToSign));
     return expectedSignature.equals(signature);
   }
 }

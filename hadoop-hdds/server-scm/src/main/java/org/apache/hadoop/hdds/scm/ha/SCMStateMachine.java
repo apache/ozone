@@ -218,6 +218,10 @@ public class SCMStateMachine extends BaseStateMachine {
 
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
+      // Configuration writes must be readable when apply completes, with their matching transaction index.
+      if (request.getType() == RequestType.STATEFUL_SERVICE_CONFIG) {
+        transactionBuffer.flush();
+      }
       updateLastAppliedTermIndex(appliedTermIndex);
 
       transactionBuffer.flushIfPendingLimitReached();
@@ -246,6 +250,25 @@ public class SCMStateMachine extends BaseStateMachine {
       RaftProtos.LogEntryProto failedEntry) {
     LOG.error("SCM statemachine appendLog failed, entry: {}", failedEntry);
     ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+  }
+
+  @Override
+  public void notifyServerShutdown(RaftProtos.RoleInfoProto roleInfo, boolean allServer) {
+    // If SCM is stopped, this shutdown originates from scm.stop(); otherwise it originates from Ratis.
+    if (!isInitialized || scm.isStopped()) {
+      return;
+    }
+    LOG.error("SCM Ratis server is shut down by Ratis, terminating SCM");
+    // Run on a different thread, so that the Ratis server can finish closing.
+    CompletableFuture.runAsync(() -> {
+      try {
+        close();
+      } catch (IOException e) {
+        String message = "Failed to close the SCM state machine after the Ratis server shutdown";
+        LOG.error(message, e);
+        scm.shutDown(message);
+      }
+    });
   }
 
   @Override

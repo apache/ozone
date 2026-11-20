@@ -52,7 +52,9 @@ import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,14 +68,17 @@ public class TestFileSizeCountTask {
   @TempDir
   private static Path temporaryFolder;
   private static ReconFileMetadataManager reconFileMetadataManager;
+  private static OMMetadataManager testOmMetadataManager;
+  private static ReconOMMetadataManager reconOMMetadataManager;
+  private static ReconDBProvider reconDBProvider;
   private FileSizeCountTaskOBS fileSizeCountTaskOBS;
   private FileSizeCountTaskFSO fileSizeCountTaskFSO;
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    testOmMetadataManager = initializeNewOmMetadataManager(Files.createDirectory(
+        temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(testOmMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
@@ -82,6 +87,20 @@ public class TestFileSizeCountTask {
             .withContainerDB()
             .build();
     reconFileMetadataManager = reconTestInjector.getInstance(ReconFileMetadataManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+  }
+
+  @AfterAll
+  public static void tearDownOnce() throws Exception {
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (testOmMetadataManager != null) {
+      testOmMetadataManager.stop();
+    }
   }
 
   @BeforeEach
