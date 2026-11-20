@@ -810,12 +810,16 @@ public class TestContainerBalancerTask {
     }
   }
 
+  /**
+   * A DISK container on the source is seen during the SSD pass and rejected there, either by the SSD utilization limit
+   * or by its storage type. That rejection only applies to the SSD pass: candidates are kept per storage type, so the
+   * same container is still selected and moved in the DISK pass.
+   */
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   public void testRejectedContainerRemainsAvailableForAnotherStorageType(boolean exceedsSsdLimit) throws Exception {
     DatanodeUsageInfo source = storageTypeNode(80, 95);
     DatanodeUsageInfo target = storageTypeNode(20, 5);
-    // The larger DISK container is rejected either by the SSD utilization limit or by its storage type.
     addStorageTypeContainer(source, 1000, StorageType.DISK, (exceedsSsdLimit ? 50 : 20) * STORAGE_UNIT);
     addStorageTypeContainer(source, 1001, StorageType.SSD, 10 * STORAGE_UNIT);
     List<StorageType> order = new ArrayList<>();
