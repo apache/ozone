@@ -28,7 +28,7 @@ hadoop-ozone/dev-support/checks/_build.sh compile \
   -pl :ozone-filesystem-shaded,:ozone-filesystem-hadoop2 \
   -Dmaven-replacer-plugin.skip "$@"
 
-# exercise some checks on limited modules
+# exercise some checks on limited modules to get more dependencies
 hadoop-ozone/dev-support/checks/errorprone.sh -pl :ozone-main "$@" || true
 hadoop-ozone/dev-support/checks/pmd.sh -am -pl :ozone-dev-support "$@" || true
 hadoop-ozone/dev-support/checks/repro.sh -pl :ozone-main "$@" || true
