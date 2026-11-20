@@ -99,6 +99,22 @@ public class TestMultiDeleteRequestUnmarshaller {
     assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), ((OS3Exception) ex.getCause()).getCode());
   }
 
+  @Test
+  public void bodyOverSizeLimitIsRejected() {
+    InputStream endless = new InputStream() {
+      @Override
+      public int read() {
+        return ' ';
+      }
+    };
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class,
+        () -> new MultiDeleteRequestUnmarshaller().readFrom(null, null, null, null, null, endless));
+
+    assertEquals(S3ErrorTable.PAYLOAD_TOO_LARGE.getHttpCode(), ex.getResponse().getStatus());
+    assertEquals(S3ErrorTable.PAYLOAD_TOO_LARGE.getCode(), ((OS3Exception) ex.getCause()).getCode());
+  }
+
   private MultiDeleteRequest unmarshall(ByteArrayInputStream inputBody)
       throws IOException {
     return new MultiDeleteRequestUnmarshaller()

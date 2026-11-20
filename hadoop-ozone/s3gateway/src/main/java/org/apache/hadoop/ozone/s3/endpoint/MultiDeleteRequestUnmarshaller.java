@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PAYLOAD_TOO_LARGE;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_DELETE_OBJECTS_MAX_BODY_SIZE;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 import java.io.ByteArrayInputStream;
@@ -34,6 +36,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.Provider;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.BoundedInputStream;
 
 /**
  * Custom unmarshaller to read MultiDeleteRequest w/wo namespace.
@@ -54,9 +57,16 @@ public class MultiDeleteRequestUnmarshaller
       throws WebApplicationException {
     final byte[] body;
     try {
-      body = IOUtils.toByteArray(inputStream);
+      body = IOUtils.toByteArray(BoundedInputStream.builder()
+          .setInputStream(inputStream)
+          .setMaxCount(S3_DELETE_OBJECTS_MAX_BODY_SIZE + 1L)
+          .setPropagateClose(false)
+          .get());
     } catch (IOException ex) {
       throw wrapOS3Exception(newError(INVALID_REQUEST, ex).withMessage(ex.getMessage()));
+    }
+    if (body.length > S3_DELETE_OBJECTS_MAX_BODY_SIZE) {
+      throw wrapOS3Exception(newError(PAYLOAD_TOO_LARGE));
     }
     MultiDeleteRequest request = super.readFrom(clazz, type, annotations, mediaType, httpHeaders,
         new ByteArrayInputStream(body));
