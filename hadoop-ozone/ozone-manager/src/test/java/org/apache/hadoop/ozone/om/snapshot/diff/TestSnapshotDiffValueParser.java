@@ -35,13 +35,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.EventHold;
 import org.apache.hadoop.ozone.om.helpers.ObjectRetention;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionDuration;
+import org.apache.hadoop.ozone.om.helpers.RetentionDuration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionTimeUnit;
 import org.junit.jupiter.api.Test;
@@ -146,10 +146,10 @@ class TestSnapshotDiffValueParser {
     OmKeyInfo keyInfo = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    RetentionDuration rule = RetentionDuration.newBuilder().setTimeUnit(RetentionTimeUnit.DAYS).setDuration(1).build();
+    RetentionDuration rule = new RetentionDuration(RetentionTimeUnit.DAYS, 1);
     ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, 1_800_000_000_000L, null);
     OmKeyInfo retained = keyInfo.toBuilder().setRetention(retention).setLegalHold(true).build();
-    EventHold eventHold = EventHold.newBuilder().setEnabled(true).setDuration(rule).build();
+    EventHold eventHold = new EventHold(true, rule);
     OmKeyInfo held = keyInfo.toBuilder()
         .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null, eventHold)).build();
     return Stream.of(
@@ -165,10 +165,10 @@ class TestSnapshotDiffValueParser {
         Arguments.of("event hold without date", keyInfo, held, false),
         Arguments.of("event hold disabled", held, held.toBuilder()
             .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
-                eventHold.toBuilder().setEnabled(false).build())).build(), false),
+                new EventHold(false, rule))).build(), false),
         Arguments.of("event hold rule changed", held, held.toBuilder()
             .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
-                eventHold.toBuilder().setDuration(rule.toBuilder().setDuration(2)).build())).build(), false),
+                new EventHold(true, new RetentionDuration(rule.getTimeUnit(), 2)))).build(), false),
         Arguments.of("legal hold enabled", keyInfo, keyInfo.toBuilder().setLegalHold(true).build(), false),
         Arguments.of("legal hold disabled", retained, retained.toBuilder().setLegalHold(false).build(), false),
         Arguments.of("legal hold absent versus false", keyInfo,

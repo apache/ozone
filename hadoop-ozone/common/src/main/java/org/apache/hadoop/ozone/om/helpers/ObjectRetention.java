@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.Objects;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyRetention;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 
@@ -55,7 +54,7 @@ public final class ObjectRetention {
     Objects.requireNonNull(proto, "retention is null");
     return new ObjectRetention(proto.getRetentionMode(),
         proto.hasRetentionDate() ? proto.getRetentionDate() : null,
-        proto.hasEventHold() ? proto.getEventHold() : null);
+        proto.hasEventHold() ? EventHold.fromProto(proto.getEventHold()) : null);
   }
 
   public KeyRetention toProto() {
@@ -64,7 +63,7 @@ public final class ObjectRetention {
       builder.setRetentionDate(retentionDate);
     }
     if (eventHold != null) {
-      builder.setEventHold(eventHold);
+      builder.setEventHold(eventHold.toProto());
     }
     return builder.build();
   }

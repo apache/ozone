@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionDuration;
 
 /**
  * Validation and UTC date calculations for retention rules.
@@ -30,7 +29,7 @@ public final class RetentionUtil {
   }
 
   public static void validateRule(RetentionDuration rule) {
-    if (rule == null || !rule.isInitialized() || rule.getDuration() <= 0) {
+    if (rule == null || rule.getDuration() <= 0) {
       throw new IllegalArgumentException("Retention rule requires a time unit and positive signed-long duration");
     }
   }

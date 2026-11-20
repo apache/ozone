@@ -29,11 +29,10 @@ import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import java.io.IOException;
 import java.time.Instant;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRetention;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfoProtoLight;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionDuration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionTimeUnit;
 import org.junit.jupiter.api.Test;
@@ -56,8 +55,10 @@ class TestRetention {
     assertNotNull(BucketRetention.getDescriptor().findFieldByName("retentionMode"));
     assertEquals(2, BucketRetention.getDescriptor().findFieldByName("duration").getNumber());
     assertEquals(3, BucketRetention.getDescriptor().findFieldByName("defaultEventHold").getNumber());
-    assertEquals(1, RetentionDuration.getDescriptor().findFieldByName("timeUnit").getNumber());
-    assertEquals(2, RetentionDuration.getDescriptor().findFieldByName("duration").getNumber());
+    assertEquals(1, OzoneManagerProtocolProtos.RetentionDuration.getDescriptor()
+        .findFieldByName("timeUnit").getNumber());
+    assertEquals(2, OzoneManagerProtocolProtos.RetentionDuration.getDescriptor()
+        .findFieldByName("duration").getNumber());
   }
 
   @Test
@@ -65,11 +66,11 @@ class TestRetention {
     RetentionDuration rule = rule(RetentionTimeUnit.DAYS, 30);
     for (BucketRetention proto : new BucketRetention[]{
         BucketRetention.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).build(),
-        BucketRetention.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).setDuration(rule).build(),
+        BucketRetention.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).setDuration(rule.toProto()).build(),
         BucketRetention.newBuilder().setRetentionMode(RetentionMode.COMPLIANCE)
-            .setDefaultEventHold(rule).build(),
-        BucketRetention.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).setDuration(rule)
-            .setDefaultEventHold(rule).build()}) {
+            .setDefaultEventHold(rule.toProto()).build(),
+        BucketRetention.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).setDuration(rule.toProto())
+            .setDefaultEventHold(rule.toProto()).build()}) {
       Retention retention = Retention.fromProto(proto);
       assertEquals(proto, retention.toProto());
       assertEquals(retention, Retention.fromProto(retention.toProto()));
@@ -80,25 +81,47 @@ class TestRetention {
 
   @Test
   void defaultsKeyEventHoldToEnabled() throws IOException {
-    EventHold hold = EventHold.newBuilder().setDuration(rule(RetentionTimeUnit.DAYS, 30)).build();
-    EventHold decoded = EventHold.parseFrom(hold.toByteArray());
+    OzoneManagerProtocolProtos.EventHold hold = OzoneManagerProtocolProtos.EventHold.newBuilder()
+        .setDuration(rule(RetentionTimeUnit.DAYS, 30).toProto()).build();
+    OzoneManagerProtocolProtos.EventHold decoded = OzoneManagerProtocolProtos.EventHold.parseFrom(hold.toByteArray());
     assertFalse(decoded.hasEnabled());
     assertTrue(decoded.getEnabled());
-    ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, null, decoded);
+    ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, null, EventHold.fromProto(decoded));
     assertTrue(ObjectRetention.fromProto(retention.toProto()).getEventHold().getEnabled());
-    EventHold released = decoded.toBuilder().setEnabled(false).build();
+    assertEquals(decoded, retention.toProto().getEventHold());
+    assertFalse(retention.toProto().getEventHold().hasEnabled());
+    EventHold released = new EventHold(false, rule(RetentionTimeUnit.DAYS, 30));
     assertFalse(ObjectRetention.fromProto(new ObjectRetention(RetentionMode.GOVERNANCE, null, released).toProto())
         .getEventHold().getEnabled());
-    assertTrue(EventHold.getDescriptor().findFieldByName("enabled").isOptional());
+    assertTrue(OzoneManagerProtocolProtos.EventHold.getDescriptor().findFieldByName("enabled").isOptional());
     assertEquals("RetentionDuration", BucketRetention.getDescriptor().findFieldByName("defaultEventHold")
         .getMessageType().getName());
     assertNull(BucketRetention.getDescriptor().findFieldByName("eventHold"));
   }
 
   @Test
+  void preservesEventHoldEnabledPresence() {
+    RetentionDuration duration = rule(RetentionTimeUnit.DAYS, 30);
+    for (Boolean enabled : new Boolean[]{null, false, true}) {
+      EventHold hold = new EventHold(enabled, duration);
+      OzoneManagerProtocolProtos.EventHold proto = hold.toProto();
+      assertEquals(enabled != null, proto.hasEnabled());
+      assertEquals(enabled == null || enabled, proto.getEnabled());
+      assertEquals(hold, EventHold.fromProto(proto));
+      assertEquals(hold.hashCode(), EventHold.fromProto(proto).hashCode());
+      assertEquals(proto, EventHold.fromProto(proto).toProto());
+    }
+    assertNotEquals(new EventHold(null, duration), new EventHold(true, duration));
+    assertNotEquals(new EventHold(true, duration), new EventHold(false, duration));
+    assertNotEquals(new EventHold(true, duration), new EventHold(true, rule(RetentionTimeUnit.DAYS, 31)));
+    assertThrows(IllegalArgumentException.class,
+        () -> EventHold.fromProto(OzoneManagerProtocolProtos.EventHold.getDefaultInstance()));
+  }
+
+  @Test
   void preservesObjectRetentionAndUtcDates() {
     long date = Instant.parse("2027-01-15T08:00:00.123Z").toEpochMilli();
-    EventHold hold = EventHold.newBuilder().setEnabled(true).setDuration(rule(RetentionTimeUnit.YEARS, 1)).build();
+    EventHold hold = new EventHold(true, rule(RetentionTimeUnit.YEARS, 1));
     for (ObjectRetention retention : new ObjectRetention[]{
         new ObjectRetention(RetentionMode.GOVERNANCE, date, null),
         new ObjectRetention(RetentionMode.COMPLIANCE, null, hold),
@@ -135,7 +158,7 @@ class TestRetention {
       assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateEventHoldRule(invalid));
       assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateEventHoldRule(rule(unit, 0)));
       assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateEventHoldRule(rule(unit, -1)));
-      EventHold hold = EventHold.newBuilder().setEnabled(true).setDuration(invalid).build();
+      EventHold hold = new EventHold(true, invalid);
       assertThrows(IllegalArgumentException.class, () -> new Retention(RetentionMode.GOVERNANCE, null, invalid));
       assertThrows(IllegalArgumentException.class, () -> new ObjectRetention(RetentionMode.GOVERNANCE, null, hold));
       RetentionUtil.validateRule(invalid);
@@ -156,7 +179,7 @@ class TestRetention {
   void rejectsInvalidRulesAndOverflow() {
     assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateRule(null));
     assertThrows(IllegalArgumentException.class,
-        () -> RetentionUtil.validateRule(RetentionDuration.getDefaultInstance()));
+        () -> RetentionDuration.fromProto(OzoneManagerProtocolProtos.RetentionDuration.getDefaultInstance()));
     assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateRule(rule(RetentionTimeUnit.DAYS, 0)));
     assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateRule(rule(RetentionTimeUnit.DAYS, -1)));
     assertThrows(IllegalArgumentException.class,
@@ -178,6 +201,6 @@ class TestRetention {
   }
 
   private static RetentionDuration rule(RetentionTimeUnit unit, long duration) {
-    return RetentionDuration.newBuilder().setTimeUnit(unit).setDuration(duration).build();
+    return new RetentionDuration(unit, duration);
   }
 }

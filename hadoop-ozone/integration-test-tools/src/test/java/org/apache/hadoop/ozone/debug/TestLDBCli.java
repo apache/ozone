@@ -72,6 +72,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import picocli.CommandLine;
 
@@ -378,8 +379,9 @@ public class TestLDBCli {
     assertEquals(1, tmpDir2.listFiles().length);
   }
 
-  @Test
-  void testSchemaCommand() throws IOException {
+  @ParameterizedTest
+  @CsvSource({"keyTable,keyName", "bucketTable,bucketName"})
+  void testSchemaCommand(String tableName, String expectedField) throws IOException {
     // Prepare dummy table
     prepareTable(KEY_TABLE, false);
 
@@ -387,16 +389,17 @@ public class TestLDBCli {
     List<String> completeScanArgs = new ArrayList<>(Arrays.asList(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "value-schema",
-        "--column-family", KEY_TABLE));
+        "--column-family", tableName));
 
     int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
     // Check exit code. Print stderr if not expected
     assertEquals(0, exitCode, stderr.toString());
 
     // Check stdout
-    Pattern p = Pattern.compile(".*keyName.*", Pattern.MULTILINE);
+    Pattern p = Pattern.compile(".*" + expectedField + ".*", Pattern.MULTILINE);
     Matcher m = p.matcher(stdout.toString());
     assertTrue(m.find());
+    assertThat(stdout.toString()).contains("duration", "timeUnit").doesNotContain("unknownFields");
     // Check stderr
     assertEquals("", stderr.toString());
   }

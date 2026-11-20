@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.protobuf.TextFormat;
 import java.util.Objects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRetention;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionDuration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 
 /**
@@ -54,17 +53,18 @@ public final class Retention {
 
   public static Retention fromProto(BucketRetention proto) {
     Objects.requireNonNull(proto, "retention config is null");
-    return new Retention(proto.getRetentionMode(), proto.hasDuration() ? proto.getDuration() : null,
-        proto.hasDefaultEventHold() ? proto.getDefaultEventHold() : null);
+    return new Retention(proto.getRetentionMode(),
+        proto.hasDuration() ? RetentionDuration.fromProto(proto.getDuration()) : null,
+        proto.hasDefaultEventHold() ? RetentionDuration.fromProto(proto.getDefaultEventHold()) : null);
   }
 
   public BucketRetention toProto() {
     BucketRetention.Builder builder = BucketRetention.newBuilder().setRetentionMode(retentionMode);
     if (duration != null) {
-      builder.setDuration(duration);
+      builder.setDuration(duration.toProto());
     }
     if (defaultEventHold != null) {
-      builder.setDefaultEventHold(defaultEventHold);
+      builder.setDefaultEventHold(defaultEventHold.toProto());
     }
     return builder.build();
   }
