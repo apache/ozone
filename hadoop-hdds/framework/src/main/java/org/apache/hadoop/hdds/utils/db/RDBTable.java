@@ -245,14 +245,37 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, IteratorType type)
       throws RocksDatabaseException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
-        prefix, type);
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false, prefixUpperBound(prefix)), this, prefix, type);
   }
 
   KeyValueIterator<CodecBuffer, CodecBuffer> iterator(
       CodecBuffer prefix, IteratorType type) throws RocksDatabaseException {
-    return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
-        this, prefix, type);
+    final byte[] upperBound = prefix == null ? null : prefixUpperBound(toArray(prefix.asReadOnlyByteBuffer()));
+    return new RDBStoreCodecBufferIterator(db.newIterator(family, false, upperBound), this, prefix, type);
+  }
+
+  /**
+   * @return the smallest key greater than every key starting with the given prefix,
+   *         or null if there is no such key (null, empty or all 0xFF prefix).
+   */
+  static byte[] prefixUpperBound(byte[] prefix) {
+    if (prefix == null) {
+      return null;
+    }
+    for (int i = prefix.length - 1; i >= 0; i--) {
+      if (prefix[i] != (byte) 0xFF) {
+        final byte[] upperBound = Arrays.copyOf(prefix, i + 1);
+        upperBound[i]++;
+        return upperBound;
+      }
+    }
+    return null;
+  }
+
+  private static byte[] toArray(ByteBuffer buffer) {
+    final byte[] array = new byte[buffer.remaining()];
+    buffer.get(array);
+    return array;
   }
 
   boolean isClosed() {
