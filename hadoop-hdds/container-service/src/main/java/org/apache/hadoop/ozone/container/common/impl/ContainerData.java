@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -219,8 +220,8 @@ public abstract class ContainerData {
     ContainerDataProto.State oldState = this.state;
     this.state = state;
 
-    if ((oldState == ContainerDataProto.State.OPEN) &&
-        (state != oldState)) {
+    // Space is reserved only while the container accepts writes.
+    if (state != oldState && HddsUtils.isOpenToWriteState(oldState)) {
       releaseCommitSpace();
     }
   }
@@ -380,8 +381,8 @@ public abstract class ContainerData {
     //we don't expect duplicate calls
     Preconditions.assertTrue(!committedSpace);
 
-    // Only Open Containers have Committed Space
-    if (myState != ContainerDataProto.State.OPEN) {
+    // Only OPEN and RECOVERING containers accept writes and reserve space
+    if (!HddsUtils.isOpenToWriteState(myState)) {
       return;
     }
 
