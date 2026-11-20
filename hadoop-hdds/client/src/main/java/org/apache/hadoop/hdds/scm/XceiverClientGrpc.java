@@ -753,6 +753,20 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     semaphore.release();
   }
 
+  /**
+   * Takes back the permit that an open streaming read gave up with {@link #completeStreamRead()} while it was idle,
+   * before it sends another request.
+   */
+  public void resumeStreamRead() throws InterruptedIOException {
+    try {
+      semaphore.acquire();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw (InterruptedIOException) new InterruptedIOException("Interrupted while waiting to resume a streaming read")
+          .initCause(e);
+    }
+  }
+
   private static List<DatanodeDetails> sortDatanodeByOperationalState(
       List<DatanodeDetails> datanodeList) {
     List<DatanodeDetails> sortedDatanodeList = new ArrayList<>(datanodeList);
