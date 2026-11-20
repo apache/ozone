@@ -169,6 +169,17 @@ jobs:
         run: |
           dev-support/ci/populate-cache.sh
 
+      - name: Setup Java 21
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: $/.github/actions/setup-java
+        with:
+          java-version: 21
+
+      - name: Fetch Java 21 dependencies
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: |
+          hadoop-ozone/dev-support/checks/compile.sh -pl :ozone-manager -Dozone.java.version.server=21
+
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: rm -fr ~/.m2/repository/org/apache/ozone
