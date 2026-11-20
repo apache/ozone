@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.UuidCodec;
 import org.apache.hadoop.ozone.util.UUIDUtil;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.util.MemoizedSupplier;
 
 /**
@@ -40,6 +41,7 @@ public final class PipelineID {
 
   private final UUID id;
   private final Supplier<HddsProtos.PipelineID> protoSupplier;
+  private final Supplier<RaftGroupId> groupIdSupplier;
 
   public static Codec<PipelineID> getCodec() {
     return CODEC;
@@ -48,6 +50,7 @@ public final class PipelineID {
   private PipelineID(UUID id) {
     this.id = id;
     this.protoSupplier = MemoizedSupplier.valueOf(() -> buildProtobuf(id));
+    this.groupIdSupplier = MemoizedSupplier.valueOf(() -> RaftGroupId.valueOf(id));
   }
 
   public static PipelineID randomId() {
@@ -77,6 +80,11 @@ public final class PipelineID {
 
   public UUID getId() {
     return id;
+  }
+
+  @JsonIgnore
+  public RaftGroupId getGroupId() {
+    return groupIdSupplier.get();
   }
 
   @JsonIgnore

@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * This class tests container report with DN container state info.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestContainerReportWithKeys implements NonHATests.TestCase {
+public abstract class TestContainerReportWithKeys implements ClusterForTests.TestCase {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);
   private OzoneClient client;

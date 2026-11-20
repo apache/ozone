@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -101,6 +102,39 @@ public class TestRevokedSTSTokenCleanupService {
       final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
           omRequest.getDeleteRevokedSTSTokensRequest();
       assertThat(deleteRevokedSTSTokensRequest.getOriginalAccessKeyIdList()).containsExactly("original-access-key-a");
+      final long cleanupThresholdMillis = TimeUnit.SECONDS.toMillis(S3STSUtils.MAX_DURATION_SECONDS)
+          + TimeUnit.MINUTES.toMillis(30);
+      assertThat(deleteRevokedSTSTokensRequest.hasPurgeBeforeMillis()).isTrue();
+      assertThat(deleteRevokedSTSTokensRequest.getPurgeBeforeMillis())
+          .isBetween(nowMillis - cleanupThresholdMillis, System.currentTimeMillis() - cleanupThresholdMillis);
+    }
+  }
+
+  @Test
+  public void testKeepsCutoffForClockSkewMarginPastMaxTokenLifetime() throws Exception {
+    final long nowMillis = testClock.millis();
+    revokedStsTokenTable.put(
+        "original-access-key-within-margin",
+        nowMillis - TimeUnit.HOURS.toMillis(12) - TimeUnit.MINUTES.toMillis(1));
+    revokedStsTokenTable.put(
+        "original-access-key-past-margin",
+        nowMillis - TimeUnit.HOURS.toMillis(12) - TimeUnit.MINUTES.toMillis(31));
+
+    final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      mockRatisSubmitAndCapture(ozoneManagerRatisUtilsMock, capturedRequest);
+
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+
+      assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(1);
+
+      final OMRequest omRequest = capturedRequest.get();
+      assertThat(omRequest).isNotNull();
+      assertThat(
+          omRequest.getDeleteRevokedSTSTokensRequest().getOriginalAccessKeyIdList())
+          .containsExactly("original-access-key-past-margin");
     }
   }
 
@@ -249,6 +283,10 @@ public class TestRevokedSTSTokenCleanupService {
           .sum();
       assertThat(totalTokens).isEqualTo(10);
       assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(10);
+
+      // Every request of the run carries the same purgeBeforeMillis
+      assertThat(capturedRequests.get(1).getDeleteRevokedSTSTokensRequest().getPurgeBeforeMillis())
+          .isEqualTo(capturedRequests.get(0).getDeleteRevokedSTSTokensRequest().getPurgeBeforeMillis());
     }
   }
 
@@ -256,7 +294,7 @@ public class TestRevokedSTSTokenCleanupService {
   public void testSingleOversizedExpiredTokenAndItIsTheOnlyExpiredToken() throws Exception {
     // One originalAccessKeyId is larger than the ratisByteLimit, and it is the only expired entry
     final long nowMillis = testClock.millis();
-    // Serialized size for largeToken is 102 > 90 (the effective ratisByteLimit) .
+    // Serialized size for largeToken is 109 > 90 (the effective ratisByteLimit) .
     final String largeToken = new String(new char[100]).replace('\0', 'a');
     revokedStsTokenTable.put(largeToken, nowMillis - TimeUnit.HOURS.toMillis(13));
 
@@ -336,7 +374,8 @@ public class TestRevokedSTSTokenCleanupService {
   public void testExpiredTokenMatchesRatisByteLimitExactly() throws Exception {
     // Force small batch of 100 bytes and test when the batch size is exactly ratisByteLimit
     final long nowMillis = testClock.millis();
-    final String tokenMatchingRatisByteLimitWhenSerialized = new String(new char[88]).replace('\0', 'a');
+    // Serialized size is 90: 83 bytes for the originalAccessKeyId field and 7 bytes for purgeBeforeMillis.
+    final String tokenMatchingRatisByteLimitWhenSerialized = new String(new char[81]).replace('\0', 'a');
 
     revokedStsTokenTable.put(tokenMatchingRatisByteLimitWhenSerialized, nowMillis - TimeUnit.HOURS.toMillis(13));
 
