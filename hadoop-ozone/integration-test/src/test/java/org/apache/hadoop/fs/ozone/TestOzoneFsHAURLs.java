@@ -126,7 +126,8 @@ public abstract class TestOzoneFsHAURLs implements HACluster.TestCase {
 
   @AfterAll
   void cleanup() {
-    IOUtils.closeQuietly(client);
+    // URI tests cache filesystems under several aliases; release their clients before the cluster's leak check.
+    IOUtils.closeQuietly(client, FileSystem::closeAll);
   }
 
   /**
