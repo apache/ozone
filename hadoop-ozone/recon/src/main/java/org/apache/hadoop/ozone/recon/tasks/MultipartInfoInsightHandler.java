@@ -23,8 +23,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -219,12 +217,12 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    * schema.
    */
   @Override
-  public Triple<Long, Long, Long> getTableSizeAndCount(String tableName,
+  public TableSizeAndCount getTableSizeAndCount(String tableName,
       OMMetadataManager omMetadataManager) throws IOException {
     long count = 0;
-    // left = unreplicated size, right = replicated size. A mutable pair is used
-    // so the running totals can be updated from the part-iteration lambda below.
-    final MutablePair<Long, Long> sizes = MutablePair.of(0L, 0L);
+    // SizeTotals is used so the running totals can be updated from the
+    // part-iteration callback below.
+    final SizeTotals sizes = new SizeTotals();
 
     // uploadId -> parent replication config, for split-schema MPUs. Their parts
     // live in multipartPartsTable but do not carry a replication config, so the
@@ -240,10 +238,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
         if (kv != null && kv.getValue() != null) {
           OmMultipartKeyInfo multipartKeyInfo = kv.getValue();
           if (isLegacySchema(multipartKeyInfo)) {
-            forEachLegacyPart(multipartKeyInfo, (dataSize, replicatedSize) -> {
-              sizes.setLeft(sizes.getLeft() + dataSize);
-              sizes.setRight(sizes.getRight() + replicatedSize);
-            });
+            forEachLegacyPart(multipartKeyInfo, sizes::add);
           } else {
             // Split schema: parts are stored in multipartPartsTable. Remember
             // the parent replication config keyed by uploadId (last component
@@ -272,15 +267,13 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
               continue;
             }
             long partDataSize = kv.getValue().getDataSize();
-            sizes.setLeft(sizes.getLeft() + partDataSize);
-            sizes.setRight(sizes.getRight()
-                + QuotaUtil.getReplicatedSize(partDataSize, replicationConfig));
+            sizes.add(partDataSize, QuotaUtil.getReplicatedSize(partDataSize, replicationConfig));
           }
         }
       }
     }
 
-    return Triple.of(count, sizes.getLeft(), sizes.getRight());
+    return new TableSizeAndCount(count, sizes.dataSize, sizes.replicatedSize);
   }
 
   /**
@@ -380,5 +373,19 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
   private static String getUploadIdFromMultipartKey(String multipartKey) {
     int idx = multipartKey.lastIndexOf(OzoneConsts.OM_KEY_PREFIX);
     return idx >= 0 ? multipartKey.substring(idx + OzoneConsts.OM_KEY_PREFIX.length()) : multipartKey;
+  }
+
+  /**
+   * The running unreplicated size of multipart parts paired with their running replicated size,
+   * used to accumulate the totals while iterating over the parts.
+   */
+  private static final class SizeTotals {
+    private long dataSize;
+    private long replicatedSize;
+
+    private void add(long data, long replicated) {
+      dataSize += data;
+      replicatedSize += replicated;
+    }
   }
 }

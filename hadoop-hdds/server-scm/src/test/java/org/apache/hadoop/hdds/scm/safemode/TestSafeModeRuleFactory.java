@@ -18,6 +18,9 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -89,8 +92,13 @@ class TestSafeModeRuleFactory {
     final SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
     factory.addSafeModeManager(safeModeManager);
 
-    assertEquals(4, factory.getSafeModeRules().size(),
-        "EC default with flag=false should skip RATIS/THREE pipeline rules");
+    // HealthyPipelineSafeModeRule stays to check for pipelines with unregistered datanodes.
+    assertEquals(5, factory.getSafeModeRules().size(),
+        "EC default with flag=false should skip OneReplicaPipelineSafeModeRule");
+    HealthyPipelineSafeModeRule healthyPipelineRule = factory.getSafeModeRule(HealthyPipelineSafeModeRule.class);
+    assertNotNull(healthyPipelineRule);
+    assertFalse(healthyPipelineRule.isRatisThreeRuleEnabled());
+    assertNull(factory.getSafeModeRule(OneReplicaPipelineSafeModeRule.class));
   }
 
   @Test

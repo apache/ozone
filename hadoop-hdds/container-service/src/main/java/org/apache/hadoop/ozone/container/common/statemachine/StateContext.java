@@ -368,6 +368,24 @@ public class StateContext {
   }
 
   /**
+   * Clears queued command status reports for one endpoint while preserving all
+   * other pending report types.
+   *
+   * @return number of queued command status report messages removed
+   */
+  public int clearCommandStatusReports(HostAndPort endpoint) {
+    synchronized (incrementalReportsQueue) {
+      List<Message> reports = incrementalReportsQueue.get(endpoint);
+      if (reports == null || reports.isEmpty()) {
+        return 0;
+      }
+      int before = reports.size();
+      reports.removeIf(CommandStatusReportsProto.class::isInstance);
+      return before - reports.size();
+    }
+  }
+
+  /**
    * Returns all the available reports from the report queue, or empty list if
    * the queue is empty.
    *
@@ -375,14 +393,38 @@ public class StateContext {
    */
   public List<Message> getAllAvailableReports(
       HostAndPort endpoint) {
-    int maxLimit = Integer.MAX_VALUE;
-    // TODO: It is highly unlikely that we will reach maxLimit for the number
-    //       for the number of reports, specially as it does not apply to the
-    //       number of entries in a report. But if maxLimit is hit, should a
-    //       heartbeat be scheduled ASAP? Should full reports not included be
-    //       dropped? Currently this code will keep the full reports not sent
-    //       and include it in the next heartbeat.
+    return getAllAvailableReportsUpToLimit(endpoint, Integer.MAX_VALUE);
+  }
+
+  /**
+   * Returns up to {@code maxLimit} available reports for the endpoint,
+   * removing them from the queue. Any reports beyond the limit stay queued
+   * and are returned by a later call; callers can use {@link
+   * #hasPendingReports(HostAndPort)} to detect that case and schedule a
+   * follow-up heartbeat.
+   *
+   * @return List of reports
+   */
+  public List<Message> getAllAvailableReports(
+      HostAndPort endpoint, int maxLimit) {
     return getAllAvailableReportsUpToLimit(endpoint, maxLimit);
+  }
+
+  /**
+   * Returns true if any reports are still queued for the endpoint.
+   */
+  public boolean hasPendingReports(HostAndPort endpoint) {
+    synchronized (incrementalReportsQueue) {
+      List<Message> reportsForEndpoint = incrementalReportsQueue.get(endpoint);
+      if (reportsForEndpoint != null && !reportsForEndpoint.isEmpty()) {
+        return true;
+      }
+    }
+    Map<String, AtomicBoolean> fullReports =
+        isFullReportReadyToBeSent.get(endpoint);
+    return fullReports != null && fullReports.entrySet().stream()
+        .anyMatch(report -> report.getValue().get()
+            && type2Reports.get(report.getKey()).get() != null);
   }
 
   /**

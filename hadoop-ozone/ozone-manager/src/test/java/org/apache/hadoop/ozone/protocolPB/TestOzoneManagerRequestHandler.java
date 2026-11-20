@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -48,6 +50,8 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
@@ -80,6 +84,42 @@ public class TestOzoneManagerRequestHandler {
     Mockito.when(ozoneManager.getConfig()).thenReturn(config);
     Mockito.when(ozoneManager.getConfiguration()).thenReturn(conf);
     return new OzoneManagerRequestHandler(ozoneManager);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testMultipartListingS3Context(boolean assumeContext) throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager om = handler.getOzoneManager();
+    Mockito.when(om.listMultipartUploads(
+        "request-volume", "bucket", "prefix/", "previous", "previous-upload", 2, true, assumeContext))
+        .thenReturn(OmMultipartUploadList.newBuilder().setUploads(Collections.emptyList()).build());
+    Mockito.when(om.listParts("request-volume", "bucket", "key", "upload-id", 3, 2, assumeContext))
+        .thenReturn(new OmMultipartUploadListParts(
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), 0, false));
+    OzoneManagerProtocolProtos.OMRequest.Builder request = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setClientId("test-client");
+    if (assumeContext) {
+      request.setAssumeS3Context(true);
+    }
+    OzoneManagerProtocolProtos.OMResponse uploads = handler.handleReadRequest(request
+        .setCmdType(OzoneManagerProtocolProtos.Type.ListMultipartUploads)
+        .setListMultipartUploadsRequest(OzoneManagerProtocolProtos.ListMultipartUploadsRequest.newBuilder()
+            .setVolume("request-volume").setBucket("bucket").setPrefix("prefix/")
+            .setKeyMarker("previous").setUploadIdMarker("previous-upload").setMaxUploads(2).setWithPagination(true))
+        .build());
+    OzoneManagerProtocolProtos.OMResponse parts = handler.handleReadRequest(request
+        .clearListMultipartUploadsRequest().setCmdType(OzoneManagerProtocolProtos.Type.ListMultiPartUploadParts)
+        .setListMultipartUploadPartsRequest(OzoneManagerProtocolProtos.MultipartUploadListPartsRequest.newBuilder()
+            .setVolume("request-volume").setBucket("bucket").setKey("key").setUploadID("upload-id")
+            .setPartNumbermarker(3).setMaxParts(2)).build());
+
+    assertThat(uploads.getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    assertThat(parts.getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    Mockito.verify(om)
+        .listMultipartUploads("request-volume", "bucket", "prefix/", "previous", "previous-upload", 2, true,
+            assumeContext);
+    Mockito.verify(om).listParts("request-volume", "bucket", "key", "upload-id", 3, 2, assumeContext);
   }
 
   private OmKeyInfo getMockedOmKeyInfo() {
@@ -161,6 +201,56 @@ public class TestOzoneManagerRequestHandler {
     default:
       break;
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testDisallowKeyWithMultipartPartIv(boolean hasPartIv) {
+    OzoneManagerProtocolProtos.KeyLocation.Builder location = OzoneManagerProtocolProtos.KeyLocation.newBuilder()
+        .setBlockID(HddsProtos.BlockID.newBuilder().setContainerBlockID(
+            HddsProtos.ContainerBlockID.newBuilder().setContainerID(1).setLocalID(1)))
+        .setOffset(0).setLength(10).setPartNumber(1);
+    if (hasPartIv) {
+      location.setPartIv(ByteString.copyFrom(new byte[16]));
+    }
+    OzoneManagerProtocolProtos.KeyInfo keyInfo = OzoneManagerProtocolProtos.KeyInfo.newBuilder()
+        .setVolumeName("volume").setBucketName("bucket").setKeyName("key").setDataSize(10)
+        .setType(HddsProtos.ReplicationType.RATIS).setCreationTime(0).setModificationTime(0)
+        .addKeyLocationList(OzoneManagerProtocolProtos.KeyLocationList.newBuilder()
+            .setVersion(0).addKeyLocations(location))
+        .build();
+    OzoneManagerProtocolProtos.OMRequest request = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.LookupKey).setClientId("client").build();
+
+    List<OzoneManagerProtocolProtos.OMResponse> responses = Arrays.asList(
+        OzoneManagerRequestHandler.disallowLookupKeyWithMultipartPartIv(request, okResponse()
+            .setLookupKeyResponse(OzoneManagerProtocolProtos.LookupKeyResponse.newBuilder().setKeyInfo(keyInfo))
+            .build(), null),
+        OzoneManagerRequestHandler.disallowGetKeyInfoWithMultipartPartIv(request, okResponse()
+            .setGetKeyInfoResponse(OzoneManagerProtocolProtos.GetKeyInfoResponse.newBuilder().setKeyInfo(keyInfo))
+            .build(), null),
+        OzoneManagerRequestHandler.disallowLookupFileWithMultipartPartIv(request, okResponse()
+            .setLookupFileResponse(OzoneManagerProtocolProtos.LookupFileResponse.newBuilder().setKeyInfo(keyInfo))
+            .build(), null));
+
+    for (OzoneManagerProtocolProtos.OMResponse response : responses) {
+      boolean hasKeyInfo = response.hasLookupKeyResponse() || response.hasGetKeyInfoResponse()
+          || response.hasLookupFileResponse();
+      if (hasPartIv) {
+        Assertions.assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION, response.getStatus());
+        assertThat(response.getMessage()).contains("volume/bucket/key");
+        Assertions.assertFalse(hasKeyInfo);
+      } else {
+        Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getStatus());
+        Assertions.assertTrue(hasKeyInfo);
+      }
+    }
+  }
+
+  private static OzoneManagerProtocolProtos.OMResponse.Builder okResponse() {
+    return OzoneManagerProtocolProtos.OMResponse.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.LookupKey)
+        .setStatus(OzoneManagerProtocolProtos.Status.OK);
   }
 
   /**

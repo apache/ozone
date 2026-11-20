@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ import picocli.CommandLine;
 /**
  * Test for HadoopFsReadWriteValidator.
  */
-public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestCase {
+public abstract class TestHadoopFsReadWriteValidator implements ClusterForTests.TestCase {
 
   private ObjectStore store = null;
   private OzoneClient client;

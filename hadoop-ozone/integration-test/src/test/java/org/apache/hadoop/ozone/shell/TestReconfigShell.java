@@ -39,9 +39,9 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +51,7 @@ import org.junit.jupiter.api.TestInstance;
  * Integration test for {@code ozone admin reconfig} command.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestReconfigShell implements NonHATests.TestCase {
+public abstract class TestReconfigShell implements ClusterForTests.TestCase {
 
   private OzoneAdmin ozoneAdmin;
   private ReconfigurationHandler reconfigurationHandler;
