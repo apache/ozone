@@ -19,6 +19,10 @@ Resource            ../ozone-lib/shell.robot
 Resource            setup.robot
 Resource            ../lib/fs.robot
 Resource            ../ozone-lib/freon.robot
+Resource            ../ozone-lib/batch.robot
+Resource            ../ozone-lib/batch-shell.robot
+Suite Setup         Setup Suite
+Suite Teardown      Teardown Suite
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -40,31 +44,30 @@ Expected Snapshot Diff Output
     END
 
 
-
 *** Test Cases ***
 Create Bucket With Replication Type
     Pass Execution If    '${CLIENT_VERSION}' < '${EC_VERSION}'    Client does not support EC
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    Execute             ozone sh bucket create --replication 3 --type RATIS /vol1/ratis-${CLIENT_VERSION}
-    Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /vol1/ecbucket-${CLIENT_VERSION}
+    Execute Later and Expect No Output For ozone sh    bucket create --replication 3 --type RATIS /vol1/ratis-${CLIENT_VERSION}
+    Execute Later and Expect No Output For ozone sh    bucket create --replication rs-3-2-1024k --type EC /vol1/ecbucket-${CLIENT_VERSION}
 
 Create Encrypted Bucket
-    Execute    ozone sh bucket create -k ${ENCRYPTION_KEY} /vol1/encrypted-${CLIENT_VERSION}
+    Execute Later and Expect No Output For ozone sh    bucket create -k ${ENCRYPTION_KEY} /vol1/encrypted-${CLIENT_VERSION}
 
 Create Key in Encrypted Bucket
-    Execute    ozone sh key put /vol1/encrypted-${CLIENT_VERSION}/key ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/encrypted-${CLIENT_VERSION}/key ${TESTFILE}
 
 Key Can Be Written
-    Create Key    /vol1/bucket1/key-${CLIENT_VERSION}    ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/bucket1/key-${CLIENT_VERSION} ${TESTFILE}
 
 Key Can Be Written To Bucket With Replication Type
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    Execute         ozone sh key put /vol1/ratis-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
-    Execute         ozone sh key put /vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/ratis-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
 
 Key Can Be Deleted
-    Create Key    /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}    ${TESTFILE}
-    Execute       ozone sh key delete /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/bucket1/to-be-deleted-${CLIENT_VERSION} ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key delete /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}
 
 Dir Can Be Created
     Execute    ozone fs -mkdir o3fs://bucket1.vol1/dir-${CLIENT_VERSION}
@@ -81,10 +84,14 @@ File Can Be Deleted
     Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
     Execute    ozone fs -rm -skipTrash o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
 
-FSO Bucket Can Be Created and Used
+FSO Bucket Can Be Created
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
     Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
-    Execute    ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED ${FSO_BUCKET}
+    Execute Later and Expect No Output For ozone sh    bucket create --layout FILE_SYSTEM_OPTIMIZED ${FSO_BUCKET}
+
+FSO Bucket Can Be Used
+    Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
+    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
     Execute    ozone fs -mkdir -p ofs://om/${FSO_BUCKET}/dir/subdir
     Execute    ozone fs -put ${TESTFILE} ofs://om/${FSO_BUCKET}/dir/subdir/file
 
@@ -100,33 +107,37 @@ Snapshot Can Be Created
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Client does not support snapshots
     Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Cluster does not support snapshots
 
-    Execute          ozone sh snapshot create ${FSO_BUCKET} ${SNAPSHOT1}
-    Execute          ozone sh key put ${FSO_BUCKET}/${SNAPSHOT_KEY1} ${TESTFILE}
-    Execute          ozone sh snapshot create ${FSO_BUCKET} ${SNAPSHOT2}
-    Execute          ozone sh key put ${FSO_BUCKET}/${SNAPSHOT_KEY2} ${TESTFILE}
-    Execute          ozone sh snapshot create ${FSO_BUCKET} ${SNAPSHOT3}
+    Execute Later ozone sh    snapshot create ${FSO_BUCKET} ${SNAPSHOT1}
+    Execute Later and Expect No Output For ozone sh    key put ${FSO_BUCKET}/${SNAPSHOT_KEY1} ${TESTFILE}
+    Execute Later ozone sh    snapshot create ${FSO_BUCKET} ${SNAPSHOT2}
+    Execute Later and Expect No Output For ozone sh    key put ${FSO_BUCKET}/${SNAPSHOT_KEY2} ${TESTFILE}
+    Execute Later ozone sh    snapshot create ${FSO_BUCKET} ${SNAPSHOT3}
 
 Snapshot Diff Can Be Requested
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Client does not support snapshots
     Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Cluster does not support snapshots
 
-    ${output} =    Execute    ozone sh snapshot diff ${FSO_BUCKET} ${SNAPSHOT1} ${SNAPSHOT2}
+    ${output} =    Execute Later ozone sh    snapshot diff ${FSO_BUCKET} ${SNAPSHOT1} ${SNAPSHOT2}
     ${expected} =    Expected Snapshot Diff Output
-    Should Contain    ${output}    ${expected}
+    Assert Later    File ${output} Should    Contain    ${expected}
 
 Snapshot Diff --get-report Submits Job On Old Cluster
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client does not support snapshot diff submit
     Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Cluster does not support snapshots
     Pass Execution If    '${CLUSTER_VERSION}' >= '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Cluster supports snapshot diff submit, no fallback
 
-    ${output} =    Execute    ozone sh snapshot diff --get-report ${FSO_BUCKET} ${SNAPSHOT2} ${SNAPSHOT3}
+    ${output} =    Execute Later ozone sh    snapshot diff --get-report ${FSO_BUCKET} ${SNAPSHOT2} ${SNAPSHOT3}
     ${expected} =    Expected Snapshot Diff Output
-    Should Contain    ${output}    ${expected}
+    Assert Later    File ${output} Should    Contain    ${expected}
 
 Snapshot Diff Can Be --ordered
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_ORDERED_VERSION}'    Client does not support ordered snapshots
     Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'                Cluster does not support snapshots
 
-    ${output} =    Execute    ozone sh snapshot diff --ordered ${FSO_BUCKET} ${SNAPSHOT1} ${SNAPSHOT3}
+    ${output} =    Execute Later ozone sh    snapshot diff --ordered ${FSO_BUCKET} ${SNAPSHOT1} ${SNAPSHOT3}
     ${expected} =    Expected Snapshot Diff Output
-    Should Contain    ${output}    ${expected}
+    Assert Later    File ${output} Should    Contain    ${expected}
+
+# execute batch before any ozone fs or other non-sh commands
+Execute Batch Shell
+    Execute Batch

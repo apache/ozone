@@ -84,3 +84,7 @@ File ${file} Should
     FOR    ${keyword}    ${arg}    IN    @{args}
         Run Keyword    Should ${keyword}    ${content}    ${arg}
     END
+
+Log Contents of ${file}
+    ${content} =    Get File    ${file}
+    Log    ${content}

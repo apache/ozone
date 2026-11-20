@@ -82,11 +82,6 @@ Create Key
                    Should not contain  ${output}       Failed
     Log            Uploaded ${file} to ${key}
 
-Assert Unsupported
-    [arguments]    ${cmd}
-    ${result} =     Execute and checkrc         ${cmd}       255
-                    Should Contain  ${result}   NOT_SUPPORTED_OPERATION
-
 Verify Bucket Empty Replication Config
     [arguments]    ${bucket}
     ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig'
@@ -124,3 +119,17 @@ Verify EC Replication Config
                    Should Match Regexp      ${result}       ^(?m)${data}$
                    Should Match Regexp      ${result}       ^(?m)${parity}$
                    Should Match Regexp      ${result}       ^(?m)${chunksize}$
+
+Verify Empty Replication Config in ${file}
+    ${result} =    Execute    jq -r '.replicationConfig' ${file}
+    Should Be Equal    ${result}    null
+
+Verify Replica Replication Config in ${file}
+    [arguments]    @{params}
+    ${result} =    Execute    jq -r '.replicationConfig.replicationType, .replicationConfig.replicationFactor' ${file}
+                   Verify Replica Replication Config    ${result}   @{params}
+
+Verify EC Replication Config in ${file}
+    [arguments]    @{params}
+    ${result} =    Execute    jq -r '.replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize' ${file}
+                   Verify EC Replication Config     ${result}    @{params}
