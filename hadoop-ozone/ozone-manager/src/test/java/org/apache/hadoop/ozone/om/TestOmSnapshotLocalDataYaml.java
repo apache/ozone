@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.StringUtils;
@@ -108,7 +107,7 @@ public class TestOmSnapshotLocalDataYaml {
   /**
    * Creates a snapshot local data YAML file.
    */
-  private Pair<File, UUID> writeToYaml(UUID snapshotId, String snapshotName, TransactionInfo transactionInfo)
+  private YamlWriteResult writeToYaml(UUID snapshotId, String snapshotName, TransactionInfo transactionInfo)
       throws IOException {
     String yamlFilePath = snapshotName + ".yaml";
     UUID previousSnapshotId = UUID.randomUUID();
@@ -147,7 +146,7 @@ public class TestOmSnapshotLocalDataYaml {
     // Check YAML file exists
     assertTrue(yamlFile.exists());
 
-    return Pair.of(yamlFile, previousSnapshotId);
+    return new YamlWriteResult(yamlFile, previousSnapshotId);
   }
 
   @Test
@@ -155,9 +154,9 @@ public class TestOmSnapshotLocalDataYaml {
     UUID snapshotId = UUID.randomUUID();
     TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
         ThreadLocalRandom.current().nextLong());
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot1", transactionInfo);
-    File yamlFile = yamlFilePrevIdPair.getLeft();
-    UUID prevSnapId = yamlFilePrevIdPair.getRight();
+    YamlWriteResult writeResult = writeToYaml(snapshotId, "snapshot1", transactionInfo);
+    File yamlFile = writeResult.yamlFile();
+    UUID prevSnapId = writeResult.previousSnapshotId();
 
     // Read from YAML file
     OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
@@ -199,8 +198,8 @@ public class TestOmSnapshotLocalDataYaml {
   @Test
   public void testUpdateSnapshotDataFile() throws IOException {
     UUID snapshotId = UUID.randomUUID();
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot2", null);
-    File yamlFile = yamlFilePrevIdPair.getLeft();
+    YamlWriteResult writeResult = writeToYaml(snapshotId, "snapshot2", null);
+    File yamlFile = writeResult.yamlFile();
     // Read from YAML file
     OmSnapshotLocalData dataYaml =
         omSnapshotLocalDataSerializer.load(yamlFile);
@@ -257,7 +256,7 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testPreviousSnapshotVersionsWrittenBeforeSstFiles() throws IOException {
-    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot8", TransactionInfo.valueOf(1, 2)).getLeft();
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot8", TransactionInfo.valueOf(1, 2)).yamlFile();
     String content = FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8);
     int sstFilesIndex = content.indexOf("\n" + OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO + ":");
     assertThat(sstFilesIndex).isPositive();
@@ -282,7 +281,7 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testChecksumWithAndWithoutPreviousSnapshotVersions() throws IOException {
-    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot9", TransactionInfo.valueOf(1, 2)).getLeft();
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot9", TransactionInfo.valueOf(1, 2)).yamlFile();
     File oldLayout = writeWithoutPreviousSnapshotVersions(yamlFile);
     OmSnapshotLocalData newData = omSnapshotLocalDataSerializer.load(yamlFile);
     OmSnapshotLocalData oldData = omSnapshotLocalDataSerializer.load(oldLayout);
@@ -300,7 +299,7 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testLoadWithoutSstFiles() throws IOException {
-    File newLayout = writeToYaml(UUID.randomUUID(), "snapshot7", TransactionInfo.valueOf(1, 2)).getLeft();
+    File newLayout = writeToYaml(UUID.randomUUID(), "snapshot7", TransactionInfo.valueOf(1, 2)).yamlFile();
     for (File yamlFile : asList(newLayout, writeWithoutPreviousSnapshotVersions(newLayout))) {
       assertLoadWithoutSstFiles(yamlFile);
     }
@@ -380,8 +379,8 @@ public class TestOmSnapshotLocalDataYaml {
     UUID snapshotId = UUID.randomUUID();
     TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
         ThreadLocalRandom.current().nextLong());
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot3", transactionInfo);
-    File yamlFile = yamlFilePrevIdPair.getLeft();
+    YamlWriteResult writeResult = writeToYaml(snapshotId, "snapshot3", transactionInfo);
+    File yamlFile = writeResult.yamlFile();
     // Read from YAML file
     OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
 
@@ -399,8 +398,8 @@ public class TestOmSnapshotLocalDataYaml {
     UUID snapshotId = UUID.randomUUID();
     TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
         ThreadLocalRandom.current().nextLong());
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot4", transactionInfo);
-    File yamlFile = yamlFilePrevIdPair.getLeft();
+    YamlWriteResult writeResult = writeToYaml(snapshotId, "snapshot4", transactionInfo);
+    File yamlFile = writeResult.yamlFile();
     String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
 
     // Verify the YAML content contains all expected fields
@@ -418,8 +417,8 @@ public class TestOmSnapshotLocalDataYaml {
   @Test
   public void testLoadYamlWithoutLastDefragTimeDefaultsTo0() throws IOException {
     UUID snapshotId = UUID.randomUUID();
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot5", null);
-    File yamlFile = yamlFilePrevIdPair.getLeft();
+    YamlWriteResult writeResult = writeToYaml(snapshotId, "snapshot5", null);
+    File yamlFile = writeResult.yamlFile();
     String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
     String legacyContent = content.replace("lastDefragTime: " + LAST_DEFRAG_TIME + "\n", "");
     FileUtils.writeStringToFile(yamlFile, legacyContent, Charset.defaultCharset());
@@ -438,8 +437,8 @@ public class TestOmSnapshotLocalDataYaml {
     // Parser compatibility for older/edited YAML: removing this field or
     // leaving it empty must not make deserialization fail.
     UUID snapshotId = UUID.randomUUID();
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot6", null);
-    File yamlFile = yamlFilePrevIdPair.getLeft();
+    YamlWriteResult writeResult = writeToYaml(snapshotId, "snapshot6", null);
+    File yamlFile = writeResult.yamlFile();
     String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
     String legacyContent = content.replace("lastDefragTime: " + LAST_DEFRAG_TIME,
         "lastDefragTime:");
@@ -452,5 +451,12 @@ public class TestOmSnapshotLocalDataYaml {
     assertTrue(snapshotData.getNeedsDefrag());
     assertTrue(snapshotData.getSstFiltered());
     assertEquals(3, snapshotData.getVersionSstFileInfos().size());
+  }
+
+  /**
+   * A written snapshot local data YAML file paired with its previous snapshot id,
+   * used as the result of {@link #writeToYaml}.
+   */
+  private record YamlWriteResult(File yamlFile, UUID previousSnapshotId) {
   }
 }

@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -81,9 +80,9 @@ public class CompositeDeltaDiffComputer extends FileLinkDeltaFileComputer {
   }
 
   @Override
-  Optional<Map<Path, Pair<Path, SstFileInfo>>> computeDeltaFiles(SnapshotInfo fromSnapshotInfo,
+  Optional<Map<Path, DeltaFile>> computeDeltaFiles(SnapshotInfo fromSnapshotInfo,
       SnapshotInfo toSnapshotInfo, Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) throws IOException {
-    Map<Path, Pair<Path, SstFileInfo>> deltaFiles = null;
+    Map<Path, DeltaFile> deltaFiles = null;
     try {
       if (differComputer != null) {
         updateActivity(SnapshotDiffResponse.SubStatus.SST_FILE_DELTA_DAG_WALK);
@@ -117,7 +116,7 @@ public class CompositeDeltaDiffComputer extends FileLinkDeltaFileComputer {
             .getAbsoluteFile().toPath();
         for (SstFileInfo sstFileInfo : fromSnapshotFiles) {
           Path source = sstFileInfo.getFilePath(fromSnapshotPath);
-          deltaFiles.put(source, Pair.of(createLink(source), sstFileInfo));
+          deltaFiles.put(source, new DeltaFile(createLink(source), sstFileInfo));
         }
       }
     }

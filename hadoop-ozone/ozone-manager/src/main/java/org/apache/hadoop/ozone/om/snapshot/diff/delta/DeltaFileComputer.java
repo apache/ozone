@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 
@@ -40,11 +39,17 @@ public interface DeltaFileComputer extends Closeable {
    * @param fromSnapshot the baseline snapshot from which changes are computed
    * @param toSnapshot the target snapshot to which changes are compared
    * @param tablesToLookup the set of table names to consider when determining changes
-   * @return a collection of pairs, where each pair consists of a
-   *         {@code Path} representing the delta file and an associated {@code SstFileInfo}, or
-   *         an empty {@code Optional} if no changes are found
+   * @return a collection of {@link DeltaFile}, each consisting of a {@code Path} representing the delta file and
+   *         an associated {@code SstFileInfo}, or an empty collection if no changes are found
    * @throws IOException if an I/O error occurs while retrieving delta files
    */
-  Collection<Pair<Path, SstFileInfo>> getDeltaFiles(SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot,
+  Collection<DeltaFile> getDeltaFiles(SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot,
       Set<String> tablesToLookup) throws IOException;
+
+  /**
+   * A delta file path paired with the SST file information it was created from,
+   * used as the element type of the computed delta files.
+   */
+  record DeltaFile(Path path, SstFileInfo sstFileInfo) {
+  }
 }

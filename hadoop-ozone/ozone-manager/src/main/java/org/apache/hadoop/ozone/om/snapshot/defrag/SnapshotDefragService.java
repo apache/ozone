@@ -47,7 +47,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -87,12 +86,12 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
+import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer.DeltaFile;
 import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.util.Time;
 import org.apache.logging.log4j.util.Strings;
-import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
@@ -213,14 +212,14 @@ public class SnapshotDefragService extends BackgroundService
    * a pair indicating the need for defragmentation and the corresponding version of the snapshot.
    *
    * @param snapshotInfo Information about the snapshot to be checked for defragmentation.
-   * @return A pair containing a boolean value and an integer:
-   *         - The boolean value indicates whether the snapshot requires defragmentation
+   * @return A {@link DefragCheckResult} containing:
+   *         - needsDefrag, which indicates whether the snapshot requires defragmentation
    *         (true if needed, false otherwise).
-   *         - The integer represents the version of the snapshot being evaluated.
+   *         - version, which represents the version of the snapshot being evaluated.
    * @throws IOException If an I/O error occurs while accessing the local snapshot data or metadata.
    */
   @VisibleForTesting
-  Pair<Boolean, Integer> needsDefragmentation(SnapshotInfo snapshotInfo) throws IOException {
+  DefragCheckResult needsDefragmentation(SnapshotInfo snapshotInfo) throws IOException {
     // Update snapshot local metadata to point to the correct previous snapshotId if it was different and check if
     // snapshot needs defrag.
     try (WritableOmSnapshotLocalDataProvider writableOmSnapshotLocalDataProvider =
@@ -241,11 +240,11 @@ public class SnapshotDefragService extends BackgroundService
       } else {
         LOG.debug("Snapshot {} needsDefragmentation field value: true", snapshotInfo.getSnapshotId());
       }
-      return Pair.of(needsDefrag, localData.getVersion());
+      return new DefragCheckResult(needsDefrag, localData.getVersion());
     }
   }
 
-  private Pair<String, String> getTableBounds(Table<String, ?> table) throws RocksDatabaseException, CodecException {
+  private TableBounds getTableBounds(Table<String, ?> table) throws RocksDatabaseException, CodecException {
     String tableLowestValue = null, tableHighestValue = null;
     try (TableIterator<String, String> keyIterator = table.keyIterator()) {
       if (keyIterator.hasNext()) {
@@ -258,7 +257,7 @@ public class SnapshotDefragService extends BackgroundService
         tableHighestValue = keyIterator.next();
       }
     }
-    return Pair.of(tableLowestValue, tableHighestValue);
+    return new TableBounds(tableLowestValue, tableHighestValue);
   }
 
   /**
@@ -281,9 +280,9 @@ public class SnapshotDefragService extends BackgroundService
       String tableBucketPrefix = prefixInfo.getTablePrefix(table);
       String prefixUpperBound = getLexicographicallyHigherString(tableBucketPrefix);
 
-      Pair<String, String> tableBounds = getTableBounds(checkpointTable);
-      String tableLowestValue = tableBounds.getLeft();
-      String tableHighestValue = tableBounds.getRight();
+      TableBounds tableBounds = getTableBounds(checkpointTable);
+      String tableLowestValue = tableBounds.lowest();
+      String tableHighestValue = tableBounds.highest();
 
       // If lowest value is not null and if the bucket prefix corresponding to the table is greater than lower then
       // delete the range between lowest value and bucket prefix.
@@ -320,11 +319,11 @@ public class SnapshotDefragService extends BackgroundService
    * @param snapshotTable the current snapshot table for comparison
    * @param previousSnapshotTable the previous snapshot table for comparison
    * @param tableKeyPrefix the prefix for filtering certain keys, or null if all keys are to be included
-   * @return a pair of the path of the created SST file containing the differences and a boolean
+   * @return a {@link SpillResult} of the path of the created SST file containing the differences and a boolean
    *         indicating whether any delta entries were written (true if there are differences, false otherwise)
    * @throws IOException if an I/O error occurs during processing
    */
-  private Pair<Path, Boolean> spillTableDiffIntoSstFile(List<Path> deltaFilePaths,
+  private SpillResult spillTableDiffIntoSstFile(List<Path> deltaFilePaths,
       Table<String, CodecBuffer> snapshotTable, Table<String, CodecBuffer> previousSnapshotTable,
       String tableKeyPrefix) throws IOException {
     String sstFileReaderUpperBound = null;
@@ -366,7 +365,7 @@ public class SnapshotDefragService extends BackgroundService
       }
     }
     // If there are no delta entries then delete the delta file. No need to ingest the file as a diff.
-    return Pair.of(fileToBeIngested, deltaEntriesCount != 0);
+    return new SpillResult(fileToBeIngested, deltaEntriesCount != 0);
   }
 
   /**
@@ -390,20 +389,20 @@ public class SnapshotDefragService extends BackgroundService
       DBStore checkpointStore, TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables)
       throws IOException {
     // Map of delta files grouped on the basis of the tableName.
-    Collection<Pair<Path, SstFileInfo>> allTableDeltaFiles = this.deltaDiffComputer.getDeltaFiles(
+    Collection<DeltaFile> allTableDeltaFiles = this.deltaDiffComputer.getDeltaFiles(
         previousSnapshotInfo, snapshotInfo, incrementalTables);
     snapshotMetrics.incNumSnapshotIncDefragDeltaFilesProcessed(allTableDeltaFiles.size());
 
     Map<String, List<Path>> tableGroupedDeltaFiles = allTableDeltaFiles.stream()
-        .collect(Collectors.groupingBy(pair -> pair.getValue().getColumnFamily(),
-            Collectors.mapping(Pair::getKey, Collectors.toList())));
+        .collect(Collectors.groupingBy(deltaFile -> deltaFile.sstFileInfo().getColumnFamily(),
+            Collectors.mapping(DeltaFile::path, Collectors.toList())));
 
     String volumeName = snapshotInfo.getVolumeName();
     String bucketName = snapshotInfo.getBucketName();
 
     Set<Path> filesToBeDeleted = new HashSet<>();
     // All files computed as delta must be deleted irrespective of whether ingestion succeeded or not.
-    allTableDeltaFiles.forEach(pair -> filesToBeDeleted.add(pair.getKey()));
+    allTableDeltaFiles.forEach(deltaFile -> filesToBeDeleted.add(deltaFile.path()));
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
              omSnapshotManager.getActiveSnapshot(volumeName, bucketName, snapshotInfo.getName());
          UncheckedAutoCloseableSupplier<OmSnapshot> previousSnapshot =
@@ -419,10 +418,10 @@ public class SnapshotDefragService extends BackgroundService
         Table<String, CodecBuffer> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
             .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
         String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
-        Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFiles, snapshotTable,
+        SpillResult spillResult = spillTableDiffIntoSstFile(deltaFiles, snapshotTable,
             previousSnapshotTable, tableBucketPrefix);
-        Path fileToBeIngested = spillResult.getValue() ? spillResult.getLeft() : null;
-        filesToBeDeleted.add(spillResult.getLeft());
+        Path fileToBeIngested = spillResult.hasEntries() ? spillResult.file() : null;
+        filesToBeDeleted.add(spillResult.file());
         if (fileToBeIngested != null) {
           if (!fileToBeIngested.toFile().exists()) {
             throw new IOException("Delta file does not exist: " + fileToBeIngested);
@@ -696,10 +695,10 @@ public class SnapshotDefragService extends BackgroundService
       snapshotMetrics.incNumSnapshotDefragSnapshotSkipped();
       return false;
     }
-    Pair<Boolean, Integer> needsDefragVersionPair = needsDefragmentation(snapshotInfo);
-    if (!needsDefragVersionPair.getLeft()) {
+    DefragCheckResult defragCheckResult = needsDefragmentation(snapshotInfo);
+    if (!defragCheckResult.needsDefrag()) {
       snapshotMetrics.incNumSnapshotDefragSnapshotSkipped();
-      int currentVersion = needsDefragVersionPair.getValue();
+      int currentVersion = defragCheckResult.version();
       if (currentVersion > 0) {
         try {
           omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, currentVersion - 1);
@@ -724,7 +723,7 @@ public class SnapshotDefragService extends BackgroundService
       DBStore checkpointDBStore = checkpointMetadataManager.getStore();
       if (LOG.isTraceEnabled()) {
         Path snapshotDbDir = OmSnapshotManager.getSnapshotPath(
-            ozoneManager.getMetadataManager(), snapshotId, needsDefragVersionPair.getValue());
+            ozoneManager.getMetadataManager(), snapshotId, defragCheckResult.version());
         logDirStats("Before defrag", snapshotInfo, snapshotDbDir);
       }
       TablePrefixInfo prefixInfo = ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
@@ -910,5 +909,26 @@ public class SnapshotDefragService extends BackgroundService
         LOG.error("Failed to delete temporary directory: {}", tmpDirPath, e);
       }
     }
+  }
+
+  /**
+   * Whether a snapshot needs defragmentation paired with the snapshot version evaluated,
+   * used as the result of {@link #needsDefragmentation(SnapshotInfo)}.
+   */
+  record DefragCheckResult(boolean needsDefrag, int version) {
+  }
+
+  /**
+   * The lowest key paired with the highest key of a table (null when the table is empty),
+   * used to decide which key ranges to delete from a checkpoint table.
+   */
+  private record TableBounds(String lowest, String highest) {
+  }
+
+  /**
+   * The delta SST file written for a table paired with whether it holds any delta entries,
+   * used to decide if the file is ingested into the checkpoint or only deleted.
+   */
+  private record SpillResult(Path file, boolean hasEntries) {
   }
 }
