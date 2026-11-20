@@ -88,13 +88,9 @@ public class ReconTaskStatusUpdater {
    * Call this function before the actual task processing starts to update table in DB.
    */
   public void recordRunStart() {
-    try {
-      this.reconTaskStatus.setIsCurrentTaskRunning(1);
-      this.reconTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
-      updateDetails();
-    } catch (DataAccessException e) {
-      LOG.error("Failed to update table for start of task: {}", this.reconTaskStatus.getTaskName());
-    }
+    this.reconTaskStatus.setIsCurrentTaskRunning(1);
+    this.reconTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
+    updateDetails();
   }
 
   /**
@@ -105,26 +101,27 @@ public class ReconTaskStatusUpdater {
    * before calling.
    */
   public void recordRunCompletion() {
-    try {
-      this.reconTaskStatus.setIsCurrentTaskRunning(0);
-      this.reconTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
-      updateDetails();
-    } catch (DataAccessException e) {
-      LOG.error("Failed to update table for task: {}", this.reconTaskStatus.getTaskName());
-    }
+    this.reconTaskStatus.setIsCurrentTaskRunning(0);
+    this.reconTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
+    updateDetails();
   }
 
   /**
    * Utility function to update table with task details and update the counter if needed.
+   * A failed write only leaves a stale status row, so it is logged and not propagated to the caller.
    */
   public void updateDetails() {
-    if (!reconTaskStatusDao.existsById(this.taskName)) {
-      // First time getting the task, so insert value
-      reconTaskStatusDao.insert(this.reconTaskStatus);
-      LOG.info("Registered Task: {}", this.taskName);
-    } else {
-      // We already have row for the task in the table, update the row
-      reconTaskStatusDao.update(this.reconTaskStatus);
+    try {
+      if (!reconTaskStatusDao.existsById(this.taskName)) {
+        // First time getting the task, so insert value
+        reconTaskStatusDao.insert(this.reconTaskStatus);
+        LOG.info("Registered Task: {}", this.taskName);
+      } else {
+        // We already have row for the task in the table, update the row
+        reconTaskStatusDao.update(this.reconTaskStatus);
+      }
+    } catch (DataAccessException e) {
+      LOG.warn("Failed to update task status table for task: {}", this.taskName, e);
     }
   }
 }

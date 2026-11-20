@@ -17,12 +17,8 @@
 
 package org.apache.hadoop.ozone.om.service;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.om.service.CompactDBUtil.getBottommostLevelCompaction;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -36,7 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for {@link CompactDBUtil}.
@@ -66,27 +61,4 @@ class TestCompactDBUtil {
             ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip));
   }
 
-  @Test
-  void testDefaultConfigValueMapsToKSkip() {
-    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
-        OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"", "kForceeee"})
-  void testDefaultConfigKeyIsReadFromOzoneConfiguration(String compactionType) {
-    // unset or invalid values should use the default value
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, compactionType);
-    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip, getBottommostLevelCompaction(conf));
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"kForce", " kForce", "kForce ", " kForce "})
-  void testConfigKeyIsReadFromOzoneConfiguration(String compactionType) {
-    // have trailing spaces in the config values to ensure they are trimmed and handled correctly
-    OzoneConfiguration  conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, compactionType);
-    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce, getBottommostLevelCompaction(conf));
-  }
 }

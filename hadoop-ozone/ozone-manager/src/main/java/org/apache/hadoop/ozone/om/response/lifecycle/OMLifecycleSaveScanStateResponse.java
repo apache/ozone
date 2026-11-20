@@ -40,7 +40,7 @@ public class OMLifecycleSaveScanStateResponse extends OMClientResponse {
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager, BatchOperation batchOperation) throws IOException {
-    if (getOMResponse().getStatus() == OK) {
+    if (getOMResponse().getStatus() == OK && state != null) {
       omMetadataManager.getLifecycleScanStateTable().putWithBatch(
           batchOperation, state.getBucketKey(), state);
     }

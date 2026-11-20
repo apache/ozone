@@ -386,10 +386,16 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
+  /**
+   * Flush and commit NSSummary to DB.
+   *
+   * @param nsSummaryMap Map of objectId to NSSummary
+   * @return true if successful, false otherwise
+   */
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
       updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return false;
     } finally {
@@ -409,7 +415,7 @@ public class NSSummaryTaskDbEventHandler {
                                                 Collection<Long> objectIdsToBeDeleted) {
     try {
       updateNSSummariesToDB(nsSummaryMap, objectIdsToBeDeleted);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB. batchSize={}", nsSummaryMap.size(), e);
       return false;
     } finally {
@@ -460,4 +466,10 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
+  /**
+   * The seek position reached by an NSSummary sub-task paired with whether it processed the events successfully,
+   * used as the result of processing an event batch.
+   */
+  public record ProcessResult(int seekPosition, boolean success) {
+  }
 }

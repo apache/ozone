@@ -43,6 +43,10 @@ public final class HddsConfigKeys {
   public static final String HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD =
       "hdds.heartbeat.address.refresh.missed-count-threshold";
   public static final int HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT = 3;
+  /** Missed heartbeats against one SCM before the DN forces endpoint re-registration. */
+  public static final String HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD =
+      "hdds.heartbeat.re-register.missed-count-threshold";
+  public static final int HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD_DEFAULT = 100;
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
@@ -67,6 +71,12 @@ public final class HddsConfigKeys {
       "hdds.pipeline.action.max.limit";
   public static final int HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT =
       20;
+  // Maximum number of report messages (node, pipeline, command status, full and
+  // incremental container reports) a datanode includes in a single heartbeat.
+  public static final String HDDS_HEARTBEAT_REPORT_MAX_LIMIT =
+      "hdds.heartbeat.report.max.limit";
+  public static final int HDDS_HEARTBEAT_REPORT_MAX_LIMIT_DEFAULT =
+      10000;
   // Configuration to allow volume choosing policy.
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";

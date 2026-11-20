@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.AclTests;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +57,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test OzoneManager list volume operation under combinations of configs.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase {
+public abstract class TestOzoneManagerListVolumes implements ClusterForTests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();
   private static final String VOL_PREFIX = "vol-" + UNIQUE;

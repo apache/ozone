@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
-import org.apache.ozone.test.HATests;
+import org.apache.ozone.test.HACluster;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -29,7 +29,7 @@ import org.junit.jupiter.api.TestInstance;
  * This class tests ozone admin scm commands.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestScmAdminHA implements HATests.TestCase {
+public abstract class TestScmAdminHA implements HACluster.TestCase {
 
   private OzoneAdmin ozoneAdmin;
   private MiniOzoneCluster cluster;

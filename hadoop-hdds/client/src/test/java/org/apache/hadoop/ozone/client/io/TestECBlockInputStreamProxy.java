@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
@@ -44,10 +45,12 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -355,11 +358,21 @@ public class TestECBlockInputStreamProxy {
       return new ECStreamTestUtil.TestBlockInputStream(block.getBlockID(), block.getLength(), ByteBuffer.wrap(data)) {
         @Override
         public int read(ByteBuffer destination) throws IOException {
+          failIfHealthy();
+          return super.read(destination);
+        }
+
+        @Override
+        protected int readPositioned(long position, ByteBuffer destination) throws IOException {
+          failIfHealthy();
+          return super.readPositioned(position, destination);
+        }
+
+        private void failIfHealthy() throws IOException {
           if (!missing) {
             failedAttempts.incrementAndGet();
             throw new BadDataLocationException(bad, "failed data replica");
           }
-          return super.read(destination);
         }
       };
     };
@@ -412,6 +425,17 @@ public class TestECBlockInputStreamProxy {
       return new ECStreamTestUtil.TestBlockInputStream(block.getBlockID(), block.getLength(), ByteBuffer.wrap(data)) {
         @Override
         public int read(ByteBuffer destination) throws IOException {
+          beforeRead(destination);
+          return super.read(destination);
+        }
+
+        @Override
+        protected int readPositioned(long position, ByteBuffer destination) throws IOException {
+          beforeRead(destination);
+          return super.readPositioned(position, destination);
+        }
+
+        private void beforeRead(ByteBuffer destination) throws IOException {
           if ("failover".equals(mode) && !missing) {
             destination.put((byte) 0); // Retry must overwrite bytes from the failed attempt.
             throw new BadDataLocationException(info.getPipeline().getFirstNode(), "failed data replica");
@@ -424,7 +448,6 @@ public class TestECBlockInputStreamProxy {
           if ("failure".equals(mode)) {
             throw new IOException("injected failure");
           }
-          return super.read(destination);
         }
 
         @Override
@@ -458,11 +481,71 @@ public class TestECBlockInputStreamProxy {
       }
       assertEquals(71, stream.getPos());
       assertEquals(opened.get() - 1, closed.get());
+      if ("healthy".equals(mode)) {
+        // healthy positioned reads use the sequential reader, without changing its position
+        assertEquals(1, opened.get());
+      }
       assertEquals(-1, stream.read(data.length, ByteBuffer.allocate(1)));
     } finally {
       pool.shutdownNow();
     }
     assertEquals(opened.get(), closed.get());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "failover", "seeked"})
+  void spareReplicaReadsCurrentStripe(String mode) throws IOException {
+    int chunkSize = 1024;
+    ECReplicationConfig replication = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize);
+    int stripeSize = chunkSize * replication.getData();
+    int blockLength = stripeSize * 3;
+    byte[] expected = new byte[blockLength];
+    ByteBuffer[] data = new ByteBuffer[replication.getData()];
+    for (int index = 0; index < data.length; index++) {
+      data[index] = ByteBuffer.allocate(chunkSize * 3);
+      for (int stripe = 0; stripe < 3; stripe++) {
+        for (int offset = 0; offset < chunkSize; offset++) {
+          int position = stripe * stripeSize + index * chunkSize + offset;
+          expected[position] = (byte) (position % 251);
+          data[index].put(expected[position]);
+        }
+      }
+    }
+    List<ByteBuffer> replicas = new ArrayList<>(Arrays.asList(data));
+    replicas.addAll(Arrays.asList(ECStreamTestUtil.generateParity(data, replication)));
+    Map<DatanodeDetails, Integer> locations = new LinkedHashMap<>();
+    int[] indexes = "failover".equals(mode) ? new int[] {1, 1, 2, 3, 4, 5} : new int[] {1, 1, 3, 4, 5};
+    for (int index : indexes) {
+      locations.put(MockDatanodeDetails.randomDatanodeDetails(), index);
+    }
+    BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(replication, blockLength, locations);
+    ECStreamTestUtil.TestBlockInputStreamFactory replicaFactory = new ECStreamTestUtil.TestBlockInputStreamFactory();
+    replicaFactory.setCurrentPipeline(info.getPipeline());
+    replicaFactory.setBlockStreamData(replicas);
+    if ("failover".equals(mode)) {
+      replicaFactory.setFailIndexes(2);
+    }
+    ExecutorService executor = Executors.newFixedThreadPool(5);
+    ECBlockInputStreamFactory factory = ECBlockInputStreamFactoryImpl.getInstance(
+        replicaFactory, new ElasticByteBufferPool(), () -> executor);
+    try (ECBlockInputStreamProxy stream = new ECBlockInputStreamProxy(replication, info, null, null,
+        factory, conf.getObject(OzoneClientConfig.class))) {
+      if ("seeked".equals(mode)) {
+        stream.seek(0);
+      }
+      byte[] actual = new byte[blockLength];
+      assertEquals(stripeSize, stream.read(ByteBuffer.wrap(actual, 0, stripeSize)));
+      replicaFactory.getBlockStream(1).setShouldError(true, chunkSize, new IOException("injected read failure"));
+      ByteBuffer rest = ByteBuffer.wrap(actual, stripeSize, blockLength - stripeSize);
+      while (rest.hasRemaining()) {
+        assertThat(stream.read(rest)).isPositive();
+      }
+      assertEquals(blockLength, stream.getPos());
+      assertArrayEquals(expected, actual);
+      assertEquals(-1, stream.read(ByteBuffer.allocate(1)));
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   private ByteBuffer generateData(int length) {

@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -55,7 +55,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * in a legacy/OBS bucket layout type.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestListKeys implements NonHATests.TestCase {
+public abstract class TestListKeys implements ClusterForTests.TestCase {
 
   private OzoneBucket legacyOzoneBucket;
   private OzoneBucket obsOzoneBucket;

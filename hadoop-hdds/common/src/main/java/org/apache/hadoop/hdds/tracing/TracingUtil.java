@@ -22,11 +22,13 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
+import io.opentelemetry.context.ContextStorage;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.context.propagation.TextMapGetter;
@@ -48,6 +50,7 @@ import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * Utility class to collect all the tracing helper methods.
@@ -62,9 +65,27 @@ public final class TracingUtil {
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
   private static volatile SdkTracerProvider sdkTracerProvider;
   private static BatchSpanProcessor batchSpanProcessor;
+  private static boolean mdcContextStorageInstalled;
   public static final String GLOBAL_TRACER_NAME = "ozone";
 
   private TracingUtil() {
+  }
+
+  /**
+   * Adds the current trace and span IDs to the logging MDC.
+   * Only for Ozone services and CLIs, not the client library, so applications keep their own MDC.
+   * Must be called before OpenTelemetry {@link Context} is first used in the JVM.
+   */
+  public static synchronized void installMdcContextStorage() {
+    if (mdcContextStorageInstalled) {
+      return;
+    }
+    mdcContextStorageInstalled = true;
+    ContextStorage.addWrapper(MdcContextStorage::new);
+    if (!(ContextStorage.get() instanceof MdcContextStorage)) {
+      LOG.warn("OpenTelemetry context is already initialized, {} and {} will not be added to the logging MDC",
+          MdcContextStorage.MDC_TRACE_ID, MdcContextStorage.MDC_SPAN_ID);
+    }
   }
 
   /**
@@ -128,6 +149,7 @@ public final class TracingUtil {
 
   /**
    * This function initializes tracing, runs the command in a span, and exports spans before returning for CLI spans.
+   * Only for Ozone CLIs: it also installs the MDC context storage, see {@link #installMdcContextStorage()}.
    */
   public static <R, E extends Exception> R execute(
       String serviceName,
@@ -143,6 +165,7 @@ public final class TracingUtil {
       SpanKind spanKind,
       ConfigurationSource conf,
       CheckedSupplier<R, E> supplier) throws E {
+    installMdcContextStorage();
     initTracing(serviceName, conf);
     try {
       return executeInNewSpan(spanName, spanKind, supplier);
@@ -369,15 +392,39 @@ public final class TracingUtil {
    * @return A new interface which implements interface but delegate all the
    * calls to the delegate and also enables tracing.
    */
-  public static <T> T createProxy(
+  public static <T> T createInternalProxy(
       T delegate, Class<T> itf, ConfigurationSource conf) {
+    return createProxy(delegate, itf, conf, SpanKind.INTERNAL);
+  }
+
+  /** Same as {@link #createInternalProxy(Object, Class, ConfigurationSource)}, with CLIENT spans for an RPC delegate.*/
+  public static <T> T createClientProxy(T delegate, Class<T> itf, ConfigurationSource conf) {
+    return createProxy(delegate, itf, conf, SpanKind.CLIENT);
+  }
+
+  /** Creates a proxy with spans named {@code <delegate class>.<method>}, also usable at startup without a span. */
+  public static <T> T createProxy(T delegate, Class<T> itf, SpanKind spanKind) {
+    if (!tracingEnabled && !applicationAware) {
+      return delegate;
+    }
+    if (!hasUsableTracer()) {
+      return delegate;
+    }
+    return newProxy(delegate, itf, delegate.getClass().getSimpleName(), spanKind);
+  }
+
+  private static <T> T createProxy(T delegate, Class<T> itf, ConfigurationSource conf, SpanKind spanKind) {
     if (!shouldCreateTracingProxy(conf)) {
       return delegate;
     }
+    return newProxy(delegate, itf, itf.getSimpleName(), spanKind);
+  }
+
+  private static <T> T newProxy(T delegate, Class<T> itf, String name, SpanKind spanKind) {
     Class<?> aClass = delegate.getClass();
     return itf.cast(Proxy.newProxyInstance(aClass.getClassLoader(),
         new Class<?>[] {itf},
-        new TraceAllMethod<>(delegate, itf.getSimpleName())));
+        new TraceAllMethod<>(delegate, name, spanKind)));
   }
 
   public static boolean isTracingEnabled(ConfigurationSource conf) {
@@ -475,8 +522,7 @@ public final class TracingUtil {
     try (Scope ignored = span.makeCurrent()) {
       return supplier.get();
     } catch (Exception ex) {
-      span.addEvent("Failed with exception: " + ex.getMessage());
-      span.setStatus(StatusCode.ERROR);
+      recordException(span, ex);
       throw ex;
     } finally {
       span.end();
@@ -491,8 +537,7 @@ public final class TracingUtil {
     try (Scope ignored = span.makeCurrent()) {
       runnable.run();
     } catch (Exception ex) {
-      span.addEvent("Failed with exception: " + ex.getMessage());
-      span.setStatus(StatusCode.ERROR);
+      recordException(span, ex);
       throw ex;
     } finally {
       span.end();
@@ -531,6 +576,63 @@ public final class TracingUtil {
 
   public static Span getActiveSpan() {
     return Span.current();
+  }
+
+  public static Span createInternalSpan(String spanName) {
+    return createSpan(spanName, SpanKind.INTERNAL);
+  }
+
+  public static Span createSpan(String spanName, SpanKind spanKind) {
+    return buildSpan(spanName, spanKind);
+  }
+
+  public static void recordExceptionInCurrentSpan(Throwable t) {
+    recordException(Span.current(), t);
+  }
+
+  public static void recordException(Span span, Throwable t) {
+    if (t == null || !span.isRecording()) {
+      return;
+    }
+    span.recordException(t);
+    if (t.getMessage() == null) {
+      span.setStatus(StatusCode.ERROR);
+    } else {
+      span.setStatus(StatusCode.ERROR, t.getMessage());
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, String value) {
+    Span span = Span.current();
+    if (value != null && span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, long value) {
+    Span span = Span.current();
+    if (span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addAttributesToCurrentSpan(String key, boolean value) {
+    Span span = Span.current();
+    if (span.isRecording()) {
+      span.setAttribute(key, value);
+    }
+  }
+
+  public static void addEventToCurrentSpan(String name, String key, String value) {
+    Span span = Span.current();
+    if (!span.isRecording()) {
+      return;
+    }
+    if (value == null) {
+      span.addEvent(name);
+    } else {
+      span.addEvent(name, Attributes.of(AttributeKey.stringKey(key), value));
+    }
   }
 
   /**
@@ -647,5 +749,57 @@ public final class TracingUtil {
       scope.close();
       span.end();
     };
+  }
+
+  /**
+   * {@link ContextStorage} that keeps the logging MDC in sync with the current span.
+   * Installed through {@link #installMdcContextStorage()} by Ozone services and CLIs only,
+   * so applications using the Ozone client keep their own MDC and context storage.
+   * Every {@code makeCurrent()} / {@code Context.wrap(...)} goes through {@link #attach(Context)},
+   * so trace and span IDs are available to log patterns without changes at the call sites.
+   * The MDC is always derived from the current context (never saved and restored),
+   * so values inherited by child threads through the MDC are overwritten on the next attach or close.
+   */
+  static final class MdcContextStorage implements ContextStorage {
+    static final String MDC_TRACE_ID = "trace_id";
+    static final String MDC_SPAN_ID = "span_id";
+
+    private final ContextStorage delegate;
+
+    MdcContextStorage(ContextStorage delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public Scope attach(Context toAttach) {
+      Scope scope = delegate.attach(toAttach);
+      updateMdc(delegate.current());
+      return () -> {
+        scope.close();
+        updateMdc(delegate.current());
+      };
+    }
+
+    @Override
+    public Context current() {
+      return delegate.current();
+    }
+
+    @Override
+    public Context root() {
+      return delegate.root();
+    }
+
+    private static void updateMdc(Context context) {
+      SpanContext spanContext = context == null ? SpanContext.getInvalid()
+          : Span.fromContext(context).getSpanContext();
+      if (spanContext.isValid()) {
+        MDC.put(MDC_TRACE_ID, spanContext.getTraceId());
+        MDC.put(MDC_SPAN_ID, spanContext.getSpanId());
+      } else {
+        MDC.remove(MDC_TRACE_ID);
+        MDC.remove(MDC_SPAN_ID);
+      }
+    }
   }
 }

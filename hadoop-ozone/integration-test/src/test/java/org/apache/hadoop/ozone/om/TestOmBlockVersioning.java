@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -47,7 +47,7 @@ import org.junit.jupiter.api.TestInstance;
  * This class tests the versioning of blocks from OM side.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
+public abstract class TestOmBlockVersioning implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   private OzoneManager ozoneManager;
