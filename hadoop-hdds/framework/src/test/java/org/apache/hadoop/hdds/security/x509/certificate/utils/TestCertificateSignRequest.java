@@ -18,8 +18,13 @@
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameFormat;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameFormatWithSN;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -48,6 +53,8 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.DLSequence;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.GeneralName;
@@ -65,6 +72,9 @@ import org.mockito.MockedStatic;
  * Certificate Signing Request.
  */
 public class TestCertificateSignRequest {
+  /** Longer than the RFC 5280 ub-common-name (64), like user@FQDN of a Kubernetes pod. */
+  static final String LONG_SUBJECT =
+      "dn@aaaa-ozone-000-datanode-1.aaa-ozone-000-datanode-headless.aaaa-data.svc.cluster.local";
 
   private SecurityConfig securityConfig;
 
@@ -268,6 +278,49 @@ public class TestCertificateSignRequest {
     // Verify de-serialized CSR matches with the original CSR
     PKCS10CertificationRequest dsCsr = new PKCS10CertificationRequest(csrBytes);
     assertEquals(csr, dsCsr);
+  }
+
+  @Test
+  public void testDistinguishedNameEncodingUnchanged() throws Exception {
+    String clusterID = UUID.randomUUID().toString();
+    String scmID = UUID.randomUUID().toString();
+    String subject = "dn@host1.example.com";
+
+    assertArrayEquals(
+        new X500Name(String.format(getDistinguishedNameFormat(), subject, scmID, clusterID)).getEncoded(),
+        getDistinguishedName(subject, scmID, clusterID).getEncoded());
+    assertArrayEquals(
+        new X500Name(String.format(getDistinguishedNameFormatWithSN(), subject, scmID, clusterID, "12345"))
+            .getEncoded(),
+        getDistinguishedNameWithSN(subject, scmID, clusterID, "12345").getEncoded());
+    // A datanode sends null SCM and cluster IDs before registration.
+    assertArrayEquals(
+        new X500Name(String.format(getDistinguishedNameFormat(), subject, null, null)).getEncoded(),
+        getDistinguishedName(subject, null, null).getEncoded());
+  }
+
+  @Test
+  public void testGenerateCSRWithLongSubject() throws Exception {
+    String clusterID = UUID.randomUUID().toString();
+    String scmID = UUID.randomUUID().toString();
+    assertThat(LONG_SUBJECT.length()).isGreaterThan(64);
+    KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .setSubject(LONG_SUBJECT)
+        .setScmID(scmID)
+        .setClusterID(clusterID)
+        .setKey(keyPair)
+        .setConfiguration(securityConfig)
+        .build()
+        .generateCSR();
+
+    assertEquals(LONG_SUBJECT, csr.getSubject().getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+    assertEquals(String.format(getDistinguishedNameFormat(), LONG_SUBJECT, scmID, clusterID),
+        csr.getSubject().toString());
+    ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder()
+        .setProvider(securityConfig.getProvider()).build(csr.getSubjectPublicKeyInfo());
+    assertTrue(csr.isSignatureValid(verifierProvider));
   }
 
   @Test

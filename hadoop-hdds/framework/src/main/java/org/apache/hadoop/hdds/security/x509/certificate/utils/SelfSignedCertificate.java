@@ -124,9 +124,7 @@ public final class SelfSignedCertificate {
     }
     // For the Root Certificate we form the name from Subject, SCM ID and
     // Cluster ID.
-    String dnName = String.format(getNameFormat(),
-        subject, scmID, clusterID, serial);
-    X500Name name = new X500Name(dnName);
+    X500Name name = CertificateSignRequest.getDistinguishedNameWithSN(subject, scmID, clusterID, serial.toString());
 
     // Valid from the Start of the day when we generate this Certificate.
     Date validFrom = Date.from(beginDate.toInstant());

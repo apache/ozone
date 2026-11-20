@@ -42,12 +42,15 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.ASN1Set;
 import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.DERPrintableString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.DERUTF8String;
 import org.bouncycastle.asn1.pkcs.Attribute;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.X500NameBuilder;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
@@ -117,15 +120,28 @@ public final class CertificateSignRequest {
   // used by server side DN regeneration
   public static X500Name getDistinguishedNameWithSN(String subject,
       String scmID, String clusterID, String serialID) {
-    return new X500Name(String.format(DISTINGUISHED_NAME_WITH_SN_FORMAT,
-        subject, scmID, clusterID, serialID));
+    return distinguishedNameBuilder(subject, scmID, clusterID)
+        .addRDN(BCStyle.SERIALNUMBER, new DERPrintableString(String.valueOf(serialID)))
+        .build();
   }
 
   // used by client side DN generation
   public static X500Name getDistinguishedName(String subject, String scmID,
       String clusterID) {
-    return new X500Name(String.format(getDistinguishedNameFormat(), subject,
-        scmID, clusterID));
+    return distinguishedNameBuilder(subject, scmID, clusterID).build();
+  }
+
+  /**
+   * Builds the RDNs from typed values instead of parsing a DN string, so Bouncy Castle 1.85+ does not reject a
+   * commonName longer than RFC 5280 ub-common-name (64), e.g. user@FQDN on Kubernetes.
+   * The encoding matches what {@link BCStyle} produces for the same DN string, and a null value is encoded as
+   * "null" like {@link String#format} did (a datanode sends null SCM and cluster IDs before registration).
+   */
+  private static X500NameBuilder distinguishedNameBuilder(String subject, String scmID, String clusterID) {
+    return new X500NameBuilder()
+        .addRDN(BCStyle.CN, new DERUTF8String(String.valueOf(subject)))
+        .addRDN(BCStyle.OU, new DERUTF8String(String.valueOf(scmID)))
+        .addRDN(BCStyle.O, new DERUTF8String(String.valueOf(clusterID)));
   }
 
   public static Extensions getPkcs9Extensions(PKCS10CertificationRequest csr)
