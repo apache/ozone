@@ -83,7 +83,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
   private long sequenceId;
-  // Health state of the container (determined by ReplicationManager)
+  // Summary label from the last ReplicationManager check; not a lifecycle state and not persisted.
   private ContainerHealthState healthState;
   private boolean suppressed;
 
@@ -253,7 +253,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   /**
-   * Get the health state of the container.
+   * Get the label set by the last ReplicationManager check of this container. This is not the
+   * container lifecycle state; see {@link #getState()}. It is kept only in SCM memory.
    *
    * @return ContainerHealthState
    */
@@ -262,7 +263,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   /**
-   * Set the health state of the container.
+   * Set the label from a ReplicationManager check of this container.
    *
    * @param newHealthState The new health state
    */
