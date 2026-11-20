@@ -39,14 +39,17 @@ import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResu
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,6 +64,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -83,6 +87,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -356,6 +362,46 @@ public class TestMoveManager {
     assertEquals(COMPLETED, finalResult);
   }
 
+  @ParameterizedTest
+  @CsvSource(value = {"SSD,SSD,SSD", "NULL,SSD,SSD", "SSD,NULL,SSD", "ARCHIVE,ARCHIVE,ARCHIVE"},
+      nullValues = "NULL")
+  public void testTypedMovePreservesSourceTypeAndDeadline(
+      StorageType recorded, StorageType volume, StorageType requested) throws Exception {
+    ContainerReplica replica = ReplicationTestUtil.createContainerReplica(containerInfo.containerID(), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED).toBuilder().setStorageType(recorded).setVolumeStorageType(volume).build();
+    replicas.add(replica);
+    replicas.addAll(ReplicationTestUtil.createReplicas(containerInfo.containerID(), 0, 0));
+    src = replica.getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+    moveManager.setReplicationTimeout(3000);
+    CompletableFuture<MoveManager.MoveResult> result =
+        moveManager.move(containerInfo.containerID(), src, tgt, requested);
+    assertFalse(result.isDone());
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+        eq(containerInfo), eq(0), eq(src), eq(tgt), eq(clock.millis() + 3000), eq(requested));
+    verify(replicationManager, never()).sendDeleteCommand(any(), anyInt(), any(), anyBoolean(), anyLong());
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {"NULL,NULL", "DISK,DISK", "SSD,DISK"}, nullValues = "NULL")
+  public void testTypedMoveRejectsChangedUnknownOrConflictingSourceType(StorageType recorded, StorageType volume)
+      throws Exception {
+    ContainerReplica replica = ReplicationTestUtil.createContainerReplica(containerInfo.containerID(), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED).toBuilder().setStorageType(recorded).setVolumeStorageType(volume).build();
+    replicas.add(replica);
+    src = replica.getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+    assertEquals(MoveManager.MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH,
+        moveManager.move(containerInfo.containerID(), src, tgt, StorageType.SSD).get());
+    verify(replicationManager, never()).sendLowPriorityReplicateContainerCommand(
+        any(), anyInt(), any(), any(), anyLong(), any());
+    assertTrue(moveManager.getPendingMove().isEmpty());
+  }
+
   @Test
   public void testSuccessfulMoveNonZeroRepIndex() throws Exception {
     containerInfo = ReplicationTestUtil.createContainer(
@@ -377,6 +423,48 @@ public class TestMoveManager {
     verify(replicationManager).sendLowPriorityReplicateContainerCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src), eq(tgt),
         anyLong());
+
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+
+    verify(replicationManager).sendDeleteCommand(
+        eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
+        eq(true), anyLong());
+
+    op = new ContainerReplicaOp(
+        DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+
+    MoveManager.MoveResult finalResult = res.get();
+    assertEquals(COMPLETED, finalResult);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"SSD", "ARCHIVE"})
+  public void testTypedMovePreservesEcFragmentIndex(StorageType type) throws Exception {
+    containerInfo = ReplicationTestUtil.createContainer(
+        HddsProtos.LifeCycleState.CLOSED, new ECReplicationConfig(3, 2));
+    setupMocks();
+
+    replicas.addAll(ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(), 1, 2, 3, 4, 5));
+    Iterator<ContainerReplica> iterator = replicas.iterator();
+    ContainerReplica original = iterator.next();
+    iterator.remove();
+    ContainerReplica srcReplica = original.toBuilder().setStorageType(type).setVolumeStorageType(type).build();
+    replicas.add(srcReplica);
+    src = srcReplica.getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+
+    CompletableFuture<MoveManager.MoveResult> res =
+        moveManager.move(containerInfo.containerID(), src, tgt, type);
+
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+        eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src), eq(tgt),
+        anyLong(), eq(type));
 
     ContainerReplicaOp op = new ContainerReplicaOp(
         ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
