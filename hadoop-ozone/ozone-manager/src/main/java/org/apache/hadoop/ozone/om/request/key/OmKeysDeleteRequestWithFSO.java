@@ -24,7 +24,9 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -38,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -47,7 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles DeleteKeys request for recursive bucket deletion.
+ * Handles DeleteKeys request for FSO buckets.
  */
 public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
@@ -91,7 +94,8 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   @Override
   protected Pair<Long, Integer> markKeysAsDeletedInCache(
       OzoneManager ozoneManager, long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap) throws IOException {
+      List<OmKeyInfo> nonEmptyDirs, OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap)
+      throws IOException {
     long quotaReleased = 0L;
     int emptyKeys = 0;
     // Mark all keys which can be deleted, in cache as deleted.
@@ -135,9 +139,20 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       }
     }
 
+    // A non-recursive request deletes a directory only if the rest of the request leaves it empty. The files are
+    // marked above; check each subdirectory before its parent, so that the parent sees it deleted as well.
+    final boolean recursive = getOmRequest().getDeleteKeysRequest().getRecursive();
+    if (!recursive) {
+      dirList.sort(Comparator.comparingInt((OmKeyInfo dir) -> OzoneFSUtils.getFileCount(dir.getKeyName())).reversed());
+    }
     // Mark directory keys.
-    for (int i = 0; i < dirList.size(); i++) {
-      final OmKeyInfo dirInfo = dirList.get(i);
+    for (ListIterator<OmKeyInfo> dirs = dirList.listIterator(); dirs.hasNext();) {
+      final OmKeyInfo dirInfo = dirs.next();
+      if (!recursive && OMFileRequest.hasChildren(dirInfo, omMetadataManager)) {
+        dirs.remove();
+        nonEmptyDirs.add(dirInfo);
+        continue;
+      }
       final long volumeId = omMetadataManager.getVolumeId(
               dirInfo.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
@@ -155,7 +170,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
           .setUpdateID(trxnLogIndex)
           .build();
       quotaReleased += sumBlockLengths(updatedDirInfo);
-      dirList.set(i, updatedDirInfo);
+      dirs.set(updatedDirInfo);
     }
     return Pair.of(quotaReleased, emptyKeys);
   }

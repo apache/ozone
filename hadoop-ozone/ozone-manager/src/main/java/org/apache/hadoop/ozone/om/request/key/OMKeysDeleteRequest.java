@@ -248,10 +248,19 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
+      List<OmKeyInfo> nonEmptyDirs = new ArrayList<>();
       // Mark all keys which can be deleted, in cache as deleted.
       Pair<Long, Integer> quotaReleasedEmptyKeys =
           markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
-              dirList, omMetadataManager, openKeyInfoMap);
+              dirList, nonEmptyDirs, omMetadataManager, openKeyInfoMap);
+      for (OmKeyInfo dir : nonEmptyDirs) {
+        deleteStatus = false;
+        deleteKeys.remove(dir.getKeyName());
+        deleteKeysInfo.remove(dir);
+        unDeletedKeys.addKeys(dir.getKeyName());
+        keyToError.put(dir.getKeyName(),
+            new ErrorInfo(OMException.ResultCodes.DIRECTORY_NOT_EMPTY.name(), "Directory is not empty"));
+      }
       omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
       // For empty keyInfos the quota should be released and not added to namespace.
       omBucketInfo.decrUsedNamespace(omKeyInfoList.size() + dirList.size() -
@@ -403,8 +412,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  /**
+   * Marks the keys to delete as deleted in the table cache.
+   * A directory that a non-recursive request leaves non-empty is moved from dirList to nonEmptyDirs instead.
+   */
   protected Pair<Long, Integer> markKeysAsDeletedInCache(OzoneManager ozoneManager,
-      long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
+      long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList, List<OmKeyInfo> nonEmptyDirs,
       OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap)
           throws IOException {
     int emptyKeys = 0;

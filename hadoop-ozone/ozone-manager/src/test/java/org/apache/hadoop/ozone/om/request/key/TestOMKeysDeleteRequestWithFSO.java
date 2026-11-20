@@ -18,21 +18,36 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_EMPTY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -111,6 +126,73 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
                 .addKeys("dir0/file0").addKeys("dir0//file0").addKeys("/dir0/file0")
                 .addKeys("dir1/").addKeys("/dir1"))).build();
     checkDuplicateKeysReleaseQuotaOnce(request, 2);
+  }
+
+  @Test
+  public void testNonRecursiveKeepsNonEmptyDirectories() throws Exception {
+    addFile("a/b", "file");
+
+    OMResponse response = deleteNonRecursive("a/", "a/b/");
+
+    assertEquals(Status.PARTIAL_DELETE, response.getStatus());
+    DeleteKeysResponse deleteKeysResponse = response.getDeleteKeysResponse();
+    assertThat(deleteKeysResponse.getUnDeletedKeys().getKeysList()).containsExactlyInAnyOrder("a/", "a/b/");
+    assertThat(deleteKeysResponse.getErrorsList())
+        .extracting(DeleteKeyError::getKey, DeleteKeyError::getErrorCode)
+        .containsExactlyInAnyOrder(tuple("a/", DIRECTORY_NOT_EMPTY.name()), tuple("a/b/", DIRECTORY_NOT_EMPTY.name()));
+    for (String key : Arrays.asList("a/", "a/b/", "a/b/file")) {
+      assertNotNull(getFileStatus(key), key);
+    }
+  }
+
+  @Test
+  public void testNonRecursiveDeletesDirectoriesEmptiedByTheRequest() throws Exception {
+    addFile("a/b", "file");
+
+    // A listing returns each directory before its contents.
+    OMResponse response = deleteNonRecursive("a/", "a/b/", "a/b/file");
+
+    assertEquals(Status.OK, response.getStatus());
+    for (String key : Arrays.asList("a/", "a/b/", "a/b/file")) {
+      assertNull(getFileStatus(key), key);
+    }
+  }
+
+  /**
+   * Adds a file and its parent directories. Unlike {@link #createPreRequisites()}, which gives all its top-level
+   * directories the same object ID, every entry here has its own, so a directory's children are only its own.
+   */
+  private void addFile(String parentDir, String fileName) throws Exception {
+    when(ozoneManager.getDefaultReplicationConfig()).thenReturn(RatisReplicationConfig.getInstance(ONE));
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, parentDir, omMetadataManager);
+    OmKeyInfo file = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, parentDir + "/" + fileName,
+            RatisReplicationConfig.getInstance(ONE))
+        .setObjectID(parentId + 1L)
+        .setParentObjectID(parentId)
+        .build();
+    file.setKeyName(fileName);
+    OMRequestTestUtils.addFileToKeyTable(false, false, fileName, file, -1, 50, omMetadataManager);
+  }
+
+  private OMResponse deleteNonRecursive(String... keys) throws Exception {
+    OMRequest request = OMRequest.newBuilder().setClientId(UUID.randomUUID().toString()).setCmdType(DeleteKeys)
+        .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
+            .setRecursive(false)
+            .setDeleteKeys(DeleteKeyArgs.newBuilder()
+                .setVolumeName(volumeName).setBucketName(bucketName).addAllKeys(Arrays.asList(keys))))
+        .build();
+    OMClientResponse response = getOmKeysDeleteRequest(request).validateAndUpdateCache(ozoneManager, 100L);
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    return response.getOMResponse();
+  }
+
+  private OzoneFileStatus getFileStatus(String keyName) throws IOException {
+    return OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName, bucketName, keyName, 0,
+        RatisReplicationConfig.getInstance(ONE));
   }
 
   @Override

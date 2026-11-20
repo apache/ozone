@@ -1500,6 +1500,8 @@ message DeleteKeysRequest {
     optional DeleteKeyArgs deleteKeys = 1;
     optional RequestSource sourceType = 2 [default = USER];
     optional LifecycleScanState scanState = 3;
+    // If false, a directory in an FSO bucket is deleted only if the other keys in the request leave it empty.
+    optional bool recursive = 4 [default = true];
 }
 
 enum RequestSource {

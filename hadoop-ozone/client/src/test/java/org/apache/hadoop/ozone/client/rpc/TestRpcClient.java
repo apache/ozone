@@ -1127,7 +1127,7 @@ public class TestRpcClient {
   @EnumSource(value = OzoneManagerVersion.class, names = {"S3_DERIVED_KEY", "CONDITIONAL_DELETE"})
   public void testConditionalDeleteOmVersion(OzoneManagerVersion version) throws IOException {
     List<OMRequest> requests = new ArrayList<>();
-    RpcClient client = createConditionalRequestClient(requests, version);
+    RpcClient client = createCapturingClient(requests, version);
     try {
       for (String etag : Arrays.asList(null, "etag")) {
         requests.clear();
@@ -1156,7 +1156,7 @@ public class TestRpcClient {
       names = {"S3_LIST_MULTIPART_UPLOADS_PAGINATION", "ATOMIC_CREATE_IF_NOT_EXISTS"})
   public void testConditionalCompleteMpuOmVersion(OzoneManagerVersion version) throws IOException {
     List<OMRequest> requests = new ArrayList<>();
-    RpcClient client = createConditionalRequestClient(requests, version);
+    RpcClient client = createCapturingClient(requests, version);
     try {
       for (Long generation : Arrays.asList(null, 0L)) {
         for (String etag : Arrays.asList(null, "etag")) {
@@ -1187,7 +1187,32 @@ public class TestRpcClient {
     }
   }
 
-  private static RpcClient createConditionalRequestClient(List<OMRequest> requests, OzoneManagerVersion version)
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {"CONDITIONAL_DELETE", "NON_RECURSIVE_DELETE_KEYS"})
+  public void testNonRecursiveDeleteKeysOmVersion(OzoneManagerVersion version) throws IOException {
+    List<OMRequest> requests = new ArrayList<>();
+    RpcClient client = createCapturingClient(requests, version);
+    try {
+      for (boolean recursive : new boolean[] {true, false}) {
+        requests.clear();
+        IOException error = assertThrows(IOException.class,
+            () -> client.deleteKeys("vol", "bucket", Collections.singletonList("key"), true, recursive));
+        if (recursive || OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS.isSupportedBy(version)) {
+          assertThat(error).hasMessage("request sent");
+          assertThat(requests).hasSize(1);
+          assertThat(requests.get(0).getDeleteKeysRequest().getRecursive()).isEqualTo(recursive);
+        } else {
+          // An older OzoneManager would ignore the flag and delete FSO directories recursively.
+          assertThat(error).hasMessage("OzoneManager does not support non-recursive deletion of multiple keys.");
+          assertThat(requests).isEmpty();
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  private static RpcClient createCapturingClient(List<OMRequest> requests, OzoneManagerVersion version)
       throws IOException {
     return createRpcClient(new MockOmTransport() {
       @Override
@@ -1197,7 +1222,8 @@ public class TestRpcClient {
               .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
               .build();
         }
-        if (request.getCmdType() == Type.DeleteKey || request.getCmdType() == Type.CompleteMultiPartUpload) {
+        if (request.getCmdType() == Type.DeleteKey || request.getCmdType() == Type.DeleteKeys
+            || request.getCmdType() == Type.CompleteMultiPartUpload) {
           requests.add(request);
           throw new IOException("request sent");
         }

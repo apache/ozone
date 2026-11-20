@@ -1076,6 +1076,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(deleteKeys.getVolume())
         .addAllKeys(deleteKeys.getKeyNames()).build();
     req.setDeleteKeys(deletedKeys);
+    if (!deleteKeys.isRecursive()) {
+      req.setRecursive(false);
+    }
     OMRequest omRequest = createOMRequest(Type.DeleteKeys)
         .setDeleteKeysRequest(req)
         .build();

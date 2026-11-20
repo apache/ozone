@@ -1904,13 +1904,16 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public Map<String, ErrorInfo> deleteKeys(
-      String volumeName, String bucketName, List<String> keyNameList, boolean quiet)
+      String volumeName, String bucketName, List<String> keyNameList, boolean quiet, boolean recursive)
       throws IOException {
+    if (!recursive && !OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support non-recursive deletion of multiple keys.");
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyNameList, "keyNameList == null");
     OmDeleteKeys omDeleteKeys = new OmDeleteKeys(volumeName, bucketName,
-        keyNameList);
+        keyNameList, recursive);
     return ozoneManagerClient.deleteKeys(omDeleteKeys, quiet);
   }
 
