@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
@@ -148,6 +149,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private final XceiverServerRatis ratisServer;
+  private final ReplicationType replicationType;
   private final NavigableMap<Long, WriteFutures> writeChunkFutureMap;
 
   private final long writeChunkWaitMaxNs;
@@ -251,12 +253,16 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(HddsDatanodeService hddsDatanodeService, RaftGroupId gid,
+      ReplicationType replicationType,
       ContainerDispatcher dispatcher,
       ContainerController containerController,
       List<ThreadPoolExecutor> chunkExecutors,
       XceiverServerRatis ratisServer,
       ConfigurationSource conf,
       String threadNamePrefix) {
+    Preconditions.checkArgument(replicationType == ReplicationType.RATIS || replicationType == ReplicationType.CHAINED,
+        "Unexpected replicationType %s", replicationType);
+    this.replicationType = replicationType;
     this.datanodeService = hddsDatanodeService;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -308,6 +314,10 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     this.writeChunkWaitMaxNs = conf.getTimeDuration(ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
         ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_NS_DEFAULT, TimeUnit.NANOSECONDS);
+  }
+
+  ReplicationType getReplicationType() {
+    return replicationType;
   }
 
   private void validatePeers() throws IOException {

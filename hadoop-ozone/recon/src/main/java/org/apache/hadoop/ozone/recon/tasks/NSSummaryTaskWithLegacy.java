@@ -26,8 +26,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -73,8 +71,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 
-  public Pair<Integer, Boolean> processWithLegacy(OMUpdateEventBatch events,
-                                                  int seekPos) {
+  public ProcessResult processWithLegacy(OMUpdateEventBatch events, int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int itrPos = 0;
     while (eventIterator.hasNext() && itrPos < seekPos) {
@@ -139,7 +136,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         }
         if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
           if (!flushAndCommitNSToDB(nsSummaryMap)) {
-            return new ImmutablePair<>(seekPos, false);
+            return new ProcessResult(seekPos, false);
           }
           seekPos = itrPos + eventCounter;
         }
@@ -147,17 +144,17 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
             ex);
         nsSummaryMap.clear();
-        return new ImmutablePair<>(seekPos, false);
+        return new ProcessResult(seekPos, false);
       }
     }
 
     // flush and commit left out entries at end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      return new ImmutablePair<>(seekPos, false);
+      return new ProcessResult(seekPos, false);
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithLegacy");
-    return new ImmutablePair<>(itrPos + eventCounter, true);
+    return new ProcessResult(itrPos + eventCounter, true);
   }
 
   private void processWithFileSystemLayout(OmKeyInfo updatedKeyInfo,

@@ -482,4 +482,10 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
+  /**
+   * The seek position reached by an NSSummary sub-task paired with whether it processed the events successfully,
+   * used as the result of processing an event batch.
+   */
+  public record ProcessResult(int seekPosition, boolean success) {
+  }
 }

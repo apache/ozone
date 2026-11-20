@@ -37,13 +37,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskDbEventHandler.ProcessResult;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -438,13 +438,13 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
       OMUpdateEventBatch batch = new OMUpdateEventBatch(Collections.singletonList(
           obsPutEvent(KEY_FOUR, KEY_FOUR_OBJECT_ID, KEY_FOUR_SIZE)), 0L);
 
-      Pair<Integer, Boolean> result = new NSSummaryTaskWithOBS(failingManager, getReconOMMetadataManager(),
+      ProcessResult result = new NSSummaryTaskWithOBS(failingManager, getReconOMMetadataManager(),
           1, 5, 20, 2000).processWithOBS(batch, 0);
-      assertFalse(result.getRight());
-      assertEquals(1, result.getLeft());
+      assertFalse(result.success());
+      assertEquals(1, result.seekPosition());
 
       assertTrue(new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(), getReconOMMetadataManager(),
-          1, 5, 20, 2000).processWithOBS(batch, result.getLeft()).getRight());
+          1, 5, 20, 2000).processWithOBS(batch, result.seekPosition()).success());
       assertEquals(2, getReconNamespaceSummaryManager()
           .getNSSummary(BUCKET_THREE_OBJECT_ID).getNumOfFiles());
     }

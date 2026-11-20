@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -50,9 +51,10 @@ public interface XceiverServerSpi {
   boolean isExist(PipelineID pipelineId);
 
   /**
-   * Join a new pipeline with priority.
+   * Join a new pipeline of the given type with priority.
    */
   default void addGroup(PipelineID pipelineId,
+      ReplicationType type,
       List<DatanodeDetails> peers,
       List<Integer> priorityList) throws IOException {
   }

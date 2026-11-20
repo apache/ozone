@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -113,7 +112,7 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
    * pending deletion in Ozone.
    */
   @Override
-  public Triple<Long, Long, Long> getTableSizeAndCount(String tableName,
+  public TableSizeAndCount getTableSizeAndCount(String tableName,
       OMMetadataManager omMetadataManager) throws IOException {
     long count = 0;
     long unReplicatedSize = 0;
@@ -132,6 +131,6 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
         }
       }
     }
-    return Triple.of(count, unReplicatedSize, replicatedSize);
+    return new TableSizeAndCount(count, unReplicatedSize, replicatedSize);
   }
 }

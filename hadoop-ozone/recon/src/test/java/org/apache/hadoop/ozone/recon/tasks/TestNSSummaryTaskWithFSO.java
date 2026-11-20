@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -42,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskDbEventHandler.ProcessResult;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -230,7 +230,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
   @Nested
   public class TestProcess {
 
-    private Pair<Integer, Boolean> result;
+    private ProcessResult result;
 
     @BeforeEach
     public void setUp() throws IOException {
@@ -502,8 +502,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       Assertions.assertNotNull(result, "Result should not be null");
       // Why seekPos should be 7 ? because all 7 events of the batch are committed,
       // so a retry has nothing left to apply.
-      Assertions.assertEquals(7, result.getLeft(), "seekPos should be 7");
-      Assertions.assertTrue(result.getRight(), "The processing should fail due to flush failure");
+      Assertions.assertEquals(7, result.seekPosition(), "seekPos should be 7");
+      Assertions.assertTrue(result.success(), "The processing should fail due to flush failure");
     }
 
     @Test
@@ -573,11 +573,11 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
           .flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
 
       // Call the method under test
-      Pair<Integer, Boolean> result1 = taskSpy.processWithFSO(events, 0);
+      ProcessResult result1 = taskSpy.processWithFSO(events, 0);
 
       // Assertions
       Assertions.assertNotNull(result1, "Result should not be null");
-      Assertions.assertEquals(3, result1.getLeft(), "seekPos should be 3");
+      Assertions.assertEquals(3, result1.seekPosition(), "seekPos should be 3");
 
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();
