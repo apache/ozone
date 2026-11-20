@@ -728,14 +728,7 @@ public class TestKeyValueHandler {
 
       File metadataDir = new File(container.getContainerData().getMetadataPath());
       assumeThat(metadataDir.setWritable(false)).isTrue();
-      File writeProbe = new File(metadataDir, "write-probe");
-      try {
-        assumeThat(writeProbe.createNewFile()).isFalse();
-      } finally {
-        if (writeProbe.exists()) {
-          writeProbe.delete();
-        }
-      }
+      assumeThat(Files.isWritable(metadataDir.toPath())).isFalse();
       try {
         StorageContainerException ex = assertThrows(StorageContainerException.class,
             () -> keyValueHandler.markContainerForClose(container));
@@ -772,14 +765,7 @@ public class TestKeyValueHandler {
 
       File metadataDir = new File(container.getContainerData().getMetadataPath());
       assumeThat(metadataDir.setWritable(false)).isTrue();
-      File writeProbe = new File(metadataDir, "write-probe");
-      try {
-        assumeThat(writeProbe.createNewFile()).isFalse();
-      } finally {
-        if (writeProbe.exists()) {
-          writeProbe.delete();
-        }
-      }
+      assumeThat(Files.isWritable(metadataDir.toPath())).isFalse();
       try {
         assertThrows(StorageContainerException.class,
             () -> keyValueHandler.markContainerForClose(container));
