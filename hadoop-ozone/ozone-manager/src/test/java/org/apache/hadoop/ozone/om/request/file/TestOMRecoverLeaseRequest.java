@@ -215,9 +215,9 @@ public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
     assertThat(blocksWith(applied.getRecoverLeaseResponse().getOpenKeyInfo(), KeyLocation::hasPipeline))
         .containsOnly(false);
 
-    final RecoverLeaseResponse reply = OMRecoverLeaseRequest.addBlockInfo(
-        ozoneManager, createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery), applied)
-        .getRecoverLeaseResponse();
+    final OMRecoverLeaseRequest request = getOmRecoverLeaseRequest(
+        createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery));
+    final RecoverLeaseResponse reply = request.postExecute(ozoneManager, applied).getRecoverLeaseResponse();
     assertThat(blocksWith(reply.getKeyInfo(), KeyLocation::hasPipeline)).containsExactly(false, false, true);
     assertThat(blocksWith(reply.getOpenKeyInfo(), KeyLocation::hasPipeline)).containsExactly(false, true, true);
   }
@@ -241,9 +241,9 @@ public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
 
     Server.getCurCall().set(new RpcCallerStub(createRemoteUser("alice")));
     try {
-      final RecoverLeaseResponse reply = OMRecoverLeaseRequest.addBlockInfo(
-          ozoneManager, createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery), applied)
-          .getRecoverLeaseResponse();
+      final OMRecoverLeaseRequest request = getOmRecoverLeaseRequest(
+          createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery));
+      final RecoverLeaseResponse reply = request.postExecute(ozoneManager, applied).getRecoverLeaseResponse();
       assertThat(blocksWith(reply.getKeyInfo(), KeyLocation::hasToken)).containsExactly(false, false, true);
       assertThat(blocksWith(reply.getOpenKeyInfo(), KeyLocation::hasToken)).containsExactly(false, true, true);
       final ArgumentCaptor<String> tokenUser = ArgumentCaptor.forClass(String.class);
@@ -268,9 +268,9 @@ public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
     assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout()).get(getOpenFileName()).getMetadata())
         .containsKey(OzoneConsts.LEASE_RECOVERY);
 
-    final OMException e = assertThrows(
-        OMException.class, () -> OMRecoverLeaseRequest.addBlockInfo(
-            ozoneManager, createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery), applied));
+    final OMRecoverLeaseRequest request = getOmRecoverLeaseRequest(
+        createRecoverLeaseRequest(volumeName, bucketName, keyName, forceRecovery));
+    final OMException e = assertThrows(OMException.class, () -> request.postExecute(ozoneManager, applied));
     assertEquals(OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION, e.getResult());
     assertEquals("SCM is not reachable", e.getMessage());
   }

@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.file.OMRecoverLeaseRequest;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -52,7 +51,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint.LocalLeaseContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseRequest;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
 import org.apache.ratis.proto.RaftProtos.FollowerInfoProto;
@@ -214,34 +212,18 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       if (response == null) {
         this.lastRequestToSubmit = request;
         response = ozoneManager.getOmExecutionFlow().submit(request, true);
+      } else if (response.getSuccess()) {
+        // Cached replies come from Ratis apply, so leader-only postExecute steps still need to run.
+        response = ozoneManager.getOmExecutionFlow().postExecute(request, response);
       }
       if (derivedKey != null && response.getSuccess() && response.hasCreateKeyResponse()) {
         return response.toBuilder().setCreateKeyResponse(response.getCreateKeyResponse().toBuilder()
             .setDerivedKey(derivedKey)).build();
       }
-      if (response.getSuccess() && response.hasRecoverLeaseResponse()) {
-        // Only the RPC response needs block tokens and pipelines. Asking SCM for them must not happen during apply.
-        return addRecoverLeaseBlockInfo(request, response);
-      }
       return response;
     } finally {
       OzoneManager.setS3Auth(null);
       OzoneManager.setStsTokenIdentifier(null);
-    }
-  }
-
-  private OMResponse addRecoverLeaseBlockInfo(OMRequest request, OMResponse response) {
-    try {
-      return OMRecoverLeaseRequest.addBlockInfo(ozoneManager, request, response);
-    } catch (IOException ex) {
-      // The request was applied successfully, so nothing else logs that the client gets an error instead.
-      final RecoverLeaseRequest recoverLease = request.getRecoverLeaseRequest();
-      LOG.warn(
-          "Failed to add block info to the RecoverLease response. Volume:{}, Bucket:{}, Key:{}",
-          recoverLease.getVolumeName(), recoverLease.getBucketName(), recoverLease.getKeyName(), ex);
-      final OMResponse errorResponse = createErrorResponse(request, ex);
-      return response.hasOmLockDetails() ?
-          errorResponse.toBuilder().setOmLockDetails(response.getOmLockDetails()).build() : errorResponse;
     }
   }
 

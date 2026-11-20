@@ -72,12 +72,7 @@ public class OMExecutionFlow {
     final OMRequest requestToSubmit;
     if (isWrite) {
       try {
-        if (INTERNAL_CMD_TYPES.contains(request.getCmdType())) {
-          throw new OMException(request.getCmdType() + " requests are not accepted from clients.",
-              OMException.ResultCodes.PERMISSION_DENIED);
-        }
-        omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
-        assert (omClientRequest != null);
+        omClientRequest = createClientRequest(request);
         final OMClientRequest finalOmClientRequest = omClientRequest;
         OMRequest preExecuted = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
             () -> finalOmClientRequest.preExecute(ozoneManager));
@@ -100,10 +95,53 @@ public class OMExecutionFlow {
 
     // 2. submit request to ratis
     OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit, isWrite);
-    if (!response.getSuccess() && omClientRequest != null) {
-      omClientRequest.handleRequestFailure(ozoneManager);
+    if (omClientRequest != null) {
+      if (!response.getSuccess()) {
+        omClientRequest.handleRequestFailure(ozoneManager);
+      } else {
+        return postExecute(omClientRequest, request, response);
+      }
     }
     return response;
+  }
+
+  /**
+   * Runs post-execute steps on a successful write response served from the Ratis retry cache.
+   */
+  public OMResponse postExecute(OMRequest request, OMResponse response) {
+    final OMClientRequest omClientRequest;
+    try {
+      omClientRequest = createClientRequest(request);
+    } catch (IOException ex) {
+      // Creating the request handler may look up current metadata (such as bucket layout) that was deleted after the
+      // request was applied. Return the cached response instead of failing an already-applied request.
+      return response;
+    }
+    return postExecute(omClientRequest, request, response);
+  }
+
+  private OMResponse postExecute(OMClientRequest omClientRequest, OMRequest request, OMResponse response) {
+    try {
+      return omClientRequest.postExecute(ozoneManager, response);
+    } catch (IOException ex) {
+      return createPostExecuteErrorResponse(request, response, ex);
+    }
+  }
+
+  private OMClientRequest createClientRequest(OMRequest request) throws IOException {
+    if (INTERNAL_CMD_TYPES.contains(request.getCmdType())) {
+      throw new OMException(
+          request.getCmdType() + " requests are not accepted from clients.", OMException.ResultCodes.PERMISSION_DENIED);
+    }
+    final OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
+    assert (omClientRequest != null);
+    return omClientRequest;
+  }
+
+  private static OMResponse createPostExecuteErrorResponse(OMRequest request, OMResponse response, IOException ex) {
+    final OMResponse errorResponse = OzoneManagerRatisUtils.createErrorResponse(request, ex);
+    return response.hasOmLockDetails() ?
+        errorResponse.toBuilder().setOmLockDetails(response.getOmLockDetails()).build() : errorResponse;
   }
 
   /**

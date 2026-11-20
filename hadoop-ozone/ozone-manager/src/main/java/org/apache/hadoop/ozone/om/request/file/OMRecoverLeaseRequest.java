@@ -39,7 +39,6 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -267,37 +266,52 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
    * Only the reply to the client needs them, so this runs on the leader after the request has been applied:
    * applying the request must not depend on SCM.
    */
-  public static OMResponse addBlockInfo(OzoneManager ozoneManager, OMRequest omRequest, OMResponse omResponse)
-      throws IOException {
-    final RecoverLeaseResponse recoverLeaseResponse = omResponse.getRecoverLeaseResponse();
+  @Override
+  public OMResponse postExecute(OzoneManager ozoneManager, OMResponse omResponse) throws IOException {
+    final OMResponse response = super.postExecute(ozoneManager, omResponse);
+    if (!response.hasRecoverLeaseResponse()) {
+      return response;
+    }
+    final RecoverLeaseResponse recoverLeaseResponse = response.getRecoverLeaseResponse();
+    if (!recoverLeaseResponse.hasKeyInfo() || !recoverLeaseResponse.hasOpenKeyInfo()) {
+      return response;
+    }
     final OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo());
-    final OmKeyInfo openKeyInfo = OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo());
+    final OmKeyInfo openFileKeyInfo = OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo());
 
     final List<OmKeyLocationInfo> keyLocationInfoList = keyInfo.getLatestVersionLocations().createLocationList();
     final List<OmKeyLocationInfo> openKeyLocationInfoList =
-        openKeyInfo.getLatestVersionLocations().createLocationList();
+        openFileKeyInfo.getLatestVersionLocations().createLocationList();
 
-    if (!keyLocationInfoList.isEmpty()) {
-      updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
-    }
-    if (openKeyLocationInfoList.size() > 1) {
-      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1));
-      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 2));
-    } else if (!openKeyLocationInfoList.isEmpty()) {
-      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(0));
+    try {
+      if (!keyLocationInfoList.isEmpty()) {
+        updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
+      }
+      if (openKeyLocationInfoList.size() > 1) {
+        updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1));
+        updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 2));
+      } else if (!openKeyLocationInfoList.isEmpty()) {
+        updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(0));
+      }
+    } catch (IOException ex) {
+      // The request was applied successfully, so nothing else logs that the client gets an error instead.
+      LOG.warn(
+          "Failed to add block info to the RecoverLease response. Volume:{}, Bucket:{}, Key:{}", volumeName, bucketName,
+          keyName, ex);
+      throw ex;
     }
 
-    final ClientVersion clientVersion = ClientVersion.deserialize(omRequest.getVersion());
-    return omResponse.toBuilder().setRecoverLeaseResponse(RecoverLeaseResponse.newBuilder()
+    final ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
+    return response.toBuilder().setRecoverLeaseResponse(RecoverLeaseResponse.newBuilder()
         .setKeyInfo(keyInfo.getNetworkProtobuf(clientVersion, true))
-        .setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(clientVersion, true))).build();
+        .setOpenKeyInfo(openFileKeyInfo.getNetworkProtobuf(clientVersion, true))).build();
   }
 
-  private static void updateBlockInfo(OzoneManager ozoneManager, OmKeyLocationInfo blockInfo) throws IOException {
+  private void updateBlockInfo(OzoneManager ozoneManager, OmKeyLocationInfo blockInfo) throws IOException {
     if (blockInfo != null) {
       // set token to last block if enabled
       if (ozoneManager.isGrpcBlockTokenEnabled()) {
-        final String remoteUser = HddsServerUtil.getRemoteUser().getShortUserName();
+        final String remoteUser = getRemoteUser().getShortUserName();
         final OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
         blockInfo.setToken(secretManager.generateToken(remoteUser, blockInfo.getBlockID(),
             EnumSet.of(READ, WRITE), blockInfo.getLength()));
