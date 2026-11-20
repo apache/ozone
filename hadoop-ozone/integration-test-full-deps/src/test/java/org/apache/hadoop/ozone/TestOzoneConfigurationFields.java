@@ -135,7 +135,6 @@ public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
         HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT,
         HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
-        OzoneConfigKeys.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY,
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY,
         OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,

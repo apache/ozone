@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY;
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

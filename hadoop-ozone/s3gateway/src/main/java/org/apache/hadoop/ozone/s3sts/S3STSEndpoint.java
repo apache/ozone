@@ -56,7 +56,6 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
@@ -126,7 +125,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private RequestIdentifier requestIdentifier;
 
   @Inject
-  private OzoneConfiguration ozoneConfiguration;
+  private S3STSDurationConfig stsDurationConfig;
 
   @VisibleForTesting
   public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
@@ -134,8 +133,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   }
 
   @VisibleForTesting
-  public void setOzoneConfiguration(OzoneConfiguration conf) {
-    this.ozoneConfiguration = conf;
+  public void setS3STSDurationConfig(S3STSDurationConfig config) {
+    this.stsDurationConfig = config;
   }
 
   /**
@@ -234,7 +233,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     int duration = S3STSUtils.DEFAULT_DURATION_SECONDS;
     String durationValidationError = null;
     try {
-      duration = S3STSUtils.validateDuration(durationSeconds, S3STSUtils.getMinDurationSeconds(ozoneConfiguration));
+      duration = S3STSUtils.validateDuration(durationSeconds, stsDurationConfig.getMinDurationSeconds());
     } catch (OMException e) {
       durationValidationError = e.getMessage();
     }

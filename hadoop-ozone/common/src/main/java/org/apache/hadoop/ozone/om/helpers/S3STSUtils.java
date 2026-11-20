@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
 import com.google.common.base.Preconditions;
@@ -36,6 +35,12 @@ public final class S3STSUtils {
   public static final int DEFAULT_DURATION_SECONDS = 3600;    // 1 hour
   public static final int MAX_DURATION_SECONDS = 43200;       // 12 hours
   public static final int MIN_DURATION_SECONDS = 900;         // 15 minutes
+
+  /**
+   * Test-only: override the minimum AssumeRole {@code DurationSeconds} accepted by OM and S3 Gateway STS.
+   * Values may only lower the AWS-compatible minimum of 900 seconds.  Valid range is 1-900.
+   */
+  public static final String OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY = "ozone.s3g.sts.test.min.duration.seconds";
 
   public static final int ASSUME_ROLE_SESSION_NAME_MIN_LENGTH = 2;
   public static final int ASSUME_ROLE_SESSION_NAME_MAX_LENGTH = 64;

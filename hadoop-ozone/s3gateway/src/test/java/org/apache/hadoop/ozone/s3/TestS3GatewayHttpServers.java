@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -122,7 +123,7 @@ class TestS3GatewayHttpServers {
   @Test
   void disabledStsServerIgnoresInvalidMinDurationConfig() {
     final OzoneConfiguration conf = newConf();
-    conf.setInt(OzoneConfigKeys.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
 
     assertDoesNotThrow(
         () -> {
@@ -137,7 +138,7 @@ class TestS3GatewayHttpServers {
     final OzoneConfiguration conf = newConf();
     conf.setBoolean(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, true);
     conf.set(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ADDRESS_KEY, PortAllocator.localhostWithFreePort());
-    conf.setInt(OzoneConfigKeys.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
 
     assertThrows(
         IllegalArgumentException.class, () -> {
@@ -152,7 +153,7 @@ class TestS3GatewayHttpServers {
     final OzoneConfiguration conf = newConf();
     conf.setBoolean(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, true);
     conf.set(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ADDRESS_KEY, PortAllocator.localhostWithFreePort());
-    conf.setInt(OzoneConfigKeys.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 10);
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 10);
 
     assertDoesNotThrow(
         () -> {
