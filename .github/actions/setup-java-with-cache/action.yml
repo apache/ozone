@@ -53,6 +53,7 @@ runs:
       with:
         distribution: 'temurin'
         java-version: ${{ inputs.java-version }}
+        show-download-progress: true
 
     - name: Calculate cache key
       id: cache-key

@@ -30,7 +30,7 @@ source "${DIR}/_lib.sh"
 JACOCO_VERSION=$(get_version jacoco)
 
 #Install jacoco cli
-./mvnw --non-recursive --no-transfer-progress -Dscan=false \
+./mvnw --non-recursive -Dscan=false \
   org.apache.maven.plugins:maven-dependency-plugin:copy \
   -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
 
