@@ -1132,14 +1132,19 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     public ContainerCommandResponseProto get(long time, TimeUnit unit)
         throws InterruptedException, ExecutionException, TimeoutException {
       final long deadline = System.nanoTime() + unit.toNanos(time);
+      boolean timedOut = false;
       try {
         if (onAbandon != null && deadlineNanos - deadline <= 0) {
           runTasksUntil(deadlineNanos);
         } else {
           runTasksUntil(deadline, false);
+          timedOut = !isDone();
         }
       } finally {
         detach();
+      }
+      if (timedOut) {
+        throw new TimeoutException("timed out waiting for the reply");
       }
       return super.get(0, TimeUnit.NANOSECONDS);
     }

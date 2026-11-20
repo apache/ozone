@@ -388,6 +388,22 @@ class TestXceiverClientGrpcCallerRuns {
   }
 
   @Test
+  void timedGetBeforeTheDeadlineThrowsTimeoutAndCancelsTheStream() throws Exception {
+    final int permits = client.getAvailablePermits();
+    hang = true;
+    CompletableFuture<ContainerCommandResponseProto> future = client.sendCommandAsync(readContainer(), dn)
+        .getResponse();
+    assertThrows(TimeoutException.class, () -> future.get(10, TimeUnit.MILLISECONDS));
+    ExecutionException e = assertThrows(ExecutionException.class, future::get);
+    assertEquals(Status.Code.CANCELLED, Status.fromThrowable(e.getCause()).getCode());
+
+    hang = false;
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        client.sendCommand(readContainer(), Collections.emptyList()).getResult());
+    assertEquals(permits, client.getAvailablePermits());
+  }
+
+  @Test
   void abandonedRequestDoesNotCancelTheNextRequestOnTheStream() throws Exception {
     XceiverClientGrpc.PooledStream stream = new XceiverClientGrpc.PooledStream(null);
     @SuppressWarnings("unchecked")
