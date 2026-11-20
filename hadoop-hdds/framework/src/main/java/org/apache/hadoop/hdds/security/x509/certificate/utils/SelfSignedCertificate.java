@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getValidInetsForCurrentHost;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -95,11 +94,6 @@ public final class SelfSignedCertificate {
     this.config = builder.config;
     this.key = builder.key;
     this.altNames = builder.altNames;
-  }
-
-  @VisibleForTesting
-  public static String getNameFormat() {
-    return CertificateSignRequest.getDistinguishedNameFormatWithSN();
   }
 
   public static Builder newBuilder() {

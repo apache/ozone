@@ -74,11 +74,6 @@ import org.slf4j.LoggerFactory;
  * PKCS10CertificationRequest to CertificateServer.
  */
 public final class CertificateSignRequest {
-  // Ozone final certificate distinguished format:
-  // (CN=Subject,OU=ScmID,O=ClusterID,SERIALNUMBER=SerialID).
-  private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
-  private static final String DISTINGUISHED_NAME_WITH_SN_FORMAT =
-      "CN=%s,OU=%s,O=%s,SERIALNUMBER=%s";
   private static final Logger LOG =
       LoggerFactory.getLogger(CertificateSignRequest.class);
   private final KeyPair keyPair;
@@ -109,14 +104,6 @@ public final class CertificateSignRequest {
     this.extensions = extensions;
   }
 
-  public static String getDistinguishedNameFormat() {
-    return DISTINGUISHED_NAME_FORMAT;
-  }
-
-  public static String getDistinguishedNameFormatWithSN() {
-    return DISTINGUISHED_NAME_WITH_SN_FORMAT;
-  }
-
   // used by server side DN regeneration
   public static X500Name getDistinguishedNameWithSN(String subject,
       String scmID, String clusterID, String serialID) {
@@ -132,6 +119,7 @@ public final class CertificateSignRequest {
   }
 
   /**
+   * Ozone certificate subject: CN=Subject,OU=ScmID,O=ClusterID[,SERIALNUMBER=SerialID].
    * Builds the RDNs from typed values instead of parsing a DN string, so Bouncy Castle 1.85+ does not reject a
    * commonName longer than RFC 5280 ub-common-name (64), e.g. user@FQDN on Kubernetes.
    * The encoding matches what {@link BCStyle} produces for the same DN string, and a null value is encoded as

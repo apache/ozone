@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameFormat;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameFormatWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -72,6 +70,8 @@ import org.mockito.MockedStatic;
  * Certificate Signing Request.
  */
 public class TestCertificateSignRequest {
+  private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
+  private static final String DISTINGUISHED_NAME_WITH_SN_FORMAT = "CN=%s,OU=%s,O=%s,SERIALNUMBER=%s";
   /** Longer than the RFC 5280 ub-common-name (64), like user@FQDN of a Kubernetes pod. */
   static final String LONG_SUBJECT =
       "dn@aaaa-ozone-000-datanode-1.aaa-ozone-000-datanode-headless.aaaa-data.svc.cluster.local";
@@ -105,7 +105,7 @@ public class TestCertificateSignRequest {
     PKCS10CertificationRequest csr = builder.build().generateCSR();
 
     // Check the Subject Name is in the expected format.
-    String dnName = String.format(getDistinguishedNameFormat(),
+    String dnName = String.format(DISTINGUISHED_NAME_FORMAT,
         subject, scmID, clusterID);
     assertEquals(dnName, csr.getSubject().toString());
 
@@ -163,7 +163,7 @@ public class TestCertificateSignRequest {
     PKCS10CertificationRequest csr = builder.build().generateCSR();
 
     // Check the Subject Name is in the expected format.
-    String dnName = String.format(getDistinguishedNameFormat(),
+    String dnName = String.format(DISTINGUISHED_NAME_FORMAT,
         subject, scmID, clusterID);
     assertEquals(dnName, csr.getSubject().toString());
 
@@ -239,7 +239,7 @@ public class TestCertificateSignRequest {
     PKCS10CertificationRequest csr = builder.build().generateCSR();
 
     // Check the Subject Name is in the expected format.
-    String dnName = String.format(getDistinguishedNameFormat(),
+    String dnName = String.format(DISTINGUISHED_NAME_FORMAT,
         subject, scmID, clusterID);
     assertEquals(dnName, csr.getSubject().toString());
 
@@ -287,15 +287,15 @@ public class TestCertificateSignRequest {
     String subject = "dn@host1.example.com";
 
     assertArrayEquals(
-        new X500Name(String.format(getDistinguishedNameFormat(), subject, scmID, clusterID)).getEncoded(),
+        new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, subject, scmID, clusterID)).getEncoded(),
         getDistinguishedName(subject, scmID, clusterID).getEncoded());
     assertArrayEquals(
-        new X500Name(String.format(getDistinguishedNameFormatWithSN(), subject, scmID, clusterID, "12345"))
+        new X500Name(String.format(DISTINGUISHED_NAME_WITH_SN_FORMAT, subject, scmID, clusterID, "12345"))
             .getEncoded(),
         getDistinguishedNameWithSN(subject, scmID, clusterID, "12345").getEncoded());
     // A datanode sends null SCM and cluster IDs before registration.
     assertArrayEquals(
-        new X500Name(String.format(getDistinguishedNameFormat(), subject, null, null)).getEncoded(),
+        new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, subject, null, null)).getEncoded(),
         getDistinguishedName(subject, null, null).getEncoded());
   }
 
@@ -316,7 +316,7 @@ public class TestCertificateSignRequest {
         .generateCSR();
 
     assertEquals(LONG_SUBJECT, csr.getSubject().getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
-    assertEquals(String.format(getDistinguishedNameFormat(), LONG_SUBJECT, scmID, clusterID),
+    assertEquals(String.format(DISTINGUISHED_NAME_FORMAT, LONG_SUBJECT, scmID, clusterID),
         csr.getSubject().toString());
     ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder()
         .setProvider(securityConfig.getProvider()).build(csr.getSubjectPublicKeyInfo());
