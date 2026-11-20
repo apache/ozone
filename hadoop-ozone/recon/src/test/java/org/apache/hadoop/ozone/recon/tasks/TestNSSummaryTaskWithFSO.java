@@ -451,8 +451,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
           .build();
       List<OMDBUpdateEvent> events = putFirst ? Arrays.asList(putEvent, deleteEvent)
           : Arrays.asList(deleteEvent, putEvent);
-      Pair<Integer, Boolean> renameResult = nSSummaryTaskWithFso.processWithFSO(new OMUpdateEventBatch(events, 0L), 0);
-      Assertions.assertTrue(renameResult.getRight());
+      ProcessResult renameResult = nSSummaryTaskWithFso.processWithFSO(new OMUpdateEventBatch(events, 0L), 0);
+      Assertions.assertTrue(renameResult.success());
 
       String desc = "newParent=" + newParentId + ", newName=" + newName + ", putFirst=" + putFirst;
       NSSummary dirTwo = getReconNamespaceSummaryManager().getNSSummary(DIR_TWO_OBJECT_ID);
