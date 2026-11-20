@@ -53,12 +53,14 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.ByteBufferGetStatus;
+import org.rocksdb.PerfLevel;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -860,6 +862,55 @@ public class TestRDBTableStore {
 
       // check block count
       assertEquals(0, keyCount);
+    }
+  }
+
+  @Test
+  public void testPrefixUpperBound() {
+    assertNull(RDBTable.prefixUpperBound(null));
+    assertNull(RDBTable.prefixUpperBound(new byte[0]));
+    assertNull(RDBTable.prefixUpperBound(new byte[] {(byte) 0xFF, (byte) 0xFF}));
+    assertArrayEquals(StringUtils.string2Bytes("/1/10000"),
+        RDBTable.prefixUpperBound(StringUtils.string2Bytes("/1/1000/")));
+    assertArrayEquals(new byte[] {1, 3}, RDBTable.prefixUpperBound(new byte[] {1, 2, (byte) 0xFF}));
+  }
+
+  @Test
+  public void testPrefixIteratorDoesNotSkipTombstonesOfLaterPrefixes() throws Exception {
+    final RDBTable table = rdbStore.getTable("Ten");
+    final byte[] prefix = StringUtils.string2Bytes("/1/1000/");
+    final int laterTombstones = 1000;
+    // An emptied prefix followed by the tombstones of later emptied prefixes, then one live key.
+    for (int i = 0; i <= laterTombstones; i++) {
+      final byte[] key = StringUtils.string2Bytes("/1/" + (1000 + i) + "/key");
+      table.put(key, bytesOf[1]);
+      table.delete(key);
+    }
+    table.put(StringUtils.string2Bytes("/1/9999/key"), bytesOf[1]);
+
+    final RocksDB db = rdbStore.getDb().getManagedRocksDb().get();
+    db.setPerfLevel(PerfLevel.ENABLE_COUNT);
+    try {
+      db.getPerfContext().reset();
+      try (ManagedRocksIterator unbounded = rdbStore.getDb().newIterator(table.getColumnFamily())) {
+        unbounded.get().seek(prefix);
+      }
+      assertThat(db.getPerfContext().getInternalDeleteSkippedCount()).isGreaterThan(laterTombstones);
+
+      db.getPerfContext().reset();
+      try (Table.KeyValueIterator<byte[], byte[]> iter = table.iterator(prefix, IteratorType.KEY_ONLY)) {
+        assertFalse(iter.hasNext());
+      }
+      assertThat(db.getPerfContext().getInternalDeleteSkippedCount()).isLessThanOrEqualTo(1);
+
+      db.getPerfContext().reset();
+      try (Table.KeyValueIterator<CodecBuffer, CodecBuffer> iter = table.iterator(
+          CodecBufferCodec.get(true).fromPersistedFormat(prefix), IteratorType.KEY_ONLY)) {
+        assertFalse(iter.hasNext());
+      }
+      assertThat(db.getPerfContext().getInternalDeleteSkippedCount()).isLessThanOrEqualTo(1);
+    } finally {
+      db.setPerfLevel(PerfLevel.DISABLE);
     }
   }
 
