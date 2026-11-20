@@ -129,6 +129,8 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -1447,27 +1449,27 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata, Map<String, String> tags,
       boolean derivedKeyPiggyBacking) throws IOException {
-    String ownerName = getRealUserInfo().getShortUserName();
-    OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
-        bucketName, keyName, size, replicationConfig, metadata, tags);
-    builder.setOwnerName(ownerName);
-    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
-    return openOutputStream(builder.build(), size);
+    return createKey(volumeName, bucketName, keyName, new CreateKeyOptions.Builder()
+        .setSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setMetadata(metadata)
+        .setTags(tags)
+        .setDerivedKeyPiggyBacking(derivedKeyPiggyBacking)
+        .build());
   }
 
   @Override
-  @SuppressWarnings("checkstyle:parameternumber")
   public OzoneOutputStream createKey(
-      String volumeName, String bucketName, String keyName, long size,
-      ReplicationConfig replicationConfig,
-      Map<String, String> metadata, Map<String, String> tags,
-      StoragePolicy storagePolicy) throws IOException {
+      String volumeName, String bucketName, String keyName, CreateKeyOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
-        bucketName, keyName, size, replicationConfig, metadata, tags);
+        bucketName, keyName, options.getSize(), options.getReplicationConfig(), options.getMetadata(),
+        options.getTags());
     builder.setOwnerName(ownerName);
-    builder.setStoragePolicy(storagePolicy);
-    return openOutputStream(builder.build(), size);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(options.isDerivedKeyPiggyBacking()));
+    builder.setStoragePolicy(options.getStoragePolicy());
+    return openOutputStream(builder.build(), options.getSize());
   }
 
   @Override
@@ -2641,6 +2643,19 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException {
+    return createFile(volumeName, bucketName, keyName, new CreateFileOptions.Builder()
+        .setSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setOverWrite(overWrite)
+        .setRecursive(recursive)
+        .build());
+  }
+
+  @Override
+  public OzoneOutputStream createFile(String volumeName, String bucketName,
+      String keyName, CreateFileOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    final ReplicationConfig replicationConfig = options.getReplicationConfig();
     if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
       if (replicationConfig.getReplicationType()
           == HddsProtos.ReplicationType.EC) {
@@ -2654,13 +2669,13 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setDataSize(size)
+        .setDataSize(options.getSize())
         .setReplicationConfig(replicationConfig)
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName)
         .build();
     OpenKeySession keySession =
-        ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
+        ozoneManagerClient.createFile(keyArgs, options.isOverWrite(), options.isRecursive());
     return createOutputStream(keySession);
   }
 
