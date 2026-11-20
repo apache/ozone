@@ -19,8 +19,6 @@ set -e -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../.." || exit 1
 
-BASE_DIR="$(pwd -P)"
-
 # install, but skip shaded modules
 ./mvnw --batch-mode --show-version clean install \
   -DskipShade -Pgo-offline ${BUILD_ARGS:-} "$@"
