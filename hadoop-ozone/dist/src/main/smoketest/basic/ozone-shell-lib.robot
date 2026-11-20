@@ -35,8 +35,7 @@ Generate prefix
 Test ozone shell
     [arguments]     ${protocol}         ${server}       ${volume}
 
-    ${result} =     Execute Later ozone sh    volume create ${protocol}${server}/${volume} --space-quota 100TB --namespace-quota 100
-    Assert Later    File Should Be Empty     ${result}
+    Execute Later and Expect No Output For ozone sh    volume create ${protocol}${server}/${volume} --space-quota 100TB --namespace-quota 100
 
     ${result} =     Execute Later ozone sh    volume list ${protocol}${server}/
     ${filter} =     Set Variable    jq -r '.[] | select(.name=="${volume}")'
@@ -52,8 +51,7 @@ Test ozone shell
     ${filter} =     Set Variable    jq -r '. | select(.name=="${volume}") | .quotaInBytes'
     Assert Later    File ${result} Filtered By ${filter} Should    Be Equal       10995116277760
 
-    ${result} =     Execute Later ozone sh    bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
-    Assert Later    File Should Be Empty     ${result}
+    Execute Later and Expect No Output For ozone sh    bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
 
     ${result} =     Execute Later ozone sh    bucket info ${protocol}${server}/${volume}/bb1
     ${filter} =     Set Variable    jq -r '. | select(.name=="bb1") | .storageType'
@@ -98,14 +96,16 @@ Test ozone shell
 
     Execute Later ozone sh    bucket delete -r --yes ${protocol}${server}/${volume}/bb1
     Execute Later ozone sh    volume delete ${protocol}${server}/${volume}
-    Execute Later ozone sh    volume create ${protocol}${server}/${volume}
+    Assert Later Volume Does Not Exist    ${protocol}${server}/${volume}
+
+    Execute Later and Expect No Output For ozone sh    volume create ${protocol}${server}/${volume}
     ${result} =     Execute Later ozone sh    volume info ${protocol}${server}/${volume}
     ${filter} =     Set Variable    jq -r '. | select(.name=="${volume}") | .quotaInBytes'
     Assert Later    File ${result} Filtered By ${filter} Should    Be Equal       -1
     ${filter} =     Set Variable    jq -r '. | select(.name=="${volume}") | .quotaInNamespace'
     Assert Later    File ${result} Filtered By ${filter} Should    Be Equal       -1
 
-    Execute Later ozone sh    bucket create ${protocol}${server}/${volume}/bb1
+    Execute Later and Expect No Output For ozone sh    bucket create ${protocol}${server}/${volume}/bb1
     ${result} =     Execute Later ozone sh    bucket info ${protocol}${server}/${volume}/bb1
     ${filter} =     Set Variable    jq -r '. | select(.name=="bb1") | .quotaInBytes'
     Assert Later    File ${result} Filtered By ${filter} Should    Be Equal       -1
@@ -114,6 +114,7 @@ Test ozone shell
 
     Execute Later ozone sh    bucket delete ${protocol}${server}/${volume}/bb1
     Execute Later ozone sh    volume delete ${protocol}${server}/${volume}
+    Assert Later Volume Does Not Exist    ${protocol}${server}/${volume}
 
 Test ozone shell errors
     [arguments]     ${protocol}         ${server}       ${volume}
@@ -337,6 +338,7 @@ Test native authorizer
     ${vol1} =    Set Variable    ${protocol}${server}/${volume}1
     Execute Later ozone sh    volume create ${vol1}
     Execute Later ozone sh    volume removeacl ${vol1} -a group:root:a
+    Execute Later ozone sh    bucket create ${vol1}/bb1
 
     # no list
     ${vol2} =    Set Variable    ${protocol}${server}/${volume}2

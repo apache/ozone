@@ -31,3 +31,8 @@ Get Key Later
     ${get_to} =    Get Next Filename    ${BATCH_OUTPUT_DIR}/key-get
     Execute Later ozone sh    key get -f ${get_from} ${get_to}
     [return]    ${get_to}
+
+Assert Later Volume Does Not Exist
+    [arguments]    ${volume}
+    ${result} =     Execute Later ozone sh    volume info ${volume}
+    Assert Later    File ${result} Should    Contain    VOLUME_NOT_FOUND
