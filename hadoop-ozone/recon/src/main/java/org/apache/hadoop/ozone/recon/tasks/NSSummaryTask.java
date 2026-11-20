@@ -37,13 +37,13 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskDbEventHandler.ProcessResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -188,11 +188,11 @@ public class NSSummaryTask implements ReconOmTask {
     int legacySeek = subTaskSeekPosMap.getOrDefault(BucketType.LEGACY.name(), 0);
     int obsSeek = subTaskSeekPosMap.getOrDefault(BucketType.OBS.name(), 0);
 
-    Future<Pair<Integer, Boolean>> fsoFuture = SUB_TASK_EXECUTOR.submit(
+    Future<ProcessResult> fsoFuture = SUB_TASK_EXECUTOR.submit(
         () -> nsSummaryTaskWithFSO.processWithFSO(events, fsoSeek));
-    Future<Pair<Integer, Boolean>> legacyFuture = SUB_TASK_EXECUTOR.submit(
+    Future<ProcessResult> legacyFuture = SUB_TASK_EXECUTOR.submit(
         () -> nsSummaryTaskWithLegacy.processWithLegacy(events, legacySeek));
-    Future<Pair<Integer, Boolean>> obsFuture = SUB_TASK_EXECUTOR.submit(
+    Future<ProcessResult> obsFuture = SUB_TASK_EXECUTOR.submit(
         () -> nsSummaryTaskWithOBS.processWithOBS(events, obsSeek));
 
     boolean anyFailure = false;
@@ -211,13 +211,13 @@ public class NSSummaryTask implements ReconOmTask {
   }
 
   private boolean awaitSubTask(String name, BucketType type,
-                               Future<Pair<Integer, Boolean>> future,
+                               Future<ProcessResult> future,
                                int fallbackSeek,
                                Map<String, Integer> updatedSeekPositions) {
     try {
-      Pair<Integer, Boolean> result = future.get();
-      updatedSeekPositions.put(type.name(), result.getLeft());
-      if (!result.getRight()) {
+      ProcessResult result = future.get();
+      updatedSeekPositions.put(type.name(), result.seekPosition());
+      if (!result.success()) {
         LOG.error("{} failed.", name);
         return false;
       }

@@ -684,6 +684,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     cache.cleanup(epochs);
   }
 
+  @Override
+  public void closeCache() {
+    cache.close();
+  }
+
   @VisibleForTesting
   TableCache<KEY, VALUE> getCache() {
     return cache;

@@ -113,13 +113,7 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
         (int) OmUtils.getOMClientRpcTimeOut(conf), connectionRetryPolicy)
         .getProxy();
 
-    RetryPolicy retryPolicy = RetryPolicies.retryUpToMaximumCountWithFixedSleep(
-        10, 1000, TimeUnit.MILLISECONDS);
-
-    OMAdminProtocolPB rpcProxy = (OMAdminProtocolPB) RetryProxy.create(
-        OMAdminProtocolPB.class, proxy, retryPolicy);
-
-    return new OMAdminProtocolClientSideImpl(rpcProxy,
+    return new OMAdminProtocolClientSideImpl(proxy,
         omNodeDetails.getOMPrintInfo());
   }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -15,8 +15,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-@test "coverage_summary.py unit tests" {
-  cd "${BATS_TEST_DIRNAME}"
-  run python3 -m unittest test_coverage_summary
-  [ "$status" -eq 0 ]
-}
+set -u -o pipefail
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+DIAGNOSTIC_FILE="$REPORT_DIR/diagnostics.txt"
+REPORT_FILE="$REPORT_DIR/summary.txt"
+
+MAVEN_DIAGNOSTIC_PATTERN='^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
+JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'
+MAVEN_ERROR_PATTERN='^\[ERROR\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
+JAVAC_ERROR_PATTERN='^.*:[0-9]+: error: \[[^]]+\]'
+ERROR_DIAGNOSTIC_PATTERN="${MAVEN_ERROR_PATTERN}|${JAVAC_ERROR_PATTERN}"
+
+grep -E "${MAVEN_DIAGNOSTIC_PATTERN}|${JAVAC_DIAGNOSTIC_PATTERN}" "${REPORT_DIR}/output.log" \
+  | awk '!seen[$0]++' > "$DIAGNOSTIC_FILE"
+
+grep -E "$ERROR_DIAGNOSTIC_PATTERN" "$DIAGNOSTIC_FILE" > "$REPORT_FILE" || true
+
+source "${DIR}/_post_process.sh"

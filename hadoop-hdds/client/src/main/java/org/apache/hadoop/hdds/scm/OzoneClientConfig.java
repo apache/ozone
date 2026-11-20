@@ -382,6 +382,24 @@ public class OzoneClientConfig {
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
 
+  @Config(key = "ozone.client.stream.read.max-concurrent-streams",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Maximum number of concurrently open streaming read block streams per pipeline client. "
+          + "Each open block input stream holds one slot until it is closed; opening a stream beyond the limit "
+          + "waits up to ozone.client.stream.read.timeout for a slot; a wait that times out is retried under the "
+          + "read retry policy (ozone.client.read.max.retries) before the read fails. A positioned read and every "
+          + "block a key input stream has seeked into each hold a slot, so the limit must exceed the number of "
+          + "block streams one reader keeps open at once. Each open stream can buffer up to "
+          + "ozone.client.stream.read.pre-read-size bytes, so this limit also bounds client memory per pipeline. "
+          + "Any non-positive value (the default) makes the limit follow "
+          + "hdds.ratis.raft.client.async.outstanding-requests.max, preserving the capacity streaming reads "
+          + "had when they were counted against the request limit. Streaming reads no longer consume permits "
+          + "from hdds.ratis.raft.client.async.outstanding-requests.max; that limit now applies to unary "
+          + "requests only.")
+  private int streamReadMaxConcurrentStreams = -1;
+
   @Config(key = "ozone.client.netty.warmup.enabled",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
@@ -771,6 +789,14 @@ public class OzoneClientConfig {
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {
     this.streamReadTimeout = streamReadTimeout;
+  }
+
+  public int getStreamReadMaxConcurrentStreams() {
+    return streamReadMaxConcurrentStreams;
+  }
+
+  public void setStreamReadMaxConcurrentStreams(int streamReadMaxConcurrentStreams) {
+    this.streamReadMaxConcurrentStreams = streamReadMaxConcurrentStreams;
   }
 
   public boolean isDatastreamPutBlockWithoutRaftEnabled() {
