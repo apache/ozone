@@ -111,7 +111,7 @@ final class S3ConditionalRequest {
     String ifNoneMatch = headers.getHeaderString(context.ifNoneMatchHeader);
     if (ifNoneMatch != null) {
       if (eTagMatches(ifNoneMatch, currentETag)) {
-        if (context != PreconditionContext.READ) {
+        if (context == PreconditionContext.COPY_SOURCE) {
           throw newError(PRECOND_FAILED, keyPath);
         }
         return buildNotModifiedResponse(key);
@@ -121,7 +121,7 @@ final class S3ConditionalRequest {
 
     String ifModifiedSince = headers.getHeaderString(context.ifModifiedSinceHeader);
     if (ifModifiedSince != null && !matchesIfModifiedSince(key, ifModifiedSince)) {
-      if (context != PreconditionContext.READ) {
+      if (context == PreconditionContext.COPY_SOURCE) {
         throw newError(PRECOND_FAILED, keyPath);
       }
       return buildNotModifiedResponse(key);
