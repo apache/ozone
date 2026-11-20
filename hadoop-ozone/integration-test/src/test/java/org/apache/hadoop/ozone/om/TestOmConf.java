@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -39,11 +40,15 @@ public class TestOmConf {
         OzoneManagerRatisServerConfig.class);
     assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
+    assertFalse(ratisConf.isAppendEntriesComposeEnabled(), "isAppendEntriesComposeEnabled");
     assertWaitTimeMin(TimeDuration.ZERO, conf);
+    assertAppendEntriesComposeEnabled(false, conf);
 
     ratisConf.setLogAppenderWaitTimeMin(1);
+    ratisConf.setAppendEntriesComposeEnabled(true);
     conf.setFromObject(ratisConf);
     assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
+    assertAppendEntriesComposeEnabled(true, conf);
 
   }
 
@@ -54,5 +59,11 @@ public class TestOmConf {
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     assertEquals(expected, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
+  }
+
+  static void assertAppendEntriesComposeEnabled(boolean expected, OzoneConfiguration conf) {
+    final RaftProperties p = OzoneManagerRatisServer.newRaftProperties(conf, 1000, "dummy/dir");
+    assertEquals(expected, RaftServerConfigKeys.Log.appendEntriesComposeEnabled(p),
+        RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
   }
 }

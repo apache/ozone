@@ -201,8 +201,7 @@ public final class RatisHelper {
   }
 
   public static RaftGroup newRaftGroup(Pipeline pipeline) {
-    return RaftGroup.valueOf(RaftGroupId.valueOf(pipeline.getId().getId()),
-        toRaftPeers(pipeline));
+    return RaftGroup.valueOf(pipeline.getId().getGroupId(), toRaftPeers(pipeline));
   }
 
   /**
@@ -219,11 +218,20 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource ozoneConfiguration) throws IOException {
+    return newRaftClient(rpcType, pipeline, retryPolicy, tlsConfig, ozoneConfiguration, false);
+  }
+
+  /**
+   * Same as {@link #newRaftClient(RpcType, Pipeline, RetryPolicy, GrpcTlsConfig, ConfigurationSource)}.
+   * @param skipSendForward whether the data streams of the client are closed without a Raft log entry
+   */
+  public static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline, RetryPolicy retryPolicy,
+      GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration, boolean skipSendForward) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
         toRaftPeer(pipeline.getClosestNode()),
-        newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
-            pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
+        newRaftGroup(pipeline.getId().getGroupId(),
+            pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration, skipSendForward);
   }
 
   private static RpcType getRpcType(ConfigurationSource conf) {
@@ -264,6 +272,13 @@ public final class RatisHelper {
   private static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader,
       RaftPeer primary, RaftGroup group, RetryPolicy retryPolicy,
       GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration) {
+    return newRaftClient(rpcType, leader, primary, group, retryPolicy, tlsConfig, ozoneConfiguration, false);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader, RaftPeer primary, RaftGroup group,
+      RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration,
+      boolean skipSendForward) {
     if (LOG.isTraceEnabled()) {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
@@ -273,6 +288,9 @@ public final class RatisHelper {
 
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
+    if (skipSendForward) {
+      RaftConfigKeys.DataStream.setSkipSendForward(properties, true);
+    }
 
     return RaftClient.newBuilder()
         .setRaftGroup(group)
@@ -435,12 +453,6 @@ public final class RatisHelper {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  public static Long getMinReplicatedIndex(
-      Collection<RaftProtos.CommitInfoProto> commitInfos) {
-    return commitInfos.stream().map(RaftProtos.CommitInfoProto::getCommitIndex)
-        .min(Long::compareTo).orElse(null);
   }
 
   private static boolean datanodeUseHostName() {

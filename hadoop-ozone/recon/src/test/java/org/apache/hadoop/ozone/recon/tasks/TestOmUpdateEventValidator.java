@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -65,6 +66,13 @@ public class TestOmUpdateEventValidator {
     // Create a mock logger
     logger = mock(Logger.class);
     OmUpdateEventValidator.setLogger(logger);
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   @Test

@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.function.DoubleConsumer;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -46,16 +47,19 @@ import org.apache.hadoop.hdds.utils.db.Table;
  * signature.
  *
  * <p>When an update-id gate is supplied (HA OM), to-side gating normally admits
- * rows with {@code updateID > fromSnapshotDbTxSequenceNumber}. HA OM write paths
+ * rows with {@code updateID} above the from snapshot's creation transaction index. HA OM write paths
  * are expected to bump {@code updateID} on every meaningful metadata change.
  * Rows with a missing {@code updateID}, {@code updateID == 0}, or
  * {@code updateID == DEFAULT_OM_UPDATE_ID} ({@code -1}) are always treated as
  * candidates as a conservative fallback for legacy or ambiguous rows.
  *
- * <p>When no gate is supplied (non-HA), every to-side row is a candidate and a
+ * <p>When no gate is supplied (non-HA or reverse diff or missing creation transaction index),
+ * every to-side row is a candidate and a
  * compare signature is computed for each.
  */
 public class FullDiffSequentialReader {
+
+  private static final double TO_TABLE_PROGRESS_END = 0.5;
 
   private final SnapDiffJobStore store;
   private final long updateIdGate;
@@ -70,8 +74,8 @@ public class FullDiffSequentialReader {
 
   /**
    * @param store        per-job temp column families for this full diff job
-   * @param updateIdGate when non-null, enables HA gating using this from-snapshot
-   *                     transaction index; when null, gating is disabled (non-HA)
+   * @param updateIdGate when non-null, enables HA gating using the from snapshot's creation
+   *                     transaction index; when null, gating is disabled
    */
   public FullDiffSequentialReader(SnapDiffJobStore store, Long updateIdGate) {
     this.store = store;
@@ -87,9 +91,10 @@ public class FullDiffSequentialReader {
    * @param keyPrefix optional bucket prefix as stored in RocksDB; {@code null} scans the full table
    */
   public void scanFileTables(Table<byte[], byte[]> fromTable,
-      Table<byte[], byte[]> toTable, byte[] keyPrefix) throws IOException {
-    scanToTable(toTable, keyPrefix, false);
-    scanFromTable(fromTable, keyPrefix, false);
+      Table<byte[], byte[]> toTable, byte[] keyPrefix, DoubleConsumer progress,
+      long estimatedToTableKeys, long estimatedFromTableKeys) throws IOException {
+    scanToTable(toTable, keyPrefix, false, progress, estimatedToTableKeys);
+    scanFromTable(fromTable, keyPrefix, false, progress, estimatedFromTableKeys);
   }
 
   /**
@@ -100,39 +105,58 @@ public class FullDiffSequentialReader {
    * @param keyPrefix optional bucket prefix as stored in RocksDB; {@code null} scans the full table
    */
   public void scanDirectoryTables(Table<byte[], byte[]> fromTable,
-      Table<byte[], byte[]> toTable, byte[] keyPrefix) throws IOException {
-    scanToTable(toTable, keyPrefix, true);
-    scanFromTable(fromTable, keyPrefix, true);
+      Table<byte[], byte[]> toTable, byte[] keyPrefix, DoubleConsumer progress,
+      long estimatedToTableKeys, long estimatedFromTableKeys) throws IOException {
+    scanToTable(toTable, keyPrefix, true, progress, estimatedToTableKeys);
+    scanFromTable(fromTable, keyPrefix, true, progress, estimatedFromTableKeys);
   }
 
-  private void scanToTable(Table<byte[], byte[]> table, byte[] keyPrefix, boolean isDir)
-      throws IOException {
+  private void scanToTable(Table<byte[], byte[]> table, byte[] keyPrefix, boolean isDir,
+      DoubleConsumer progress, long estimatedTableKeys) throws IOException {
+    long processedRows = 0L;
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     try (Table.KeyValueIterator<byte[], byte[]> iter =
         table.iterator(keyPrefix, IteratorType.VALUE_ONLY)) {
       while (iter.hasNext()) {
         byte[] value = iter.next().getValue();
         processToSideEntry(value, isDir);
+        processedRows++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(progress, 0.0, TO_TABLE_PROGRESS_END,
+            processedRows, estimatedTableKeys, checkpoint);
       }
     } catch (RocksDatabaseException | CodecException e) {
       throw new IOException(e);
     }
     store.flushWrites();
+    if (progress != null) {
+      progress.accept(TO_TABLE_PROGRESS_END);
+    }
   }
 
-  private void scanFromTable(Table<byte[], byte[]> table, byte[] keyPrefix, boolean isDir)
-      throws IOException {
+  private void scanFromTable(Table<byte[], byte[]> table, byte[] keyPrefix, boolean isDir,
+      DoubleConsumer progress, long estimatedTableKeys) throws IOException {
     store.flushWrites();
+    long processedRows = 0L;
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     try (Table.KeyValueIterator<byte[], byte[]> iter =
         table.iterator(keyPrefix, IteratorType.VALUE_ONLY)) {
       while (iter.hasNext()) {
         byte[] value = iter.next().getValue();
         processFromSideEntry(value, isDir);
+        processedRows++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(progress, TO_TABLE_PROGRESS_END, 1.0,
+            processedRows, estimatedTableKeys, checkpoint);
       }
     } catch (RocksDatabaseException | CodecException e) {
       throw new IOException(e);
     }
     store.clearDiffCandidates();
     store.flushWrites();
+    if (progress != null) {
+      progress.accept(1.0);
+    }
   }
 
   private void processToSideEntry(byte[] value, boolean isDir) throws IOException {

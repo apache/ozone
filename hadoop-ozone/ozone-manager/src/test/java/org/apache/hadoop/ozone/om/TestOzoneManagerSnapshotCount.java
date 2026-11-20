@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,7 +83,7 @@ public class TestOzoneManagerSnapshotCount {
   void init() {
     omSpy = spy(omTestManagers.getOzoneManager());
     omMetadataReader = mock(OmMetadataReader.class);
-    org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState(omSpy, "omMetadataReader", omMetadataReader);
+    HddsWhiteboxTestUtils.setInternalState(omSpy, "omMetadataReader", omMetadataReader);
     AuditMessage auditMessage = mock(AuditMessage.class);
     when(auditMessage.getOp()).thenReturn("SNAPSHOT_COUNT");
     doReturn(auditMessage).when(omSpy).buildAuditMessageForSuccess(any(), anyMap());

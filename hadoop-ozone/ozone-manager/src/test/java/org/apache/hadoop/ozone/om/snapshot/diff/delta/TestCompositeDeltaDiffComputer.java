@@ -613,7 +613,7 @@ public class TestCompositeDeltaDiffComputer {
     UncheckedAutoCloseableSupplier<OmSnapshot> fromSnapSupplier = 
         (UncheckedAutoCloseableSupplier<OmSnapshot>) org.mockito.Mockito.mock(UncheckedAutoCloseableSupplier.class);
     when(fromSnapSupplier.get()).thenReturn(fromSnap);
-    when(omSnapshotManager.getActiveSnapshot(eq("vol1"), eq("bucket1"), eq("snap1")))
+    when(omSnapshotManager.getActiveSnapshot(eq("vol1"), eq("bucket1"), eq("snap1"), eq(fromSnapshot.getSnapshotId())))
         .thenReturn(fromSnapSupplier);
 
     // Mock RDBDifferComputer to return a result

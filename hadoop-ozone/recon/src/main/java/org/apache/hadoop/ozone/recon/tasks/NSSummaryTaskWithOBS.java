@@ -27,8 +27,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -191,8 +189,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  public Pair<Integer, Boolean> processWithOBS(OMUpdateEventBatch events,
-                                               int seekPos) {
+  public ProcessResult processWithOBS(OMUpdateEventBatch events, int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
@@ -275,8 +272,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
             // an UPDATE event — that would be a delete+put).
             handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, parentObjectID);
           } else {
-            LOG.warn("Update event does not have the old keyInfo for {}.",
-                updatedKey);
+            LOG.warn("Update event does not have the old keyInfo for {}.", updatedKey);
           }
           handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, parentObjectID);
           break;
@@ -285,25 +281,24 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         }
         if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
           if (!flushAndCommitNSToDB(nsSummaryMap)) {
-            return new ImmutablePair<>(seekPos, false);
+            return new ProcessResult(seekPos, false);
           }
-          seekPos = eventCounter + 1;
+          seekPos = itrPos + eventCounter;
         }
-      } catch (IOException ioEx) {
-        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
+      } catch (IOException | RuntimeException ex) {
+        LOG.error("Unable to process Namespace Summary data in Recon DB. ", ex);
         nsSummaryMap.clear();
-        return new ImmutablePair<>(seekPos, false);
+        return new ProcessResult(seekPos, false);
       }
     }
 
     // Flush and commit left-out entries at the end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      return new ImmutablePair<>(seekPos, false);
+      return new ProcessResult(seekPos, false);
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithOBS");
-    return new ImmutablePair<>(seekPos, true);
+    return new ProcessResult(itrPos + eventCounter, true);
   }
 
 }
