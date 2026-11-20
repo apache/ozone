@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -300,13 +301,12 @@ public final class OzoneTestHelper {
 
     // wait for the pipeline to get destroyed in the datanodes
     for (Pipeline pipeline : pipelineList) {
-      HddsProtos.PipelineID pipelineId = pipeline.getId().getProtobuf();
       for (DatanodeDetails dn : pipeline.getNodes()) {
         XceiverServerSpi server =
             cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
                 .getDatanodeStateMachine().getContainer().getWriteChannel();
         assertInstanceOf(XceiverServerRatis.class, server);
-        GenericTestUtils.waitFor(() -> !server.isExist(pipelineId),
+        GenericTestUtils.waitFor(() -> !server.isExist(pipeline.getId()),
             100, 30_000);
       }
     }
@@ -324,8 +324,8 @@ public final class OzoneTestHelper {
                       .getWriteChannel();
       assertInstanceOf(XceiverServerRatis.class, server);
       try {
-        server.addGroup(pipeline.getId().getProtobuf(), Collections.
-                unmodifiableList(pipeline.getNodes()));
+        final List<DatanodeDetails> peers = Collections.unmodifiableList(pipeline.getNodes());
+        server.addGroup(pipeline.getId(), RATIS, peers, Collections.nCopies(peers.size(), 0));
       } catch (Exception e) {
         //ignore exception
       }

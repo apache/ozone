@@ -435,7 +435,7 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
               new WaitSubCARotationPrepareAckTask(newRootCertificate),
               1, 1, TimeUnit.SECONDS);
           waitAckTimeoutTask = executorService.schedule(() -> {
-            // No enough acks are received
+            // Not enough acks are received
             waitAckTask.cancel(true);
             String msg = "Failed to receive all acks of rotation prepare" +
                 " after " + ackTimeout + ", received " +

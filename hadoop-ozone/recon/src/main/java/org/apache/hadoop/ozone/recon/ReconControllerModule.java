@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.recon.api.ExportJobManager;
+import org.apache.hadoop.ozone.recon.api.SnapshotTrappedBytesJobManager;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotModule;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
@@ -117,6 +118,7 @@ public class ReconControllerModule extends AbstractModule {
 
     bind(ContainerHealthSchemaManager.class).in(Singleton.class);
     bind(ExportJobManager.class).in(Singleton.class);
+    bind(SnapshotTrappedBytesJobManager.class).in(Singleton.class);
     bind(ReconContainerMetadataManager.class)
         .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
     bind(ReconFileMetadataManager.class)
@@ -229,11 +231,18 @@ public class ReconControllerModule extends AbstractModule {
   }
 
   @Provides
+  @Singleton
   DataSourceConfiguration getDataSourceConfiguration(
       final OzoneConfiguration ozoneConfiguration) {
 
     ReconSqlDbConfig sqlDbConfig =
         ozoneConfiguration.getObject(ReconSqlDbConfig.class);
+
+    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:derby:")) {
+      LOG.warn("Derby is no longer supported for the Recon SQL DB. Ignoring the configured {} and using the SQLite "
+          + "defaults.", sqlDbConfig.getJdbcUrl());
+      sqlDbConfig.setJdbcUrl(ReconSqlDbConfig.DEFAULT_JDBC_URL);
+    }
 
     // ${ozone.recon.db.dir} is left unresolved when the key is not set, so resolve it with the same fallback
     // (ozone.metadata.dirs) as the other Recon DBs.

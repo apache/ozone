@@ -30,10 +30,10 @@ MAVEN_OPTIONS='-B -fae -DskipRecon -Dcheckstyle.failOnViolation=false --no-trans
 MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 declare -i rc
-mvn ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"
+./mvnw ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"
 rc=$?
 if [[ ${rc} -ne 0 ]]; then
-  mvn ${MAVEN_OPTIONS} clean test-compile checkstyle:check > output.log
+  ./mvnw ${MAVEN_OPTIONS} clean test-compile checkstyle:check > output.log
   rc=$?
   mkdir -p "$REPORT_DIR" # removed by mvn clean
   mv output.log "${REPORT_DIR}"/

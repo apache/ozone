@@ -28,7 +28,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -44,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.VolumeBucket;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,11 +61,9 @@ public final class OzoneClientUtils {
 
   public static BucketLayout resolveLinkBucketLayout(OzoneBucket bucket,
                                                      ObjectStore objectStore,
-                                                     Set<Pair<String,
-                                                         String>> visited)
-      throws IOException {
+                                                     Set<VolumeBucket> visited) throws IOException {
     if (bucket.isLink()) {
-      if (!visited.add(Pair.of(bucket.getVolumeName(),
+      if (!visited.add(new VolumeBucket(bucket.getVolumeName(),
           bucket.getName()))) {
         throw new OMException("Detected loop in bucket links. Bucket name: " +
             bucket.getName() + ", Volume name: " + bucket.getVolumeName(),

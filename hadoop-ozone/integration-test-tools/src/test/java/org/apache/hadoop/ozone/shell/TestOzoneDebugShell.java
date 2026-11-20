@@ -27,8 +27,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
@@ -59,6 +57,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
@@ -145,33 +145,32 @@ public abstract class TestOzoneDebugShell implements ClusterForTests.TestCase {
   @ParameterizedTest
   @EnumSource
   public void testLdbCliForOzoneSnapshot(BucketLayout layout) throws Exception {
-    String columnFamily = omMetadataManager.getKeyTable(layout).getName();
-    StringWriter stdout = new StringWriter();
-    PrintWriter pstdout = new PrintWriter(stdout);
-    CommandLine cmd = new CommandLine(new RDBParser())
-        .setOut(pstdout);
-    final String volumeName = UUID.randomUUID().toString();
-    final String bucketName = UUID.randomUUID().toString();
-    final String keyName = UUID.randomUUID().toString();
+    try (PrintStreamCapturer stdout = new SystemOutCapturer()) {
+      String columnFamily = omMetadataManager.getKeyTable(layout).getName();
+      CommandLine cmd = new CommandLine(new RDBParser());
+      final String volumeName = UUID.randomUUID().toString();
+      final String bucketName = UUID.randomUUID().toString();
+      final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName, false, layout);
+      writeKey(volumeName, bucketName, keyName, false, layout);
 
-    String snapshotName =
-        client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
-    OzoneSnapshot snapshot =
-        client.getObjectStore().listSnapshot(volumeName, bucketName, null, null)
-            .next();
-    assertEquals(snapshotName, snapshot.getName());
-    String dbPath = getSnapshotDBPath(snapshot.getCheckpointDir());
-    String snapshotCurrent = dbPath + OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils
-        .waitFor(() -> new File(snapshotCurrent).exists(), 1000, 120000);
-    String[] args =
-        new String[] {"--db=" + dbPath, "scan", "--cf", columnFamily};
-    int exitCode = cmd.execute(args);
-    assertEquals(0, exitCode);
-    String cmdOut = stdout.toString();
-    assertThat(cmdOut).contains(keyName);
+      String snapshotName =
+          client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
+      OzoneSnapshot snapshot =
+          client.getObjectStore().listSnapshot(volumeName, bucketName, null, null)
+              .next();
+      assertEquals(snapshotName, snapshot.getName());
+      String dbPath = getSnapshotDBPath(snapshot.getCheckpointDir());
+      String snapshotCurrent = dbPath + OM_KEY_PREFIX + "CURRENT";
+      GenericTestUtils
+          .waitFor(() -> new File(snapshotCurrent).exists(), 1000, 120000);
+      String[] args =
+          new String[]{"--db=" + dbPath, "scan", "--cf", columnFamily};
+      int exitCode = cmd.execute(args);
+      assertEquals(0, exitCode);
+      String cmdOut = stdout.toString();
+      assertThat(cmdOut).contains(keyName);
+    }
   }
 
   private String getSnapshotDBPath(String checkPointDir) {
@@ -224,8 +223,7 @@ public abstract class TestOzoneDebugShell implements ClusterForTests.TestCase {
     try {
       GenericTestUtils.waitFor(() -> {
         Set<String> blockFilePaths = new HashSet<>();
-        try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils
-            .SystemOutCapturer()) {
+        try (SystemOutCapturer capture = new SystemOutCapturer()) {
           exitCode.set(runChunkInfoCommand(volumeName, bucketName, keyName));
           String output = capture.getOutput();
           // Parse the JSON array string into a JsonNode

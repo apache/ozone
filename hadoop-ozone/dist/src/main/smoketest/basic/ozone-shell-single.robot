@@ -18,8 +18,21 @@ Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ozone-shell-lib.robot
+Resource            ../ozone-lib/batch.robot
 Test Timeout        10 minutes
-Suite Setup         Generate prefix
+Suite Setup         Setup Suite
+Suite Teardown      Teardown Suite
+
+*** Keywords ***
+Setup Suite
+    Get Security Enabled From Config
+    Generate prefix
+    Setup Batch
+    Kinit test user
+
+Teardown Suite
+    Teardown Batch
+
 
 *** Test Cases ***
 
