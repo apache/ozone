@@ -1391,6 +1391,50 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     assertThat(remaining.isTruncated()).isFalse();
   }
 
+  /**
+   * S3 has no directories, so DeleteObjects with a {@code dir/} key that names no object deletes nothing.
+   * On an FSO bucket such a key resolves to a directory, and deleting it must not delete the objects under it.
+   */
+  @Test
+  public void testDeleteObjectsKeepsNonEmptyFsoDirectory() throws Exception {
+    final String bucketName = getBucketName();
+    final List<String> keyNames = Arrays.asList("c/d2/file1.txt", "c/other.txt");
+    createFsoBucket(bucketName);
+    keyNames.forEach(k -> s3Client.putObject(b -> b.bucket(bucketName).key(k), RequestBody.fromString("bar")));
+
+    final DeleteObjectsResponse deleted = s3Client.deleteObjects(b -> b.bucket(bucketName).delete(d -> d.objects(
+        ObjectIdentifier.builder().key("c/d2/").build(), ObjectIdentifier.builder().key("c/").build())));
+
+    // AWS S3 reports a key that names no object as deleted
+    assertThat(deleted.errors()).isEmpty();
+    assertThat(deleted.deleted()).extracting(DeletedObject::key).containsExactlyInAnyOrder("c/d2/", "c/");
+    for (String keyName : keyNames) {
+      assertDoesNotThrow(() -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+    }
+  }
+
+  /**
+   * Tools like S3A {@code rm -r} list a prefix and delete every key listed. On an FSO bucket the listing has a
+   * {@code dir/} entry for each directory, before its contents, and DeleteObjects must delete them all.
+   */
+  @Test
+  public void testDeleteObjectsDeletesFsoDirectoriesWithTheirContents() throws Exception {
+    final String bucketName = getBucketName();
+    createFsoBucket(bucketName);
+    for (String keyName : Arrays.asList("dir/file1.txt", "dir/sub/file2.txt")) {
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("bar"));
+    }
+    final List<String> listed = s3Client.listObjectsV2(b -> b.bucket(bucketName)).contents().stream()
+        .map(S3Object::key).collect(Collectors.toList());
+    assertThat(listed).containsExactly("dir/", "dir/file1.txt", "dir/sub/", "dir/sub/file2.txt");
+
+    final DeleteObjectsResponse deleted = s3Client.deleteObjects(b -> b.bucket(bucketName).delete(d -> d.objects(
+        listed.stream().map(k -> ObjectIdentifier.builder().key(k).build()).collect(Collectors.toList()))));
+
+    assertThat(deleted.errors()).isEmpty();
+    assertThat(s3Client.listObjectsV2(b -> b.bucket(bucketName)).contents()).isEmpty();
+  }
+
   @Test
   public void testListObjectVersionsFiltersCommonPrefixesByKeyMarker() {
     final String bucketName = getBucketName();

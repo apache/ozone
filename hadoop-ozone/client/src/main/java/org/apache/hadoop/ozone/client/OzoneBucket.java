@@ -885,7 +885,23 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
-    return proxy.deleteKeys(volumeName, name, keyList, quiet);
+    return deleteKeys(keyList, quiet, true);
+  }
+
+  /**
+   * Deletes the given list of keys from the bucket.
+   * @param keyList List of the key name to be deleted.
+   * @param quiet if true, per-key failures are returned in the result map instead of being thrown
+   * @param recursive if false, a directory in an FSO bucket is deleted only if the other keys leave it empty,
+   *                  otherwise it is reported as DIRECTORY_NOT_EMPTY
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true,
+   *                     or if recursive is false and the OzoneManager is older than
+   *                     {@code OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS}
+   */
+  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet, boolean recursive)
+      throws IOException {
+    return proxy.deleteKeys(volumeName, name, keyList, quiet, recursive);
   }
 
   /**

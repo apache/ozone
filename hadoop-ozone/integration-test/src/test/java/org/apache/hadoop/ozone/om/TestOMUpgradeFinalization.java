@@ -235,7 +235,7 @@ class TestOMUpgradeFinalization {
 
         // Every OM is pre-finalized for ZDU. The version returned to clients should reflect the last software
         // version before ZDU to remain compatible with the old version framework.
-        assertAllOmServiceInfoVersions(cluster, OzoneManagerVersion.CONDITIONAL_DELETE);
+        assertAllOmServiceInfoVersions(cluster, OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS);
 
         omClient.finalizeUpgrade();
         OMUpgradeTestUtils.waitForFinalization(omClient);

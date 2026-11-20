@@ -413,7 +413,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
-                                           List<String> keyNameList, boolean quiet)
+                                           List<String> keyNameList, boolean quiet, boolean recursive)
       throws IOException {
     return new HashMap<>();
   }

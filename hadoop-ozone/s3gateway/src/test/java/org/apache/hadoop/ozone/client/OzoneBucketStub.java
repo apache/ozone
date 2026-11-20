@@ -681,7 +681,7 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
-  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
+  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet, boolean recursive) throws IOException {
     Map<String, ErrorInfo> keyErrorMap = new HashMap<>();
     for (String key : keyList) {
       if (keyDetails.remove(key) == null) {

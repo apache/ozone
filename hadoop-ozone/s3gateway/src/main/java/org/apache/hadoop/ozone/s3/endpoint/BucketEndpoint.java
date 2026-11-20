@@ -47,6 +47,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
@@ -404,12 +405,17 @@ public class BucketEndpoint extends BucketOperationHandler {
       long startNanos = context.getStartNanos();
       try {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-        undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
+        // An OzoneManager that does not support it deletes FSO directories recursively, as before.
+        boolean recursive =
+            !OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS.isSupportedBy(getClientProtocol().getOmVersion());
+        undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true, recursive);
         for (DeleteObject d : request.getObjects()) {
           ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
           boolean deleted = error == null ||
               // if the key is not found, it is assumed to be successfully deleted
-              ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
+              ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode()) ||
+              // S3 has no directories, so a key that names a non-empty FSO directory is not an object to delete
+              ResultCodes.DIRECTORY_NOT_EMPTY.name().equals(error.getCode());
           if (deleted) {
             if (!request.isQuiet()) {
               DeletedObject deletedObject = new DeletedObject(d.getKey());

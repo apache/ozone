@@ -29,10 +29,20 @@ public class OmDeleteKeys {
 
   private List<String> keyNames;
 
+  private boolean recursive = true;
+
   public OmDeleteKeys(String volume, String bucket, List<String> keyNames) {
     this.volume = volume;
     this.bucket = bucket;
     this.keyNames = keyNames;
+  }
+
+  /**
+   * @param recursive if false, a directory in an FSO bucket is deleted only if the other keys leave it empty
+   */
+  public OmDeleteKeys(String volume, String bucket, List<String> keyNames, boolean recursive) {
+    this(volume, bucket, keyNames);
+    this.recursive = recursive;
   }
 
   public String getVolume() {
@@ -45,5 +55,9 @@ public class OmDeleteKeys {
 
   public List< String > getKeyNames() {
     return keyNames;
+  }
+
+  public boolean isRecursive() {
+    return recursive;
   }
 }

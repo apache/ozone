@@ -76,6 +76,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
   S3_DERIVED_KEY(16, "OzoneManager version that returns derived S3 signing keys for chunk verification"),
   // Conditional delete predates ZDU; pre-ZDU versions must not be added after 2.3.0 is released.
   CONDITIONAL_DELETE(17, "OzoneManager version that supports conditional key deletion"),
+  // Non-recursive DeleteKeys predates ZDU and is available before finalization.
+  NON_RECURSIVE_DELETE_KEYS(18, "OzoneManager version that supports non-recursive deletion of multiple keys"),
   ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
   LIST_STATUS_REJECTS_OBS(101,
       "OzoneManager version that rejects listStatus on OBJECT_STORE buckets "
