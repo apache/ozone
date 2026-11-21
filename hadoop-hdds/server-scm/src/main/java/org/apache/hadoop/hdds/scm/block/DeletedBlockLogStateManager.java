@@ -56,16 +56,18 @@ public interface DeletedBlockLogStateManager extends SCMHandler {
     removeTransactionsFromDB(txIDs, null);
   }
 
+  /** Kept to apply Raft log entries written by older SCM versions. */
   @Deprecated
   @Replicate
-  default void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs) throws IOException {
-  }
+  void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs) throws IOException;
 
+  /**
+   * Kept to apply Raft log entries written by older SCM versions.
+   * Older versions returned an int, which is not used; a primitive return type cannot be encoded in the response.
+   */
   @Deprecated
   @Replicate
-  default int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs) throws IOException {
-    return 0;
-  }
+  void resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs) throws IOException;
 
   Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
       throws IOException;

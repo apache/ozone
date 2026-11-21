@@ -17,13 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.ha.invoker;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
+import java.lang.reflect.Method;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
+import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.scm.security.RootCARotationHandler;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
@@ -38,6 +41,15 @@ public final class TestScmInvokerCodeGenerator {
   static void runTest(Class<?> api) throws Exception {
     final ScmInvokerCodeGenerator generator = new ScmInvokerCodeGenerator(api);
     final String classString = generator.generateClass();
+    // A Raft log may hold an entry for any @Replicate method, including a deprecated one kept for older logs.
+    for (Method method : api.getMethods()) {
+      if (method.getAnnotation(Replicate.class) != null) {
+        assertThat(classString).as("invokeLocal case for %s", method).contains("case \"" + method.getName() + "\":");
+        // SCMRatisResponse.encode cannot encode a primitive return value.
+        assertThat(method.getReturnType()).as("return type of %s", method)
+            .matches(t -> !t.isPrimitive() || t == void.class);
+      }
+    }
     final File file = generator.updateFile(classString, DIR, false);
     assertNull(file, () -> ScmInvokerCodeGenerator.getInvokerClassName(api) + " is changed.");
   }

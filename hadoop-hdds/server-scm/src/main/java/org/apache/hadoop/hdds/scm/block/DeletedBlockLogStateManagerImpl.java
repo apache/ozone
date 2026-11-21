@@ -184,6 +184,18 @@ public class DeletedBlockLogStateManagerImpl
     }
   }
 
+  @Deprecated
+  @Override
+  public void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs) {
+    // The retry count is not stored in the DB anymore.
+  }
+
+  @Deprecated
+  @Override
+  public void resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs) {
+    // The retry count is not stored in the DB anymore.
+  }
+
   @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
