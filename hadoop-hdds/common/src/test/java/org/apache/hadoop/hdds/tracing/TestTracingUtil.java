@@ -49,6 +49,9 @@ import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
@@ -305,6 +308,41 @@ public class TestTracingUtil {
     assertTrue(ex2.keys(carrier).iterator().hasNext());
     assertEquals("00-a-b-01", ex2.get(carrier, "traceparent"));
     assertEquals("00-a-b-01", ex2.get(carrier, "traceparent"));
+  }
+
+  @Test
+  public void testTextExtractorSplitSemantics() {
+    TracingUtil.TextExtractor ex = TracingUtil.TextExtractor.INSTANCE;
+    // Trailing '=' characters are dropped, as String.split("=") drops trailing empty strings.
+    assertEquals("b", ex.get("a=b=", "a"));
+    assertNull(ex.get("a==", "a"));
+    assertNull(ex.get("a=b=c", "a"));
+    assertNull(ex.get("a=", "a"));
+    assertEquals("x", ex.get("=x", ""));
+    // Keys and values are trimmed; the last duplicate wins.
+    assertEquals("b", ex.get(" a = b ;", "a"));
+    assertEquals("2", ex.get("k=1;k=2", "k"));
+    assertEquals("", ex.get("k= ;", "k"));
+    assertNull(ex.get("ka=1", "k"));
+    assertNull(ex.get(null, "k"));
+    assertNull(ex.get("k=1", null));
+    assertEquals(Arrays.asList("k", "x"), toList(ex.keys("k=1;bad;x=y;k=2;z=")));
+  }
+
+  @Test
+  public void testTextExtractorSharedInstanceIsStateless() {
+    TracingUtil.TextExtractor ex = TracingUtil.TextExtractor.INSTANCE;
+    assertEquals("00-a-b-01", ex.get("traceparent=00-a-b-01;", "traceparent"));
+    assertEquals("00-c-d-00", ex.get("traceparent=00-c-d-00;tracestate=s=1;", "traceparent"));
+    assertNull(ex.get("traceparent=00-c-d-00;tracestate=s=1;", "tracestate"));
+    assertEquals("s1", ex.get("tracestate=s1", "tracestate"));
+    assertFalse(ex.keys("").iterator().hasNext());
+  }
+
+  private static List<String> toList(Iterable<String> it) {
+    List<String> list = new ArrayList<>();
+    it.forEach(list::add);
+    return list;
   }
 
   @Test
