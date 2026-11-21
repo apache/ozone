@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.DELETE
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntry;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -213,21 +214,17 @@ class TestSnapDiffDependencyGraph {
 
   @Test
   void testDeleteAndRecreateWithOldTreeChildModifyAndRename() {
-    // DELETE A + CREATE A while a child is MODIFY+RENAME under the old A path.
-    // Child ops are from-snapshot; CREATE A must not pull them after itself.
+    // DELETE A + CREATE A while a child under the old A is modified and renamed
+    // to A/renamed, which is under the new A. The RENAME needs the old A (before
+    // DELETE A) and the new A (after CREATE A); placing it before DELETE A
+    // would delete the renamed child on replay, so this is a cycle.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 0L, DELETE, "A"),
         entry(2L, 0L, CREATE, "A"),
-        entry(3L, 1L, RENAME, "A/child", "A/renamed"),
+        renameEntry(3L, 1L, 2L, "A/child", "A/renamed"),
         entry(3L, 1L, MODIFY, "A/child"));
 
-    List<SnapDiffDependencyEntry> ordered = sort(entries);
-    assertBefore(ordered, indexOf(ordered, MODIFY, "A/child"),
-        indexOf(ordered, RENAME, "A/child"));
-    assertBefore(ordered, indexOf(ordered, RENAME, "A/child"),
-        indexOf(ordered, DELETE, "A"));
-    assertBefore(ordered, indexOf(ordered, DELETE, "A"),
-        indexOf(ordered, CREATE, "A"));
+    assertCycle(entries);
   }
 
   @Test
@@ -321,8 +318,8 @@ class TestSnapDiffDependencyGraph {
   void testDeleteAndRecreateWithDescendantModify() {
     // DELETE A + CREATE A (new objectId) + MODIFY A/child on the old subtree.
     // MODIFY is reported on the from-snapshot path, so A/child lives under the
-    // deleted A, not the recreated A. The to-snapshot prefix edge from the new
-    // CREATE A back to MODIFY A/child must be skipped or the graph cycles.
+    // deleted A, not the recreated A. An edge from the new CREATE A to
+    // MODIFY A/child must not exist or the graph cycles.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 0L, DELETE, "A"),
         entry(2L, 0L, CREATE, "A"),
@@ -338,9 +335,8 @@ class TestSnapDiffDependencyGraph {
   @Test
   void testDeleteAndRenameTargetReuseWithDescendantModify() {
     // DELETE A frees A on the from-snap side; RENAME X -> A occupies A on the
-    // to-snap side; MODIFY A/child sits under the deleted A. A is reoccupied,
-    // so the to-snap prefix edge from RENAME(target=A) back to MODIFY A/child
-    // must be skipped.
+    // to-snap side; MODIFY A/child sits under the deleted A, so RENAME(target=A)
+    // must not order MODIFY A/child.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 0L, DELETE, "A"),
         entry(2L, 0L, RENAME, "X", "A"),
@@ -373,8 +369,7 @@ class TestSnapDiffDependencyGraph {
   @Test
   void testRenameSourceReuseByRenameTargetWithDescendantModify() {
     // RENAME A -> B frees A; RENAME X -> A occupies A; MODIFY A/child lives
-    // under the from-snap A. A is reoccupied, so the RENAME(X->A) ancestor
-    // edge back to MODIFY A/child must be skipped.
+    // under the from-snap A, so RENAME(X->A) must not order MODIFY A/child.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 0L, RENAME, "A", "B"),
         entry(2L, 0L, RENAME, "X", "A"),
@@ -392,8 +387,8 @@ class TestSnapDiffDependencyGraph {
     // RENAME A -> B frees A; RENAME X -> A occupies A; RENAME A/child -> Z/child
     // moves the descendant out from under the reoccupied ancestor. The
     // descendant's from-snap source A/child forces it before RENAME A -> B,
-    // and its to-snap target is outside A so no reoccupied-path skip is
-    // consulted for that side. Rename chain still orders A -> B before X -> A.
+    // and its to-snap target is outside A. Rename chain still orders A -> B
+    // before X -> A.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 0L, RENAME, "A", "B"),
         entry(2L, 0L, RENAME, "X", "A"),
@@ -404,6 +399,64 @@ class TestSnapDiffDependencyGraph {
         indexOf(ordered, RENAME, "A"));
     assertBefore(ordered, indexOf(ordered, RENAME, "A"),
         indexOf(ordered, RENAME, "X"));
+  }
+
+  @Test
+  void testRenameSourceReuseWithDescendantRenameIntoNewOccupierDetectsCycle() {
+    // RENAME A -> B frees A; CREATE A occupies it; RENAME A/child -> A/child
+    // moves the child from the old A into the new A. It must precede RENAME
+    // A -> B (source) and follow CREATE A (target), which no order satisfies.
+    // Ordering it first would carry the child to B/child on replay.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, RENAME, "A", "B"),
+        entry(2L, 0L, CREATE, "A"),
+        renameEntry(3L, 1L, 2L, "A/child", "A/child"));
+
+    assertCycle(entries);
+  }
+
+  @Test
+  void testRenameSourceReuseByNestedCreateWithDescendantModify() {
+    // RENAME A -> B frees A and, implicitly, A/B. CREATE A and CREATE A/B occupy
+    // them again. MODIFY A/B/child is reported under the renamed-away A, so it
+    // must precede RENAME A -> B and must not depend on the new A/B.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, RENAME, "A", "B"),
+        entry(2L, 0L, CREATE, "A"),
+        entry(3L, 2L, CREATE, "A/B"),
+        entry(5L, 4L, MODIFY, "A/B/child"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, MODIFY, "A/B/child"),
+        indexOf(ordered, RENAME, "A"));
+    assertBefore(ordered, indexOf(ordered, RENAME, "A"),
+        indexOf(ordered, CREATE, "A"));
+    assertBefore(ordered, indexOf(ordered, CREATE, "A"),
+        indexOf(ordered, CREATE, "A/B"));
+  }
+
+  @Test
+  void testDeleteAndRecreateNestedPathWithDescendantModifyAndRename() {
+    // DELETE B frees B and, implicitly, B/A (a DELETE below a deleted directory is
+    // not reported). CREATE B and CREATE B/A occupy them again. B/A/B is modified
+    // and renamed out to A, so it must precede DELETE B and must not depend on the
+    // new B/A.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, DELETE, "B"),
+        entry(3L, 2L, MODIFY, "B/A/B"),
+        renameEntry(3L, 2L, 0L, "B/A/B", "A"),
+        entry(4L, 0L, CREATE, "B"),
+        entry(5L, 4L, CREATE, "B/A"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, MODIFY, "B/A/B"),
+        indexOf(ordered, RENAME, "B/A/B"));
+    assertBefore(ordered, indexOf(ordered, RENAME, "B/A/B"),
+        indexOf(ordered, DELETE, "B"));
+    assertBefore(ordered, indexOf(ordered, DELETE, "B"),
+        indexOf(ordered, CREATE, "B"));
+    assertBefore(ordered, indexOf(ordered, CREATE, "B"),
+        indexOf(ordered, CREATE, "B/A"));
   }
 
   @Test
@@ -459,6 +512,11 @@ class TestSnapDiffDependencyGraph {
       String targetPath) {
     return new SnapDiffDependencyEntry(objectId, sourceParentObjectId,
         targetParentObjectId, getDiffReportEntry(RENAME, sourcePath, targetPath));
+  }
+
+  private static void assertCycle(List<SnapDiffDependencyEntry> entries) {
+    IllegalStateException e = assertThrows(IllegalStateException.class, () -> sort(entries));
+    assertThat(e).hasMessageContaining("Cycle detected");
   }
 
   private static int indexOf(List<SnapDiffDependencyEntry> ordered,
