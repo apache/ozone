@@ -276,13 +276,18 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         dbOpenKeyToDeleteKey = omMetadataManager.getOpenKey(volumeName, bucketName,
             keyName, Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
         openKeyToDelete = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKeyToDeleteKey);
-        openKeyToDelete = openKeyToDelete.toBuilder()
-            .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
-            .setUpdateID(trxnLogIndex)
-            .build();
-        openKeyToDelete.setModificationTime(Time.now());
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-            dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
+        if (openKeyToDelete != null) {
+          openKeyToDelete = openKeyToDelete.toBuilder()
+              .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+              .setUpdateID(trxnLogIndex)
+              .build();
+          openKeyToDelete.setModificationTime(Time.now());
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+              dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
+        } else {
+          LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'",
+              dbOpenKeyToDeleteKey);
+        }
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
