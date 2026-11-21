@@ -118,7 +118,7 @@ public class DeletedBlockLogImpl
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
             containerManager, () -> scm.getReplicationManager().getContainerReplicaPendingOps(), metrics,
-            scmCommandTimeoutMs);
+            scmCommandTimeoutMs, scm.getSystemClock());
     int limit = (int) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.RatisPipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -50,7 +51,8 @@ public class TestLeaderChoosePolicy {
         mock(PipelineStateManagerImpl.class),
         conf,
         mock(EventPublisher.class),
-        SCMContext.emptyContext());
+        SCMContext.emptyContext(),
+        PipelineID::randomId);
     assertSame(
         ratisPipelineProvider.getLeaderChoosePolicy().getClass(),
         MinLeaderCountChoosePolicy.class);
@@ -68,7 +70,8 @@ public class TestLeaderChoosePolicy {
             mock(PipelineStateManagerImpl.class),
             conf,
             mock(EventPublisher.class),
-            SCMContext.emptyContext())
+            SCMContext.emptyContext(),
+            PipelineID::randomId)
     );
 
     // expecting exception

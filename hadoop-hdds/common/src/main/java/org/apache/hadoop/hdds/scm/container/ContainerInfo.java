@@ -148,11 +148,16 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   public void setState(HddsProtos.LifeCycleState state) {
+    setState(state, clock.instant());
+  }
+
+  /** Moves the container to the given state, entered at the given time. */
+  public void setState(HddsProtos.LifeCycleState newState, Instant enterTime) {
     previousState = this.state;
     previousStateEnterTime = this.stateEnterTime;
 
-    this.state = state;
-    this.stateEnterTime = clock.instant();
+    this.state = newState;
+    this.stateEnterTime = enterTime;
   }
 
   public Instant getStateEnterTime() {
