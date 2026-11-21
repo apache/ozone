@@ -64,7 +64,9 @@ runs:
             '.mvn/extensions.xml',
             '.mvn/wrapper/maven-wrapper.properties',
             'dev-support/ci/populate-cache.sh'
-        ) }}-${{ inputs.java-version }}" >> "$GITHUB_OUTPUT"
+        ) }}-$JAVA_VERSION" >> "$GITHUB_OUTPUT"
+      env:
+        JAVA_VERSION: ${{ inputs.java-version }}
 
     - name: Remove any leftover Maven repo
       id: cleanup
