@@ -94,6 +94,7 @@ class TestS3DerivedKey {
     when(secrets.getSecretString(ACCESS_ID)).thenReturn(SECRET);
     translator = new OzoneManagerProtocolServerSideTranslatorPB(om, ratis, mock(ProtocolMessageMetrics.class));
     when(execution.submit(any(), anyBoolean())).thenReturn(response(Status.OK));
+    when(execution.postExecute(any(), any())).thenAnswer(i -> i.getArgument(1));
   }
 
   @AfterEach
