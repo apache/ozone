@@ -75,7 +75,7 @@ import org.slf4j.LoggerFactory;
  * OMClientRequest provides methods which every write OM request should
  * implement.
  */
-public abstract class OMClientRequest implements RequestAuditor {
+public abstract class OMClientRequest implements IOMClientRequest {
 
   protected static final Logger LOG =
       LoggerFactory.getLogger(OMClientRequest.class);
@@ -87,6 +87,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   private final OMLockDetails omLockDetails = new OMLockDetails();
   private final OMAuditLogger.Builder auditBuilder = OMAuditLogger.newBuilder();
 
+  @Override
   public OMAuditLogger.Builder getAuditBuilder() {
     return auditBuilder;
   }
@@ -146,6 +147,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * submission. An example of this would be an undo of any steps
    * taken during pre-execute.
    */
+  @Override
   public void handleRequestFailure(OzoneManager ozoneManager) {
     // Most requests would not have any un-do processing.
   }
@@ -163,6 +165,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    *
    * @return the response that will be returned to the client.
    */
+  @Override
   public abstract OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context);
 
   /** For testing only. */
@@ -177,6 +180,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
+  @Override
   @VisibleForTesting
   public OMRequest getOmRequest() {
     return omRequest;
@@ -186,6 +190,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Get User information which needs to be set in the OMRequest object.
    * @return User Info.
    */
+  @Override
   public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
     return getUserInfo(omRequest, true);
   }

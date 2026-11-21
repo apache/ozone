@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -68,7 +69,7 @@ public class OMExecutionFlow {
 
   private OMResponse submitExecutionToRatis(OMRequest request, boolean isWrite) throws ServiceException {
     // 1. create client request and preExecute
-    OMClientRequest omClientRequest = null;
+    IOMClientRequest omClientRequest = null;
     final OMRequest requestToSubmit;
     if (isWrite) {
       try {
@@ -78,7 +79,7 @@ public class OMExecutionFlow {
         }
         omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
         assert (omClientRequest != null);
-        final OMClientRequest finalOmClientRequest = omClientRequest;
+        final IOMClientRequest finalOmClientRequest = omClientRequest;
         OMRequest preExecuted = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
             () -> finalOmClientRequest.preExecute(ozoneManager));
         requestToSubmit = preExecuted.hasAssumeS3Context()
