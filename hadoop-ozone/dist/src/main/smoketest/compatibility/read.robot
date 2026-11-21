@@ -225,6 +225,5 @@ Can --get-report of --ordered Snapshot Diff
         Should Contain    ${output}    Report is dependency ordered
     END
 
-# execute batch before any ozone fs or other non-sh commands
 Execute Batch Shell
     Execute Batch

@@ -69,39 +69,10 @@ Key Can Be Deleted
     Execute Later and Expect No Output For ozone sh    key put /vol1/bucket1/to-be-deleted-${CLIENT_VERSION} ${TESTFILE}
     Execute Later and Expect No Output For ozone sh    key delete /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}
 
-Dir Can Be Created
-    Execute    ozone fs -mkdir o3fs://bucket1.vol1/dir-${CLIENT_VERSION}
-
-File Can Be Put
-    Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/file-${CLIENT_VERSION}
-
-File Can Be Put To Bucket With Replication Type
-    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    Execute         ozone fs -put ${TESTFILE} ofs://om/vol1/ratis-${CLUSTER_VERSION}/file-${CLIENT_VERSION}
-    Execute         ozone fs -put ${TESTFILE} ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/file-${CLIENT_VERSION}
-
-File Can Be Deleted
-    Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
-    Execute    ozone fs -rm -skipTrash o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
-
 FSO Bucket Can Be Created
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
     Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
     Execute Later and Expect No Output For ozone sh    bucket create --layout FILE_SYSTEM_OPTIMIZED ${FSO_BUCKET}
-
-FSO Bucket Can Be Used
-    Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
-    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
-    Execute    ozone fs -mkdir -p ofs://om/${FSO_BUCKET}/dir/subdir
-    Execute    ozone fs -put ${TESTFILE} ofs://om/${FSO_BUCKET}/dir/subdir/file
-
-HSync Can Be Used To Create Keys
-    Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
-    Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
-    ${o3fspath} =   Format FS URL         o3fs     vol1    bucket1
-    Freon DFSG      sync=HSYNC    n=1    path=${o3fspath}
-    ${pfspath} =    Format FS URL         ofs      $vol1    bucket1
-    Freon DFSG      sync=HSYNC    n=1    path=${pfspath}
 
 Snapshot Can Be Created
     Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Client does not support snapshots
@@ -141,3 +112,32 @@ Snapshot Diff Can Be --ordered
 # execute batch before any ozone fs or other non-sh commands
 Execute Batch Shell
     Execute Batch
+
+Dir Can Be Created
+    Execute    ozone fs -mkdir o3fs://bucket1.vol1/dir-${CLIENT_VERSION}
+
+File Can Be Put
+    Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/file-${CLIENT_VERSION}
+
+File Can Be Put To Bucket With Replication Type
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+    Execute         ozone fs -put ${TESTFILE} ofs://om/vol1/ratis-${CLUSTER_VERSION}/file-${CLIENT_VERSION}
+    Execute         ozone fs -put ${TESTFILE} ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/file-${CLIENT_VERSION}
+
+File Can Be Deleted
+    Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
+    Execute    ozone fs -rm -skipTrash o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
+
+FSO Bucket Can Be Written To
+    Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
+    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
+    Execute    ozone fs -mkdir -p ofs://om/${FSO_BUCKET}/dir/subdir
+    Execute    ozone fs -put ${TESTFILE} ofs://om/${FSO_BUCKET}/dir/subdir/file
+
+HSync Can Be Used To Create Keys
+    Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
+    Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
+    ${o3fspath} =   Format FS URL         o3fs     vol1    bucket1
+    Freon DFSG      sync=HSYNC    n=1    path=${o3fspath}
+    ${pfspath} =    Format FS URL         ofs      $vol1    bucket1
+    Freon DFSG      sync=HSYNC    n=1    path=${pfspath}
