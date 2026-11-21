@@ -63,11 +63,14 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -122,7 +125,7 @@ public class TestOMDirectoryCreateRequest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"a/b/c", "a/.snapshot/c", "a.snapshot/b/c"})
+  @ValueSource(strings = {"a/b/c", "a/.snapshot/c", "a.snapshot/b/c", "a/./b/"})
   public void testPreExecute(String keyName) throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
@@ -140,6 +143,7 @@ public class TestOMDirectoryCreateRequest {
 
     // As in preExecute, we modify the original request.
     assertNotEquals(omRequest, modifiedOmRequest);
+    assertEquals(keyName, modifiedOmRequest.getCreateDirectoryRequest().getKeyArgs().getKeyName());
   }
 
   // Test verifies that .snapshot is not allowed as root dir name.
@@ -162,6 +166,46 @@ public class TestOMDirectoryCreateRequest {
     assertEquals(
         "Cannot create key under path reserved for snapshot: .snapshot/",
         omException.getMessage());
+  }
+
+  /**
+   * Documents the existing inconsistency: directories allow ':', but files beneath them are rejected.
+   */
+  @Test
+  public void testFileCannotBeCreatedUnderDirectoryWithColon() throws Exception {
+    when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    String dirName = "a:b";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+
+    OMRequest modifiedOmRequest = new OMDirectoryCreateRequest(
+        createDirectoryRequest(volumeName, bucketName, dirName), getBucketLayout()).preExecute(ozoneManager);
+    OMDirectoryCreateRequest directoryRequest = new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
+    directoryRequest.setUGI(UserGroupInformation.getCurrentUser());
+    OMClientResponse response = directoryRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, dirName)));
+
+    KeyArgs keyArgs = KeyArgs.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(dirName + OZONE_URI_DELIMITER + "f").build();
+    OMRequest createFileRequest = OMRequest.newBuilder()
+        .setCreateFileRequest(CreateFileRequest.newBuilder().setKeyArgs(keyArgs)
+            .setIsRecursive(false).setIsOverwrite(false))
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateFile)
+        .setClientId(UUID.randomUUID().toString()).build();
+    OMException createFileException = assertThrows(OMException.class,
+        () -> new OMFileCreateRequest(createFileRequest, getBucketLayout()).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, createFileException.getResult());
+
+    OMRequest commitKeyRequest = OMRequest.newBuilder()
+        .setCommitKeyRequest(CommitKeyRequest.newBuilder().setKeyArgs(keyArgs).setClientID(1L))
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString()).build();
+    OMException commitException = assertThrows(OMException.class,
+        () -> new OMKeyCommitRequest(commitKeyRequest, getBucketLayout()).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, commitException.getResult());
   }
 
   @Test

@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
@@ -55,6 +57,7 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -75,6 +78,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -141,6 +145,47 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // As in preExecute, we modify original request.
     assertNotEquals(omRequest, modifiedOmRequest);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"a/./b,a/b", "a/c/../b,a/b", "/a/b,a/b", "a//b/,a/b", "a:b/c,a:b/c"})
+  public void testPreExecuteNormalizesKeyName(String keyName, String normalizedKeyName) throws Exception {
+    OMRequest omRequest = createDirectoryRequest("vol1", "bucket1", keyName);
+
+    OMRequest modifiedOmRequest =
+        new OMDirectoryCreateRequestWithFSO(omRequest, getBucketLayout()).preExecute(ozoneManager);
+
+    assertThat(modifiedOmRequest.getCreateDirectoryRequest().getKeyArgs().getKeyName()).isEqualTo(normalizedKeyName);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"..", "../a", "a/../../b", "./.snapshot/a"})
+  public void testPreExecuteRejectsInvalidKeyPath(String keyName) {
+    OMDirectoryCreateRequestWithFSO omDirCreateRequestFSO =
+        new OMDirectoryCreateRequestWithFSO(createDirectoryRequest("vol1", "bucket1", keyName), getBucketLayout());
+
+    OMException e = assertThrows(OMException.class, () -> omDirCreateRequestFSO.preExecute(ozoneManager));
+
+    assertThat(e.getResult()).isEqualTo(OMException.ResultCodes.INVALID_KEY_NAME);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {".", "a/.."})
+  public void testDotComponentsResolvingToBucketRootAreNotCreated(String keyName) throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMRequest modifiedOmReq = new OMDirectoryCreateRequestWithFSO(
+        createDirectoryRequest(volumeName, bucketName, keyName), getBucketLayout()).preExecute(ozoneManager);
+    OMDirectoryCreateRequestWithFSO omDirCreateRequestFSO =
+        new OMDirectoryCreateRequestWithFSO(modifiedOmReq, getBucketLayout());
+    omDirCreateRequestFSO.setUGI(UserGroupInformation.getCurrentUser());
+    OMClientResponse omClientResponse = omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertThat(omClientResponse.getOMResponse().getStatus())
+        .isEqualTo(OzoneManagerProtocolProtos.Status.CANNOT_CREATE_DIRECTORY_AT_ROOT);
+    assertThat(omMetadataManager.getDirectoryTable().cacheIterator()).isExhausted();
   }
 
   @Test
