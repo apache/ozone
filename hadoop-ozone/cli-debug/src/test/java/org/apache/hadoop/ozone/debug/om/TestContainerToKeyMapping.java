@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.debug.om;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +29,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
@@ -48,6 +47,8 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,7 +66,7 @@ public class TestContainerToKeyMapping {
   private OMMetadataManager omMetadataManager;
   private String dbPath;
   private CommandLine cmd;
-  private StringWriter outWriter;
+  private PrintStreamCapturer outWriter;
 
   private static final String VOLUME_NAME = "vol1";
   private static final String FSO_BUCKET_NAME = "fso-bucket";
@@ -95,11 +96,8 @@ public class TestContainerToKeyMapping {
     dbPath = dbFile.toString();
     
     cmd = new OzoneDebug().getCmd();
-    outWriter = new StringWriter();
-    StringWriter errWriter = new StringWriter();
-    cmd.setOut(new PrintWriter(outWriter));
-    cmd.setErr(new PrintWriter(errWriter));
-    
+    outWriter = new SystemOutCapturer();
+
     OzoneConfiguration conf = new OzoneConfiguration();
     omMetadataManager = new OmMetadataManagerImpl(conf,
         tempDir.toFile(), "om.db", false);
@@ -111,6 +109,7 @@ public class TestContainerToKeyMapping {
 
   @AfterEach
   public void tearDown() throws Exception {
+    IOUtils.closeQuietly(outWriter);
     if (omMetadataManager != null && !omMetadataManager.getStore().isClosed()) {
       omMetadataManager.getStore().close();
     }

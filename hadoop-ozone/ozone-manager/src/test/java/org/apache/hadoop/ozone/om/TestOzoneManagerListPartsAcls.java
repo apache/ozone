@@ -46,6 +46,8 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -55,6 +57,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InOrder;
 
 
@@ -136,12 +140,18 @@ public class TestOzoneManagerListPartsAcls {
     verify(metrics, never()).incNumListMultipartUploadPartFails();
   }
 
-  @Test
-  void testAclsEnabledChecksBucketReadThenKeyReadUsingResolvedNames() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testAclsEnabledChecksBucketReadThenKeyReadUsingResolvedNames(boolean assumeS3Context) throws Exception {
     setupS3Request();
     when(omSpy.getAclsEnabled()).thenReturn(true);
+    if (assumeS3Context) {
+      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume(REQUESTED_VOLUME)
+          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(omSpy).getS3VolumeContext(true);
+    }
 
-    omSpy.listParts(REQUESTED_VOLUME, REQUESTED_BUCKET, KEY_NAME, UPLOAD_ID, 0, 10);
+    String volumeName = assumeS3Context ? "s3v" : REQUESTED_VOLUME;
+    omSpy.listParts(volumeName, REQUESTED_BUCKET, KEY_NAME, UPLOAD_ID, 0, 10, assumeS3Context);
 
     final InOrder inOrder = inOrder(omMetadataReader);
     inOrder.verify(omMetadataReader).checkAcls(BUCKET, OZONE, READ, REAL_VOLUME, REAL_BUCKET, null);

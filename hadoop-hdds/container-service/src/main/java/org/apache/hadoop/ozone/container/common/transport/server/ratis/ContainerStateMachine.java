@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
@@ -148,6 +149,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private final XceiverServerRatis ratisServer;
+  private final ReplicationType replicationType;
   private final NavigableMap<Long, WriteFutures> writeChunkFutureMap;
 
   private final long writeChunkWaitMaxNs;
@@ -251,12 +253,16 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(HddsDatanodeService hddsDatanodeService, RaftGroupId gid,
+      ReplicationType replicationType,
       ContainerDispatcher dispatcher,
       ContainerController containerController,
       List<ThreadPoolExecutor> chunkExecutors,
       XceiverServerRatis ratisServer,
       ConfigurationSource conf,
       String threadNamePrefix) {
+    Preconditions.checkArgument(replicationType == ReplicationType.RATIS || replicationType == ReplicationType.CHAINED,
+        "Unexpected replicationType %s", replicationType);
+    this.replicationType = replicationType;
     this.datanodeService = hddsDatanodeService;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -274,8 +280,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     stateMachineDataCache = new ResourceCache<>(
         (index, data) -> data.size(),
         pendingRequestsBytesLimit,
-        (p) -> {
-          if (p.wasEvicted()) {
+        (index, data, cause) -> {
+          if (cause.wasEvicted()) {
             metrics.incNumEvictedCacheCount();
           }
         });
@@ -308,6 +314,10 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     this.writeChunkWaitMaxNs = conf.getTimeDuration(ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
         ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_NS_DEFAULT, TimeUnit.NANOSECONDS);
+  }
+
+  ReplicationType getReplicationType() {
+    return replicationType;
   }
 
   private void validatePeers() throws IOException {
@@ -730,13 +740,42 @@ public class ContainerStateMachine extends BaseStateMachine {
               requestProto.getContainerID(), requestProto.getPipelineID(),
               requestProto.getTraceID());
     }
-    dispatchCommand(requestProto, context);  // stream init
+    final ContainerCommandResponseProto response = dispatchCommand(requestProto, context);  // stream init
+    if (response.getResult() != ContainerProtos.Result.SUCCESS) {
+      throw new StorageContainerException(response.getMessage(), response.getResult());
+    }
     final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock
-        = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? this::streamPutBlock : null;
+        = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? r -> streamPutBlock(requestProto, r) : null;
     return dispatcher.getStreamDataChannel(requestProto, putBlock);
   }
 
-  void streamPutBlock(ContainerCommandRequestProto request) throws IOException {
+  /** A PutBlock sent on a data stream must be a PutBlock for the block the stream was opened for. */
+  private static void checkStreamPutBlock(ContainerCommandRequestProto streamInit,
+      ContainerCommandRequestProto request) throws StorageContainerException {
+    if (request.getCmdType() != Type.PutBlock) {
+      throw new StorageContainerException("Unexpected stream PutBlock request type " + request.getCmdType()
+          + ", expected " + Type.PutBlock, ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    final ContainerProtos.DatanodeBlockID putBlock = request.getPutBlock().getBlockData().getBlockID();
+    if (request.getContainerID() != putBlock.getContainerID()) {
+      throw new StorageContainerException("Container ID mismatched: request " + request.getContainerID()
+          + " != PutBlock " + putBlock.getContainerID(), ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    if (request.getContainerID() != streamInit.getContainerID()) {
+      throw new StorageContainerException("Container ID mismatched: request " + request.getContainerID()
+          + " != stream " + streamInit.getContainerID(), ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    final ContainerProtos.DatanodeBlockID streamBlock = streamInit.getWriteChunk().getBlockID();
+    if (!putBlock.equals(streamBlock)) {
+      throw new StorageContainerException("DatanodeBlockID mismatched: PutBlock "
+          + TextFormat.shortDebugString(putBlock) + " != stream " + TextFormat.shortDebugString(streamBlock),
+          ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+  }
+
+  void streamPutBlock(ContainerCommandRequestProto streamInit, ContainerCommandRequestProto request)
+      throws IOException {
+    checkStreamPutBlock(streamInit, request);
     final DispatcherContext context = DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_LINK)
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
@@ -752,14 +791,12 @@ public class ContainerStateMachine extends BaseStateMachine {
    * @return the serialized {@link ContainerCommandResponseProto},
    *         which is identical on all the peers of the pipeline.
    */
-  ByteBuffer streamCommand(ByteBuffer command, DataChannel channel) throws IOException {
+  ByteBuffer streamCommand(ContainerCommandRequestProto streamInit, ByteBuffer command, DataChannel channel)
+      throws IOException {
     // unsafeWrap is okay since the command buffer can be modified after this method has returned.
     final ContainerCommandRequestProto request = ContainerCommandRequestMessage.toProto(
         UnsafeByteOperations.unsafeWrap(command), getGroupId());
-    if (request.getCmdType() != Type.PutBlock) {
-      throw new StorageContainerException("Unexpected stream command " + request.getCmdType()
-          + ", expected " + Type.PutBlock, ContainerProtos.Result.MALFORMED_REQUEST);
-    }
+    checkStreamPutBlock(streamInit, request);
     if (request.getPutBlock().getSync()) {
       channel.force(false);
     }
@@ -790,7 +827,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         final DataChannel channel = getStreamDataChannel(requestProto, context);
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
-        return new LocalStream(channel, chunkExecutor, command -> streamCommand(command, channel));
+        return new LocalStream(channel, chunkExecutor, command -> streamCommand(requestProto, command, channel));
       } catch (IOException e) {
         throw new CompletionException("Failed to create data stream", e);
       }

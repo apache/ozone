@@ -67,6 +67,7 @@ public class TestHddsConfServlet {
     TEST_PROPERTIES.put("test.key3", "value3");
     TEST_FORMATS.put(HttpServletUtils.ResponseFormat.XML.toString(), "application/xml");
     TEST_FORMATS.put(HttpServletUtils.ResponseFormat.JSON.toString(), "application/json");
+    OzoneConfiguration.addDefaultResource("hdds-server-framework-test-default.xml");
   }
 
   @Test
