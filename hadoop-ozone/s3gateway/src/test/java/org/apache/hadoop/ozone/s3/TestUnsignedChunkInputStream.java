@@ -159,11 +159,11 @@ public class TestUnsignedChunkInputStream {
   @ValueSource(booleans = {false, true})
   void rejectEveryTruncatedBody(boolean singleByte) throws IOException {
     for (int length = 0; length < BODY.length(); length++) {
-      assertInvalidBody(BODY.substring(0, length), singleByte);
+      assertBodyError(BODY.substring(0, length), singleByte, S3ErrorTable.INCOMPLETE_BODY);
     }
   }
 
-  static Stream<Arguments> malformedBodies() {
+  static Stream<Arguments> malformedTrailers() {
     return Stream.of(
         "0\r\n\r\n",
         "0\r\nx-amz-checksum-sha1:HydN+w==\r\n\r\n",
@@ -175,19 +175,30 @@ public class TestUnsignedChunkInputStream {
         "0\r\nx-amz-checksum-crc32:AAAAAA==\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n",
         "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\nextra",
         "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n\r\n",
+        "0\r\nx-amz-checksum-crc32:" + "A".repeat(8193) + "\r\n\r\n")
+        .flatMap(body -> Stream.of(Arguments.of(body, false), Arguments.of(body, true)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("malformedTrailers")
+  void rejectMalformedTrailer(String body, boolean singleByte) throws IOException {
+    assertBodyError(body, singleByte, S3ErrorTable.MALFORMED_TRAILER_ERROR);
+  }
+
+  static Stream<Arguments> malformedBodies() {
+    return Stream.of(
         "1\r\naXX0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n",
         "1\r\na\rX0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n",
         "-1\r\n", "+1\r\n", "xyz\r\n", " 0\r\n", "0x0\r\n", "8000000000000000\r\n",
         "10000000000000000\r\n", "0;chunk-signature=abc\r\n",
-        "A".repeat(8193) + "\r\n",
-        "0\r\nx-amz-checksum-crc32:" + "A".repeat(8193) + "\r\n\r\n")
+        "A".repeat(8193) + "\r\n")
         .flatMap(body -> Stream.of(Arguments.of(body, false), Arguments.of(body, true)));
   }
 
   @ParameterizedTest
   @MethodSource("malformedBodies")
   void rejectMalformedBody(String body, boolean singleByte) throws IOException {
-    assertInvalidBody(body, singleByte);
+    assertBodyError(body, singleByte, S3ErrorTable.INVALID_REQUEST);
   }
 
   @ParameterizedTest
@@ -197,7 +208,7 @@ public class TestUnsignedChunkInputStream {
     try (UnsignedChunksInputStream stream = wrapContent("0\r\n" + header.getHeaderName() + ":" + value + "\r\n\r\n",
         header)) {
       OS3Exception error = assertThrows(OS3Exception.class, stream::verifyComplete);
-      assertThat(error.getCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode());
+      assertThat(error.getCode()).isEqualTo(S3ErrorTable.MALFORMED_TRAILER_ERROR.getCode());
       assertThat(error.getErrorMessage()).contains(header.getHeaderName());
     }
   }
@@ -214,11 +225,12 @@ public class TestUnsignedChunkInputStream {
   void chunkLengthDoesNotRequireIntegerRangeOrAllocation() throws IOException {
     try (UnsignedChunksInputStream stream = wrapContent("80000000\r\na", TrailerHeader.CRC32)) {
       assertThat(stream.read()).isEqualTo('a');
-      assertThrows(OS3Exception.class, stream::read);
+      OS3Exception error = assertThrows(OS3Exception.class, stream::read);
+      assertThat(error.getCode()).isEqualTo(S3ErrorTable.INCOMPLETE_BODY.getCode());
     }
   }
 
-  private void assertInvalidBody(String body, boolean singleByte) throws IOException {
+  private void assertBodyError(String body, boolean singleByte, S3ErrorTable expected) throws IOException {
     try (UnsignedChunksInputStream stream = wrapContent(body, TrailerHeader.CRC32)) {
       OS3Exception error = assertThrows(OS3Exception.class, () -> {
         if (singleByte) {
@@ -230,7 +242,8 @@ public class TestUnsignedChunkInputStream {
           IOUtils.toByteArray(stream);
         }
       }, () -> "Accepted malformed body: " + body);
-      assertThat(error.getCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode());
+      assertThat(error.getCode()).isEqualTo(expected.getCode());
+      assertThat(error.getHttpCode()).isEqualTo(expected.getHttpCode());
       assertThat(stream.getTrailerChecksum()).isNull();
     }
   }
