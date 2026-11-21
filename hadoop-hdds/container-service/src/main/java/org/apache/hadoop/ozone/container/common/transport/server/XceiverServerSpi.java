@@ -21,9 +21,10 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
 /** A server endpoint that acts as the communication layer for Ozone containers. */
 public interface XceiverServerSpi {
@@ -37,46 +38,25 @@ public interface XceiverServerSpi {
   int getIPCPort();
 
   /**
-   * Returns the Replication type supported by this end-point.
-   * @return enum -- {Stand_Alone, Ratis, Chained}
-   */
-  HddsProtos.ReplicationType getServerType();
-
-  /**
    * submits a containerRequest to be performed by the replication pipeline.
    * @param request ContainerCommandRequest
    */
-  void submitRequest(ContainerCommandRequestProto request,
-      HddsProtos.PipelineID pipelineID)
-      throws IOException;
+  void submitRequest(ContainerCommandRequestProto request, PipelineID pipelineID) throws IOException;
 
   /**
    * Returns true if the given pipeline exist.
    *
    * @return true if pipeline present, else false
    */
-  boolean isExist(HddsProtos.PipelineID pipelineId);
+  boolean isExist(PipelineID pipelineId);
 
   /**
-   * Join a new pipeline.
+   * Join a new pipeline of the given type with priority.
    */
-  default void addGroup(HddsProtos.PipelineID pipelineId,
-      List<DatanodeDetails> peers) throws IOException {
-  }
-
-  /**
-   * Join a new pipeline with priority.
-   */
-  default void addGroup(HddsProtos.PipelineID pipelineId,
+  default void addGroup(PipelineID pipelineId,
+      ReplicationType type,
       List<DatanodeDetails> peers,
       List<Integer> priorityList) throws IOException {
-  }
-
-  /**
-   * Exit a pipeline.
-   */
-  default void removeGroup(HddsProtos.PipelineID pipelineId)
-      throws IOException {
   }
 
   /**

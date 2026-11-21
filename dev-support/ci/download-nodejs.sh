@@ -34,7 +34,8 @@ mkdir -p "${REPO_DIR}"
 declare -i rc=1
 
 if [[ -z "${NODEJS_VERSION:-}" ]]; then
-  NODEJS_VERSION=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout -Dscan=false)
+  source hadoop-ozone/dev-support/checks/_lib.sh
+  NODEJS_VERSION=$(get_version nodejs)
 fi
 
 if [[ -n "${NODEJS_VERSION}" ]]; then

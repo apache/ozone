@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -31,6 +33,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -56,6 +60,8 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
   private static final Logger LOG = LoggerFactory.getLogger(OMFinalizeUpgradeRequestBase.class);
+  private static final int PEER_VERSION_CHECK_MAX_RETRIES = 1;
+  private static final long PEER_VERSION_CHECK_RPC_TIMEOUT_SECONDS = 60;
 
   public OMFinalizeUpgradeRequestBase(OMRequest omRequest) {
     super(omRequest);
@@ -149,6 +155,14 @@ public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
     }
     OzoneManagerVersion leaderVersion = OzoneManagerVersion.SOFTWARE_VERSION;
     List<String> failedPeers = new ArrayList<>();
+    OzoneConfiguration peerCheckConfiguration = new OzoneConfiguration(configuration);
+    peerCheckConfiguration.setInt(OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_KEY,
+        PEER_VERSION_CHECK_MAX_RETRIES);
+    peerCheckConfiguration.setInt(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY,
+        PEER_VERSION_CHECK_MAX_RETRIES);
+    OMClientConfig peerCheckClientConfig = peerCheckConfiguration.getObject(OMClientConfig.class);
+    peerCheckClientConfig.setRpcTimeOut(TimeUnit.SECONDS.toMillis(PEER_VERSION_CHECK_RPC_TIMEOUT_SECONDS));
+    peerCheckConfiguration.setFromObject(peerCheckClientConfig);
     for (OMNodeDetails peerDetails : peerNodes) {
       String peerId = peerDetails.getNodeId();
       OMAdminProtocolClientSideImpl client = null;
@@ -156,7 +170,7 @@ public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
         // Use the OM service login (Kerberos keytab) identity, not the remote client's identity: this runs inside the
         // client's RPC handler thread, whose UGI has no credentials to open a fresh outbound RPC to the peer OM.
         client = OMAdminProtocolClientSideImpl.createProxyForSingleOM(
-            configuration, UserGroupInformation.getLoginUser(), peerDetails);
+            peerCheckConfiguration, UserGroupInformation.getLoginUser(), peerDetails);
         OzoneManagerVersion peerVersion = client.getPeerUpgradeStatus();
         if (!peerVersion.equals(leaderVersion)) {
           LOG.warn("OM peer {} is running software version {} but leader is running version {}. "

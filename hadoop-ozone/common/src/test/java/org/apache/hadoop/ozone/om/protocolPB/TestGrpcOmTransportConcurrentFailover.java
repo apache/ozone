@@ -23,12 +23,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.AdditionalAnswers.delegatesTo;
-import static org.mockito.Mockito.mock;
 
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
-import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,11 +40,14 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OzoneManagerServiceGrpcBinding;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.thirdparty.io.grpc.Server;
+import org.apache.ratis.thirdparty.io.grpc.ServerBuilder;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -237,30 +235,6 @@ public class TestGrpcOmTransportConcurrentFailover {
     private final AtomicInteger successCount = new AtomicInteger(0);
     private final AtomicInteger failureCount = new AtomicInteger(0);
     private final AtomicBoolean isLeader = new AtomicBoolean(false);
-    private final OzoneManagerServiceGrpc.OzoneManagerServiceImplBase serviceImpl =
-        mock(OzoneManagerServiceGrpc.OzoneManagerServiceImplBase.class,
-            delegatesTo(new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
-              @Override
-              public void submitRequest(OMRequest request, StreamObserver<OMResponse> responseObserver) {
-                requestCount.incrementAndGet();
-
-                if (!isLeader.get()) {
-                  failureCount.incrementAndGet();
-                  responseObserver.onError(OMGrpcError.toStatusRuntimeException(
-                      new OMNotLeaderException("OM:" + nodeId + " is not the leader. Suggested leader: om2")));
-                } else {
-                  successCount.incrementAndGet();
-                  OMResponse response = OMResponse.newBuilder()
-                      .setCmdType(request.getCmdType())
-                      .setStatus(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK)
-                      .setMessage("Success from " + nodeId)
-                      .build();
-
-                  responseObserver.onNext(response);
-                  responseObserver.onCompleted();
-                }
-              }
-            }));
     private Server server;
 
     MockOMServer(String nodeId, int port) {
@@ -270,9 +244,29 @@ public class TestGrpcOmTransportConcurrentFailover {
 
     public void start() throws Exception {
       server = ServerBuilder.forPort(port)
-          .addService(serviceImpl)
+          .addService(OzoneManagerServiceGrpcBinding.bindService(this::submitRequest))
           .build()
           .start();
+    }
+
+    private void submitRequest(OMRequest request, StreamObserver<OMResponse> responseObserver) {
+      requestCount.incrementAndGet();
+
+      if (!isLeader.get()) {
+        failureCount.incrementAndGet();
+        responseObserver.onError(OMGrpcError.toStatusRuntimeException(
+            new OMNotLeaderException("OM:" + nodeId + " is not the leader. Suggested leader: om2")));
+      } else {
+        successCount.incrementAndGet();
+        OMResponse response = OMResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK)
+            .setMessage("Success from " + nodeId)
+            .build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+      }
     }
 
     public void stop() throws Exception {

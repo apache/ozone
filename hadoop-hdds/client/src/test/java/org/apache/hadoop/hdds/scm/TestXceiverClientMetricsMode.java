@@ -169,7 +169,7 @@ class TestXceiverClientMetricsMode {
       assertFalse(ManagementFactory.getPlatformMBeanServer().isRegistered(
           new ObjectName("Hadoop:service=" + SOURCE_NAME + ",name=MetricsSystem,sub=Control")));
     } finally {
-      metrics.unRegister();
+      DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
       XceiverClientMetrics.setMetricsMode(MetricsMode.AUTO);
     }
   }
