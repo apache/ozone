@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script merges the combined jacoco files (output of unit.sh and others)
+# This script merges the combined jacoco files
 # and generates a report in HTML and XML formats
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
