@@ -74,6 +74,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
@@ -128,11 +130,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SubmitContainerIdExportRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -1355,6 +1359,35 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.SuppressContainer, builder -> builder.setSuppressContainerRequest(request))
             .getSuppressContainerResponse();
     return response.getFailedContainerIDsList();
+  }
+
+  @Override
+  public String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException {
+    final SubmitContainerIdExportRequestProto.Builder request = SubmitContainerIdExportRequestProto.newBuilder()
+        .setMaxRows(maxRows)
+        .setBatchSize(batchSize)
+        .setPartSize(partSize);
+    if (startContainerId != null) {
+      request.setStartContainerID(startContainerId.getProtobuf());
+    }
+    if (lifeCycleState != null) {
+      request.setLifecycleState(lifeCycleState);
+    }
+    if (healthState != null) {
+      request.setHealthState(healthState.name());
+    }
+    return submitRequest(Type.SubmitContainerIdExport, builder -> builder.setSubmitContainerIdExportRequest(request))
+        .getSubmitContainerIdExportResponse().getJobId();
+  }
+
+  @Override
+  public GetContainerIdExportStatusResponseProto getContainerIdExportStatus(String jobId) throws IOException {
+    final GetContainerIdExportStatusRequestProto request = GetContainerIdExportStatusRequestProto.newBuilder()
+        .setJobId(jobId)
+        .build();
+    return submitRequest(Type.GetContainerIdExportStatus,
+        builder -> builder.setGetContainerIdExportStatusRequest(request)).getGetContainerIdExportStatusResponse();
   }
 
   /**

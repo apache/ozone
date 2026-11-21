@@ -39,10 +39,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusResponseProto;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +62,7 @@ import org.slf4j.LoggerFactory;
  * schedules work.
  *
  * <p>Retention: only the {@code maxRetained} most recently finished jobs stay queryable through
- * {@link #getExportStatus}, and only the {@code maxRetained} newest completed archives stay on disk. Older
+ * {@link #getContainerExportStatus}, and only the {@code maxRetained} newest completed archives stay on disk. Older
  * ones are dropped when a job finishes and when the manager starts, so an unknown job id can also mean an
  * evicted one.
  */
@@ -153,7 +155,10 @@ public class ContainerExportManager {
     final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
     final ExportJob job = new ExportJob(scope, start, sizing);
     if (!runningJob.compareAndSet(null, job)) {
-      throw new IOException("Another container ID export is already running");
+      // The running job may finish right after the failed compareAndSet, so the slot can already be empty here.
+      final ExportJob running = runningJob.get();
+      throw new NonRetriableException("Another container ID export is already running"
+          + (running != null ? ": " + running.getId() : ""));
     }
 
     jobMap.put(job.getId(), job);
@@ -169,9 +174,44 @@ public class ContainerExportManager {
     return job;
   }
 
-  public ExportJob.Status getExportStatus(ExportJob.Id jobId) {
-    ExportJob job = jobMap.get(jobId);
-    return job != null ? job.getStatus() : null;
+  /**
+   * Returns the status of a job as sent to clients.
+   *
+   * @return the status, or {@code null} if the job is unknown, for example because it was evicted or SCM restarted
+   */
+  public GetContainerIdExportStatusResponseProto getContainerExportStatus(String jobId) {
+    final ExportJob job = jobMap.get(ExportJob.Id.of(jobId));
+    if (job == null) {
+      return null;
+    }
+    final ExportJob.Status status = job.getStatus();
+    final GetContainerIdExportStatusResponseProto.Builder builder = GetContainerIdExportStatusResponseProto
+        .newBuilder()
+        .setJobId(jobId)
+        .setMaxRows(job.getMaxRows())
+        .setBatchSize(job.getBatchSize())
+        .setPartSize(job.getPartSize())
+        .setElapsedMs(status.getElapsedMs());
+    if (job.getLifeCycleState() != null) {
+      builder.setLifecycleState(job.getLifeCycleState());
+    }
+    if (job.getHealthState() != null) {
+      builder.setHealthState(job.getHealthState().name());
+    }
+    if (!status.isDone()) {
+      return builder.setState(GetContainerIdExportStatusResponseProto.ExecutionState.RUNNING).build();
+    }
+    final Throwable failure = status.getException();
+    if (failure != null) {
+      return builder.setState(GetContainerIdExportStatusResponseProto.ExecutionState.FAILED)
+          .setErrorMessage(failure.getMessage() != null ? failure.getMessage() : failure.toString()).build();
+    }
+    builder.setState(GetContainerIdExportStatusResponseProto.ExecutionState.SUCCEEDED)
+        .setIdsWritten(status.getIdsWritten());
+    if (status.getIdsWritten() > 0) {
+      builder.setTarPath(fileManager.getArchivePath(job.getFileName()));
+    }
+    return builder.build();
   }
 
   public void shutdown() {
@@ -197,7 +237,7 @@ public class ContainerExportManager {
     // A job accepted but drained from the executor queue by shutdownNow() never ran; fail it.
     final ExportJob notStarted = runningJob.getAndSet(null);
     if (notStarted != null) {
-      notStarted.getFuture().completeExceptionally(new InterruptedException("Export cancelled: SCM shutting down"));
+      notStarted.fail(new InterruptedException("Export cancelled: SCM shutting down"));
     }
     try {
       fileManager.unlock();
@@ -237,9 +277,9 @@ public class ContainerExportManager {
       retain(job, failure == null && idsWritten > 0);
       final boolean cleared = runningJob.compareAndSet(job, null);
       if (failure == null) {
-        job.getFuture().complete(idsWritten);
+        job.complete(idsWritten);
       } else {
-        job.getFuture().completeExceptionally(failure);
+        job.fail(failure);
       }
       Preconditions.assertTrue(cleared);
     }

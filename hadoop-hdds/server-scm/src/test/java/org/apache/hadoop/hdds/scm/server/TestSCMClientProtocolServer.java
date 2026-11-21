@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -55,11 +57,15 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.export.ContainerExportManager;
+import org.apache.hadoop.hdds.scm.container.export.ExportJob;
 import org.apache.hadoop.hdds.scm.ha.NonRetriableException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -253,6 +259,106 @@ public class TestSCMClientProtocolServer {
   }
 
   @Test
+  public void testSubmitContainerIdExportChecksWriteAccessAndDelegates() throws Exception {
+    final ContainerExportManager exportManager = mock(ContainerExportManager.class);
+    final ExportJob job = mock(ExportJob.class);
+    when(job.getId()).thenReturn(ExportJob.Id.of("job-1"));
+    when(exportManager.submitJob(any(), any(), any(), anyLong(), anyInt(), anyInt())).thenReturn(job);
+    final StorageContainerManager mockScm = scmWithExportManager(exportManager);
+    final SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockScm, mock(ReconfigurationHandler.class));
+    try {
+      assertEquals("job-1", scmServer.submitContainerIdExport(
+          ContainerID.valueOf(5), LifeCycleState.OPEN, ContainerHealthState.MISSING, 10, 20, 30));
+      // Submitting starts a job, so it needs write access (readOnly=false).
+      verify(mockScm).checkAdminAccess(any(), eq(false));
+      verify(exportManager).submitJob(
+          ContainerID.valueOf(5), LifeCycleState.OPEN, ContainerHealthState.MISSING, 10, 20, 30);
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testSubmitContainerIdExportDeniedDoesNotStartAJob() throws Exception {
+    final ContainerExportManager exportManager = mock(ContainerExportManager.class);
+    final StorageContainerManager mockScm = scmWithExportManager(exportManager);
+    doThrow(new AccessControlException("Access denied")).when(mockScm).checkAdminAccess(any(), eq(false));
+    final SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockScm, mock(ReconfigurationHandler.class));
+    try {
+      assertThrows(AccessControlException.class, () -> scmServer.submitContainerIdExport(
+          null, LifeCycleState.OPEN, null, 0, 0, 0));
+      verifyNoInteractions(exportManager);
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testSubmitContainerIdExportRejectsBadSizingWithoutRetry() throws Exception {
+    final ContainerExportManager exportManager = mock(ContainerExportManager.class);
+    when(exportManager.submitJob(any(), any(), any(), anyLong(), anyInt(), anyInt()))
+        .thenThrow(new IllegalArgumentException("batchSize must be between 0 and 1000000: -1"));
+    final SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        scmWithExportManager(exportManager), mock(ReconfigurationHandler.class));
+    try {
+      assertThatThrownBy(() -> scmServer.submitContainerIdExport(null, LifeCycleState.OPEN, null, 0, -1, 0))
+          .isInstanceOf(NonRetriableException.class)
+          .hasMessageContaining("batchSize");
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testGetContainerIdExportStatusChecksReadAccessAndDelegates() throws Exception {
+    final ContainerExportManager exportManager = mock(ContainerExportManager.class);
+    final GetContainerIdExportStatusResponseProto expected = GetContainerIdExportStatusResponseProto.newBuilder()
+        .setJobId("job-1").setState(GetContainerIdExportStatusResponseProto.ExecutionState.RUNNING).build();
+    when(exportManager.getContainerExportStatus("job-1")).thenReturn(expected);
+    final StorageContainerManager mockScm = scmWithExportManager(exportManager);
+    final SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockScm, mock(ReconfigurationHandler.class));
+    try {
+      assertEquals(expected, scmServer.getContainerIdExportStatus("job-1"));
+      // Reading a status only needs read access (readOnly=true).
+      verify(mockScm).checkAdminAccess(any(), eq(true));
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testGetContainerIdExportStatusDeniedDoesNotReadJobs() throws Exception {
+    final ContainerExportManager exportManager = mock(ContainerExportManager.class);
+    final StorageContainerManager mockScm = scmWithExportManager(exportManager);
+    doThrow(new AccessControlException("Access denied")).when(mockScm).checkAdminAccess(any(), eq(true));
+    final SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockScm, mock(ReconfigurationHandler.class));
+    try {
+      assertThrows(AccessControlException.class, () -> scmServer.getContainerIdExportStatus("job-1"));
+      verifyNoInteractions(exportManager);
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testGetContainerIdExportStatusOfUnknownJobIsNotRetried() throws Exception {
+    final ContainerExportManager exportManager = mock(ContainerExportManager.class);
+    final SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        scmWithExportManager(exportManager), mock(ReconfigurationHandler.class));
+    try {
+      assertThatThrownBy(() -> scmServer.getContainerIdExportStatus("no-such-job"))
+          .isInstanceOf(NonRetriableException.class)
+          .hasMessageContaining("no-such-job");
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
   public void testScmGetContainerCount() throws IOException {
     SCMClientProtocolServer scmServer =
         new SCMClientProtocolServer(new OzoneConfiguration(),
@@ -363,6 +469,12 @@ public class TestSCMClientProtocolServer {
   @Test
   public void testGetPeerUpgradeStatusReturnsLocalVersion() throws IOException {
     assertEquals(HDDSVersion.SOFTWARE_VERSION, server.getPeerUpgradeStatus());
+  }
+
+  private StorageContainerManager scmWithExportManager(ContainerExportManager exportManager) {
+    final StorageContainerManager mockScm = mockStorageContainerManager();
+    when(mockScm.getContainerExportManager()).thenReturn(exportManager);
+    return mockScm;
   }
 
   private ContainerInfo newContainerWithLastUsedTime(long containerId,

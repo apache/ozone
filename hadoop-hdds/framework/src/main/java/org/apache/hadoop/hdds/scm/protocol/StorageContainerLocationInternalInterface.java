@@ -35,11 +35,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerIdExportStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -566,4 +568,27 @@ public interface StorageContainerLocationInternalInterface extends Closeable {
    * @throws IOException
    */
   List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException;
+
+  /**
+   * Starts an asynchronous export of container IDs on the SCM leader. At least one of
+   * {@code lifeCycleState} and {@code healthState} must be set. Only one export runs at a time.
+   *
+   * @param startContainerId first container ID to export, or null for 0
+   * @param lifeCycleState only export containers in this lifecycle state, or null for any
+   * @param healthState only export containers in this health state, or null for any
+   * @param maxRows upper bound on exported container IDs, or 0 for no limit
+   * @param batchSize container IDs fetched per listing query, or 0 for the SCM default
+   * @param partSize container IDs written per part file, or 0 for the SCM default
+   * @return the id of the submitted job
+   * @throws IOException if the request is invalid, another export is running, or this is not the SCM leader
+   */
+  String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException;
+
+  /**
+   * Returns the status of a container ID export job.
+   *
+   * @throws IOException if the job is unknown (for example evicted, or SCM restarted) or this is not the SCM leader
+   */
+  GetContainerIdExportStatusResponseProto getContainerIdExportStatus(String jobId) throws IOException;
 }
