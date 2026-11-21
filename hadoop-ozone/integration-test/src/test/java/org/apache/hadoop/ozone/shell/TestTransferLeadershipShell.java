@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -36,7 +38,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -142,10 +143,16 @@ public class TestTransferLeadershipShell {
     StorageContainerManager leader = getScmLeader(cluster);
 
     String[] args = {"scm", "transfer", "-n", "no-such-scm"};
-    try (GenericTestUtils.SystemErrCapturer capture = new GenericTestUtils.SystemErrCapturer()) {
+    // The command prints its error to its own writer, which may not be System.err.
+    StringWriter err = new StringWriter();
+    PrintWriter originalErr = ozoneAdmin.getCmd().getErr();
+    ozoneAdmin.getCmd().setErr(new PrintWriter(err, true));
+    try {
       assertNotEquals(ExitCode.OK, ozoneAdmin.execute(args));
-      assertThat(capture.getOutput()).contains("Target no-such-scm not found in group");
+    } finally {
+      ozoneAdmin.getCmd().setErr(originalErr);
     }
+    assertThat(err.toString()).contains("Target no-such-scm not found in group");
     assertEquals(leader, getScmLeader(cluster));
   }
 
