@@ -170,9 +170,8 @@ jobs:
 
       - name: Setup Java 21
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-java@v6
+        uses: $/.github/actions/setup-java
         with:
-          distribution: 'temurin'
           java-version: 21
 
       - name: Fetch Java 21 dependencies
