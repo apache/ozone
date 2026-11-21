@@ -270,7 +270,7 @@ public class BlockDeletingService extends BackgroundService {
           return false;
         }
         // in case the ratis group does not exist, just mark it for deletion.
-        if (!ratisServer.isExist(pipelineID.getProtobuf())) {
+        if (!ratisServer.isExist(pipelineID)) {
           return true;
         }
         try {
@@ -290,7 +290,7 @@ public class BlockDeletingService extends BackgroundService {
         } catch (IOException ioe) {
           // in case of any exception check again whether the pipeline exist
           // and in case the pipeline got destroyed, just mark it for deletion
-          if (!ratisServer.isExist(pipelineID.getProtobuf())) {
+          if (!ratisServer.isExist(pipelineID)) {
             return true;
           } else {
             LOG.info("Skipping deletes for container {} due to exception: {}",

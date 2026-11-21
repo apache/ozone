@@ -29,11 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -69,8 +67,6 @@ import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -667,30 +663,153 @@ public class TestRpcClient {
     }
   }
 
+  static Stream<Arguments> multipartContextCases() {
+    return Arrays.stream(OzoneManagerVersion.values())
+        .flatMap(version -> Stream.of(
+            Arguments.of(version, true, null),
+            Arguments.of(version, true, "explicit-volume"),
+            Arguments.of(version, false, null),
+            Arguments.of(version, false, "explicit-volume")));
+  }
+
   @ParameterizedTest
-  @EnumSource(value = OzoneManagerVersion.class,
-      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
-  void testAbortS3MultipartUpload(OzoneManagerVersion version) throws Exception {
-    RpcClient client = spy(createRpcClient());
+  @MethodSource("multipartContextCases")
+  void testMultipartListingS3Context(OzoneManagerVersion version, boolean s3Client, String volumeName)
+      throws Exception {
+    List<OMRequest> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          OMResponse response = super.submitRequest(request);
+          return response.toBuilder().setServiceListResponse(response.getServiceListResponse().toBuilder()
+              .clearServiceInfo().addServiceInfo(om(version).getProtobuf())).build();
+        }
+        requests.add(request);
+        OMResponse.Builder response = OMResponse.newBuilder()
+            .setCmdType(request.getCmdType()).setSuccess(true).setStatus(Status.OK);
+        if (request.getCmdType() == Type.ListMultipartUploads) {
+          return response.setListMultipartUploadsResponse(
+              OzoneManagerProtocolProtos.ListMultipartUploadsResponse.newBuilder()).build();
+        }
+        if (request.getCmdType() == Type.ListMultiPartUploadParts) {
+          return response.setListMultipartUploadPartsResponse(
+              OzoneManagerProtocolProtos.MultipartUploadListPartsResponse.newBuilder()
+                  .setType(HddsProtos.ReplicationType.RATIS).setFactor(HddsProtos.ReplicationFactor.ONE)).build();
+        }
+        throw new IOException("Unexpected request: " + request.getCmdType());
+      }
+    };
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(S3Auth.S3_AUTH_CHECK, s3Client);
+    RpcClient client = spy(createRpcClient(transport, config));
+    try {
+      boolean assumeContext = volumeName == null
+          && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version);
+      if (volumeName == null && !assumeContext) {
+        assertThrows(NullPointerException.class,
+            () -> client.listMultipartUploads(null, "bucket", "prefix/", "previous", "previous-upload", 2));
+        assertThrows(NullPointerException.class, () -> client.listParts(null, "bucket", "key", "upload-id", 3, 2));
+        assertThat(requests).isEmpty();
+        verify(client, never()).getS3VolumeContext();
+        return;
+      }
+      String expectedVolume = assumeContext ? "s3v" : volumeName;
+
+      assertThat(client.listMultipartUploads(volumeName, "bucket", "prefix/", "previous", "previous-upload", 2)
+          .getUploads()).isEmpty();
+      assertThat(client.listParts(volumeName, "bucket", "key", "upload-id", 3, 2).getPartInfoList()).isEmpty();
+
+      assertThat(requests).hasSize(2);
+      for (OMRequest request : requests) {
+        assertEquals(assumeContext, request.getAssumeS3Context());
+      }
+      OzoneManagerProtocolProtos.ListMultipartUploadsRequest uploads = requests.get(0).getListMultipartUploadsRequest();
+      assertEquals(expectedVolume, uploads.getVolume());
+      assertEquals("bucket", uploads.getBucket());
+      assertEquals("prefix/", uploads.getPrefix());
+      assertEquals("previous", uploads.getKeyMarker());
+      assertEquals("previous-upload", uploads.getUploadIdMarker());
+      assertEquals(2, uploads.getMaxUploads());
+      assertEquals(OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION.isSupportedBy(version),
+          uploads.getWithPagination());
+      OzoneManagerProtocolProtos.MultipartUploadListPartsRequest parts =
+          requests.get(1).getListMultipartUploadPartsRequest();
+      assertEquals(expectedVolume, parts.getVolume());
+      assertEquals("bucket", parts.getBucket());
+      assertEquals("key", parts.getKey());
+      assertEquals("upload-id", parts.getUploadID());
+      assertEquals(3, parts.getPartNumbermarker());
+      assertEquals(2, parts.getMaxParts());
+      verify(client, never()).getS3VolumeContext();
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("multipartContextCases")
+  void testAbortMultipartUploadS3Context(OzoneManagerVersion version, boolean s3Client, String volumeName)
+      throws Exception {
+    List<OMRequest> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          OMResponse response = super.submitRequest(request);
+          return response.toBuilder().setServiceListResponse(response.getServiceListResponse().toBuilder()
+              .clearServiceInfo().addServiceInfo(om(version).getProtobuf())).build();
+        }
+        requests.add(request);
+        return OMResponse.newBuilder().setCmdType(request.getCmdType()).setSuccess(true).setStatus(Status.OK).build();
+      }
+    };
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(S3Auth.S3_AUTH_CHECK, s3Client);
+    RpcClient client = spy(createRpcClient(transport, config));
+    try {
+      boolean assumeContext = volumeName == null
+          && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version);
+      if (volumeName == null && !assumeContext) {
+        assertThrows(NullPointerException.class, () -> client.abortMultipartUpload(null, "bucket", "key", "upload-id"));
+        assertThat(requests).isEmpty();
+        verify(client, never()).getS3VolumeContext();
+        return;
+      }
+      client.abortMultipartUpload(volumeName, "bucket", "key", "upload-id");
+
+      assertThat(requests).hasSize(1);
+      OMRequest request = requests.get(0);
+      assertEquals(Type.AbortMultiPartUpload, request.getCmdType());
+      assertEquals(assumeContext, request.getAssumeS3Context());
+      KeyArgs args = request.getAbortMultiPartUploadRequest().getKeyArgs();
+      assertEquals(assumeContext ? "s3v" : volumeName, args.getVolumeName());
+      assertEquals("bucket", args.getBucketName());
+      assertEquals("key", args.getKeyName());
+      assertEquals("upload-id", args.getMultipartUploadID());
+      verify(client, never()).getS3VolumeContext();
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  void testAbortMultipartUploadValidatesArguments() throws Exception {
+    RpcClient client = createRpcClient();
     try {
       OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
-      FieldUtils.writeField(client, "omVersion", version, true);
       FieldUtils.writeField(client, "ozoneManagerClient", om, true);
-      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
-          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
-      boolean assumeContext = version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION;
 
-      client.abortS3MultipartUpload("bucket", "key", "upload-id");
-
-      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
-      if (assumeContext) {
-        verify(om).abortMultipartUpload(args.capture(), eq(true));
-      } else {
-        verify(om).abortMultipartUpload(args.capture());
-      }
-      verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
-      assertEquals(assumeContext ? "s3v" : "tenant-volume", args.getValue().getVolumeName());
-      assertEquals("upload-id", args.getValue().getMultipartUploadID());
+      OMException invalidVolume = assertThrows(OMException.class,
+          () -> client.abortMultipartUpload("invalid/volume", "bucket", "key", "upload-id"));
+      assertEquals(ResultCodes.INVALID_VOLUME_NAME, invalidVolume.getResult());
+      OMException invalidBucket = assertThrows(OMException.class,
+          () -> client.abortMultipartUpload("volume", "invalid/bucket", "key", "upload-id"));
+      assertEquals(ResultCodes.INVALID_BUCKET_NAME, invalidBucket.getResult());
+      assertThrows(NullPointerException.class,
+          () -> client.abortMultipartUpload("volume", "bucket", null, "upload-id"));
+      assertThrows(NullPointerException.class, () -> client.abortMultipartUpload("volume", "bucket", "key", null));
+      verifyNoInteractions(om);
     } finally {
       client.close();
     }

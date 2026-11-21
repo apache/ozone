@@ -22,7 +22,6 @@ import java.util.EnumMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -57,10 +56,6 @@ public class XceiverClientMetrics implements MetricsSource {
   private MetricsRegistry registry;
 
   public XceiverClientMetrics() {
-    init();
-  }
-
-  public void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
     int[] intervals = conf.getInts(OzoneConfigKeys.OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
 
@@ -123,17 +118,6 @@ public class XceiverClientMetrics implements MetricsSource {
   @VisibleForTesting
   public long getContainerOpCountMetrics(ContainerProtos.Type type) {
     return opsArray.get(type).value();
-  }
-
-  @VisibleForTesting
-  public void reset() {
-    init();
-  }
-
-  public void unRegister() {
-    IOUtils.closeQuietly(containerOpsLatency.values());
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
   }
 
   @Override

@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomUtils;
@@ -117,8 +120,11 @@ class TestKeyDataStreamOutput {
    */
   private KeyDataStreamOutput createKeyStream(OzoneManagerProtocol omClient, MockDatanodePipeline... pipelines)
       throws Exception {
+    return createKeyStream(createConfig(), omClient, pipelines);
+  }
 
-    OzoneClientConfig config = createConfig();
+  private KeyDataStreamOutput createKeyStream(OzoneClientConfig config, OzoneManagerProtocol omClient,
+      MockDatanodePipeline... pipelines) throws Exception {
     ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
 
     OmKeyInfo keyInfo = new OmKeyInfo.Builder()
@@ -267,6 +273,28 @@ class TestKeyDataStreamOutput {
     // allocateBlock should have been called (for the retry block)
     verify(omClient).allocateBlock(any(OmKeyArgs.class), anyLong(), any(ExcludeList.class));
     verify(omClient).commitKey(any(OmKeyArgs.class), anyLong());
+  }
+
+  @Test
+  void testFailedStreamCloseOfSecondBlockRewritesOnlyItsData() throws Exception {
+    final MockDatanodePipeline pipeline1 = new MockDatanodePipeline(new BlockID(1, 1));
+    final MockDatanodePipeline pipeline2 = new MockDatanodePipeline(new BlockID(2, 2)).failStreamClose();
+    final MockDatanodePipeline pipeline3 = new MockDatanodePipeline(new BlockID(3, 3));
+    // createOmClient only lists pipelines returned by allocateBlock in call order, i.e. pipeline2 then pipeline3.
+    final OzoneManagerProtocol omClient = createOmClient(pipeline2, pipeline3);
+    final OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    // PutBlock commands at 300B and 600B, so the stream close of the first block commits its last 200B.
+    config.setDataStreamBufferFlushSize(300);
+    final byte[] data = RandomUtils.secure().randomBytes(850);
+
+    try (KeyDataStreamOutput stream = createKeyStream(config, omClient, pipeline1, pipeline2, pipeline3)) {
+      stream.write(ByteBuffer.wrap(data), 0, data.length);
+    }
+
+    // Only the data of the second block is written again; none of the first block, whose close succeeded.
+    assertArrayEquals(Arrays.copyOfRange(data, 800, 850), pipeline3.getAllReceivedData());
+    verify(omClient).commitKey(argThat(args -> args.getDataSize() == data.length), anyLong());
   }
 
   @Test

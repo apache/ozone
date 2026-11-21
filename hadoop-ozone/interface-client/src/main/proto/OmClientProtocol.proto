@@ -1493,6 +1493,7 @@ message RenameKeyResponse{
 
 message DeleteKeyRequest {
     required KeyArgs keyArgs = 1;
+    optional uint64 updateID = 2; // the key's update ID when key is identified for deletion
 }
 
 message DeleteKeysRequest {

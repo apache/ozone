@@ -3988,10 +3988,10 @@ public abstract class OmSnapshotTests {
     assertEquals(expectedDiffs, diff.getDiffList());
   }
 
-  protected SnapshotDiffResponse waitForDoneReportAfterOrderedSubmit(String volume, String bucket,
-      String fromSnap, String toSnap, boolean orderedReport)
+  protected SnapshotDiffResponse waitForDoneReportAfterSubmit(String volume, String bucket,
+      String fromSnap, String toSnap, boolean forceFullDiff, boolean orderedReport)
       throws IOException, InterruptedException, TimeoutException {
-    store.submitSnapshotDiff(volume, bucket, fromSnap, toSnap, false, false, orderedReport);
+    store.submitSnapshotDiff(volume, bucket, fromSnap, toSnap, forceFullDiff, false, orderedReport);
     AtomicReference<SnapshotDiffResponse> responseRef = new AtomicReference<>();
     GenericTestUtils.waitFor(() -> {
       try {
