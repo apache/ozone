@@ -23,6 +23,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
@@ -43,7 +44,8 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   private final DatanodeInfo nodeDetails;
   private final boolean httpsEnabled;
   private final MetricsServiceProvider metricsServiceProvider;
-  private static final String BEAN_NAME = "Hadoop:service=HddsDatanode,name=BlockDeletingService";
+  private static final String DATANODE_METRICS_BEAN_PREFIX = "Hadoop:service=HddsDatanode,name=";
+  private static final String LEGACY_BEAN_NAME = DATANODE_METRICS_BEAN_PREFIX + BlockDeletingServiceMetrics.SOURCE_NAME;
   private static final String METRICS_KEY = "TotalPendingBlockBytes";
 
   public DataNodeMetricsCollectionTask(
@@ -59,12 +61,17 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   public DatanodePendingDeletionMetrics call() {
     LOG.debug("Collecting pending deletion metrics from DataNode {}", nodeDetails.getHostName());
     try {
-      List<Map<String, Object>> metrics = metricsServiceProvider.getMetrics(BEAN_NAME);
+      // ObjectName property-value pattern: the trailing '*' matches LEGACY_BEAN_NAME and the
+      // datanode-qualified beans a same-JVM cluster registers.
+      List<Map<String, Object>> metrics = metricsServiceProvider.getMetrics(LEGACY_BEAN_NAME + "*");
       if (metrics == null || metrics.isEmpty()) {
         return new DatanodePendingDeletionMetrics(
             nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
       }
-      Map<String, Object> deletionMetrics = ReconUtils.getMetricsData(metrics, BEAN_NAME);
+      Map<String, Object> deletionMetrics = ReconUtils.getMetricsData(metrics, getBlockDeletingServiceBeanName());
+      if (deletionMetrics == null) {
+        deletionMetrics = ReconUtils.getMetricsData(metrics, LEGACY_BEAN_NAME);
+      }
       long pendingBlockSize = ReconUtils.extractLongMetricValue(deletionMetrics, METRICS_KEY);
 
       return new DatanodePendingDeletionMetrics(
@@ -82,5 +89,9 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
     Name portName = httpsEnabled ?  Name.HTTPS : Name.HTTP;
     return protocol + "://" + HddsUtils.getHostPortString(nodeDetails.getHostName(),
         nodeDetails.getPort(portName).getValue()) + "/jmx";
+  }
+
+  private String getBlockDeletingServiceBeanName() {
+    return DATANODE_METRICS_BEAN_PREFIX + BlockDeletingServiceMetrics.getSourceName(nodeDetails.getUuidString());
   }
 }

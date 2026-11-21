@@ -38,7 +38,7 @@ import org.apache.hadoop.util.Time;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Manager Metrics", context = "dfs")
-public class OMMetrics implements OmMetadataReaderMetrics {
+public final class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
 
@@ -265,12 +265,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numPutBucketTaggingFails;
   private @Metric MutableCounterLong numDeleteBucketTaggingFails;
 
-  public OMMetrics(int maxRatisEvents) {
-    dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
+  private OMMetrics(int maxRatisEvents, String metricsSourceId) {
+    dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics", metricsSourceId);
     this.maxRatisEvents = maxRatisEvents;
   }
 
   public static OMMetrics create(ConfigurationSource conf) {
+    return create(conf, null);
+  }
+
+  public static OMMetrics create(ConfigurationSource conf, String omNodeId) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     int maxRatisEvents = conf == null
         ? OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
@@ -278,7 +282,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
         OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
     return ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
-        new OMMetrics(maxRatisEvents));
+        new OMMetrics(maxRatisEvents, omNodeId));
   }
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {

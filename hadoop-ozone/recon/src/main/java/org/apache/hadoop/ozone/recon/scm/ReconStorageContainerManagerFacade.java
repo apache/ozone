@@ -378,7 +378,7 @@ public class ReconStorageContainerManagerFacade
 
     // Use a version manager with no upgrade actions. The version will only be used to track Datanode versions,
     // not run SCM specific reformatting on upgrade.
-    this.scmVersionManager = new ScmVersionManager(scmStorageConfig, this, HashMap::new);
+    this.scmVersionManager = new ScmVersionManager(scmStorageConfig, this, HashMap::new, "ReconSCM");
     this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
@@ -678,6 +678,7 @@ public class ReconStorageContainerManagerFacade
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
     containerSyncMetrics.unRegister();
+    scmVersionManager.close();
     scmSnapshotExecutor.shutdownNow();
     IOUtils.close(LOG, dbStore);
   }

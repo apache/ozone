@@ -324,6 +324,7 @@ import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.snapshot.trapped.BucketDeletedDataCalculator;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMUpgradeActionProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizeService;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OzoneManagerAdminService;
@@ -638,7 +639,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
 
-    versionManager = new OMVersionManager(omStorage, this);
+    versionManager = new OMVersionManager(omStorage, this, new OMUpgradeActionProvider(), getOMNodeId());
 
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
@@ -769,7 +770,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY,
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
 
-    metrics = OMMetrics.create(conf);
+    metrics = OMMetrics.create(conf, getOMNodeId());
     omSnapshotIntMetrics = OmSnapshotInternalMetrics.create(getOMServiceId(),
         getOMNodeId());
     perfMetrics = OMPerformanceMetrics.register();

@@ -84,6 +84,7 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.ScmNodeAddress;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -457,6 +458,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private void registerMXBean() {
     Map<String, String> jmxProperties = new HashMap<>();
     jmxProperties.put("component", "ServerRuntime");
+    if (DefaultMetricsSystem.inMiniClusterMode()) {
+      jmxProperties.put("datanode", datanodeDetails.getUuidString());
+    }
     this.dnInfoBeanName = HddsUtils.registerWithJmxProperties(
         "HddsDatanodeService",
         "HddsDatanodeServiceInfo", jmxProperties, this.serviceRuntimeInfo);

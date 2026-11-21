@@ -130,6 +130,7 @@ public class OzoneContainer {
   private final HddsDispatcher hddsDispatcher;
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource config;
+  private final String metricsSourceId;
   private final MutableVolumeSet volumeSet;
   private final MutableVolumeSet metaVolumeSet;
   private final MutableVolumeSet dbVolumeSet;
@@ -188,9 +189,11 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
+    this.metricsSourceId = datanodeDetails.getUuidString();
     this.startupProgress = hddsDatanodeService != null && hddsDatanodeService.getStartupProgress() != null
         ? hddsDatanodeService.getStartupProgress() : new StartupProgress<>(DatanodeStartupPhase.class);
-    this.volumeChecker = new StorageVolumeChecker(conf, new Timer(), datanodeDetails.threadNamePrefix());
+    this.volumeChecker = new StorageVolumeChecker(conf, new Timer(),
+        datanodeDetails.threadNamePrefix(), metricsSourceId);
 
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.DATA_VOLUME, volumeChecker);
@@ -226,12 +229,12 @@ public class OzoneContainer {
     volumeSet.setGatherContainerUsages(this::gatherContainerUsages);
     metadataScanner = null;
 
-    metrics = ContainerMetrics.create(conf);
+    metrics = ContainerMetrics.create(conf, metricsSourceId);
     handlers = Maps.newHashMap();
 
     IncrementalReportSender<Container> icrSender = createIncrementalReportSender();
 
-    checksumTreeManager = new ContainerChecksumTreeManager(config);
+    checksumTreeManager = new ContainerChecksumTreeManager(config, metricsSourceId);
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(
@@ -242,7 +245,7 @@ public class OzoneContainer {
 
     SecurityConfig secConf = new SecurityConfig(conf);
     hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
-        handlers, context, metrics, TokenVerifier.create(secConf, secretKeyClient));
+        handlers, context, metrics, TokenVerifier.create(secConf, secretKeyClient), metricsSourceId);
 
     /*
      * ContainerController is the control plane
@@ -296,6 +299,7 @@ public class OzoneContainer {
             blockDeletingServiceTimeout, TimeUnit.MILLISECONDS,
             blockDeletingServiceWorkerSize, config,
             datanodeDetails.threadNamePrefix(),
+            metricsSourceId,
             checksumTreeManager,
             context.getParent().getReconfigurationHandler());
 
@@ -308,7 +312,7 @@ public class OzoneContainer {
       diskBalancerService =
           new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
               diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
-              config);
+              config, metricsSourceId);
     } else {
       diskBalancerService = null;
       LOG.info("Disk Balancer is not enabled. Please enable the " +
@@ -506,7 +510,7 @@ public class OzoneContainer {
   private void initMetadataScanner(ContainerScannerConfiguration c) {
     if (this.metadataScanner == null) {
       this.metadataScanner =
-          new BackgroundContainerMetadataScanner(c, controller);
+          new BackgroundContainerMetadataScanner(c, controller, metricsSourceId);
       backgroundScanners.add(metadataScanner);
     }
     this.metadataScanner.start();
@@ -518,7 +522,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    onDemandScanner = new OnDemandContainerScanner(c, controller);
+    onDemandScanner = new OnDemandContainerScanner(c, controller, metricsSourceId);
     containerSet.registerOnDemandScanner(onDemandScanner);
   }
 
@@ -739,12 +743,14 @@ public class OzoneContainer {
       dbCompactionExecutorService.shutdown();
     }
     blockDeletingService.shutdown();
+    // Not in BlockDeletingService#shutdown: updateAndRestart() restarts the service with the same metrics.
+    blockDeletingService.getMetrics().unregister();
     if (diskBalancerService != null) {
       diskBalancerService.shutdown();
     }
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
-    ContainerMetrics.remove();
+    metrics.unregister();
     checksumTreeManager.stop();
     if (this.witnessedContainerMetadataStore != null) {
       try {

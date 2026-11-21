@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -44,6 +46,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
@@ -70,14 +73,19 @@ public class SCMConnectionManager
   private ObjectName jmxBean;
 
   public SCMConnectionManager(ConfigurationSource conf) {
+    this(conf, null);
+  }
+
+  public SCMConnectionManager(ConfigurationSource conf, String component) {
     this.mapLock = new ReentrantReadWriteLock();
     Long timeOut = getScmRpcTimeOutInMilliseconds(conf);
     this.rpcTimeout = timeOut.intValue();
     this.scmMachines = new HashMap<>();
     this.conf = conf;
-    jmxBean = MBeans.register("HddsDatanode",
-        "SCMConnectionManager",
-        this);
+    Map<String, String> jmxProperties =
+        DefaultMetricsSystem.inMiniClusterMode() && component != null
+        ? Collections.singletonMap("datanode", component) : Collections.emptyMap();
+    jmxBean = HddsUtils.registerWithJmxProperties("HddsDatanode", "SCMConnectionManager", jmxProperties, this);
   }
 
   /**
