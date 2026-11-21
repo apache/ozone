@@ -49,7 +49,7 @@ public class ContainerTestVersionInfo {
   };
 
   static {
-    for (ContainerLayoutVersion ch : ContainerLayoutVersion.getAllVersions()) {
+    for (ContainerLayoutVersion ch : ContainerLayoutVersion.getSupportedVersions()) {
       for (String sch : SCHEMA_VERSIONS) {
         layoutList.add(new ContainerTestVersionInfo(sch, ch));
       }

@@ -87,6 +87,17 @@ describe('Pipelines Component', () => {
     expect(table).toHaveTextContent('CLOSED');
   });
 
+  test('loads data when auto refresh is disabled', async () => {
+    sessionStorage.setItem('autoReloadEnabled', 'false');
+    try {
+      render(<Pipelines />);
+      const rows = await waitFor(() => screen.getAllByTestId(pipelineLocators.pipelineRowRegex));
+      expect(rows).toHaveLength(3);
+    } finally {
+      sessionStorage.removeItem('autoReloadEnabled');
+    }
+  });
+
   test('Renders table with correct number of rows', async () => {
     render(<Pipelines />);
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -158,5 +159,58 @@ class TestContainerReportQueue {
 
     assertThat(failure.get(10, TimeUnit.SECONDS)).isInstanceOf(InterruptedException.class);
     taker.join();
+  }
+
+  @Test
+  void replacesQueuedFullReportAtCapacity() {
+    ContainerReportQueue singleSlotQueue = new ContainerReportQueue(1);
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerReportFromDatanode oldReport = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance());
+    ContainerReportFromDatanode newReport = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance());
+
+    assertThat(singleSlotQueue.add(oldReport)).isTrue();
+    assertThat(singleSlotQueue.add(newReport)).isTrue();
+    assertThat(singleSlotQueue).hasSize(1);
+    assertThat(singleSlotQueue.poll()).isSameAs(newReport);
+  }
+
+  @Test
+  void rejectsFullReportWhenNoFcrCanBeReplaced() {
+    ContainerReportQueue singleSlotQueue = new ContainerReportQueue(1);
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    IncrementalContainerReportFromDatanode incrementalReport =
+        new IncrementalContainerReportFromDatanode(
+            datanode, IncrementalContainerReportProto.getDefaultInstance());
+    ContainerReportFromDatanode fullReport = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance());
+
+    assertThat(singleSlotQueue.add(incrementalReport)).isTrue();
+    assertThatIllegalStateException()
+        .isThrownBy(() -> singleSlotQueue.add(fullReport))
+        .withMessage("capacity not available");
+    assertThat(singleSlotQueue).hasSize(1);
+    assertThat(singleSlotQueue.poll()).isSameAs(incrementalReport);
+  }
+
+  @Test
+  void rejectsFullReportFromDifferentDatanodeAtCapacity() {
+    ContainerReportQueue singleSlotQueue = new ContainerReportQueue(1);
+
+    // Each call creates a datanode with a newly generated ID.
+    DatanodeDetails datanodeA = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanodeB = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerReportFromDatanode queuedReport = new ContainerReportFromDatanode(
+        datanodeA, ContainerReportsProto.getDefaultInstance());
+    ContainerReportFromDatanode newReport = new ContainerReportFromDatanode(
+        datanodeB, ContainerReportsProto.getDefaultInstance());
+
+    assertThat(singleSlotQueue.add(queuedReport)).isTrue();
+    assertThatIllegalStateException()
+        .isThrownBy(() -> singleSlotQueue.add(newReport))
+        .withMessage("capacity not available");
+    assertThat(singleSlotQueue).hasSize(1);
+    assertThat(singleSlotQueue.poll()).isSameAs(queuedReport);
   }
 }

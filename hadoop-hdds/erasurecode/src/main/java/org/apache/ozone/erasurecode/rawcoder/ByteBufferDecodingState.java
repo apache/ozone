@@ -115,7 +115,7 @@ class ByteBufferDecodingState extends DecodingState {
     }
 
     if (validInputs < decoder.getNumDataUnits()) {
-      throw new IllegalArgumentException("No enough valid inputs are provided ("
+      throw new IllegalArgumentException("Not enough valid inputs are provided ("
           + validInputs + " vs. " + decoder.getNumDataUnits()
           + "), not recoverable");
     }

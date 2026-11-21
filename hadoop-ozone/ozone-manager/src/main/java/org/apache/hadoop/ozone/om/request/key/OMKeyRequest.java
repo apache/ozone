@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -65,6 +66,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -206,6 +208,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       long requestedSize, boolean shouldSortDatanodes,
       UserInfo userInfo, OzoneManager ozoneManager)
       throws IOException {
+    Preconditions.checkArgument(requestedSize > 0, "requestedSize = %s <= 0", requestedSize);
     final long scmBlockSize = ozoneManager.getScmBlockSize();
     final KeyManager keyManager = ozoneManager.getKeyManager();
 
@@ -215,7 +218,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
     final String scmClientMachine;
-    final String omClientMachine;
     // Sorted order cached by datanode set so blocks whose pipelines share the
     // same datanodes are sorted once (mirrors the read path's caching). Keyed by
     // the UUID set so it is order-insensitive and dedups across pipelines.
@@ -224,20 +226,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final NetworkTopology clusterMap = shouldSortDatanodes
         && keyManager.isSortDatanodesForWriteEnabled()
         ? ozoneManager.getClusterMapAllowNull() : null;
+    // Resolve the client once per request, before the block loop, so the
+    // DNS-to-switch mapping is consulted at most once.
+    final Node omClient = clusterMap != null && !remoteAddress.isEmpty()
+        ? keyManager.resolveClientForWrite(remoteAddress, clusterMap) : null;
     if (!shouldSortDatanodes) {
       scmClientMachine = "";
-      omClientMachine = "";
       sortedByNodes = null;
-    } else if (clusterMap != null && !remoteAddress.isEmpty()) {
+    } else if (omClient != null) {
       // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
       scmClientMachine = "";
-      omClientMachine = remoteAddress;
       sortedByNodes = new HashMap<>();
     } else {
-      // Sort in SCM (or keep order when remoteAddress is empty, since SCM skips
-      // sorting for an empty client machine).
+      // Sort in SCM when OM has no topology or cannot resolve the client (or keep order
+      // when remoteAddress is empty, since SCM skips sorting for an empty client machine).
       scmClientMachine = remoteAddress;
-      omClientMachine = "";
       sortedByNodes = null;
     }
 
@@ -253,6 +256,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
         throw new OMException(ex.getMessage(),
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
       }
+      if (ex.getResult() == SCMException.ResultCodes.PIPELINE_NOT_FOUND) {
+        throw new OMException(ex.getMessage(), ex, OMException.ResultCodes.KEY_ALLOCATION_ERROR);
+      }
       throw ex;
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
@@ -264,15 +270,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
         List<? extends DatanodeDetails> sorted = sortedByNodes.get(uuidSet);
         if (sorted == null) {
-          sorted = keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap);
-          // Cache only a freshly sorted order, not an input list returned
-          // unchanged when the client is unresolved: that order is per-pipeline
-          // and must not be reused for another pipeline with the same node set.
-          if (sorted != nodes) {
+          sorted = keyManager.sortDatanodesForWrite(nodes, remoteAddress, omClient, clusterMap);
+          // Cache only sorted results; a skipped sort must preserve each pipeline's own order.
+          if (sorted != null) {
             sortedByNodes.put(uuidSet, sorted);
           }
         }
-        if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
+        if (sorted != null && !Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }
       }
@@ -783,22 +787,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
             omMetadataManager.getBucketKey(volumeName,
                 bucketName));
 
-        // If bucket is symlink, resolveBucketLink to figure out real
-        // volume/bucket.
-        if (bucketInfo.isLink()) {
-          ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-              Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-
-          bucketInfo = omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(resolvedBucket.realVolume(),
-                  resolvedBucket.realBucket()));
-        }
-
       } finally {
         if (acquireLock) {
           mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(
               BUCKET_LOCK, volumeName, bucketName));
         }
+      }
+
+      // If bucket is symlink, resolveBucketLink to figure out real
+      // volume/bucket. It takes the lock of each bucket it reads, so it must be called without holding a bucket lock.
+      if (bucketInfo != null && bucketInfo.isLink()) {
+        final ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+            Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+
+        bucketInfo = omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(resolvedBucket.realVolume(), resolvedBucket.realBucket()));
       }
 
       // Don't throw exception of bucket not found when bucketinfo is
@@ -825,26 +828,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
       KeyArgs.Builder newKeyArgs, OzoneManager ozoneManager)
       throws IOException {
 
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-
-    boolean acquireLock = false;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     newKeyArgs.clearPartIv();
 
     if (ozoneManager.getKmsProvider() != null) {
-      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
-          BUCKET_LOCK, volumeName, bucketName));
-      acquireLock = getOmLockDetails().isLockAcquired();
+      // Resolved before taking a bucket lock, see generateRequiredEncryptionInfo.
+      final ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+      final String realVolume = resolvedBucket.realVolume();
+      final String realBucket = resolvedBucket.realBucket();
+      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK, realVolume, realBucket));
+      final boolean acquireLock = getOmLockDetails().isLockAcquired();
       try {
-        ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-            Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-
         // Get the DB key name for looking up keyInfo in OpenKeyTable with
         // resolved volume/bucket.
         String dbMultipartOpenKey =
-            getDBMultipartOpenKey(resolvedBucket.realVolume(),
-                resolvedBucket.realBucket(), keyArgs.getKeyName(),
+            getDBMultipartOpenKey(realVolume, realBucket, keyArgs.getKeyName(),
                 keyArgs.getMultipartUploadID(), omMetadataManager);
 
         OmKeyInfo omKeyInfo =
@@ -870,8 +869,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       } finally {
         if (acquireLock) {
-          mergeOmLockDetails(omMetadataManager.getLock()
-              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
+          mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, realVolume, realBucket));
         }
       }
     }

@@ -19,17 +19,18 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Manages records in the OpenKey Table, updating counts and sizes of
- * open keys in the backend.
+ * open keys in the backend. Multipart open keys are excluded, since incomplete
+ * multipart uploads are tracked by {@link MultipartInfoInsightHandler}.
  */
 public class OpenKeysInsightHandler implements OmTableHandler {
 
@@ -49,6 +50,9 @@ public class OpenKeysInsightHandler implements OmTableHandler {
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
+      if (OMMultipartUploadUtils.isMultipartKeySet(omKeyInfo)) {
+        return;
+      }
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName), (k, count) -> count + 1L);
       unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size + omKeyInfo.getDataSize());
@@ -73,6 +77,9 @@ public class OpenKeysInsightHandler implements OmTableHandler {
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
+      if (OMMultipartUploadUtils.isMultipartKeySet(omKeyInfo)) {
+        return;
+      }
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count > 0 ? count - 1L : 0L);
       unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
@@ -128,7 +135,7 @@ public class OpenKeysInsightHandler implements OmTableHandler {
    * that are currently open in the backend.
    */
   @Override
-  public Triple<Long, Long, Long> getTableSizeAndCount(String tableName,
+  public TableSizeAndCount getTableSizeAndCount(String tableName,
       OMMetadataManager omMetadataManager) throws IOException {
     long count = 0;
     long unReplicatedSize = 0;
@@ -138,7 +145,7 @@ public class OpenKeysInsightHandler implements OmTableHandler {
     try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-        if (kv != null && kv.getValue() != null) {
+        if (kv != null && kv.getValue() != null && !OMMultipartUploadUtils.isMultipartKeySet(kv.getValue())) {
           OmKeyInfo omKeyInfo = kv.getValue();
           unReplicatedSize += omKeyInfo.getDataSize();
           replicatedSize += omKeyInfo.getReplicatedSize();
@@ -146,7 +153,7 @@ public class OpenKeysInsightHandler implements OmTableHandler {
         }
       }
     }
-    return Triple.of(count, unReplicatedSize, replicatedSize);
+    return new TableSizeAndCount(count, unReplicatedSize, replicatedSize);
   }
 
 }

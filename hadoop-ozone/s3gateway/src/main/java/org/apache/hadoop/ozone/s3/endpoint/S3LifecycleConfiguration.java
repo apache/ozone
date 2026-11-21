@@ -475,6 +475,9 @@ public class S3LifecycleConfiguration {
       builder.setPrefix(filter.getPrefix());
     }
     if (filter.getTag() != null) {
+      if (filter.getTag().getKey() == null || filter.getTag().getValue() == null) {
+        throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML);
+      }
       builder.setTag(filter.getTag().getKey(), filter.getTag().getValue());
     }
     if (filter.getAndOperator() != null) {
@@ -498,6 +501,12 @@ public class S3LifecycleConfiguration {
     }
     if (andOperator.getTags() != null) {
       Map<String, String> tags = andOperator.getTags().stream()
+          .map(tag -> {
+            if (tag.getKey() == null || tag.getValue() == null) {
+              throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML);
+            }
+            return tag;
+          })
           .collect(Collectors.toMap(Tag::getKey, Tag::getValue));
       builder.setTags(tags);
     }

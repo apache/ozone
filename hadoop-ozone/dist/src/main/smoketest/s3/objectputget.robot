@@ -351,6 +351,32 @@ Put object with server-side encryption
                                 Should contain             ${result}    404
     END
 
+Get and head object report server-side encryption
+    [tags]    aws-skip
+                                Execute                    echo "sse" > /tmp/ssetestfile
+    IF    '${BUCKET}' == 'encrypted'
+        # without an SSE header, an object in an encrypted bucket is reported as encrypted with the bucket's KMS key
+                                Execute AWSS3APICli        put-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/kms --body /tmp/ssetestfile
+        ${result} =             Execute AWSS3APICli        head-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/kms
+                                Should contain             ${result}    "ServerSideEncryption": "aws:kms"
+                                Should contain             ${result}    "SSEKMSKeyId"
+        ${result} =             Execute AWSS3APICli        get-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/kms /tmp/ssetestfile.result
+                                Should contain             ${result}    "ServerSideEncryption": "aws:kms"
+        # an object written with AES256 reports AES256
+                                Execute AWSS3APICli        put-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/aes --body /tmp/ssetestfile --server-side-encryption AES256
+        ${result} =             Execute AWSS3APICli        head-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/aes
+                                Should contain             ${result}    "ServerSideEncryption": "AES256"
+                                Should not contain         ${result}    SSEKMSKeyId
+        ${result} =             Execute AWSS3APICli        get-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/aes /tmp/ssetestfile.result
+                                Should contain             ${result}    "ServerSideEncryption": "AES256"
+    ELSE
+                                Execute AWSS3APICli        put-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/plain --body /tmp/ssetestfile
+        ${result} =             Execute AWSS3APICli        head-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/plain
+                                Should not contain         ${result}    ServerSideEncryption
+        ${result} =             Execute AWSS3APICli        get-object --bucket ${BUCKET} --key ${PREFIX}/getobject/sse/plain /tmp/ssetestfile.result
+                                Should not contain         ${result}    ServerSideEncryption
+    END
+
 Put object with customer-provided encryption key
     [tags]    aws-skip
                                 Execute                    echo "ssec" > /tmp/ssectestfile

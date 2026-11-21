@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -86,6 +87,16 @@ public class TestOMDBUpdatesHandler {
     OzoneConfiguration reconConfiguration = createNewTestPath("reconConfig");
     reconOmMetadataManager = new OmMetadataManagerImpl(reconConfiguration,
         null);
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconOmMetadataManager != null) {
+      reconOmMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   @Test
@@ -231,7 +242,8 @@ public class TestOMDBUpdatesHandler {
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
     List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
-    assertEquals(7, events.size());
+    // The second delete finds the key already deleted, so it yields no event.
+    assertEquals(6, events.size());
 
     OMDBUpdateEvent volEvent = events.get(0);
     assertEquals(PUT, volEvent.getAction());
@@ -270,13 +282,7 @@ public class TestOMDBUpdatesHandler {
     assertEquals("key_new2",
         ((OmKeyInfo)keyDeleteEvent.getValue()).getKeyName());
 
-    OMDBUpdateEvent keyDeleteEvent2 = events.get(5);
-    assertEquals(DELETE, keyDeleteEvent2.getAction());
-    assertEquals("/sampleVol/bucketOne/key", keyDeleteEvent2.getKey());
-    assertEquals("key_new2",
-        ((OmKeyInfo)keyDeleteEvent2.getValue()).getKeyName());
-
-    OMDBUpdateEvent keyPut2 = events.get(6);
+    OMDBUpdateEvent keyPut2 = events.get(5);
     assertEquals(PUT, keyPut2.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyPut2.getKey());
     assertEquals("key_new2",
