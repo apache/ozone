@@ -56,12 +56,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeIdCommand;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -323,8 +323,8 @@ public class TestReplicationManagerScenarios {
   private void assertExpectations(Scenario scenario,
       ReplicationManagerReport report) {
     Expectation expectation = scenario.getExpectation();
-    for (ContainerHealthState state :
-        ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state :
+        SimplifiedContainerHealthStateForReporting.values()) {
       assertEquals(expectation.getExpected(state), report.getStat(state),
           "Test: " + scenario + ": Unexpected count for " + state);
     }
@@ -502,68 +502,68 @@ public class TestReplicationManagerScenarios {
   public static class Expectation {
 
     // The expected counts for each health state, as would be seen in the ReplicationManagerReport.
-    private Map<ContainerHealthState, Integer> stateCounts = new HashMap<>();
+    private Map<SimplifiedContainerHealthStateForReporting, Integer> stateCounts = new HashMap<>();
     // The expected count for each queue after running the RM check phase.
     private int underReplicatedQueue = 0;
     private int overReplicatedQueue = 0;
 
     public void setUnderReplicated(int underReplicated) {
-      stateCounts.put(ContainerHealthState.UNDER_REPLICATED, underReplicated);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED, underReplicated);
     }
 
     public void setOverReplicated(int overReplicated) {
-      stateCounts.put(ContainerHealthState.OVER_REPLICATED, overReplicated);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED, overReplicated);
     }
 
     public void setMisReplicated(int misReplicated) {
-      stateCounts.put(ContainerHealthState.MIS_REPLICATED, misReplicated);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED, misReplicated);
     }
 
     public void setUnhealthy(int unhealthy) {
-      stateCounts.put(ContainerHealthState.UNHEALTHY, unhealthy);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.UNHEALTHY, unhealthy);
     }
 
     public void setMissing(int missing) {
-      stateCounts.put(ContainerHealthState.MISSING, missing);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.MISSING, missing);
     }
 
     public void setEmpty(int empty) {
-      stateCounts.put(ContainerHealthState.EMPTY,  empty);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.EMPTY,  empty);
     }
 
     public void setQuasiClosedStuck(int quasiClosedStuck) {
-      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK, quasiClosedStuck);
     }
 
     public void setOpenUnhealthy(int openUnhealthy) {
-      stateCounts.put(ContainerHealthState.OPEN_UNHEALTHY, openUnhealthy);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.OPEN_UNHEALTHY, openUnhealthy);
     }
 
     public void setQuasiClosedStuckUnderReplicated(int count) {
-      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED, count);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED, count);
     }
 
     public void setQuasiClosedStuckOverReplicated(int count) {
-      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED, count);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_OVER_REPLICATED, count);
     }
 
     public void setQuasiClosedStuckMissing(int count) {
-      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_MISSING, count);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_MISSING, count);
     }
 
     public void setUnhealthyUnderReplicated(int count) {
-      stateCounts.put(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED, count);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED, count);
     }
 
     public void setUnhealthyOverReplicated(int count) {
-      stateCounts.put(ContainerHealthState.UNHEALTHY_OVER_REPLICATED, count);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED, count);
     }
 
     public void setMissingUnderReplicated(int count) {
-      stateCounts.put(ContainerHealthState.MISSING_UNDER_REPLICATED, count);
+      stateCounts.put(SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED, count);
     }
 
-    public int getExpected(ContainerHealthState state) {
+    public int getExpected(SimplifiedContainerHealthStateForReporting state) {
       return stateCounts.getOrDefault(state, 0);
     }
 

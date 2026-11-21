@@ -29,12 +29,12 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.MonitoringReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -312,7 +312,7 @@ public class ReconReplicationManager extends ReplicationManager {
         List<ContainerReplicaOp> pendingOps = getPendingReplicationOps(cid);
         if (container.isSuppressed()) {
           // processContainer skips a suppressed container and would leave its last health state in place.
-          container.setHealthState(ContainerHealthState.HEALTHY);
+          container.setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting.HEALTHY);
         }
 
         // Call inherited processContainer - this runs SCM's health check chain
@@ -377,33 +377,33 @@ public class ReconReplicationManager extends ReplicationManager {
         ContainerInfo container = allContainers.get(i);
         ContainerID containerId = container.containerID();
         try {
-          ContainerHealthState healthState = container.getHealthState();
-          if (healthState == ContainerHealthState.MISSING
-              || healthState == ContainerHealthState.QUASI_CLOSED_STUCK_MISSING
-              || healthState == ContainerHealthState.MISSING_UNDER_REPLICATED) {
+          SimplifiedContainerHealthStateForReporting healthState = container.getSimplifiedHealthStateForReporting();
+          if (healthState == SimplifiedContainerHealthStateForReporting.MISSING
+              || healthState == SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_MISSING
+              || healthState == SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED) {
             handleMissingContainer(containerId, currentTime, recordsToInsert,
                 chunkStats);
           }
-          if (healthState == ContainerHealthState.UNDER_REPLICATED
-              || healthState == ContainerHealthState.UNHEALTHY_UNDER_REPLICATED
-              || healthState == ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED
-              || healthState == ContainerHealthState.MISSING_UNDER_REPLICATED) {
+          if (healthState == SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED
+              || healthState == SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED
+              || healthState == SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED
+              || healthState == SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED) {
             chunkStats.incrementUnderRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.UNDER_REPLICATED,
                 recordsToInsert,
                 negativeSizeRecorded, chunkStats);
           }
-          if (healthState == ContainerHealthState.OVER_REPLICATED
-              || healthState == ContainerHealthState.UNHEALTHY_OVER_REPLICATED
-              || healthState == ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED) {
+          if (healthState == SimplifiedContainerHealthStateForReporting.OVER_REPLICATED
+              || healthState == SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED
+              || healthState == SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_OVER_REPLICATED) {
             chunkStats.incrementOverRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.OVER_REPLICATED,
                 recordsToInsert,
                 negativeSizeRecorded, chunkStats);
           }
-          if (healthState == ContainerHealthState.MIS_REPLICATED) {
+          if (healthState == SimplifiedContainerHealthStateForReporting.MIS_REPLICATED) {
             chunkStats.incrementMisRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.MIS_REPLICATED,
@@ -551,7 +551,7 @@ public class ReconReplicationManager extends ReplicationManager {
   }
 
   private void logUnmappedScmStates(ReconReplicationManagerReport report) {
-    for (ContainerHealthState state : ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state : SimplifiedContainerHealthStateForReporting.values()) {
       if (isMappedScmState(state)) {
         continue;
       }
@@ -565,7 +565,7 @@ public class ReconReplicationManager extends ReplicationManager {
     }
   }
 
-  private boolean isMappedScmState(ContainerHealthState state) {
+  private boolean isMappedScmState(SimplifiedContainerHealthStateForReporting state) {
     switch (state) {
     case MISSING:
     case UNDER_REPLICATED:
