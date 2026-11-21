@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterva
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmInitialHeartbeatInterval;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Message;
 import java.io.IOException;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
@@ -393,38 +395,66 @@ public class StateContext {
    */
   public List<Message> getAllAvailableReports(
       HostAndPort endpoint) {
-    return getAllAvailableReportsUpToLimit(endpoint, Integer.MAX_VALUE);
+    List<Message> reports = getFullReports(endpoint, Integer.MAX_VALUE);
+    reports.addAll(getIncrementalReports(endpoint, Integer.MAX_VALUE - reports.size()));
+    return reports;
   }
 
   /**
-   * Returns up to {@code maxLimit} available reports for the endpoint,
-   * removing them from the queue. Any reports beyond the limit stay queued
-   * and are returned by a later call; callers can use {@link
-   * #hasPendingReports(HostAndPort)} to detect that case and schedule a
-   * follow-up heartbeat.
-   *
-   * @return List of reports
+   * Returns available reports other than command status reports. Full reports
+   * are selected before incremental reports, and the total number returned is
+   * capped by {@code maxLimit}.
    */
-  public List<Message> getAllAvailableReports(
+  public List<Message> getAvailableNonCommandStatusReports(
       HostAndPort endpoint, int maxLimit) {
-    return getAllAvailableReportsUpToLimit(endpoint, maxLimit);
+    List<Message> reports = getFullReports(endpoint, maxLimit);
+    reports.addAll(getIncrementalReportsExcludingCommandStatus(
+        endpoint, maxLimit - reports.size()));
+    return reports;
   }
 
   /**
-   * Returns true if any reports are still queued for the endpoint.
+   * Selects command status reports within both the report count and serialized
+   * byte limits.
    */
-  public boolean hasPendingReports(HostAndPort endpoint) {
+  public CommandStatusReportSelection getCommandStatusReports(
+      HostAndPort endpoint, int maxLimit, long maxBytes,
+      long oversizedThreshold) {
+    List<CommandStatusReportsProto> selected = new LinkedList<>();
+    long selectedBytes = 0;
+    long oversizedBytes = 0;
     synchronized (incrementalReportsQueue) {
-      List<Message> reportsForEndpoint = incrementalReportsQueue.get(endpoint);
-      if (reportsForEndpoint != null && !reportsForEndpoint.isEmpty()) {
-        return true;
+      List<Message> reportsForEndpoint =
+          incrementalReportsQueue.get(endpoint);
+      if (reportsForEndpoint != null) {
+        Iterator<Message> iterator = reportsForEndpoint.iterator();
+        while (iterator.hasNext() && selected.size() < maxLimit) {
+          Message message = iterator.next();
+          if (!(message instanceof CommandStatusReportsProto)) {
+            continue;
+          }
+
+          CommandStatusReportsProto report =
+              (CommandStatusReportsProto) message;
+          long remainingBytes = maxBytes - selectedBytes;
+          long reportBytes = getCommandStatusReportWireSize(report);
+          if (reportBytes <= remainingBytes) {
+            selected.add(report);
+            selectedBytes += reportBytes;
+            iterator.remove();
+            if (reportBytes > oversizedThreshold) {
+              oversizedBytes = reportBytes;
+            }
+            continue;
+          }
+          if (reportBytes > oversizedThreshold) {
+            oversizedBytes = reportBytes;
+          }
+          break;
+        }
       }
+      return new CommandStatusReportSelection(selected, oversizedBytes);
     }
-    Map<String, AtomicBoolean> fullReports =
-        isFullReportReadyToBeSent.get(endpoint);
-    return fullReports != null && fullReports.entrySet().stream()
-        .anyMatch(report -> report.getValue().get()
-            && type2Reports.get(report.getKey()).get() != null);
   }
 
   /**
@@ -457,17 +487,6 @@ public class StateContext {
     }
   }
 
-  @VisibleForTesting
-  List<Message> getAllAvailableReportsUpToLimit(
-      HostAndPort endpoint,
-      int limit) {
-    List<Message> reports = getFullReports(endpoint, limit);
-    List<Message> incrementalReports = getIncrementalReports(endpoint,
-        limit - reports.size()); // get all (MAX_VALUE)
-    reports.addAll(incrementalReports);
-    return reports;
-  }
-
   List<Message> getIncrementalReports(
       HostAndPort endpoint, int maxLimit) {
     List<Message> reportsToReturn = new LinkedList<>();
@@ -482,6 +501,62 @@ public class StateContext {
       }
     }
     return reportsToReturn;
+  }
+
+  private List<Message> getIncrementalReportsExcludingCommandStatus(
+      HostAndPort endpoint, int maxLimit) {
+    List<Message> reportsToReturn = new LinkedList<>();
+    synchronized (incrementalReportsQueue) {
+      List<Message> reportsForEndpoint =
+          incrementalReportsQueue.get(endpoint);
+      if (reportsForEndpoint != null) {
+        Iterator<Message> iterator = reportsForEndpoint.iterator();
+        while (iterator.hasNext() && reportsToReturn.size() < maxLimit) {
+          Message report = iterator.next();
+          if (!(report instanceof CommandStatusReportsProto)) {
+            reportsToReturn.add(report);
+            iterator.remove();
+          }
+        }
+      }
+    }
+    return reportsToReturn;
+  }
+
+  private static long getCommandStatusReportWireSize(
+      CommandStatusReportsProto report) {
+    return getCommandStatusReportWireSize(report.getSerializedSize());
+  }
+
+  private static long getCommandStatusReportWireSize(
+      long reportBytes) {
+    return CodedOutputStream.computeTagSize(
+        SCMHeartbeatRequestProto.COMMANDSTATUSREPORTS_FIELD_NUMBER)
+        + CodedOutputStream.computeUInt64SizeNoTag(reportBytes)
+        + reportBytes;
+  }
+
+  /**
+   * Command status reports selected for one heartbeat and the size of any
+   * oversized report blocking the queue.
+   */
+  public static final class CommandStatusReportSelection {
+    private final List<CommandStatusReportsProto> reports;
+    private final long oversizedBytes;
+
+    private CommandStatusReportSelection(
+        List<CommandStatusReportsProto> reports, long oversizedBytes) {
+      this.reports = reports;
+      this.oversizedBytes = oversizedBytes;
+    }
+
+    public List<CommandStatusReportsProto> getReports() {
+      return reports;
+    }
+
+    public long getOversizedBytes() {
+      return oversizedBytes;
+    }
   }
 
   List<Message> getFullReports(

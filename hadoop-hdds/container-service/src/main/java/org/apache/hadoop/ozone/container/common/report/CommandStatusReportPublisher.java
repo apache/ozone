@@ -21,7 +21,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_I
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL_DEFAULT;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
@@ -63,21 +65,31 @@ public class CommandStatusReportPublisher extends
 
   @Override
   protected CommandStatusReportsProto getReport() {
+    return null;
+  }
+
+  @Override
+  protected List<CommandStatusReportsProto> getIncrementalReports() {
     Map<Long, CommandStatus> map = this.getContext()
         .getCommandStatusMap();
     Iterator<Long> iterator = map.keySet().iterator();
-    CommandStatusReportsProto.Builder builder = CommandStatusReportsProto
-        .newBuilder();
+    List<CommandStatusReportsProto> reports = new ArrayList<>();
 
-    iterator.forEachRemaining(key -> {
+    while (iterator.hasNext()) {
+      Long key = iterator.next();
       CommandStatus cmdStatus = map.get(key);
+      if (cmdStatus == null) {
+        continue;
+      }
+      reports.add(CommandStatusReportsProto.newBuilder()
+          .addCmdStatus(cmdStatus.getProtoBufMessage())
+          .build());
       // If status is still pending then don't remove it from map as
       // CommandHandler will change its status when it works on this command.
       if (!cmdStatus.getStatus().equals(Status.PENDING)) {
         map.remove(key);
       }
-      builder.addCmdStatus(cmdStatus.getProtoBufMessage());
-    });
-    return builder.getCmdStatusCount() > 0 ? builder.build() : null;
+    }
+    return reports;
   }
 }
