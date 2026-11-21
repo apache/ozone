@@ -41,7 +41,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
@@ -52,6 +51,7 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer.DeltaFile;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -245,14 +245,14 @@ public class TestFullDiffComputer {
 
     Map<Path, SstFileInfo> result = fullDiffComputer.computeDeltaFiles(fromSnapshot, toSnapshot,
         tablesToLookup, tablePrefixInfo).orElse(Collections.emptyMap()).entrySet()
-        .stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getValue()));
+        .stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().sstFileInfo()));
     when(activeMetadataManager.getTableBucketPrefix("vol1", "bucket1")).thenReturn(tablePrefixInfo);
     assertEquals(expectedDiffFile.entrySet().stream().collect(
         Collectors.toMap(entry -> snapDirectory.resolve(entry.getKey()), Map.Entry::getValue)),
         result);
 
     Set<Object> iNodes = fullDiffComputer.getDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup).stream()
-        .map(Pair::getKey).map(path -> {
+        .map(DeltaFile::path).map(path -> {
           try {
             return getINode(path);
           } catch (IOException e) {

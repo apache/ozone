@@ -76,7 +76,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
@@ -114,8 +113,10 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService.DefragCheckResult;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
+import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer.DeltaFile;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.util.ClosableIterator;
@@ -355,10 +356,10 @@ public class TestSnapshotDefragService {
     Map<Integer, OmSnapshotLocalData.VersionMeta> versionMap = ImmutableMap.of(1, versionInfo);
     when(localData.getVersionSstFileInfos()).thenReturn(versionMap);
 
-    Pair<Boolean, Integer> result = defragService.needsDefragmentation(snapshotInfo);
+    DefragCheckResult result = defragService.needsDefragmentation(snapshotInfo);
 
-    assertFalse(result.getLeft());
-    assertEquals(1, result.getRight());
+    assertFalse(result.needsDefrag());
+    assertEquals(1, result.version());
     verify(provider).commit();
     verify(provider).close();
   }
@@ -381,10 +382,10 @@ public class TestSnapshotDefragService {
     int version = ThreadLocalRandom.current().nextInt(100);
     when(localData.getVersion()).thenReturn(version);
 
-    Pair<Boolean, Integer> result = defragService.needsDefragmentation(snapshotInfo);
+    DefragCheckResult result = defragService.needsDefragmentation(snapshotInfo);
 
-    assertTrue(result.getLeft());
-    assertEquals(version, result.getRight());
+    assertTrue(result.needsDefrag());
+    assertEquals(version, result.version());
     verify(provider).close();
   }
 
@@ -798,7 +799,7 @@ public class TestSnapshotDefragService {
           sourceStore, tableName, key, liveSstType);
       when(deltaFileComputer.getDeltaFiles(eq(previousSnapshotInfo),
           eq(snapshotInfo), eq(ImmutableSet.of(tableName))))
-          .thenReturn(ImmutableList.of(Pair.of(deltaFile,
+          .thenReturn(ImmutableList.of(new DeltaFile(deltaFile,
               new SstFileInfo(deltaFile.toFile().getName(), key, key,
                   tableName))));
 
@@ -936,21 +937,22 @@ public class TestSnapshotDefragService {
     TablePrefixInfo prefixInfo = new TablePrefixInfo(ImmutableMap.of("cf1", "ab", "cf2", "cd",
         "cf3", "ef"));
 
-    List<Pair<Path, SstFileInfo>> deltaFiles = ImmutableList.of(
-        Pair.of(tempDir.resolve("1.sst").toAbsolutePath(), new SstFileInfo("1", "", "", "cf1")),
-        Pair.of(tempDir.resolve("2.sst").toAbsolutePath(), new SstFileInfo("2", "", "", "cf2")),
-        Pair.of(tempDir.resolve("3.sst").toAbsolutePath(), new SstFileInfo("3", "", "", "cf2")));
+    List<DeltaFile> deltaFiles = ImmutableList.of(
+        new DeltaFile(tempDir.resolve("1.sst").toAbsolutePath(), new SstFileInfo("1", "", "", "cf1")),
+        new DeltaFile(tempDir.resolve("2.sst").toAbsolutePath(), new SstFileInfo("2", "", "", "cf2")),
+        new DeltaFile(tempDir.resolve("3.sst").toAbsolutePath(), new SstFileInfo("3", "", "", "cf2")));
     Map<String, String> deltaFileNamesToTableMap = deltaFiles.stream()
-        .collect(Collectors.groupingBy(pair -> pair.getValue().getColumnFamily())).entrySet()
+        .collect(Collectors.groupingBy(deltaFile -> deltaFile.sstFileInfo().getColumnFamily())).entrySet()
         .stream().collect(Collectors.toMap(
-            e -> e.getValue().stream().map(Pair::getKey).map(Path::toString).sorted().collect(Collectors.joining(",")),
+            e -> e.getValue().stream().map(DeltaFile::path).map(Path::toString).sorted()
+                .collect(Collectors.joining(",")),
             Map.Entry::getKey));
-    for (Pair<Path, SstFileInfo> deltaFile : deltaFiles) {
-      assertTrue(deltaFile.getKey().toFile().createNewFile());
+    for (DeltaFile deltaFile : deltaFiles) {
+      assertTrue(deltaFile.path().toFile().createNewFile());
     }
     AtomicReference<String> currentTable = new AtomicReference<>();
     Map<String, String> dumpedFileName = new HashMap<>();
-    Map<Path, List<Pair<String, String>>> deltaFileContents = new HashMap<>();
+    Map<Path, List<DeltaFileEntry>> deltaFileContents = new HashMap<>();
     when(deltaFileComputer.getDeltaFiles(eq(snap1Info), eq(snap2Info), eq(incrementalTables))).thenReturn(deltaFiles);
     try (MockedConstruction<RDBSstFileWriter> rdbSstFileWriter =
              Mockito.mockConstruction(RDBSstFileWriter.class, (mock, context) -> {
@@ -962,12 +964,12 @@ public class TestSnapshotDefragService {
                  String key = StringCodec.get().fromCodecBuffer(i.getArgument(0));
                  String value = StringCodec.get().fromCodecBuffer(i.getArgument(1));
                  deltaFileContents.computeIfAbsent(filePath, k -> new ArrayList<>())
-                     .add(Pair.of(key, value));
+                     .add(new DeltaFileEntry(key, value));
                  return null;
                }).when(mock).put(any(CodecBuffer.class), any(CodecBuffer.class));
                doAnswer(i -> {
                  String key = StringCodec.get().fromCodecBuffer(i.getArgument(0));
-                 deltaFileContents.computeIfAbsent(filePath, k -> new ArrayList<>()).add(Pair.of(key, null));
+                 deltaFileContents.computeIfAbsent(filePath, k -> new ArrayList<>()).add(new DeltaFileEntry(key, null));
                  return null;
                }).when(mock).delete(any(CodecBuffer.class));
              });
@@ -1028,15 +1030,15 @@ public class TestSnapshotDefragService {
       assertEquals(incrementalTables, new HashSet<>(dumpedFileName.values()));
       assertEquals(ingestedFiles, dumpedFileName);
       assertEquals(incrementalTables, new HashSet<>(ingestedFiles.values()));
-      for (Map.Entry<Path, List<Pair<String, String>>> deltaFileContent : deltaFileContents.entrySet()) {
+      for (Map.Entry<Path, List<DeltaFileEntry>> deltaFileContent : deltaFileContents.entrySet()) {
         int idx = 0;
         for (int i = 0; i < 100; i++) {
           String tableName = dumpedFileName.get(deltaFileContent.getKey().toString());
           if (i % 6 < 3) {
             String key = String.format("%s%03d", prefixInfo.getTablePrefix(tableName), i);
-            Pair<String, String> actualKey = deltaFileContent.getValue().get(idx);
+            DeltaFileEntry actualKey = deltaFileContent.getValue().get(idx);
             CodecBuffer value = snap2TableValues.get(key);
-            Pair<String, String> expectedKey = Pair.of(key, value == null ? null :
+            DeltaFileEntry expectedKey = new DeltaFileEntry(key, value == null ? null :
                 StringCodec.get().fromCodecBuffer(value));
             assertEquals(expectedKey, actualKey, "Key mismatch for table " + tableName + " at index " + i);
             idx++;
@@ -1068,7 +1070,7 @@ public class TestSnapshotDefragService {
     try (MockedStatic<SnapshotUtils> mockedStatic = Mockito.mockStatic(SnapshotUtils.class)) {
       mockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(eq(ozoneManager), eq(chainManager),
           eq(snapshotInfo.getSnapshotId()))).thenReturn(snapshotInfo);
-      doReturn(Pair.of(false, 2)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
+      doReturn(new DefragCheckResult(false, 2)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
       assertFalse(spyDefragService.checkAndDefragSnapshot(chainManager, snapshotInfo.getSnapshotId()));
       verify(snapshotMetrics).incNumSnapshotDefragSnapshotSkipped();
       verify(omSnapshotManager).deleteSnapshotCheckpointDirectories(snapshotInfo.getSnapshotId(), 1);
@@ -1098,7 +1100,7 @@ public class TestSnapshotDefragService {
             eq(previousSnapshotInfo.getSnapshotId()))).thenReturn(previousSnapshotInfo);
       }
       SnapshotDefragService spyDefragService = Mockito.spy(defragService);
-      doReturn(Pair.of(true, 10)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
+      doReturn(new DefragCheckResult(true, 10)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
       OmMetadataManagerImpl checkpointMetadataManager = mock(OmMetadataManagerImpl.class);
       File checkpointPath = tempDir.resolve("checkpoint").toAbsolutePath().toFile();
       DBStore checkpointDBStore = mock(DBStore.class);
@@ -1163,7 +1165,7 @@ public class TestSnapshotDefragService {
       }
 
       SnapshotDefragService spyDefragService = Mockito.spy(defragService);
-      doReturn(Pair.of(true, 10)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
+      doReturn(new DefragCheckResult(true, 10)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
 
       @SuppressWarnings("resource") // Mock object, no actual resource management needed
       OmMetadataManagerImpl checkpointMetadataManager = mock(OmMetadataManagerImpl.class);
@@ -1270,7 +1272,7 @@ public class TestSnapshotDefragService {
             eq(previousSnapshotInfo.getSnapshotId()))).thenReturn(previousSnapshotInfo);
       }
       SnapshotDefragService spyDefragService = Mockito.spy(defragService);
-      doReturn(Pair.of(true, 10)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
+      doReturn(new DefragCheckResult(true, 10)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
       OmMetadataManagerImpl checkpointMetadataManager = mock(OmMetadataManagerImpl.class);
       File checkpointPath = tempDir.resolve("checkpoint").toAbsolutePath().toFile();
       DBStore checkpointDBStore = mock(DBStore.class);
@@ -1369,5 +1371,12 @@ public class TestSnapshotDefragService {
     builder.setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE);
     builder.setCreationTime(System.currentTimeMillis());
     return builder.build();
+  }
+
+  /**
+   * A key paired with its value (null for a deleted key),
+   * used to record the entries written to a delta SST file.
+   */
+  private record DeltaFileEntry(String key, String value) {
   }
 }

@@ -33,7 +33,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -41,7 +40,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
-import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,23 +77,23 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
   /**
    * Computes the delta files between two snapshots based on the provided parameters.
    * The method determines the differences in data between the `fromSnapshot` and
-   * `toSnapshot` and generates a mapping of paths to pairs consisting of a resolved
-   * path and corresponding SST file information.
+   * `toSnapshot` and generates a mapping of paths to {@link DeltaFile}s consisting of a
+   * resolved path and corresponding SST file information.
    *
    * @param fromSnapshot the source snapshot from which changes are calculated
    * @param toSnapshot the target snapshot up to which changes are calculated
    * @param tablesToLookup a set of table names to filter the tables that should be considered
    * @param tablePrefixInfo information about table prefixes to apply during computation
    * @return an Optional containing a map where the key is the delta file path, and the value
-   *         is a pair consisting of a resolved path and the corresponding SST file information.
+   *         is a {@link DeltaFile} consisting of a resolved path and the corresponding SST file information.
    *         Return empty if the delta files could not be computed.
    * @throws IOException if an I/O error occurs during the computation process
    */
-  abstract Optional<Map<Path, Pair<Path, SstFileInfo>>> computeDeltaFiles(SnapshotInfo fromSnapshot,
+  abstract Optional<Map<Path, DeltaFile>> computeDeltaFiles(SnapshotInfo fromSnapshot,
       SnapshotInfo toSnapshot, Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) throws IOException;
 
   @Override
-  public final Collection<Pair<Path, SstFileInfo>> getDeltaFiles(SnapshotInfo fromSnapshot,
+  public final Collection<DeltaFile> getDeltaFiles(SnapshotInfo fromSnapshot,
       SnapshotInfo toSnapshot, Set<String> tablesToLookup) throws IOException {
     TablePrefixInfo tablePrefixInfo = activeMetadataManager.getTableBucketPrefix(fromSnapshot.getVolumeName(),
         fromSnapshot.getBucketName());

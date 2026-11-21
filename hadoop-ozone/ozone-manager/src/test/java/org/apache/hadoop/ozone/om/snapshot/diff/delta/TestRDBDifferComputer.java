@@ -45,7 +45,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Consumer;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -55,6 +54,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
+import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer.DeltaFile;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -184,7 +184,7 @@ public class TestRDBDifferComputer {
     when(differ.getSSTDiffListWithFullPath(any(DifferSnapshotInfo.class), any(DifferSnapshotInfo.class),
         any(Map.class), any(TablePrefixInfo.class), anySet())).thenReturn(Optional.of(differResult));
 
-    Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+    Optional<Map<Path, DeltaFile>> result =
         rdbDifferComputer.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
     assertTrue(result.isPresent(), "Result should be present");
@@ -193,10 +193,10 @@ public class TestRDBDifferComputer {
     assertTrue(result.get().containsKey(sstFile2), "Should contain second SST file");
 
     // Verify links were created in delta directory
-    for (Map.Entry<Path, Pair<Path, SstFileInfo>> entry : result.get().entrySet()) {
+    for (Map.Entry<Path, DeltaFile> entry : result.get().entrySet()) {
       Path actualPath = entry.getKey();
-      Path link = entry.getValue().getLeft();
-      assertEquals(differResult.get(actualPath), entry.getValue().getValue());
+      Path link = entry.getValue().path();
+      assertEquals(differResult.get(actualPath), entry.getValue().sstFileInfo());
       assertTrue(link.startsWith(deltaDirPath), "Link should be in delta directory");
       assertTrue(Files.exists(link), "Link should exist");
       assertEquals(getINode(actualPath), getINode(link));
@@ -232,7 +232,7 @@ public class TestRDBDifferComputer {
     when(differ.getSSTDiffListWithFullPath(any(DifferSnapshotInfo.class), any(DifferSnapshotInfo.class),
         any(Map.class), any(TablePrefixInfo.class), anySet())).thenReturn(Optional.empty());
 
-    Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+    Optional<Map<Path, DeltaFile>> result =
         rdbDifferComputer.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
     assertFalse(result.isPresent(), "Result should be empty when differ returns empty");
@@ -253,7 +253,7 @@ public class TestRDBDifferComputer {
     Set<String> tablesToLookup = ImmutableSet.of("keyTable");
     TablePrefixInfo tablePrefixInfo = mock(TablePrefixInfo.class);
 
-    Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+    Optional<Map<Path, DeltaFile>> result =
         rdbDifferComputer.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
     assertFalse(result.isPresent(), "Result should be empty when differ is null");
@@ -303,7 +303,7 @@ public class TestRDBDifferComputer {
     when(differ.getSSTDiffListWithFullPath(any(DifferSnapshotInfo.class), any(DifferSnapshotInfo.class),
         any(Map.class), any(TablePrefixInfo.class), anySet())).thenReturn(Optional.of(differResult));
 
-    Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+    Optional<Map<Path, DeltaFile>> result =
         rdbDifferComputer.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
     assertTrue(result.isPresent(), "Result should be present");
@@ -344,7 +344,7 @@ public class TestRDBDifferComputer {
     when(differ.getSSTDiffListWithFullPath(any(DifferSnapshotInfo.class), any(DifferSnapshotInfo.class),
         any(Map.class), any(TablePrefixInfo.class), anySet())).thenReturn(Optional.of(differResult));
 
-    Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+    Optional<Map<Path, DeltaFile>> result =
         rdbDifferComputer.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
     assertTrue(result.isPresent(), "Result should be present");
@@ -469,7 +469,7 @@ public class TestRDBDifferComputer {
 
     // Multiple calls should work correctly (synchronized access to differ)
     for (int i = 0; i < 3; i++) {
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           rdbDifferComputer.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
       assertFalse(result.isPresent(), "Result should be empty");
     }
