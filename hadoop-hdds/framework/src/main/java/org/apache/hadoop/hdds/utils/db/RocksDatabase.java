@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -853,6 +854,37 @@ public final class RocksDatabase implements Closeable {
       return managed(db.get().newIterator(family.getHandle(), readOptions), ref);
     } catch (RuntimeException e) {
       ref.close();
+      throw e;
+    }
+  }
+
+  /**
+   * @param upperBound exclusive upper bound of the iteration, or null for no bound.
+   *                   RocksDB stops skipping deleted entries at this bound.
+   */
+  public ManagedRocksIterator newIterator(ColumnFamily family, boolean fillCache, byte[] upperBound)
+      throws RocksDatabaseException {
+    if (upperBound == null) {
+      return newIterator(family, fillCache);
+    }
+    final UncheckedAutoCloseable ref = acquire();
+    final ManagedReadOptions readOptions = new ManagedReadOptions();
+    final ManagedSlice upperBoundSlice = new ManagedSlice(upperBound);
+    // The native iterator references the bound, so it must be released after the iterator.
+    final UncheckedAutoCloseable release = () -> {
+      try {
+        upperBoundSlice.close();
+        readOptions.close();
+      } finally {
+        ref.close();
+      }
+    };
+    try {
+      readOptions.setFillCache(fillCache);
+      readOptions.setIterateUpperBound(upperBoundSlice);
+      return managed(db.get().newIterator(family.getHandle(), readOptions), release);
+    } catch (RuntimeException e) {
+      release.close();
       throw e;
     }
   }
