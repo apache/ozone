@@ -104,8 +104,8 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
     if (deletedOpenKeyInfo != null) {
       String hsyncClientId = getDeletedOpenKeyInfo().getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
       if (hsyncClientId != null) {
-        String dbOpenKey = omMetadataManager.getOpenKey(deletedOpenKeyInfo.getVolumeName(),
-            deletedOpenKeyInfo.getBucketName(), deletedOpenKeyInfo.getKeyName(), hsyncClientId);
+        String dbOpenKey = omMetadataManager.getOpenFileName(volumeId, getOmBucketInfo().getObjectID(),
+            getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName(), hsyncClientId);
         omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
             batchOperation, dbOpenKey, deletedOpenKeyInfo);
       }
