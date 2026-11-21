@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.tracing;
 
 import static org.apache.hadoop.hdds.tracing.TracingUtil.MdcContextStorage.MDC_SPAN_ID;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.MdcContextStorage.MDC_TRACE_ID;
-import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.exportCurrentSpan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -136,15 +135,16 @@ public class TestTracingUtil {
   }
 
   @Test
-  public void testSpanKindProxyReturnsDelegateWhenTracingOff() {
+  public void testProxyReturnsDelegateWhenTracingOff() {
     ServiceImpl delegate = new ServiceImpl();
-    assertSame(delegate, createProxy(delegate, Service.class, SpanKind.INTERNAL));
+    assertSame(delegate,
+        TracingUtil.createInternalProxy(delegate, Service.class, new InMemoryConfigurationForTesting()));
   }
 
   @Test
-  public void testSpanKindProxyCreatesRootSpanWithoutParent() {
+  public void testInternalProxyCreatesRootSpanWithoutParent() {
     try (TestSpanCollector collector = TestSpanCollector.install("test-service")) {
-      Service proxy = createProxy(new ServiceImpl(), Service.class, SpanKind.INTERNAL);
+      Service proxy = TracingUtil.createInternalProxy(new ServiceImpl(), Service.class, tracingEnabled());
       assertEquals("normal", proxy.normalMethod());
       collector.assertKind("ServiceImpl.normalMethod", SpanKind.INTERNAL);
       assertFalse(collector.onlySpan("ServiceImpl.normalMethod").getParentSpanContext().isValid());
@@ -152,9 +152,9 @@ public class TestTracingUtil {
   }
 
   @Test
-  public void testSpanKindProxyCreatesChildSpans() {
+  public void testClientProxyCreatesChildSpans() {
     try (TestSpanCollector collector = TestSpanCollector.install("test-service")) {
-      Service proxy = createProxy(new ServiceImpl(), Service.class, SpanKind.CLIENT);
+      Service proxy = TracingUtil.createClientProxy(new ServiceImpl(), Service.class, tracingEnabled());
       Span parent = TracingUtil.createInternalSpan("parent");
       try (Scope ignored = parent.makeCurrent()) {
         assertEquals("normal", proxy.normalMethod());

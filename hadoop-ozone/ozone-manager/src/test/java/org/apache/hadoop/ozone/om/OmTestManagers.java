@@ -21,6 +21,7 @@ import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -115,8 +116,8 @@ public final class OmTestManagers {
     om = OzoneManager.createOm(conf,
         OzoneManager.StartupOption.REGUALR);
 
-    keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
-        .getInternalState(om, "keyManager");
+    // The whitebox setters below need the KeyManagerImpl, not its tracing proxy.
+    keyManager = unwrapTracingProxy(HddsWhiteboxTestUtils.getInternalState(om, "keyManager"));
     ScmClient scmClient = new ScmClient(scmBlockClient, containerClient, conf);
     ScmTopologyClient scmTopologyClient =
         new ScmTopologyClient(scmBlockClient);
@@ -144,6 +145,13 @@ public final class OmTestManagers {
         .getInternalState(om, "bucketManager");
     prefixManager = (PrefixManagerImpl)HddsWhiteboxTestUtils
         .getInternalState(om, "prefixManager");
+  }
+
+  /** Returns the object behind a {@code TracingUtil.createProxy} proxy, or {@code obj} if it is not a proxy. */
+  @SuppressWarnings("unchecked")
+  private static <T> T unwrapTracingProxy(Object obj) {
+    return (T) (Proxy.isProxyClass(obj.getClass())
+        ? HddsWhiteboxTestUtils.getInternalState(Proxy.getInvocationHandler(obj), "delegate") : obj);
   }
 
   //initializing and returning a mock kmsProvider

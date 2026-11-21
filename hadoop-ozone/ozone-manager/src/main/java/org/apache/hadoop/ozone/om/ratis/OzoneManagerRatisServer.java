@@ -500,6 +500,11 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createRaftRequestImpl(OMRequest omRequest, boolean isWrite) {
+    // Replace the client's trace ID, so spans on the applying thread are children of this OM's span.
+    String traceId = TracingUtil.exportCurrentSpan();
+    if (!traceId.isEmpty()) {
+      omRequest = omRequest.toBuilder().setTraceID(traceId).build();
+    }
     return RaftClientRequest.newBuilder()
         .setClientId(getClientId())
         .setServerId(server.getId())
@@ -613,6 +618,8 @@ public final class OzoneManagerRatisServer {
       StateMachineException stateMachineException =
           reply.getStateMachineException();
       if (stateMachineException != null) {
+        TracingUtil.recordExceptionInCurrentSpan(
+            stateMachineException.getCause() != null ? stateMachineException.getCause() : stateMachineException);
         OMResponse.Builder omResponse = OMResponse.newBuilder()
             .setCmdType(omRequest.getCmdType())
             .setSuccess(false)

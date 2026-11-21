@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,6 +36,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -45,6 +49,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
@@ -52,6 +57,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -90,6 +96,33 @@ public class TestOMSnapshotCreateResponse {
       batchOperation.close();
     }
     omMetadataManager.getStore().close();
+  }
+
+  @Test
+  public void testCreateCheckpointIsTraced() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName, UUID.randomUUID().toString(),
+        UUID.randomUUID(), Time.now());
+    snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(TransactionInfo.getTermIndex(1L)).toByteString());
+    OMSnapshotCreateResponse omSnapshotCreateResponse = new OMSnapshotCreateResponse(OMResponse.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateSnapshot)
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setCreateSnapshotResponse(CreateSnapshotResponse.newBuilder()
+            .setSnapshotInfo(snapshotInfo.getProtobuf())
+            .build()).build(), snapshotInfo);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("om")) {
+      Span span = TracingUtil.createInternalSpan("addToDBBatch");
+      try (Scope ignored = span.makeCurrent()) {
+        omSnapshotCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
+      } finally {
+        span.end();
+      }
+
+      collector.assertParent("OM.snapshot.createCheckpoint", "addToDBBatch");
+    }
   }
 
   @ParameterizedTest
