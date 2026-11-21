@@ -113,10 +113,6 @@
             <artifactId>commons-net</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>dnsjava</groupId>
-            <artifactId>dnsjava</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>netty-handler</artifactId>
           </exclusion>

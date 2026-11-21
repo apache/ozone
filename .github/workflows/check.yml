@@ -51,12 +51,6 @@ on:
         default: ''
         required: false
 
-      needs-maven-cache:
-        type: boolean
-        description: "Whether to restore Maven cache before run (default: yes)"
-        default: true
-        required: false
-
       needs-npm-cache:
         type: boolean
         description: "Whether to restore NPM cache before run (default: no)"
@@ -144,9 +138,12 @@ env:
   HADOOP_IMAGE: ghcr.io/apache/hadoop
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
+  MVNW_VERBOSE: true
   OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_VOLUME_OWNER: 1000
+  RANGER_IMAGE: ghcr.io/apache/ranger
+  SPARK_SQL_IMAGE: ghcr.io/apache/spark-docker/spark
   DISPLAY_NAME: ${{ inputs.display-name }}
   SCRIPT: ${{ inputs.script }}
   SPLIT: ${{ inputs.split }}
@@ -193,16 +190,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      - name: Cache for Maven dependencies
-        if: ${{ inputs.needs-maven-cache }}
-        uses: actions/cache/restore@v6
+      - name: Setup Java ${{ inputs.java-version }} with cache
+        if: ${{ inputs.java-version }}
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
+          java-version: ${{ inputs.java-version }}
 
       - name: Download Ozone repo
         id: download-ozone-repo
@@ -234,12 +226,35 @@ jobs:
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
           rm ozone*.tar.gz
 
-      - name: Setup java ${{ inputs.java-version }}
-        if: ${{ inputs.java-version }}
-        uses: actions/setup-java@v6
+      - name: Get versions
+        id: versions
+        # TODO remove hard-code in HDDS-17509
+        if: ${{ inputs.script == 'acceptance' }}
+        run: |
+          source hadoop-ozone/dev-support/checks/_lib.sh
+          HADOOP_VERSION=$(get_version hadoop)
+          echo "HADOOP_VERSION=$HADOOP_VERSION" >> $GITHUB_ENV
+          RANGER_VERSION=$(get_version ranger)
+          echo "RANGER_VERSION=$RANGER_VERSION" >> $GITHUB_ENV
+
+      - name: Restore Hadoop
+        id: restore-hadoop
+        # TODO reduce hard-code in HDDS-17509
+        if: ${{ inputs.script == 'acceptance' && contains(inputs.split, 'test-s3a.sh') }}
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
         with:
-          distribution: 'temurin'
-          java-version: ${{ inputs.java-version }}
+          clean: true
+          path: ~/.cache/ozone
+          key: hadoop-${{ env.HADOOP_VERSION }}
+
+      - name: Restore Ranger
+        id: restore-ranger
+        # TODO reduce hard-code in HDDS-17509
+        if: ${{ inputs.script == 'acceptance' && (contains(inputs.split, 'test-ranger.sh') || contains(inputs.split, 'test-sts.sh')) }}
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          path: ~/.cache/ozone
+          key: ranger-${{ env.RANGER_VERSION }}
 
       - name: Execute pre-test steps
         if: ${{ inputs.pre-script }}

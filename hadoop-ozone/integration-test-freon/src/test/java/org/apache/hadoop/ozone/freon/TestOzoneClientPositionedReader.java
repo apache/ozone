@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
@@ -32,7 +32,7 @@ import picocli.CommandLine;
 /**
  * Tests Freon OzoneClientPositionedReader with MiniOzoneCluster.
  */
-public abstract class TestOzoneClientPositionedReader implements NonHATests.TestCase {
+public abstract class TestOzoneClientPositionedReader implements ClusterForTests.TestCase {
 
   @ParameterizedTest
   @ValueSource(ints = {1, 2})

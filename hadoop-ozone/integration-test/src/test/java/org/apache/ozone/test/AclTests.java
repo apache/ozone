@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
@@ -40,6 +42,16 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
   public static final String ADMIN_GROUP = "ozone";
   public static final UserGroupInformation ADMIN_UGI =
       UserGroupInformation.createUserForTesting(ADMIN_USER, new String[] {ADMIN_GROUP});
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
 
   @Override
   protected MiniOzoneCluster.Builder newClusterBuilder() {

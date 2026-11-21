@@ -23,11 +23,20 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
  * The replication type to be used while writing key into ozone.
  */
 public enum ReplicationType {
-  RATIS,
-  STAND_ALONE,
-  @Deprecated
-  CHAINED,
-  EC;
+  RATIS(HddsProtos.ReplicationType.RATIS),
+  STAND_ALONE(HddsProtos.ReplicationType.STAND_ALONE),
+  CHAINED(HddsProtos.ReplicationType.CHAINED),
+  EC(HddsProtos.ReplicationType.EC);
+
+  private final HddsProtos.ReplicationType proto;
+
+  ReplicationType(HddsProtos.ReplicationType proto) {
+    this.proto = proto;
+  }
+
+  public HddsProtos.ReplicationType toProto() {
+    return proto;
+  }
 
   public static ReplicationType fromProto(
       HddsProtos.ReplicationType replicationType) {
@@ -54,18 +63,6 @@ public enum ReplicationType {
     if (replicationType == null) {
       return null;
     }
-    switch (replicationType) {
-    case RATIS:
-      return HddsProtos.ReplicationType.RATIS;
-    case STAND_ALONE:
-      return HddsProtos.ReplicationType.STAND_ALONE;
-    case CHAINED:
-      return HddsProtos.ReplicationType.CHAINED;
-    case EC:
-      return HddsProtos.ReplicationType.EC;
-    default:
-      throw new IllegalArgumentException(
-          "Unsupported replication type: " + replicationType);
-    }
+    return replicationType.toProto();
   }
 }
