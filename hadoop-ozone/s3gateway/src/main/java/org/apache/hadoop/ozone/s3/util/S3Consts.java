@@ -129,6 +129,12 @@ public final class S3Consts {
   /** AWS S3 maximum number of keys per DeleteObjects request. */
   public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
 
+  /**
+   * Maximum DeleteObjects request body size, in bytes. It fits {@link #S3_DELETE_OBJECTS_MAX_KEYS} keys of
+   * the maximum S3 key length (1024 bytes) with XML escaping.
+   */
+  public static final int S3_DELETE_OBJECTS_MAX_BODY_SIZE = 8 * 1024 * 1024;
+
   /** Version ID of an object in a bucket that never had versioning enabled. */
   public static final String NULL_VERSION_ID = "null";
 

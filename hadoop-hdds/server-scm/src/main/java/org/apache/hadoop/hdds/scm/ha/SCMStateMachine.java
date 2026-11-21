@@ -253,6 +253,25 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void notifyServerShutdown(RaftProtos.RoleInfoProto roleInfo, boolean allServer) {
+    // If SCM is stopped, this shutdown originates from scm.stop(); otherwise it originates from Ratis.
+    if (!isInitialized || scm.isStopped()) {
+      return;
+    }
+    LOG.error("SCM Ratis server is shut down by Ratis, terminating SCM");
+    // Run on a different thread, so that the Ratis server can finish closing.
+    CompletableFuture.runAsync(() -> {
+      try {
+        close();
+      } catch (IOException e) {
+        String message = "Failed to close the SCM state machine after the Ratis server shutdown";
+        LOG.error(message, e);
+        scm.shutDown(message);
+      }
+    });
+  }
+
+  @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
     if (!isInitialized) {
       return;

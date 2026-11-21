@@ -30,11 +30,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import java.io.BufferedWriter;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -265,8 +267,8 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     while (iterator.get().isValid() && withinLimit(globalCount)) {
       String fileNameTarget = recordsPerFile > 0 ? fileName + "." + fileSuffix++ :
           fileName;
-      try (PrintWriter out = new PrintWriter(new BufferedWriter(
-          new PrintWriter(fileNameTarget, UTF_8.name())))) {
+      Path path = Paths.get(fileNameTarget);
+      try (PrintStream out = new PrintStream(new BufferedOutputStream(Files.newOutputStream(path)), false, UTF_8)) {
         if (!displayTable(iterator, dbColumnFamilyDef, out, schemaV3)) {
           return false;
         }
@@ -277,7 +279,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   private boolean displayTable(ManagedRocksIterator iterator,
                                DBColumnFamilyDefinition dbColumnFamilyDef,
-                               PrintWriter printWriter, boolean schemaV3) {
+                               PrintStream out, boolean schemaV3) {
     exception = false;
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setNameFormat("DBScanner-%d")
@@ -286,10 +288,10 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
         threadCount, threadCount, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(1024), factory,
         new ThreadPoolExecutor.CallerRunsPolicy());
-    LogWriter logWriter = new LogWriter(printWriter);
+    LogWriter logWriter = new LogWriter(out);
     try {
       // Start JSON object (map) or array
-      printWriter.print(withKey ? "{ " : "[ ");
+      out.print(withKey ? "{ " : "[ ");
       logWriter.start();
       processRecords(iterator, dbColumnFamilyDef, logWriter,
           threadPool, schemaV3);
@@ -301,7 +303,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       logWriter.stop();
       logWriter.join();
       // End JSON object (map) or array
-      printWriter.println(withKey ? " }" : " ]");
+      out.println(withKey ? " }" : " ]");
     }
     return !exception;
   }
@@ -913,16 +915,16 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   private static class LogWriter {
     private final Map<Long, ArrayList<String>> logs;
-    private final PrintWriter printWriter;
+    private final PrintStream out;
     private final Thread writerThread;
     private volatile boolean stop = false;
     private long expectedSequenceId = FIRST_SEQUENCE_ID;
     private final Object lock = new Object();
     private final AtomicLong inflightLogCount = new AtomicLong();
 
-    LogWriter(PrintWriter printWriter) {
+    LogWriter(PrintStream out) {
       this.logs = new HashMap<>();
-      this.printWriter = printWriter;
+      this.out = out;
       this.writerThread = new Thread(new WriterTask());
     }
 
@@ -956,7 +958,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
               ArrayList<String> results = logs.get(expectedSequenceId);
               if (results != null) {
                 for (String result : results) {
-                  printWriter.println(result);
+                  out.println(result);
                 }
                 inflightLogCount.decrementAndGet();
                 logs.remove(expectedSequenceId);
@@ -985,7 +987,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       ArrayList<String> results;
       while ((results = logs.get(expectedSequenceId)) != null) {
         for (String result : results) {
-          printWriter.println(result);
+          out.println(result);
         }
         expectedSequenceId++;
       }

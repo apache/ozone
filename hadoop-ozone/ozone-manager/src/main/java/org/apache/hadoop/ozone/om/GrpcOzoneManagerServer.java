@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_BOSSGROUP_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_BOSSGROUP_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
@@ -30,16 +28,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_WORKERGROUP_
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.grpc.Server;
-import io.grpc.ServerInterceptors;
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyServerBuilder;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import java.io.IOException;
 import java.util.OptionalInt;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -59,6 +47,15 @@ import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressServerInterceptor;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
+import org.apache.ratis.thirdparty.io.grpc.Server;
+import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
+import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
+import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
+import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketChannel;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,9 +182,7 @@ public class GrpcOzoneManagerServer {
         SslContextBuilder sslClientContextBuilder =
             SslContextBuilder.forServer(caClient.getKeyManager());
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
-            sslClientContextBuilder,
-            SslProvider.valueOf(omServerConfig.get(HDDS_GRPC_TLS_PROVIDER,
-                HDDS_GRPC_TLS_PROVIDER_DEFAULT)));
+            sslClientContextBuilder, secConf.getGrpcSslProvider());
         sslContextBuilder.protocols(secConf.getGrpcTlsProtocols());
         sslContextBuilder.ciphers(
             secConf.getGrpcTlsCiphers(),

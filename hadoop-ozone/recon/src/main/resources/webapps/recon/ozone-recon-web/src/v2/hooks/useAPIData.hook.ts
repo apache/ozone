@@ -142,7 +142,7 @@ export function useApiData<T>(
           (!error.response?.status || error.response?.status >= 500)) {
         retryCountRef.current++;
         retryTimeoutRef.current = setTimeout(() => {
-          executeRequest(requestData, true);
+          void executeRequest(requestData, true).catch(() => undefined);
         }, retryDelay * retryCountRef.current);
         return Promise.reject(error);
       }
@@ -198,12 +198,12 @@ export function useApiData<T>(
       // by checking if the component is mounted or just the URL has changed.
       mountedRef.current = true;
       if (initialFetch && method === 'GET') {
-        executeRequest();
+        void executeRequest().catch(() => undefined);
       }
     } else {
       // URL changed - refetch for GET requests
       if (method === 'GET') {
-        executeRequest();
+        void executeRequest().catch(() => undefined);
       }
     }
 

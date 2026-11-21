@@ -42,8 +42,10 @@ on:
       - '!hadoop-ozone/dist/src/main/license/jar-report.txt'
       # ignore .github except this workflow and the ones used transitively
       - '.github/**'
+      - '!.github/actions/setup-java-with-cache/**'
       - '!.github/workflows/check.yml'
       - '!.github/workflows/ci.yml'
+      - '!.github/workflows/populate-cache.yml'
       - '!.github/workflows/post-commit.yml'
       - '!.github/workflows/generate-config-doc.yml'
       - '!.github/workflows/update-ozone-site-config-doc.yml'
@@ -54,7 +56,14 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  cache:
+    uses: $/.github/workflows/populate-cache.yml
+    if: github.event_name != 'pull_request'
+
   CI:
+    needs:
+      - cache
+    if: ${{ !cancelled() }} # even if cache is skipped or fails
     uses: $/.github/workflows/ci.yml
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}

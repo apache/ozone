@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -64,7 +63,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
       }
       ServerSideEncryption.rejectCustomerKey(getHeaders(), keyPath);
       int partMarker = parsePartNumberMarker(partNumberMarker);
-      Response response = listParts(context.getVolume(), context.getBucketName(), keyPath, uploadId,
+      Response response = listParts(context.getCachedVolumeName(), context.getBucketName(), keyPath, uploadId,
           partMarker, maxParts, perf);
       long opLatencyNs = getMetrics().updateListPartsSuccessStats(context.getStartNanos());
       perf.appendOpLatencyNanos(opLatencyNs);
@@ -94,7 +93,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
         // committed key.
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId);
       }
-      Response r = abortMultipartUpload(context.getBucketName(), keyPath, uploadId);
+      Response r = abortMultipartUpload(context.getCachedVolumeName(), context.getBucketName(), keyPath, uploadId);
 
       getMetrics().updateAbortMultipartUploadSuccessStats(context.getStartNanos());
       return r;
@@ -105,10 +104,10 @@ class MultipartKeyHandler extends ObjectOperationHandler {
     }
   }
 
-  private Response abortMultipartUpload(String bucket,
+  private Response abortMultipartUpload(String volumeName, String bucket,
       String key, String uploadId) throws IOException, OS3Exception {
     try {
-      getClientProtocol().abortS3MultipartUpload(bucket, key, uploadId);
+      getClientProtocol().abortMultipartUpload(volumeName, bucket, key, uploadId);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);
@@ -121,7 +120,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
   /**
    * Returns response for the listParts request.
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
-   * @param volume
+   * @param volumeName
    * @param bucketName
    * @param key
    * @param uploadId
@@ -131,7 +130,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
    * @throws IOException
    * @throws OS3Exception
    */
-  private Response listParts(OzoneVolume volume, String bucketName, String key, String uploadId,
+  private Response listParts(String volumeName, String bucketName, String key, String uploadId,
       int partNumberMarker, int maxParts,
       PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
@@ -140,7 +139,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
 
     try {
       OzoneMultipartUploadPartListParts parts =
-          getClientProtocol().listParts(volume.getName(), bucketName, key, uploadId,
+          getClientProtocol().listParts(volumeName, bucketName, key, uploadId,
               partNumberMarker, maxParts);
 
       resp.setBucket(bucketName);

@@ -661,6 +661,8 @@ public final class HddsUtils {
     case ReadChunk:
     case ReadBlock:
     case WriteChunk:
+    case StreamInit:
+    case StreamInitWithPutBlock:
     case FinalizeBlock:
       return true;
     default:
@@ -743,6 +745,8 @@ public final class HddsUtils {
       }
       break;
     case WriteChunk:
+    case StreamInit:
+    case StreamInitWithPutBlock:
       if (msg.hasWriteChunk()) {
         blockID = msg.getWriteChunk().getBlockID();
       }

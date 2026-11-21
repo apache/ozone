@@ -23,6 +23,7 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlTransient;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
@@ -39,6 +40,10 @@ public class MultiDeleteRequest {
   @XmlElement(name = "Object")
   private List<DeleteObject> objects = new ArrayList<>();
 
+  /** Hex MD5 of the raw request body. Not part of the Delete XML. */
+  @XmlTransient
+  private String bodyContentMD5;
+
   public boolean isQuiet() {
     return quiet;
   }
@@ -54,6 +59,14 @@ public class MultiDeleteRequest {
   public void setObjects(
       List<DeleteObject> objects) {
     this.objects = objects;
+  }
+
+  public String getBodyContentMD5() {
+    return bodyContentMD5;
+  }
+
+  public void setBodyContentMD5(String bodyContentMD5) {
+    this.bodyContentMD5 = bodyContentMD5;
   }
 
   /**

@@ -116,6 +116,51 @@ public class TestS3LifecycleConfigurationPut {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"<Key>a</Key>", "<Value>b</Value>", ""})
+  public void testMissingTagFieldsPreserveConfiguration(String fields) throws Exception {
+    bucketEndpoint.put("bucket1", onePrefix());
+    for (String filter : new String[] {"<Tag>" + fields + "</Tag>",
+        "<And><Prefix>prefix/</Prefix><Tag>" + fields + "</Tag></And>"}) {
+      OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+          () -> bucketEndpoint.put("bucket1", lifecycleWithFilter(filter)));
+      assertEquals(HTTP_BAD_REQUEST, exception.getHttpCode());
+
+      // make sure the bucket keeps its current configuration
+      try (Response response = bucketEndpoint.get("bucket1")) {
+        S3LifecycleConfiguration configuration = (S3LifecycleConfiguration) response.getEntity();
+        assertThat(configuration.getRules()).hasSize(1);
+        assertThat(configuration.getRules().get(0).getId()).isEqualTo("remove logs after 30 days");
+        assertThat(configuration.getRules().get(0).getPrefix()).isEqualTo("prefix/");
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testEmptyTagValue(boolean and) throws Exception {
+    String tagString = "<Tag><Key>a</Key><Value/></Tag>";
+    String filterString = and ? "<And><Prefix>prefix/</Prefix>" + tagString + "</And>" : tagString;
+    try (Response response = bucketEndpoint.put("bucket1", lifecycleWithFilter(filterString))) {
+      assertThat(response.getStatus()).isEqualTo(HTTP_OK);
+    }
+
+    // Verify the empty tag value is preserved.
+    try (Response response = bucketEndpoint.get("bucket1")) {
+      S3LifecycleConfiguration configuration = (S3LifecycleConfiguration) response.getEntity();
+      S3LifecycleConfiguration.Filter filter = configuration.getRules().get(0).getFilter();
+      S3LifecycleConfiguration.Tag tag = and ? filter.getAndOperator().getTags().get(0) : filter.getTag();
+      assertThat(tag.getKey()).isEqualTo("a");
+      assertThat(tag.getValue()).isEmpty();
+    }
+  }
+
+  private static InputStream lifecycleWithFilter(String filter) {
+    String xml = "<LifecycleConfiguration><Rule><ID>rule</ID><Filter>" + filter
+        + "</Filter><Status>Enabled</Status><Expiration><Days>1</Days></Expiration></Rule></LifecycleConfiguration>";
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
   @Test
   public void testLifecycleConfigurationFailWithNonExistentBucket()
       throws Exception {

@@ -21,6 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -31,6 +34,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -41,11 +47,39 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test delete object tagging request.
  */
 public class TestS3DeleteObjectTaggingRequest extends OMKeyRequestTests {
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testS3VolumeContextBeforeLayoutSelection(boolean assumeS3Context) throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable(getTags(2));
+    when(ozoneManager.getS3VolumeContext()).thenReturn(new S3VolumeContext(
+        OmVolumeArgs.newBuilder().setVolume(volumeName).setOwnerName("owner").setAdminName("admin").build(), "owner"));
+    OMRequest original = createDeleteObjectTaggingRequest(assumeS3Context ? "s3v" : volumeName, bucketName, keyName)
+        .toBuilder().setAssumeS3Context(assumeS3Context).build();
+
+    S3DeleteObjectTaggingRequest resolved =
+        (S3DeleteObjectTaggingRequest) OzoneManagerRatisUtils.createClientRequest(original, ozoneManager);
+    assertThat(resolved.getBucketLayout()).isEqualTo(getBucketLayout());
+    OMRequest replicated = resolved.preExecute(ozoneManager).toBuilder().clearAssumeS3Context().build();
+    assertThat(replicated.getDeleteObjectTaggingRequest().getKeyArgs().getVolumeName()).isEqualTo(volumeName);
+    S3DeleteObjectTaggingRequest replayed =
+        (S3DeleteObjectTaggingRequest) OzoneManagerRatisUtils.createClientRequest(replicated, ozoneManager);
+    assertThat(replayed.getBucketLayout()).isEqualTo(getBucketLayout());
+    assertThat(replayed.validateAndUpdateCache(ozoneManager, 2L).getOMResponse().getStatus())
+        .isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    OmKeyInfo keyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    assertThat(keyInfo).isNotNull();
+    assertThat(keyInfo.getTags()).isEmpty();
+    verify(ozoneManager, times(assumeS3Context ? 1 : 0)).getS3VolumeContext();
+  }
 
   @Test
   public void testPreExecute() throws Exception {
