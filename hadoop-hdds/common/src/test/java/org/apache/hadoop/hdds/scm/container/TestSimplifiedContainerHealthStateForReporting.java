@@ -17,18 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.HEALTHY;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNDER_REPLICATED;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNHEALTHY_UNDER_REPLICATED;
+import static org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting.HEALTHY;
+import static org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting.MISSING;
+import static org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED;
+import static org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for the ContainerHealthState enum.
+ * Tests for the SimplifiedContainerHealthStateForReporting enum.
  */
-public class TestContainerHealthState {
+public class TestSimplifiedContainerHealthStateForReporting {
 
   @Test
   public void testDescriptions() {

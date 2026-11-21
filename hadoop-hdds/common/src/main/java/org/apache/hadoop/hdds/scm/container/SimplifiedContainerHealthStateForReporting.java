@@ -53,7 +53,7 @@ package org.apache.hadoop.hdds.scm.container;
  *   in-service nodes.</li>
  * </ul>
  */
-public enum ContainerHealthState {
+public enum SimplifiedContainerHealthStateForReporting {
 
   /**
    * Default label. No RM check found a problem. RM skips most checks for OPEN, CLOSING, DELETING and
@@ -217,7 +217,7 @@ public enum ContainerHealthState {
   private final String description;
   private final String metricName;
 
-  ContainerHealthState(String description, String metricName) {
+  SimplifiedContainerHealthStateForReporting(String description, String metricName) {
     this.description = description;
     this.metricName = metricName;
   }

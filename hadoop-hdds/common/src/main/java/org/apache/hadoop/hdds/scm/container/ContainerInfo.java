@@ -84,7 +84,9 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // container replica should have the same sequenceId.
   private long sequenceId;
   // Summary label from the last ReplicationManager check; not a lifecycle state and not persisted.
-  private ContainerHealthState healthState;
+  // The JSON name is kept as "healthState" so the container list and info CLI output does not change.
+  @JsonProperty("healthState")
+  private SimplifiedContainerHealthStateForReporting simplifiedHealthStateForReporting;
   private boolean suppressed;
 
   private ContainerInfo(Builder b) {
@@ -100,7 +102,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     sequenceId = b.sequenceId;
     replicationConfig = b.replicationConfig;
     clock = b.clock;
-    healthState = b.healthState != null ? b.healthState : ContainerHealthState.HEALTHY;
+    simplifiedHealthStateForReporting = b.simplifiedHealthStateForReporting != null
+        ? b.simplifiedHealthStateForReporting : SimplifiedContainerHealthStateForReporting.HEALTHY;
     suppressed = b.suppressed;
   }
 
@@ -256,10 +259,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
    * Get the label set by the last ReplicationManager check of this container. This is not the
    * container lifecycle state; see {@link #getState()}. It is kept only in SCM memory.
    *
-   * @return ContainerHealthState
+   * @return SimplifiedContainerHealthStateForReporting
    */
-  public ContainerHealthState getHealthState() {
-    return healthState;
+  public SimplifiedContainerHealthStateForReporting getSimplifiedHealthStateForReporting() {
+    return simplifiedHealthStateForReporting;
   }
 
   /**
@@ -267,8 +270,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
    *
    * @param newHealthState The new health state
    */
-  public void setHealthState(ContainerHealthState newHealthState) {
-    this.healthState = newHealthState;
+  public void setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting newHealthState) {
+    this.simplifiedHealthStateForReporting = newHealthState;
   }
 
   /**
@@ -421,7 +424,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     private long sequenceId;
     private PipelineID pipelineID;
     private ReplicationConfig replicationConfig;
-    private ContainerHealthState healthState;
+    private SimplifiedContainerHealthStateForReporting simplifiedHealthStateForReporting;
     private boolean suppressed;
 
     public Builder setPipelineID(PipelineID pipelineId) {
@@ -476,8 +479,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       return this;
     }
 
-    public Builder setHealthState(ContainerHealthState healthState) {
-      this.healthState = healthState;
+    public Builder setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting healthState) {
+      this.simplifiedHealthStateForReporting = healthState;
       return this;
     }
 
