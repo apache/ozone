@@ -706,10 +706,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmKeyLocationInfoGroup currentKeyInfoGroup = currentPartKeyInfo
           .getKeyLocationVersions().get(0);
 
-      // Set partNumber in each block.
+      // S3 addresses the parts of a completed object as 1..N. partsList is strictly ascending, so the 1-based
+      // position of a part is its final part number, regardless of the part number used to upload it.
+      final int renumberedPartNumber = currentPartCount;
       currentKeyInfoGroup.getLocationLists().forEach(locationList -> {
         locationList.forEach(
-            omKeyLocationInfo -> omKeyLocationInfo.setPartNumber(partNumber));
+            omKeyLocationInfo -> omKeyLocationInfo.setPartNumber(renumberedPartNumber));
         partLocationInfos.addAll(locationList);
       });
       dataSize += currentPartKeyInfo.getDataSize();

@@ -1122,14 +1122,17 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements ClusterFo
 
     s3Bucket.completeMultipartUpload(keyName, uploadID, partsMap);
 
-    // Part 3 exists among the object's blocks, so reading it must succeed.
-    OzoneKeyDetails part3 =
-        ozClient.getProxy().getS3KeyDetails(s3Bucket.getName(), keyName, 3);
-    assertEquals(part3Data.length, part3.getDataSize());
+    // The object was completed with two parts (uploaded as 1 and 3), which
+    // are renumbered to 1..2 at completion (HDDS-17663), matching how AWS S3
+    // addresses parts of a completed object. The data uploaded as part 3 is
+    // therefore read back as part number 2.
+    OzoneKeyDetails part2 =
+        ozClient.getProxy().getS3KeyDetails(s3Bucket.getName(), keyName, 2);
+    assertEquals(part3Data.length, part2.getDataSize());
 
-    // Part 2 was omitted at completion, so it does not exist and must fail.
+    // The object has only 2 parts, so part number 3 is out of range.
     OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART, () ->
-        ozClient.getProxy().getS3KeyDetails(s3Bucket.getName(), keyName, 2));
+        ozClient.getProxy().getS3KeyDetails(s3Bucket.getName(), keyName, 3));
   }
 
   @Test
