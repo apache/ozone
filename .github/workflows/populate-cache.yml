@@ -72,8 +72,6 @@ jobs:
         id: versions
         run: |
           source hadoop-ozone/dev-support/checks/_lib.sh
-          NODEJS_VERSION=$(get_version nodejs)
-          echo "NODEJS_VERSION=$NODEJS_VERSION" >> $GITHUB_ENV
           HADOOP_VERSION=$(get_version hadoop)
           echo "HADOOP_VERSION=$HADOOP_VERSION" >> $GITHUB_ENV
           RANGER_VERSION=$(get_version ranger)
@@ -151,18 +149,6 @@ jobs:
           path: ~/.cache/ozone
           key: ranger-${{ env.RANGER_VERSION }}
           retention-days: 90
-
-      - name: Restore NodeJS tarballs
-        id: restore-nodejs
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v6
-        with:
-          path: ~/.m2/repository/com/github/eirslett/node
-          key: nodejs-${{ env.NODEJS_VERSION }}
-
-      - name: Download NodeJS
-        if: steps.restore-cache.outputs.cache-hit != 'true' && steps.restore-nodejs.outputs.cache-hit != 'true'
-        run: dev-support/ci/download-nodejs.sh
 
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
