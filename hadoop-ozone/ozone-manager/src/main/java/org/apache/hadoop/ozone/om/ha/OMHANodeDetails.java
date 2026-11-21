@@ -206,7 +206,7 @@ public class OMHANodeDetails {
         LOG.info("Found matching OM address with OMServiceId: {}, " +
                 "OMNodeId: {}, RPC Address: {} ,Ratis port: {} and isListener: {}",
             localOMServiceId, localOMNodeId,
-            HddsUtils.getHostPortString(localRpcAddress.getHostName(), localRpcAddress.getPort()),
+            HddsUtils.getHostPortString(localRpcAddress.getHostString(), localRpcAddress.getPort()),
             localRatisPort, localIsListener);
 
         ConfUtils.setNodeSpecificConfigs(genericConfigKeys, conf,
@@ -277,9 +277,9 @@ public class OMHANodeDetails {
     // We need to pass null for serviceID and nodeID as this is set for
     // non-HA cluster. This means one node OM cluster.
     String httpAddr = OmUtils.getHttpAddressForOMPeerNode(conf,
-        null, null, rpcAddress.getHostName());
+        null, null, rpcAddress.getHostString());
     String httpsAddr = OmUtils.getHttpsAddressForOMPeerNode(conf,
-        null, null, rpcAddress.getHostName());
+        null, null, rpcAddress.getHostString());
 
     return new OMNodeDetails.Builder()
         .setOMServiceId(serviceId)
@@ -313,9 +313,9 @@ public class OMHANodeDetails {
     Objects.requireNonNull(nodeId, "nodeId == null");
 
     String httpAddr = OmUtils.getHttpAddressForOMPeerNode(conf,
-        serviceId, nodeId, rpcAddress.getHostName());
+        serviceId, nodeId, rpcAddress.getHostString());
     String httpsAddr = OmUtils.getHttpsAddressForOMPeerNode(conf,
-        serviceId, nodeId, rpcAddress.getHostName());
+        serviceId, nodeId, rpcAddress.getHostString());
 
     return new OMNodeDetails.Builder()
         .setOMServiceId(serviceId)
