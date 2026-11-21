@@ -55,7 +55,7 @@ fi
 
 if [[ "${BUILD_ONLY:-}" == "true" ]]; then
   cd "${HADOOP_AWS_DIR}"
-  mvn ${MAVEN_ARGS:-} --show-version -Dtest=void clean test
+  mvn ${MAVEN_ARGS:-} --show-version -Dtest=ITestS3AContractContentSummary clean test
   echo "[INFO] Skip S3A tests"
   exit 0
 fi
