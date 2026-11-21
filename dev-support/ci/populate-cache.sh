@@ -24,7 +24,7 @@ cd "$DIR/../.." || exit 1
   -DskipShade -Pgo-offline ${BUILD_ARGS:-} "$@"
 
 # only compile, no shade
-hadoop-ozone/dev-support/checks/_build.sh compile \
+hadoop-ozone/dev-support/checks/_build.sh compile cyclonedx:makeBom \
   -pl :ozone-filesystem-shaded,:ozone-filesystem-hadoop2 \
   -Dmaven-replacer-plugin.skip "$@"
 
