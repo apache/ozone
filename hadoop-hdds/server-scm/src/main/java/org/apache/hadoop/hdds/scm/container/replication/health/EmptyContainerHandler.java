@@ -87,6 +87,12 @@ public class EmptyContainerHandler extends AbstractCheck {
             .mapToLong(ContainerReplica::getSequenceId)
             .max()
             .orElse(containerInfo.getSequenceId());
+        if (maxReplicaBCSID < containerInfo.getSequenceId()) {
+          // A replica with the missing transactions may be offline. Keep the container and replicas until it returns.
+          LOG.debug("Not deleting empty QUASI_CLOSED container {} (container BCSID={}, max replica BCSID={})",
+              containerInfo.containerID(), containerInfo.getSequenceId(), maxReplicaBCSID);
+          return true;
+        }
         
         // Update container bcsId to max replica bcsId before deletion
         // This ensures resurrection logic uses the correct bcsId for stale replica detection
