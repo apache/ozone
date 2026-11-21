@@ -21,6 +21,7 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -28,10 +29,13 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 
 /**
  * Determines whether a container is eligible for reconciliation based on its state, replica states, replication
- * type, and replication factor.
+ * type, replication factor, and the status of the datanodes holding its replicas.
  */
 public final class ReconciliationEligibilityHandler {
   public static final Set<HddsProtos.LifeCycleState> ELIGIBLE_CONTAINER_STATES =
@@ -45,7 +49,7 @@ public final class ReconciliationEligibilityHandler {
   private ReconciliationEligibilityHandler() { }
 
   public static EligibilityResult isEligibleForReconciliation(
-      ContainerID containerID, ContainerManager containerManager) {
+      ContainerID containerID, ContainerManager containerManager, NodeManager nodeManager) {
     ContainerInfo container;
     Set<ContainerReplica> replicas;
     try {
@@ -95,7 +99,37 @@ public final class ReconciliationEligibilityHandler {
               "containers with more than 1 required node.", containerID, repConfig.getRequiredNodes()));
     }
 
+    boolean hasTarget = replicas.stream().anyMatch(replica -> isTarget(nodeManager, replica.getDatanodeDetails()));
+    if (!hasTarget) {
+      return new EligibilityResult(Result.NO_ELIGIBLE_TARGETS,
+          String.format("Cannot reconcile container %s because none of its replicas are on a healthy in-service " +
+              "datanode.", containerID));
+    }
+
     return new EligibilityResult(Result.OK, "Container %s is eligible for reconciliation." + containerID);
+  }
+
+  /**
+   * Whether a datanode with this status should receive a reconcile command for its replica.
+   */
+  static boolean isTarget(NodeStatus status) {
+    return status.isHealthy() && status.isInService();
+  }
+
+  /**
+   * Whether targets may contact a datanode with this status for its replica. Transitioning datanodes remain peers so
+   * other replicas can recover any unique data before the datanode leaves.
+   */
+  static boolean isPeer(NodeStatus status) {
+    return status.isHealthy() && (status.isInService() || status.isDecommissioning() || status.isEnteringMaintenance());
+  }
+
+  private static boolean isTarget(NodeManager nodeManager, DatanodeDetails datanode) {
+    try {
+      return isTarget(nodeManager.getNodeStatus(datanode));
+    } catch (NodeNotFoundException e) {
+      return false;
+    }
   }
 
   /**
@@ -108,7 +142,8 @@ public final class ReconciliationEligibilityHandler {
     INELIGIBLE_REPLICA_STATES,
     INELIGIBLE_REPLICATION_TYPE,
     NOT_ENOUGH_REQUIRED_NODES,
-    NO_REPLICAS_FOUND
+    NO_REPLICAS_FOUND,
+    NO_ELIGIBLE_TARGETS
   }
 
   /**
