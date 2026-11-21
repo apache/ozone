@@ -27,7 +27,6 @@
   <properties>
     <ban-httpcomponents.skip>false</ban-httpcomponents.skip>
     <ban-rocksdb.skip>false</ban-rocksdb.skip>
-    <ban-unshaded-grpc.skip>false</ban-unshaded-grpc.skip>
     <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
