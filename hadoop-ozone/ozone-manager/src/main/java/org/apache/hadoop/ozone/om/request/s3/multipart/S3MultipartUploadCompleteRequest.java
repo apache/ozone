@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -124,6 +125,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
     OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
+    if (keyArgs.hasDataSize() && keyArgs.getDataSize() < 0) {
+      throw new OMException("Expected object size must be non-negative", OMException.ResultCodes.INVALID_REQUEST);
+    }
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -316,6 +320,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         long dataSize = getMultipartDataSize(requestedVolume, requestedBucket,
                 keyName, ozoneKey, partKeyInfoMap, partsListSize,
                 partLocationInfos, partsList, ozoneManager);
+
+        // Use the finalized version so all OMs apply the same validation during a rolling upgrade.
+        if (keyArgs.hasDataSize()
+            && ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.S3_MULTIPART_OBJECT_SIZE)
+            && keyArgs.getDataSize() != dataSize) {
+          throw new OMException("The specified object size does not match the actual object size.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
 
         // All parts have same replication information. Here getting from last
         // part.

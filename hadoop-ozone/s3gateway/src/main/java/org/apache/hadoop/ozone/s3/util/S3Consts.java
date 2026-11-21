@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 @InterfaceAudience.Private
 public final class S3Consts {
 
+  public static final String MP_OBJECT_SIZE_HEADER = "x-amz-mp-object-size";
+
   public static final String COPY_SOURCE_HEADER = "x-amz-copy-source";
   public static final String COPY_SOURCE_HEADER_RANGE =
       "x-amz-copy-source-range";
