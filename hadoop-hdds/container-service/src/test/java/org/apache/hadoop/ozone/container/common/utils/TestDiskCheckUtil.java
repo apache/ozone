@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,9 +27,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.SyncFailedException;
+import java.io.UncheckedIOException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -110,5 +117,27 @@ public class TestDiskCheckUtil {
       assertTrue(result, "checkReadWrite should return true when disk is full");
       assertTestFileDeleted();
     }
+  }
+
+  @Test
+  public void testIsDiskIOError() {
+    assertTrue(DiskCheckUtil.isDiskIOError(new IOException("Input/output error")));
+    assertTrue(DiskCheckUtil.isDiskIOError(new FileSystemException("/data/chunk", null, "Read-only file system")));
+    assertTrue(DiskCheckUtil.isDiskIOError(new IOException("No such device or address")));
+    assertTrue(DiskCheckUtil.isDiskIOError(new IOException("Structure needs cleaning")));
+    assertTrue(DiskCheckUtil.isDiskIOError(new SyncFailedException("sync failed")));
+    assertTrue(DiskCheckUtil.isDiskIOError(
+        new IOException("IO error: While appending to file: /data/db/000123.log: Input/output error")));
+    // Disk I/O errors wrapped by the data path.
+    assertTrue(DiskCheckUtil.isDiskIOError(new UncheckedIOException(new IOException("Input/output error"))));
+    assertTrue(DiskCheckUtil.isDiskIOError(
+        new StorageContainerException(new IOException("Input/output error"), IO_EXCEPTION)));
+
+    assertFalse(DiskCheckUtil.isDiskIOError(null));
+    assertFalse(DiskCheckUtil.isDiskIOError(new NoSuchFileException("/data/chunk")));
+    assertFalse(DiskCheckUtil.isDiskIOError(new AccessDeniedException("/data/chunk")));
+    assertFalse(DiskCheckUtil.isDiskIOError(new IOException(DiskCheckUtil.LINUX_DISK_FULL_MESSAGE)));
+    assertFalse(DiskCheckUtil.isDiskIOError(new FileSystemException("/data/chunk", null, "Too many open files")));
+    assertFalse(DiskCheckUtil.isDiskIOError(new IOException("Checksum mismatch")));
   }
 }
