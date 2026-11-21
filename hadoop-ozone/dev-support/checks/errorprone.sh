@@ -27,7 +27,7 @@ BASE_DIR="$(pwd -P)"
 REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 OUTPUT_LOG=$(mktemp)
 
-MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipRecon -DskipShade -DskipTests'
+MAVEN_OPTIONS='-B -fae -Perrorprone -DskipRecon -DskipShade -DskipTests'
 MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 # timestamp prefix breaks diagnostic patterns
