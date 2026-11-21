@@ -32,6 +32,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getRandomPipelineReports;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -707,11 +708,14 @@ public class TestSCMNodeManager {
    * @throws InterruptedException
    * @throws AuthenticationException
    */
-  @Test
-  void testScmHandleJvmPause() throws Exception {
+  // Pauses just under and at the stale node interval.
+  @ParameterizedTest
+  @ValueSource(ints = {1250, 1500})
+  void testScmHandleJvmPause(int pauseMs) throws Exception {
     final int healthCheckInterval = 100; // milliseconds
-    final int heartbeatInterval = 100; // milliseconds
-    final int staleNodeInterval = 1000; // milliseconds
+    final int heartbeatInterval = 500; // milliseconds
+    final int heartbeatRpcTimeout = 100; // milliseconds
+    final int staleNodeInterval = 1500; // milliseconds
     // Keep the dead window large so the stale node does not race into dead.
     final int deadNodeInterval = 10000; // milliseconds
     ScheduledFuture schedFuture;
@@ -721,6 +725,7 @@ public class TestSCMNodeManager {
         healthCheckInterval, MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         heartbeatInterval, MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_RPC_TIMEOUT, heartbeatRpcTimeout, MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
         staleNodeInterval, MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL,
@@ -743,10 +748,10 @@ public class TestSCMNodeManager {
       assertEquals(2, nodeManager.getAllNodes().size());
       /**
        * Simulate a JVM Pause and subsequent handling in following steps:
-       * Step 1 : stop heartbeat check process for stale node interval
+       * Step 1 : stop heartbeat check process for the pause
        * Step 2 : resume heartbeat check
        * Step 3 : wait for 1 iteration of heartbeat check thread
-       * Step 4 : retrieve the state of all nodes - assert all are HEALTHY
+       * Step 4 : wait for less than a heartbeat interval and retrieve the state of all nodes - assert all are HEALTHY
        * Step 5 : heartbeat for node1
        * [TODO : what if there is scheduling delay of test thread in Step 5?]
        * Step 6 : wait for some time to allow iterations of check process
@@ -754,9 +759,12 @@ public class TestSCMNodeManager {
        * and node1 is HEALTHY
        */
 
+      // The nodes are halfway through their heartbeat interval when SCM pauses.
+      Thread.sleep(heartbeatInterval / 2);
+
       // Step 1 : stop health check process (simulate JVM pause)
       nodeManager.pauseHealthCheck();
-      Thread.sleep(staleNodeInterval);
+      Thread.sleep(pauseMs);
 
       // Step 2 : resume health check
       assertEquals(0, nodeManager.getSkippedHealthChecks(),
@@ -770,7 +778,9 @@ public class TestSCMNodeManager {
           .withFailMessage("We did not skip any heartbeat checks")
           .isGreaterThan(0);
 
-      // Step 4 : all nodes should still be HEALTHY
+      // Step 4 : all nodes should still be HEALTHY half a heartbeat interval after the pause, before node1 is due to
+      // heartbeat again.
+      Thread.sleep(heartbeatInterval / 2);
       assertEquals(2, nodeManager.getAllNodes().size());
       assertEquals(2, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
