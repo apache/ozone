@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.client.protocol;
 
 import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
@@ -494,28 +493,16 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * Writes a key in an existing bucket, placing it according to the given storage
-   * policy.
+   * Writes a key in an existing bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
-   * @param size Size of the data
-   * @param metadata Custom key value metadata
-   * @param tags Tags used for S3 object tags
-   * @param storagePolicy storage policy for the key, or null to inherit the
-   *                      bucket's policy
+   * @param options Size, replication config, metadata, tags, derived key piggybacking and storage policy of the key
    * @return {@link OzoneOutputStream}
    *
    */
-  @SuppressWarnings("checkstyle:parameternumber")
-  default OzoneOutputStream createKey(String volumeName, String bucketName,
-      String keyName, long size, ReplicationConfig replicationConfig,
-      Map<String, String> metadata, Map<String, String> tags,
-      @Nullable StoragePolicy storagePolicy)
-      throws IOException {
-    return createKey(volumeName, bucketName, keyName, size, replicationConfig,
-        metadata, tags);
-  }
+  OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, CreateKeyOptions options) throws IOException;
 
   /**
    * Writes a key in an existing bucket.
@@ -1291,6 +1278,24 @@ public interface ClientProtocol {
   OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException;
+
+  /**
+   * Creates an output stream for writing to a file.
+   *
+   * @param volumeName Volume name
+   * @param bucketName Bucket name
+   * @param keyName    Absolute path of the file to be written
+   * @param options    Size, replication config, overwrite, recursive flags and storage policy of the file
+   * @return Output stream for writing to the file
+   * @throws OMException if given key is a directory
+   *                     if file exists and isOverwrite flag is false
+   *                     if an ancestor exists as a file
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  OzoneOutputStream createFile(String volumeName, String bucketName,
+      String keyName, CreateFileOptions options) throws IOException;
 
   @SuppressWarnings("checkstyle:parameternumber")
   OzoneDataStreamOutput createStreamFile(String volumeName, String bucketName,

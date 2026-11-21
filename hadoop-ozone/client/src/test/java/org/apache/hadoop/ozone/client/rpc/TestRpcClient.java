@@ -59,6 +59,8 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -746,6 +748,30 @@ public class TestRpcClient {
         assertThat(streamError.getMessage()).contains("does not support If-None-Match");
         assertThat(completeError.getMessage()).contains("does not support If-None-Match");
       }
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  public void testCreateKeyRejectsNullOptions() throws IOException {
+    RpcClient client = createRpcClient();
+    try {
+      assertThatThrownBy(() -> client.createKey("vol", "bucket", "key", (CreateKeyOptions) null))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("options == null");
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  public void testCreateFileRejectsNullOptions() throws IOException {
+    RpcClient client = createRpcClient();
+    try {
+      assertThatThrownBy(() -> client.createFile("vol", "bucket", "key", (CreateFileOptions) null))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("options == null");
     } finally {
       client.close();
     }

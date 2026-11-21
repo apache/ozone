@@ -28,6 +28,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.junit.jupiter.api.Test;
@@ -69,6 +71,40 @@ public class TestOzoneBucket {
         .build();
 
     assertThatThrownBy(() -> bucket.initiateMultipartUpload("key", (MultipartUploadOptions) null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("options == null");
+    verifyNoInteractions(proxy);
+  }
+
+  /**
+   * A null options object is rejected before it reaches the client protocol.
+   */
+  @Test
+  public void createKeyRejectsNullOptions() {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    OzoneBucket bucket = OzoneBucket.newBuilder(new OzoneConfiguration(), proxy)
+        .setVolumeName("vol")
+        .setName("bucket")
+        .build();
+
+    assertThatThrownBy(() -> bucket.createKey("key", (CreateKeyOptions) null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("options == null");
+    verifyNoInteractions(proxy);
+  }
+
+  /**
+   * A null options object is rejected before it reaches the client protocol.
+   */
+  @Test
+  public void createFileRejectsNullOptions() {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    OzoneBucket bucket = OzoneBucket.newBuilder(new OzoneConfiguration(), proxy)
+        .setVolumeName("vol")
+        .setName("bucket")
+        .build();
+
+    assertThatThrownBy(() -> bucket.createFile("key", (CreateFileOptions) null))
         .isInstanceOf(NullPointerException.class)
         .hasMessage("options == null");
     verifyNoInteractions(proxy);
