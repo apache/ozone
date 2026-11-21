@@ -122,6 +122,48 @@ describe('Heatmap page', () => {
     await userEvent.type(pathInput, 'bad@path');
 
     expect(screen.getByText('Please enter valid path')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await flushPendingRequests();
+
+    expect(heatmapRequests).toHaveLength(1);
+    expect(heatmapRequests[0].path).toBe('/');
+  });
+
+  test('clears stale path validation after heatmap drill-down and allows search', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    const pathInput = screen.getByPlaceholderText('/');
+    await userEvent.clear(pathInput);
+    await userEvent.type(pathInput, 'bad@path');
+    expect(screen.getByText('Please enter valid path')).toBeInTheDocument();
+
+    plotOnClickRef.current!('/vol1');
+    await waitForPlot('vol1');
+    expect(pathInput).toHaveValue('/vol1');
+    await waitFor(() => {
+      expect(screen.queryByText('Please enter valid path')).not.toBeInTheDocument();
+    });
+
+    await searchPath('/empty');
+
+    await waitFor(() => {
+      expect(screen.getByText('No Data available')).toBeInTheDocument();
+    });
+    expect(heatmapRequests.map((request) => request.path)).toContain('/empty');
+  });
+
+  test('allows dot characters in volume and bucket names', async () => {
+    render(<Heatmap />);
+    await waitForPlot('root');
+
+    await searchPath('/vol1/my.bucket');
+
+    expect(screen.queryByText('Please enter valid path')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(heatmapRequests.map((request) => request.path)).toContain('/vol1/my.bucket');
+    });
   });
 
   test('fetches heatmap for a new path when the user searches', async () => {
