@@ -1275,6 +1275,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     if (state != StorageState.INITIALIZED) {
       try {
+        SCMRatisServerImpl.verifyNoRaftGroup(conf);
         if (clusterId != null && !clusterId.isEmpty()) {
           // clusterId must be an UUID
           Objects.requireNonNull(UUID.fromString(clusterId), "clusterId UUID == null");

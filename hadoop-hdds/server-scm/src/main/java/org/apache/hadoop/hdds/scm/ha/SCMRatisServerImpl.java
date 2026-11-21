@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
 import jakarta.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -101,6 +102,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         "Ratis request timeout cannot be less than 1000ms.");
     
     final RaftGroupId groupId = buildRaftGroupId(scm.getClusterId());
+    verifyNoOtherRaftGroup(conf, groupId);
     LOG.info("starting Raft server for scm:{}", scm.getScmId());
     // During SCM startup, the bootstrapped node will be started just with
     // groupId information, so that it won't trigger any leader election
@@ -132,6 +134,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   public static void initialize(String clusterId, String scmId,
       SCMNodeDetails details, OzoneConfiguration conf) throws IOException {
     final RaftGroup group = buildRaftGroup(details, scmId, clusterId);
+    verifyNoOtherRaftGroup(conf, group.getGroupId());
     RaftServer server = null;
     try {
       server = newRaftServer(scmId, conf).setGroup(group)
@@ -144,6 +147,43 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       if (server != null) {
         server.close();
       }
+    }
+  }
+
+  /**
+   * Fail if the SCM Ratis storage directory contains any Raft group directory.
+   * A new cluster has none, so any existing one is stale.
+   */
+  public static void verifyNoRaftGroup(ConfigurationSource conf) throws IOException {
+    verifyNoOtherRaftGroup(conf, null);
+  }
+
+  /**
+   * Fail if the SCM Ratis storage directory contains a Raft group directory other than the given one.
+   * SCM has a single Raft group derived from the cluster ID.
+   *
+   * @param groupId the only group allowed in the directory, or null to allow none
+   */
+  private static void verifyNoOtherRaftGroup(ConfigurationSource conf, RaftGroupId groupId) throws IOException {
+    final File ratisDir = new File(SCMHAUtils.getSCMRatisDirectory(conf));
+    final File[] children = ratisDir.listFiles(File::isDirectory);
+    if (children == null) {
+      return;
+    }
+    for (File child : children) {
+      final RaftGroupId childGroupId;
+      try {
+        childGroupId = RaftGroupId.valueOf(UUID.fromString(child.getName()));
+      } catch (IllegalArgumentException e) {
+        // not a Raft group directory, ignore
+        continue;
+      }
+      if (childGroupId.equals(groupId)) {
+        continue;
+      }
+      throw new IOException("Found stale Raft group directory " + child + " in the SCM Ratis storage directory "
+          + ratisDir + (groupId == null ? "" : ", expected only group " + groupId)
+          + ". Remove it if it was left by a previous cluster and retry.");
     }
   }
 

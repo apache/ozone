@@ -192,6 +192,10 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(
       final TransactionContext trx) {
+    if (!isInitialized) {
+      LOG.warn("Skipping applyTransaction {} on the bootstrap state machine", TermIndex.valueOf(trx.getLogEntry()));
+      return CompletableFuture.completedFuture(Message.EMPTY);
+    }
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
     transactionBuffer.beginApplyingTransaction();
