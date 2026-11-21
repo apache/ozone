@@ -247,6 +247,15 @@ jobs:
           path: ~/.cache/ozone
           key: hadoop-${{ env.HADOOP_VERSION }}
 
+      - name: Restore Hadoop AWS dependencies
+        id: restore-hadoop-deps
+        # TODO reduce hard-code in HDDS-17509
+        if: ${{ inputs.script == 'acceptance' && contains(inputs.split, 'test-s3a.sh') }}
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          path: ~/.cache/ozone/maven-repo
+          key: hadoop-${{ env.HADOOP_VERSION }}-deps
+
       - name: Restore Ranger
         id: restore-ranger
         # TODO reduce hard-code in HDDS-17509
