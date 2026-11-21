@@ -751,7 +751,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneOutputStream createFile(String volumeName, String bucketName,
-                                      String keyName, CreateFileOptions options)
+      String keyName, CreateFileOptions options)
       throws IOException {
     return null;
   }
