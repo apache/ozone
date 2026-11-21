@@ -230,12 +230,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // DNS-to-switch mapping is consulted at most once.
     final Node omClient = clusterMap != null && !remoteAddress.isEmpty()
         ? keyManager.resolveClientForWrite(remoteAddress, clusterMap) : null;
+    // SCM needs the client address to prefer a pipeline on the client's datanode; it then also sorts by it.
+    final String localityClientMachine = keyManager.isPreferClientLocalPipeline() ? remoteAddress : "";
     if (!shouldSortDatanodes) {
-      scmClientMachine = "";
+      scmClientMachine = localityClientMachine;
       sortedByNodes = null;
     } else if (omClient != null) {
-      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
-      scmClientMachine = "";
+      // Sort in OM: SCM skips sorting unless it gets the machine for locality, OM sorts by remoteAddress.
+      scmClientMachine = localityClientMachine;
       sortedByNodes = new HashMap<>();
     } else {
       // Sort in SCM when OM has no topology or cannot resolve the client (or keep order

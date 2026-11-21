@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -147,6 +148,14 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList)
       throws IOException {
+    return allocateBlock(size, replicationConfig, owner, excludeList, null);
+  }
+
+  @Override
+  public AllocatedBlock allocateBlock(final long size,
+      ReplicationConfig replicationConfig,
+      String owner, ExcludeList excludeList, DatanodeDetails client)
+      throws IOException {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Size : {} , replicationConfig: {}", size, replicationConfig);
     }
@@ -161,7 +170,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     }
 
     ContainerInfo containerInfo = writableContainerFactory.getContainer(
-        size, replicationConfig, owner, excludeList);
+        size, replicationConfig, owner, excludeList, client);
 
     if (containerInfo != null) {
       return newBlock(containerInfo);
