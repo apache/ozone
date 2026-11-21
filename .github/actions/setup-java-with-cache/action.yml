@@ -58,8 +58,13 @@ runs:
     - name: Calculate cache key
       id: cache-key
       shell: bash
-      run: |
-        echo "value=maven-repo-${{ hashFiles('**/pom.xml', '.mvn/extensions.xml', '.mvn/wrapper/maven-wrapper.properties') }}" >> "$GITHUB_OUTPUT"
+      run: >
+        echo "value=maven-repo-${{ hashFiles(
+            '**/pom.xml',
+            '.mvn/extensions.xml',
+            '.mvn/wrapper/maven-wrapper.properties',
+            'dev-support/ci/populate-cache.sh'
+        ) }}" >> "$GITHUB_OUTPUT"
 
     - name: Remove any leftover Maven repo
       id: cleanup
