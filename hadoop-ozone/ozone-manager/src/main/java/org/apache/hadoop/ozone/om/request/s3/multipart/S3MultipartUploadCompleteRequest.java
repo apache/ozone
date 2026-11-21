@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.OzoneConsts.COMPLETED_UPLOAD_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.COMPLETED_UPLOAD_PARTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
@@ -65,6 +67,7 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
@@ -274,6 +277,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           getDBOzoneKey(omMetadataManager, volumeName, bucketName, keyName);
 
       if (multipartKeyInfo == null) {
+        OmKeyInfo completedKey = omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+        if (completedKey != null && uploadID.equals(completedKey.getMetadata().get(COMPLETED_UPLOAD_ID))
+            && completedPartsHash(partsList).equals(completedKey.getMetadata().get(COMPLETED_UPLOAD_PARTS))) {
+          omResponse.setCompleteMultiPartUploadResponse(MultipartUploadCompleteResponse.newBuilder()
+              .setVolume(requestedVolume).setBucket(requestedBucket).setKey(keyName)
+              .setHash(completedKey.getMetadata().get(OzoneConsts.ETAG)));
+          omClientResponse = new DummyOMClientResponse(omResponse.build());
+          logResult(ozoneManager, multipartUploadCompleteRequest, partsList, auditMap,
+              volumeName, bucketName, keyName, null, Result.SUCCESS);
+          return omClientResponse;
+        }
         throw new OMException(
             failureMessage(requestedVolume, requestedBucket, keyName),
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -559,7 +573,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         builder.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    return builder.setUpdateID(trxnLogIndex).build();
+    // Retain enough information to recognize a retry after the multipart tables have been cleaned up.
+    return builder.addMetadata(COMPLETED_UPLOAD_ID, keyArgs.getMultipartUploadID())
+        .addMetadata(COMPLETED_UPLOAD_PARTS, completedPartsHash(partsList))
+        .setUpdateID(trxnLogIndex).build();
   }
 
   protected String getDBOzoneKey(OMMetadataManager omMetadataManager,
@@ -803,6 +820,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       }
     }
     return req;
+  }
+
+  private static String completedPartsHash(List<OzoneManagerProtocolProtos.Part> partsList) {
+    // Only serialize the parts; the required keyArgs are deliberately excluded from this digest.
+    return DigestUtils.sha256Hex(MultipartUploadCompleteRequest.newBuilder()
+        .addAllPartsList(partsList).buildPartial().toByteArray());
   }
 
   private String multipartUploadedKeyHash(

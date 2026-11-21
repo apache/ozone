@@ -48,12 +48,14 @@ import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.ClientProtocolStub;
 import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -73,6 +75,24 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test methods of the EndpointBase.
  */
 public class TestEndpointBase {
+
+  @Test
+  public void testCompletedMultipartUploadMetadataIsNotReturned() {
+    OzoneKey key = mock(OzoneKey.class);
+    when(key.getMetadata()).thenReturn(Map.of(
+        RESERVED_USER_METADATA_KEY_PREFIX + "multipart-upload-id", "upload-id",
+        RESERVED_USER_METADATA_KEY_PREFIX + "multipart-parts", "parts-hash",
+        EndpointBase.ETAG_CUSTOM, "user-etag",
+        "custom-key", "custom-value"));
+    EndpointBase endpoint = new EndpointBase() { };
+    Response.ResponseBuilder response = Response.ok();
+    endpoint.addCustomMetadataHeaders(response, key);
+
+    MultivaluedMap<String, Object> headers = response.build().getHeaders();
+    assertEquals("user-etag", headers.getFirst(CUSTOM_METADATA_HEADER_PREFIX + "etag"));
+    assertEquals("custom-value", headers.getFirst(CUSTOM_METADATA_HEADER_PREFIX + "custom-key"));
+    assertEquals(2, headers.size());
+  }
 
   /**
    * Verify s3 metadata key "gdprEnabled" can't be set up directly

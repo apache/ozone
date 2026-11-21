@@ -82,7 +82,6 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-
     // 1. Delete multipart key from OpenKeyTable, MPUTable
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .deleteWithBatch(batchOperation, multipartOpenKey);

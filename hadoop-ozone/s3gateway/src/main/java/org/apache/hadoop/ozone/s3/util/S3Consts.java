@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.util;
 
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Set of constants used for S3 implementation.
@@ -95,7 +96,7 @@ public final class S3Consts {
    * Prefix for internal metadata keys that store remapped user x-amz-meta values
    * colliding with system headers. Users must not set metadata keys with this prefix.
    */
-  public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
+  public static final String RESERVED_USER_METADATA_KEY_PREFIX = OzoneConsts.RESERVED_USER_METADATA_KEY_PREFIX;
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
   public static final String READ_CONSISTENCY_HEADER =

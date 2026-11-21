@@ -777,6 +777,30 @@ class TestObjectPut {
     assertErrorResponse(INVALID_REQUEST, () -> putObject(CONTENT));
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"", "COPY"})
+  void testCopyDoesNotRetainCompletedMultipartUploadMetadata(String directive) throws Exception {
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put("ozone-s3-internal-multipart-upload-id", "upload-id");
+    metadata.put("ozone-s3-internal-multipart-parts", "parts-hash");
+    metadata.put(EndpointBase.ETAG_CUSTOM, "user-etag");
+    metadata.put("custom-key", "custom-value");
+    try (OutputStream out = bucket.createKey(KEY_NAME, CONTENT.length(),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), metadata)) {
+      out.write(CONTENT.getBytes(StandardCharsets.UTF_8));
+    }
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn(directive);
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    Map<String, String> copied = destBucket.getKey(DEST_KEY).getMetadata();
+    assertThat(copied).doesNotContainKeys("ozone-s3-internal-multipart-upload-id", "ozone-s3-internal-multipart-parts");
+    assertEquals("user-etag", copied.get(EndpointBase.ETAG_CUSTOM));
+    assertEquals("custom-value", copied.get("custom-key"));
+    assertThat(bucket.getKey(KEY_NAME).getMetadata()).containsAllEntriesOf(metadata);
+  }
+
   @Test
   void testContentTypeStoredAndCopied() throws Exception {
     // PUT with an explicit Content-Type (preserved by HeaderPreprocessor).
