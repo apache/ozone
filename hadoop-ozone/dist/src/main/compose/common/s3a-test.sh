@@ -48,6 +48,11 @@ if ! download_hadoop_aws; then
   exit 1
 fi
 
+if [[ "${CI:-}" == "true" ]] && [[ -d "${DOWNLOAD_DIR}/maven-repo" ]]; then
+  # custom local repo for Hadoop AWS dependencies
+  MAVEN_ARGS="${MAVEN_ARGS:-} -Dmaven.repo.local=${DOWNLOAD_DIR}/maven-repo"
+fi
+
 if [[ "${BUILD_ONLY:-}" == "true" ]]; then
   cd "${HADOOP_AWS_DIR}"
   mvn ${MAVEN_ARGS:-} --show-version -Dtest=void clean test

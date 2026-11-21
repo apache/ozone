@@ -111,8 +111,8 @@ jobs:
       - name: Fetch Hadoop AWS dependencies
         if: steps.restore-hadoop-deps.outputs.stash-hit != 'true'
         run: |
-          # populate custom local repo for Hadoop AWS dependencies
-          export MAVEN_ARGS="$MAVEN_ARGS -Dmaven.repo.local=${HOME}/.cache/ozone/maven-repo"
+          # create custom local repo dir for Hadoop AWS dependencies
+          mkdir -p ~/.cache/ozone/maven-repo
           bash hadoop-ozone/dist/src/main/compose/ozone/test-s3a.sh
         env:
           BUILD_ONLY: true
