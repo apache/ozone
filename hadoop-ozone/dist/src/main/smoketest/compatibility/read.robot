@@ -18,6 +18,10 @@ Documentation       Read Compatibility
 Resource            ../ozone-lib/shell.robot
 Resource            ../snapshot/lib.resource
 Resource            setup.robot
+Resource            ../ozone-lib/batch.robot
+Resource            ../ozone-lib/batch-shell.robot
+Suite Setup         Setup Suite
+Suite Teardown      Teardown Suite
 Test Timeout        5 minutes
 
 
@@ -28,56 +32,62 @@ ${SNAPSHOT2}         snapshot-2-${DATA_VERSION}
 ${SNAPSHOT3}         snapshot-3-${DATA_VERSION}
 ${SNAPSHOT_KEY1}     snapdiff-key1-${DATA_VERSION}
 ${SNAPSHOT_KEY2}     snapdiff-key2-${DATA_VERSION}
-
-
-*** Keywords ***
-Key List With Replication
-    [arguments]    ${args}
-    ${list} =      Execute    ozone sh key list ${args}
-    ${result} =    Execute    echo '${list}' | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
-    [return]    ${result}
+${KEY_REPLICATION_FILTER}    jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
 
 
 *** Test Cases ***
 Buckets Can Be Listed
-    ${result} =     Execute     ozone sh bucket list /vol1
-    Should Contain    ${result}    bucket1
+    ${result} =     Execute Later ozone sh    bucket list /vol1
+    Assert Later    File ${result} Should    Contain    bucket1
 
     IF    '${CLUSTER_VERSION}' >= '${EC_VERSION}'
-        Should Contain    ${result}    ratis-${CLUSTER_VERSION}
-        Should Contain    ${result}    ecbucket-${CLUSTER_VERSION}
+        Assert Later    File ${result} Should
+        ...    Contain    ratis-${CLUSTER_VERSION}
+        ...    Contain    ecbucket-${CLUSTER_VERSION}
     END
 
 Bucket Without Replication Config
-    Verify Bucket Empty Replication Config    /vol1/bucket1
+    ${result} =     Execute Later ozone sh    bucket info /vol1/bucket1
+    Assert Later    Verify Empty Replication Config in ${result}
 
 Bucket With Replication Config
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
+    ${ratis_result} =    Execute Later ozone sh    bucket info /vol1/ratis-${CLUSTER_VERSION}
+    ${ec_result} =    Execute Later ozone sh    bucket info /vol1/ecbucket-${CLUSTER_VERSION}
+
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}'
-        Verify Bucket Replica Replication Config    /vol1/ratis-${CLUSTER_VERSION}   RATIS   THREE
-        Verify Bucket EC Replication Config    /vol1/ecbucket-${CLUSTER_VERSION}    RS    3    2    1048576
+        Assert Later    Verify Replica Replication Config in ${ratis_result}    RATIS   THREE
+        Assert Later    Verify EC Replication Config in ${ec_result}    RS    3    2    1048576
     ELSE
-        Verify Bucket Empty Replication Config    /vol1/ratis-${CLUSTER_VERSION}
-        Verify Bucket Empty Replication Config    /vol1/ecbucket-${CLUSTER_VERSION}
+        Assert Later    Verify Empty Replication Config in ${ratis_result}
+        Assert Later    Verify Empty Replication Config in ${ec_result}
     END
 
 Key Can Be Read
-    Key Should Match Local File    /vol1/bucket1/key-${DATA_VERSION}    ${TESTFILE}
+    ${result} =    Get Key Later    /vol1/bucket1/key-${DATA_VERSION}
+    Assert Later    Compare Files    ${result}    ${TESTFILE}
 
 Encrypted Key Can Be Read
-    Key Should Match Local File    /vol1/encrypted-${DATA_VERSION}/key    ${TESTFILE}
+    ${result} =    Get Key Later    /vol1/encrypted-${DATA_VERSION}/key
+    Assert Later    Compare Files    ${result}    ${TESTFILE}
+
+Encrypted File Can Be Read
     File Should Match Local File    ofs://om/vol1/encrypted-${DATA_VERSION}/key    ${TESTFILE}
 
 Key Read From Bucket With Replication
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
+    ${get_from_ratis_bucket} =    Get Key Later    /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
+    Assert Later    Compare Files    ${get_from_ratis_bucket}    ${TESTFILE}
+
+    ${ec_local} =    Get Next Filename    ${BATCH_OUTPUT_DIR}/key-get
+    ${ec_result} =    Execute Later ozone sh    key get /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} ${ec_local}
 
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' or '${DATA_VERSION}' == '${CLIENT_VERSION}'
-        Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
+        Assert Later    Compare Files    ${ec_local}    ${TESTFILE}
     ELSE
-        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
+        Assert Later    File ${ec_result} Should    Contain    NOT_SUPPORTED_OPERATION
     END
 
 Dir Can Be Listed
@@ -114,32 +124,33 @@ File Can Be Listed
     END
 
 Key List
+    ${result} =    Execute Later ozone sh    key list /vol1/bucket1
+
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}'
-        ${result} =     Execute    ozone sh key list /vol1/bucket1
-                        Should Contain    ${result}    key-${DATA_VERSION}
+        Assert Later    File ${result} Should    Contain    key-${DATA_VERSION}
     ELSE IF    '${DATA_VERSION}' < '${EC_VERSION}' # New client creates RATIS/ONE key by default: BUG?
-        ${result} =     Key List With Replication    /vol1/bucket1
-                        Should contain    ${result}    key-${DATA_VERSION} RATIS 3
+        Assert Later    File ${result} Filtered By ${KEY_REPLICATION_FILTER} Should    Contain    key-${DATA_VERSION} RATIS 3
     END
 
 Key List In Bucket With Replication
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
-        ${result} =     Key List With Replication    /vol1/ratis-${CLUSTER_VERSION}/
-                        Should contain  ${result}   key-${DATA_VERSION} RATIS 3
+    ${ratis_result} =     Execute Later ozone sh    key list /vol1/ratis-${CLUSTER_VERSION}
+    ${ec_result} =     Execute Later ozone sh    key list /vol1/ecbucket-${CLUSTER_VERSION}
 
-        Assert Unsupported    ozone sh key list /vol1/ecbucket-${CLUSTER_VERSION}/
+    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
+        Assert Later    File ${ratis_result} Filtered By ${KEY_REPLICATION_FILTER} Should    Contain    key-${DATA_VERSION} RATIS 3
+        Assert Later    File ${ec_result} Should    Contain    NOT_SUPPORTED_OPERATION
     ELSE
-        ${result} =     Execute    ozone sh key list /vol1/ratis-${CLUSTER_VERSION}
-                        Should Contain    ${result}    key-${DATA_VERSION}
-        ${result} =     Execute    ozone sh key list /vol1/ecbucket-${CLUSTER_VERSION}
-                        Should Contain    ${result}    key-${DATA_VERSION}
+        Assert Later    File ${ratis_result} Should    Contain    key-${DATA_VERSION}
+        Assert Later    File ${ec_result} Should    Contain    key-${DATA_VERSION}
     END
 
-
 File Can Be Get
-    Key Should Match Local File    /vol1/bucket1/dir-${DATA_VERSION}/file-${DATA_VERSION}    ${TESTFILE}
+    ${file} =    Get Key Later    /vol1/bucket1/dir-${DATA_VERSION}/file-${DATA_VERSION}
+    Assert Later    Compare Files    ${file}    ${TESTFILE}
+
+File Can Be Get via FS
     File Should Match Local File    o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION}    ${TESTFILE}
 
 File Can Be Get From Bucket With Replication
@@ -173,11 +184,11 @@ Key Info File Flag Should Be Set Correctly
     ${dirpath} =      Set Variable    /${FSO_BUCKET}/dir/subdir/
     ${filepath} =     Set Variable    ${dirpath}file
 
-    ${key_info} =     Execute    ozone sh key info ${filepath}
-    Should Contain    ${key_info}    \"file\" : true
+    ${key_info} =     Execute Later ozone sh    key info ${filepath}
+    Assert Later    File ${key_info} Should    Contain    \"file\" : true
 
-    ${dir_info} =     Execute    ozone sh key info ${dirpath}
-    Should Contain    ${dir_info}    \"file\" : false
+    ${dir_info} =     Execute Later ozone sh    key info ${dirpath}
+    Assert Later    File ${dir_info} Should    Contain    \"file\" : false
 
 Snapshots Can Be Diffed
     Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'    Cluster does not support snapshots
@@ -213,3 +224,6 @@ Can --get-report of --ordered Snapshot Diff
     IF    '${CLUSTER_VERSION}' >= '${SNAPSHOT_DIFF_ORDERED_VERSION}' and '${CLIENT_VERSION}' >= '${SNAPSHOT_DIFF_ORDERED_VERSION}'
         Should Contain    ${output}    Report is dependency ordered
     END
+
+Execute Batch Shell
+    Execute Batch
