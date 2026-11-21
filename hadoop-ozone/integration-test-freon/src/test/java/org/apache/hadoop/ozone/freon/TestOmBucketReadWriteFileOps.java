@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.freon.OmBucketTestUtils.ParameterBuilder;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for OmBucketReadWriteFileOps.
  */
-public abstract class TestOmBucketReadWriteFileOps implements NonHATests.TestCase {
+public abstract class TestOmBucketReadWriteFileOps implements ClusterForTests.TestCase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmBucketReadWriteFileOps.class);
 

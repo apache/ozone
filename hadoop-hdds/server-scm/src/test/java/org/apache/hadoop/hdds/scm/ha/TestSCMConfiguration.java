@@ -38,7 +38,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -214,6 +216,14 @@ class TestSCMConfiguration {
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     assertEquals(TimeDuration.ZERO, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
+
+    assertFalse(scmRatisConfig.isAppendEntriesComposeEnabled(), "isAppendEntriesComposeEnabled");
+    assertFalse(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(p),
+        RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
+    scmRatisConfig.setAppendEntriesComposeEnabled(true);
+    conf.setFromObject(scmRatisConfig);
+    assertTrue(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(RatisUtil.newRaftProperties(conf)),
+        RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
   }
 
   @ParameterizedTest

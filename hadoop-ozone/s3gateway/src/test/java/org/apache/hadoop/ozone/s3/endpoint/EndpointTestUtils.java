@@ -196,7 +196,11 @@ public final class EndpointTestUtils {
     if (uploadID != null) {
       subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     }
-    subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    if (partNumber == 0 && uploadID == null) {
+      subject.queryParamsForTest().unset(S3Consts.QueryParams.PART_NUMBER);
+    } else {
+      subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    }
     when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
     when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
         .thenReturn(String.valueOf(contentLength));

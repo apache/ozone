@@ -21,6 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
@@ -38,8 +42,8 @@ public class TestResourceCache {
     Cache<Integer, String> resourceCache =
         new ResourceCache<>(
             (k, v) -> (int) k, 10,
-            (P) -> {
-              if (P.wasEvicted()) {
+            (k, v, cause) -> {
+              if (cause.wasEvicted()) {
                 count.incrementAndGet();
               }
             });
@@ -62,6 +66,59 @@ public class TestResourceCache {
     resourceCache.remove(4);
     assertNull(resourceCache.get(4));
     assertEquals(1, count.get());
+  }
+
+  /** The cache is for the newest entries, for example the log entries that followers read next. */
+  @Test
+  public void testKeepsNewestEntries() throws InterruptedException {
+    final int limit = 16;
+    AtomicLong evicted = new AtomicLong();
+    Cache<Integer, String> resourceCache = new ResourceCache<>((k, v) -> 1, limit,
+        (k, v, cause) -> {
+          if (cause.wasEvicted()) {
+            evicted.incrementAndGet();
+          }
+        });
+    for (int i = 0; i < 100; i++) {
+      resourceCache.put(i, ANY_VALUE);
+      // reads of the older entries do not keep them
+      resourceCache.get(0);
+    }
+
+    for (int i = 0; i < 100 - limit; i++) {
+      assertNull(resourceCache.get(i), "key " + i);
+    }
+    for (int i = 100 - limit; i < 100; i++) {
+      assertNotNull(resourceCache.get(i), "key " + i);
+    }
+    assertEquals(100 - limit, evicted.get());
+  }
+
+  @Test
+  public void testReplaceUpdatesWeight() throws InterruptedException {
+    List<RemovalCause> causes = new ArrayList<>();
+    Cache<Integer, String> resourceCache = new ResourceCache<>((k, v) -> v.length(), 10,
+        (k, v, cause) -> causes.add(cause));
+    resourceCache.put(1, "aaaaaaaa");
+    // replacing with a lighter value frees room, so nothing is evicted
+    resourceCache.put(1, "a");
+    resourceCache.put(2, "bbbbbbbb");
+
+    assertEquals("a", resourceCache.get(1));
+    assertEquals("bbbbbbbb", resourceCache.get(2));
+    assertEquals(Collections.singletonList(RemovalCause.REPLACED), causes);
+  }
+
+  @Test
+  public void testEntryHeavierThanLimitIsNotKept() throws InterruptedException {
+    Cache<Integer, String> resourceCache = new ResourceCache<>((k, v) -> v.length(), 3, null);
+    resourceCache.put(1, "a");
+    resourceCache.put(2, "bbbb");
+
+    assertNull(resourceCache.get(1));
+    assertNull(resourceCache.get(2));
+    resourceCache.put(3, "ccc");
+    assertEquals("ccc", resourceCache.get(3));
   }
 
   @Test

@@ -22,7 +22,7 @@ set -e
 
 
 # To run this script
-#    mvn clean install -DskipShade -DskipTests
+#    ./mvnw clean install -DskipShade -DskipTests
 #    cd hadoop-ozone/dist/target/ozone-*/smoketest/s3/
 #    python3 -m venv s3env
 #    source s3env/bin/activate

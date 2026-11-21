@@ -107,7 +107,7 @@ class ByteArrayDecodingState extends DecodingState {
 
     if (validInputs < decoder.getNumDataUnits()) {
       throw new IllegalArgumentException(
-          "No enough valid inputs are provided, not recoverable");
+          "Not enough valid inputs are provided, not recoverable");
     }
   }
 

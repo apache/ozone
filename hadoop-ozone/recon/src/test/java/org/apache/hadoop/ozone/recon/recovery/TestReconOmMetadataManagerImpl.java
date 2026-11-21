@@ -30,6 +30,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,6 +47,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -56,10 +60,23 @@ public class TestReconOmMetadataManagerImpl {
   @TempDir
   private Path temporaryFolder;
 
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
+  }
+
   @Test
   public void testStart() throws Exception {
 
-    OMMetadataManager omMetadataManager = getOMMetadataManager();
+    omMetadataManager = getOMMetadataManager();
 
     //Take checkpoint of the above OM DB.
     DBCheckpoint checkpoint = omMetadataManager.getStore()
@@ -77,8 +94,7 @@ public class TestReconOmMetadataManagerImpl {
         .getAbsolutePath());
     FileUtils.copyDirectory(snapshotFile.getParentFile(), reconOmDbDir);
 
-    ReconOMMetadataManager reconOMMetadataManager =
-        new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
+    reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
     reconOMMetadataManager.start(configuration);
 
     assertNotNull(reconOMMetadataManager.getBucketTable());
@@ -95,7 +111,7 @@ public class TestReconOmMetadataManagerImpl {
   @Test
   public void testUpdateOmDB() throws Exception {
 
-    OMMetadataManager omMetadataManager = getOMMetadataManager();
+    omMetadataManager = getOMMetadataManager();
     //Make sure OM Metadata reflects the keys that were inserted.
     assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
@@ -113,12 +129,12 @@ public class TestReconOmMetadataManagerImpl {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
         .getAbsolutePath());
-    ReconOMMetadataManager reconOMMetadataManager =
-        new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
+    reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
     reconOMMetadataManager.start(configuration);
 
     //Before accepting a snapshot, the metadata should have null tables.
     assertNull(reconOMMetadataManager.getBucketTable());
+    Set<Thread> otherThreads = fullTableCacheThreads();
 
     //Update Recon OM DB with the OM DB checkpoint location.
     reconOMMetadataManager.updateOmDB(
@@ -145,15 +161,26 @@ public class TestReconOmMetadataManagerImpl {
     assertNotNull(newCheckpoint.getCheckpointLocation());
     // Update again with an existing OM DB.
     DBStore current = reconOMMetadataManager.getStore();
+    Set<Thread> replacedThreads = fullTableCacheThreads();
+    replacedThreads.removeAll(otherThreads);
+    assertThat(replacedThreads).isNotEmpty();
     reconOMMetadataManager.updateOmDB(
         newCheckpoint.getCheckpointLocation().toFile(), true);
     // Verify that the existing DB instance is closed.
     assertTrue(current.isClosed());
+    // The caches of the replaced tables stop their cleanup threads.
+    GenericTestUtils.waitFor(() -> replacedThreads.stream().noneMatch(Thread::isAlive), 100, 10_000);
+  }
+
+  private static Set<Thread> fullTableCacheThreads() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .filter(t -> t.getName().contains("FullTableCache-Cleanup"))
+        .collect(Collectors.toSet());
   }
 
   @Test
   public void testUnreadableSnapshot() throws Exception {
-    OMMetadataManager omMetadataManager = getOMMetadataManager();
+    omMetadataManager = getOMMetadataManager();
     File reconOmDbDir = Files.createDirectory(temporaryFolder.resolve("reconOmDbDir")).toFile();
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir.getAbsolutePath());
@@ -164,7 +191,7 @@ public class TestReconOmMetadataManagerImpl {
     FileUtils.copyDirectory(unreadable, new File(reconOmDbDir, "om.snapshot.db_" + System.currentTimeMillis()));
 
     // At startup the unreadable last known snapshot is skipped.
-    ReconOMMetadataManager reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
+    reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
     reconOMMetadataManager.start(configuration);
     assertThat(reconOMMetadataManager.getStore()).isNull();
 
@@ -177,13 +204,11 @@ public class TestReconOmMetadataManagerImpl {
     assertThat(reconOMMetadataManager.getStore()).isSameAs(active);
     assertThat(active.isClosed()).isFalse();
     assertThat(reconOMMetadataManager.getVolumeTable().get("/sampleVol")).isNotNull();
-    reconOMMetadataManager.stop();
-    omMetadataManager.stop();
   }
 
   @Test
   public void testSnapshotWithUnreadableTables() throws Exception {
-    OMMetadataManager omMetadataManager = getOMMetadataManager();
+    omMetadataManager = getOMMetadataManager();
     File reconOmDbDir = Files.createDirectory(temporaryFolder.resolve("reconOmDbDir")).toFile();
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir.getAbsolutePath());
@@ -196,7 +221,7 @@ public class TestReconOmMetadataManagerImpl {
     FileUtils.copyDirectory(unreadableTables, new File(reconOmDbDir, "om.snapshot.db_" + System.currentTimeMillis()));
 
     // At startup the failure is still reported, and no OM DB is left in use.
-    ReconOMMetadataManager reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
+    reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
     assertThatThrownBy(() -> reconOMMetadataManager.start(configuration)).isInstanceOf(Exception.class);
     assertThat(reconOMMetadataManager.getStore()).isNull();
 
@@ -211,20 +236,18 @@ public class TestReconOmMetadataManagerImpl {
     assertTrue(reconOMMetadataManager.isOmTablesInitialized());
     assertThat(reconOMMetadataManager.getVolumeTable().get("/sampleVol")).isNotNull();
     assertThat(reconOMMetadataManager.getKeyTable(getBucketLayout()).get("/sampleVol/bucketOne/key_one")).isNotNull();
-    reconOMMetadataManager.stop();
-    omMetadataManager.stop();
   }
 
   @Test
   public void testStartReportsTableInitializationFailure() throws Exception {
-    OMMetadataManager omMetadataManager = getOMMetadataManager();
+    omMetadataManager = getOMMetadataManager();
     File reconOmDbDir = Files.createDirectory(temporaryFolder.resolve("reconOmDbDir")).toFile();
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir.getAbsolutePath());
     FileUtils.copyDirectory(omMetadataManager.getStore().getCheckpoint(true).getCheckpointLocation().toFile(),
         new File(reconOmDbDir, "om.snapshot.db_" + System.currentTimeMillis()));
 
-    ReconOMMetadataManager reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils()) {
+    reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils()) {
       @Override
       protected void initializeOmTables(TableCache.CacheType cacheType, boolean addCacheMetrics) throws IOException {
         throw new IOException("Mocked table initialization failure");
@@ -234,7 +257,6 @@ public class TestReconOmMetadataManagerImpl {
     // Only a snapshot that cannot be opened is skipped at startup. A failure to initialize its tables is reported.
     assertThatThrownBy(() -> reconOMMetadataManager.start(configuration)).isInstanceOf(IOException.class);
     assertThat(reconOMMetadataManager.getStore()).isNull();
-    omMetadataManager.stop();
   }
 
   /**
@@ -249,8 +271,7 @@ public class TestReconOmMetadataManagerImpl {
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration, null);
+    omMetadataManager = new OmMetadataManagerImpl(omConfiguration, null);
 
     //Create a volume + bucket + 2 keys.
     String volumeKey = omMetadataManager.getVolumeKey("sampleVol");

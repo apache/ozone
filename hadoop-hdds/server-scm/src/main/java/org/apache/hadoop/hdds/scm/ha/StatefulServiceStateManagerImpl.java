@@ -63,7 +63,8 @@ public final class StatefulServiceStateManagerImpl
     if (transactionBuffer instanceof SCMHADBTransactionBuffer) {
       SCMHADBTransactionBuffer buffer =
               (SCMHADBTransactionBuffer) transactionBuffer;
-      buffer.flush();
+      // Defer until applyTransaction has advanced the transaction index.
+      buffer.flushIfNeeded(0);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Transaction buffer flushed");
       }

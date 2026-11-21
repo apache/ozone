@@ -36,10 +36,16 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
@@ -190,6 +196,32 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
       newRequest().preExecute(ozoneManager);
     }
 
+    verify(scmBlockLocationProtocol).finalizeUpgrade();
+  }
+
+  @Test
+  public void testPeerVersionCheckUsesBoundedRetriesAndRpcTimeout() throws IOException {
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
+    when(ozoneManager.getPeerNodes()).thenReturn(Collections.singletonList(buildPeer("om2")));
+    OMAdminProtocolClientSideImpl matchingClient = peerClientWithVersion(OzoneManagerVersion.SOFTWARE_VERSION);
+    AtomicReference<OzoneConfiguration> peerCheckConfiguration = new AtomicReference<>();
+
+    try (MockedStatic<OMAdminProtocolClientSideImpl> factory =
+             mockStatic(OMAdminProtocolClientSideImpl.class)) {
+      factory.when(() -> OMAdminProtocolClientSideImpl.createProxyForSingleOM(any(), any(), any()))
+          .thenAnswer(invocation -> {
+            peerCheckConfiguration.set(invocation.getArgument(0));
+            return matchingClient;
+          });
+
+      newRequest().preExecute(ozoneManager);
+    }
+
+    OzoneConfiguration configuration = peerCheckConfiguration.get();
+    assertEquals(1, configuration.getInt(OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_KEY, -1));
+    assertEquals(1, configuration.getInt(
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY, -1));
+    assertEquals(TimeUnit.SECONDS.toMillis(60), configuration.getObject(OMClientConfig.class).getRpcTimeOut());
     verify(scmBlockLocationProtocol).finalizeUpgrade();
   }
 
