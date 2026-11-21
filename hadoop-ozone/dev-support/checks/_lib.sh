@@ -103,8 +103,8 @@ get_version() {
   local tempfile=$(mktemp)
   local -i rc=0
 
-  # output version/transfer etc. to stderr first
-  ./mvnw --batch-mode --non-recursive --show-version \
+  # redirect output to stderr
+  ./mvnw --batch-mode --non-recursive --offline --show-version \
       help:evaluate -Dexpression="${dep}.version" -Doutput="${tempfile}" \
       -Dscan=false "$@" >&2 \
     && cat "${tempfile}" \
