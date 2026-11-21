@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getValidInetsForCurrentHost;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -97,11 +96,6 @@ public final class SelfSignedCertificate {
     this.altNames = builder.altNames;
   }
 
-  @VisibleForTesting
-  public static String getNameFormat() {
-    return CertificateSignRequest.getDistinguishedNameFormatWithSN();
-  }
-
   public static Builder newBuilder() {
     return new Builder();
   }
@@ -124,9 +118,7 @@ public final class SelfSignedCertificate {
     }
     // For the Root Certificate we form the name from Subject, SCM ID and
     // Cluster ID.
-    String dnName = String.format(getNameFormat(),
-        subject, scmID, clusterID, serial);
-    X500Name name = new X500Name(dnName);
+    X500Name name = CertificateSignRequest.getDistinguishedNameWithSN(subject, scmID, clusterID, serial.toString());
 
     // Valid from the Start of the day when we generate this Certificate.
     Date validFrom = Date.from(beginDate.toInstant());

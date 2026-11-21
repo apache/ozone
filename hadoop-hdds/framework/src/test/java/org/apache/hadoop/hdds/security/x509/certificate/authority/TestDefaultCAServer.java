@@ -73,6 +73,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -201,6 +203,40 @@ public class TestDefaultCAServer {
     assertEquals(caInReturnedBundle.getSubjectX500Principal(),
         signedCert.getIssuerX500Principal());
 
+  }
+
+  /**
+   * Tests that a CSR whose subject is longer than the RFC 5280 ub-common-name (64), like user@FQDN of a
+   * Kubernetes pod, is signed and the CN is kept.
+   */
+  @Test
+  public void testRequestCertificateWithLongSubject() throws Exception {
+    String subject = "dn@aaaa-ozone-000-datanode-1.aaa-ozone-000-datanode-headless.aaaa-data.svc.cluster.local";
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject(subject)
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+
+    CertificateServer testCA = new DefaultCAServer("testCA", clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+
+    Future<CertPath> holder = testCA.requestCertificate(csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC,
+        OM, String.valueOf(System.nanoTime()));
+    X509Certificate signedCert = CertificateCodec.firstCertificateFrom(holder.get());
+    X500Name name = X500Name.getInstance(signedCert.getSubjectX500Principal().getEncoded());
+    assertEquals(subject, name.getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+    assertEquals(scmId, name.getRDNs(BCStyle.OU)[0].getFirst().getValue().toString());
+    assertEquals(clusterId, name.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
   }
 
   /**
