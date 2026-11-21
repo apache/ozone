@@ -14,16 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Fetches Ozone build and runtime dependencies.
+
 set -e -u -o pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../.." || exit 1
 
+# fetch plugins, even if not part of normal build
+./mvnw --batch-mode --show-version dependency:resolve-plugins help:help
+
 # install, but skip shaded modules
 ./mvnw --batch-mode --show-version clean install \
   -DskipShade -Pgo-offline ${BUILD_ARGS:-} "$@"
 
-# only compile, no shade
+# no shading
 hadoop-ozone/dev-support/checks/_build.sh compile cyclonedx:makeBom \
   -pl :ozone-filesystem-shaded,:ozone-filesystem-hadoop2 \
   -Dmaven-replacer-plugin.skip "$@"
