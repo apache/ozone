@@ -94,6 +94,11 @@ abstract class StreamDataChannelBase
     return getChannel().isOpen();
   }
 
+  /** @return the position of the block file, i.e. the number of bytes written to it. */
+  long getPosition() throws IOException {
+    return getChannel().position();
+  }
+
   abstract boolean isPutBlockCommittedOnClose();
 
   protected void assertSpaceAvailability(int requested) throws StorageContainerException {

@@ -131,6 +131,16 @@ public interface ChunkManager {
     return null;
   }
 
+  /**
+   * A data stream keeps the end of the stream in memory.
+   * Write the data of the open stream of the given block, if any, to the block file,
+   * until the block file has at least the given length.
+   * It must be called before committing a PutBlock with this block length.
+   */
+  default void drainStreamBuffers(Container container, BlockID blockID, long length) throws IOException {
+    // no-op
+  }
+
   default StateMachine.DataChannel getStreamDataChannel(
           Container container, BlockID blockID,
           CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException> putBlock,
