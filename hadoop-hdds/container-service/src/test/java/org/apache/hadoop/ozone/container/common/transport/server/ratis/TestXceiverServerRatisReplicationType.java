@@ -20,12 +20,18 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineCreateInfoProto;
@@ -40,6 +46,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,6 +113,28 @@ public class TestXceiverServerRatisReplicationType {
     final PipelineID pipelineID = PipelineID.randomId();
     server.addGroup(pipelineID, ReplicationType.CHAINED, Collections.singletonList(dn), Collections.singletonList(0));
     assertReplicationType(ReplicationType.CHAINED, pipelineID);
+  }
+
+  @Test
+  void testChainedBeforeFinalization() throws Exception {
+    // finalized to every version except STREAM_PUTBLOCK_WITHOUT_RAFT
+    final DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    when(versionManager.isAllowed(any())).thenReturn(true);
+    when(versionManager.isAllowed(HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT)).thenReturn(false);
+    VersionedDatanodeFeatures.initialize(versionManager);
+    try {
+      final PipelineID chained = PipelineID.randomId();
+      assertThrows(IOException.class, () -> server.addGroup(chained, ReplicationType.CHAINED,
+          Collections.singletonList(dn), Collections.singletonList(0)));
+      assertFalse(hasGroup(server, chained.getGroupId()));
+
+      // RATIS is not affected
+      final PipelineID ratis = PipelineID.randomId();
+      server.addGroup(ratis, ReplicationType.RATIS, Collections.singletonList(dn), Collections.singletonList(0));
+      assertReplicationType(ReplicationType.RATIS, ratis);
+    } finally {
+      VersionedDatanodeFeatures.initialize(null);
+    }
   }
 
   @ParameterizedTest

@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import static org.apache.hadoop.hdds.HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.CHAINED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
@@ -88,6 +91,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
@@ -274,8 +278,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         return stored.getReplicationType();
       }
     }
-    LOG.debug("{}: ReplicationType not found, use {}", gid, ReplicationType.RATIS);
-    return ReplicationType.RATIS;
+    LOG.debug("{}: ReplicationType not found, use {}", gid, RATIS);
+    return RATIS;
   }
 
   /** @return PipelineCreateInfoTable, or null if it is unavailable. */
@@ -863,12 +867,17 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       ReplicationType type,
       List<DatanodeDetails> peers,
       List<Integer> priorityList) throws IOException {
+    if (type == CHAINED && !VersionedDatanodeFeatures.isFinalized(STREAM_PUTBLOCK_WITHOUT_RAFT)) {
+      // Otherwise, a downgraded datanode would load the CHAINED group as RATIS.
+      throw new IOException("Failed to add " + type + " " + pipelineID
+          + ": the datanode has not been finalized to version " + STREAM_PUTBLOCK_WITHOUT_RAFT);
+    }
     final RaftGroupId groupId = pipelineID.getGroupId();
     final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers, priorityList);
     GroupManagementRequest request = GroupManagementRequest.newAdd(
         clientId, server.getId(), nextCallId(), group);
 
-    if (type != ReplicationType.RATIS) {
+    if (type != RATIS) {
       // Persist the type before adding the group, so that the group can be reloaded with the type on restart.
       // If the datanode crashes before the group is added, cleanupPipelineCreateInfoTable() removes the entry.
       final Table<PipelineID, PipelineCreateInfoProto> table = getPipelineCreateInfoTable();
@@ -913,7 +922,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   public void removeGroup(RaftGroupId groupId, GrpcTlsConfig tlsConfig) throws IOException {
     // For RATIS  , fan-out to removeGroup for the other datanodes (faster)
     // For CHAINED, just remove it locally and don't fan-out
-    if (getReplicationType(groupId) == ReplicationType.RATIS) {
+    if (getReplicationType(groupId) == RATIS) {
       final Collection<RaftPeer> peers = getRaftPeers(groupId);
       // For RATIS pipeline, send remove group to the other datanodes first
       peers.stream()
