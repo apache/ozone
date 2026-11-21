@@ -19,17 +19,23 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 
-/** Splits a streaming block read into ranges aligned to chunk-relative checksum boundaries. */
+/**
+ * Splits a streaming block read into ranges aligned to chunk-relative checksum boundaries, or, when no checksum is
+ * sent or verified, into ranges covering exactly the requested bytes.
+ */
 class BlockReadCursor implements Iterator<BlockReadCursor.ReadRange> {
   private static final int STREAMING_BYTES_PER_CHUNK = 1024 * 64;
 
   private final List<ChunkInfo> chunks;
+  /** False: ranges cover exactly the requested bytes, carry no chunks, and the arrays below are not built. */
+  private final boolean aligned;
   // [c1 offset, c2 offset, ..., cn offset, cn offset + cn len]
   private final long[] chunkOffsets;
   private final int[] intervals;
@@ -39,6 +45,27 @@ class BlockReadCursor implements Iterator<BlockReadCursor.ReadRange> {
   private int chunkIndex;
 
   BlockReadCursor(long requestedOffset, long length, int responseSize, List<ChunkInfo> chunks) throws IOException {
+    this(requestedOffset, length, responseSize, chunks, true);
+  }
+
+  /**
+   * @param aligned whether ranges must start and end on checksum boundaries, i.e. checksums are sent or verified.
+   *     Otherwise the ranges cover exactly the requested bytes (clamped to the block) and carry no chunks.
+   */
+  BlockReadCursor(long requestedOffset, long length, int responseSize, List<ChunkInfo> chunks, boolean aligned)
+      throws IOException {
+    this.aligned = aligned;
+    if (!aligned) {
+      this.chunks = Collections.emptyList();
+      chunkOffsets = null;
+      intervals = null;
+      responseDataSize = responseSize;
+      ChunkInfo lastChunk = chunks.get(chunks.size() - 1);
+      long blockEnd = lastChunk.getOffset() + lastChunk.getLen();
+      offset = requestedOffset;
+      end = length == 0 ? requestedOffset : requestedOffset + Math.min(length, blockEnd - requestedOffset);
+      return;
+    }
     this.chunks = chunks;
     chunkOffsets = new long[chunks.size() + 1];
     intervals = new int[chunks.size()];
@@ -107,6 +134,11 @@ class BlockReadCursor implements Iterator<BlockReadCursor.ReadRange> {
       throw new NoSuchElementException("No range left at offset " + offset + " of " + end);
     }
     long limit = offset + Math.min(responseDataSize, end - offset);
+    if (!aligned) {
+      ReadRange range = new ReadRange(offset, Math.toIntExact(limit - offset), chunks);
+      offset = limit;
+      return range;
+    }
     if (limit < end) {
       limit = alignDown(limit, findChunk(limit));
     }
