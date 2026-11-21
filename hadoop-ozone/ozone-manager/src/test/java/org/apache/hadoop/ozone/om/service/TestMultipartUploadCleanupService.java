@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_PARTS_CLEANUP_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestCount;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestTime;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,10 +55,12 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -144,6 +148,43 @@ class TestMultipartUploadCleanupService {
         .isGreaterThan(oldRunCount);
     assertThat(multipartUploadCleanupService.getSubmittedMpuInfoCount())
         .isGreaterThanOrEqualTo(oldMpuInfoCount + numDEFKeys + numFSOKeys);
+  }
+
+  /**
+   * The MultipartUploadCleanupService submits an internal {@code AbortExpiredMultiPartUploads}
+   * request, which should be counted in the OmClientProtocol per-type metrics like a client request.
+   */
+  @Test
+  void testCleanupIncrementsAbortExpiredMultiPartUploadsMetric() throws Exception {
+    MultipartUploadCleanupService multipartUploadCleanupService =
+        (MultipartUploadCleanupService) keyManager.getMultipartUploadCleanupService();
+
+    multipartUploadCleanupService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL.toMillis());
+
+    final long beforeCount = getRequestCount(om.getOmClientProtocolMetrics(),
+        Type.AbortExpiredMultiPartUploads);
+    final long beforeTime = getRequestTime(om.getOmClientProtocolMetrics(),
+        Type.AbortExpiredMultiPartUploads);
+
+    createIncompleteMPUKeys(5, BucketLayout.DEFAULT);
+
+    // wait for MPU info to expire
+    Thread.sleep(EXPIRE_THRESHOLD.toMillis());
+    assertThat(getExpiredMultipartUploads()).isNotEmpty();
+
+    multipartUploadCleanupService.resume();
+
+    // wait for requests to complete
+    waitFor(() -> getExpiredMultipartUploads().isEmpty(),
+        (int) SERVICE_INTERVAL.toMillis(),
+        15 * (int) SERVICE_INTERVAL.toMillis());
+
+    assertThat(getRequestCount(om.getOmClientProtocolMetrics(),
+        Type.AbortExpiredMultiPartUploads)).isGreaterThan(beforeCount);
+    assertThat(getRequestTime(om.getOmClientProtocolMetrics(),
+        Type.AbortExpiredMultiPartUploads)).isGreaterThan(beforeTime);
   }
 
   private List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads() {
