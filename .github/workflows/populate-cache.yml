@@ -65,7 +65,7 @@ jobs:
 
       - name: Fetch plugin dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: ./mvnw $MAVEN_ARGS --no-transfer-progress --show-version dependency:resolve-plugins
+        run: ./mvnw $MAVEN_ARGS --show-version dependency:resolve-plugins help:help
 
       - name: Get versions
         id: versions
