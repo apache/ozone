@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.conf.Parameters;
@@ -209,6 +210,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
+  @SkipTracing
   public RaftServer.Division getDivision() {
     return division;
   }
@@ -219,11 +221,13 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
+  @SkipTracing
   public SCMStateMachine getSCMStateMachine() {
     return stateMachine;
   }
 
   @Override
+  @SkipTracing
   public void registerStateMachineHandler(final ScmInvoker<?> handler) {
     stateMachine.registerInvoker(handler.getType(), handler);
   }
@@ -273,6 +277,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
+  @SkipTracing
   public boolean isStopped() {
     return isStopped;
   }
@@ -321,6 +326,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
    * {@inheritDoc}
    */
   @Override
+  @SkipTracing
   public NotLeaderException triggerNotLeaderException() {
     ByteString leaderId =
         division.getInfo().getRoleInfoProto().getFollowerInfo().getLeaderInfo()

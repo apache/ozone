@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMHAMetrics;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -163,8 +162,7 @@ public abstract class TestStorageContainerManagerHAWithAllRunning implements HAC
         StorageContainerManager scm =
             cluster().getStorageContainerManagers().get(k);
         // flush to DB on each SCM
-        ((SCMRatisServerImpl) scm.getScmHAManager().getRatisServer())
-            .getStateMachine().takeSnapshot();
+        scm.getScmHAManager().getRatisServer().getSCMStateMachine().takeSnapshot();
         assertTrue(scm.getContainerManager()
             .containerExist(ContainerID.valueOf(containerID)));
         assertNotNull(scm.getScmMetadataStore().getContainerTable()

@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTra
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -142,7 +143,8 @@ public class SCMBlockProtocolServer implements
     BlockingService blockProtoPbService =
         ScmBlockLocationProtocolProtos.ScmBlockLocationProtocolService
             .newReflectiveBlockingService(
-                new ScmBlockLocationProtocolServerSideTranslatorPB(this, scm,
+                new ScmBlockLocationProtocolServerSideTranslatorPB(
+                    TracingUtil.createInternalProxy(this, ScmBlockLocationProtocol.class, conf), scm,
                     protocolMessageMetrics));
 
     final InetSocketAddress scmBlockAddress =

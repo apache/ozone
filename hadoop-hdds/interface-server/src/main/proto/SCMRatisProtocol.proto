@@ -54,6 +54,7 @@ message ListArgument {
 message SCMRatisRequestProto {
   optional RequestType type = 1;
   optional Method method = 2;
+  optional string traceID = 3;
 }
 
 message SCMRatisResponseProto {
