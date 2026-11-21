@@ -25,6 +25,8 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
@@ -35,6 +37,7 @@ import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.IdGenerator;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
@@ -62,6 +65,7 @@ public final class TracingUtil {
   private static volatile boolean isInit = false;
   private static volatile boolean tracingEnabled;
   private static volatile boolean applicationAware;
+  private static volatile boolean internalTracingEnabled;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
   private static volatile SdkTracerProvider sdkTracerProvider;
   private static BatchSpanProcessor batchSpanProcessor;
@@ -69,6 +73,13 @@ public final class TracingUtil {
   public static final String GLOBAL_TRACER_NAME = "ozone";
 
   private TracingUtil() {
+  }
+
+  /** OTel no-op span with a valid, non-sampled context: nested and remote spans inherit "not sampled". */
+  private static Span nonSampledSpan() {
+    IdGenerator ids = IdGenerator.random();
+    return Span.wrap(SpanContext.create(ids.generateTraceId(), ids.generateSpanId(),
+        TraceFlags.getDefault(), TraceState.getDefault()));
   }
 
   /**
@@ -187,6 +198,7 @@ public final class TracingUtil {
       tracer = OpenTelemetry.noop().getTracer("noop");
       tracingEnabled = false;
       applicationAware = false;
+      internalTracingEnabled = false;
       isInit = false;
     }
   }
@@ -194,6 +206,7 @@ public final class TracingUtil {
   private static void initialize(String serviceName, TracingConfig cfg, boolean isReconfig) {
     tracingEnabled = cfg.isTracingEnabled();
     applicationAware = cfg.isApplicationAware();
+    internalTracingEnabled = cfg.isInternalTracingEnabled();
 
     if (!tracingEnabled && !applicationAware) {
       tracer = OpenTelemetry.noop().getTracer(GLOBAL_TRACER_NAME);
@@ -267,6 +280,10 @@ public final class TracingUtil {
       return false;
     }
     return Span.current().getSpanContext().isValid();
+  }
+
+  private static boolean canStartInternalRootSpan() {
+    return tracingEnabled && internalTracingEnabled && hasUsableTracer();
   }
 
   /**
@@ -364,6 +381,10 @@ public final class TracingUtil {
 
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
+    SpanContext remote = Span.fromContext(extract).getSpanContext();
+    if (remote.isValid() && !remote.isSampled()) {
+      return Span.wrap(remote);
+    }
     return tracer.spanBuilder(name)
         .setParent(extract)
         .setSpanKind(spanKind)
@@ -510,6 +531,26 @@ public final class TracingUtil {
       SpanKind spanKind, CheckedSupplier<R, E> supplier) throws E {
     Span span = buildSpan(spanName, spanKind);
     return executeInSpan(span, supplier);
+  }
+
+  /**
+   * Execute timer-driven internal work in a span gated by {@code ozone.tracing.internal.enabled}.
+   * If no root may be started, runs under a non-sampled (no-op) context, so nested and remote spans are not
+   * recorded.
+   */
+  public static <E extends Exception> void executeInternalSpan(String spanName,
+      CheckedRunnable<E> runnable) throws E {
+    executeInSpan(buildInternalSpan(spanName), runnable);
+  }
+
+  /**
+   * Execute timer-driven internal work in a span gated by {@code ozone.tracing.internal.enabled}.
+   * If no root may be started, runs under a non-sampled (no-op) context, so nested and remote spans are not
+   * recorded.
+   */
+  public static <R, E extends Exception> R executeInternalSpan(String spanName,
+      CheckedSupplier<R, E> supplier) throws E {
+    return executeInSpan(buildInternalSpan(spanName), supplier);
   }
 
   /**
@@ -687,8 +728,12 @@ public final class TracingUtil {
   private static Span buildSpan(String spanName, SpanKind spanKind) {
     Context currentContext = Context.current();
     Span parentSpan = Span.fromContext(currentContext);
+    SpanContext parentContext = parentSpan.getSpanContext();
 
-    if (parentSpan.getSpanContext().isValid()) {
+    if (parentContext.isValid()) {
+      if (!parentContext.isSampled()) {
+        return Span.wrap(parentContext);
+      }
       return tracer.spanBuilder(spanName)
           .setParent(currentContext)
           .setSpanKind(spanKind)
@@ -700,6 +745,28 @@ public final class TracingUtil {
     return tracer.spanBuilder(spanName)
         .setNoParent()
         .setSpanKind(spanKind)
+        .startSpan();
+  }
+
+  private static Span buildInternalSpan(String spanName) {
+    Context currentContext = Context.current();
+    Span parentSpan = Span.fromContext(currentContext);
+    SpanContext parentContext = parentSpan.getSpanContext();
+    if (parentContext.isValid()) {
+      if (!parentContext.isSampled()) {
+        return Span.wrap(parentContext);
+      }
+      return tracer.spanBuilder(spanName)
+          .setParent(currentContext)
+          .setSpanKind(SpanKind.INTERNAL)
+          .startSpan();
+    }
+    if (!canStartInternalRootSpan()) {
+      return nonSampledSpan();
+    }
+    return tracer.spanBuilder(spanName)
+        .setNoParent()
+        .setSpanKind(SpanKind.INTERNAL)
         .startSpan();
   }
 
