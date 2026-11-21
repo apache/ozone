@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -102,6 +103,9 @@ public abstract class ContainerData {
   private static final long UNSET_DATA_CHECKSUM = -1;
 
   private boolean isEmpty;
+
+  // Number of reconciliations running on this replica. In memory only.
+  private final AtomicInteger reconciliationsInProgress = new AtomicInteger();
 
   private int replicaIndex;
 
@@ -464,6 +468,23 @@ public abstract class ContainerData {
    */
   public void markAsEmpty() {
     this.isEmpty = true;
+  }
+
+  /**
+   * Marks the start of a reconciliation of this replica. Call with the container write lock held, so that a
+   * holder of the read lock sees a stable answer from {@link #isBeingReconciled()}.
+   */
+  public void reconciliationStarted() {
+    reconciliationsInProgress.incrementAndGet();
+  }
+
+  public void reconciliationFinished() {
+    reconciliationsInProgress.decrementAndGet();
+  }
+
+  @JsonIgnore
+  public boolean isBeingReconciled() {
+    return reconciliationsInProgress.get() > 0;
   }
 
   public void setContainerFileChecksum(String checkSum) {
