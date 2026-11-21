@@ -37,10 +37,11 @@ import java.io.RandomAccessFile;
 import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Objects;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -53,6 +54,7 @@ import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.LimitInputStream;
 import org.apache.ratis.thirdparty.com.google.protobuf.CodedInputStream;
 import org.slf4j.Logger;
@@ -73,21 +75,32 @@ final class Receiver implements Runnable {
   private final int bufferSize;
   private final ThreadPoolExecutor readExecutors;
   private DataInputStream input;
-  private Lock lock = new ReentrantLock();
+  // Responses wait here for this connection's writer thread, so a client that stops reading holds no executor thread.
+  private final BlockingQueue<TaskEntry> responses = new LinkedBlockingQueue<>();
+  // Requests of this connection that are on the executor or in responses. With the executor's size as the limit, one
+  // connection keeps all of the executor's parallelism.
+  private final Semaphore inFlight;
+  // Shared by all connections of the server; bounds the block files and responses held for clients that do not read.
+  private final Semaphore responseSlots;
+  private volatile boolean closed;
 
   public static Receiver create(DomainPeer peer, ConfigurationSource conf, XceiverServerDomainSocket server,
-      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, ContainerMetrics metrics) throws IOException {
-    return new Receiver(peer, conf, server, dispatcher, executor, metrics);
+      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, Semaphore responseSlots, ContainerMetrics metrics)
+      throws IOException {
+    return new Receiver(peer, conf, server, dispatcher, executor, responseSlots, metrics);
   }
   
   private Receiver(DomainPeer peer, ConfigurationSource conf, XceiverServerDomainSocket server,
-      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, ContainerMetrics metrics) throws IOException {
+      ContainerDispatcher dispatcher, ThreadPoolExecutor executor, Semaphore responseSlots, ContainerMetrics metrics)
+      throws IOException {
     this.peer = peer;
     this.socketIn = peer.getInputStream();
     this.socketOut = peer.getOutputStream();
     this.domainSocketServer = server;
     this.dispatcher = dispatcher;
     this.readExecutors = executor;
+    this.inFlight = new Semaphore(executor.getMaximumPoolSize());
+    this.responseSlots = responseSlots;
     this.metrics = metrics;
     this.bufferSize = conf.getObject(OzoneClientConfig.class).getShortCircuitBufferSize();
   }
@@ -97,9 +110,14 @@ final class Receiver implements Runnable {
     long opsReceived = 0;
     final AtomicLong opsHandled = new AtomicLong(0);
     TaskEntry entry = null;
+    Thread writer = null;
     try {
       domainSocketServer.addPeer(peer, Thread.currentThread(), this);
       input = new DataInputStream(new BufferedInputStream(socketIn, bufferSize));
+      Thread receiver = Thread.currentThread();
+      writer = new Daemon(() -> writeResponses(receiver));
+      writer.setName(Thread.currentThread().getName() + "-writer");
+      writer.start();
 
       // We process requests in a loop, and stay around for a short timeout.
       // This optimistic behaviour allows the other end to reuse connections.
@@ -115,20 +133,27 @@ final class Receiver implements Runnable {
           throw e;
         }
 
+        inFlight.acquire();
+        responseSlots.acquire();
         readExecutors.submit(new ProcessRequestTask(entry, opsHandled));
         ++opsReceived;
         // reset request variable
         entry = null;
       } while (peer != null && !peer.isClosed());
     } catch (Throwable t) {
+      // InterruptedException: the server is closing this connection while it waits for an in-flight slot
       if ((!(t instanceof SocketTimeoutException) && !(t instanceof EOFException))
-          && !(t instanceof ClosedChannelException)) {
+          && !(t instanceof ClosedChannelException) && !(t instanceof InterruptedException)) {
         String s = "Receiver error"
             + ((entry == null) ? ", " : ", processing " + entry.getRequest().getCmdType() + " operation, " +
             "after received " + opsReceived + " ops and handled " + opsHandled.get() + " ops.");
         LOG.warn(s, t);
       }
     } finally {
+      closed = true;
+      if (writer != null) {
+        writer.interrupt();
+      }
       if (peer != null) {
         try {
           domainSocketServer.closePeer(peer);
@@ -216,9 +241,12 @@ final class Receiver implements Runnable {
           entry.setFile(file);
         }
         entry.setResponse(responseProto);
-        sendResponse(entry);
+        queueResponse(entry);
       } catch (Throwable e) {
         LOG.error("Failed to processRequest {} {} {}", type, request.getClientId(), request.getCallId(), e);
+        // no response is sent for this request
+        closeFile(entry);
+        releaseSlot();
       } finally {
         span.end();
         counter.incrementAndGet();
@@ -226,12 +254,59 @@ final class Receiver implements Runnable {
     }
   }
 
+  private void queueResponse(TaskEntry entry) {
+    responses.add(entry);
+    if (closed) {
+      // the writer may have exited already
+      closeQueued();
+    }
+  }
+
+  /** Runs on this connection's writer thread until the connection is closed. **/
+  private void writeResponses(Thread receiver) {
+    try {
+      while (!closed) {
+        TaskEntry entry = responses.take();
+        try {
+          if (closed || peer.isClosed()) {
+            closeFile(entry);
+          } else {
+            sendResponse(entry);
+          }
+        } finally {
+          releaseSlot();
+        }
+      }
+    } catch (InterruptedException e) {
+      // the connection is closed
+    } finally {
+      if (!closed) {
+        // the writer failed on a live connection; close it, or the Receiver would wait for slots that never return
+        IOUtils.closeStream(peer);
+        receiver.interrupt();
+      }
+      closeQueued();
+    }
+  }
+
+  private void closeQueued() {
+    TaskEntry entry;
+    while ((entry = responses.poll()) != null) {
+      closeFile(entry);
+      releaseSlot();
+    }
+  }
+
+  private void releaseSlot() {
+    responseSlots.release();
+    inFlight.release();
+  }
+
   void sendResponse(TaskEntry entry) {
     byte[] buf = new byte[1];
     buf[0] = DATA_TRANSFER_MAGIC_CODE;
     ContainerCommandResponseProto responseProto = entry.getResponse();
     ContainerProtos.Type type = responseProto.getCmdType();
-    lock.lock();
     try {
       entry.setSendStartTimeNs();
       RandomAccessFile file = entry.getFile();
@@ -260,15 +335,8 @@ final class Receiver implements Runnable {
       // A partial response frame may already be on the wire; close the peer so the next response is not appended to it.
       IOUtils.closeStream(peer);
     } finally {
-      lock.unlock();
       entry.setSendFinishTimeNs();
-      if (entry.getFile() != null) {
-        try {
-          entry.getFile().close();
-        } catch (IOException e) {
-          LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
-        }
-      }
+      closeFile(entry);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Request {} {}:{}, receive {} ns, in queue {} ns, " +
                 " handle {} ns, send out {} ns, total {} ns", type, responseProto.getClientId().toStringUtf8(),
@@ -277,6 +345,16 @@ final class Receiver implements Runnable {
       }
       if (isSupportedCmdType(type)) {
         metrics.incContainerLocalOpsLatencies(type, entry.getTotalTimeNs());
+      }
+    }
+  }
+
+  private static void closeFile(TaskEntry entry) {
+    if (entry.getFile() != null) {
+      try {
+        entry.getFile().close();
+      } catch (IOException e) {
+        LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
       }
     }
   }
