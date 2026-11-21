@@ -55,6 +55,7 @@ import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.netty.channel.ChannelOption;
 import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.ServerChannel;
+import org.apache.ratis.thirdparty.io.netty.channel.WriteBufferWaterMark;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.Epoll;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollEventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollServerSocketChannel;
@@ -70,6 +71,15 @@ import org.slf4j.LoggerFactory;
  * Ozone containers.
  */
 public final class XceiverServerGrpc implements XceiverServerSpi {
+  /**
+   * Write-buffer watermarks of each client connection. Netty's default high watermark (64 KiB) is below one
+   * positioned-read reply (a 64 KiB range plus framing), so every reply flipped the connection unwritable and back:
+   * the HTTP/2 flow controller stopped part-way through the reply, the connection wrote that part to the socket, and
+   * the writable event made the flow controller flush the rest in a separate socket write. HTTP/2 flow control
+   * (gRPC's default 1 MiB connection window) still bounds how much each connection buffers.
+   */
+  @VisibleForTesting
+  static final WriteBufferWaterMark CHILD_WRITE_BUFFER_WATER_MARK = new WriteBufferWaterMark(512 << 10, 1 << 20);
   private static final Logger
       LOG = LoggerFactory.getLogger(XceiverServerGrpc.class);
   private int port;
@@ -145,6 +155,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .workerEventLoopGroup(eventLoopGroup)
         .channelType(channelType)
         .withOption(ChannelOption.SO_BACKLOG, dnConf.getGrpcSoBacklog())
+        .withChildOption(ChannelOption.WRITE_BUFFER_WATER_MARK, CHILD_WRITE_BUFFER_WATER_MARK)
         .executor(readExecutors)
         // If a client does not send an actual functional business RPC for 15 minutes,
         // the server kicks them off with a GOAWAY frame.
