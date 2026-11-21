@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import com.dynatrace.hash4j.hashing.HashStream128;
+import com.dynatrace.hash4j.hashing.HashStream64;
+import com.dynatrace.hash4j.hashing.HashValue128;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.zip.Checksum;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -78,6 +82,31 @@ abstract class TrailerChecksum {
           value >>>= Byte.SIZE;
         }
         return actual;
+      }
+    };
+  }
+
+  static TrailerChecksum of(HashStream64 hash) {
+    return new TrailerChecksum() {
+      @Override
+      void update(byte value) {
+        hash.putByte(value);
+      }
+
+      @Override
+      void update(byte[] bytes, int offset, int length) {
+        hash.putBytes(bytes, offset, length);
+      }
+
+      @Override
+      byte[] finish() {
+        if (hash instanceof HashStream128) {
+          // S3 requires big-endian byte order; HashValue128.toByteArray() uses little-endian byte order.
+          HashValue128 value = ((HashStream128) hash).get();
+          return ByteBuffer.allocate(2 * Long.BYTES)
+              .putLong(value.getMostSignificantBits()).putLong(value.getLeastSignificantBits()).array();
+        }
+        return ByteBuffer.allocate(Long.BYTES).putLong(hash.getAsLong()).array();
       }
     };
   }
