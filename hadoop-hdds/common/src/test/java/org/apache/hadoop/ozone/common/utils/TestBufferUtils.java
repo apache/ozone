@@ -17,10 +17,18 @@
 
 package org.apache.hadoop.ozone.common.utils;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.Test;
 
 class TestBufferUtils {
@@ -77,5 +85,52 @@ class TestBufferUtils {
     assertEquals(
         "position (1) + length (2147483647) exceeds source limit (8)",
         exception.getMessage());
+  }
+
+  @Test
+  void testCloseAllClosesEveryBufferAndSuppressesLaterFailures() {
+    final IllegalStateException first = new IllegalStateException("first");
+    final IllegalStateException second = new IllegalStateException("second");
+    final List<String> closed = new ArrayList<>();
+    final List<UncheckedAutoCloseable> buffers = Arrays.asList(
+        () -> closed.add("a"),
+        () -> {
+          throw first;
+        },
+        () -> closed.add("b"),
+        () -> {
+          throw second;
+        },
+        () -> closed.add("c"));
+
+    assertSame(first, BufferUtils.closeAll(buffers, null));
+    assertEquals(Arrays.asList("a", "b", "c"), closed);
+    assertArrayEquals(new Throwable[] {second}, first.getSuppressed());
+  }
+
+  @Test
+  void testCloseAllKeepsAnEarlierFailure() {
+    final IllegalStateException earlier = new IllegalStateException("earlier");
+    final IllegalStateException failure = new IllegalStateException("failure");
+    final UncheckedAutoCloseable failing = () -> {
+      throw failure;
+    };
+
+    assertSame(earlier, BufferUtils.closeAll(Arrays.asList(failing), earlier));
+    assertArrayEquals(new Throwable[] {failure}, earlier.getSuppressed());
+    assertNull(BufferUtils.closeAll(Arrays.asList(() -> { }), null));
+  }
+
+  @Test
+  void testCloseAllWithTheSameExceptionTwice() {
+    final IllegalStateException failure = new IllegalStateException("cached");
+    final AtomicInteger closed = new AtomicInteger();
+    final UncheckedAutoCloseable failing = () -> {
+      throw failure;
+    };
+
+    assertSame(failure, BufferUtils.closeAll(Arrays.asList(failing, failing, closed::incrementAndGet), null));
+    assertEquals(1, closed.get());
+    assertEquals(0, failure.getSuppressed().length);
   }
 }

@@ -497,11 +497,18 @@ public final class ECKeyOutputStream extends KeyOutputStream
     } catch (InterruptedException e) {
       throw new IOException("Flushing thread was interrupted", e);
     } finally {
-      closeCurrentStreamEntry();
-      blockOutputStreamEntryPool.cleanup();
-      // Release the encoder's native resources (e.g. ISA-L coder context)
-      // that were allocated in the constructor.
-      encoder.release();
+      try {
+        try {
+          closeCurrentStreamEntry();
+        } finally {
+          // Unlike KeyOutputStream, markStreamClosed() does not clean up when closing the entry fails.
+          blockOutputStreamEntryPool.cleanup();
+        }
+      } finally {
+        // Release the encoder's native resources (e.g. ISA-L coder context)
+        // that were allocated in the constructor.
+        encoder.release();
+      }
     }
   }
 

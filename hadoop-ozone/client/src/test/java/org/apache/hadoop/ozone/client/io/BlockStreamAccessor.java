@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -47,5 +48,9 @@ public class BlockStreamAccessor {
 
   public long getStreamCurrentPosition() {
     return streamEntry.getCurrentPosition();
+  }
+
+  public BufferPool getBufferPool() {
+    return streamEntry.getBufferPool();
   }
 }
