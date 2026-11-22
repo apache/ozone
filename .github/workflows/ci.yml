@@ -38,10 +38,10 @@ on:
         required: false
 
 env:
-  # BUILD_ARGS and TEST_JAVA_VERSION are duplicated in populate-cache.yml, please keep in sync
+  # BUILD_ARGS is duplicated in populate-cache.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
-  TEST_JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
-  # MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  # JAVA_VERSION, MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   MVNW_VERBOSE: true
@@ -71,7 +71,7 @@ jobs:
       test-classes: ${{ steps.selective-checks.outputs.test-classes }}
       # `env` context cannot be used when calling reusable workflow, so we need to convert these to `outputs`
       build-args: ${{ env.BUILD_ARGS }}
-      java-version: ${{ env.TEST_JAVA_VERSION }}
+      java-version: ${{ env.JAVA_VERSION }}
       with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
       - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (${{ github.event_name }})"
@@ -499,10 +499,8 @@ jobs:
         run: |
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
-      - name: Setup java ${{ env.TEST_JAVA_VERSION }}
+      - name: Setup Java
         uses: $/.github/actions/setup-java-with-cache
-        with:
-          java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Upload coverage to Sonar
