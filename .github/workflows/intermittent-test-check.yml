@@ -116,7 +116,7 @@ jobs:
       - name: Setup java
         uses: $/.github/actions/setup-java-with-cache
         with:
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Download Ratis repo
         if: ${{ github.event.inputs.ratis-ref != '' }}
         uses: actions/download-artifact@v8
@@ -160,7 +160,7 @@ jobs:
       - name: Setup java
         uses: $/.github/actions/setup-java-with-cache
         with:
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Download Ratis repo
         if: ${{ github.event.inputs.ratis-ref != '' }}
         uses: actions/download-artifact@v8
