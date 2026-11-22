@@ -36,14 +36,11 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
@@ -51,6 +48,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -277,7 +275,7 @@ class TestBlockOutputStreamWithFailures {
   @MethodSource("clientParameters")
   void test2DatanodesFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
-    try (OzoneClient client = newClient(fastFailConf(), config)) {
+    try (OzoneClient client = newClient(OzoneTestUtils.withShortWriteRequestTimeout(cluster.getConf()), config)) {
       String keyName = getKeyName();
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
       byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
@@ -758,16 +756,6 @@ class TestBlockOutputStreamWithFailures {
       byte[] bytes = ArrayUtils.addAll(data1, data1);
       validateData(keyName, bytes, client.getObjectStore(), VOLUME, BUCKET);
     }
-  }
-
-  // Client that gives up retrying a write soon after losing the majority of the pipeline.
-  // Must stay above the Ratis client RPC request timeout set in createCluster, so the first attempt can complete.
-  private OzoneConfiguration fastFailConf() {
-    OzoneConfiguration copy = new OzoneConfiguration(cluster.getConf());
-    RatisClientConfig ratisClientConfig = copy.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(4));
-    copy.setFromObject(ratisClientConfig);
-    return copy;
   }
 
   private void stopAndRemove(DatanodeDetails dn) throws IOException {
