@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +35,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -190,20 +188,6 @@ public final class OzoneTestUtils {
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "2s");
-  }
-
-  /**
-   * Returns a copy of {@code conf} with a short Ratis client write request timeout, for clients in tests
-   * where retrying the write cannot succeed. The timeout stays above the Ratis client RPC request timeout,
-   * so the first attempt can complete.
-   */
-  public static OzoneConfiguration withShortWriteRequestTimeout(OzoneConfiguration conf) {
-    OzoneConfiguration copy = new OzoneConfiguration(conf);
-    Duration rpcTimeout = copy.getObject(RatisClientConfig.RaftConfig.class).getRpcRequestTimeout();
-    RatisClientConfig ratisClientConfig = copy.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeout(rpcTimeout.plusSeconds(1));
-    copy.setFromObject(ratisClientConfig);
-    return copy;
   }
 
   /**

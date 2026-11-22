@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -103,7 +103,7 @@ public class TestMultiBlockWritesWithDnFailures {
         .build();
     cluster.waitForClusterToBeReady();
     // Tests on the shared client lose the majority of the pipeline, so retrying the write cannot succeed.
-    client = OzoneClientFactory.getRpcClient(OzoneTestUtils.withShortWriteRequestTimeout(conf));
+    client = OzoneClientFactory.getRpcClient(RatisTestHelper.withShortWriteRequestTimeout(conf));
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "datanodefailurehandlingtest";
