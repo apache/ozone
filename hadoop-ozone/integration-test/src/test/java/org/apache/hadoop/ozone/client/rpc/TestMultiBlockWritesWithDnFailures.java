@@ -102,6 +102,7 @@ public class TestMultiBlockWritesWithDnFailures {
         .build();
     cluster.waitForClusterToBeReady();
     // Tests on the shared client lose the majority of the pipeline, so retrying the write cannot succeed.
+    // Must stay above the Ratis client RPC request timeout set above, so the first attempt can complete.
     OzoneConfiguration fastFailConf = new OzoneConfiguration(conf);
     RatisClientConfig fastFailRatis = fastFailConf.getObject(RatisClientConfig.class);
     fastFailRatis.setWriteRequestTimeout(Duration.ofSeconds(4));

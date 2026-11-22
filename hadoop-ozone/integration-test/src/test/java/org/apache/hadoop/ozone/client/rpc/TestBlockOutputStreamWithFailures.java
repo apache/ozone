@@ -761,7 +761,7 @@ class TestBlockOutputStreamWithFailures {
   }
 
   // Client that gives up retrying a write soon after losing the majority of the pipeline.
-  // Must stay above the 3s Ratis RPC timeout, so the first attempt can complete.
+  // Must stay above the Ratis client RPC request timeout set in createCluster, so the first attempt can complete.
   private OzoneConfiguration fastFailConf() {
     OzoneConfiguration copy = new OzoneConfiguration(cluster.getConf());
     RatisClientConfig ratisClientConfig = copy.getObject(RatisClientConfig.class);
