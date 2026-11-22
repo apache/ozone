@@ -80,6 +80,8 @@
     <distMgmtStagingUrl>https://repository.apache.org/service/local/staging/deploy/maven2</distMgmtStagingUrl>
     <download-maven-plugin.version>2.1.0</download-maven-plugin.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
+    <!-- set minimum JDK, but allow newer one for development -->
+    <enforced.java.version>[${ozone.java.version.server},)</enforced.java.version>
     <enforced.maven.version>[3.9.6,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <errorprone.version>2.42.0</errorprone.version>
@@ -2054,7 +2056,7 @@
           <configuration>
             <rules>
               <requireJavaVersion>
-                <version>${ozone.java.version.server}</version>
+                <version>${enforced.java.version}</version>
               </requireJavaVersion>
               <requireMavenVersion>
                 <version>${enforced.maven.version}</version>
@@ -2969,6 +2971,36 @@
                       <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
                     </exec>
                   </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>release</id>
+      <properties>
+        <!-- require exact JDK major version for release -->
+        <enforced.java.version>[${ozone.java.version.server},${ozone.java.version.server}.9999]</enforced.java.version>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>enforce-os</id>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <rules>
+                    <requireOS>
+                      <family>unix</family>
+                    </requireOS>
+                  </rules>
                 </configuration>
               </execution>
             </executions>
