@@ -146,6 +146,7 @@
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
     <maven-patch-plugin.version>1.3</maven-patch-plugin.version>
     <maven-remote-resources-plugin.version>3.3.0</maven-remote-resources-plugin.version>
+    <maven-replacer-plugin.skip>false</maven-replacer-plugin.skip>
     <maven-replacer-plugin.version>1.5.3</maven-replacer-plugin.version>
     <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
@@ -3053,12 +3054,10 @@
     <profile>
       <id>go-offline</id>
       <properties>
-        <cyclonedx.skip>true</cyclonedx.skip>
         <enforcer.skip>true</enforcer.skip>
         <jacoco.skip>true</jacoco.skip>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <mdep.analyze.skip>true</mdep.analyze.skip>
-        <skip.installnodepnpm>true</skip.installnodepnpm>
         <skip.pnpm>true</skip.pnpm>
         <test>void</test>
       </properties>
