@@ -414,6 +414,21 @@ public class StateContext {
   }
 
   /**
+   * Returns the number of command status reports queued for the endpoint.
+   */
+  public int getPendingCommandStatusReportCount(HostAndPort endpoint) {
+    synchronized (incrementalReportsQueue) {
+      List<Message> reports = incrementalReportsQueue.get(endpoint);
+      if (reports == null) {
+        return 0;
+      }
+      return (int) reports.stream()
+          .filter(CommandStatusReportsProto.class::isInstance)
+          .count();
+    }
+  }
+
+  /**
    * Selects command status reports within both the report count and serialized
    * byte limits.
    */

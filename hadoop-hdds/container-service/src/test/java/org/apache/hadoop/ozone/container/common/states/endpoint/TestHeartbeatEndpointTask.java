@@ -462,9 +462,9 @@ public class TestHeartbeatEndpointTask {
   }
 
   @Test
-  public void testNonCommandReportsConsumeReportCountLimit() throws Exception {
+  public void testCommandStatusReportsReserveCountCapacity() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT, 2);
+    conf.setInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT, 20);
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanodeStateMachine, "");
     when(datanodeStateMachine.getQueuedCommandCount())
@@ -482,16 +482,19 @@ public class TestHeartbeatEndpointTask {
 
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addIncrementalReport(IncrementalContainerReportProto.getDefaultInstance());
-    context.addIncrementalReport(IncrementalContainerReportProto.getDefaultInstance());
-    CommandStatusReportsProto commandStatus = newCommandStatusReport(1, 128);
-    context.addIncrementalReport(commandStatus);
+    for (int i = 0; i < 20; i++) {
+      context.addIncrementalReport(
+          IncrementalContainerReportProto.getDefaultInstance());
+    }
+    for (int i = 0; i < 3; i++) {
+      context.addIncrementalReport(newCommandStatusReport(i, 128));
+    }
 
     endpointTask.call();
 
-    assertEquals(2, argument.getValue().getIncrementalContainerReportCount());
-    assertEquals(0, argument.getValue().getCommandStatusReportsCount());
-    assertEquals(1,
+    assertEquals(18, argument.getValue().getIncrementalContainerReportCount());
+    assertEquals(2, argument.getValue().getCommandStatusReportsCount());
+    assertEquals(3,
         context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
   }
 

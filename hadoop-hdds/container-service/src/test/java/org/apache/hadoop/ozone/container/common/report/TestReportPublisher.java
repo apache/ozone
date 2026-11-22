@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.report;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -171,6 +172,8 @@ public class TestReportPublisher {
     assertTrue(reports.stream()
         .allMatch(report -> report.getCmdStatusCount() == 1),
         "Should publish one report for each status object");
+    assertTrue(cmdStatusMap.containsKey(obj1.getCmdId()));
+    assertFalse(cmdStatusMap.containsKey(obj2.getCmdId()));
     executorService.shutdown();
   }
 

@@ -37,8 +37,10 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import java.io.IOException;
 import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -90,6 +92,7 @@ public class HeartbeatEndpointTask
   static final int HDDS_IPC_MAXIMUM_DATA_LENGTH_DEFAULT =
       128 * 1024 * 1024;
   private static final double IPC_SIZE_SAFETY_FACTOR = 0.9;
+  private static final int COMMAND_STATUS_REPORT_RESERVATION_DIVISOR = 10;
   private final EndpointStateMachine rpcEndpoint;
   private final DatanodeDetails datanodeDetails;
   private StateContext context;
@@ -170,9 +173,15 @@ public class HeartbeatEndpointTask
           .setDatanodeDetails(datanodeDetailsProto)
           .setDatanodeVersion(versionInfo);
       SerializedSizeAccumulator heartbeatSize = new SerializedSizeAccumulator();
-      heartbeatSize.add(SCMHeartbeatRequestProto.DATANODEDETAILS_FIELD_NUMBER, datanodeDetailsProto);
-      heartbeatSize.add(SCMHeartbeatRequestProto.DATANODEVERSION_FIELD_NUMBER, versionInfo);
-      int reportCount = addNonCommandStatusReports(requestBuilder, heartbeatSize);
+      heartbeatSize.set(SCMHeartbeatRequestProto.DATANODEDETAILS_FIELD_NUMBER, datanodeDetailsProto);
+      heartbeatSize.set(SCMHeartbeatRequestProto.DATANODEVERSION_FIELD_NUMBER, versionInfo);
+      int maxReservedCommandStatusReports =
+          Math.max(1, maxReportsPerHB / COMMAND_STATUS_REPORT_RESERVATION_DIVISOR);
+      int reservedCommandStatusReports = Math.min(
+          context.getPendingCommandStatusReportCount(rpcEndpoint.getAddress()),
+          maxReservedCommandStatusReports);
+      int reportCount = addNonCommandStatusReports(requestBuilder,
+          heartbeatSize, maxReportsPerHB - reservedCommandStatusReports);
       addContainerActions(requestBuilder, heartbeatSize);
       addPipelineActions(requestBuilder, heartbeatSize);
       addQueuedCommandCounts(requestBuilder, heartbeatSize);
@@ -256,11 +265,11 @@ public class HeartbeatEndpointTask
   }
 
   private int addNonCommandStatusReports(SCMHeartbeatRequestProto.Builder requestBuilder,
-      SerializedSizeAccumulator heartbeatSize) {
+      SerializedSizeAccumulator heartbeatSize, int maxReports) {
     int reportCount = 0;
     for (Message report :
         context.getAvailableNonCommandStatusReports(
-            rpcEndpoint.getAddress(), maxReportsPerHB)) {
+            rpcEndpoint.getAddress(), maxReports)) {
       reportCount++;
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
@@ -269,10 +278,11 @@ public class HeartbeatEndpointTask
         if (heartbeatFieldName.equals(reportName)) {
           if (descriptor.isRepeated()) {
             requestBuilder.addRepeatedField(descriptor, report);
+            heartbeatSize.add(descriptor.getNumber(), report);
           } else {
             requestBuilder.setField(descriptor, report);
+            heartbeatSize.set(descriptor.getNumber(), report);
           }
-          heartbeatSize.add(descriptor.getNumber(), report);
           break;
         }
       }
@@ -319,7 +329,7 @@ public class HeartbeatEndpointTask
           .addAllContainerActions(actions)
           .build();
       requestBuilder.setContainerActions(cap);
-      heartbeatSize.add(SCMHeartbeatRequestProto.CONTAINERACTIONS_FIELD_NUMBER, cap);
+      heartbeatSize.set(SCMHeartbeatRequestProto.CONTAINERACTIONS_FIELD_NUMBER, cap);
     }
   }
 
@@ -337,7 +347,7 @@ public class HeartbeatEndpointTask
           .addAllPipelineActions(actions)
           .build();
       requestBuilder.setPipelineActions(pap);
-      heartbeatSize.add(SCMHeartbeatRequestProto.PIPELINEACTIONS_FIELD_NUMBER, pap);
+      heartbeatSize.set(SCMHeartbeatRequestProto.PIPELINEACTIONS_FIELD_NUMBER, pap);
     }
   }
 
@@ -360,14 +370,22 @@ public class HeartbeatEndpointTask
     }
     CommandQueueReportProto commandQueueReport = reportProto.build();
     requestBuilder.setCommandQueueReport(commandQueueReport);
-    heartbeatSize.add(SCMHeartbeatRequestProto.COMMANDQUEUEREPORT_FIELD_NUMBER, commandQueueReport);
+    heartbeatSize.set(SCMHeartbeatRequestProto.COMMANDQUEUEREPORT_FIELD_NUMBER, commandQueueReport);
   }
 
   private static final class SerializedSizeAccumulator {
     private long size;
+    private final Map<Integer, Long> singularFieldSizes = new HashMap<>();
 
     private void add(int fieldNumber, Message message) {
       size += CodedOutputStream.computeMessageSize(fieldNumber, message);
+    }
+
+    private void set(int fieldNumber, Message message) {
+      long fieldSize =
+          CodedOutputStream.computeMessageSize(fieldNumber, message);
+      size += fieldSize - singularFieldSizes.getOrDefault(fieldNumber, 0L);
+      singularFieldSizes.put(fieldNumber, fieldSize);
     }
 
     private long get() {
