@@ -146,12 +146,7 @@ public class TestFailureHandlingByClient {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10).build();
     cluster.waitForClusterToBeReady();
-    // Most tests on the shared client lose the majority of the pipeline, so retrying the write cannot succeed.
-    OzoneConfiguration fastFailConf = new OzoneConfiguration(conf);
-    RatisClientConfig fastFailRatis = fastFailConf.getObject(RatisClientConfig.class);
-    fastFailRatis.setWriteRequestTimeout(Duration.ofSeconds(4));
-    fastFailConf.setFromObject(fastFailRatis);
-    client = OzoneClientFactory.getRpcClient(fastFailConf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "datanodefailurehandlingtest";
