@@ -137,6 +137,8 @@ jobs:
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
           rm ozone*.tar.gz
           sudo chmod -R a+rwX hadoop-ozone/dist/target
+      - name: Setup java
+        uses: $/.github/actions/setup-java-with-cache
       - name: Execute tests
         run: |
           ./hadoop-ozone/dev-support/checks/acceptance.sh
