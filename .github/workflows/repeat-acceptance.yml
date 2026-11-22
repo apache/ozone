@@ -43,12 +43,13 @@ on:
         default: false
         required: true
 env:
+  # JAVA_VERSION, MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  JAVA_VERSION: 25
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_ACCEPTANCE_SUITE: ${{ github.event.inputs.test-suite}}
   OZONE_TEST_SELECTOR: ${{ github.event.inputs.test-filter }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
-  JAVA_VERSION: 25
   SPLITS: ${{ github.event.inputs.splits }}
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}[{1}]-{2}', inputs.test-suite || inputs.test-filter, inputs.ref, inputs.splits) || '' }}
 permissions: { }
