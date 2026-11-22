@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -68,8 +69,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.BucketPendingDeletion;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -209,6 +212,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 40L;
   private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 41L;
+
+  private static final long DIR_SEVEN_OBJECT_ID = 42L;
 
   private static final long KEY_ONE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TWO_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
@@ -352,18 +357,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     if (reconScm != null) {
       reconScm.stop();
     }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (replicaHistoryDBProvider != null) {
-      replicaHistoryDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    IOUtils.closeQuietly(replicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, omMetadataManager);
   }
 
   @SuppressWarnings("methodlength")
@@ -827,8 +821,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         (DIR_FOUR + OM_KEY_PREFIX + DIR_SEVEN + OM_KEY_PREFIX),
         LEGACY_BUCKET,
         VOLUME_ONE,
-        DIR_FOUR,
-        DIR_FOUR_OBJECT_ID,
+        DIR_SEVEN,
+        DIR_SEVEN_OBJECT_ID,
         PARENT_OBJECT_ID_ZERO,
         LEGACY_BUCKET_OBJECT_ID,
         VOLUME_ONE_OBJECT_ID,
@@ -1096,6 +1090,46 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
     assertEquals("sampleVol/bucketOne/key_three",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(1).getPath());
+  }
+
+  @Test
+  public void testGetOpenKeyInfoExcludesMultipartOpenKeys() throws Exception {
+    String obsUploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    String fsoUploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_a/" + obsUploadId, getMultipartOpenKeyInfo("sampleVol", "bucketOne", "key_a"));
+    reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_b", getOmKeyInfo("sampleVol", "bucketOne", "key_b", true));
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/sampleVol/bucketTwo/key_c/" + fsoUploadId, getMultipartOpenKeyInfo("sampleVol", "bucketTwo", "key_c"));
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/sampleVol/bucketTwo/key_d", getOmKeyInfo("sampleVol", "bucketTwo", "key_d", true));
+
+    KeyInsightInfoResponse keyInsightInfoResp = (KeyInsightInfoResponse)
+        omdbInsightEndpoint.getOpenKeyInfo(-1, "", "", true, true).getEntity();
+    assertEquals(1, keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    assertEquals("/sampleVol/bucketOne/key_b", keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getKey());
+    assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
+    assertEquals("/sampleVol/bucketTwo/key_d", keyInsightInfoResp.getFsoKeyInfoList().get(0).getKey());
+
+    // Skipped multipart open keys do not count towards the limit.
+    keyInsightInfoResp = (KeyInsightInfoResponse)
+        omdbInsightEndpoint.getOpenKeyInfo(1, "", "", false, true).getEntity();
+    assertEquals(1, keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    assertEquals("/sampleVol/bucketOne/key_b", keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getKey());
+  }
+
+  private OmKeyInfo getMultipartOpenKeyInfo(String volumeName, String bucketName, String keyName) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFile(true)
+        .setObjectID(generateUniqueRandomLong())
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(0L)
+        .setOmKeyLocationInfos(Collections.singletonList(new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+        .build();
   }
 
   @Test
@@ -1615,6 +1649,56 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertEquals(18L, keyInsightInfoResp.getUnreplicatedDataSize());
     assertEquals(QuotaUtil.getReplicatedSize(18L, replicationConfig),
         keyInsightInfoResp.getReplicatedDataSize());
+  }
+
+  @Test
+  public void testGetBucketPendingDeletion() throws Exception {
+    ReplicationConfig ratisThree = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE);
+
+    // bucketOne: a deleted key with two versions, another deleted key and a deleted directory.
+    OmKeyInfo key1 = getOmKeyInfo("sampleVol", "bucketOne", "key1", true, ratisThree);
+    key1.setDataSize(100L);
+    OmKeyInfo key1Version2 = getOmKeyInfo("sampleVol", "bucketOne", "key1", true, ratisThree);
+    key1Version2.setDataSize(50L);
+    OmKeyInfo key2 = getOmKeyInfo("sampleVol", "bucketOne", "key2", true, ratisThree);
+    key2.setDataSize(200L);
+    reconOMMetadataManager.getDeletedTable()
+        .put("/sampleVol/bucketOne/key1/1", new RepeatedOmKeyInfo(Arrays.asList(key1, key1Version2), 1));
+    reconOMMetadataManager.getDeletedTable().put("/sampleVol/bucketOne/key2/2", new RepeatedOmKeyInfo(key2, 1));
+    OmKeyInfo dir1 = getOmKeyInfo("sampleVol", "bucketOne", "dir1", false, ratisThree);
+    reconOMMetadataManager.getDeletedDirTable().put("/18/21/21/dir1/3", dir1);
+    omdbInsightEndpoint.getNsSummaryTable().put(dir1.getObjectID(), getNsSummary(30L, ratisThree));
+
+    // bucketTwo: a single large deleted key, so it sorts first.
+    OmKeyInfo key3 = getOmKeyInfo("sampleVol", "bucketTwo", "key3", true, ratisThree);
+    key3.setDataSize(1000L);
+    reconOMMetadataManager.getDeletedTable().put("/sampleVol/bucketTwo/key3/4", new RepeatedOmKeyInfo(key3, 2));
+
+    Response response = omdbInsightEndpoint.getBucketPendingDeletion(-1);
+    List<BucketPendingDeletion> buckets = (List<BucketPendingDeletion>) response.getEntity();
+    assertEquals(2, buckets.size());
+
+    BucketPendingDeletion bucketTwo = buckets.get(0);
+    assertEquals("sampleVol", bucketTwo.getVolumeName());
+    assertEquals("bucketTwo", bucketTwo.getBucketName());
+    assertEquals(1, bucketTwo.getPendingDeletionKeys());
+    assertEquals(3000L, bucketTwo.getPendingDeletionKeyBytes());
+    assertEquals(0, bucketTwo.getPendingDeletionDirs());
+    assertEquals(3000L, bucketTwo.getTotalPendingDeletionBytes());
+
+    BucketPendingDeletion bucketOne = buckets.get(1);
+    assertEquals("bucketOne", bucketOne.getBucketName());
+    assertEquals(3, bucketOne.getPendingDeletionKeys());
+    assertEquals(1050L, bucketOne.getPendingDeletionKeyBytes());
+    assertEquals(1, bucketOne.getPendingDeletionDirs());
+    assertEquals(90L, bucketOne.getPendingDeletionDirBytes());
+    assertEquals(1140L, bucketOne.getTotalPendingDeletionBytes());
+
+    List<BucketPendingDeletion> limited =
+        (List<BucketPendingDeletion>) omdbInsightEndpoint.getBucketPendingDeletion(1).getEntity();
+    assertEquals(1, limited.size());
+    assertEquals("bucketTwo", limited.get(0).getBucketName());
   }
 
   @Test

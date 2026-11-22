@@ -27,7 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -36,7 +36,7 @@ import org.junit.jupiter.api.TestInstance;
  * Test cases for the JMX management interface for OM information.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class OMMXBeanTests implements NonHATests.TestCase {
+public abstract class OMMXBeanTests implements ClusterForTests.TestCase {
 
   private OzoneManager om;
   private MBeanServer mbs;

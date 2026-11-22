@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -51,6 +50,7 @@ import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCou
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.DatanodeAdminMonitorTestUtil.ECReplicaSpec;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -404,9 +404,8 @@ public class TestDatanodeAdminMonitor {
             true,
             HddsProtos.LifeCycleState.CLOSED,
             new ECReplicationConfig(3, 2),
-            Triple.of(DECOMMISSIONING, dn1, 1),
-            Triple.of(IN_SERVICE,
-                MockDatanodeDetails.randomDatanodeDetails(), 2));
+            new ECReplicaSpec(DECOMMISSIONING, dn1, 1),
+            new ECReplicaSpec(IN_SERVICE, MockDatanodeDetails.randomDatanodeDetails(), 2));
 
     // Run the monitor for the first time and the node will transition to
     // REPLICATE_CONTAINERS as there are no pipelines to close.
@@ -432,11 +431,9 @@ public class TestDatanodeAdminMonitor {
             false,
             HddsProtos.LifeCycleState.CLOSED,
             new ECReplicationConfig(3, 2),
-            Triple.of(DECOMMISSIONING, dn1, 1),
-            Triple.of(IN_SERVICE,
-                MockDatanodeDetails.randomDatanodeDetails(), 2),
-            Triple.of(IN_SERVICE,
-                MockDatanodeDetails.randomDatanodeDetails(), 1));
+            new ECReplicaSpec(DECOMMISSIONING, dn1, 1),
+            new ECReplicaSpec(IN_SERVICE, MockDatanodeDetails.randomDatanodeDetails(), 2),
+            new ECReplicaSpec(IN_SERVICE, MockDatanodeDetails.randomDatanodeDetails(), 1));
 
     monitor.run();
 

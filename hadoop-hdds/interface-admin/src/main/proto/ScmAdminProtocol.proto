@@ -90,6 +90,7 @@ message ScmContainerLocationRequest {
   optional SCMListContainerIDsRequestProto scmListContainerIDsRequest = 51;
   optional SuppressContainerRequestProto suppressContainerRequest = 52;
   optional GetPeerUpgradeStatusRequestProto getPeerUpgradeStatusRequest = 53;
+  optional GetExistingContainersInBatchRequestProto getExistingContainersInBatchRequest = 54;
 }
 
 message ScmContainerLocationResponse {
@@ -151,6 +152,7 @@ message ScmContainerLocationResponse {
   optional SCMListContainerIDsResponseProto scmListContainerIDsResponse = 51;
   optional SuppressContainerResponseProto suppressContainerResponse = 52;
   optional GetPeerUpgradeStatusResponseProto getPeerUpgradeStatusResponse = 53;
+  optional GetExistingContainersInBatchResponseProto getExistingContainersInBatchResponse = 54;
 
   enum Status {
     OK = 1;
@@ -211,6 +213,7 @@ enum Type {
   ListContainerIDs = 47;
   SuppressContainer = 48;
   GetPeerUpgradeStatus = 49;
+  GetExistingContainersInBatch = 50;
 }
 
 /**
@@ -763,4 +766,13 @@ message SuppressContainerResponseProto {
  */
 service StorageContainerLocationProtocolService {
   rpc submitRequest (ScmContainerLocationRequest) returns (ScmContainerLocationResponse);
+}
+
+/** Returns metadata for existing containers without resolving their pipelines. */
+message GetExistingContainersInBatchRequestProto {
+  repeated int64 containerIDs = 1;
+}
+
+message GetExistingContainersInBatchResponseProto {
+  repeated ContainerInfoProto containers = 1;
 }
