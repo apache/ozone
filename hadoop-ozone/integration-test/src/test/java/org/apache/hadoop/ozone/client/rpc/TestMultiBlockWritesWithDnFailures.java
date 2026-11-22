@@ -88,7 +88,7 @@ public class TestMultiBlockWritesWithDnFailures {
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
     ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
     conf.setFromObject(ratisClientConfig);
 
@@ -101,7 +101,12 @@ public class TestMultiBlockWritesWithDnFailures {
         .setNumDatanodes(datanodes)
         .build();
     cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(conf);
+    // Tests on the shared client lose the majority of the pipeline, so retrying the write cannot succeed.
+    OzoneConfiguration fastFailConf = new OzoneConfiguration(conf);
+    RatisClientConfig fastFailRatis = fastFailConf.getObject(RatisClientConfig.class);
+    fastFailRatis.setWriteRequestTimeout(Duration.ofSeconds(4));
+    fastFailConf.setFromObject(fastFailRatis);
+    client = OzoneClientFactory.getRpcClient(fastFailConf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "datanodefailurehandlingtest";

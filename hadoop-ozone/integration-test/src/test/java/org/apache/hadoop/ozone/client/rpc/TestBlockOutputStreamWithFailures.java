@@ -36,11 +36,14 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
@@ -274,7 +277,7 @@ class TestBlockOutputStreamWithFailures {
   @MethodSource("clientParameters")
   void test2DatanodesFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
-    try (OzoneClient client = newClient(cluster.getConf(), config)) {
+    try (OzoneClient client = newClient(fastFailConf(), config)) {
       String keyName = getKeyName();
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
       byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
@@ -755,6 +758,16 @@ class TestBlockOutputStreamWithFailures {
       byte[] bytes = ArrayUtils.addAll(data1, data1);
       validateData(keyName, bytes, client.getObjectStore(), VOLUME, BUCKET);
     }
+  }
+
+  // Client that gives up retrying a write soon after losing the majority of the pipeline.
+  // Must stay above the 3s Ratis RPC timeout, so the first attempt can complete.
+  private OzoneConfiguration fastFailConf() {
+    OzoneConfiguration copy = new OzoneConfiguration(cluster.getConf());
+    RatisClientConfig ratisClientConfig = copy.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(4));
+    copy.setFromObject(ratisClientConfig);
+    return copy;
   }
 
   private void stopAndRemove(DatanodeDetails dn) throws IOException {
