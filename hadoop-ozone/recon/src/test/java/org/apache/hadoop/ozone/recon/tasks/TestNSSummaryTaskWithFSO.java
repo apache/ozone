@@ -409,6 +409,69 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       // after renaming dir1, check its new name
       assertEquals(DIR_ONE_RENAME, nsSummaryForDir1.getDirName());
+
+      // the deleted dir 3 must still be unlinked from its parent
+      NSSummary nsSummaryForDir3 = getReconNamespaceSummaryManager().getNSSummary(DIR_THREE_OBJECT_ID);
+      assertNotNull(nsSummaryForDir3);
+      assertEquals(0, nsSummaryForDir3.getParentId());
+    }
+
+    @Test
+    public void testProcessDirRenameInEitherEventOrder() throws IOException {
+      // rename dir2 within dir1 and to bucket 2, with the PUT of the new key processed before and after the DELETE
+      assertDirTwoRename(DIR_ONE_OBJECT_ID, "dir2_new", true);
+      assertDirTwoRename(DIR_ONE_OBJECT_ID, "dir2_new", false);
+      assertDirTwoRename(BUCKET_TWO_OBJECT_ID, DIR_TWO, true);
+      assertDirTwoRename(BUCKET_TWO_OBJECT_ID, DIR_TWO, false);
+    }
+
+    private void assertDirTwoRename(long newParentId, String newName, boolean putFirst) throws IOException {
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
+      nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
+      long oldParentId = DIR_ONE_OBJECT_ID;
+      boolean sameParent = newParentId == oldParentId;
+      NSSummary oldParentBefore = getReconNamespaceSummaryManager().getNSSummary(oldParentId);
+      NSSummary newParentBefore = getReconNamespaceSummaryManager().getNSSummary(newParentId);
+      int oldParentFiles = oldParentBefore.getNumOfFiles();
+      long oldParentSize = oldParentBefore.getSizeOfFiles();
+      int newParentFiles = newParentBefore.getNumOfFiles();
+      long newParentSize = newParentBefore.getSizeOfFiles();
+
+      OMDBUpdateEvent deleteEvent = new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(oldParentId + OM_KEY_PREFIX + DIR_TWO)
+          .setValue(buildOmDirInfo(DIR_TWO, DIR_TWO_OBJECT_ID, oldParentId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build();
+      OMDBUpdateEvent putEvent = new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(newParentId + OM_KEY_PREFIX + newName)
+          .setValue(buildOmDirInfo(newName, DIR_TWO_OBJECT_ID, newParentId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build();
+      List<OMDBUpdateEvent> events = putFirst ? Arrays.asList(putEvent, deleteEvent)
+          : Arrays.asList(deleteEvent, putEvent);
+      ProcessResult renameResult = nSSummaryTaskWithFso.processWithFSO(new OMUpdateEventBatch(events, 0L), 0);
+      Assertions.assertTrue(renameResult.success());
+
+      String desc = "newParent=" + newParentId + ", newName=" + newName + ", putFirst=" + putFirst;
+      NSSummary dirTwo = getReconNamespaceSummaryManager().getNSSummary(DIR_TWO_OBJECT_ID);
+      assertEquals(newParentId, dirTwo.getParentId(), desc);
+      assertEquals(newName, dirTwo.getDirName(), desc);
+
+      NSSummary oldParent = getReconNamespaceSummaryManager().getNSSummary(oldParentId);
+      NSSummary newParent = getReconNamespaceSummaryManager().getNSSummary(newParentId);
+      assertEquals(sameParent, oldParent.getChildDir().contains(DIR_TWO_OBJECT_ID), desc);
+      Assertions.assertTrue(newParent.getChildDir().contains(DIR_TWO_OBJECT_ID), desc);
+      if (sameParent) {
+        assertEquals(oldParentFiles, oldParent.getNumOfFiles(), desc);
+        assertEquals(oldParentSize, oldParent.getSizeOfFiles(), desc);
+      } else {
+        assertEquals(oldParentFiles - 1, oldParent.getNumOfFiles(), desc);
+        assertEquals(oldParentSize - KEY_THREE_SIZE, oldParent.getSizeOfFiles(), desc);
+        assertEquals(newParentFiles + 1, newParent.getNumOfFiles(), desc);
+        assertEquals(newParentSize + KEY_THREE_SIZE, newParent.getSizeOfFiles(), desc);
+      }
     }
 
     @Test
