@@ -1871,8 +1871,8 @@
           <artifactId>aspectj-maven-plugin</artifactId>
           <version>${aspectj-plugin.version}</version>
           <configuration>
-            <complianceLevel>${maven.compiler.release}</complianceLevel>
             <argumentFileDirectory>${project.build.directory}/aspectj-build</argumentFileDirectory>
+            <release>${maven.compiler.release}</release>
           </configuration>
           <dependencies>
             <dependency>
