@@ -101,7 +101,7 @@ jobs:
       - name: Setup java
         uses: $/.github/actions/setup-java-with-cache
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Dmaven.javadoc.skip=true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       - name: Store binaries for tests
