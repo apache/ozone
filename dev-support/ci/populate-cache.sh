@@ -22,7 +22,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../.." || exit 1
 
 # fetch plugins, even if not part of normal build
-./mvnw --batch-mode --show-version dependency:resolve-plugins help:help
+./mvnw --batch-mode --show-version dependency:resolve-plugins help:help "$@"
 
 # install, but skip shaded modules
 ./mvnw --batch-mode --show-version clean install \
