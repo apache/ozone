@@ -62,7 +62,7 @@ public class TestObjectTaggingPut {
 
   private static final String BUCKET_NAME = "b1";
   private static final String KEY_NAME = "key=value/1";
-  private static final Map<String, String> TAGS = ImmutableMap.of("tag1", "val1", "tag2", "val2");
+  private static final Map<String, String> TAGS = ImmutableMap.of("tag1", "val1", "tag2", "a@b");
 
   @BeforeEach
   void setup() throws Exception {
@@ -198,7 +198,7 @@ public class TestObjectTaggingPut {
             "      </Tag>" +
             "      <Tag>" +
             "         <Key>tag2</Key>" +
-            "         <Value>val2</Value>" +
+            "         <Value>a@b</Value>" +
             "      </Tag>" +
             "   </TagSet>" +
             "</Tagging>";
