@@ -542,8 +542,10 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           metrics.addContainerOpsLatency(type, endToEndCost);
         } catch (SocketTimeoutException | EOFException | ClosedChannelException e) {
           isDomainSocketOpen.set(false);
-          LOG.debug("{} receiveResponseTask is closed after send {} requests and received {} responses, due to {}",
-              domainSocket.toString(), requestSent, responseReceived, e.getClass().getName(), e);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("{} receiveResponseTask is closed after send {} requests and received {} responses, due to {}",
+                domainSocket.toString(), requestSent, responseReceived, e.getClass().getName(), e);
+          }
           // fail all requests pending responses
           sentRequests.values().forEach(i -> i.fail(e));
         } catch (Throwable e) {

@@ -204,7 +204,9 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         peer = new DomainPeer(connSock);
         peer.setReadTimeout(readTimeoutMs);
         peer.setWriteTimeout(writeTimeoutMs);
-        LOG.debug("Accepted a new connection {}, xceiverCount {}", connSock, xceiverCount.get());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Accepted a new connection {}, xceiverCount {}", connSock, xceiverCount.get());
+        }
 
         // Make sure the xceiver count is not exceeded
         if (xceiverCount.get() > maxXceiverCount) {
@@ -301,7 +303,9 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
     }
     peers.put(peer, t);
     peersReceiver.put(peer, receiver);
-    LOG.debug("Peer {} is added", peer.getDomainSocket());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Peer {} is added", peer.getDomainSocket());
+    }
   }
 
   void closePeer(DomainPeer peer) throws IOException {
@@ -312,7 +316,9 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
     peersReceiver.remove(peer);
     org.apache.hadoop.io.IOUtils.closeStream(peer);
     xceiverCount.decrementAndGet();
-    LOG.debug("Peer {} is closed", peer.getDomainSocket());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Peer {} is closed", peer.getDomainSocket());
+    }
   }
 
   @VisibleForTesting

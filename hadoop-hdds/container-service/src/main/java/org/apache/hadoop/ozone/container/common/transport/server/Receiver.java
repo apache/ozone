@@ -111,8 +111,10 @@ final class Receiver implements Runnable {
         } catch (SocketTimeoutException | EOFException | ClosedChannelException e) {
           // Since we optimistically expect the next request, it's quite normal to
           // get EOF here.
-          LOG.debug("{} is closed with {} after received {} ops and handled {} ops.",
-              peer, e.getClass().getName(), opsReceived, opsHandled.get());
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("{} is closed with {} after received {} ops and handled {} ops.",
+                peer, e.getClass().getName(), opsReceived, opsHandled.get());
+          }
           throw e;
         }
 
