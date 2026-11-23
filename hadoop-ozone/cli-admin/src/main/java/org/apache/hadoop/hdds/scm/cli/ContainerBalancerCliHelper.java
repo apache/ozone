@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerAdvisor;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerEstimation;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerProfile;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerRecommendation;
-import org.apache.hadoop.ozone.OzoneConsts;
 
 /** Shared parsing and CLI output for container balancer subcommands. */
 public final class ContainerBalancerCliHelper {
@@ -101,15 +100,12 @@ public final class ContainerBalancerCliHelper {
     sb.append(" -t ").append(formatThreshold(recommendation.getThresholdPercent()))
         .append(" -i ").append(recommendation.getRecommendedIterations())
         .append(" -d ").append(recommendation.getMaxDatanodesPercentage())
-        .append(" -s ").append(bytesToGb(recommendation.getMaxSizeToMovePerIteration()))
-        .append(" -e ").append(bytesToGb(recommendation.getMaxSizeEnteringTarget()))
-        .append(" -l ").append(bytesToGb(recommendation.getMaxSizeLeavingSource()))
-        .append(" --balancing-iteration-interval-minutes ")
-        .append(recommendation.getBalancingIntervalMillis() / 60000)
-        .append(" --move-timeout-minutes ")
-        .append(recommendation.getMoveTimeoutMillis() / 60000)
-        .append(" --move-replication-timeout-minutes ")
-        .append(recommendation.getMoveReplicationTimeoutMillis() / 60000);
+        .append(" -s ").append(recommendation.getMaxSizeToMovePerIterationInGB())
+        .append(" -e ").append(recommendation.getMaxSizeEnteringTargetInGB())
+        .append(" -l ").append(recommendation.getMaxSizeLeavingSourceInGB())
+        .append(" --balancing-iteration-interval-minutes ").append(recommendation.getBalancingIntervalMinutes())
+        .append(" --move-timeout-minutes ").append(recommendation.getMoveTimeoutMinutes())
+        .append(" --move-replication-timeout-minutes ").append(recommendation.getMoveReplicationTimeoutMinutes());
     appendNodeFilters(sb, includeNodes, excludeNodes);
     return sb.toString();
   }
@@ -122,10 +118,6 @@ public final class ContainerBalancerCliHelper {
         .ifPresent(s -> sb.append(" --include-datanodes ").append(s.trim()));
     excludeNodes.filter(s -> !StringUtils.isBlank(s))
         .ifPresent(s -> sb.append(" --exclude-datanodes ").append(s.trim()));
-  }
-
-  private static long bytesToGb(long bytes) {
-    return bytes / OzoneConsts.GB;
   }
 
   private static String formatThreshold(double thresholdPercent) {
@@ -291,9 +283,9 @@ public final class ContainerBalancerCliHelper {
         .threshold(Optional.of(recommendation.getThresholdPercent()))
         .iterations(effectiveIterations)
         .maxDatanodesPercentageToInvolvePerIteration(Optional.of(recommendation.getMaxDatanodesPercentage()))
-        .maxSizeToMovePerIterationInGB(Optional.of(bytesToGb(recommendation.getMaxSizeToMovePerIteration())))
-        .maxSizeEnteringTargetInGB(Optional.of(bytesToGb(recommendation.getMaxSizeEnteringTarget())))
-        .maxSizeLeavingSourceInGB(Optional.of(bytesToGb(recommendation.getMaxSizeLeavingSource())))
+        .maxSizeToMovePerIterationInGB(Optional.of(recommendation.getMaxSizeToMovePerIterationInGB()))
+        .maxSizeEnteringTargetInGB(Optional.of(recommendation.getMaxSizeEnteringTargetInGB()))
+        .maxSizeLeavingSourceInGB(Optional.of(recommendation.getMaxSizeLeavingSourceInGB()))
         .balancingIntervalMinutes(configOptions.getBalancingIntervalMinutes())
         .moveTimeoutMinutes(configOptions.getMoveTimeoutMinutes())
         .moveReplicationTimeoutMinutes(configOptions.getMoveReplicationTimeoutMinutes())

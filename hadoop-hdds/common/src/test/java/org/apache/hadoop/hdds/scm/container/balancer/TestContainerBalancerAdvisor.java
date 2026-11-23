@@ -271,7 +271,8 @@ public final class TestContainerBalancerAdvisor {
       assertTrue(result.succeeded());
       assertNotNull(result.getEstimation());
       assertTrue(result.getEstimation().succeeded());
-      assertEquals(result.getMaxSizeToMovePerIteration(), result.getEstimation().getMaxSizeToMovePerIteration());
+      assertEquals(result.getMaxSizeToMovePerIterationInGB() * OzoneConsts.GB,
+          result.getEstimation().getMaxSizeToMovePerIteration());
       assertTrue(result.getRecommendedIterations() >= result.getEstimation().getEstimatedIterations());
       assertFalse(result.getRationale().isEmpty());
     }
@@ -326,12 +327,13 @@ public final class TestContainerBalancerAdvisor {
         .get(0);
 
     assertEquals(10, slow.getMaxDatanodesPercentage());
-    assertEquals(10L * OzoneConsts.GB, slow.getMaxSizeEnteringTarget());
-    assertEquals(10L * OzoneConsts.GB, slow.getMaxSizeLeavingSource());
-    assertEquals(30L * OzoneConsts.GB, slow.getMaxSizeToMovePerIteration());
-    assertEquals(slow.getMaxSizeToMovePerIteration(), slow.getEstimation().getMaxSizeToMovePerIteration());
-    assertTrue(slow.getMaxSizeToMovePerIteration() >= slow.getMaxSizeEnteringTarget());
-    assertTrue(slow.getMaxSizeToMovePerIteration() >= slow.getMaxSizeLeavingSource());
+    assertEquals(10L, slow.getMaxSizeEnteringTargetInGB());
+    assertEquals(10L, slow.getMaxSizeLeavingSourceInGB());
+    assertEquals(30L, slow.getMaxSizeToMovePerIterationInGB());
+    assertEquals(slow.getMaxSizeToMovePerIterationInGB() * OzoneConsts.GB,
+        slow.getEstimation().getMaxSizeToMovePerIteration());
+    assertTrue(slow.getMaxSizeToMovePerIterationInGB() >= slow.getMaxSizeEnteringTargetInGB());
+    assertTrue(slow.getMaxSizeToMovePerIterationInGB() >= slow.getMaxSizeLeavingSourceInGB());
   }
 
   @Test

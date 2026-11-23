@@ -617,6 +617,7 @@ class TestContainerBalancerSubCommand {
 
     assertThat(out.get())
         .contains("Starting with auto-configured parameters (profile: MEDIUM)")
+        .contains("Use \"ozone admin containerbalancer status --verbose\" to see the configuration in use.")
         .contains("Container Balancer started successfully.");
     verify(scmClient).startContainerBalancer(
         eq(Optional.of(10.0)),

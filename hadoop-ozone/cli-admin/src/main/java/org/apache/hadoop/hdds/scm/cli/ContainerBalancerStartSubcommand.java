@@ -46,7 +46,8 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Option(names = {"--auto-config"},
       description = "Recommend configuration from current cluster imbalance and start with those "
-          + "values. Uses profile MEDIUM by default; override with --profile. Default false.")
+          + "values. Uses profile MEDIUM by default; override with --profile. "
+          + "Use \"ozone admin containerbalancer status --verbose\" to see the configuration in use. Default false.")
   private boolean autoConfig;
 
   @Option(names = {"--profile"},
@@ -123,6 +124,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       moveReplicationTimeoutMinutes = effective.getMoveReplicationTimeoutMinutes();
       out().printf("Starting with auto-configured parameters (profile: %s).%n",
           recommendation.getProfile().name());
+      out().println("Use \"ozone admin containerbalancer status --verbose\" to see the configuration in use.");
     }
 
     StartContainerBalancerResponseProto response = scmClient.startContainerBalancer(

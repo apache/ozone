@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
-import static org.apache.hadoop.util.StringUtils.byteDesc;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -139,10 +137,6 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
 
   private void printRecommendedParameters(ContainerBalancerRecommendation recommendation) {
     Map<String, String> rationale = recommendation.getRationale();
-    long moveTimeoutMinutes = Math.round(recommendation.getMoveTimeoutMillis() / 60000d);
-    long moveReplicationTimeoutMinutes =
-        Math.round(recommendation.getMoveReplicationTimeoutMillis() / 60000d);
-    long balancingIntervalMinutes = Math.round(recommendation.getBalancingIntervalMillis() / 60000d);
 
     out().println(" Recommended parameters:");
     printParameterRow("Parameter", "Value", "Rationale");
@@ -153,22 +147,22 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
         String.format("%d%%", recommendation.getMaxDatanodesPercentage()),
         rationale.get("maxDatanodesPercentage"));
     printParameterRow("--max-size-to-move-per-iteration-in-gb",
-        byteDesc(recommendation.getMaxSizeToMovePerIteration()),
+        String.format("%d GB", recommendation.getMaxSizeToMovePerIterationInGB()),
         rationale.get("maxSizeToMovePerIteration"));
     printParameterRow("--max-size-entering-target-in-gb",
-        byteDesc(recommendation.getMaxSizeEnteringTarget()) + " / node",
+        String.format("%d GB / node", recommendation.getMaxSizeEnteringTargetInGB()),
         rationale.get("maxSizeEnteringTarget"));
     printParameterRow("--max-size-leaving-source-in-gb",
-        byteDesc(recommendation.getMaxSizeLeavingSource()) + " / node",
+        String.format("%d GB / node", recommendation.getMaxSizeLeavingSourceInGB()),
         rationale.get("maxSizeLeavingSource"));
     printParameterRow("--move-timeout-minutes",
-        String.format("%d min", moveTimeoutMinutes),
+        String.format("%d min", recommendation.getMoveTimeoutMinutes()),
         rationale.get("moveTimeout"));
     printParameterRow("--move-replication-timeout-minutes",
-        String.format("%d min", moveReplicationTimeoutMinutes),
+        String.format("%d min", recommendation.getMoveReplicationTimeoutMinutes()),
         rationale.get("moveReplicationTimeout"));
     printParameterRow("--balancing-iteration-interval-minutes",
-        String.format("%d min", balancingIntervalMinutes),
+        String.format("%d min", recommendation.getBalancingIntervalMinutes()),
         rationale.get("balancingInterval"));
     printParameterRow("--iterations",
         String.valueOf(recommendation.getRecommendedIterations()),
