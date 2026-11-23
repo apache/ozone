@@ -47,6 +47,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -366,8 +367,10 @@ class TestMergeJoinSnapDiffWriter {
       store.putOldList(302L, entry(BUCKET_OBJECT_ID, "b", false, sig));
       store.flushWrites();
 
+      AtomicReference<Double> progress = new AtomicReference<>(0.0);
       Pair<Long, String> reportMeta = writeReport(mockManagerPassthroughDeletes(), store,
-          BUCKET_OBJECT_ID, true, true, null);
+          BUCKET_OBJECT_ID, true, true, progress::set);
+      assertEquals(1.0, progress.get());
       // Successful write with unordered outcome is what SnapshotDiffManager marks DONE with.
       assertEquals(2L, reportMeta.getKey().longValue());
       assertFalse(store.isReportDependencyOrdered());
