@@ -184,7 +184,7 @@ jobs:
 
       - name: Cache for NPM dependencies
         if: ${{ inputs.needs-npm-cache }}
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.pnpm-store
