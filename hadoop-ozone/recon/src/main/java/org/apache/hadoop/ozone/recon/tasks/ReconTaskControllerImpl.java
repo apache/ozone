@@ -558,7 +558,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // waiting would move the task cursor up to the OmDeltaRequest cursor, so a restart before that
     // rebuild would find nothing to redo and the failed batch would be lost.
     if (hasTasksFailed()) {
-      LOG.warn("Skipping buffered OM update batch ending at sequence {} because a task has failed and " +
+      LOG.debug("Skipping buffered OM update batch ending at sequence {} because a task has failed and " +
           "reinitialization is pending.", events.getLastSequenceNumber());
       return;
     }
