@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -772,21 +773,8 @@ public class TestRpcClient {
   public void testInitiateMultipartUploadWithStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
       throws IOException {
     List<KeyArgs> requests = new ArrayList<>();
-    OmTransport transport = new MockOmTransport() {
-      @Override
-      public OMResponse submitRequest(OMRequest request) throws IOException {
-        if (request.getCmdType() == Type.ServiceList) {
-          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
-              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
-              .build();
-        }
-        if (request.getCmdType() == Type.InitiateMultiPartUpload) {
-          requests.add(request.getInitiateMultiPartUploadRequest().getKeyArgs());
-          throw new IOException("captured");
-        }
-        return super.submitRequest(request);
-      }
-    };
+    OmTransport transport = transportWithOmVersion(version, Type.InitiateMultiPartUpload,
+        request -> requests.add(request.getInitiateMultiPartUploadRequest().getKeyArgs()));
     RpcClient client = createRpcClient(transport);
     try {
       ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
@@ -819,21 +807,8 @@ public class TestRpcClient {
   public void testCreateBucketWithStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
       throws IOException {
     List<BucketInfo> requests = new ArrayList<>();
-    OmTransport transport = new MockOmTransport() {
-      @Override
-      public OMResponse submitRequest(OMRequest request) throws IOException {
-        if (request.getCmdType() == Type.ServiceList) {
-          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
-              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
-              .build();
-        }
-        if (request.getCmdType() == Type.CreateBucket) {
-          requests.add(request.getCreateBucketRequest().getBucketInfo());
-          throw new IOException("captured");
-        }
-        return super.submitRequest(request);
-      }
-    };
+    OmTransport transport = transportWithOmVersion(version, Type.CreateBucket,
+        request -> requests.add(request.getCreateBucketRequest().getBucketInfo()));
     RpcClient client = createRpcClient(transport);
     try {
       IOException withoutPolicyError = assertThrows(IOException.class, () -> client.createBucket(
@@ -872,21 +847,8 @@ public class TestRpcClient {
   public void testSetBucketStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
       throws IOException {
     List<OzoneManagerProtocolProtos.BucketArgs> requests = new ArrayList<>();
-    OmTransport transport = new MockOmTransport() {
-      @Override
-      public OMResponse submitRequest(OMRequest request) throws IOException {
-        if (request.getCmdType() == Type.ServiceList) {
-          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
-              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
-              .build();
-        }
-        if (request.getCmdType() == Type.SetBucketProperty) {
-          requests.add(request.getSetBucketPropertyRequest().getBucketArgs());
-          throw new IOException("captured");
-        }
-        return super.submitRequest(request);
-      }
-    };
+    OmTransport transport = transportWithOmVersion(version, Type.SetBucketProperty,
+        request -> requests.add(request.getSetBucketPropertyRequest().getBucketArgs()));
     RpcClient client = createRpcClient(transport);
     try {
       IOException withPolicyError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
@@ -922,6 +884,29 @@ public class TestRpcClient {
     } finally {
       client.close();
     }
+  }
+
+  /**
+   * A transport whose OM reports the given version. A request of the captured type is passed to the captor and then
+   * fails with "captured", so that a test sees what the client sent without a real OM.
+   */
+  private static OmTransport transportWithOmVersion(
+      OzoneManagerVersion version, Type capturedType, Consumer<OMRequest> captor) {
+    return new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == capturedType) {
+          captor.accept(request);
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
   }
 
   private static ServiceInfo om(OzoneManagerVersion version) {
