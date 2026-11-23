@@ -112,7 +112,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
       }
       return;
     }
-    Stream<BasicDatanodeInfo> allNodes = getAllNodes(scmClient).stream();
+    Stream<BasicDatanodeInfo> allNodes = getAllNodes(scmClient);
     if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getIp())) {
       allNodes = allNodes.filter(p -> p.getIpAddress()
           .compareToIgnoreCase(exclusiveNodeOptions.getIp()) == 0
@@ -147,7 +147,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     }
   }
 
-  private List<BasicDatanodeInfo> getAllNodes(ScmClient scmClient)
+  private Stream<BasicDatanodeInfo> getAllNodes(ScmClient scmClient)
       throws IOException {
 
     // If sorting is requested
@@ -158,7 +158,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
         usageInfos = scmClient.getDatanodeUsageInfo(sortByMostUsed, Integer.MAX_VALUE);
       } catch (Exception e) {
         System.err.println("Failed to get datanode usage info: " + e.getMessage());
-        return Collections.emptyList();
+        return Stream.empty();
       }
 
       return usageInfos.stream()
@@ -182,16 +182,14 @@ public class ListInfoSubcommand extends ScmSubcommand {
               return null;
             }
           })
-          .filter(Objects::nonNull)
-          .collect(Collectors.toList());
+          .filter(Objects::nonNull);
     }
     
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
         null, HddsProtos.QueryScope.CLUSTER, "");
 
     return nodes.stream().map(p -> new BasicDatanodeInfo.Builder(p).build())
-        .sorted(Comparator.comparing(BasicDatanodeInfo::getHealthState))
-        .collect(Collectors.toList());
+        .sorted(Comparator.comparing(BasicDatanodeInfo::getHealthState));
   }
 
   private void printDatanodeInfo(BasicDatanodeInfo dn) {

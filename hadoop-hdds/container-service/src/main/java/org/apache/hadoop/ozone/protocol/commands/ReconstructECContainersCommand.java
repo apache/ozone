@@ -125,7 +125,7 @@ public class ReconstructECContainersCommand
         protoMessage.getContainerID(),
         srcDatanodeDetails, targetDatanodeDetails,
         protoMessage.getMissingContainerIndexes(),
-        new ECReplicationConfig(protoMessage.getEcReplicationConfig()),
+        ECReplicationConfig.getInstance(protoMessage.getEcReplicationConfig()),
         protoMessage.getCmdId());
     if (protoMessage.hasApparentVersion()) {
       cmd.apparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(

@@ -239,4 +239,11 @@ public class AbstractReconSqlDBTest {
       };
     }
   }
+
+  /**
+   * A table column's name paired with its SQL type,
+   * used to verify the columns of a schema definition.
+   */
+  record ColumnNameAndType(String name, int type) {
+  }
 }

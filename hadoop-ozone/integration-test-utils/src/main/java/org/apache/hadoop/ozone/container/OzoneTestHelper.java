@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -324,7 +325,7 @@ public final class OzoneTestHelper {
       assertInstanceOf(XceiverServerRatis.class, server);
       try {
         final List<DatanodeDetails> peers = Collections.unmodifiableList(pipeline.getNodes());
-        server.addGroup(pipeline.getId(), peers, Collections.nCopies(peers.size(), 0));
+        server.addGroup(pipeline.getId(), RATIS, peers, Collections.nCopies(peers.size(), 0));
       } catch (Exception e) {
         //ignore exception
       }

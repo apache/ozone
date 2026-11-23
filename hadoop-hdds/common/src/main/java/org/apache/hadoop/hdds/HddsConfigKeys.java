@@ -43,6 +43,10 @@ public final class HddsConfigKeys {
   public static final String HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD =
       "hdds.heartbeat.address.refresh.missed-count-threshold";
   public static final int HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT = 3;
+  /** Missed heartbeats against one SCM before the DN forces endpoint re-registration. */
+  public static final String HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD =
+      "hdds.heartbeat.re-register.missed-count-threshold";
+  public static final int HDDS_HEARTBEAT_RE_REGISTER_MISSED_COUNT_THRESHOLD_DEFAULT = 100;
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =

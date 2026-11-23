@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.util.Map;
 import net.jcip.annotations.Immutable;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
@@ -33,6 +35,12 @@ public final class S3STSUtils {
   public static final int DEFAULT_DURATION_SECONDS = 3600;    // 1 hour
   public static final int MAX_DURATION_SECONDS = 43200;       // 12 hours
   public static final int MIN_DURATION_SECONDS = 900;         // 15 minutes
+
+  /**
+   * Test-only: override the minimum AssumeRole {@code DurationSeconds} accepted by OM and S3 Gateway STS.
+   * Values may only lower the AWS-compatible minimum of 900 seconds.  Valid range is 1-900.
+   */
+  public static final String OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY = "ozone.s3g.sts.test.min.duration.seconds";
 
   public static final int ASSUME_ROLE_SESSION_NAME_MIN_LENGTH = 2;
   public static final int ASSUME_ROLE_SESSION_NAME_MAX_LENGTH = 64;
@@ -100,14 +108,36 @@ public final class S3STSUtils {
   }
 
   /**
+   * Returns the minimum AssumeRole duration in seconds: either the AWS default 900, or the test-only override when set.
+   */
+  public static int getMinDurationSeconds(ConfigurationSource conf) {
+    final int configured = conf.getInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, MIN_DURATION_SECONDS);
+    Preconditions.checkArgument(
+        configured >= 1 && configured <= MIN_DURATION_SECONDS, "%s must be between 1 and %s, but was %s",
+        OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, MIN_DURATION_SECONDS, configured);
+    return configured;
+  }
+
+  /**
    * Validates the duration in seconds.
    * @param durationSeconds duration in seconds
    * @return validated duration
    * @throws OMException if duration is invalid
    */
   public static int validateDuration(int durationSeconds) throws OMException {
-    if (durationSeconds < MIN_DURATION_SECONDS || durationSeconds > MAX_DURATION_SECONDS) {
-      throw new OMException(DURATION_VALIDATION_ERROR_MESSAGE, INVALID_REQUEST);
+    return validateDuration(durationSeconds, MIN_DURATION_SECONDS);
+  }
+
+  /**
+   * Validates the duration in seconds against the supplied minimum.
+   * @param durationSeconds duration in seconds
+   * @param minDurationSeconds minimum allowed duration
+   * @return validated duration
+   * @throws OMException if duration is invalid
+   */
+  public static int validateDuration(int durationSeconds, int minDurationSeconds) throws OMException {
+    if (durationSeconds < minDurationSeconds || durationSeconds > MAX_DURATION_SECONDS) {
+      throw new OMException(durationValidationErrorMessage(minDurationSeconds), INVALID_REQUEST);
     }
 
     return durationSeconds;
@@ -120,6 +150,17 @@ public final class S3STSUtils {
    * @throws OMException if duration is invalid
    */
   public static int validateDuration(String durationSeconds) throws OMException {
+    return validateDuration(durationSeconds, MIN_DURATION_SECONDS);
+  }
+
+  /**
+   * Validates the duration in seconds from a raw request value against the supplied minimum.
+   * @param durationSeconds duration in seconds as a string
+   * @param minDurationSeconds minimum allowed duration
+   * @return validated duration
+   * @throws OMException if duration is invalid
+   */
+  public static int validateDuration(String durationSeconds, int minDurationSeconds) throws OMException {
     if (durationSeconds == null) {
       return DEFAULT_DURATION_SECONDS;
     }
@@ -128,9 +169,9 @@ public final class S3STSUtils {
     try {
       value = Integer.parseInt(durationSeconds);
     } catch (NumberFormatException e) {
-      throw new OMException(DURATION_VALIDATION_ERROR_MESSAGE, INVALID_REQUEST);
+      throw new OMException(durationValidationErrorMessage(minDurationSeconds), INVALID_REQUEST);
     }
-    return validateDuration(value);
+    return validateDuration(value, minDurationSeconds);
   }
 
   /**
@@ -210,6 +251,14 @@ public final class S3STSUtils {
         .append('/')
         .append(roleSessionName);
     return stringBuilder.toString();
+  }
+
+  private static String durationValidationErrorMessage(int minDurationSeconds) {
+    if (minDurationSeconds == MIN_DURATION_SECONDS) {
+      return DURATION_VALIDATION_ERROR_MESSAGE;
+    }
+    return "Invalid Value: DurationSeconds must be a number between " + minDurationSeconds + " and " +
+        MAX_DURATION_SECONDS + " seconds";
   }
 
   private static String[] splitRoleArnWithoutRegex(String roleArn) {

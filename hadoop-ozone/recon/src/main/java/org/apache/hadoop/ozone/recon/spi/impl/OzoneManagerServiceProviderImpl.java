@@ -59,11 +59,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
@@ -128,6 +128,9 @@ public class OzoneManagerServiceProviderImpl
   private final long omDBLagThreshold;
 
   private AtomicBoolean isSyncDataFromOMRunning;
+  // Held by the sync thread from applying a delta batch to the Recon OM DB until the batch is handed to the tasks,
+  // so that a manual rebuild cannot checkpoint the DB with the batch in it and then have the batch applied again.
+  private final ReentrantLock deltaApplyLock = new ReentrantLock();
   private final String threadNamePrefix;
   private ThreadFactory threadFactory;
   private ReconContext reconContext;
@@ -595,8 +598,14 @@ public class OzoneManagerServiceProviderImpl
               + "present in the Recon OM DB directory and has been loaded, then retry.");
     }
 
-    ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD);
+    ReconTaskController.ReInitializationResult result;
+    deltaApplyLock.lock();
+    try {
+      result = reconTaskController.queueReInitializationEvent(
+          ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD);
+    } finally {
+      deltaApplyLock.unlock();
+    }
 
     if (result == ReconTaskController.ReInitializationResult.SUCCESS) {
       return new OMDBReprocessResponse(OMDBReprocessResponse.Status.ACCEPTED,
@@ -611,6 +620,8 @@ public class OzoneManagerServiceProviderImpl
   /**
    * Get Delta updates from OM through RPC call and apply to local OM DB as
    * well as accumulate in a buffer.
+   * When OM returns updates, this returns (or throws) holding {@code deltaApplyLock};
+   * the caller must release it after handing the updates to the tasks.
    *
    * @param fromSequenceNumber from sequence number to request from.
    * @param omdbUpdatesHandler OM DB updates handler to buffer updates.
@@ -623,9 +634,9 @@ public class OzoneManagerServiceProviderImpl
       long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     LOG.debug("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
-    ImmutablePair<Boolean, Long> dbUpdatesLatestSeqNumOfOMDB =
+    DeltaUpdatesResult dbUpdatesLatestSeqNumOfOMDB =
         innerGetAndApplyDeltaUpdatesFromOM(fromSequenceNumber, omdbUpdatesHandler);
-    if (!dbUpdatesLatestSeqNumOfOMDB.getLeft()) {
+    if (!dbUpdatesLatestSeqNumOfOMDB.success()) {
       LOG.error(
           "Retrieve OM DB delta update failed for sequence number : {}, " +
               "so falling back to full snapshot.", fromSequenceNumber);
@@ -634,22 +645,23 @@ public class OzoneManagerServiceProviderImpl
               fromSequenceNumber);
     }
     omdbUpdatesHandler.setLatestSequenceNumber(getCurrentOMDBSequenceNumber());
-    return dbUpdatesLatestSeqNumOfOMDB.getRight();
+    return dbUpdatesLatestSeqNumOfOMDB.lag();
   }
 
   /**
    * Get Delta updates from OM through RPC call and apply to local OM DB as
    * well as accumulate in a buffer.
+   * When OM returns updates, this takes {@code deltaApplyLock} before applying them and returns (or throws)
+   * still holding it; the caller must release it after handing the updates to the tasks.
    *
    * @param fromSequenceNumber from sequence number to request from.
    * @param omdbUpdatesHandler OM DB updates handler to buffer updates.
-   * @return Pair of dbUpdatesSuccess, lag (lag between OM and Recom)
-   * @throws IOException      when OM RPC request fails.
+   * @return dbUpdatesSuccess and lag (lag between OM and Recon)
+   * @throws IOException when OM RPC request fails.
    * @throws RocksDBException when writing to RocksDB fails.
    */
   @VisibleForTesting
-  ImmutablePair<Boolean, Long> innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
-                                                                  OMDBUpdatesHandler omdbUpdatesHandler)
+  DeltaUpdatesResult innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     // Track delta fetch operation
     long deltaFetchStartTime = Time.monotonicNow();
@@ -687,6 +699,8 @@ public class OzoneManagerServiceProviderImpl
       // Track delta apply (conversion + DB apply combined)
       long deltaApplyStartTime = Time.monotonicNow();
 
+      // Released by syncDataFromOM once the events are handed to the tasks.
+      deltaApplyLock.lock();
       try {
         for (byte[] data : dbUpdates.getData()) {
           try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
@@ -720,7 +734,7 @@ public class OzoneManagerServiceProviderImpl
             "SequenceNumber diff: {}, SequenceNumber Lag from OM {}, isDBUpdateSuccess: {}",
         fromSequenceNumber, getCurrentOMDBSequenceNumber(), numUpdates,
         getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag, null != dbUpdates && dbUpdates.isDBUpdateSuccess());
-    return new ImmutablePair<>(null != dbUpdates && dbUpdates.isDBUpdateSuccess(), lag);
+    return new DeltaUpdatesResult(null != dbUpdates && dbUpdates.isDBUpdateSuccess(), lag);
   }
 
   /**
@@ -862,6 +876,10 @@ public class OzoneManagerServiceProviderImpl
               LOG.warn("Unable to get and apply delta updates from OM: {}, falling back to full snapshot",
                   e.getMessage());
               fullSnapshot = true;
+            } finally {
+              if (deltaApplyLock.isHeldByCurrentThread()) {
+                deltaApplyLock.unlock();
+              }
             }
             if (fullSnapshot) {
               break;
@@ -1039,5 +1057,11 @@ public class OzoneManagerServiceProviderImpl
     this.reconSnapshotProvider = reconSnapshotProvider;
   }
 
+  /**
+   * Whether the OM DB delta updates were applied successfully paired with the sequence number lag from OM,
+   * used as the result of fetching and applying delta updates.
+   */
+  record DeltaUpdatesResult(boolean success, long lag) {
+  }
 }
 

@@ -241,7 +241,7 @@ public class TestMultiTenantVolume {
     String keyName = "key";
     String uploadID = bucket.initiateMultipartUpload(keyName).getUploadID();
     assertMultipartListing(store, BUCKET_NAME, keyName, uploadID);
-    store.getClientProxy().abortS3MultipartUpload(BUCKET_NAME, keyName, uploadID);
+    store.getClientProxy().abortMultipartUpload(null, BUCKET_NAME, keyName, uploadID);
     OMException exception = assertThrows(OMException.class, () -> bucket.abortMultipartUpload(keyName, uploadID));
     assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
 
@@ -259,7 +259,7 @@ public class TestMultiTenantVolume {
     OzoneBucket sourceBucket = sourceVolume.getBucket(sourceBucketName);
     String linkUploadID = sourceBucket.initiateMultipartUpload(keyName).getUploadID();
     assertMultipartListing(store, linkBucketName, keyName, linkUploadID);
-    store.getClientProxy().abortS3MultipartUpload(linkBucketName, keyName, linkUploadID);
+    store.getClientProxy().abortMultipartUpload(null, linkBucketName, keyName, linkUploadID);
     exception = assertThrows(OMException.class, () -> sourceBucket.abortMultipartUpload(keyName, linkUploadID));
     assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
 

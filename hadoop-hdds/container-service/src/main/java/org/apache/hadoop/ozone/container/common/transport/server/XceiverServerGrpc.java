@@ -129,10 +129,10 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
     Class<? extends ServerChannel> channelType;
     if (Epoll.isAvailable()) {
-      eventLoopGroup = new EpollEventLoopGroup(readExecutors.getPoolSize() / 10, factory);
+      eventLoopGroup = new EpollEventLoopGroup(readExecutors.getCorePoolSize() / 10, factory);
       channelType = EpollServerSocketChannel.class;
     } else {
-      eventLoopGroup = new NioEventLoopGroup(readExecutors.getPoolSize() / 10, factory);
+      eventLoopGroup = new NioEventLoopGroup(readExecutors.getCorePoolSize() / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
 

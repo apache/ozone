@@ -624,6 +624,15 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       lastRetryTimestamp.set(0);
     }
 
+    // Before the OM metadata manager is set (e.g. during Recon upgrade finalization) no checkpoint can be created.
+    // Defer to the next OM sync without counting a retry, so the startup reinitialization is not throttled.
+    if (currentOMMetadataManager == null) {
+      LOG.warn("OM metadata manager is not set yet; deferring reinitialization due to {} to the next OM sync.",
+          reason);
+      tasksFailed.compareAndSet(false, true);
+      return ReInitializationResult.RETRY_LATER;
+    }
+
     ReInitializationResult reInitializationResult = validateRetryCountAndDelay();
     if (null != reInitializationResult) {
       return reInitializationResult;
