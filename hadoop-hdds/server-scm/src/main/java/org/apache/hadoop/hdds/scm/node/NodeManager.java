@@ -177,22 +177,25 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
         ComponentVersion dnApparentVersion = dn.getLastKnownApparentVersion();
         ComponentVersion dnSoftwareVersion = dn.getLastKnownSoftwareVersion();
+        boolean softwareVersionMatchesScm = HDDSVersion.SOFTWARE_VERSION.equals(dnSoftwareVersion);
 
         int dnApparentVersionInt = dnApparentVersion.serialize();
         minApparentVersion = Math.min(minApparentVersion, dnApparentVersionInt);
         maxApparentVersion = Math.max(maxApparentVersion, dnApparentVersionInt);
 
-        if (!dnApparentVersion.equals(dnSoftwareVersion)) {
-          // Datanode has not yet finalized
-          LOG.debug("Datanode {} has not yet finalized: apparent version={}, software version={}",
-              dn.getHostName(), dnApparentVersion, dnSoftwareVersion);
-        } else {
+        // A datanode is counted as finalized only if it's software and apparent versions match each other
+        // and SCM's software version
+        if (softwareVersionMatchesScm && dnApparentVersion.equals(dnSoftwareVersion)) {
           finalizedNodes++;
+        } else {
+          LOG.debug("Datanode {} has not yet finalized: apparent version={}, software version={}, " +
+              "SCM software version={}", dn.getHostName(), dnApparentVersion, dnSoftwareVersion,
+              HDDSVersion.SOFTWARE_VERSION);
         }
 
         // Track whether every healthy datanode is running the same software version as SCM. A
         // datanode on a lower (or unknown) software version must not be present when SCM finalizes.
-        if (!HDDSVersion.SOFTWARE_VERSION.equals(dnSoftwareVersion)) {
+        if (!softwareVersionMatchesScm) {
           allSoftwareVersionsMatchScm = false;
           // This is expected during a rolling upgrade. Do not flood the logs with one message for every datanode.
           LOG.debug("Datanode {} software version {} does not match SCM software version {}.",
