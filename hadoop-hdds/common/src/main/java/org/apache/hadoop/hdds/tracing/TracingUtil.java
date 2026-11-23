@@ -623,6 +623,13 @@ public final class TracingUtil {
     }
   }
 
+  public static void addAttributesToCurrentSpan(Map<String, String> attributes) {
+    if (attributes == null) {
+      return;
+    }
+    attributes.forEach(TracingUtil::addAttributesToCurrentSpan);
+  }
+
   public static void addEventToCurrentSpan(String name, String key, String value) {
     Span span = Span.current();
     if (!span.isRecording()) {

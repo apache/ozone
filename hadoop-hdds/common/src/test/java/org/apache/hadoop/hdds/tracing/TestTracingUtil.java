@@ -49,6 +49,9 @@ import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
@@ -256,6 +259,41 @@ public class TestTracingUtil {
               throw new IOException("expected");
             }));
     assertEquals("expected", thrown.getMessage());
+  }
+
+  @Test
+  public void testAddAttributesFromMapToCurrentSpan() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Map<String, String> attributes = new HashMap<>();
+      attributes.put("size", "128");
+      attributes.put("skipped", null);
+
+      TracingUtil.executeInNewSpan("request", () -> TracingUtil.addAttributesToCurrentSpan(attributes));
+
+      collector.assertAttribute("request", "size", "128");
+      collector.assertNoAttribute("request", "skipped");
+    }
+  }
+
+  @Test
+  public void testAddAttributesFromNullMapOrWithoutSpanIsIgnored() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      TracingUtil.addAttributesToCurrentSpan(Collections.singletonMap("size", "128"));
+      TracingUtil.executeInNewSpan("request", () -> TracingUtil.addAttributesToCurrentSpan((Map<String, String>) null));
+
+      collector.assertNoAttribute("request", "size");
+    }
+  }
+
+  @Test
+  public void testAssertNoSpan() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      collector.assertNoSpan("request");
+
+      TracingUtil.executeInNewSpan("request", () -> { });
+
+      assertThrows(AssertionError.class, () -> collector.assertNoSpan("request"));
+    }
   }
 
   @Test

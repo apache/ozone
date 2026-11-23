@@ -84,6 +84,8 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInter
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.net.StaticMapping;
@@ -363,6 +365,19 @@ public class TestSCMBlockProtocolServer {
   private List<AllocatedBlock> allocateBlock() throws IOException {
     return server.allocateBlock(128 * MB, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "o",
         new ExcludeList(), null);
+  }
+
+  @Test
+  void testAllocateBlockAuditParamsAreAddedToSpan() throws IOException {
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      TracingUtil.executeInNewSpan("allocateBlock", this::allocateBlock);
+
+      collector.assertAttribute("allocateBlock", "size", String.valueOf(128 * MB));
+      collector.assertAttribute("allocateBlock", "num", "1");
+      collector.assertAttribute("allocateBlock", "replication",
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE).toString());
+      collector.assertAttribute("allocateBlock", "allocated", "1");
+    }
   }
 
   @Test
