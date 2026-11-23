@@ -1093,10 +1093,13 @@ public class ContainerBalancerTask implements Runnable {
           // the container which caused failure of move is not excluded
           // as it is an intermittent failure or a replica related failure
           findSourceStrategy.addBackSourceDataNode(source);
-        } else if (result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE ||
-            result == MoveManager.MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH) {
+        } else if (result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE) {
           findSourceStrategy.addBackSourceDataNode(source);
           selectionCriteria.addToExcludeDueToFailContainers(containerID);
+        } else if (result == MoveManager.MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH) {
+          // Only this storage type's source replica changed; other types may still move the container.
+          findSourceStrategy.addBackSourceDataNode(source);
+          selectionCriteria.addToExcludeDueToStorageTypeMismatch(containerID, storageType);
         }
         return result == MoveManager.MoveResult.COMPLETED;
       }

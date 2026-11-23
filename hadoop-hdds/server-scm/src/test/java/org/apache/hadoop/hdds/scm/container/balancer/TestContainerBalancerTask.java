@@ -375,8 +375,8 @@ public class TestContainerBalancerTask {
   }
 
   /**
-   * Tests that pre-move failures return the source to the queue. Post-move health
-   * failures and changed storage types also exclude the selected container for this iteration.
+   * Tests that pre-move failures return the source to the queue. Post-move health failures also exclude the selected
+   * container for this iteration. A changed storage type excludes it only for the storage type that was moved.
    */
   @ParameterizedTest
   @EnumSource(value = MoveManager.MoveResult.class,
@@ -415,14 +415,12 @@ public class TestContainerBalancerTask {
     verify(moveManager, atLeast(1)).move(containerCaptor.capture(),
         any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class));
     ContainerID failedContainerId = containerCaptor.getAllValues().get(0);
-    if (moveResult == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE ||
-        moveResult == MoveManager.MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH) {
-      assertTrue(containerBalancerTask.getSelectionCriteria()
-          .getExcludeDueToFailContainers().contains(failedContainerId));
-    } else {
-      assertFalse(containerBalancerTask.getSelectionCriteria()
-          .getExcludeDueToFailContainers().contains(failedContainerId));
-    }
+    ContainerBalancerSelectionCriteria criteria = containerBalancerTask.getSelectionCriteria();
+    assertEquals(moveResult == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE,
+        criteria.getExcludeDueToFailContainers().contains(failedContainerId));
+    assertEquals(moveResult == MoveManager.MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH,
+        criteria.getExcludeDueToStorageTypeMismatch(StorageType.DISK).contains(failedContainerId));
+    assertThat(criteria.getExcludeDueToStorageTypeMismatch(StorageType.SSD)).doesNotContain(failedContainerId);
     stopBalancer();
   }
 
@@ -831,6 +829,98 @@ public class TestContainerBalancerTask {
         ContainerID.valueOf(1000), ContainerID.valueOf(1001));
   }
 
+  /**
+   * One container has an SSD replica on one source and a DISK replica on another. Each storage type's pass may only use
+   * the source whose replica is on that type, and the container is moved at most once per iteration.
+   */
+  @Test
+  public void testMixedStorageTypeContainerMovesOnceFromMatchingSource() throws Exception {
+    DatanodeUsageInfo ssdSource = storageTypeNode(90, 50);
+    DatanodeUsageInfo diskSource = storageTypeNode(50, 90);
+    DatanodeUsageInfo target = storageTypeNode(10, 10);
+    Map<DatanodeUsageInfo, StorageType> replicaTypes = new HashMap<>();
+    replicaTypes.put(ssdSource, StorageType.SSD);
+    replicaTypes.put(diskSource, StorageType.DISK);
+    addMixedStorageTypeContainer(1000, 10 * STORAGE_UNIT, replicaTypes);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(ssdSource, diskSource, target), 0, order);
+    Map<StorageType, DatanodeDetails> sourceByType = new EnumMap<>(StorageType.class);
+    doAnswer(invocation -> {
+      sourceByType.put(invocation.getArgument(3), invocation.getArgument(1));
+      order.add(invocation.getArgument(3));
+      return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+    }).when(moveManager).move(any(), any(), any(), any());
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).hasSize(1);
+    StorageType moved = order.get(0);
+    assertEquals(moved == StorageType.SSD ? ssdSource.getDatanodeDetails() : diskSource.getDatanodeDetails(),
+        sourceByType.get(moved));
+    assertThat(containerBalancerTask.getContainerToSourceMap()).containsOnlyKeys(ContainerID.valueOf(1000));
+  }
+
+  /**
+   * A storage-type mismatch during the SSD pass excludes the container only for SSD, so the DISK pass can still move
+   * the same container from its DISK replica in the same iteration.
+   */
+  @Test
+  public void testStorageTypeMismatchDoesNotBlockOtherStorageType() throws Exception {
+    DatanodeUsageInfo ssdSource = storageTypeNode(90, 50);
+    DatanodeUsageInfo diskSource = storageTypeNode(50, 90);
+    DatanodeUsageInfo target = storageTypeNode(10, 10);
+    Map<DatanodeUsageInfo, StorageType> replicaTypes = new HashMap<>();
+    replicaTypes.put(ssdSource, StorageType.SSD);
+    replicaTypes.put(diskSource, StorageType.DISK);
+    addMixedStorageTypeContainer(1000, 10 * STORAGE_UNIT, replicaTypes);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(ssdSource, diskSource, target), 0, order);
+    doAnswer(invocation -> {
+      StorageType type = invocation.getArgument(3);
+      order.add(type);
+      return CompletableFuture.completedFuture(type == StorageType.SSD
+          ? MoveManager.MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH : MoveManager.MoveResult.COMPLETED);
+    }).when(moveManager).move(any(), any(), any(), any());
+    startBalancer(balancerConfiguration);
+
+    ContainerID id = ContainerID.valueOf(1000);
+    assertThat(order).containsExactly(StorageType.SSD, StorageType.DISK);
+    assertEquals(diskSource.getDatanodeDetails(), containerBalancerTask.getContainerToSourceMap().get(id));
+    ContainerBalancerSelectionCriteria criteria = containerBalancerTask.getSelectionCriteria();
+    assertThat(criteria.getExcludeDueToStorageTypeMismatch(StorageType.SSD)).containsExactly(id);
+    assertThat(criteria.getExcludeDueToStorageTypeMismatch(StorageType.DISK)).isEmpty();
+    assertThat(criteria.getExcludeDueToFailContainers()).doesNotContain(id);
+  }
+
+  /**
+   * Only the replica on the source decides a typed move. A conflicting or unknown replica on another datanode does not
+   * stop the container from moving from a source whose replica matches.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testOtherDatanodeReplicaDoesNotAffectTypedMove(boolean otherConflicting) throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(90, 50);
+    DatanodeUsageInfo other = storageTypeNode(50, 50);
+    DatanodeUsageInfo target = storageTypeNode(10, 50);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, 10 * STORAGE_UNIT);
+    ContainerID id = ContainerID.valueOf(1000);
+    Set<ContainerReplica> replicas = new HashSet<>(cidToReplicasMap.get(id));
+    replicas.add(otherConflicting
+        ? storageTypeReplica(id, other, StorageType.SSD, StorageType.DISK, 10 * STORAGE_UNIT)
+        : storageTypeReplica(id, other, null, null, 10 * STORAGE_UNIT));
+    cidToReplicasMap.put(id, replicas);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(source, other, target), 0, order);
+    doAnswer(invocation -> {
+      assertEquals(source.getDatanodeDetails(), invocation.getArgument(1));
+      order.add(invocation.getArgument(3));
+      return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+    }).when(moveManager).move(any(), any(), any(), any());
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).containsExactly(StorageType.SSD);
+    assertEquals(source.getDatanodeDetails(), containerBalancerTask.getContainerToSourceMap().get(id));
+  }
+
   @ParameterizedTest
   @CsvSource({"0,true", "1,true", "0,false", "1,false"})
   public void testFirstStorageTypeRotatesWithSmallSharedLimit(int iteration, boolean nodeLimit) throws Exception {
@@ -1123,6 +1213,24 @@ public class TestContainerBalancerTask {
     }
     return new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat(capacity, used, remaining,
         Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap()));
+  }
+
+  /** Adds one container with a replica on each given node; each replica records and reports the given storage type. */
+  private void addMixedStorageTypeContainer(long id, long size, Map<DatanodeUsageInfo, StorageType> replicaTypes) {
+    ContainerInfo container = createContainer(id, 1);
+    container.setUsedBytes(size);
+    cidToInfoMap.put(container.containerID(), container);
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicaTypes.forEach((node, type) -> replicas.add(storageTypeReplica(container.containerID(), node, type, type,
+        size)));
+    cidToReplicasMap.put(container.containerID(), replicas);
+  }
+
+  private ContainerReplica storageTypeReplica(ContainerID id, DatanodeUsageInfo node, StorageType recordedType,
+      StorageType volumeType, long size) {
+    return ContainerReplica.newBuilder().setContainerID(id).setContainerState(ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(node.getDatanodeDetails()).setOriginNodeId(node.getDatanodeDetails().getID())
+        .setStorageType(recordedType).setVolumeStorageType(volumeType).setBytesUsed(size).setSequenceId(1000L).build();
   }
 
   private void addStorageTypeContainer(DatanodeUsageInfo source, long id, StorageType type, long size) {

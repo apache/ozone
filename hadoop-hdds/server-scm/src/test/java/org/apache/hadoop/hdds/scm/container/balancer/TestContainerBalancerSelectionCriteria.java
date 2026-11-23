@@ -202,6 +202,28 @@ public class TestContainerBalancerSelectionCriteria {
   }
 
   /**
+   * A storage-type mismatch excludes the container only for that storage type, both when checking a container and when
+   * building candidates. Untyped moves are unaffected, and a mismatch without a type falls back to a full exclusion.
+   */
+  @Test
+  public void shouldExcludeStorageTypeMismatchOnlyForThatStorageType() throws Exception {
+    replicaOnSourceWithStorageType(StorageType.DISK);
+    when(nodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(nodeManager.getContainers(any())).thenAnswer(ignored -> new HashSet<>(Collections.singleton(containerID)));
+
+    criteria.addToExcludeDueToStorageTypeMismatch(containerID, StorageType.SSD);
+    assertThat(criteria.getContainerIDSet(source, StorageType.SSD)).isEmpty();
+    assertThat(criteria.getContainerIDSet(source, StorageType.DISK)).containsExactly(containerID);
+    assertFalse(criteria.shouldBeExcluded(containerID, source, 0L, StorageType.DISK));
+    assertFalse(criteria.shouldBeExcluded(containerID, source, 0L));
+    assertThat(criteria.getExcludeDueToFailContainers()).isEmpty();
+
+    criteria.addToExcludeDueToStorageTypeMismatch(containerID, null);
+    assertThat(criteria.getExcludeDueToFailContainers()).containsExactly(containerID);
+    assertTrue(criteria.shouldBeExcluded(containerID, source, 0L, StorageType.DISK));
+  }
+
+  /**
    * Passing no storage type must behave exactly as before, considering containers
    * on any tier.
    */
