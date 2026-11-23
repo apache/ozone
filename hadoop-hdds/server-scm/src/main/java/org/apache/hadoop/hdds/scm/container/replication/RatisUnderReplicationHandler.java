@@ -28,6 +28,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -131,27 +133,26 @@ public class RatisUnderReplicationHandler
       return 0;
     }
 
-    List<DatanodeDetails> targetDatanodes;
+    TargetSelection targetSelection;
     try {
       // find targets to send replicas to
-      targetDatanodes = getTargets(replicaCount, pendingOps);
+      targetSelection = selectTargetsWithFallback(
+          ReplicationManagerUtil.getTargetStorageType(containerInfo),
+          storageType -> getTargets(replicaCount, pendingOps, storageType));
     } catch (SCMException e) {
-      SCMException.ResultCodes code = e.getResult();
-      if (code != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
-        throw e;
+      if (e.getResult() == SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
+        LOG.warn("Cannot replicate container {} because no suitable targets " +
+            "were found.", containerInfo);
+        removeUnhealthyReplicaIfPossible(containerInfo, replicas, pendingOps);
       }
-      LOG.warn("Cannot replicate container {} because no suitable targets " +
-          "were found.", containerInfo);
-      removeUnhealthyReplicaIfPossible(containerInfo, replicas, pendingOps);
-      // Throw the original exception so the request gets re-queued to try again
+      // Throw the exception so the request gets re-queued to try again.
       throw e;
     }
 
     int commandsSent = sendReplicationCommands(
-        containerInfo, sourceDatanodes, targetDatanodes,
-        ReplicationManagerUtil.getTargetStorageType(containerInfo));
+        containerInfo, sourceDatanodes, targetSelection.targets, targetSelection.storageType);
 
-    if (targetDatanodes.size() < replicaCount.additionalReplicaNeeded()) {
+    if (targetSelection.targets.size() < replicaCount.additionalReplicaNeeded()) {
       // The placement policy failed to find enough targets to satisfy fix
       // the under replication. There fore even though some commands were sent,
       // we throw an exception to indicate that the container is still under
@@ -159,11 +160,11 @@ public class RatisUnderReplicationHandler
       LOG.debug("Placement policy failed to find enough targets to satisfy " +
           "under replication for container {}. Targets found: {}, " +
           "additional replicas needed: {}",
-          containerInfo, targetDatanodes.size(),
+          containerInfo, targetSelection.targets.size(),
           replicaCount.additionalReplicaNeeded());
       metrics.incrPartialReplicationTotal();
       throw new InsufficientDatanodesException(
-          replicaCount.additionalReplicaNeeded(), targetDatanodes.size());
+          replicaCount.additionalReplicaNeeded(), targetSelection.targets.size());
     }
     return commandsSent;
   }
@@ -237,20 +238,18 @@ public class RatisUnderReplicationHandler
 
     CommandTargetOverloadedException firstException = null;
     int numCommandsSent = 0;
-    StorageType targetStorageType =
-        ReplicationManagerUtil.getTargetStorageType(container);
+    StorageType preferredStorageType = ReplicationManagerUtil.getTargetStorageType(container);
     for (ContainerReplica replica : sources) {
       // find a target for each source and send replicate command
-      final List<DatanodeDetails> target =
-          ReplicationManagerUtil.getTargetDatanodes(placementPolicy, 1, excludedAndUsedNodes.getUsedNodes(),
-              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container,
-              targetStorageType);
+      TargetSelection targetSelection = selectTargetsWithFallback(preferredStorageType,
+          storageType -> getTargets(container, excludedAndUsedNodes, storageType));
       int count = 0;
       try {
-        count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target,
-            targetStorageType);
+        count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()),
+            targetSelection.targets, targetSelection.storageType);
       } catch (CommandTargetOverloadedException e) {
-        LOG.info("Exception while replicating {} to target {} for container {}.", replica, target, container, e);
+        LOG.info("Exception while replicating {} to target {} for container {}.", replica, targetSelection.targets,
+            container, e);
         if (firstException == null) {
           firstException = e;
         }
@@ -258,7 +257,7 @@ public class RatisUnderReplicationHandler
 
       if (count == 1) {
         // a command was sent to target, so it needs to be in the used nodes list because it's pending an add
-        excludedAndUsedNodes.getUsedNodes().add(target.get(0));
+        excludedAndUsedNodes.getUsedNodes().add(targetSelection.targets.get(0));
       }
       numCommandsSent += count;
     }
@@ -450,7 +449,7 @@ public class RatisUnderReplicationHandler
 
   private List<DatanodeDetails> getTargets(
       RatisContainerReplicaCount replicaCount,
-      List<ContainerReplicaOp> pendingOps) throws IOException {
+      List<ContainerReplicaOp> pendingOps, StorageType targetStorageType) throws SCMException {
     LOG.debug("Need {} target datanodes for container {}. Current " +
             "replicas: {}.", replicaCount.additionalReplicaNeeded(),
         replicaCount.getContainer().containerID(), replicaCount.getReplicas());
@@ -467,8 +466,59 @@ public class RatisUnderReplicationHandler
         used, used.size(), excluded, excluded.size());
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
         replicaCount.additionalReplicaNeeded(), used, excluded,
-        currentContainerSize, replicaCount.getContainer(),
-        ReplicationManagerUtil.getTargetStorageType(replicaCount.getContainer()));
+        currentContainerSize, replicaCount.getContainer(), targetStorageType);
+  }
+
+  private List<DatanodeDetails> getTargets(ContainerInfo container,
+      ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes, StorageType targetStorageType)
+      throws SCMException {
+    return ReplicationManagerUtil.getTargetDatanodes(placementPolicy, 1, excludedAndUsedNodes.getUsedNodes(),
+        excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container, targetStorageType);
+  }
+
+  private TargetSelection selectTargetsWithFallback(StorageType preferredStorageType, TargetSelector selector)
+      throws SCMException {
+    try {
+      return new TargetSelection(selector.select(preferredStorageType), preferredStorageType);
+    } catch (SCMException e) {
+      if (e.getResult() != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
+        throw e;
+      }
+      StorageType fallbackStorageType = getFallbackStorageType(preferredStorageType);
+      if (fallbackStorageType == null) {
+        throw e;
+      }
+      List<DatanodeDetails> targets = selector.select(fallbackStorageType);
+      if (targets.isEmpty()) {
+        throw e;
+      }
+      return new TargetSelection(targets, fallbackStorageType);
+    }
+  }
+
+  private static StorageType getFallbackStorageType(StorageType storageType) {
+    for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
+      if (storagePolicy.getCreationTier().getUniformStorageType() == storageType) {
+        StorageTier fallbackTier = storagePolicy.getCreationFallbackTier();
+        return fallbackTier == StorageTier.EMPTY ? null : fallbackTier.getUniformStorageType();
+      }
+    }
+    return null;
+  }
+
+  @FunctionalInterface
+  private interface TargetSelector {
+    List<DatanodeDetails> select(StorageType storageType) throws SCMException;
+  }
+
+  private static final class TargetSelection {
+    private final List<DatanodeDetails> targets;
+    private final StorageType storageType;
+
+    private TargetSelection(List<DatanodeDetails> targets, StorageType storageType) {
+      this.targets = targets;
+      this.storageType = storageType;
+    }
   }
 
   private int sendReplicationCommands(

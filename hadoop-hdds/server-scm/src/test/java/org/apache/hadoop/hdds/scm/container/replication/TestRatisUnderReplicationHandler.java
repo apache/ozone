@@ -175,7 +175,7 @@ public class TestRatisUnderReplicationHandler {
   }
 
   @Test
-  public void testUnderReplicationDoesNotFallbackToIncompatibleStorageTier() throws IOException {
+  public void testUnderReplicationFallsBackToDiskWhenSsdIsUnavailable() throws IOException {
     container = TestContainerInfo.newBuilderForTest()
         .setContainerID(1)
         .setReplicationConfig(RATIS_REPLICATION_CONFIG)
@@ -188,6 +188,31 @@ public class TestRatisUnderReplicationHandler {
         .thenThrow(new SCMException("No SSD target", SCMException.ResultCodes.NO_SUCH_DATANODE));
     when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.DISK)))
         .thenReturn(Collections.singletonList(diskTarget));
+
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+    handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2);
+
+    ReplicateContainerCommand command =
+        (ReplicateContainerCommand) commandsSent.iterator().next().getValue();
+    assertEquals(StorageType.DISK, command.getTargetVolumeStorageType());
+  }
+
+  @Test
+  public void testUnderReplicationDoesNotFallbackFromArchive() throws IOException {
+    container = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.ARCHIVE)
+        .build();
+    policy = mock(PlacementPolicy.class);
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.ARCHIVE)))
+        .thenThrow(new SCMException("No ARCHIVE target", SCMException.ResultCodes.NO_SUCH_DATANODE));
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.DISK)))
+        .thenReturn(Collections.singletonList(MockDatanodeDetails.randomDatanodeDetails()));
 
     RatisUnderReplicationHandler handler =
         new RatisUnderReplicationHandler(policy, conf, replicationManager);
@@ -615,8 +640,19 @@ public class TestRatisUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithVulnerableReplicas() throws IOException {
     final long sequenceID = 20;
-    container = ReplicationTestUtil.createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
-        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
+    container = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setSequenceId(sequenceID)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    DatanodeDetails diskTarget = MockDatanodeDetails.randomDatanodeDetails();
+    policy = mock(PlacementPolicy.class);
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD)))
+        .thenThrow(new SCMException("No SSD target", SCMException.ResultCodes.NO_SUCH_DATANODE));
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.DISK)))
+        .thenReturn(Collections.singletonList(diskTarget));
 
     final Set<ContainerReplica> replicas = new HashSet<>(4);
     for (int i = 0; i < 3; i++) {
@@ -631,7 +667,9 @@ public class TestRatisUnderReplicationHandler {
 
     final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(replicas, Collections.emptyList(),
         result, 2, 1);
-    assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().getKey());
+    Pair<DatanodeDetails, SCMCommand<?>> command = commands.iterator().next();
+    assertEquals(unhealthyReplica.getDatanodeDetails(), command.getKey());
+    assertEquals(StorageType.DISK, ((ReplicateContainerCommand) command.getValue()).getTargetVolumeStorageType());
   }
 
   /**
